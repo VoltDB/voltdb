@@ -121,6 +121,7 @@ void MaterializedViewMetadata::setIndexForMinMax(std::string indexForMinOrMax)
         for (int i = 0; i < candidates.size(); i++) {
             if (indexForMinOrMax.compare(candidates[i]->getName()) == 0) {
                 m_indexForMinMax = candidates[i];
+                m_indexCursor.reset(new IndexCursor(m_indexForMinMax->getTupleSchema()));
                 break;
             }
         }
@@ -280,10 +281,10 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueIndexed(const TableTuple
         srcColIdx = m_aggColIndexes[aggIndex];
     }
     NValue newVal = initialNull;
-    m_indexForMinMax->moveToKey(&m_searchKeyTuple);
+    m_indexForMinMax->moveToKey(&m_searchKeyTuple, m_indexCursor.get());
     VOLT_TRACE("Starting to scan tuples using index %s\n", m_indexForMinMax->debug().c_str());
     TableTuple tuple;
-    while (!(tuple = m_indexForMinMax->nextValueAtKey()).isNullTuple()) {
+    while (!(tuple = m_indexForMinMax->nextValueAtKey(m_indexCursor.get())).isNullTuple()) {
         // skip the oldTuple and apply post filter
         if (tuple.equals(oldTuple) ||
             (m_filterPredicate && !m_filterPredicate->eval(&tuple, NULL).isTrue())) {
@@ -564,8 +565,8 @@ bool MaterializedViewMetadata::findExistingTuple(const TableTuple &tuple)
     }
 
     // determine if the row exists (create the empty one if it doesn't)
-    m_index->moveToKey(&m_searchKeyTuple);
-    m_existingTuple = m_index->nextValueAtKey();
+    m_index->moveToKey(&m_searchKeyTuple, m_indexCursor.get());
+    m_existingTuple = m_index->nextValueAtKey(m_indexCursor.get());
     return ! m_existingTuple.isNullTuple();
 }
 

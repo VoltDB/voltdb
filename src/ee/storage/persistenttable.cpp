@@ -1191,11 +1191,13 @@ size_t PersistentTable::hashCode() {
         pkeyIndex->addEntry(&tuple);
     }
 
-    pkeyIndex->moveToEnd(true);
+    boost::scoped_ptr<IndexCursor> indexCursor(new IndexCursor(pkeyIndex->getTupleSchema()));
+
+    pkeyIndex->moveToEnd(true, indexCursor.get());
 
     size_t hashCode = 0;
     while (true) {
-         tuple = pkeyIndex->nextValue();
+         tuple = pkeyIndex->nextValue(indexCursor.get());
          if (tuple.isNullTuple()) {
              break;
          }

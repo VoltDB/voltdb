@@ -128,6 +128,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     // update local target table with its most recent reference
     Table* targetTable = m_node->getTargetTable();
     TableIndex * tableIndex = targetTable->index(m_node->getTargetIndexName());
+    boost::scoped_ptr<IndexCursor> indexCursor (new IndexCursor(tableIndex->getTupleSchema()));
 
     TableTuple searchKey, endKey;
     if (m_numOfSearchkeys != 0) {
@@ -288,26 +289,26 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                    localLookupType, activeNumOfSearchKeys, searchKey.debugNoHeader().c_str());
         if (searchKeyUnderflow == false) {
             if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
-                rkStart = tableIndex->getCounterLET(&searchKey, true);
+                rkStart = tableIndex->getCounterLET(&searchKey, true, indexCursor.get());
             } else {
                 // handle start inclusive cases.
                 if (tableIndex->hasKey(&searchKey)) {
                     leftIncluded = 1;
-                    rkStart = tableIndex->getCounterLET(&searchKey, false);
+                    rkStart = tableIndex->getCounterLET(&searchKey, false, indexCursor.get());
 
                     if (reverseScanNullEdgeCase) {
-                        tableIndex->moveToKeyOrGreater(&searchKey);
+                        tableIndex->moveToKeyOrGreater(&searchKey, indexCursor.get());
                         reverseScanMovedIndexToScan = true;
                     }
                 } else {
-                    rkStart = tableIndex->getCounterLET(&searchKey, true);
+                    rkStart = tableIndex->getCounterLET(&searchKey, true, indexCursor.get());
                 }
             }
         } else {
             // Do not count null row or columns
-            tableIndex->moveToKeyOrGreater(&searchKey);
+            tableIndex->moveToKeyOrGreater(&searchKey, indexCursor.get());
             assert(countNULLExpr);
-            long numNULLs = countNulls(tableIndex, countNULLExpr);
+            long numNULLs = countNulls(tableIndex, countNULLExpr, indexCursor.get());
             rkStart += numNULLs;
             VOLT_DEBUG("Index count[underflow case]: "
                     "find out %ld null rows or columns are not counted in.", numNULLs);
@@ -317,10 +318,10 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     if (reverseScanNullEdgeCase) {
         // reverse scan case
         if (!reverseScanMovedIndexToScan && localLookupType != INDEX_LOOKUP_TYPE_GT) {
-            tableIndex->moveToEnd(true);
+            tableIndex->moveToEnd(true, indexCursor.get());
         }
         assert(countNULLExpr);
-        long numNULLs = countNulls(tableIndex, countNULLExpr);
+        long numNULLs = countNulls(tableIndex, countNULLExpr, indexCursor.get());
         rkStart += numNULLs;
         VOLT_DEBUG("Index count[reverse case]: "
                 "find out %ld null rows or columns are not counted in.", numNULLs);
@@ -328,17 +329,17 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
 
     if (m_numOfEndkeys != 0) {
         if (endKeyOverflow) {
-            rkEnd = tableIndex->getCounterGET(&endKey, true);
+            rkEnd = tableIndex->getCounterGET(&endKey, true, indexCursor.get());
         } else {
             IndexLookupType localEndType = m_endType;
             if (localEndType == INDEX_LOOKUP_TYPE_LT) {
-                rkEnd = tableIndex->getCounterGET(&endKey, false);
+                rkEnd = tableIndex->getCounterGET(&endKey, false, indexCursor.get());
             } else {
                 if (tableIndex->hasKey(&endKey)) {
                     rightIncluded = 1;
-                    rkEnd = tableIndex->getCounterGET(&endKey, true);
+                    rkEnd = tableIndex->getCounterGET(&endKey, true, indexCursor.get());
                 } else {
-                    rkEnd = tableIndex->getCounterGET(&endKey, false);
+                    rkEnd = tableIndex->getCounterGET(&endKey, false, indexCursor.get());
                 }
             }
         }
@@ -357,13 +358,14 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
 }
 
 
-long IndexCountExecutor::countNulls(TableIndex * tableIndex, AbstractExpression * countNULLExpr) {
+long IndexCountExecutor::countNulls(TableIndex * tableIndex, AbstractExpression * countNULLExpr,
+        IndexCursor* cursor) {
     if (countNULLExpr == NULL) {
         return 0;
     }
     long numNULLs = 0;
     TableTuple tuple;
-    while ( ! (tuple = tableIndex->nextValue()).isNullTuple()) {
+    while ( ! (tuple = tableIndex->nextValue(cursor)).isNullTuple()) {
          if ( ! countNULLExpr->eval(&tuple, NULL).isTrue()) {
              break;
          }

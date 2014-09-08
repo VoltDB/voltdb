@@ -108,6 +108,7 @@ private:
 
     // the index on srcTable which can be used to maintain min/max
     TableIndex *m_indexForMinMax;
+    boost::scoped_ptr<IndexCursor> m_indexCursor;
 
     // space to store temp view tuples
     TableTuple m_existingTuple;

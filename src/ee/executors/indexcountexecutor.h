@@ -36,6 +36,7 @@ class TempTable;
 class PersistentTable;
 class AbstractExpression;
 class IndexCountPlanNode;
+struct IndexCursor;
 
 class IndexCountExecutor : public AbstractExecutor
 {
@@ -50,7 +51,7 @@ private:
     bool p_init(AbstractPlanNode*, TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
 
-    long countNulls(TableIndex * tableIndex, AbstractExpression * countNullExpr);
+    long countNulls(TableIndex * tableIndex, AbstractExpression * countNullExpr, IndexCursor* cursor);
 
     // Data in this class is arranged roughly in the order it is read for
     // p_execute(). Please don't reshuffle it only in the name of beauty.

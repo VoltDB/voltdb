@@ -50,6 +50,7 @@
  */
 
 #include <boost/foreach.hpp>
+#include <boost/scoped_ptr.hpp>
 
 #include "harness.h"
 #include "common/common.h"
@@ -445,6 +446,9 @@ TEST_F(IndexTest, IntsUnique) {
     TableIndex* index = table->index("ixu");
     EXPECT_EQ(true, index != NULL);
 
+    boost::scoped_ptr<IndexCursor> cursor(new IndexCursor(index->getTupleSchema()));
+    IndexCursor *indexCursor = cursor.get();
+
     //EXPECT_EQ( 62520, index->getMemoryEstimate());
 
     TableTuple tuple(table->schema());
@@ -460,9 +464,9 @@ TEST_F(IndexTest, IntsUnique) {
     searchkey.move(new char[searchkey.tupleLength()]);
     searchkey.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(550)));
     searchkey.setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(2)));
-    EXPECT_TRUE(index->moveToKey(&searchkey));
+    EXPECT_TRUE(index->moveToKey(&searchkey, indexCursor));
 
-    tuple = index->nextValueAtKey();
+    tuple = index->nextValueAtKey(indexCursor);
     EXPECT_FALSE(tuple.isNullTuple());
     EXPECT_TRUE(ValueFactory::getBigIntValue(50).op_equals(tuple.getNValue(0)).isTrue());
     EXPECT_TRUE(ValueFactory::getBigIntValue(50 % 2).op_equals(tuple.getNValue(1)).isTrue());
@@ -470,13 +474,13 @@ TEST_F(IndexTest, IntsUnique) {
     EXPECT_TRUE(ValueFactory::getBigIntValue(50 + 20).op_equals(tuple.getNValue(3)).isTrue());
     EXPECT_TRUE(ValueFactory::getBigIntValue(50 * 11).op_equals(tuple.getNValue(4)).isTrue());
 
-    tuple = index->nextValueAtKey();
+    tuple = index->nextValueAtKey(indexCursor);
     EXPECT_TRUE(tuple.isNullTuple());
 
     searchkey.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(550)));
     searchkey.setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(1)));
-    EXPECT_FALSE(index->moveToKey(&searchkey));
-    tuple = index->nextValueAtKey();
+    EXPECT_FALSE(index->moveToKey(&searchkey, indexCursor));
+    tuple = index->nextValueAtKey(indexCursor);
     EXPECT_TRUE(tuple.isNullTuple());
 
     // partial index search test
@@ -484,8 +488,9 @@ TEST_F(IndexTest, IntsUnique) {
         setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(440)));
     searchkey.
         setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(-10000000)));
-    index->moveToKeyOrGreater(&searchkey);
-    EXPECT_FALSE((tuple = index->nextValue()).isNullTuple());
+    index->moveToKeyOrGreater(&searchkey, indexCursor);
+    EXPECT_FALSE((tuple = index->nextValue(indexCursor)).isNullTuple());
+
     EXPECT_TRUE(ValueFactory::getBigIntValue(40).
                 op_equals(tuple.getNValue(0)).isTrue());
     EXPECT_TRUE(ValueFactory::getBigIntValue(40 % 2).
@@ -496,7 +501,7 @@ TEST_F(IndexTest, IntsUnique) {
                 op_equals(tuple.getNValue(3)).isTrue());
     EXPECT_TRUE(ValueFactory::getBigIntValue(40 * 11).
                 op_equals(tuple.getNValue(4)).isTrue());
-    EXPECT_FALSE((tuple = index->nextValue()).isNullTuple());
+    EXPECT_FALSE((tuple = index->nextValue(indexCursor)).isNullTuple());
     EXPECT_TRUE(ValueFactory::getBigIntValue(41).
                 op_equals(tuple.getNValue(0)).isTrue());
     EXPECT_TRUE(ValueFactory::getBigIntValue(41 % 2).
@@ -512,8 +517,8 @@ TEST_F(IndexTest, IntsUnique) {
         setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(440)));
     searchkey.
         setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(10000000)));
-    index->moveToKeyOrGreater(&searchkey);
-    EXPECT_FALSE((tuple = index->nextValue()).isNullTuple());
+    index->moveToKeyOrGreater(&searchkey, indexCursor);
+    EXPECT_FALSE((tuple = index->nextValue(indexCursor)).isNullTuple());
     EXPECT_TRUE(ValueFactory::getBigIntValue(41).
                 op_equals(tuple.getNValue(0)).isTrue());
     EXPECT_TRUE(ValueFactory::getBigIntValue(41 % 2).
@@ -524,7 +529,7 @@ TEST_F(IndexTest, IntsUnique) {
                 op_equals(tuple.getNValue(3)).isTrue());
     EXPECT_TRUE(ValueFactory::getBigIntValue(41 * 11).
                 op_equals(tuple.getNValue(4)).isTrue());
-    EXPECT_FALSE((tuple = index->nextValue()).isNullTuple());
+    EXPECT_FALSE((tuple = index->nextValue(indexCursor)).isNullTuple());
     EXPECT_TRUE(ValueFactory::getBigIntValue(42).
                 op_equals(tuple.getNValue(0)).isTrue());
     EXPECT_TRUE(ValueFactory::getBigIntValue(42 % 2).
@@ -541,8 +546,8 @@ TEST_F(IndexTest, IntsUnique) {
         setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(330)));
     searchkey.
         setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(30%3)));
-    index->moveToGreaterThanKey(&searchkey);
-    EXPECT_FALSE((tuple = index->nextValue()).isNullTuple());
+    index->moveToGreaterThanKey(&searchkey, indexCursor);
+    EXPECT_FALSE((tuple = index->nextValue(indexCursor)).isNullTuple());
     EXPECT_TRUE(ValueFactory::getBigIntValue(31).
                 op_equals(tuple.getNValue(0)).isTrue());
     EXPECT_TRUE(ValueFactory::getBigIntValue(31 % 2).
@@ -605,6 +610,8 @@ TEST_F(IndexTest, IntsMulti) {
 
     TableIndex* index = table->index("ixm2");
     EXPECT_EQ(true, index != NULL);
+    boost::scoped_ptr<IndexCursor> cursor(new IndexCursor(index->getTupleSchema()));
+    IndexCursor *indexCursor = cursor.get();
 
     //EXPECT_EQ( 52000, index->getMemoryEstimate());
 
@@ -621,9 +628,9 @@ TEST_F(IndexTest, IntsMulti) {
     searchkey.move(new char[searchkey.tupleLength()]);
     searchkey.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(550)));
     searchkey.setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(2)));
-    EXPECT_TRUE(index->moveToKey(&searchkey));
+    EXPECT_TRUE(index->moveToKey(&searchkey, indexCursor));
 
-    tuple = index->nextValueAtKey();
+    tuple = index->nextValueAtKey(indexCursor);
     EXPECT_FALSE(tuple.isNullTuple());
     EXPECT_TRUE(ValueFactory::getBigIntValue(50).op_equals(tuple.getNValue(0)).isTrue());
     EXPECT_TRUE(ValueFactory::getBigIntValue(50 % 2).op_equals(tuple.getNValue(1)).isTrue());
@@ -631,13 +638,13 @@ TEST_F(IndexTest, IntsMulti) {
     EXPECT_TRUE(ValueFactory::getBigIntValue(50 + 20).op_equals(tuple.getNValue(3)).isTrue());
     EXPECT_TRUE(ValueFactory::getBigIntValue(50 * 11).op_equals(tuple.getNValue(4)).isTrue());
 
-    tuple = index->nextValueAtKey();
+    tuple = index->nextValueAtKey(indexCursor);
     EXPECT_TRUE(tuple.isNullTuple());
 
     searchkey.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(550)));
     searchkey.setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(1)));
-    EXPECT_FALSE(index->moveToKey(&searchkey));
-    tuple = index->nextValueAtKey();
+    EXPECT_FALSE(index->moveToKey(&searchkey, indexCursor));
+    tuple = index->nextValueAtKey(indexCursor);
     EXPECT_TRUE(tuple.isNullTuple());
 
     // partial index search test
@@ -646,8 +653,8 @@ TEST_F(IndexTest, IntsMulti) {
     searchkey.
         setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(-10000000)));
 
-    index->moveToKeyOrGreater(&searchkey);
-    EXPECT_FALSE((tuple = index->nextValue()).isNullTuple());
+    index->moveToKeyOrGreater(&searchkey, indexCursor);
+    EXPECT_FALSE((tuple = index->nextValue(indexCursor)).isNullTuple());
     EXPECT_TRUE(ValueFactory::getBigIntValue(40).
                 op_equals(tuple.getNValue(0)).isTrue());
     EXPECT_TRUE(ValueFactory::getBigIntValue(40 % 2).
@@ -658,7 +665,7 @@ TEST_F(IndexTest, IntsMulti) {
                 op_equals(tuple.getNValue(3)).isTrue());
     EXPECT_TRUE(ValueFactory::getBigIntValue(40 * 11).
                 op_equals(tuple.getNValue(4)).isTrue());
-    EXPECT_FALSE((tuple = index->nextValue()).isNullTuple());
+    EXPECT_FALSE((tuple = index->nextValue(indexCursor)).isNullTuple());
     EXPECT_TRUE(ValueFactory::getBigIntValue(41).
                 op_equals(tuple.getNValue(0)).isTrue());
     EXPECT_TRUE(ValueFactory::getBigIntValue(41 % 2).
@@ -674,8 +681,8 @@ TEST_F(IndexTest, IntsMulti) {
         setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(440)));
     searchkey.
         setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(10000000)));
-    index->moveToKeyOrGreater(&searchkey);
-    EXPECT_FALSE((tuple = index->nextValue()).isNullTuple());
+    index->moveToKeyOrGreater(&searchkey, indexCursor);
+    EXPECT_FALSE((tuple = index->nextValue(indexCursor)).isNullTuple());
     EXPECT_TRUE(ValueFactory::getBigIntValue(41).
                 op_equals(tuple.getNValue(0)).isTrue());
     EXPECT_TRUE(ValueFactory::getBigIntValue(41 % 2).
@@ -686,7 +693,7 @@ TEST_F(IndexTest, IntsMulti) {
                 op_equals(tuple.getNValue(3)).isTrue());
     EXPECT_TRUE(ValueFactory::getBigIntValue(41 * 11).
                 op_equals(tuple.getNValue(4)).isTrue());
-    EXPECT_FALSE((tuple = index->nextValue()).isNullTuple());
+    EXPECT_FALSE((tuple = index->nextValue(indexCursor)).isNullTuple());
     EXPECT_TRUE(ValueFactory::getBigIntValue(42).
                 op_equals(tuple.getNValue(0)).isTrue());
     EXPECT_TRUE(ValueFactory::getBigIntValue(42 % 2).
@@ -704,8 +711,8 @@ TEST_F(IndexTest, IntsMulti) {
     searchkey.
         setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(30%3)));
 
-    index->moveToGreaterThanKey(&searchkey);
-    EXPECT_FALSE((tuple = index->nextValue()).isNullTuple());
+    index->moveToGreaterThanKey(&searchkey, indexCursor);
+    EXPECT_FALSE((tuple = index->nextValue(indexCursor)).isNullTuple());
     EXPECT_TRUE(ValueFactory::getBigIntValue(31).
                 op_equals(tuple.getNValue(0)).isTrue());
     EXPECT_TRUE(ValueFactory::getBigIntValue(31 % 2).
@@ -761,6 +768,9 @@ TEST_F(IndexTest, TupleKeyUnique) {
     TableIndex* index = table->index("ixu_wide");
     EXPECT_EQ(true, index != NULL);
 
+    boost::scoped_ptr<IndexCursor> cursor(new IndexCursor(index->getTupleSchema()));
+    IndexCursor *indexCursor = cursor.get();
+
     //EXPECT_EQ( 280, index->getMemoryEstimate());
 
     // make a tuple with the table's schema
@@ -781,24 +791,24 @@ TEST_F(IndexTest, TupleKeyUnique) {
     // TEST moveToKey and nextValueAtKey
     int64_t row = 2;
     setWideIndexToRow(searchkey, row);
-    EXPECT_TRUE(index->moveToKey(&searchkey));
-    tuple = index->nextValueAtKey();
+    EXPECT_TRUE(index->moveToKey(&searchkey, indexCursor));
+    tuple = index->nextValueAtKey(indexCursor);
     EXPECT_FALSE(tuple.isNullTuple());
     verifyWideRow(tuple, row);
-    tuple = index->nextValueAtKey();
+    tuple = index->nextValueAtKey(indexCursor);
     EXPECT_TRUE(tuple.isNullTuple());
 
     // TEST remove tuple
     // remove the tuple found above from the table (which updates the index)
     setWideIndexToRow(searchkey, 2);  // DELETE row 2.
-    EXPECT_TRUE(index->moveToKey(&searchkey));
-    tuple = index->nextValueAtKey();
+    EXPECT_TRUE(index->moveToKey(&searchkey, indexCursor));
+    tuple = index->nextValueAtKey(indexCursor);
     bool deleted = table->deleteTuple(tuple, true);
     EXPECT_TRUE(deleted);
 
     // and now that tuple is gone
-    EXPECT_FALSE(index->moveToKey(&searchkey));
-    tuple = index->nextValueAtKey();
+    EXPECT_FALSE(index->moveToKey(&searchkey, indexCursor));
+    tuple = index->nextValueAtKey(indexCursor);
     EXPECT_TRUE(tuple.isNullTuple());
 
     tuple.move(tuplestorage);

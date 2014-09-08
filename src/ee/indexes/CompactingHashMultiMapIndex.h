@@ -68,6 +68,14 @@ class CompactingHashMultiMapIndex : public TableIndex
 
     ~CompactingHashMultiMapIndex() {};
 
+    void assignFromIter(IndexCursor* cursor, MapIterator &iter) {
+        cursor->m_keyIter = static_cast<void*> (&iter);
+    }
+
+    MapIterator& castToIter(IndexCursor* cursor) {
+        return *static_cast<MapIterator*> (cursor->m_keyIter);
+    }
+
     bool addEntry(const TableTuple *tuple)
     {
         ++m_inserts;
@@ -119,27 +127,32 @@ class CompactingHashMultiMapIndex : public TableIndex
         return ! findTuple(*persistentTuple).isEnd();
     }
 
-    bool moveToKey(const TableTuple *searchKey) {
+    bool moveToKey(const TableTuple *searchKey, IndexCursor* cursor) {
         ++m_lookups;
-        m_keyIter = findKey(searchKey);
-        if (m_keyIter.isEnd()) {
-            m_match.move(NULL);
+
+        MapIterator mapIter = findKey(searchKey);
+        if (mapIter.isEnd()) {
+            cursor->m_match.move(NULL);
             return false;
         }
-        m_match.move(const_cast<void*>(m_keyIter.value()));
+        cursor->m_match.move(const_cast<void*>(mapIter.value()));
+
+        assignFromIter(cursor, mapIter);
         return true;
     }
 
-    TableTuple nextValueAtKey() {
-        if (m_match.isNullTuple()) {
-            return m_match;
+    TableTuple nextValueAtKey(IndexCursor* cursor) {
+        if (cursor->m_match.isNullTuple()) {
+            return cursor->m_match;
         }
-        TableTuple retval = m_match;
-        m_keyIter.moveNext();
-        if (m_keyIter.isEnd()) {
-            m_match.move(NULL);
+        TableTuple retval = cursor->m_match;
+
+        MapIterator mapIter = castToIter(cursor);
+        mapIter.moveNext();
+        if (mapIter.isEnd()) {
+            cursor->m_match.move(NULL);
         } else {
-            m_match.move(const_cast<void*>(m_keyIter.value()));
+            cursor->m_match.move(const_cast<void*>(mapIter.value()));
         }
         return retval;
     }
@@ -176,10 +189,6 @@ class CompactingHashMultiMapIndex : public TableIndex
 
     MapType m_entries;
 
-    // iteration stuff
-    MapIterator m_keyIter;
-    TableTuple m_match;
-
     // comparison stuff
    KeyEqualityChecker m_eq;
 
@@ -187,7 +196,6 @@ public:
     CompactingHashMultiMapIndex(const TupleSchema *keySchema, const TableIndexScheme &scheme) :
         TableIndex(keySchema, scheme),
         m_entries(false, KeyHasher(keySchema), KeyEqualityChecker(keySchema)),
-        m_match(getTupleSchema()),
         m_eq(keySchema)
     {}
 

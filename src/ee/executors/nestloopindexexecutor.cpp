@@ -162,6 +162,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
 
     TableIndex* index = inner_table->index(m_indexNode->getTargetIndexName());
     assert(index);
+    boost::scoped_ptr<IndexCursor> indexCursor (new IndexCursor(index->getTupleSchema()));
 
     // NULL tuple for outer join
     if (node->getJoinType() == JOIN_TYPE_LEFT) {
@@ -381,34 +382,34 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                 if (num_of_searchkeys > 0)
                 {
                     if (localLookupType == INDEX_LOOKUP_TYPE_EQ) {
-                        index->moveToKey(&index_values);
+                        index->moveToKey(&index_values, indexCursor.get());
                     }
                     else if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
-                        index->moveToGreaterThanKey(&index_values);
+                        index->moveToGreaterThanKey(&index_values, indexCursor.get());
                     }
                     else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
-                        index->moveToKeyOrGreater(&index_values);
+                        index->moveToKeyOrGreater(&index_values, indexCursor.get());
                     }
                     else if (localLookupType == INDEX_LOOKUP_TYPE_LT) {
-                        index->moveToLessThanKey(&index_values);
+                        index->moveToLessThanKey(&index_values, indexCursor.get());
                     } else if (localLookupType == INDEX_LOOKUP_TYPE_LTE) {
                         // find the entry whose key is greater than search key,
                         // do a forward scan using initialExpr to find the correct
                         // start point to do reverse scan
-                        bool isEnd = index->moveToGreaterThanKey(&index_values);
+                        bool isEnd = index->moveToGreaterThanKey(&index_values, indexCursor.get());
                         if (isEnd) {
-                            index->moveToEnd(false);
+                            index->moveToEnd(false, indexCursor.get());
                         } else {
-                            while (!(inner_tuple = index->nextValue()).isNullTuple()) {
+                            while (!(inner_tuple = index->nextValue(indexCursor.get())).isNullTuple()) {
                                 pmp.countdownProgress();
                                 if (initial_expression != NULL && !initial_expression->eval(&outer_tuple, &inner_tuple).isTrue()) {
                                     // just passed the first failed entry, so move 2 backward
-                                    index->moveToBeforePriorEntry();
+                                    index->moveToBeforePriorEntry(indexCursor.get());
                                     break;
                                 }
                             }
                             if (inner_tuple.isNullTuple()) {
-                                index->moveToEnd(false);
+                                index->moveToEnd(false, indexCursor.get());
                             }
                         }
                     }
@@ -417,16 +418,16 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                     }
                 } else {
                     bool toStartActually = (localSortDirection != SORT_DIRECTION_TYPE_DESC);
-                    index->moveToEnd(toStartActually);
+                    index->moveToEnd(toStartActually, indexCursor.get());
                 }
 
                 AbstractExpression* skipNullExprIteration = skipNullExpr;
 
                 while ((limit == -1 || tuple_ctr < limit) &&
                        ((localLookupType == INDEX_LOOKUP_TYPE_EQ &&
-                        !(inner_tuple = index->nextValueAtKey()).isNullTuple()) ||
+                        !(inner_tuple = index->nextValueAtKey(indexCursor.get())).isNullTuple()) ||
                        ((localLookupType != INDEX_LOOKUP_TYPE_EQ || num_of_searchkeys == 0) &&
-                        !(inner_tuple = index->nextValue()).isNullTuple())))
+                        !(inner_tuple = index->nextValue(indexCursor.get())).isNullTuple())))
                 {
                     VOLT_TRACE("inner_tuple:%s",
                                inner_tuple.debug(inner_table->name()).c_str());

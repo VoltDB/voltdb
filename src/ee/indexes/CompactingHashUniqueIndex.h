@@ -68,6 +68,14 @@ class CompactingHashUniqueIndex : public TableIndex
 
     ~CompactingHashUniqueIndex() {};
 
+    void assignFromIter(IndexCursor* cursor, MapIterator &iter) {
+        cursor->m_keyIter = static_cast<void*> (&iter);
+    }
+
+    MapIterator& castToIter(IndexCursor* cursor) {
+        return *static_cast<MapIterator*> (cursor->m_keyIter);
+    }
+
     bool addEntry(const TableTuple *tuple) {
         ++m_inserts;
         return m_entries.insert(setKeyFromTuple(tuple), tuple->address());
@@ -114,20 +122,23 @@ class CompactingHashUniqueIndex : public TableIndex
         return ! findTuple(*persistentTuple).isEnd();
     }
 
-    bool moveToKey(const TableTuple *searchKey) {
+    bool moveToKey(const TableTuple *searchKey, IndexCursor* cursor) {
         ++m_lookups;
-        m_keyIter = findKey(searchKey);
-        if (m_keyIter.isEnd()) {
-            m_match.move(NULL);
+
+        MapIterator mapIter = findKey(searchKey);
+        if (mapIter.isEnd()) {
+            cursor->m_match.move(NULL);
             return false;
         }
-        m_match.move(const_cast<void*>(m_keyIter.value()));
+        cursor->m_match.move(const_cast<void*>(mapIter.value()));
+
+        assignFromIter(cursor, mapIter);
         return true;
     }
 
-    TableTuple nextValueAtKey() {
-        TableTuple retval = m_match;
-        m_match.move(NULL);
+    TableTuple nextValueAtKey(IndexCursor* cursor) {
+        TableTuple retval = cursor->m_match;
+        cursor->m_match.move(NULL);
         return retval;
     }
 
@@ -179,10 +190,6 @@ class CompactingHashUniqueIndex : public TableIndex
 
     MapType m_entries;
 
-    // iteration stuff
-    MapIterator m_keyIter;
-    TableTuple m_match;
-
     // comparison stuff
    KeyEqualityChecker m_eq;
 
@@ -190,7 +197,6 @@ public:
     CompactingHashUniqueIndex(const TupleSchema *keySchema, const TableIndexScheme &scheme) :
         TableIndex(keySchema, scheme),
         m_entries(true, KeyHasher(keySchema), KeyEqualityChecker(keySchema)),
-        m_match(getTupleSchema()),
         m_eq(keySchema)
     {}
 };
