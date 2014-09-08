@@ -23,6 +23,12 @@ import java.nio.ByteBuffer;
 
 import com.google_voltpatches.common.base.Preconditions;
 
+/**
+ * An {@link OutputStream} implementation that writes to an underlying
+ * {@link ByteBuffer}.
+ *
+ * It is CATEGORICALLY NOT THREAD SAFE
+ */
 public class ByteBufferOutputStream extends OutputStream {
     protected static final int DEFAULT_ALLOCATION_SIZE = 256 * 1024;
 
@@ -73,7 +79,7 @@ public class ByteBufferOutputStream extends OutputStream {
      * @return a read only view of the backing {@link ByteBuffer}
      */
     public ByteBuffer toByteBuffer() {
-        ByteBuffer bb = m_bb.duplicate();
+        ByteBuffer bb = m_bb.asReadOnlyBuffer();
         bb.flip();
         return bb;
     }
