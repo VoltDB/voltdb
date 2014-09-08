@@ -943,7 +943,7 @@ public abstract class StatementDMQL extends Statement {
         }
     }
 
-    static VoltXMLElement voltGetXMLSpecification(QuerySpecification select, ExpressionColumn parameters[], Session session)
+    private static VoltXMLElement voltGetXMLSpecification(QuerySpecification select, ExpressionColumn parameters[], Session session)
     throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
         // select
@@ -1251,23 +1251,29 @@ public abstract class StatementDMQL extends Statement {
         }
     }
 
-    static protected void voltAppendParameters(Session session, VoltXMLElement xml,
+    static protected void voltAppendParameters(Session session, VoltXMLElement parentXml,
                                                ExpressionColumn[] parameters)
     {
         VoltXMLElement parameterXML = new VoltXMLElement("parameters");
-        xml.children.add(parameterXML);
+        parentXml.children.add(parameterXML);
         assert(parameterXML != null);
-
-        for (int i = 0; i < parameters.length; i++) {
+        int index = 0;
+        for (Expression expr : parameters) {
+            org.hsqldb_voltpatches.types.Type paramType = expr.getDataType();
+            if (paramType == null) {
+                // This covers the case of parameters that were getting tentatively scanned
+                // by the parser but then lost in a "rewind" and later rescanned and added
+                // (again!) to this list but then actually processed, given a data type, etc.
+                // Somehow (?) the hsql executor manages to just ignore the originally scanned
+                // duplicate parameters left behind like this. So, so should VoltDB.
+                continue;
+            }
             VoltXMLElement parameter = new VoltXMLElement("parameter");
             parameterXML.children.add(parameter);
-            parameter.attributes.put("index", String.valueOf(i));
-            Expression expr = parameters[i];
-            parameter.attributes.put("id", expr.getUniqueId(session));
-            org.hsqldb_voltpatches.types.Type paramType = expr.getDataType();
-            if (paramType != null) {
-                parameter.attributes.put("valuetype", Types.getTypeName(paramType.typeCode));
-            }
+            parameter.attributes.put("index", String.valueOf(index));
+            ++index;
+            parameter.attributes.put("id", expr.getUniqueVoltId(session));
+            parameter.attributes.put("valuetype", Types.getTypeName(paramType.typeCode));
             // Use of non-null nodeDataTypes for a DYNAMIC_PARAM is a voltdb extension to signal
             // that values passed to parameters such as the one in "col in ?" must be vectors.
             // So, it can just be forwarded as a boolean.
