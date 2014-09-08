@@ -470,7 +470,8 @@ public class Collector {
         }
     }
 
-    private static void cmd(TarGenerator tarGenerator, String[] command,String folderPathInTar, String resFilename)
+
+    private static void cmd(TarGenerator tarGenerator, String[] command, String folderPathInTar, String resFilename)
             throws IOException, TarMalformatException {
         File tempFile = File.createTempFile(resFilename, null);
         tempFile.deleteOnExit();
