@@ -164,4 +164,68 @@ public class TestAdhocCreateDropJavaProc extends AdhocDDLTestBase {
             teardownSystem();
         }
     }
+
+    // This test should trigger the same failure seen in ENG-6611
+    public void testCreateUsingExistingImport() throws Exception
+    {
+        System.out.println("\n\n-----\n testCreateUsingExistingImport \n-----\n\n");
+
+        String pathToCatalog = Configuration.getPathToCatalogForTest("updateclasses.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("updateclasses.xml");
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        // Start off with the dependency imported
+        builder.addLiteralSchema("import class org.voltdb_testprocs.updateclasses.NoMeaningClass;");
+        builder.setUseAdhocSchema(true);
+        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
+        assertTrue("Schema compilation failed", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+        try {
+            LocalCluster cluster = new LocalCluster("updateclasses.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+            cluster.compile(builder);
+            cluster.setHasLocalServer(false);
+            cluster.startUp();
+            m_client = ClientFactory.createClient();
+            m_client.createConnection(cluster.getListenerAddress(0));
+
+            ClientResponse resp;
+            resp = m_client.callProcedure("@SystemCatalog", "CLASSES");
+            System.out.println(resp.getResults()[0]);
+
+            // Now load the procedure requiring the already-resident dependency
+            InMemoryJarfile jarfile = new InMemoryJarfile();
+            VoltCompiler comp = new VoltCompiler();
+            comp.addClassToJar(jarfile, org.voltdb_testprocs.updateclasses.testImportProc.class);
+
+            try {
+                resp = m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Triggered ENG-6611!");
+            }
+            resp = m_client.callProcedure("@SystemCatalog", "CLASSES");
+            assertEquals(2, resp.getResults()[0].getRowCount());
+            // create the proc and make sure it runs
+            try {
+                resp = m_client.callProcedure("@AdHoc",
+                        "create procedure from class org.voltdb_testprocs.updateclasses.testImportProc");
+            }
+            catch (ProcCallException pce) {
+                fail("Should be able to create testImportProc procedure");
+            }
+            assertTrue(findProcedureInSystemCatalog("testImportProc"));
+            try {
+                resp = m_client.callProcedure("testImportProc");
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Should be able to call fully consistent procedure");
+            }
+            assertEquals(10L, resp.getResults()[0].asScalarLong());
+        }
+        finally {
+            teardownSystem();
+        }
+    }
 }

@@ -28,6 +28,17 @@ public class ParticipantTransactionState extends TransactionState
         super(null, notice);
     }
 
+    /**
+     * This constructor is only reserved for BorrowTransactionState, which is read only now.
+     * @param txnId
+     * @param notice
+     * @param readOnly
+     */
+    ParticipantTransactionState(long txnId, TransactionInfoBaseMessage notice, boolean readOnly)
+    {
+        super(null, notice, readOnly);
+    }
+
     @Override
     public boolean isSinglePartition()
     {

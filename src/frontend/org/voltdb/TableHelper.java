@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -197,7 +198,7 @@ public class TableHelper {
             String ddl = "CREATE ";
             ddl += unique ? "UNIQUE " : "";
             ddl += "INDEX " + indexName + " ON ";
-            ddl += table.m_name + " (";
+            ddl += table.m_extraMetadata.name + " (";
             String[] colNames = new String[columns.length];
             for (int i = 0; i < columns.length; i++) {
                 colNames[i] = table.getColumnName(columns[i]);
@@ -448,60 +449,62 @@ public class TableHelper {
                 VoltType.TIMESTAMP, VoltType.TINYINT, VoltType.VARBINARY };
 
         // random type
-        VoltTable.ColumnInfo column = new VoltTable.ColumnInfo(name, allTypes[rand.nextInt(allTypes.length)]);
+        VoltType type = allTypes[rand.nextInt(allTypes.length)];
 
         // random sizes
-        column.size = 0;
-        if ((column.type == VoltType.VARBINARY) || (column.type == VoltType.STRING)) {
+        int size = 0;
+        if ((type == VoltType.VARBINARY) || (type == VoltType.STRING)) {
             // pick a column size with 50% inline and 50% out of line
             if (rand.nextBoolean()) {
                 // pick a random number between 1 and 63 inclusive
-                column.size = rand.nextInt(63) + 1;
+                size = rand.nextInt(63) + 1;
             }
             else {
                 // gaussian with stddev on 1024 (though offset by 64) and max of 1mb
-                column.size = Math.min(64 + (int) (Math.abs(rand.nextGaussian()) * (1024 - 64)), 1024 * 1024);
+                size = Math.min(64 + (int) (Math.abs(rand.nextGaussian()) * (1024 - 64)), 1024 * 1024);
             }
         }
 
         // nullable or default valued?
         Object defaultValue = null;
+        boolean nullable = false;
         if (rand.nextBoolean()) {
-            column.nullable = true;
-            defaultValue = VoltTypeUtil.getRandomValue(column.type, Math.max(column.size % 128, 1), 0.8, rand);
+            nullable = true;
+            defaultValue = VoltTypeUtil.getRandomValue(type, Math.max(size % 128, 1), 0.8, rand);
         }
         else {
-            column.nullable = false;
-            defaultValue = VoltTypeUtil.getRandomValue(column.type, Math.max(column.size % 128, 1), 0.0, rand);
+            nullable = false;
+            defaultValue = VoltTypeUtil.getRandomValue(type, Math.max(size % 128, 1), 0.0, rand);
             // no uniques for now, as the random fill becomes too slow
             //column.unique = (r.nextDouble() > 0.3); // 30% of non-nullable cols unique (15% total)
         }
         if (defaultValue != null) {
-            column.defaultValue = String.valueOf(defaultValue);
+            defaultValue = String.valueOf(defaultValue);
         }
         else {
-            column.defaultValue = null;
+            defaultValue = null;
         }
 
         // these two columns need to be nullable with no default value
-        if ((column.type == VoltType.VARBINARY) || (column.type == VoltType.DECIMAL)) {
-            column.defaultValue = null;
-            column.nullable = true;
+        if ((type == VoltType.VARBINARY) || (type == VoltType.DECIMAL)) {
+            defaultValue = null;
+            nullable = true;
         }
 
-        assert(column.name != null);
-        assert(column.size >= 0);
-        if((column.type == VoltType.STRING) || (column.type == VoltType.VARBINARY)) {
-            assert(column.size >= 0);
+        assert(name != null);
+        assert(size >= 0);
+        if((type == VoltType.STRING) || (type == VoltType.VARBINARY)) {
+            assert(size >= 0);
         }
 
-        return column;
+        return new VoltTable.ColumnInfo(name, type, size, nullable, false, (String) defaultValue);
     }
 
     /**
      * Generate a totally random (valid) schema.
      * One constraint is that it will have a single bigint pkey somewhere.
      * For now, no non-pkey unique columns.
+     * 50% chance of partitioned or replicated.
      */
     public static VoltTable getTotallyRandomTable(String name, Random rand) {
         // pick a number of cols between 1 and 1000, with most tables < 25 cols
@@ -515,15 +518,24 @@ public class TableHelper {
 
         // pick pkey and make it a bigint
         int pkeyIndex = rand.nextInt(numColumns);
-        columns[pkeyIndex] = new VoltTable.ColumnInfo("PKEY", VoltType.BIGINT);
-        columns[pkeyIndex].pkeyIndex = 0;
-        columns[pkeyIndex].size = 0;
-        columns[pkeyIndex].nullable = false;
-        columns[pkeyIndex].unique = true;
+        columns[pkeyIndex] = new VoltTable.ColumnInfo("PKEY",
+                                                      VoltType.BIGINT,
+                                                      0,
+                                                      false,
+                                                      true,
+                                                      "0");
+        int[] pkeyIndexes = new int[] { pkeyIndex };
+
+        boolean partitioned = rand.nextBoolean();
+        int partitionColumn = partitioned ? pkeyIndexes[0] : -1;
 
         // return the table from the columns
-        VoltTable t = new VoltTable(columns);
-        t.m_name = name;
+        VoltTable.ExtraMetadata extraMetadata = new VoltTable.ExtraMetadata(name,
+                                                                            partitionColumn,
+                                                                            pkeyIndexes,
+                                                                            columns);
+
+        VoltTable t = new VoltTable(extraMetadata, columns, columns.length);
         return t;
     }
 
@@ -534,34 +546,42 @@ public class TableHelper {
         VoltTable.ColumnInfo newCol = null;
         switch (oldCol.type) {
         case TINYINT:
-            newCol = new VoltTable.ColumnInfo(oldCol.name, VoltType.SMALLINT);
+            newCol = new VoltTable.ColumnInfo(oldCol.name,
+                                              VoltType.SMALLINT,
+                                              oldCol.size,
+                                              oldCol.nullable,
+                                              oldCol.unique,
+                                              oldCol.defaultValue);
             break;
         case SMALLINT:
-            newCol = new VoltTable.ColumnInfo(oldCol.name, VoltType.INTEGER);
+            newCol = new VoltTable.ColumnInfo(oldCol.name,
+                                              VoltType.INTEGER,
+                                              oldCol.size,
+                                              oldCol.nullable,
+                                              oldCol.unique,
+                                              oldCol.defaultValue);
             break;
         case INTEGER:
-            newCol = new VoltTable.ColumnInfo(oldCol.name, VoltType.BIGINT);
-            break;
+            newCol = new VoltTable.ColumnInfo(oldCol.name,
+                                              VoltType.BIGINT,
+                                              oldCol.size,
+                                              oldCol.nullable,
+                                              oldCol.unique,
+                                              oldCol.defaultValue);
         case VARBINARY: case STRING:
-            if (oldCol.size < 63) {
-                newCol = new VoltTable.ColumnInfo(oldCol.name, oldCol.type);
-                newCol.size = oldCol.size + 1;
-            }
             // skip size 63 for now due to a bug
-            if ((oldCol.size > 63) && (oldCol.size < VoltType.MAX_VALUE_LENGTH)) {
-                newCol = new VoltTable.ColumnInfo(oldCol.name, oldCol.type);
-                newCol.size = oldCol.size + 1;
+            if ((oldCol.size != 63) && (oldCol.size < VoltType.MAX_VALUE_LENGTH)) {
+                newCol = new VoltTable.ColumnInfo(oldCol.name,
+                                                  oldCol.type,
+                                                  oldCol.size + 1,
+                                                  oldCol.nullable,
+                                                  oldCol.unique,
+                                                  oldCol.defaultValue);
             }
             break;
         default:
             // do nothing
             break;
-        }
-
-        if (newCol != null) {
-            newCol.defaultValue = oldCol.defaultValue;
-            newCol.nullable = oldCol.nullable;
-            newCol.unique = oldCol.unique;
         }
 
         return newCol;
@@ -587,6 +607,109 @@ public class TableHelper {
         return max + 1;
     }
 
+    public static String getAlterTableDDLToMigrate(VoltTable t1, VoltTable t2) {
+        assert(t1.m_extraMetadata.name.equals(t2.m_extraMetadata.name));
+
+        StringBuilder ddl = new StringBuilder();
+
+        // look for column type changes
+        for (VoltTable.ColumnInfo t1Column : t1.m_extraMetadata.originalColumnInfos) {
+            boolean found = false;
+            for (VoltTable.ColumnInfo t2Column : t2.m_extraMetadata.originalColumnInfos) {
+                // same column, even if position is different
+                if (t1Column.name.equals(t2Column.name)) {
+                    found = true;
+                    if (!t1Column.equals(t2Column)) {
+                        // DDL to change this column
+                        ddl.append(String.format("ALTER TABLE %s ALTER COLUMN %s;\n", t1.m_extraMetadata.name, getDDLColumnDefinition(t2, t2Column)));
+                    }
+                }
+            }
+            if (!found) {
+                ddl.append(String.format("ALTER TABLE %s DROP %s;\n", t1.m_extraMetadata.name, t1Column.name));
+            }
+        }
+
+        for (int i = t2.m_extraMetadata.originalColumnInfos.length - 1; i >=0 ; i--) {
+            VoltTable.ColumnInfo t2Column = t2.m_extraMetadata.originalColumnInfos[i];
+            boolean found = false;
+            for (VoltTable.ColumnInfo t1Column : t1.m_extraMetadata.originalColumnInfos) {
+                // same column, even if position is different
+                if (t1Column.name.equals(t2Column.name)) {
+                    found = true;
+                }
+            }
+
+            if (!found) {
+                // DDL to add this column
+                ddl.append(String.format("ALTER TABLE %s ADD COLUMN %s", t1.m_extraMetadata.name, getDDLColumnDefinition(t2, t2Column)));
+                // if not the last column, add it before the next column
+                if (i != t2.m_extraMetadata.originalColumnInfos.length - 1) {
+                    VoltTable.ColumnInfo nextCol = t2.m_extraMetadata.originalColumnInfos[i + 1];
+                    ddl.append(String.format(" BEFORE %s", nextCol.name));
+                }
+                ddl.append(";\n");
+            }
+        }
+
+        return ddl.toString();
+    }
+
+    /** Is this column a member of the primary key? */
+    static boolean isAPkeyColumn(VoltTable table, VoltTable.ColumnInfo column) {
+        assert(table.m_extraMetadata != null);
+        for (int pkeyIndex : table.m_extraMetadata.pkeyIndexes) {
+            VoltTable.ColumnInfo indexColumn = table.m_extraMetadata.originalColumnInfos[pkeyIndex];
+            if (indexColumn.name.equals(column.name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Check if a unique column should be ASSUMEUNIQUE or UNIQUE */
+    static boolean needsAssumeUnique(VoltTable table, VoltTable.ColumnInfo column) {
+        // stupid safety
+        if (column.unique == false) return false;
+
+        // replicated tables can use UNIQUE
+        if (table.m_extraMetadata.partitionColIndex == -1) {
+            return false;
+        }
+
+        // find the index of this column in the table
+        int colIndex = -1;
+        for (int i = 0; i < table.m_extraMetadata.originalColumnInfos.length; i++) {
+            if (column.equals(table.m_extraMetadata.originalColumnInfos[i])) {
+                colIndex = i;
+            }
+        }
+        assert(colIndex >= 0);
+
+        // can use UNIQUE if the column is the partition column
+        if (colIndex == table.m_extraMetadata.partitionColIndex) {
+            return false;
+        }
+
+        boolean pkeyContainsPartitionColumn = false;
+        boolean pkeyContainsThisColumn = false;
+        for (int pkeyColIndex : table.m_extraMetadata.pkeyIndexes) {
+            if (pkeyColIndex == table.m_extraMetadata.partitionColIndex) {
+                pkeyContainsPartitionColumn = true;
+            }
+            if (pkeyColIndex == colIndex) {
+                pkeyContainsThisColumn = true;
+            }
+        }
+        // can use unique if this column is in the pkey and the pkey contains partition col
+        if (pkeyContainsPartitionColumn && pkeyContainsThisColumn) {
+            return false;
+        }
+
+        // needs to be ASSUMEUNIQUE
+        return true;
+    }
+
     /**
      * Given a VoltTable with schema metadata, return a new VoltTable with schema
      * metadata that had been changed slightly.
@@ -602,7 +725,9 @@ public class TableHelper {
         int columnDrops;
         int columnAdds;
         int columnGrows;
-        int columnReorders;
+
+        int[] pkeyIndexes = table.m_extraMetadata.pkeyIndexes.clone();
+        int partitionColIndex = table.m_extraMetadata.partitionColIndex;
 
         // pick values for the various kinds of mutations
         // don't allow all zeros unless allowIdentidy == true
@@ -610,40 +735,42 @@ public class TableHelper {
             columnDrops =    Math.min((int) (Math.abs(rand.nextGaussian()) * 1.5), table.m_colCount);
             columnAdds =     Math.min((int) (Math.abs(rand.nextGaussian()) * 1.5), table.m_colCount);
             columnGrows =    Math.min((int) (Math.abs(rand.nextGaussian()) * 1.5), table.m_colCount);
-            columnReorders = Math.min((int) (Math.abs(rand.nextGaussian()) * 1.5), table.m_colCount);
-            totalMutations = columnDrops + columnAdds + columnGrows + columnReorders;
+            totalMutations = columnDrops + columnAdds + columnGrows;
         }
         while ((allowIdenty == false) && (totalMutations == 0));
 
-        System.out.printf("Mutations: %d %d %d %d\n", columnDrops, columnAdds, columnGrows, columnReorders);
+        System.out.printf("Mutations: %d %d %d\n", columnDrops, columnAdds, columnGrows);
 
         ArrayList<VoltTable.ColumnInfo> columns = new ArrayList<VoltTable.ColumnInfo>();
-        for (int i = 0; i < table.m_originalColumnInfos.length; i++) {
-            columns.add(table.m_originalColumnInfos[i].clone());
+        for (int i = 0; i < table.m_extraMetadata.originalColumnInfos.length; i++) {
+            columns.add(table.m_extraMetadata.originalColumnInfos[i].clone());
         }
+
+        //////////////////
+        // DROP COLUMNS //
 
         // limit tries to prevent looping forever
         int tries = columns.size() * 2;
         while ((columnDrops > 0) && (tries-- > 0)) {
             int indexToRemove = rand.nextInt(columns.size());
             VoltTable.ColumnInfo toRemove = columns.get(indexToRemove);
-            if (toRemove.pkeyIndex == -1) {
+            if (!isAPkeyColumn(table, toRemove)) {
                 columnDrops--;
                 columns.remove(indexToRemove);
+
+                if ((partitionColIndex >= 0) && (partitionColIndex > indexToRemove)) {
+                    partitionColIndex--;
+                }
+                for (int i = 0; i < pkeyIndexes.length; i++) {
+                    if (pkeyIndexes[i] > indexToRemove) {
+                        pkeyIndexes[i]--;
+                    }
+                }
             }
         }
 
-        while (columnReorders > 0) {
-            if (columns.size() > 1) {
-                int srcIndex = rand.nextInt(columns.size());
-                int destIndex;
-                do {
-                    destIndex = rand.nextInt(columns.size());
-                } while (destIndex == srcIndex);
-                columns.add(destIndex, columns.remove(srcIndex));
-            }
-            columnReorders--;
-        }
+        /////////////////
+        // ADD COLUMNS //
 
         int newColIndex = getNextColumnIndex(table);
         while (columnAdds > 0) {
@@ -651,14 +778,26 @@ public class TableHelper {
             VoltTable.ColumnInfo toAdd = getRandomColumn(String.format("NEW%d", newColIndex++), rand);
             columnAdds--;
             columns.add(indexToAdd, toAdd);
+
+            if ((partitionColIndex >= 0) && (partitionColIndex >= indexToAdd)) {
+                partitionColIndex++;
+            }
+            for (int i = 0; i < pkeyIndexes.length; i++) {
+                if (pkeyIndexes[i] >= indexToAdd) {
+                    pkeyIndexes[i]++;
+                }
+            }
         }
+
+        ///////////////////
+        // WIDEN COLUMNS //
 
         // limit tries to prevent looping forever
         tries = columns.size() * 2;
         while ((columnGrows > 0) && (tries-- > 0)) {
             int indexToGrow = rand.nextInt(columns.size());
             VoltTable.ColumnInfo toGrow = columns.get(indexToGrow);
-            if (toGrow.pkeyIndex != -1) continue;
+            if (isAPkeyColumn(table, toGrow)) continue;
             toGrow = growColumn(toGrow);
             if (toGrow != null) {
                 columns.remove(indexToGrow);
@@ -667,49 +806,67 @@ public class TableHelper {
             }
         }
 
-        VoltTable t2 = new VoltTable(columns.toArray(new VoltTable.ColumnInfo[0]));
-        t2.m_name = table.m_name;
-        return t2;
+        VoltTable.ColumnInfo[] columnArray = columns.toArray(new VoltTable.ColumnInfo[0]);
+        VoltTable.ExtraMetadata extraMetadata = new VoltTable.ExtraMetadata(
+                table.m_extraMetadata.name,
+                partitionColIndex,
+                pkeyIndexes,
+                columnArray);
+
+        return new VoltTable(extraMetadata, columnArray, columnArray.length);
     }
 
+    /**
+     * Get the DDL description for a column that can be used for CREATE TABLE
+     * or ALTER TABLE
+     */
+    static String getDDLColumnDefinition(final VoltTable table, final VoltTable.ColumnInfo colInfo) {
+        assert(colInfo != null);
+
+        String col = colInfo.name + " " + colInfo.type.toSQLString().toUpperCase();
+        if ((colInfo.type == VoltType.STRING) || (colInfo.type == VoltType.VARBINARY)) {
+            col += String.format("(%d)", colInfo.size);
+        }
+        if (colInfo.defaultValue != VoltTable.ColumnInfo.NO_DEFAULT_VALUE) {
+            col += " DEFAULT ";
+            if (colInfo.defaultValue == null) {
+                col += "NULL";
+            }
+            else if (colInfo.type.isNumber()) {
+                col += colInfo.defaultValue;
+            }
+            else {
+                col += "'" + colInfo.defaultValue + "'";
+            }
+        }
+        if (colInfo.nullable == false) {
+            col += " NOT NULL";
+        }
+        if (colInfo.unique == true) {
+            if (needsAssumeUnique(table, colInfo)) {
+                col += " ASSUMEUNIQUE";
+            }
+            else {
+                col += " UNIQUE";
+            }
+        }
+        return col;
+    }
 
     /**
      * Get the DDL for a table.
      * Only works with tables created with TableHelper.quickTable(..) above.
      */
     public static String ddlForTable(VoltTable table) {
-        assert(table.m_originalColumnInfos != null);
+        assert(table.m_extraMetadata != null);
 
         // for each column, one line
-        String[] colLines = new String[table.m_originalColumnInfos.length];
-        for (int i = 0; i < table.m_originalColumnInfos.length; i++) {
-            VoltTable.ColumnInfo colInfo = table.m_originalColumnInfos[i];
-            String col = colInfo.name + " " + colInfo.type.toSQLString().toUpperCase();
-            if ((colInfo.type == VoltType.STRING) || (colInfo.type == VoltType.VARBINARY)) {
-                col += String.format("(%d)", colInfo.size);
-            }
-            if (colInfo.defaultValue != VoltTable.ColumnInfo.NO_DEFAULT_VALUE) {
-                col += " DEFAULT ";
-                if (colInfo.defaultValue == null) {
-                    col += "NULL";
-                }
-                else if (colInfo.type.isNumber()) {
-                    col += colInfo.defaultValue;
-                }
-                else {
-                    col += "'" + colInfo.defaultValue + "'";
-                }
-            }
-            if (colInfo.nullable == false) {
-                col += " NOT NULL";
-            }
-            if (colInfo.unique == true) {
-                col += " UNIQUE";
-            }
-            colLines[i] = col;
+        String[] colLines = new String[table.m_extraMetadata.originalColumnInfos.length];
+        for (int i = 0; i < table.m_extraMetadata.originalColumnInfos.length; i++) {
+            colLines[i] = getDDLColumnDefinition(table, table.m_extraMetadata.originalColumnInfos[i]);
         }
 
-        String s = "CREATE TABLE " + table.m_name + " (\n  ";
+        String s = "CREATE TABLE " + table.m_extraMetadata.name + " (\n  ";
         s += StringUtils.join(colLines, ",\n  ");
 
         // pkey line
@@ -725,6 +882,13 @@ public class TableHelper {
         }
 
         s += "\n);";
+
+        // partition this table if need be
+        if (table.m_extraMetadata.partitionColIndex != -1) {
+            s += String.format("\nPARTITION TABLE %s ON COLUMN %s;",
+                    table.m_extraMetadata.name,
+                    table.m_extraMetadata.originalColumnInfos[table.m_extraMetadata.partitionColIndex].name);
+        }
 
         return s;
     }
@@ -826,7 +990,7 @@ public class TableHelper {
      * - Supports dropping columns.
      * - Supports widening of columns.
      *
-     * Note, this might fail in wierd ways if you ask it to do more than what
+     * Note, this might fail in weird ways if you ask it to do more than what
      * the EE version can do. It's not really set up to test the negative
      * cases.
      */
@@ -857,7 +1021,7 @@ public class TableHelper {
                 else {
                     row[i] = dest.getColumnDefaultValue(i);
                     // handle no default specified
-                    if (row[i] == TableShorthand.ColMeta.NO_DEFAULT_VALUE) {
+                    if (row[i] == VoltTable.ColumnInfo.NO_DEFAULT_VALUE) {
                         if (dest.getColumnNullable(i)) {
                             row[i] = null;
                         }
@@ -884,7 +1048,7 @@ public class TableHelper {
      * Public access to the package-private metadata.
      */
     public static String getTableName(VoltTable table) {
-        return table.m_name;
+        return table.m_extraMetadata.name;
     }
 
     /**
@@ -894,21 +1058,16 @@ public class TableHelper {
      */
     public static int getBigintPrimaryKeyIndexIfExists(VoltTable table) {
         // find the primary key
-        int pkeyColIndex = 0;
-        if (table.m_originalColumnInfos != null) {
-            for (int i = 0; i < table.getColumnCount(); i++) {
-                if (table.m_originalColumnInfos[i].pkeyIndex == 0) {
-                    pkeyColIndex = i;
+        if (table.m_extraMetadata != null) {
+            int[] pkeyIndexes = table.m_extraMetadata.pkeyIndexes;
+            if (pkeyIndexes != null) {
+                if (pkeyIndexes.length > 0) {
+                    VoltTable.ColumnInfo column = table.m_extraMetadata.originalColumnInfos[pkeyIndexes[0]];
+                    if (column.type == VoltType.BIGINT) {
+                        return pkeyIndexes[0];
+                    }
                 }
-                // no multi-column pkeys
-                if (table.m_originalColumnInfos[i].pkeyIndex > 0) {
-                    return -1;
-                }
-            }
-            // bigint columns only for now
-            if (table.m_originalColumnInfos[pkeyColIndex].type == VoltType.BIGINT) {
-                return pkeyColIndex;
-            }
+             }
         }
         return -1;
     }
@@ -945,7 +1104,7 @@ public class TableHelper {
         }
 
         System.out.printf("Filling table %s with rows starting with pkey id %d (every %d rows) until either RSS=%dmb or rowcount=%d\n",
-                table.m_name, offset, jump, mbTarget, maxRows);
+                table.m_extraMetadata.name, offset, jump, mbTarget, maxRows);
 
         // find the primary key, assume first col if not found
         int pkeyColIndex = getBigintPrimaryKeyIndexIfExists(table);
@@ -994,7 +1153,7 @@ public class TableHelper {
         long i = offset;
         long rows = 0;
         rssThread.start();
-        final String insertProcName = table.m_name.toUpperCase() + ".insert";
+        final String insertProcName = table.m_extraMetadata.name.toUpperCase() + ".insert";
         while (rss.get() < mbTarget) {
             Object[] row = randomRow(table, Integer.MAX_VALUE, rand);
             row[pkeyColIndex] = i;
@@ -1014,7 +1173,7 @@ public class TableHelper {
         rssThread.join();
 
         System.out.printf("Filled table %s with %d rows and now RSS=%dmb\n",
-                table.m_name, rows, rss.get());
+                table.m_extraMetadata.name, rows, rss.get());
     }
 
     /**
@@ -1064,7 +1223,7 @@ public class TableHelper {
 
         // delete 100k rows at a time until nothing comes back
         long deleted = 0;
-        final String deleteProcName = table.m_name.toUpperCase() + ".delete";
+        final String deleteProcName = table.m_extraMetadata.name.toUpperCase() + ".delete";
         for (int i = 1; i <= maxId; i += n) {
             client.callProcedure(callback, deleteProcName, i);
             outstanding.incrementAndGet();
@@ -1085,5 +1244,61 @@ public class TableHelper {
         System.out.printf("Deleted %d odd rows\n", deleteCount.get());
 
         return deleteCount.get();
+    }
+
+    /**
+     * A fairly straighforward loader for tables with metadata and rows. Maybe this could
+     * be faster or have better error messages? Meh.
+     *
+     * @param client Client connected to a VoltDB instance containing a table with same name
+     * and schema as the VoltTable parameter named "t".
+     * @param t A table with extra metadata and presumably some data in it.
+     * @throws Exception
+     */
+    public static void loadTable(Client client, VoltTable t) throws Exception {
+        // ensure table is annotated
+        assert(t.m_extraMetadata != null);
+
+        // replicated tables
+        if (t.m_extraMetadata.partitionColIndex == -1) {
+            client.callProcedure("@LoadMultipartitionTable", t.m_extraMetadata.name, t);
+        }
+
+        // partitioned tables
+        else {
+            final AtomicBoolean failed = new AtomicBoolean(false);
+            final CountDownLatch latch = new CountDownLatch(t.getRowCount());
+            int columns = t.getColumnCount();
+            String procedureName = t.m_extraMetadata.name.toUpperCase() + ".insert";
+
+            // callback for async row insertion tracks response count + failure
+            final ProcedureCallback insertCallback = new ProcedureCallback() {
+                @Override
+                public void clientCallback(ClientResponse clientResponse) throws Exception {
+                    latch.countDown();
+                    if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+                        failed.set(true);
+                    }
+                }
+            };
+
+            // async insert all the rows
+            t.resetRowPosition();
+            while (t.advanceRow()) {
+                Object params[] = new Object[columns];
+                for (int i = 0; i < columns; ++i) {
+                    params[i] = t.get(i, t.getColumnType(i));
+                }
+                client.callProcedure(insertCallback, procedureName, params);
+            }
+
+            // block until all inserts are done
+            latch.await();
+
+            // throw a generic exception if anything fails
+            if (failed.get()) {
+                throw new RuntimeException("TableHelper.load failed.");
+            }
+        }
     }
 }

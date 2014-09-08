@@ -100,7 +100,6 @@ class Plot:
         y_formatter = matplotlib.ticker.ScalarFormatter(useOffset=False)
         self.ax.yaxis.set_major_formatter(y_formatter)
         ymin, ymax = plt.ylim()
-        plt.ylim((ymin-(ymax-ymin)*0.05, ymax+(ymax-ymin)*0.05))
         plt.xlim((self.xmin.toordinal(), (self.xmax+datetime.timedelta(1)).replace(minute=0, hour=0, second=0, microsecond=0).toordinal()))
         plt.legend(prop={'size': 16}, loc=2)
         plt.savefig(self.filename, format="png", transparent=False,
@@ -138,32 +137,51 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
                 mc[b] = (COLORS[len(mc.keys())%len(COLORS)], MARKERS[len(mc.keys())%len(MARKERS)])
             pl.plot(u[0], u[1], mc[b][0], mc[b][1], b, '-')
 
-            if len(u[0]) > 10:
-                ma = moving_average(u[1], 10)
+            ma = [None]
+            if len(u[0]) >= 10:
+                (ma,mstd) = moving_average(u[1], 10)
                 pl.plot(u[0], ma, mc[b][0], None, None, ":")
                 failed = 0
                 if k.startswith('lat'):
+                    polarity = 1
                     cv = np.nanmin(ma)
+                    rp = (u[0][np.nanargmin(ma)], cv)
                     if ma[-1] > cv * 1.05:
-                        failed = -1
-                        rp = (u[0][np.nanargmin(ma)], cv)
+                        failed = 1
                 else:
+                    polarity = -1
                     cv = np.nanmax(ma)
+                    rp = (u[0][np.nanargmax(ma)], cv)
                     if ma[-1] < cv * 0.95:
                         failed = 1
-                        rp = (u[0][np.nanargmax(ma)], cv)
+
+                twosigma = np.sum([np.convolve(mstd, polarity*2), ma], axis=0)
+                pl.plot(u[0], twosigma, mc[b][0], None, None, '-.')
+                pl.ax.annotate(r"$2\sigma$", xy=(u[0][-1], twosigma[-1]), xycoords='data', xytext=(20,0), textcoords='offset points', ha='right')
+
+                twntypercent = np.sum([np.convolve(ma, polarity*0.2), ma], axis=0)
+                pl.plot(u[0], twntypercent, mc[b][0], None, None, '-.')
+                pl.ax.annotate(r"20%", xy=(u[0][-1], twntypercent[-1]), xycoords='data', xytext=(20,0), textcoords='offset points', ha='right')
+
+                p = (ma[-1]-rp[1])/rp[1]*100.
 
                 if failed != 0:
-                    p = (ma[-1]-rp[1])/rp[1]*100.
+                    if p<10:
+                        color = 'yellow'
+                    else:
+                        color = 'red'
                     flag[k].append((b, p))
-                    pl.ax.annotate("%.2f" % cv, xy=rp, xycoords='data', xytext=(0,10*failed),
-                        textcoords='offset points', ha='center', color='red')
-                    pl.ax.annotate("%.2f" % ma[-1], xy=(u[0][-1],ma[-1]), xycoords='data', xytext=(5,+5),
-                        textcoords='offset points', ha='left', color='red')
-                    pl.ax.annotate("(%+.2f%%)" % p, xy=(u[0][-1],ma[-1]), xycoords='data', xytext=(5,-5),
-                        textcoords='offset points', ha='left', color='red')
                     for pos in ['top', 'bottom', 'right', 'left']:
-                        pl.ax.spines[pos].set_edgecolor("red")
+                        pl.ax.spines[pos].set_edgecolor(color)
+                    pl.ax.set_axis_bgcolor(color)
+                    pl.ax.set_alpha(0.2)
+
+                pl.ax.annotate("%.2f" % cv, xy=rp, xycoords='data', xytext=(0,-10*polarity),
+                    textcoords='offset points', ha='center')
+                pl.ax.annotate("%.2f" % ma[-1], xy=(u[0][-1],ma[-1]), xycoords='data', xytext=(5,+5),
+                    textcoords='offset points', ha='left')
+                pl.ax.annotate("(%+.2f%%)" % p, xy=(u[0][-1],ma[-1]), xycoords='data', xytext=(5,-5),
+                    textcoords='offset points', ha='left')
 
             """
             #pl.ax.annotate(b, xy=(u[0][-1],u[1][-1]), xycoords='data',
@@ -280,7 +298,11 @@ def moving_average(x, n, type='simple'):
 
     a =  np.convolve(x, weights, mode='full')[:len(x)]
     a[:n-1] = None
-    return a
+
+    s = [float('NaN')]*(n-1)
+    for d in range(n, len(x)+1):
+        s.append(np.std(x[d-n:d]))
+    return (a,s)
 
 
 def usage():
@@ -353,6 +375,8 @@ def main():
         filenames.append(tuple(fns))
 
     filenames.append(("KVBenchmark-five9s-latency", "", "", "http://ci/view/system%20tests-elastic/job/performance-nextrelease-5nines/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/5nines-histograms.png", iorder))
+    filenames.append(("KVBenchmark-five9s-nofail-latency", "", "", "http://ci/view/system%20tests-elastic/job/performance-nextrelease-5nines-nofail/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/5nines-histograms.png", iorder))
+    filenames.append(("KVBenchmark-five9s-nofail-nocl-latency", "", "", "http://ci/view/system%20tests-elastic/job/performance-nextrelease-5nines-nofail-nocl/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/5nines-histograms.png", iorder))
 
     # generate index file
     index_file = open(root_path + '-index.html', 'w')

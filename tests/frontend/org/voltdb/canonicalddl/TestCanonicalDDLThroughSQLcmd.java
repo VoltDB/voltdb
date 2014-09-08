@@ -109,7 +109,8 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
 
         assertTrue(callSQLcmd(firstCanonicalDDL));
         roundtripDDL = getDDLFromHTTP();
-        assertTrue(firstCanonicalDDL.equals(roundtripDDL));
+        // IZZY: we force single statement SQL keywords to lower case, it seems
+        assertTrue(firstCanonicalDDL.equalsIgnoreCase(roundtripDDL));
 
         assertTrue(callSQLcmd("CREATE TABLE NONSENSE (id INTEGER);\n"));
         roundtripDDL = getDDLFromHTTP();

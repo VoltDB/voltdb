@@ -123,11 +123,10 @@ public final class Stopwatch {
    * Creates (but does not start) a new stopwatch using {@link System#nanoTime}
    * as its time source.
    *
-   * @deprecated Use {@link Stopwatch#createUnstarted()} instead. This
-   *     constructor is scheduled to be removed in Guava release 17.0.
+   * @deprecated Use {@link Stopwatch#createUnstarted()} instead.
    */
   @Deprecated
-  public Stopwatch() {
+  Stopwatch() {
     this(Ticker.systemTicker());
   }
 
@@ -135,11 +134,10 @@ public final class Stopwatch {
    * Creates (but does not start) a new stopwatch, using the specified time
    * source.
    *
-   * @deprecated Use {@link Stopwatch#createUnstarted(Ticker)} instead. This
-   *     constructor is scheduled to be removed in Guava release 17.0.
+   * @deprecated Use {@link Stopwatch#createUnstarted(Ticker)} instead.
    */
   @Deprecated
-  public Stopwatch(Ticker ticker) {
+  Stopwatch(Ticker ticker) {
     this.ticker = checkNotNull(ticker, "ticker");
   }
 
@@ -208,35 +206,6 @@ public final class Stopwatch {
    */
   public long elapsed(TimeUnit desiredUnit) {
     return desiredUnit.convert(elapsedNanos(), NANOSECONDS);
-  }
-
-  /**
-   * Returns the current elapsed time shown on this stopwatch, expressed
-   * in the desired time unit, with any fraction rounded down.
-   *
-   * <p>Note that the overhead of measurement can be more than a microsecond, so
-   * it is generally not useful to specify {@link TimeUnit#NANOSECONDS}
-   * precision here.
-   *
-   * @deprecated Use {@link Stopwatch#elapsed(TimeUnit)} instead. This method is
-   *     scheduled to be removed in Guava release 16.0.
-   */
-  @Deprecated
-  public long elapsedTime(TimeUnit desiredUnit) {
-    return elapsed(desiredUnit);
-  }
-
-  /**
-   * Returns the current elapsed time shown on this stopwatch, expressed
-   * in milliseconds, with any fraction rounded down. This is identical to
-   * {@code elapsed(TimeUnit.MILLISECONDS)}.
-   *
-   * @deprecated Use {@code stopwatch.elapsed(MILLISECONDS)} instead. This
-   *     method is scheduled to be removed in Guava release 16.0.
-   */
-  @Deprecated
-  public long elapsedMillis() {
-    return elapsed(MILLISECONDS);
   }
 
   /**

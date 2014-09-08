@@ -216,10 +216,10 @@ public class KafkaLoader {
         }
     }
 
-    class KafkaBulkLoaderCallback implements CSVLoaderErrorHandler {
+    class KafkaBulkLoaderCallback implements BulkLoaderErrorHandler {
 
         @Override
-        public boolean handleError(CSVLineWithMetaData metaData, ClientResponse response, String error) {
+        public boolean handleError(RowWithMetaData metaData, ClientResponse response, String error) {
             if (response != null) {
                 byte status = response.getStatus();
                 if (status != ClientResponse.SUCCESS) {
@@ -303,7 +303,7 @@ public class KafkaLoader {
                 long offset = md.offset();
                 String smsg = new String(msg);
                 try {
-                    m_loader.insertRow(new CSVLineWithMetaData(smsg, offset), m_csvParser.parseLine(smsg));
+                    m_loader.insertRow(new RowWithMetaData(smsg, offset), m_csvParser.parseLine(smsg));
                 } catch (Exception ex) {
                     m_log.error("Consumer stopped", ex);
                     System.exit(1);
