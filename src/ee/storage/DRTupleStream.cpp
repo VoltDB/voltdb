@@ -54,6 +54,13 @@ void DRTupleStream::setSecondaryCapacity(size_t capacity) {
     m_secondaryCapacity = capacity;
 }
 
+const int64_t TIMESTAMP_BITS = 40;
+const int64_t COUNTER_BITS = 9;
+const int64_t PARTITIONID_BITS = 14;
+const int64_t VOLT_EPOCH = 1199145600000L;
+const int64_t TIMESTAMP_MAX_VALUE = (1L << TIMESTAMP_BITS) - 1L;
+const int64_t COUNTER_MAX_VALUE = (1L << COUNTER_BITS) - 1L;
+const int64_t PARTITIONID_MAX_VALUE = (1L << PARTITIONID_BITS) - 1L;
 const int64_t PARTITION_ID_MASK = (1 << 14) - 1;
 
 /*
@@ -259,4 +266,64 @@ bool DRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size
         return true;
     }
     return false;
+}
+
+static int64_t makeIdFromComponents(int64_t ts, int64_t seqNo, int64_t partitionId) {
+    // compute the time in millis since VOLT_EPOCH
+    int64_t uniqueId = ts - VOLT_EPOCH;
+    // verify all fields are the right size
+    assert(uniqueId <= TIMESTAMP_MAX_VALUE);
+    assert(seqNo <= COUNTER_MAX_VALUE);
+    assert(partitionId <= PARTITIONID_MAX_VALUE);
+
+    // put this time value in the right offset
+    uniqueId = uniqueId << (COUNTER_BITS + PARTITIONID_BITS);
+    // add the counter value at the right offset
+    uniqueId |= seqNo << PARTITIONID_BITS;
+    // finally add the siteid at the end
+    uniqueId |= partitionId;
+
+    return uniqueId;
+}
+
+int32_t DRTupleStream::getTestDRBuffer(char *outBytes) {
+    DRTupleStream stream;
+    stream.configure(42);
+
+    char tableHandle[] = { 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f',
+                           'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f', 'f' };
+
+    // set up the schema used to fill the new buffer
+    std::vector<ValueType> columnTypes;
+    std::vector<int32_t> columnLengths;
+    std::vector<bool> columnAllowNull;
+    for (int i = 0; i < 2; i++) {
+        columnTypes.push_back(VALUE_TYPE_INTEGER);
+        columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
+        columnAllowNull.push_back(false);
+    }
+    TupleSchema *schema = TupleSchema::createTupleSchemaForTest(columnTypes,
+                                                                columnLengths,
+                                                                columnAllowNull);
+    char tupleMemory[(2 + 1) * 8];
+    TableTuple tuple(tupleMemory, schema);
+
+    for (int ii = 0; ii < 100;) {
+        int64_t lastUID = makeIdFromComponents(ii - 5, 0, 42);
+        int64_t uid = makeIdFromComponents(ii, 0, 42);
+        for (int zz = 0; zz < 5; zz++) {
+            stream.appendTuple(lastUID, tableHandle, uid, uid, uid, uid, tuple, DR_RECORD_INSERT );
+        }
+        ii += 5;
+    }
+
+    TupleSchema::freeTupleSchema(schema);
+
+    int64_t committedUID = makeIdFromComponents(99, 0, 42);
+    stream.commit(committedUID, committedUID, committedUID, committedUID, committedUID, false, false);
+
+    const int32_t adjustedLength = stream.m_currBlock->rawLength() - MAGIC_HEADER_SPACE_FOR_JAVA;
+    ::memcpy(outBytes, stream.m_currBlock->rawPtr() + MAGIC_HEADER_SPACE_FOR_JAVA, adjustedLength);
+    return adjustedLength;
+
 }

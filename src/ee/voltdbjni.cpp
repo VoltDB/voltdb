@@ -1332,7 +1332,7 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_sync_1file_1
   (JNIEnv *, jclass, jlong fd, jlong offset, jlong length, jint advice) {
 #ifdef LINUX
 #ifndef __NR_sync_file_range
-#error VoltDB server requires that your kernel headers define __NR_sync_file_range.
+#error VoltDB server requires that yourjni kernel headers define __NR_sync_file_range.
 #endif
     return syscall(__NR_sync_file_range, static_cast<int>(fd), static_cast<loff_t>(offset), static_cast<loff_t>(length),
                    static_cast<unsigned int>(advice));
@@ -1359,7 +1359,7 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_fallocate
 }
 
 
-JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecuteTask
+SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecuteTask
   (JNIEnv *env, jobject obj, jlong engine_ptr) {
     VOLT_DEBUG("nativeHashinate in C++ called");
     VoltDBEngine *engine = castToEngine(engine_ptr);
@@ -1377,4 +1377,29 @@ JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecuteTask
     }
 }
 
+/*
+ * Class:     org_voltdb_jni_ExecutionEngine
+ * Method:    getTestDRBuffer
+ * Signature: ()[B
+ */
+SHAREDLIB_JNIEXPORT jbyteArray JNICALL Java_org_voltdb_jni_ExecutionEngine_getTestDRBuffer
+  (JNIEnv *env, jclass clazz) {
+    try {
+        char *output = new char[1024 * 256];
+        int32_t length = DRTupleStream::getTestDRBuffer(output);
+        jbyteArray array = env->NewByteArray(length);
+        jbyte *arrayBytes = env->GetByteArrayElements( array, NULL);
+        ::memcpy(arrayBytes, output, length);
+        env->ReleaseByteArrayElements(array, arrayBytes, 0);
+        return array;
+    } catch (const FatalException &e) {
+        cerr << e.m_reason << std::endl;
+        cerr << e.m_backtracepath << std::endl;
+        cerr << e.m_filename << ":" << e.m_lineno << std::endl;
+        for (int ii = 0; ii < e.m_traces.size(); ii++) {
+            cerr << e.m_traces[ii] << std::endl;
+        }
+        exit(-1);
+    }
+}
 /** @} */ // end of JNI doxygen group
