@@ -18,9 +18,11 @@
 package org.hsqldb_voltpatches;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.TreeMap;
 
 /**
@@ -73,7 +75,17 @@ public class VoltXMLElement {
             retval.children.add(child.duplicate());
         }
         return retval;
-	}
+    }
+
+    public VoltXMLElement findChild(String name)
+    {
+        for (VoltXMLElement vxe : children) {
+            if (name.equals(vxe.name)) {
+                return vxe;
+            }
+        }
+        return null;
+    }
 
     /**
      * Get a string representation that is designed to be as short as possible
@@ -98,5 +110,125 @@ public class VoltXMLElement {
             e.toMinString(sb);
         }
         return sb;
+    }
+
+    static public class VoltXMLDiff
+    {
+        List<VoltXMLElement> m_addedNodes = new ArrayList<VoltXMLElement>();
+        List<VoltXMLElement> m_removedNodes = new ArrayList<VoltXMLElement>();
+        List<VoltXMLElement> m_changedNodes = new ArrayList<VoltXMLElement>();
+        List<String> m_addedAttributes = new ArrayList<String>();
+        List<String> m_removedAttributes = new ArrayList<String>();
+        List<String> m_changedAttributes = new ArrayList<String>();
+
+        public List<VoltXMLElement> getAddedNodes()
+        {
+            return m_addedNodes;
+        }
+
+        public List<VoltXMLElement> getRemovedNodes()
+        {
+            return m_removedNodes;
+        }
+
+        public List<VoltXMLElement> getChangedNodes()
+        {
+            return m_changedNodes;
+        }
+
+        public List<String> getAddedAttributes()
+        {
+            return m_addedAttributes;
+        }
+
+        public List<String> getRemovedAttributes()
+        {
+            return m_removedAttributes;
+        }
+
+        public List<String> getChangedAttributes()
+        {
+            return m_changedAttributes;
+        }
+
+        public boolean isEmpty()
+        {
+            return (m_addedNodes.isEmpty() &&
+                    m_removedNodes.isEmpty() &&
+                    m_changedNodes.isEmpty() &&
+                    m_addedAttributes.isEmpty() &&
+                    m_removedAttributes.isEmpty() &&
+                    m_changedAttributes.isEmpty());
+        }
+    }
+
+    static public VoltXMLDiff computeDiff(VoltXMLElement first, VoltXMLElement second)
+    {
+        VoltXMLDiff result = new VoltXMLDiff();
+        // Top level call needs both names to match (I think this makes sense)
+        // Just treat it as first removed and second added and don't descend
+        if (!first.name.equals(second.name)) {
+            result.m_removedNodes.add(first);
+            result.m_addedNodes.add(second);
+        }
+        else {
+            // first, check the attributes
+            Set<String> firstKeys = first.attributes.keySet();
+            Set<String> secondKeys = new HashSet<String>();
+            secondKeys.addAll(second.attributes.keySet());
+            // Do removed and changed attributes walking the first element's attributes
+            for (String firstKey : firstKeys) {
+                if (!secondKeys.contains(firstKey)) {
+                    result.m_removedAttributes.add(firstKey);
+                }
+                else if (!(second.attributes.get(firstKey).equals(first.attributes.get(firstKey)))) {
+                    result.m_changedAttributes.add(firstKey);
+                }
+                // remove the firstKey from secondKeys to track things added
+                secondKeys.remove(firstKey);
+            }
+            // everything in secondKeys should be something added
+            result.m_addedAttributes.addAll(secondKeys);
+
+            // Now, need to check the children.  Each pair of children with the same names
+            // need to be descended to look for changes
+            // Probably more efficient ways to do this, but brute force it for now
+            // Would be helpful if the underlying children objects were Maps rather than
+            // Lists.
+            Set<String> firstChildren = new HashSet<String>();
+            for (VoltXMLElement child : first.children) {
+                firstChildren.add(child.name);
+            }
+            Set<String> secondChildren = new HashSet<String>();
+            for (VoltXMLElement child : second.children) {
+                secondChildren.add(child.name);
+            }
+            Set<String> commonNames = new HashSet<String>();
+            for (VoltXMLElement firstChild : first.children) {
+                if (!secondChildren.contains(firstChild.name)) {
+                    result.m_removedNodes.add(firstChild);
+                }
+                else {
+                    commonNames.add(firstChild.name);
+                }
+            }
+            for (VoltXMLElement secondChild : second.children) {
+                if (!firstChildren.contains(secondChild.name)) {
+                    result.m_addedNodes.add(secondChild);
+                }
+                else {
+                    assert(commonNames.contains(secondChild.name));
+                }
+            }
+
+            for (String name : commonNames) {
+                VoltXMLDiff childDiff = computeDiff(first.findChild(name), second.findChild(name));
+                if (!childDiff.isEmpty()) {
+                    result.m_changedNodes.add(second.findChild(name));
+                }
+            }
+        }
+
+        return result;
     }
 }
