@@ -1272,7 +1272,7 @@ public abstract class StatementDMQL extends Statement {
             parameterXML.children.add(parameter);
             parameter.attributes.put("index", String.valueOf(index));
             ++index;
-            parameter.attributes.put("id", expr.getUniqueVoltId(session));
+            parameter.attributes.put("id", expr.getUniqueId(session));
             parameter.attributes.put("valuetype", Types.getTypeName(paramType.typeCode));
             // Use of non-null nodeDataTypes for a DYNAMIC_PARAM is a voltdb extension to signal
             // that values passed to parameters such as the one in "col in ?" must be vectors.
