@@ -635,4 +635,8 @@ public class MockVoltDB implements VoltDBInterface
     public ReplicaDRGateway getReplicaDRGateway() {
         return null;
     }
+
+    @Override
+    public void onSyncSnapshotCompletion() {
+    }
 }
