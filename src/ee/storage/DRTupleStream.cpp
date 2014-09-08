@@ -24,6 +24,7 @@
 #include "common/tabletuple.h"
 #include "common/ExportSerializeIo.h"
 #include "common/executorcontext.hpp"
+#include "common/UniqueId.hpp"
 #include "crc/crc32c.h"
 
 #include <cstdio>
@@ -54,15 +55,6 @@ void DRTupleStream::setSecondaryCapacity(size_t capacity) {
     m_secondaryCapacity = capacity;
 }
 
-const int64_t TIMESTAMP_BITS = 40;
-const int64_t COUNTER_BITS = 9;
-const int64_t PARTITIONID_BITS = 14;
-const int64_t VOLT_EPOCH = 1199145600000L;
-const int64_t TIMESTAMP_MAX_VALUE = (1L << TIMESTAMP_BITS) - 1L;
-const int64_t COUNTER_MAX_VALUE = (1L << COUNTER_BITS) - 1L;
-const int64_t PARTITIONID_MAX_VALUE = (1L << PARTITIONID_BITS) - 1L;
-const int64_t PARTITION_ID_MASK = (1 << 14) - 1;
-
 /*
  * If SpHandle represents a new transaction, commit previous data.
  * Always serialize the supplied tuple in to the stream.
@@ -79,9 +71,9 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
                                   TableTuple &tuple,
                                   DRRecordType type)
 {
-    assert((spUniqueId & PARTITION_ID_MASK) == m_partitionId);
-    assert((spHandle & PARTITION_ID_MASK) == m_partitionId);
-    assert((lastCommittedSpHandle & PARTITION_ID_MASK) == m_partitionId);
+    assert(UniqueId::pid(spUniqueId) == m_partitionId);
+    assert(UniqueId::pid(spHandle) == m_partitionId);
+    assert(UniqueId::pid(lastCommittedSpHandle) == m_partitionId);
     //Drop the row, don't move the USO
     if (!m_enabled) return m_uso;
 
@@ -174,10 +166,10 @@ DRTupleStream::computeOffsets(TableTuple &tuple,
 
 void DRTupleStream::pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) {
     if (sync) return;
-    if ((block->startSpUniqueId() & PARTITION_ID_MASK) != m_partitionId) {
+    if (UniqueId::pid(block->startSpUniqueId()) != m_partitionId) {
         throwFatalException("oops");
     }
-    if ((block->lastSpUniqueId() & PARTITION_ID_MASK) != m_partitionId) {
+    if (UniqueId::pid(block->lastSpUniqueId()) != m_partitionId) {
         throwFatalException("oops");
     }
 //    std::cout << "Pushing block with start " << block->startSpUniqueId() << " and end " << block->lastSpUniqueId() << std::endl;
@@ -268,24 +260,6 @@ bool DRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size
     return false;
 }
 
-static int64_t makeIdFromComponents(int64_t ts, int64_t seqNo, int64_t partitionId) {
-    // compute the time in millis since VOLT_EPOCH
-    int64_t uniqueId = ts - VOLT_EPOCH;
-    // verify all fields are the right size
-    assert(uniqueId <= TIMESTAMP_MAX_VALUE);
-    assert(seqNo <= COUNTER_MAX_VALUE);
-    assert(partitionId <= PARTITIONID_MAX_VALUE);
-
-    // put this time value in the right offset
-    uniqueId = uniqueId << (COUNTER_BITS + PARTITIONID_BITS);
-    // add the counter value at the right offset
-    uniqueId |= seqNo << PARTITIONID_BITS;
-    // finally add the siteid at the end
-    uniqueId |= partitionId;
-
-    return uniqueId;
-}
-
 int32_t DRTupleStream::getTestDRBuffer(char *outBytes) {
     DRTupleStream stream;
     stream.configure(42);
@@ -309,8 +283,8 @@ int32_t DRTupleStream::getTestDRBuffer(char *outBytes) {
     TableTuple tuple(tupleMemory, schema);
 
     for (int ii = 0; ii < 100;) {
-        int64_t lastUID = makeIdFromComponents(ii - 5, 0, 42);
-        int64_t uid = makeIdFromComponents(ii, 0, 42);
+        int64_t lastUID = UniqueId::makeIdFromComponents(ii - 5, 0, 42);
+        int64_t uid = UniqueId::makeIdFromComponents(ii, 0, 42);
         for (int zz = 0; zz < 5; zz++) {
             stream.appendTuple(lastUID, tableHandle, uid, uid, uid, uid, tuple, DR_RECORD_INSERT );
         }
@@ -319,7 +293,7 @@ int32_t DRTupleStream::getTestDRBuffer(char *outBytes) {
 
     TupleSchema::freeTupleSchema(schema);
 
-    int64_t committedUID = makeIdFromComponents(99, 0, 42);
+    int64_t committedUID = UniqueId::makeIdFromComponents(99, 0, 42);
     stream.commit(committedUID, committedUID, committedUID, committedUID, committedUID, false, false);
 
     const int32_t adjustedLength = stream.m_currBlock->rawLength() - MAGIC_HEADER_SPACE_FOR_JAVA;
