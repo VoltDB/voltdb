@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -40,6 +41,7 @@ import org.hsqldb_voltpatches.FunctionSQL;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.hsqldb_voltpatches.VoltXMLElement.VoltXMLDiff;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.utils.CoreUtils;
@@ -417,6 +419,7 @@ public class DDLCompiler {
 
     // Partition descriptors parsed from DDL PARTITION or REPLICATE statements.
     final VoltDDLElementTracker m_tracker;
+    VoltXMLElement m_schema = new VoltXMLElement(HSQLInterface.XML_SCHEMA_NAME);
 
     // used to match imported class with those in the classpath
     // For internal cluster compilation, this will point to the
@@ -457,6 +460,7 @@ public class DDLCompiler {
         this.m_compiler = compiler;
         this.m_tracker = tracker;
         this.m_classLoader = classLoader;
+        m_schema.attributes.put("name", HSQLInterface.XML_SCHEMA_NAME);
     }
 
     /**
@@ -513,7 +517,10 @@ public class DDLCompiler {
                     // avoid embedded newlines so we can delimit statements
                     // with newline.
                     m_fullDDL += Encoder.hexEncode(stmt.statement) + "\n";
-                    m_hsql.runDDLCommand(stmt.statement);
+                    // Get the diff that results from applying this statement and apply it
+                    // to our local tree (with Volt-specific additions)
+                    VoltXMLDiff thisStmtDiff = m_hsql.runDDLCommandAndDiff(stmt.statement);
+                    applyDiff(thisStmtDiff);
                 } catch (HSQLParseException e) {
                     String msg = "DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
                     throw m_compiler.new VoltCompilerException(msg, stmt.lineNo);
@@ -532,6 +539,52 @@ public class DDLCompiler {
         m_tracker.addExtraClasses(m_classMatcher.getMatchedClassList());
         // possibly save some memory
         m_classMatcher.clear();
+    }
+
+    private void applyDiff(VoltXMLDiff stmtDiff)
+    {
+        m_schema.applyDiff(stmtDiff);
+        // now go back and clean up anything that wasn't resolvable just by applying the diff
+        // For now, this is:
+        // - ensuring that the partition columns on tables are correct.  The hard
+        // case is when the partition column is dropped from the table
+
+        // Each statement can affect at most one table.  Check to see if the table is listed in
+        // the changed nodes
+        if (stmtDiff.getChangedNodes().isEmpty()) {
+            return;
+        }
+        assert(stmtDiff.getChangedNodes().size() == 1);
+        Entry<String, VoltXMLDiff> tableEntry = stmtDiff.getChangedNodes().entrySet().iterator().next();
+        VoltXMLDiff tableDiff = tableEntry.getValue();
+        // need columns to be changed
+        if (tableDiff.getChangedNodes().isEmpty() ||
+            !tableDiff.getChangedNodes().containsKey("columnscolumns"))
+        {
+            return;
+        }
+        VoltXMLDiff columnsDiff = tableDiff.getChangedNodes().get("columnscolumns");
+        assert(columnsDiff != null);
+        // Need to have deleted columns
+        if (columnsDiff.getRemovedNodes().isEmpty()) {
+            return;
+        }
+        // Okay, get a list of deleted column names
+        Set<String> removedColumns = new HashSet<String>();
+        for (VoltXMLElement e : columnsDiff.getRemovedNodes()) {
+            assert(e.attributes.get("name") != null);
+            removedColumns.add(e.attributes.get("name"));
+        }
+        // go back and get our table name.  Use the uniquename ("table" + name) to get the element
+        // from the schema
+        VoltXMLElement tableElement = m_schema.findChild(tableEntry.getKey());
+        assert(tableElement != null);
+        String partitionCol = tableElement.attributes.get("partitioncolumn");
+        // if we removed the partition column, then remove the attribute from the schema
+        if (partitionCol != null && removedColumns.contains(partitionCol)) {
+            m_compiler.addWarn(String.format("Partition column %s was dropped from table %s.  Attempting to change table to replicated.", partitionCol, tableElement.attributes.get("name")));
+            tableElement.attributes.remove("partitioncolumn");
+        }
     }
 
     /**
@@ -777,10 +830,17 @@ public class DDLCompiler {
                             statement.substring(0,statement.length()-1))); // remove trailing semicolon
                 }
                 // group(1) -> table, group(2) -> column
-                m_tracker.put(
-                        checkIdentifierStart(statementMatcher.group(1),statement),
-                        checkIdentifierStart(statementMatcher.group(2),statement)
-                        );
+                String tableName = checkIdentifierStart(statementMatcher.group(1), statement);
+                String columnName = checkIdentifierStart(statementMatcher.group(2), statement);
+                VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
+                if (tableXML != null) {
+                    tableXML.attributes.put("partitioncolumn", columnName.toUpperCase());
+                    // Column validity check done by VoltCompiler in post-processing
+                }
+                else {
+                    throw m_compiler.new VoltCompilerException(String.format(
+                                "Invalid PARTITION statement: table %s does not exist", tableName));
+                }
                 return true;
             }
             else if (PROCEDURE.equals(partitionee)) {
@@ -829,10 +889,15 @@ public class DDLCompiler {
         statementMatcher = replicatePattern.matcher(statement);
         if (statementMatcher.matches()) {
             // group(1) -> table
-            m_tracker.put(
-                    checkIdentifierStart(statementMatcher.group(1), statement),
-                    null
-                    );
+            String tableName = checkIdentifierStart(statementMatcher.group(1), statement);
+            VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
+            if (tableXML != null) {
+                tableXML.attributes.remove("partitioncolumn");
+            }
+            else {
+                throw m_compiler.new VoltCompilerException(String.format(
+                            "Invalid REPLICATE statement: table %s does not exist", tableName));
+            }
             return true;
         }
 
@@ -908,7 +973,15 @@ public class DDLCompiler {
 
             // check the table portion
             String tableName = checkIdentifierStart(statementMatcher.group(1), statement);
-            m_tracker.addExportedTable(tableName);
+            VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
+            if (tableXML != null) {
+                tableXML.attributes.put("export", "true");
+            }
+            else {
+                throw m_compiler.new VoltCompilerException(String.format(
+                            "Invalid EXPORT statement: table %s was not present in the catalog.",
+                            tableName));
+            }
 
             return true;
         }
@@ -966,22 +1039,37 @@ public class DDLCompiler {
         String binDDL = Encoder.compressAndBase64Encode(m_fullDDL);
         db.setSchema(binDDL);
 
-        VoltXMLElement xmlCatalog;
-        try
-        {
-            xmlCatalog = m_hsql.getXMLFromCatalog();
-        }
-        catch (HSQLParseException e)
-        {
-            String msg = "DDL Error: " + e.getMessage();
-            throw m_compiler.new VoltCompilerException(msg);
-        }
-
         // output the xml catalog to disk
-        BuildDirectoryUtils.writeFile("schema-xml", "hsql-catalog-output.xml", xmlCatalog.toString(), true);
+        BuildDirectoryUtils.writeFile("schema-xml", "hsql-catalog-output.xml", m_schema.toString(), true);
 
         // build the local catalog from the xml catalog
-        fillCatalogFromXML(db, xmlCatalog);
+        fillCatalogFromXML(db, m_schema);
+        fillTrackerFromXML();
+    }
+
+    // Fill the table stuff in VoltDDLElementTracker from the VoltXMLElement tree at the end when
+    // requested from the compiler
+    private void fillTrackerFromXML()
+    {
+        for (VoltXMLElement e : m_schema.children) {
+            if (e.name.equals("table")) {
+                String tableName = e.attributes.get("name");
+                String partitionCol = e.attributes.get("partitioncolumn");
+                String export = e.attributes.get("export");
+                if (partitionCol != null) {
+                    m_tracker.addPartition(tableName, partitionCol);
+                }
+                else {
+                    m_tracker.removePartition(tableName);
+                }
+                if (export != null) {
+                    m_tracker.addExportedTable(tableName);
+                }
+                else {
+                    m_tracker.removeExportedTable(tableName);
+                }
+            }
+        }
     }
 
     /**
@@ -1309,14 +1397,17 @@ public class DDLCompiler {
         // map of index replacements for later constraint fixup
         Map<String, String> indexReplacementMap = new TreeMap<String, String>();
 
-        ArrayList<VoltType> columnTypes = new ArrayList<VoltType>();
+        // Need the columnTypes sorted by column index.
+        SortedMap<Integer, VoltType> columnTypes = new TreeMap<Integer, VoltType>();
         for (VoltXMLElement subNode : node.children) {
 
             if (subNode.name.equals("columns")) {
                 int colIndex = 0;
                 for (VoltXMLElement columnNode : subNode.children) {
-                    if (columnNode.name.equals("column"))
-                        addColumnToCatalog(table, columnNode, colIndex++, columnTypes);
+                    if (columnNode.name.equals("column")) {
+                        addColumnToCatalog(table, columnNode, columnTypes);
+                        colIndex++;
+                    }
                 }
                 // limit the total number of columns in a table
                 if (colIndex > MAX_COLUMNS) {
@@ -1399,13 +1490,16 @@ public class DDLCompiler {
         }
     }
 
-    void addColumnToCatalog(Table table, VoltXMLElement node, int index, ArrayList<VoltType> columnTypes) throws VoltCompilerException {
+    void addColumnToCatalog(Table table, VoltXMLElement node,
+                            SortedMap<Integer, VoltType> columnTypes) throws VoltCompilerException
+    {
         assert node.name.equals("column");
 
         String name = node.attributes.get("name");
         String typename = node.attributes.get("valuetype");
         String nullable = node.attributes.get("nullable");
         String sizeString = node.attributes.get("size");
+        int index = Integer.valueOf(node.attributes.get("index"));
         String defaultvalue = null;
         String defaulttype = null;
 
@@ -1444,7 +1538,7 @@ public class DDLCompiler {
 
         // fyi: Historically, VoltType class initialization errors get reported on this line (?).
         VoltType type = VoltType.typeFromString(typename);
-        columnTypes.add(type);
+        columnTypes.put(index, type);
         if (defaultFuncID == -1) {
             if (defaultvalue != null && (type == VoltType.DECIMAL || type == VoltType.NUMERIC)) {
                 // Until we support deserializing scientific notation in the EE, we'll
