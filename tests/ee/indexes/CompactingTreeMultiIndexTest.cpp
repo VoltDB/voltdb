@@ -295,18 +295,18 @@ TEST_F(CompactingTreeMultiIndexTest, PerformanceDifference) {
         EXPECT_NE(data, NULL);
 
         std::clock_t c1 = insertTuplesIntoIndex(m_index, m_schema, data, places);
-//        std::cout<<"insert 2**"<<places<< " IntsPointerKey<1> : "<< c1 <<std::endl;
+        std::cout<<"insert 2**"<<places<< " IntsPointerKey<1> : "<< c1 <<std::endl;
         std::clock_t c2 = insertTuplesIntoIndex(m_indexWithoutPointer1, m_schema, data, places);
-//        std::cout<<"insert 2**"<<places<< " IntsKey<1> : "<< c2 <<std::endl;
+        std::cout<<"insert 2**"<<places<< " IntsKey<1> : "<< c2 <<std::endl;
         std::clock_t c3 = insertTuplesIntoIndex(m_indexWithoutPointer2, m_schema, data, places);
-//        std::cout<<"insert 2**"<<places<< " IntsKey<2> : "<< c3 <<std::endl;
+        std::cout<<"insert 2**"<<places<< " IntsKey<2> : "<< c3 <<std::endl;
 
         c1 = deleteTuplesFromIndex(m_index, m_schema, data, places, 7);
-//        std::cout<<"delete 2**"<<places<< " IntsPointerKey<1> : "<< c1 <<std::endl;
+        std::cout<<"delete 2**"<<places<< " IntsPointerKey<1> : "<< c1 <<std::endl;
         c2 = deleteTuplesFromIndex(m_indexWithoutPointer1, m_schema, data, places, 7);
-//        std::cout<<"delete 2**"<<places<< " IntsKey<1> : "<< c2 <<std::endl;
+        std::cout<<"delete 2**"<<places<< " IntsKey<1> : "<< c2 <<std::endl;
         c3 = deleteTuplesFromIndex(m_indexWithoutPointer2, m_schema, data, places, 7);
-//        std::cout<<"delete 2**"<<places<< " IntsKey<2> : "<< c3 <<std::endl;
+        std::cout<<"delete 2**"<<places<< " IntsKey<2> : "<< c3 <<std::endl;
 
         delete data;
         freeSchemaAndIndexForPerformanceDifference();
@@ -318,18 +318,18 @@ TEST_F(CompactingTreeMultiIndexTest, PerformanceDifference) {
         EXPECT_NE(data, NULL);
 
         std::clock_t c1 = insertTuplesIntoIndex2(m_index, m_schema, data, places);
-//        std::cout<<"insert 2**"<<places<< " IntsPointerKey<1> : "<< c1 <<std::endl;
+        std::cout<<"insert 2**"<<places<< " IntsPointerKey<1> : "<< c1 <<std::endl;
         std::clock_t c2 = insertTuplesIntoIndex2(m_indexWithoutPointer1, m_schema, data, places);
-//        std::cout<<"insert 2**"<<places<< " IntsKey<1> : "<< c2 <<std::endl;
+        std::cout<<"insert 2**"<<places<< " IntsKey<1> : "<< c2 <<std::endl;
         std::clock_t c3 = insertTuplesIntoIndex2(m_indexWithoutPointer2, m_schema, data, places);
-//        std::cout<<"insert 2**"<<places<< " IntsKey<2> : "<< c3 <<std::endl;
+        std::cout<<"insert 2**"<<places<< " IntsKey<2> : "<< c3 <<std::endl;
 
         c1 = deleteTuplesFromIndex(m_index, m_schema, data, places, 7);
-//        std::cout<<"delete 2**"<<places<< " IntsPointerKey<1> : "<< c1 <<std::endl;
+        std::cout<<"delete 2**"<<places<< " IntsPointerKey<1> : "<< c1 <<std::endl;
         c2 = deleteTuplesFromIndex(m_indexWithoutPointer1, m_schema, data, places, 7);
-//        std::cout<<"delete 2**"<<places<< " IntsKey<1> : "<< c2 <<std::endl;
+        std::cout<<"delete 2**"<<places<< " IntsKey<1> : "<< c2 <<std::endl;
         c3 = deleteTuplesFromIndex(m_indexWithoutPointer2, m_schema, data, places, 7);
-//        std::cout<<"delete 2**"<<places<< " IntsKey<2> : "<< c3 <<std::endl;
+        std::cout<<"delete 2**"<<places<< " IntsKey<2> : "<< c3 <<std::endl;
 
         delete data;
         freeSchemaAndIndexForPerformanceDifference();

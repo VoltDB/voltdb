@@ -162,7 +162,8 @@ public:
         memset(m_keyEndIter, 0, sizeof(m_keyEndIter));
     }
 
-    ~IndexCursor() {};
+    ~IndexCursor() {
+    };
 
     // iteration stuff
     bool m_forward;  // for tree index ONLY
