@@ -292,7 +292,14 @@ public class TestLiveTableSchemaMigration extends TestCase {
             migrateSchema("FOO (A:INTEGER-N, B:TINYINT) P(A)", "FOO (A:INTEGER-N, B:TINYINT)");
             fail();
         }
-        catch (Exception e) {}
+        catch (ProcCallException e) {
+            ClientResponseImpl cri = (ClientResponseImpl) e.getClientResponse();
+            assertEquals(cri.getStatus(), ClientResponse.GRACEFUL_FAILURE);
+            assertTrue(cri.getStatusString().contains("Unable to change"));
+        }
+        catch (Exception e) {
+            fail(); // not expecting a different exception
+        }
 
         // change partition key with data should fail
         try {
@@ -301,10 +308,11 @@ public class TestLiveTableSchemaMigration extends TestCase {
         }
         catch (ProcCallException e) {
             ClientResponseImpl cri = (ClientResponseImpl) e.getClientResponse();
-            assert(cri.getStatus() == ClientResponse.GRACEFUL_FAILURE);
+            assertEquals(cri.getStatus(), ClientResponse.GRACEFUL_FAILURE);
+            assertTrue(cri.getStatusString().contains("Unable to change"));
         }
         catch (Exception e) {
-            fail();
+            fail(); // not expecting a different exception
         }
     }
 

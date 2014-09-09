@@ -413,10 +413,13 @@ public class CatalogDiffEngine {
     }
 
     /**
-     * @return null if the change is not possible under any circumstances. Return the name of a table if
-     * the change could be made if the table of that name had no tuples.
+     * @return null if the change is not possible under any circumstances.
+     * Return two strings if it is possible if the table is empty.
+     * String 1 is name of a table if the change could be made if the table of that name had no tuples.
+     * String 2 is the error message to show the user if that table isn't empty.
      */
-    private String checkAddDropIfEmptyTableWhitelist(final CatalogType suspect, final ChangeType changeType) {
+    private String[] checkAddDropIfEmptyTableWhitelist(final CatalogType suspect, final ChangeType changeType) {
+        // Nothing for now. Will need content here to support adding a unique index for example.
         return null;
     }
 
@@ -657,13 +660,18 @@ public class CatalogDiffEngine {
     }
 
     /**
-     * @return null if the change is not possible under any circumstances. Return the name of a table if
-     * the change could be made if the table of that name had no tuples.
+     * @return null if the change is not possible under any circumstances.
+     * Return two strings if it is possible if the table is empty.
+     * String 1 is name of a table if the change could be made if the table of that name had no tuples.
+     * String 2 is the error message to show the user if that table isn't empty.
      */
-    public String checkModifyIfTableIsEmptyWhitelist(final CatalogType suspect,
+    public String[] checkModifyIfTableIsEmptyWhitelist(final CatalogType suspect,
                                                      final CatalogType prevType,
                                                      final String field)
     {
+        // first is table name, second is error message
+        String[] retval = new String[2];
+
         if (prevType instanceof Table) {
             Table prevTable = (Table) prevType; // safe because of enclosing if-block
             Database db = (Database) prevType.getParent();
@@ -675,10 +683,22 @@ public class CatalogDiffEngine {
 
             // allowed changes to a table
             if (field.equalsIgnoreCase("isreplicated")) {
-                return suspect.getTypeName();
+                // table name
+                retval[0] = suspect.getTypeName();
+                // error message
+                retval[1] = String.format(
+                        "Unable to change whether table %s is replicated unless it is empty.",
+                        retval[0]);
+                return retval;
             }
             if (field.equalsIgnoreCase("partitioncolumn")) {
-                return suspect.getTypeName();
+                // table name
+                retval[0] = suspect.getTypeName();
+                // error message
+                retval[1] = String.format(
+                        "Unable to change the partition column of table %s unless it is empty.",
+                        retval[0]);
+                return retval;
             }
         }
         return null;
@@ -699,26 +719,32 @@ public class CatalogDiffEngine {
 
         // if it's not possible with non-empty tables, check for possible with empty tables
         if (errorMessage != null) {
-            String tableName = checkModifyIfTableIsEmptyWhitelist(newType, prevType, field);
+            String[] response = checkModifyIfTableIsEmptyWhitelist(newType, prevType, field);
+            assert((response == null) || (response.length == 2));
 
             // if no tablename, then it's just not possible
-            if (tableName == null) {
+            if (response == null) {
                 m_supported = false;
                 m_errors.append(errorMessage);
             }
             // otherwise, it's possible if a specific table is empty
             // collect the error message(s) and decide if it can be done inside @UAC
             else {
+                assert(response.length == 2);
+                String tableName = response[0]; assert(tableName != null);
+                String nonEmptyErrorMessage = response[1]; assert(nonEmptyErrorMessage != null);
+
                 String existingErrorMessagesForNonEmptyTable = m_tablesThatMustBeEmpty.get(tableName);
-                if (errorMessage.length() == 0) {
+                if (nonEmptyErrorMessage.length() == 0) {
                     // the empty string presumes there is already an error for this table
                     assert(existingErrorMessagesForNonEmptyTable != null);
                 }
                 else {
                     if (existingErrorMessagesForNonEmptyTable != null) {
-                        errorMessage = existingErrorMessagesForNonEmptyTable + "\n" + errorMessage;
+                        nonEmptyErrorMessage = nonEmptyErrorMessage + "\n" + existingErrorMessagesForNonEmptyTable;
                     }
-                    m_tablesThatMustBeEmpty.put(tableName, errorMessage);
+                    // add indentation here so the formatting comes out right for the user #gianthack
+                    m_tablesThatMustBeEmpty.put(tableName, "  " + nonEmptyErrorMessage);
                 }
             }
         }
@@ -753,26 +779,32 @@ public class CatalogDiffEngine {
 
         // if it's not possible with non-empty tables, check for possible with empty tables
         if (errorMessage != null) {
-            String tableName = checkAddDropIfEmptyTableWhitelist(prevType, ChangeType.DELETION);
+            String[] response = checkAddDropIfEmptyTableWhitelist(prevType, ChangeType.DELETION);
+            assert((response == null) || (response.length == 2));
 
             // if no tablename, then it's just not possible
-            if (tableName == null) {
+            if (response == null) {
                 m_supported = false;
                 m_errors.append(errorMessage);
             }
             // otherwise, it's possible if a specific table is empty
             // collect the error message(s) and decide if it can be done inside @UAC
             else {
+                assert(response.length == 2);
+                String tableName = response[0]; assert(tableName != null);
+                String nonEmptyErrorMessage = response[1]; assert(nonEmptyErrorMessage != null);
+
                 String existingErrorMessagesForNonEmptyTable = m_tablesThatMustBeEmpty.get(tableName);
-                if (errorMessage.length() == 0) {
+                if (nonEmptyErrorMessage.length() == 0) {
                     // the empty string presumes there is already an error for this table
                     assert(existingErrorMessagesForNonEmptyTable != null);
                 }
                 else {
                     if (existingErrorMessagesForNonEmptyTable != null) {
-                        errorMessage = existingErrorMessagesForNonEmptyTable + "\n" + errorMessage;
+                        nonEmptyErrorMessage = nonEmptyErrorMessage + "\n" + existingErrorMessagesForNonEmptyTable;
                     }
-                    m_tablesThatMustBeEmpty.put(tableName, errorMessage);
+                    // add indentation here so the formatting comes out right for the user #gianthack
+                    m_tablesThatMustBeEmpty.put(tableName, "  " + nonEmptyErrorMessage);
                 }
             }
         }
@@ -800,26 +832,32 @@ public class CatalogDiffEngine {
 
         // if it's not possible with non-empty tables, check for possible with empty tables
         if (errorMessage != null) {
-            String tableName = checkAddDropIfEmptyTableWhitelist(newType, ChangeType.ADDITION);
+            String[] response = checkAddDropIfEmptyTableWhitelist(newType, ChangeType.ADDITION);
+            assert((response == null) || (response.length == 2));
 
             // if no tablename, then it's just not possible
-            if (tableName == null) {
+            if (response == null) {
                 m_supported = false;
                 m_errors.append(errorMessage);
             }
             // otherwise, it's possible if a specific table is empty
             // collect the error message(s) and decide if it can be done inside @UAC
             else {
+                assert(response.length == 2);
+                String tableName = response[0]; assert(tableName != null);
+                String nonEmptyErrorMessage = response[1]; assert(nonEmptyErrorMessage != null);
+
                 String existingErrorMessagesForNonEmptyTable = m_tablesThatMustBeEmpty.get(tableName);
-                if (errorMessage.length() == 0) {
+                if (nonEmptyErrorMessage.length() == 0) {
                     // the empty string presumes there is already an error for this table
                     assert(existingErrorMessagesForNonEmptyTable != null);
                 }
                 else {
                     if (existingErrorMessagesForNonEmptyTable != null) {
-                        errorMessage = existingErrorMessagesForNonEmptyTable + "\n" + errorMessage;
+                        nonEmptyErrorMessage = nonEmptyErrorMessage + "\n" + existingErrorMessagesForNonEmptyTable;
                     }
-                    m_tablesThatMustBeEmpty.put(tableName, errorMessage);
+                    // add indentation here so the formatting comes out right for the user #gianthack
+                    m_tablesThatMustBeEmpty.put(tableName, "  " + nonEmptyErrorMessage);
                 }
             }
         }

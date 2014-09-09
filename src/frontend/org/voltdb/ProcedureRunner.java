@@ -1027,6 +1027,7 @@ public class ProcedureRunner {
        // use local var to avoid warnings about reassigning method argument
        Throwable e = eIn;
        boolean expected_failure = true;
+       boolean hideStackTrace = false;
        StackTraceElement[] stack = e.getStackTrace();
        ArrayList<StackTraceElement> matches = new ArrayList<StackTraceElement>();
        for (StackTraceElement ste : stack) {
@@ -1071,29 +1072,39 @@ public class ProcedureRunner {
            SpecifiedException se = (SpecifiedException) e;
            status = se.getStatus();
            expected_failure = true;
+           hideStackTrace = true;
        }
        else {
            msg.append("UNEXPECTED FAILURE:\n");
            expected_failure = false;
        }
 
-       // If the error is something we know can happen as part of normal operation,
-       // reduce the verbosity.
-       // Otherwise, generate more output for debuggability
-       if (expected_failure) {
+       // ensure the message is returned if we're not going to hit the verbose condition below
+       if (expected_failure || hideStackTrace) {
            msg.append("  ").append(e.getMessage());
-           for (StackTraceElement ste : matches) {
-               msg.append("\n    at ");
-               msg.append(ste.getClassName()).append(".").append(ste.getMethodName());
-               msg.append("(").append(ste.getFileName()).append(":");
-               msg.append(ste.getLineNumber()).append(")");
-           }
        }
-       else {
-           Writer result = new StringWriter();
-           PrintWriter pw = new PrintWriter(result);
-           e.printStackTrace(pw);
-           msg.append("  ").append(result.toString());
+
+       // Rarely hide the stack trace.
+       // Right now, just for SpecifiedException, which is usually from sysprocs where the error is totally
+       // known and not helpful to the user.
+       if (!hideStackTrace) {
+           // If the error is something we know can happen as part of normal operation,
+           // reduce the verbosity.
+           // Otherwise, generate more output for debuggability
+           if (expected_failure) {
+               for (StackTraceElement ste : matches) {
+                   msg.append("\n    at ");
+                   msg.append(ste.getClassName()).append(".").append(ste.getMethodName());
+                   msg.append("(").append(ste.getFileName()).append(":");
+                   msg.append(ste.getLineNumber()).append(")");
+               }
+           }
+           else {
+               Writer result = new StringWriter();
+               PrintWriter pw = new PrintWriter(result);
+               e.printStackTrace(pw);
+               msg.append("  ").append(result.toString());
+           }
        }
 
        return getErrorResponse(

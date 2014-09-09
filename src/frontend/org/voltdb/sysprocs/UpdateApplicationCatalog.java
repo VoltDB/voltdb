@@ -145,7 +145,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         // return an error containing the names of all non-empty tables
         // via the propagated reasons why each needs to be empty
         if (!nonEmptyTables.isEmpty()) {
-            String msg = "Unable to make requested schema change: ";
+            String msg = "Unable to make requested schema change:\n";
             for (i = 0; i < tablesThatMustBeEmpty.length; ++i) {
                 if (nonEmptyTables.contains(tablesThatMustBeEmpty[i])) {
                     msg += reasonsForEmptyTables[i] + "\n";
