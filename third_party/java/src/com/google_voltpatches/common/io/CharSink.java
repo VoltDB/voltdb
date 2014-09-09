@@ -49,6 +49,11 @@ import java.nio.charset.Charset;
 public abstract class CharSink implements OutputSupplier<Writer> {
 
   /**
+   * Constructor for use by subclasses.
+   */
+  protected CharSink() {}
+
+  /**
    * Opens a new {@link Writer} for writing to this sink. This method should return a new,
    * independent writer each time it is called.
    *
@@ -65,7 +70,7 @@ public abstract class CharSink implements OutputSupplier<Writer> {
    * @since 15.0
    * @deprecated This method is only provided for temporary compatibility with the
    *     {@link OutputSupplier} interface and should not be called directly. Use
-   *     {@link #openStream} instead.
+   *     {@link #openStream} instead. This method is scheduled for removal in Guava 18.0.
    */
   @Override
   @Deprecated

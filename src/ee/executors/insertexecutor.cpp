@@ -43,24 +43,26 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "insertexecutor.h"
-#include "common/debuglog.h"
+#include "common/FatalException.hpp"
 #include "common/ValueFactory.hpp"
 #include "common/ValuePeeker.hpp"
+#include "common/debuglog.h"
 #include "common/tabletuple.h"
-#include "common/FatalException.hpp"
 #include "common/types.h"
-#include "plannodes/insertnode.h"
 #include "execution/VoltDBEngine.h"
+#include "expressions/functionexpression.h"
+#include "insertexecutor.h"
+#include "plannodes/insertnode.h"
+#include "storage/ConstraintFailureException.h"
 #include "storage/persistenttable.h"
 #include "storage/streamedtable.h"
 #include "storage/table.h"
 #include "storage/tableiterator.h"
 #include "storage/tableutil.h"
 #include "storage/temptable.h"
-#include "storage/ConstraintFailureException.h"
 
 #include <vector>
+#include <set>
 
 using namespace std;
 using namespace voltdb;
@@ -73,15 +75,17 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
     m_node = dynamic_cast<InsertPlanNode*>(abstractNode);
     assert(m_node);
     assert(m_node->getTargetTable());
-    assert(m_node->getInputTables().size() == 1);
+    assert(m_node->getInputTableCount() == 1);
+
+    Table* targetTable = m_node->getTargetTable();
 
     setDMLCountOutputTable(limits);
 
-    m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTables()[0]); //input table should be temptable
+    m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTable()); //input table should be temptable
     assert(m_inputTable);
 
     // Target table can be StreamedTable or PersistentTable and must not be NULL
-    PersistentTable *persistentTarget = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
+    PersistentTable *persistentTarget = dynamic_cast<PersistentTable*>(targetTable);
     m_partitionColumn = -1;
     m_partitionColumnIsString = false;
     m_isStreamed = (persistentTarget == NULL);
@@ -95,13 +99,27 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
     }
 
     m_multiPartition = m_node->isMultiPartition();
+
+    // allocate memory for template tuple, set defaults for all columns
+    m_templateTuple.init(targetTable->schema());
+
+
+    TableTuple tuple = m_templateTuple.tuple();
+
+    std::set<int> fieldsExplicitlySet(m_node->getFieldMap().begin(), m_node->getFieldMap().end());
+    m_node->initTupleWithDefaultValues(m_engine,
+                                       &m_memoryPool,
+                                       fieldsExplicitlySet,
+                                       tuple,
+                                       m_nowFields);
+
     return true;
 }
 
 bool InsertExecutor::p_execute(const NValueArray &params) {
     assert(m_node == dynamic_cast<InsertPlanNode*>(m_abstractNode));
     assert(m_node);
-    assert(m_inputTable == dynamic_cast<TempTable*>(m_node->getInputTables()[0]));
+    assert(m_inputTable == dynamic_cast<TempTable*>(m_node->getInputTable()));
     assert(m_inputTable);
 
     // Target table can be StreamedTable or PersistentTable and must not be NULL
@@ -111,12 +129,6 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     assert((targetTable == dynamic_cast<PersistentTable*>(targetTable)) ||
             (targetTable == dynamic_cast<StreamedTable*>(targetTable)));
 
-    // we need to use the schema of the target table here, not the input table
-    TableTuple &templateTuple = targetTable->tempTuple();
-
-    // initialize the template tuple with default values from the catalog
-    m_node->initTemplateTuple(m_engine, templateTuple);
-
     VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug().c_str());
 
     // count the number of successful inserts
@@ -124,6 +136,13 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
 
     Table* outputTable = m_node->getOutputTable();
     assert(outputTable);
+
+    TableTuple templateTuple = m_templateTuple.tuple();
+
+    std::vector<int>::iterator it;
+    for (it = m_nowFields.begin(); it != m_nowFields.end(); ++it) {
+        templateTuple.setNValue(*it, NValue::callConstant<FUNC_CURRENT_TIMESTAMP>());
+    }
 
     //
     // An insert is quite simple really. We just loop through our m_inputTable

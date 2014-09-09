@@ -41,6 +41,7 @@ import org.voltdb.compiler.deploymentfile.PartitionDetectionType.Snapshot;
 import org.voltdb.compiler.deploymentfile.PathEntry;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PathsType.Voltdbroot;
+import org.voltdb.compiler.deploymentfile.SchemaType;
 import org.voltdb.compiler.deploymentfile.SecurityProviderString;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
@@ -116,6 +117,9 @@ public class DeploymentBuilder {
 
     private boolean m_elenabled;      // true if enabled; false if disabled
 
+    // whether to allow DDL over adhoc or use full catalog updates
+    private boolean m_useAdhocSchema = false;
+
     public DeploymentBuilder() {
         this(1, 1, 0);
     }
@@ -164,6 +168,13 @@ public class DeploymentBuilder {
     public void setVoltRoot(String voltRoot) {
         assert(voltRoot != null);
         m_voltRootPath = voltRoot;
+    }
+
+    /**
+     * whether to allow DDL over adhoc or use full catalog updates
+     */
+    public void setUseAdhocSchema(boolean useIt) {
+        m_useAdhocSchema = useIt;
     }
 
     public void configureLogging(String internalSnapshotPath, String commandLogPath, Boolean commandLogSync,
@@ -282,6 +293,7 @@ public class DeploymentBuilder {
         cluster.setHostcount(m_hostCount);
         cluster.setSitesperhost(m_sitesPerHost);
         cluster.setKfactor(m_replication);
+        cluster.setSchema(m_useAdhocSchema ? SchemaType.ADHOC : SchemaType.CATALOG);
 
         // <paths>
         PathsType paths = factory.createPathsType();

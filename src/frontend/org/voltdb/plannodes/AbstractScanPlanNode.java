@@ -242,10 +242,10 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                 {
                     // must produce a tuple value expression for this column.
                     TupleValueExpression tve = new TupleValueExpression(
-                            m_targetTableName, m_targetTableAlias, col.getTypeName(), col.getTypeName(), col.getIndex());
-                    tve.setValueType(VoltType.get((byte)col.getType()));
-                    tve.setValueSize(col.getSize());
-                    tve.setInBytes(col.getInbytes());
+                            m_targetTableName, m_targetTableAlias, col.getTypeName(), col.getTypeName(),
+                            col.getIndex());
+
+                    tve.setTypeSizeBytes(col.getType(), col.getSize(), col.getInbytes());
                     m_tableSchema.addColumn(new SchemaColumn(m_targetTableName,
                                                              m_targetTableAlias,
                                                              col.getTypeName(),

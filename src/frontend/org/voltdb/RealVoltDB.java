@@ -59,13 +59,14 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.cassandra_voltpatches.GCInspector;
-import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.apache.log4j.Appender;
 import org.apache.log4j.DailyRollingFileAppender;
 import org.apache.log4j.FileAppender;
 import org.apache.log4j.Logger;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.WatchedEvent;
+import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
@@ -114,6 +115,7 @@ import org.voltdb.rejoin.Iv2RejoinCoordinator;
 import org.voltdb.rejoin.JoinCoordinator;
 import org.voltdb.utils.CLibrary;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.LogKeys;
@@ -167,9 +169,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    static final String m_defaultVersionString = "4.5";
+    static final String m_defaultVersionString = "4.7";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q4.5\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q4.7\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -265,6 +267,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     List<Integer> m_partitionsToSitesAtStartupForExportInit;
 
     RestoreAgent m_restoreAgent = null;
+
+    private ListeningExecutorService m_es = CoreUtils.getCachedSingleThreadExecutor("StartAction ZK Watcher", 15000);
 
     private volatile boolean m_isRunning = false;
 
@@ -447,6 +451,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             //Start validating the build string in the background
             final Future<?> buildStringValidation = validateBuildString(getBuildString(), m_messenger.getZK());
+
+            // race to create start action nodes and then verify theirs compatibility.
+            m_messenger.getZK().create(VoltZK.start_action, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, new ZKUtil.StringCallback(), null);
+            VoltZK.createStartActionNode(m_messenger.getZK(), m_messenger.getHostId(), m_config.m_startAction);
+            validateStartAction();
 
             final int numberOfNodes = readDeploymentAndCreateStarterCatalogContext();
             if (!isRejoin && !m_joining) {
@@ -968,6 +977,54 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         }
     }
 
+    class StartActionWatcher implements Watcher {
+        @Override
+        public void process(WatchedEvent event) {
+            m_es.submit(new Runnable() {
+                @Override
+                public void run() {
+                    validateStartAction();
+                }
+            });
+        }
+    }
+
+    private void validateStartAction() {
+        try {
+            ZooKeeper zk = m_messenger.getZK();
+            boolean initCompleted = zk.exists(VoltZK.init_completed, false) != null;
+            List<String> children = zk.getChildren(VoltZK.start_action, new StartActionWatcher(), null);
+            if (!children.isEmpty()) {
+                for (String child : children) {
+                    byte[] data = zk.getData(VoltZK.start_action + "/" + child, false, null);
+                    if (data == null) {
+                        VoltDB.crashLocalVoltDB("Couldn't find " + VoltZK.start_action + "/" + child);
+                    }
+                    String startAction = new String(data);
+                    if ((startAction.equals(StartAction.JOIN.toString()) ||
+                            startAction.equals(StartAction.REJOIN.toString()) ||
+                            startAction.equals(StartAction.LIVE_REJOIN.toString())) &&
+                            !initCompleted) {
+                        int nodeId = VoltZK.getHostIDFromChildName(child);
+                        if (nodeId == m_messenger.getHostId()) {
+                            VoltDB.crashLocalVoltDB("This node was started with start action " + startAction + " during cluster creation. "
+                                    + "All nodes should be started with matching create or recover actions when bring up a cluster. "
+                                    + "Join and rejoin are for adding nodes to an already running cluster.");
+                        } else {
+                            hostLog.warn("Node " + nodeId + " tried to " + startAction + " cluster but it is not allowed during cluster creation. "
+                                    + "All nodes should be started with matching create or recover actions when bring up a cluster. "
+                                    + "Join and rejoin are for adding nodes to an already running cluster.");
+                        }
+                    }
+                }
+            }
+        } catch (KeeperException e) {
+            hostLog.error("Failed to validate the start actions", e);
+        } catch (InterruptedException e) {
+            VoltDB.crashLocalVoltDB("Interrupted during start action validation:" + e.getMessage(), true, e);
+        }
+    }
+
     private class ConfigLogging implements Runnable {
         private void logConfigInfo() {
             hostLog.info("Logging config info");
@@ -1058,7 +1115,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     deploymentFile.delete();
                 }
                 FileOutputStream fileOutputStream = new FileOutputStream(deploymentFile);
-                fileOutputStream.write(getHostMessenger().getZK().getData(VoltZK.deploymentBytes, false, null));
+                CatalogAndIds catalogStuff =
+                    CatalogUtil.getCatalogFromZK(getHostMessenger().getZK());
+                fileOutputStream.write(catalogStuff.deploymentBytes);
                 fileOutputStream.close();
             } catch (Exception e) {
                 hostLog.error("Failed to log deployment file: " + e.getMessage());
@@ -1200,15 +1259,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         GCInspector.instance.start(m_periodicPriorityWorkThread);
     }
 
-    //Get deployment bytes from ZooKeeper.
-    byte[] getDeploymentBytesFromZk(ZooKeeper zk) {
-        try {
-            return zk.getData(VoltZK.deploymentBytes, false, null);
-        } catch (Exception ex) {
-            return null;
-        }
-    }
-
     int readDeploymentAndCreateStarterCatalogContext() {
         /*
          * Debate with the cluster what the deployment file should be
@@ -1225,26 +1275,32 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             try {
                 if (deploymentBytes != null) {
-                    zk.create(VoltZK.deploymentBytes, deploymentBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+                    CatalogUtil.writeCatalogToZK(zk,
+                            // Fill in innocuous values for non-deployment stuff
+                            0,
+                            0L,
+                            0L,
+                            new byte[] {},  // spin loop in Inits.LoadCatalog.run() needs
+                                            // this to be of zero length until we have a real catalog.
+                            deploymentBytes);
                     hostLog.info("URL of deployment: " + m_config.m_pathToDeployment);
                 } else {
-                    deploymentBytes = getDeploymentBytesFromZk(zk);
+                    CatalogAndIds catalogStuff = CatalogUtil.getCatalogFromZK(zk);
+                    deploymentBytes = catalogStuff.deploymentBytes;
                 }
             } catch (KeeperException.NodeExistsException e) {
-                byte deploymentBytesTemp[] = getDeploymentBytesFromZk(zk);
+                CatalogAndIds catalogStuff = CatalogUtil.getCatalogFromZK(zk);
+                byte[] deploymentBytesTemp = catalogStuff.deploymentBytes;
                 if (deploymentBytesTemp != null) {
-                    //Check crc if its a supplied deployment on command line.
+                    //Check hash if its a supplied deployment on command line.
                     //We will ignore the supplied or default deployment anyways.
-                    // TODO: Someday change this to use the SHA-1 hash
                     if (deploymentBytes != null && !m_config.m_deploymentDefault) {
-                        PureJavaCrc32 crc = new PureJavaCrc32();
-                        crc.update(deploymentBytes);
-                        final long checksumHere = crc.getValue();
-                        crc.reset();
-                        crc.update(deploymentBytesTemp);
-                        if (checksumHere != crc.getValue()) {
-                            hostLog.warn("The locally provided deployment configuration did not match the "
-                                    + "configuration information found in the cluster.");
+                        byte[] deploymentHashHere =
+                            CatalogUtil.makeCatalogOrDeploymentHash(deploymentBytes);
+                        if (!(Arrays.equals(deploymentHashHere, catalogStuff.getDeploymentHash())))
+                        {
+                            hostLog.warn("The locally provided deployment configuration did not " +
+                                    " match the configuration information found in the cluster.");
                         } else {
                             hostLog.info("Deployment configuration pulled from other cluster node.");
                         }
@@ -1593,6 +1649,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         SortedMap<String, String> dbgMap = m_catalogContext.getDebuggingInfoFromCatalog();
         for (String line : dbgMap.values()) {
             hostLog.info(line);
+        }
+
+        if (m_catalogContext.cluster.getUseadhocschema()) {
+            consoleLog.warn("Cluster is configured to use live DDL for application changes. " +
+                  "This feature is currently a preview of work-in-progress and not recommended for " +
+                  "production environments.  Remove the schema attribute in the <cluster> " +
+                  "element of your deployment file if you did not intend to use the preview.");
         }
 
         // print out a bunch of useful system info
@@ -2347,6 +2410,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_mode = OperationMode.RUNNING;
         }
         consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null);
+
+        // Create a zk node to indicate initialization is completed
+        m_messenger.getZK().create(VoltZK.init_completed, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, new ZKUtil.StringCallback(), null);
     }
 
     @Override

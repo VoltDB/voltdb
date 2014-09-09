@@ -58,6 +58,51 @@ class Config:
     def get_config(self, config_name):
         return self.__config[config_name]
 
+def print_seconds(seconds=0, message_end="", message_begin="Total   time: ",
+                  include_current_time=False):
+    """ Prints, and returns, a message containing the specified number of
+    seconds, preceded by the 'message_begin' and followed by "seconds, " and
+    the 'message_end'; if the number of seconds is greater than or equal to 60,
+    it also prints the minutes and seconds in parentheses, e.g., 61.9 seconds
+    would be printed as "61.9 seconds (01:02), ". Optionally, if
+    'include_current_time' is True, the current time (in seconds since January
+    1, 1970) is also printed, in brackets, e.g.,
+    "61.9 seconds (1:02) [at 1408645826.68], ", which is useful for debugging
+    purposes.
+    """
+
+    time_msg = str(seconds) + " seconds"
+    if (seconds >= 60):
+        time_msg += " (" + re.sub("^0:", "", str(datetime.timedelta(0, round(seconds))), 1) + ")"
+    if (include_current_time):
+        time_msg += " [at " + str(time.time()) + "]"
+
+    message = message_begin + time_msg + ", " + message_end
+    print message
+    return message
+
+def print_elapsed_seconds(message_end="", prev_time=-1,
+                          message_begin="Elapsed time: "):
+    """Computes, returns and prints the difference (in seconds) between the
+    current system time and a previous time, which is either the specified
+    'prev_time' or, if that is negative (or unspecified), the previous time
+    at which this function was called. The printed message is preceded by
+    'message_begin' and followed by "seconds, " and 'message_end'; if the
+    elapsed time is greater than or equal to 60 seconds, it also includes the
+    minutes and seconds in parentheses, e.g., 61.9 seconds would be printed
+    as "61.9 seconds (01:02), ".
+    """
+
+    now = time.time()
+    global save_prev_time
+    if (prev_time < 0):
+        prev_time = save_prev_time
+    save_prev_time = now
+
+    diff_time = now - prev_time
+    print_seconds(diff_time, message_end, message_begin)
+    return diff_time
+
 def run_once(name, command, statements_path, results_path, submit_verbosely, testConfigKit):
 
     print "Running \"run_once\":"
@@ -165,6 +210,10 @@ def run_once(name, command, statements_path, results_path, submit_verbosely, tes
 
 def run_config(suite_name, config, basedir, output_dir, random_seed, report_all, generate_only,
     subversion_generation, submit_verbosely, args, testConfigKit):
+
+    # Store the current, initial system time (in seconds since January 1, 1970)
+    time0 = time.time()
+
     for key in config.iterkeys():
         print "in run_config key = '%s', config[key] = '%s'" % (key, config[key])
         if not os.path.isabs(config[key]):
@@ -206,11 +255,19 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
         # Claim success without running servers.
         return {"keyStats" : None, "mis" : 0}
 
+    # Print the elapsed time, with a message
+    global gensql_time
+    gensql_time += print_elapsed_seconds("for generating statements (" + suite_name + ")", time0)
+
     if run_once("jni", command, statements_path, jni_path, submit_verbosely, testConfigKit) != 0:
         print >> sys.stderr, "Test with the JNI backend had errors."
         print >> sys.stderr, "  jni_path: %s" % (jni_path)
         sys.stderr.flush()
         exit(1)
+
+    # Print the elapsed time, with a message
+    global voltdb_time
+    voltdb_time += print_elapsed_seconds("for running VoltDB (JNI) statements (" + suite_name + ")")
 
     random.seed(random_seed)
     random.setstate(random_state)
@@ -219,10 +276,20 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
         print >> sys.stderr, "Test with the HSQLDB backend had errors."
         exit(1)
 
+    # Print the elapsed time, with a message
+    global hsqldb_time
+    hsqldb_time += print_elapsed_seconds("for running HSqlDB statements (" + suite_name + ")")
+
     global compare_results
     compare_results = imp.load_source("normalizer", config["normalizer"]).compare_results
     success = compare_results(suite_name, random_seed, statements_path, hsql_path,
                               jni_path, output_dir, report_all)
+
+    # Print the elapsed time and total time, with a message
+    global compar_time
+    compar_time += print_elapsed_seconds("for comparing DB results (" + suite_name + ")")
+    print_elapsed_seconds("for run_config of '" + suite_name + "'", time0, "Sub-tot time: ")
+
     return success
 
 def get_voltcompiler(basedir):
@@ -376,6 +443,16 @@ The following place holders are supported,
 if __name__ == "__main__":
     #print the whole command line, maybe useful for debugging
     #print " ".join(sys.argv)
+
+    # Print the current, initial system time
+    time0 = time.time()
+    print "Initial time: " + str(time0) + ", at start (in seconds since January 1, 1970)"
+    save_prev_time = time0
+    gensql_time = 0.0
+    voltdb_time = 0.0
+    hsqldb_time = 0.0
+    compar_time = 0.0
+
     parser = OptionParser()
     parser.add_option("-l", "--leader", dest="hostname",
                       help="the hostname of the leader")
@@ -464,8 +541,18 @@ if __name__ == "__main__":
             success = False
 
     # Write the summary
+    time1 = time.time()
     generate_summary(output_dir, statistics)
+
+    # Print the elapsed time, and the current system time
+    print_seconds(gensql_time, "for generating ALL statements")
+    print_seconds(voltdb_time, "for running ALL VoltDB (JNI) statements")
+    print_seconds(hsqldb_time, "for running ALL HSqlDB statements")
+    print_seconds(compar_time, "for comparing ALL DB results")
+    print_elapsed_seconds("for generating the output report", time1, "Total   time: ")
+    print_elapsed_seconds("for the entire run", time0, "Total   time: ")
 
     if not success:
         print >> sys.stderr, "SQL coverage has errors."
         exit(1)
+

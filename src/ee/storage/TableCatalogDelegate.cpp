@@ -565,7 +565,8 @@ TableCatalogDelegate::migrateChangedTuples(catalog::Table const &catalogTable,
         else {
             std::string defaultValue = column->defaultvalue();
             // this could probably use the temporary string pool instead?
-            defaults[newIndex] = ValueFactory::nvalueFromSQLDefaultType(defaultColType, defaultValue, ValueFactory::USE_LONG_TERM_STORAGE);
+            // (Instead of passing NULL to use persistant storage)
+            defaults[newIndex] = ValueFactory::nvalueFromSQLDefaultType(defaultColType, defaultValue, NULL);
         }
 
         // find a source column in the existing table, if one exists
@@ -667,19 +668,25 @@ static bool isDefaultNow(const std::string& defaultValue) {
 }
 
 // This method produces a row containing all the default values for
-// the table.  Note that if there are timestamp columns in the table
-// with a default value of "now", then the column will be populated
-// with whatever time you call this function.
-void TableCatalogDelegate::initTemplateTuple(catalog::Table const *catalogTable, TableTuple& tbTuple) {
+// the table, skipping over fields explictly set, and adding "default
+// now" fields to nowFields.
+void TableCatalogDelegate::initTupleWithDefaultValues(Pool* pool,
+                                                      catalog::Table const *catalogTable,
+                                                      const std::set<int>& fieldsExplicitlySet,
+                                                      TableTuple& tbTuple,
+                                                      std::vector<int>& nowFields) {
     catalog::CatalogMap<catalog::Column>::field_map_iter colIter;
     for (colIter = catalogTable->columns().begin();
          colIter != catalogTable->columns().end();
          colIter++) {
 
-        // TODO an optimization: can skip over the fields which will be
-        // overwritten by values from child node.
-
         catalog::Column *col = colIter->second;
+        if (fieldsExplicitlySet.find(col->index()) != fieldsExplicitlySet.end()) {
+            // this field will be set explicitly so no need to
+            // serialize the default value
+            continue;
+        }
+
         ValueType defaultColType = static_cast<ValueType>(col->defaulttype());
 
         switch (defaultColType) {
@@ -689,7 +696,9 @@ void TableCatalogDelegate::initTemplateTuple(catalog::Table const *catalogTable,
 
         case VALUE_TYPE_TIMESTAMP:
             if (isDefaultNow(col->defaultvalue())) {
-                tbTuple.setNValue(col->index(), NValue::callConstant<FUNC_CURRENT_TIMESTAMP>());
+                // Caller will need to set this to the current
+                // timestamp at the appropriate time
+                nowFields.push_back(col->index());
                 break;
             }
             // else, fall through to default case
@@ -697,7 +706,7 @@ void TableCatalogDelegate::initTemplateTuple(catalog::Table const *catalogTable,
 
             NValue defaultValue = ValueFactory::nvalueFromSQLDefaultType(defaultColType,
                                                                          col->defaultvalue(),
-                                                                         ValueFactory::USE_TEMP_STORAGE);
+                                                                         pool);
             tbTuple.setNValue(col->index(), defaultValue);
             break;
         }

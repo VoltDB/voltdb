@@ -221,11 +221,20 @@ public:
         return bytes;
     }
 
-    void setNValue(const int idx, voltdb::NValue value);
+    /*
+     * This will put the NValue into this tuple at the idx-th field.
+     *
+     * If the NValue refers to inlined storage (points to storage
+     * interior to some tuple memory), and the storage is not inlined
+     * in this tuple, then this will allocate the un-inlined value in
+     * the temp string pool.  So, don't use this to update a tuple in
+     * a persistent table!
+     */
+    void setNValue(const int idx, voltdb::NValue value) const;
     /*
      * Copies range of NValues from one tuple to another.
      */
-    void setNValues(int beginIdx, TableTuple lhs, int begin, int end);
+    void setNValues(int beginIdx, TableTuple lhs, int begin, int end) const;
 
     /*
      * Version of setNValue that will allocate space to copy
@@ -236,7 +245,7 @@ public:
      * be allocated on the heap.
      */
     void setNValueAllocateForObjectCopies(const int idx, voltdb::NValue value,
-                                             Pool *dataPool);
+                                             Pool *dataPool) const;
 
     /** How long is a tuple? */
     inline int tupleLength() const {
@@ -307,7 +316,7 @@ public:
     void copy(const TableTuple &source);
 
     /** this does set NULL in addition to clear string count.*/
-    void setAllNulls();
+    void setAllNulls() const;
 
     bool equals(const TableTuple &other) const;
     bool equalsNoSchemaCheck(const TableTuple &other) const;
@@ -371,7 +380,7 @@ private:
      */
     char *m_data;
 
-    inline char* getWritableDataPtr(const TupleSchema::ColumnInfo * colInfo) {
+    inline char* getWritableDataPtr(const TupleSchema::ColumnInfo * colInfo) const {
         assert(m_schema);
         assert(m_data);
         return &m_data[TUPLE_HEADER_SIZE + colInfo->offset];
@@ -421,19 +430,26 @@ private:
 
 // A small class to hold together a standalone tuple (not backed by any table)
 // and the associated tuple storage memory to keep the actual data.
+// This class will also make a copy of the tuple schema passed in and delete the
+// copy in its destructor (since instances of TupleSchema for persistent tables can
+// go away in the event of TRUNCATE TABLE).
 class StandAloneTupleStorage {
     public:
         /** Creates an uninitialized tuple */
         StandAloneTupleStorage() :
-            m_tupleStorage(),m_tuple() {
+            m_tupleStorage(),m_tuple(), m_tupleSchema(NULL) {
         }
 
         /** Allocates enough memory for a given schema
          * and initialies tuple to point to this memory
          */
         explicit StandAloneTupleStorage(const TupleSchema* schema) :
-            m_tupleStorage(), m_tuple() {
+            m_tupleStorage(), m_tuple(), m_tupleSchema(NULL) {
             init(schema);
+        }
+
+        ~StandAloneTupleStorage() {
+            TupleSchema::freeTupleSchema(m_tupleSchema);
         }
 
         /** Allocates enough memory for a given schema
@@ -441,22 +457,27 @@ class StandAloneTupleStorage {
          */
         void init(const TupleSchema* schema) {
             assert(schema != NULL);
-            m_tupleStorage.reset(new char[schema->tupleLength() + TUPLE_HEADER_SIZE]);
-            m_tuple.m_schema = schema;
+
+            // TupleSchema can go away, so copy it here and keep it with our tuple.
+            if (m_tupleSchema != NULL) {
+                TupleSchema::freeTupleSchema(m_tupleSchema);
+            }
+            m_tupleSchema = TupleSchema::createTupleSchema(schema);
+
+            // note: apparently array new of the form
+            //   new char[N]()
+            // will zero-initialize the allocated memory.
+            m_tupleStorage.reset(new char[m_tupleSchema->tupleLength() + TUPLE_HEADER_SIZE]());
+            m_tuple.m_schema = m_tupleSchema;
             m_tuple.move(m_tupleStorage.get());
             m_tuple.setAllNulls();
             m_tuple.setActiveTrue();
         }
 
-        /** Operator conversion to get an access to the underline tuple.
-         * To prevent clients from repointing the tuple to some other backing
-         * storage via move()or address() calls the tuple is returned by value
+        /** Get the tuple that this object is wrapping.
+         * Returned const ref to avoid corrupting the tuples data and schema pointers
          */
-        operator TableTuple () {
-            return m_tuple;
-        }
-
-        operator TableTuple () const {
+        const TableTuple& tuple() const {
             return m_tuple;
         }
 
@@ -464,7 +485,7 @@ class StandAloneTupleStorage {
 
         boost::scoped_array<char> m_tupleStorage;
         TableTuple m_tuple;
-
+        TupleSchema* m_tupleSchema;
 };
 
 inline TableTuple::TableTuple() :
@@ -496,7 +517,8 @@ inline TableTuple& TableTuple::operator=(const TableTuple &rhs) {
 
 /** Copy scalars by value and non-scalars (non-inlined strings, decimals) by
     reference from a slim value in to this tuple. */
-inline void TableTuple::setNValue(const int idx, voltdb::NValue value) {
+inline void TableTuple::setNValue(const int idx, voltdb::NValue value) const
+{
     assert(m_schema);
     assert(m_data);
 
@@ -510,7 +532,8 @@ inline void TableTuple::setNValue(const int idx, voltdb::NValue value) {
 }
 
 /** Multi column version. */
-inline void TableTuple::setNValues(int beginIdx, TableTuple lhs, int begin, int end) {
+inline void TableTuple::setNValues(int beginIdx, TableTuple lhs, int begin, int end) const
+{
     assert(m_schema);
     assert(lhs.getSchema());
     assert(beginIdx + end - begin <= sizeInValues());
@@ -522,7 +545,7 @@ inline void TableTuple::setNValues(int beginIdx, TableTuple lhs, int begin, int 
 /* Copy strictly by value from slimvalue into this tuple */
 inline void TableTuple::setNValueAllocateForObjectCopies(const int idx,
                                                             voltdb::NValue value,
-                                                            Pool *dataPool)
+                                                            Pool *dataPool) const
 {
     assert(m_schema);
     assert(m_data);
@@ -775,7 +798,7 @@ inline bool TableTuple::equalsNoSchemaCheck(const TableTuple &other) const {
     return true;
 }
 
-inline void TableTuple::setAllNulls() {
+inline void TableTuple::setAllNulls() const {
     assert(m_schema);
     assert(m_data);
 

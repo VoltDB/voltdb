@@ -468,7 +468,7 @@ public class AsyncBenchmark {
             String msg = "In printStatistics. We got an exception: '" + e.getMessage() + "'!!";
             prt(msg);
         }
-        if ((System.currentTimeMillis() - lastSuccessfulResponse) > 6*60*1000) {
+        if (lastSuccessfulResponse > 0  && (System.currentTimeMillis() - lastSuccessfulResponse) > 6*60*1000) {
             prt("Not making any progress, last at " +
                     (new SimpleDateFormat("yyyy-MM-DD HH:mm:ss.S")).format(new Date(lastSuccessfulResponse)) + ", exiting");
             printJStack();

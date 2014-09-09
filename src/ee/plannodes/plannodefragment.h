@@ -80,7 +80,7 @@ class PlanNodeFragment {
 
     // construct a new fragment from a root node (used by testcode)
     PlanNodeFragment(AbstractPlanNode *root_node);
-    bool constructTree(AbstractPlanNode *node);
+    void constructTree(AbstractPlanNode *node);
 
     // first node in serialization order
     AbstractPlanNode * getRootNode() {
