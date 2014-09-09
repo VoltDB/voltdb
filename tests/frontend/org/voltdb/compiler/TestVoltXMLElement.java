@@ -24,6 +24,8 @@
 package org.voltdb.compiler;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.hsqldb_voltpatches.VoltXMLElement.VoltXMLDiff;
@@ -40,16 +42,6 @@ public class TestVoltXMLElement extends TestCase {
             }
         }
         return null;
-    }
-
-    boolean hasAttribute(List<String> list, String name)
-    {
-        for (String e : list) {
-            if (name.equals(e)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     public void testDiff() {
@@ -80,27 +72,35 @@ public class TestVoltXMLElement extends TestCase {
 
         VoltXMLDiff diff = VoltXMLElement.computeDiff(first, second);
 
-        List<String> addedAtt = diff.getAddedAttributes();
+        Set<String> addedAtt = diff.getAddedAttributes();
         assertEquals(1, addedAtt.size());
-        assertTrue(hasAttribute(addedAtt, "added"));
+        assertTrue(addedAtt.contains("added"));
 
-        List<String> changedAtt = diff.getChangedAttributes();
+        Set<String> changedAtt = diff.getChangedAttributes();
         assertEquals(1, changedAtt.size());
-        assertTrue(hasAttribute(changedAtt, "changes"));
+        assertTrue(changedAtt.contains("changes"));
 
-        List<String> removedAtt = diff.getRemovedAttributes();
+        Set<String> removedAtt = diff.getRemovedAttributes();
         assertEquals(1, removedAtt.size());
-        assertTrue(hasAttribute(removedAtt, "deleted"));
+        assertTrue(removedAtt.contains("deleted"));
 
         List<VoltXMLElement> added = diff.getAddedNodes();
+        assertEquals(1, added.size());
         assertTrue(findNamedNode(added, "addedchild") != null);
 
         List<VoltXMLElement> removed = diff.getRemovedNodes();
+        assertEquals(1, removed.size());
         assertTrue(findNamedNode(removed, "deletedchild") != null);
 
-        List<VoltXMLElement> changed = diff.getChangedNodes();
-        assertTrue(findNamedNode(changed, "changedchild1") != null);
-        assertTrue(findNamedNode(changed, "changedchild2") != null);
-
+        Map<String, VoltXMLDiff> changed = diff.getChangedNodes();
+        assertEquals(2, changed.size());
+        assertTrue(changed.containsKey("changedchild1"));
+        VoltXMLDiff child1 = changed.get("changedchild1");
+        assertTrue(child1.getRemovedAttributes().contains("deleteme"));
+        assertTrue(changed.containsKey("changedchild2"));
+        VoltXMLDiff child2 = changed.get("changedchild2");
+        assertTrue(child2.getChangedNodes().containsKey("changedgrandchild"));
+        VoltXMLDiff grandchild = child2.getChangedNodes().get("changedgrandchild");
+        assertTrue(findNamedNode(grandchild.getRemovedNodes(), "doomeddescendent") != null);
     }
 }
