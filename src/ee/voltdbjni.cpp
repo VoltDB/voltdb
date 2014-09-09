@@ -1332,7 +1332,7 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_PosixAdvise_sync_1file_1
   (JNIEnv *, jclass, jlong fd, jlong offset, jlong length, jint advice) {
 #ifdef LINUX
 #ifndef __NR_sync_file_range
-#error VoltDB server requires that yourjni kernel headers define __NR_sync_file_range.
+#error VoltDB server requires that your kernel headers define __NR_sync_file_range.
 #endif
     return syscall(__NR_sync_file_range, static_cast<int>(fd), static_cast<loff_t>(offset), static_cast<loff_t>(length),
                    static_cast<unsigned int>(advice));
