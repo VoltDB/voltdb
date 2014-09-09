@@ -20,6 +20,7 @@ import static com.google_voltpatches.common.base.Preconditions.checkArgument;
 
 import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.annotations.VisibleForTesting;
+import com.google_voltpatches.common.base.MoreObjects;
 import com.google_voltpatches.common.base.Objects;
 import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.cache.LocalCache.Strength;
@@ -233,7 +234,7 @@ public final class CacheBuilderSpec {
    */
   @Override
   public String toString() {
-    return Objects.toStringHelper(this).addValue(toParsableString()).toString();
+    return MoreObjects.toStringHelper(this).addValue(toParsableString()).toString();
   }
 
   @Override

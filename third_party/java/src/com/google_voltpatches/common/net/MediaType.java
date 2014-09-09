@@ -30,6 +30,7 @@ import com.google_voltpatches.common.base.CharMatcher;
 import com.google_voltpatches.common.base.Function;
 import com.google_voltpatches.common.base.Joiner;
 import com.google_voltpatches.common.base.Joiner.MapJoiner;
+import com.google_voltpatches.common.base.MoreObjects;
 import com.google_voltpatches.common.base.Objects;
 import com.google_voltpatches.common.base.Optional;
 import com.google_voltpatches.common.collect.ImmutableListMultimap;
@@ -227,6 +228,7 @@ public final class MediaType {
   public static final MediaType APPLICATION_XML_UTF_8 = createConstantUtf8(APPLICATION_TYPE, "xml");
   public static final MediaType ATOM_UTF_8 = createConstantUtf8(APPLICATION_TYPE, "atom+xml");
   public static final MediaType BZIP2 = createConstant(APPLICATION_TYPE, "x-bzip2");
+
   /**
    * Media type for <a href="http://en.wikipedia.org/wiki/Embedded_OpenType">Embedded OpenType</a>
    * fonts. This is
@@ -280,6 +282,15 @@ public final class MediaType {
   public static final MediaType KML = createConstant(APPLICATION_TYPE, "vnd.google-earth.kml+xml");
   public static final MediaType KMZ = createConstant(APPLICATION_TYPE, "vnd.google-earth.kmz");
   public static final MediaType MBOX = createConstant(APPLICATION_TYPE, "mbox");
+
+  /**
+   * Media type for
+   * <a href="http://goo.gl/1pGBFm">Apple over-the-air mobile configuration profiles</a>.
+   *
+   * @since 18.0
+   */
+  public static final MediaType APPLE_MOBILE_CONFIG =
+      createConstant(APPLICATION_TYPE, "x-apple-aspen-config");
   public static final MediaType MICROSOFT_EXCEL = createConstant(APPLICATION_TYPE, "vnd.ms-excel");
   public static final MediaType MICROSOFT_POWERPOINT =
       createConstant(APPLICATION_TYPE, "vnd.ms-powerpoint");
@@ -439,7 +450,7 @@ public final class MediaType {
     builder.put(normalizedAttribute, normalizeParameterValue(normalizedAttribute, value));
     MediaType mediaType = new MediaType(type, subtype, builder.build());
     // Return one of the constants if the media type is a known type.
-    return Objects.firstNonNull(KNOWN_TYPES.get(mediaType), mediaType);
+    return MoreObjects.firstNonNull(KNOWN_TYPES.get(mediaType), mediaType);
   }
 
   /**
@@ -564,7 +575,7 @@ public final class MediaType {
     }
     MediaType mediaType = new MediaType(normalizedType, normalizedSubtype, builder.build());
     // Return one of the constants if the media type is a known type.
-    return Objects.firstNonNull(KNOWN_TYPES.get(mediaType), mediaType);
+    return MoreObjects.firstNonNull(KNOWN_TYPES.get(mediaType), mediaType);
   }
 
   private static String normalizeToken(String token) {

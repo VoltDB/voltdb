@@ -16,10 +16,9 @@
 
 package com.google_voltpatches.common.util.concurrent;
 
-import static com.google_voltpatches.common.base.Objects.firstNonNull;
-
 import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.annotations.VisibleForTesting;
+import com.google_voltpatches.common.base.MoreObjects;
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.collect.ImmutableList;
@@ -430,7 +429,7 @@ public abstract class Striped<L> {
       }
       L created = supplier.get();
       existing = locks.putIfAbsent(index, created);
-      return firstNonNull(existing, created);
+      return MoreObjects.firstNonNull(existing, created);
     }
 
     @Override public int size() {
