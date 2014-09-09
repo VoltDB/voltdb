@@ -156,16 +156,19 @@ struct TableIndexScheme {
 struct IndexCursor {
 public:
     IndexCursor(const TupleSchema * schema) :
-        m_forward(true), m_match(schema), m_keyIter(NULL), m_keyEndIter(NULL)
-    {}
+        m_forward(true), m_match(schema)
+    {
+        memset(m_keyIter, 0, sizeof(m_keyIter));
+        memset(m_keyEndIter, 0, sizeof(m_keyEndIter));
+    }
 
     ~IndexCursor() {};
 
     // iteration stuff
     bool m_forward;  // for tree index ONLY
     TableTuple m_match;
-    void * m_keyIter;
-    void * m_keyEndIter; // for multiple tree index ONLY
+    char m_keyIter[16];
+    char m_keyEndIter[16]; // for multiple tree index ONLY
 };
 
 /**

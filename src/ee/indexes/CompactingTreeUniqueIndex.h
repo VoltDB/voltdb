@@ -70,12 +70,9 @@ class CompactingTreeUniqueIndex : public TableIndex
 
     ~CompactingTreeUniqueIndex() {};
 
-    void assignFromIter(IndexCursor* cursor, MapIterator &iter) {
-        cursor->m_keyIter = static_cast<void*> (&iter);
-    }
-
-    MapIterator& castToIter(IndexCursor* cursor) {
-        return *static_cast<MapIterator*> (cursor->m_keyIter);
+    static MapIterator& castToIter(IndexCursor* cursor) {
+        assert(sizeof(MapIterator *) == 16);
+        return *reinterpret_cast<MapIterator*> (cursor->m_keyIter);
     }
 
     bool addEntry(const TableTuple *tuple)
@@ -131,8 +128,8 @@ class CompactingTreeUniqueIndex : public TableIndex
     {
         ++m_lookups;
         cursor->m_forward = true;
-        MapIterator mapIter = findKey(searchKey);
-        assignFromIter(cursor, mapIter);
+        MapIterator &mapIter = castToIter(cursor);
+        mapIter = findKey(searchKey);
 
         if (mapIter.isEnd()) {
             cursor->m_match.move(NULL);
@@ -146,16 +143,18 @@ class CompactingTreeUniqueIndex : public TableIndex
     {
         ++m_lookups;
         cursor->m_forward = true;
-        MapIterator mapIter = m_entries.lowerBound(KeyType(searchKey));
-        assignFromIter(cursor, mapIter);
+        MapIterator &mapIter = castToIter(cursor);
+
+        mapIter = m_entries.lowerBound(KeyType(searchKey));
     }
 
     bool moveToGreaterThanKey(const TableTuple *searchKey, IndexCursor* cursor)
     {
         ++m_lookups;
         cursor->m_forward = true;
-        MapIterator mapIter = m_entries.upperBound(KeyType(searchKey));
-        assignFromIter(cursor, mapIter);
+        MapIterator &mapIter = castToIter(cursor);
+        mapIter = m_entries.upperBound(KeyType(searchKey));
+
         return mapIter.isEnd();
     }
 
@@ -163,7 +162,9 @@ class CompactingTreeUniqueIndex : public TableIndex
     {
         // do moveToKeyOrGreater()
         ++m_lookups;
-        MapIterator mapIter = m_entries.lowerBound(KeyType(searchKey));
+        MapIterator &mapIter = castToIter(cursor);
+        mapIter = m_entries.lowerBound(KeyType(searchKey));
+
         // find prev entry
         if (mapIter.isEnd()) {
             moveToEnd(false, cursor);
@@ -171,7 +172,6 @@ class CompactingTreeUniqueIndex : public TableIndex
             cursor->m_forward = false;
             mapIter.movePrev();
         }
-        assignFromIter(cursor, mapIter);
     }
 
     // only be called after moveToGreaterThanKey() for LTE case
@@ -179,7 +179,7 @@ class CompactingTreeUniqueIndex : public TableIndex
     {
         assert(cursor->m_forward);
         cursor->m_forward = false;
-        MapIterator mapIter = castToIter(cursor);
+        MapIterator &mapIter = castToIter(cursor);
 
         if (mapIter.isEnd()) {
             mapIter = m_entries.rbegin();
@@ -197,21 +197,19 @@ class CompactingTreeUniqueIndex : public TableIndex
     {
         ++m_lookups;
         cursor->m_forward = begin;
-        MapIterator mapIter;
+        MapIterator &mapIter = castToIter(cursor);
 
         if (begin)
             mapIter = m_entries.begin();
         else
             mapIter = m_entries.rbegin();
-
-        assignFromIter(cursor, mapIter);
     }
 
     TableTuple nextValue(IndexCursor* cursor)
     {
         TableTuple retval(getTupleSchema());
 
-        MapIterator mapIter = castToIter(cursor);
+        MapIterator &mapIter = castToIter(cursor);
 
         if (! mapIter.isEnd()) {
             retval.move(const_cast<void*>(mapIter.value()));
@@ -234,7 +232,7 @@ class CompactingTreeUniqueIndex : public TableIndex
 
     bool advanceToNextKey(IndexCursor* cursor)
     {
-        MapIterator mapIter = castToIter(cursor);
+        MapIterator &mapIter = castToIter(cursor);
 
         if (cursor->m_forward) {
             mapIter.moveNext();
@@ -275,7 +273,7 @@ class CompactingTreeUniqueIndex : public TableIndex
             return -1;
         }
         CompactingTreeUniqueIndex::moveToKeyOrGreater(searchKey, cursor);
-        MapIterator mapIter = castToIter(cursor);
+        MapIterator &mapIter = castToIter(cursor);
 
         if (mapIter.isEnd()) {
             return m_entries.size() + 1;
