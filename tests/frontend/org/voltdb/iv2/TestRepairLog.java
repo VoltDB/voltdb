@@ -40,6 +40,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
+import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TheHashinator;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.messaging.CompleteTransactionMessage;
@@ -227,7 +228,7 @@ public class TestRepairLog
     // There should be only one FragmentTaskMessage per MP TxnID
     // There should be at most one FragmentTaskMessage uncovered by a CompleteTransactionMessage
     // There should be no CompleteTransactionMessages indicating restart
-    private void validateRepairLog(List<Iv2RepairLogResponseMessage> stuff)
+    private void validateRepairLog(List<Iv2RepairLogResponseMessage> stuff, long binaryLogUniqueId)
     {
         long prevHandle = Long.MIN_VALUE;
         Long mpTxnId = null;
@@ -249,8 +250,22 @@ public class TestRepairLog
                 }
             } else {
                 assertTrue(imsg.hasHashinatorConfig());
+                assertEquals(binaryLogUniqueId, imsg.getBinaryLogUniqueId());
             }
         }
+    }
+
+    private long setBinaryLogUniqueId(TransactionInfoBaseMessage msg, UniqueIdGenerator uig) {
+        if (msg instanceof Iv2InitiateTaskMessage) {
+            Iv2InitiateTaskMessage taskMsg = (Iv2InitiateTaskMessage) msg;
+            if ("@ApplyBinaryLogSP".equals(taskMsg.getStoredProcedureName())) {
+                StoredProcedureInvocation spi = taskMsg.getStoredProcedureInvocation();
+                long uid = uig.getNextUniqueId();
+                when(spi.getOriginalUniqueId()).thenReturn(uid);
+                return uid;
+            }
+        }
+        return Long.MIN_VALUE;
     }
 
     @Test
@@ -258,25 +273,28 @@ public class TestRepairLog
     {
         TxnEgo sphandle = TxnEgo.makeZero(0);
         UniqueIdGenerator uig = new UniqueIdGenerator(0, 0);
+        UniqueIdGenerator buig = new UniqueIdGenerator(0, 0);
         sphandle = sphandle.makeNext();
         RandomMsgGenerator msgGen = new RandomMsgGenerator();
         RepairLog dut = new RepairLog();
+        long binaryLogUniqueId = Long.MIN_VALUE;
         for (int i = 0; i < 4000; i++) {
             // get next message, update the sphandle according to SpScheduler rules,
             // but only submit messages that would have been forwarded by the master
             // to the repair log.
             TransactionInfoBaseMessage msg = msgGen.generateRandomMessageInStream();
             msg.setSpHandleAndSpUniqueId(sphandle.getTxnId(), uig.getNextUniqueId());
+            binaryLogUniqueId = Math.max(binaryLogUniqueId, setBinaryLogUniqueId(msg, buig));
             sphandle = sphandle.makeNext();
             if (!msg.isReadOnly() || msg instanceof CompleteTransactionMessage) {
                 dut.deliver(msg);
             }
         }
         List<Iv2RepairLogResponseMessage> stuff = dut.contents(1l, false);
-        validateRepairLog(stuff);
+        validateRepairLog(stuff, binaryLogUniqueId);
         // Also check the MP version
         stuff = dut.contents(1l, true);
-        validateRepairLog(stuff);
+        validateRepairLog(stuff, binaryLogUniqueId);
     }
 
     @Test
