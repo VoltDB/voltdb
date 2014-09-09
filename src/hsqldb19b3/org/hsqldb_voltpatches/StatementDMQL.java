@@ -1261,12 +1261,21 @@ public abstract class StatementDMQL extends Statement {
         for (Expression expr : parameters) {
             org.hsqldb_voltpatches.types.Type paramType = expr.getDataType();
             if (paramType == null) {
-                // This covers the case of parameters that were getting tentatively scanned
-                // by the parser but then lost in a "rewind" and later rescanned and added
-                // (again!) to this list but then actually processed, given a data type, etc.
-                // Somehow (?) the hsql executor manages to just ignore the originally scanned
-                // duplicate parameters left behind like this. So, so should VoltDB.
-                continue;
+                // Parameters used with " IN ?" use a different method of recording their paramType
+                // to avoid confusing the HSQL front end. Account for that here.
+                if (expr.nodeDataTypes != null &&
+                        expr.nodeDataTypes.length == 1 &&
+                        expr.nodeDataTypes[0] != null) {
+                    paramType = expr.nodeDataTypes[0];
+                }
+                else {
+                    // This covers the case of parameters that were getting tentatively scanned
+                    // by the parser but then lost in a "rewind" and later rescanned and added
+                    // (again!) to this list but then actually processed, given a data type, etc.
+                    // Somehow (?) the hsql executor manages to just ignore the originally scanned
+                    // duplicate parameters left behind like this. So, so should VoltDB.
+                    continue;
+                }
             }
             VoltXMLElement parameter = new VoltXMLElement("parameter");
             parameterXML.children.add(parameter);
