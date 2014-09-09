@@ -25,9 +25,6 @@ namespace voltdb {
 volatile int tupleBlocksAllocated = 0;
 
 TupleBlock::TupleBlock(Table *table, TBBucketPtr bucket) :
-#ifdef USE_MMAP
-        m_tableAllocationSize(table->m_tableAllocationSize),
-#endif
         m_storage(NULL),
         m_references(0),
         m_tupleLength(table->m_tupleLength),
@@ -40,7 +37,8 @@ TupleBlock::TupleBlock(Table *table, TBBucketPtr bucket) :
         m_bucketIndex(0)
 {
 #ifdef USE_MMAP
-    m_storage = static_cast<char*>(::mmap( 0, table->m_tableAllocationSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 ));
+    size_t tableAllocationSize = static_cast<size_t> (m_tupleLength * m_tuplesPerBlock);
+    m_storage = static_cast<char*>(::mmap( 0, tableAllocationSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 ));
     if (m_storage == MAP_FAILED) {
         std::cout << strerror( errno ) << std::endl;
         throwFatalException("Failed mmap");
@@ -53,8 +51,8 @@ TupleBlock::TupleBlock(Table *table, TBBucketPtr bucket) :
 
 TupleBlock::~TupleBlock() {
 #ifdef USE_MMAP
-    assert(m_tableAllocationSize - m_tupleLength * m_tuplesPerBlock == 0);
-    if (::munmap( m_storage, m_tableAllocationSize) != 0) {
+    size_t tableAllocationSize = static_cast<size_t> (m_tupleLength * m_tuplesPerBlock);
+    if (::munmap( m_storage, tableAllocationSize) != 0) {
         std::cout << strerror( errno ) << std::endl;
         throwFatalException("Failed munmap");
     }

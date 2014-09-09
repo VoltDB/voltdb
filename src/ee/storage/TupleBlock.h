@@ -223,9 +223,6 @@ public:
         return m_bucket;
     }
 private:
-#ifdef USE_MMAP
-    size_t m_tableAllocationSize;
-#endif
     char*   m_storage;
     uint32_t m_references;
     uint32_t m_tupleLength;
