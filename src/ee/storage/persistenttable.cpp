@@ -366,7 +366,7 @@ void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
     }
 }
 
-void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, bool fallible)
+void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, bool fallible, bool shouldDRStream)
 {
     if (fallible) {
         // not null checks at first
@@ -403,7 +403,7 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
     DRTupleStream *drStream = ec->drStream();
     size_t drMark = drStream->m_uso;
-    if (!m_isMaterialized && m_drEnabled) {
+    if (!m_isMaterialized && m_drEnabled && shouldDRStream) {
         ExecutorContext *ec = ExecutorContext::getExecutorContext();
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         const int64_t currentTxnId = ec->currentTxnId();
@@ -1068,7 +1068,7 @@ void PersistentTable::processLoadedTuple(TableTuple &tuple,
                                          size_t &tupleCountPosition,
                                          bool shouldDRStreamRows) {
     try {
-        insertTupleCommon(tuple, tuple, true);
+        insertTupleCommon(tuple, tuple, true, shouldDRStreamRows);
     } catch (ConstraintFailureException &e) {
         if (uniqueViolationOutput) {
             if (serializedTupleCount == 0) {

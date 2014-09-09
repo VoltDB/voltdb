@@ -488,7 +488,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // occurs. In case of exception, target tuple should be released, but the
     // source tuple's memory should still be retained until the exception is
     // handled.
-    void insertTupleCommon(TableTuple &source, TableTuple &target, bool fallible);
+    void insertTupleCommon(TableTuple &source, TableTuple &target, bool fallible, bool shouldDRStream = true);
     void insertTupleForUndo(char *tuple);
     void updateTupleForUndo(char* targetTupleToUpdate,
                             char* sourceTupleWithNewValues,
