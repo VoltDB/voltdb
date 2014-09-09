@@ -24,10 +24,12 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
@@ -35,6 +37,7 @@ import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
+import org.cliffc_voltpatches.high_scale_lib.NonBlockingHashMap;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -92,9 +95,22 @@ public class SnapshotSaveAPI
 
     /*
      * Ugh!, needs to be visible to all the threads doing the snapshot,
-     * pbulished under the snapshot create lock.
+     * published under the snapshot create lock.
      */
     private static Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers;
+
+    /*
+     * Double ugh!, remote DC unique ids get used the same way as the export IDs, end up going into ZK
+     * so that they can be retrieved by the SnapshotCompletionInterest code. Rejoin
+     * needs to get these numbers to initialize the last received IDs
+     */
+    private static Map<Integer, Map<Integer, Long>> remoteDCUniqueIds;
+
+    /*
+     * Populated in ApplyBinaryLogSP and SnapshotRestore. Stored
+     * here so it is visible in community
+     */
+    public static final ConcurrentMap<Integer, AtomicLong> m_lastAppliedUniqueId = new NonBlockingHashMap<>();
 
     /**
      * The only public method: do all the work to start a snapshot.
@@ -133,6 +149,17 @@ public class SnapshotSaveAPI
                 public void run() {
                     Map<Integer, Long> partitionTransactionIds = m_partitionLastSeenTransactionIds;
                     Map<Integer, Long> partitionUniqueIds = m_partitionLastSeenUniqueIds;
+
+                    /*
+                     * Copy last seen unique ids from remote data centers from @ApplyBinaryLogSP
+                     */
+                    Map<Integer, Map<Integer, Long>> remoteDCLastUniqueIds = new HashMap<Integer, Map<Integer, Long>>();
+                    Map<Integer, Long> dc0UniqueIds = new HashMap<Integer, Long>();
+                    remoteDCLastUniqueIds.put(0, dc0UniqueIds);
+                    for (Map.Entry<Integer, AtomicLong> e : m_lastAppliedUniqueId.entrySet()) {
+                        dc0UniqueIds.put(e.getKey(), e.getValue().get());
+                    }
+
                     SNAP_LOG.debug("Last seen partition transaction ids " + partitionTransactionIds + " and unique ids " + partitionUniqueIds);
                     m_partitionLastSeenTransactionIds = new HashMap<Integer, Long>();
                     m_partitionLastSeenUniqueIds = new HashMap<Integer, Long>();
@@ -155,6 +182,7 @@ public class SnapshotSaveAPI
                         }
                     }
                     exportSequenceNumbers = SnapshotSiteProcessor.getExportSequenceNumbers();
+                    remoteDCUniqueIds = remoteDCLastUniqueIds;
                     createSetupIv2(
                             file_path,
                             file_nonce,
@@ -162,6 +190,7 @@ public class SnapshotSaveAPI
                             multiPartTxnId,
                             partitionTransactionIds,
                             partitionUniqueIds,
+                            remoteDCLastUniqueIds,
                             data,
                             context,
                             result,
@@ -234,7 +263,8 @@ public class SnapshotSaveAPI
                                 format,
                                 taskList,
                                 multiPartTxnId,
-                                exportSequenceNumbers);
+                                exportSequenceNumbers,
+                                remoteDCUniqueIds);
                     }
 
                     if (m_deferredSetupFuture != null && taskList != null) {
@@ -448,6 +478,7 @@ public class SnapshotSaveAPI
             final String file_path, final String file_nonce, SnapshotFormat format,
             final long txnId, final Map<Integer, Long> partitionTransactionIds,
             Map<Integer, Long> partitionUniqueIds,
+            Map<Integer, Map<Integer, Long>> remoteDCLastUniqueIds,
             String data, final SystemProcedureExecutionContext context,
             final VoltTable result,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
@@ -483,7 +514,7 @@ public class SnapshotSaveAPI
             throw new RuntimeException("BAD BAD BAD");
         }
         final Callable<Boolean> deferredSetup = plan.createSetup(file_path, file_nonce, txnId,
-                partitionTransactionIds, partitionUniqueIds, jsData, context, result, exportSequenceNumbers, tracker,
+                partitionTransactionIds, partitionUniqueIds, remoteDCLastUniqueIds, jsData, context, result, exportSequenceNumbers, tracker,
                 hashinatorData, timestamp);
         m_deferredSetupFuture =
                 VoltDB.instance().submitSnapshotIOWork(

@@ -34,6 +34,7 @@ public interface SnapshotCompletionInterest {
         public final boolean didSucceed;
         public final String requestId;
         public final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers;
+        public final Map<Integer, Map<Integer, Long>> remoteDCLastUniqueIds;
 
         public SnapshotCompletionEvent(
                 String path,
@@ -43,7 +44,8 @@ public interface SnapshotCompletionInterest {
                 final boolean truncationSnapshot,
                 final boolean didSucceed,
                 final String requestId,
-                final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers) {
+                final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers,
+                final Map<Integer, Map<Integer, Long>> remoteDCLastUniqueIds) {
             this.path = path;
             this.nonce = nonce;
             this.multipartTxnId = multipartTxnId;
@@ -52,6 +54,7 @@ public interface SnapshotCompletionInterest {
             this.didSucceed = didSucceed;
             this.requestId = requestId;
             this.exportSequenceNumbers = exportSequenceNumbers;
+            this.remoteDCLastUniqueIds = remoteDCLastUniqueIds;
         }
     }
 

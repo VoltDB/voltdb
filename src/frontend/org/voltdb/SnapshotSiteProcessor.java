@@ -126,6 +126,13 @@ public class SnapshotSiteProcessor {
      */
     private Map<String, Map<Integer, Pair<Long,Long>>> m_exportSequenceNumbersToLogOnCompletion;
 
+    /**
+     * Used to pass the last seen unique ids from remote datacenters into the snapshot
+     * termination path so it can publish it to ZK where it is extracted by rejoining
+     * nodes
+     */
+    private Map<Integer, Map<Integer, Long>> m_remoteDCLastSeenUniqueIds;
+
     /*
      * Do some random tasks that are deferred to the snapshot termination thread.
      * The two I know about are syncing/closing the digest file and catalog copy
@@ -369,7 +376,8 @@ public class SnapshotSiteProcessor {
             SnapshotFormat format,
             Deque<SnapshotTableTask> tasks,
             long txnId,
-            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers)
+            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+            Map<Integer, Map<Integer, Long>> remoteDCLastUniqueIds)
     {
         ExecutionSitesCurrentlySnapshotting.add(this);
         final long now = System.currentTimeMillis();
@@ -380,6 +388,7 @@ public class SnapshotSiteProcessor {
         m_streamers = Maps.newHashMap();
         m_snapshotTargetTerminators = new ArrayList<Thread>();
         m_exportSequenceNumbersToLogOnCompletion = exportSequenceNumbers;
+        m_remoteDCLastSeenUniqueIds = remoteDCLastUniqueIds;
 
         // Table doesn't implement hashCode(), so use the table ID as key
         for (Map.Entry<Integer, byte[]> tablePredicates : makeTablesAndPredicatesToSnapshot(tasks).entrySet()) {
@@ -650,7 +659,10 @@ public class SnapshotSiteProcessor {
                 final long txnId = m_lastSnapshotTxnId;
                 final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers =
                         m_exportSequenceNumbersToLogOnCompletion;
+                final Map<Integer, Map<Integer, Long>> remoteDCLastUniqueIds =
+                        m_remoteDCLastSeenUniqueIds;
                 m_exportSequenceNumbersToLogOnCompletion = null;
+                m_remoteDCLastSeenUniqueIds = null;
                 final Thread terminatorThread =
                     new Thread("Snapshot terminator") {
                     @Override
@@ -720,7 +732,10 @@ public class SnapshotSiteProcessor {
                                 ExecutionSitesCurrentlySnapshotting.remove(SnapshotSiteProcessor.this);
                             }
 
-                            logSnapshotCompleteToZK(txnId, snapshotSucceeded, exportSequenceNumbers);
+                            logSnapshotCompleteToZK(txnId,
+                                                    snapshotSucceeded,
+                                                    exportSequenceNumbers,
+                                                    m_remoteDCLastSeenUniqueIds);
                         }
                     }
                 };
@@ -744,7 +759,8 @@ public class SnapshotSiteProcessor {
     private static void logSnapshotCompleteToZK(
             long txnId,
             boolean snapshotSuccess,
-            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
+            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+            Map<Integer, Map<Integer, Long>> remoteDCLastUniqueIds) {
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
 
         // Timeout after 10 minutes
@@ -783,6 +799,7 @@ public class SnapshotSiteProcessor {
                     jsonObj.put("isTruncation", false);
                 }
                 mergeExportSequenceNumbers(jsonObj, exportSequenceNumbers);
+                mergeDRLastUniqueIds(jsonObj, remoteDCLastUniqueIds);
                 zk.setData(snapshotPath, jsonObj.toString(4).getBytes("UTF-8"), stat.getVersion());
             } catch (KeeperException.BadVersionException e) {
                 continue;
@@ -867,6 +884,50 @@ public class SnapshotSiteProcessor {
                     newObj.put("sequenceNumber", partitionSequenceNumber);
                     newObj.put("ackOffset", ackOffset);
                     sequenceNumbers.put(partitionIdString, newObj);
+                }
+            }
+        }
+    }
+
+    /*
+     * When recording snapshot completion we also record DR remote DC unique ids
+     * as JSON. Need to merge our unique ids with existing numbers
+     * since multiple replicas will submit the unique ids
+     */
+    private static void mergeDRLastUniqueIds(JSONObject jsonObj,
+            Map<Integer, Map<Integer, Long>> remoteDCLastUniqueId) throws JSONException {
+        JSONObject dcUniqueIdMap;
+        if (jsonObj.has("remoteDCUniqueIds")) {
+            dcUniqueIdMap = jsonObj.getJSONObject("remoteDCUniqueIds");
+        } else {
+            dcUniqueIdMap = new JSONObject();
+            jsonObj.put("remoteDCUniqueIds", dcUniqueIdMap);
+        }
+
+        for (Map.Entry<Integer, Map<Integer, Long>> dcEntry : remoteDCLastUniqueId.entrySet()) {
+            JSONObject lastSeenUniqueIds;
+            final String dcKeyString = dcEntry.getKey().toString();
+            if (dcUniqueIdMap.has(dcKeyString)) {
+                lastSeenUniqueIds = dcUniqueIdMap.getJSONObject(dcKeyString);
+            } else {
+                lastSeenUniqueIds = new JSONObject();
+                dcUniqueIdMap.put(dcKeyString, lastSeenUniqueIds);
+            }
+
+            for (Map.Entry<Integer, Long> partitionEntry : dcEntry.getValue().entrySet()) {
+                final Integer partitionId = partitionEntry.getKey();
+                final String partitionIdString = partitionId.toString();
+                final Long lastSeenUniqueIdLong = partitionEntry.getValue();
+
+                /*
+                 * Check that the sequence number is the same everywhere and log if it isn't.
+                 * Not going to crash because we are worried about poison pill transactions.
+                 */
+                if (dcUniqueIdMap.has(partitionIdString)) {
+                    long existingEntry = dcUniqueIdMap.getLong(partitionIdString);
+                    dcUniqueIdMap.put(partitionIdString, Math.max(existingEntry, lastSeenUniqueIdLong));
+                } else {
+                    dcUniqueIdMap.put(partitionIdString, lastSeenUniqueIdLong);
                 }
             }
         }

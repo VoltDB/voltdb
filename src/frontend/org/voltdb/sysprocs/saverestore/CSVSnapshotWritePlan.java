@@ -71,6 +71,7 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
             String file_path, String file_nonce,
             long txnId, Map<Integer, Long> partitionTransactionIds,
             Map<Integer, Long> partitionUniqueIds,
+            Map<Integer, Map<Integer, Long>> remoteDCLastUniqueIds,
             JSONObject jsData, SystemProcedureExecutionContext context,
             final VoltTable result,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
@@ -159,7 +160,8 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
         placeReplicatedTasks(replicatedSnapshotTasks, tracker.getSitesForHost(context.getHostId()));
 
         // All IO work will be deferred and be run on the dedicated snapshot IO thread
-        return createDeferredSetup(file_path, file_nonce, txnId, partitionTransactionIds, partitionUniqueIds, context,
+        return createDeferredSetup(file_path, file_nonce, txnId, partitionTransactionIds, partitionUniqueIds,
+                remoteDCLastUniqueIds, context,
                 exportSequenceNumbers, timestamp, numTables, snapshotRecord,
                 partitionedSnapshotTasks, replicatedSnapshotTasks);
     }
@@ -169,6 +171,7 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
                                                   final long txnId,
                                                   final Map<Integer, Long> partitionTransactionIds,
                                                   final Map<Integer, Long> partitionUniqueIds,
+                                                  final Map<Integer, Map<Integer, Long>> remoteDCLastUniqueIds,
                                                   final SystemProcedureExecutionContext context,
                                                   final Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
                                                   final long timestamp,
@@ -182,7 +185,7 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
             public Boolean call() throws Exception
             {
                 NativeSnapshotWritePlan.createFileBasedCompletionTasks(file_path, file_nonce,
-                        txnId, partitionTransactionIds, partitionUniqueIds, context, exportSequenceNumbers, null, timestamp,
+                        txnId, partitionTransactionIds, partitionUniqueIds, remoteDCLastUniqueIds, context, exportSequenceNumbers, null, timestamp,
                         context.getNumberOfPartitions());
 
                 for (SnapshotTableTask task : replicatedSnapshotTasks) {

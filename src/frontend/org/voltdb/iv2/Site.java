@@ -731,9 +731,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             SnapshotFormat format,
             Deque<SnapshotTableTask> tasks,
             long txnId,
-            Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers) {
+            Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers,
+            Map<Integer, Map<Integer, Long>> remoteDCLastUniqueIds) {
         m_snapshotter.initiateSnapshots(m_sysprocContext, format, tasks, txnId,
-                                        exportSequenceNumbers);
+                                        exportSequenceNumbers, remoteDCLastUniqueIds);
     }
 
     /*

@@ -362,6 +362,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_mode = OperationMode.INITIALIZING;
             m_config = config;
             m_startMode = null;
+            SnapshotSaveAPI.m_lastAppliedUniqueId.clear();
 
             // set a bunch of things to null/empty/new for tests
             // which reusue the process

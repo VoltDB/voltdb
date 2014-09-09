@@ -144,6 +144,7 @@ public class SnapshotUtil {
         Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
         Map<Integer, Long> partitionTransactionIds,
         Map<Integer, Long> partitionUniqueIds,
+        Map<Integer, Map<Integer, Long>> remoteDCLastUniqueIds,
         InstanceId instanceId,
         long timestamp,
         int newPartitionCount)
@@ -206,6 +207,18 @@ public class SnapshotUtil {
 
                 stringer.key("catalogCRC").value(catalogCRC);
                 stringer.key("instanceId").value(instanceId.serializeToJSONObject());
+
+                stringer.key("remoteDCLastUniqueIds");
+                stringer.object();
+                for (Map.Entry<Integer, Map<Integer, Long>> e : remoteDCLastUniqueIds.entrySet()) {
+                    stringer.key(e.getKey().toString());
+                    stringer.object();
+                    for (Map.Entry<Integer, Long> e2 : e.getValue().entrySet()) {
+                        stringer.key(e2.getKey().toString()).value(e2.getValue());
+                    }
+                    stringer.endObject();
+                }
+                stringer.endObject();
                 stringer.endObject();
             } catch (JSONException e) {
                 throw new IOException(e);
