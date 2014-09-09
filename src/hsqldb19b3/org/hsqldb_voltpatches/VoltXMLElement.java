@@ -18,6 +18,7 @@
 package org.hsqldb_voltpatches;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -116,10 +117,10 @@ public class VoltXMLElement {
     {
         List<VoltXMLElement> m_addedNodes = new ArrayList<VoltXMLElement>();
         List<VoltXMLElement> m_removedNodes = new ArrayList<VoltXMLElement>();
-        List<VoltXMLElement> m_changedNodes = new ArrayList<VoltXMLElement>();
-        List<String> m_addedAttributes = new ArrayList<String>();
-        List<String> m_removedAttributes = new ArrayList<String>();
-        List<String> m_changedAttributes = new ArrayList<String>();
+        Map<String, VoltXMLDiff> m_changedNodes = new HashMap<String, VoltXMLDiff>();
+        Set<String> m_addedAttributes = new HashSet<String>();
+        Set<String> m_removedAttributes = new HashSet<String>();
+        Set<String> m_changedAttributes = new HashSet<String>();
 
         public List<VoltXMLElement> getAddedNodes()
         {
@@ -131,22 +132,22 @@ public class VoltXMLElement {
             return m_removedNodes;
         }
 
-        public List<VoltXMLElement> getChangedNodes()
+        public Map<String, VoltXMLDiff> getChangedNodes()
         {
             return m_changedNodes;
         }
 
-        public List<String> getAddedAttributes()
+        public Set<String> getAddedAttributes()
         {
             return m_addedAttributes;
         }
 
-        public List<String> getRemovedAttributes()
+        public Set<String> getRemovedAttributes()
         {
             return m_removedAttributes;
         }
 
-        public List<String> getChangedAttributes()
+        public Set<String> getChangedAttributes()
         {
             return m_changedAttributes;
         }
@@ -224,7 +225,7 @@ public class VoltXMLElement {
             for (String name : commonNames) {
                 VoltXMLDiff childDiff = computeDiff(first.findChild(name), second.findChild(name));
                 if (!childDiff.isEmpty()) {
-                    result.m_changedNodes.add(second.findChild(name));
+                    result.m_changedNodes.put(name, childDiff);
                 }
             }
         }
