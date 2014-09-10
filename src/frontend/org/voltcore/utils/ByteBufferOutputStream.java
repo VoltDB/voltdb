@@ -40,7 +40,7 @@ public class ByteBufferOutputStream extends OutputStream {
                 initialAllocationSize > 0,
                 "allocation size must be greater than 0"
                 );
-        m_bb = ByteBuffer.wrap(new byte[initialAllocationSize]);
+        m_bb = ByteBuffer.allocateDirect(initialAllocationSize);
     }
 
     public ByteBufferOutputStream() {
@@ -115,7 +115,7 @@ public class ByteBufferOutputStream extends OutputStream {
                 newCapacity *= 2;
             }
 
-            ByteBuffer newbb = ByteBuffer.wrap(new byte[newCapacity]);
+            ByteBuffer newbb = ByteBuffer.allocateDirect(newCapacity);
             newbb.put(oldbb);
 
             m_bb = newbb;
