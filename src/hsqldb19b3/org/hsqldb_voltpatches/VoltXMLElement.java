@@ -115,12 +115,20 @@ public class VoltXMLElement {
 
     static public class VoltXMLDiff
     {
+        final String m_name;
         List<VoltXMLElement> m_addedNodes = new ArrayList<VoltXMLElement>();
         List<VoltXMLElement> m_removedNodes = new ArrayList<VoltXMLElement>();
         Map<String, VoltXMLDiff> m_changedNodes = new HashMap<String, VoltXMLDiff>();
-        Set<String> m_addedAttributes = new HashSet<String>();
+        Map<String, String> m_addedAttributes = new HashMap<String, String>();
         Set<String> m_removedAttributes = new HashSet<String>();
-        Set<String> m_changedAttributes = new HashSet<String>();
+        Map<String, String> m_changedAttributes = new HashMap<String, String>();
+
+        public VoltXMLDiff(String name)
+        {
+            // May need to change this to the toMinString() result for the VoltXMLElement
+            // it matches instead
+            m_name = name;
+        }
 
         public List<VoltXMLElement> getAddedNodes()
         {
@@ -137,7 +145,7 @@ public class VoltXMLElement {
             return m_changedNodes;
         }
 
-        public Set<String> getAddedAttributes()
+        public Map<String, String> getAddedAttributes()
         {
             return m_addedAttributes;
         }
@@ -147,7 +155,7 @@ public class VoltXMLElement {
             return m_removedAttributes;
         }
 
-        public Set<String> getChangedAttributes()
+        public Map<String, String> getChangedAttributes()
         {
             return m_changedAttributes;
         }
@@ -165,71 +173,88 @@ public class VoltXMLElement {
 
     static public VoltXMLDiff computeDiff(VoltXMLElement first, VoltXMLElement second)
     {
-        VoltXMLDiff result = new VoltXMLDiff();
         // Top level call needs both names to match (I think this makes sense)
-        // Just treat it as first removed and second added and don't descend
         if (!first.name.equals(second.name)) {
-            result.m_removedNodes.add(first);
-            result.m_addedNodes.add(second);
+            // not sure this is best behavior, ponder as progress is made
+            return null;
         }
-        else {
-            // first, check the attributes
-            Set<String> firstKeys = first.attributes.keySet();
-            Set<String> secondKeys = new HashSet<String>();
-            secondKeys.addAll(second.attributes.keySet());
-            // Do removed and changed attributes walking the first element's attributes
-            for (String firstKey : firstKeys) {
-                if (!secondKeys.contains(firstKey)) {
-                    result.m_removedAttributes.add(firstKey);
-                }
-                else if (!(second.attributes.get(firstKey).equals(first.attributes.get(firstKey)))) {
-                    result.m_changedAttributes.add(firstKey);
-                }
-                // remove the firstKey from secondKeys to track things added
-                secondKeys.remove(firstKey);
-            }
-            // everything in secondKeys should be something added
-            result.m_addedAttributes.addAll(secondKeys);
 
-            // Now, need to check the children.  Each pair of children with the same names
-            // need to be descended to look for changes
-            // Probably more efficient ways to do this, but brute force it for now
-            // Would be helpful if the underlying children objects were Maps rather than
-            // Lists.
-            Set<String> firstChildren = new HashSet<String>();
-            for (VoltXMLElement child : first.children) {
-                firstChildren.add(child.name);
+        VoltXMLDiff result = new VoltXMLDiff(first.name);
+        // first, check the attributes
+        Set<String> firstKeys = first.attributes.keySet();
+        Set<String> secondKeys = new HashSet<String>();
+        secondKeys.addAll(second.attributes.keySet());
+        // Do removed and changed attributes walking the first element's attributes
+        for (String firstKey : firstKeys) {
+            if (!secondKeys.contains(firstKey)) {
+                result.m_removedAttributes.add(firstKey);
             }
-            Set<String> secondChildren = new HashSet<String>();
-            for (VoltXMLElement child : second.children) {
-                secondChildren.add(child.name);
+            else if (!(second.attributes.get(firstKey).equals(first.attributes.get(firstKey)))) {
+                result.m_changedAttributes.put(firstKey, second.attributes.get(firstKey));
             }
-            Set<String> commonNames = new HashSet<String>();
-            for (VoltXMLElement firstChild : first.children) {
-                if (!secondChildren.contains(firstChild.name)) {
-                    result.m_removedNodes.add(firstChild);
-                }
-                else {
-                    commonNames.add(firstChild.name);
-                }
-            }
-            for (VoltXMLElement secondChild : second.children) {
-                if (!firstChildren.contains(secondChild.name)) {
-                    result.m_addedNodes.add(secondChild);
-                }
-                else {
-                    assert(commonNames.contains(secondChild.name));
-                }
-            }
+            // remove the firstKey from secondKeys to track things added
+            secondKeys.remove(firstKey);
+        }
+        // everything in secondKeys should be something added
+        for (String key : secondKeys) {
+            result.m_addedAttributes.put(key, second.attributes.get(key));
+        }
 
-            for (String name : commonNames) {
-                VoltXMLDiff childDiff = computeDiff(first.findChild(name), second.findChild(name));
-                if (!childDiff.isEmpty()) {
-                    result.m_changedNodes.put(name, childDiff);
-                }
+        // Now, need to check the children.  Each pair of children with the same names
+        // need to be descended to look for changes
+        // Probably more efficient ways to do this, but brute force it for now
+        // Would be helpful if the underlying children objects were Maps rather than
+        // Lists.
+        Set<String> firstChildren = new HashSet<String>();
+        for (VoltXMLElement child : first.children) {
+            firstChildren.add(child.name);
+        }
+        Set<String> secondChildren = new HashSet<String>();
+        for (VoltXMLElement child : second.children) {
+            secondChildren.add(child.name);
+        }
+        Set<String> commonNames = new HashSet<String>();
+        for (VoltXMLElement firstChild : first.children) {
+            if (!secondChildren.contains(firstChild.name)) {
+                result.m_removedNodes.add(firstChild);
+            }
+            else {
+                commonNames.add(firstChild.name);
+            }
+        }
+        for (VoltXMLElement secondChild : second.children) {
+            if (!firstChildren.contains(secondChild.name)) {
+                result.m_addedNodes.add(secondChild);
+            }
+            else {
+                assert(commonNames.contains(secondChild.name));
+            }
+        }
+
+        for (String name : commonNames) {
+            VoltXMLDiff childDiff = computeDiff(first.findChild(name), second.findChild(name));
+            if (!childDiff.isEmpty()) {
+                result.m_changedNodes.put(name, childDiff);
             }
         }
 
         return result;
+    }
+
+    public boolean applyDiff(VoltXMLDiff diff)
+    {
+        // Can only apply a diff to the root at which it was generated
+        assert(name.equals(diff.m_name));
+
+        // Do the attribute changes
+        attributes.putAll(diff.getAddedAttributes());
+        for (String key : diff.getRemovedAttributes()) {
+            attributes.remove(key);
+        }
+        for (Entry<String,String> e : diff.getChangedAttributes().entrySet()) {
+            attributes.put(e.getKey(), e.getValue());
+        }
+
+        return true;
     }
 }
