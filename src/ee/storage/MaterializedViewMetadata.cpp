@@ -56,6 +56,8 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
     m_target->incrementRefcount();
     srcTable->addMaterializedView(this);
 
+    m_indexCursor.reset(new IndexCursor(m_index->getTupleSchema()));
+
     // When updateTupleWithSpecificIndexes needs to be called,
     // the context is lost that identifies which base table columns potentially changed.
     // So the minimal set of indexes that MIGHT need to be updated must include
@@ -106,6 +108,7 @@ void MaterializedViewMetadata::setTargetTable(PersistentTable * target)
 
     // Re-initialize dependencies on the target table, allowing for widened columns
     m_index = m_target->primaryKeyIndex();
+    m_indexCursor.reset(new IndexCursor(m_index->getTupleSchema()));
 
     freeBackedTuples();
     allocateBackedTuples();
@@ -121,7 +124,7 @@ void MaterializedViewMetadata::setIndexForMinMax(std::string indexForMinOrMax)
         for (int i = 0; i < candidates.size(); i++) {
             if (indexForMinOrMax.compare(candidates[i]->getName()) == 0) {
                 m_indexForMinMax = candidates[i];
-                m_indexCursor.reset(new IndexCursor(m_indexForMinMax->getTupleSchema()));
+                m_minMaxCursor.reset(new IndexCursor(m_indexForMinMax->getTupleSchema()));
                 break;
             }
         }
@@ -281,10 +284,10 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueIndexed(const TableTuple
         srcColIdx = m_aggColIndexes[aggIndex];
     }
     NValue newVal = initialNull;
-    m_indexForMinMax->moveToKey(&m_searchKeyTuple, m_indexCursor.get());
+    m_indexForMinMax->moveToKey(&m_searchKeyTuple, m_minMaxCursor.get());
     VOLT_TRACE("Starting to scan tuples using index %s\n", m_indexForMinMax->debug().c_str());
     TableTuple tuple;
-    while (!(tuple = m_indexForMinMax->nextValueAtKey(m_indexCursor.get())).isNullTuple()) {
+    while (!(tuple = m_indexForMinMax->nextValueAtKey(m_minMaxCursor.get())).isNullTuple()) {
         // skip the oldTuple and apply post filter
         if (tuple.equals(oldTuple) ||
             (m_filterPredicate && !m_filterPredicate->eval(&tuple, NULL).isTrue())) {
