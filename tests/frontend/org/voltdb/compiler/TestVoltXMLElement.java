@@ -62,7 +62,7 @@ public class TestVoltXMLElement extends TestCase {
 
         VoltXMLElement second = first.duplicate();
         second.attributes.remove("deleted");
-        second.attributes.put("added", "doesntmatter");
+        second.attributes.put("added", "addedval");
         second.attributes.put("changes", "newvalue");
         second.children.add(new VoltXMLElement("addedchild"));
         second.children.remove(second.findChild("deletedchild"));
@@ -72,13 +72,15 @@ public class TestVoltXMLElement extends TestCase {
 
         VoltXMLDiff diff = VoltXMLElement.computeDiff(first, second);
 
-        Set<String> addedAtt = diff.getAddedAttributes();
+        Map<String, String> addedAtt = diff.getAddedAttributes();
         assertEquals(1, addedAtt.size());
-        assertTrue(addedAtt.contains("added"));
+        assertTrue(addedAtt.keySet().contains("added"));
+        assertEquals("addedval", addedAtt.get("added"));
 
-        Set<String> changedAtt = diff.getChangedAttributes();
+        Map<String, String> changedAtt = diff.getChangedAttributes();
         assertEquals(1, changedAtt.size());
-        assertTrue(changedAtt.contains("changes"));
+        assertTrue(changedAtt.keySet().contains("changes"));
+        assertEquals("newvalue", changedAtt.get("changes"));
 
         Set<String> removedAtt = diff.getRemovedAttributes();
         assertEquals(1, removedAtt.size());
