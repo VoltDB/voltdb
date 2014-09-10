@@ -71,7 +71,6 @@ class CompactingTreeUniqueIndex : public TableIndex
     ~CompactingTreeUniqueIndex() {};
 
     static MapIterator& castToIter(IndexCursor* cursor) {
-        assert(sizeof(MapIterator *) == 16);
         return *reinterpret_cast<MapIterator*> (cursor->m_keyIter);
     }
 

@@ -69,7 +69,6 @@ class CompactingHashUniqueIndex : public TableIndex
     ~CompactingHashUniqueIndex() {};
 
     static MapIterator& castToIter(IndexCursor* cursor) {
-        assert(sizeof(MapIterator *) == 8);
         return *reinterpret_cast<MapIterator*> (cursor->m_keyIter);
     }
 

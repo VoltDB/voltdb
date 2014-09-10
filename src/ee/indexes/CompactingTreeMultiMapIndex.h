@@ -70,7 +70,6 @@ class CompactingTreeMultiMapIndex : public TableIndex
     ~CompactingTreeMultiMapIndex() {};
 
     static MapIterator& castToIter(IndexCursor * cursor) {
-        assert(sizeof(MapIterator *) == 16);
         return *reinterpret_cast<MapIterator*> (cursor->m_keyIter);
     }
 

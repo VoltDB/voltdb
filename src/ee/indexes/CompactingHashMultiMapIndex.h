@@ -69,7 +69,6 @@ class CompactingHashMultiMapIndex : public TableIndex
     ~CompactingHashMultiMapIndex() {};
 
     static MapIterator& castToIter(IndexCursor* cursor) {
-        assert(sizeof(MapIterator *) == 8);
         return *reinterpret_cast<MapIterator*> (cursor->m_keyIter);
     }
 
