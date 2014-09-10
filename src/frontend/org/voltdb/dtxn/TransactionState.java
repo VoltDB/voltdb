@@ -160,7 +160,7 @@ public abstract class TransactionState extends OrderableTransaction  {
         throw new UnsupportedOperationException(msg);
     }
 
-    public void createAllParticipatingFragmentWork(FragmentTaskMessage task) {
+    public void createAllParticipatingFragmentWork(FragmentTaskMessage task, boolean[] isReplicatedRead) {
         String msg = "The current transaction context of type " + this.getClass().getName();
         msg += " doesn't support creating fragment tasks.";
         throw new UnsupportedOperationException(msg);

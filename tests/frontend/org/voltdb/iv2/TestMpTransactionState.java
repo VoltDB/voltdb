@@ -24,10 +24,8 @@
 package org.voltdb.iv2;
 
 import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyLong;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -62,6 +60,9 @@ public class TestMpTransactionState extends TestCase
     static class MpTestPlan
     {
         FragmentTaskMessage remoteWork;
+        // in parallel with remoteWork: which frags are replicated reads,
+        // needed for calling createAllParticipatingFragmentWork
+        boolean[] isReplicatedRead;
         FragmentTaskMessage localWork;
         List<FragmentResponseMessage> generatedResponses =
             new ArrayList<FragmentResponseMessage>();
@@ -80,6 +81,10 @@ public class TestMpTransactionState extends TestCase
     // Currently emulates the code in ProcedureRunner.slowPath()
     // So any change to how that stuff is built will need to
     // be reflected here
+    // slowPath Fix: now replicated reads are done by buddy
+    // in its customized distributed task, not in the local task
+    // so this code has changed somewhat
+    // These plans are for all frags "single frags" or all frags not single frags
     MpTestPlan createTestPlan(int batchSize, boolean readOnly,
                               boolean replicatedTable, boolean rollback,
                               long[] remoteHSIds) throws IOException
@@ -95,15 +100,17 @@ public class TestMpTransactionState extends TestCase
             // each SQL statement in the batch gets an output dep ID
             // which corresponds to a local fragment ID
             depsToResumeList.add(i);
-            // each local fragment ID needs an input dep.  If this is
-            // not replicated read only, generate a new value and add it to
+            // If this is not replicated read only, generate a new value and add it to
             // the distributed output deps
             if (!single_frag) {
                 // take the dep and add 1000
                 depsForLocalTask.add(i + 1000);
                 distributedOutputDepIds.add(i + 1000);
             } else {
-                depsForLocalTask.add(-1);
+            	// there is no local work for a replicated read
+            	// A replicated read is sent to the buddy only in the distributed work phase
+            	// its results go to the resumed SP
+            	distributedOutputDepIds.add(i);
             }
         }
 
@@ -116,68 +123,76 @@ public class TestMpTransactionState extends TestCase
                                                   Long.MIN_VALUE, // try not to care?
                                                   1234l, // magic, change if it matters
                                                   readOnly,
-                                                  false, false);  // IV2 doesn't use final task (yet)
-
+                                                  false, false);  // IV2 doesn't use final task (yet) 
+        
+        plan.isReplicatedRead = new boolean[batchSize];
+        // single_frag case: all frags are replicated reads
+        if (single_frag)
+        	for (int i = 0; i < batchSize; i++)
+        		plan.isReplicatedRead[i] = true; 
+        
+        plan.remoteWork.setProcedureName("testProcedureBOGO");
+        
         for (int i = 0; i < distributedOutputDepIds.size(); i++) {
             plan.remoteWork.addFragment(VoltSystemProcedure.fragIdToHash(Long.MIN_VALUE),
                     distributedOutputDepIds.get(i), createDummyParameterSet());
         }
-        System.out.println("REMOTE TASK: " + plan.remoteWork.toString());
+		System.out.println("REMOTE TASK: " + plan.remoteWork.toString());
+		// generate a remote fragment response for each remote message
+		// generate only one for replicated read batch, from buddy site
+		for (int i = 0; i < remoteHSIds.length; i++) {
+			if (!single_frag || remoteHSIds[i] == buddyHSId) { 
+				FragmentResponseMessage resp = new FragmentResponseMessage(
+						plan.remoteWork, remoteHSIds[i]);
+				if (rollback && i == (remoteHSIds.length - 1)) {
+					resp.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR,
+							new EEException(1234));
+				} else {
+					resp.setStatus(FragmentResponseMessage.SUCCESS, null);
+					for (int j = 0; j < distributedOutputDepIds.size(); j++) {
+						resp.addDependency(distributedOutputDepIds.get(j),
+								new VoltTable(new VoltTable.ColumnInfo("BOGO",
+										VoltType.BIGINT)));
+					}
+				}
+				System.out.println("RESPONSE: " + resp);
+				plan.generatedResponses.add(resp);
+			}
+		}
 
-        if (!single_frag) {
-            // generate a remote fragment response for each remote message
-            for (int i = 0; i < remoteHSIds.length; i++) {
-                FragmentResponseMessage resp =
-                    new FragmentResponseMessage(plan.remoteWork, remoteHSIds[i]);
-                if (rollback && i == (remoteHSIds.length - 1)) {
-                    resp.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR,
-                                   new EEException(1234));
-                }
-                else {
-                    resp.setStatus(FragmentResponseMessage.SUCCESS, null);
-                    for (int j = 0; j < distributedOutputDepIds.size(); j++) {
-                        resp.addDependency(distributedOutputDepIds.get(j),
-                                           new VoltTable(new VoltTable.ColumnInfo("BOGO",
-                                                                                  VoltType.BIGINT)));
-                    }
-                }
-                System.out.println("RESPONSE: " + resp);
-                plan.generatedResponses.add(resp);
-            }
-        }
+		// generate local task with new output IDs, use above outputs as
+		// inputs, if any
 
-        // generate local task with new output IDs, use above outputs as inputs, if any
-        plan.localWork = new FragmentTaskMessage(Long.MIN_VALUE, // try not to care
-                Long.MIN_VALUE,
-                Long.MIN_VALUE,
-                1234l,
-                readOnly,
-                false,
-                false);
+		plan.localWork = new FragmentTaskMessage(Long.MIN_VALUE, // try not to care
+				Long.MIN_VALUE, Long.MIN_VALUE, 1234l, readOnly, false, false);
 
-        for (int i = 0; i < batchSize; i++) {
-            plan.localWork.addFragment(VoltSystemProcedure.fragIdToHash(0L),
-                    depsToResumeList.get(i), createDummyParameterSet());
-        }
+		if (!single_frag) {
+			// There is no local work/borrow task for pure replicated read batch
+			for (int i = 0; i < batchSize; i++) {
+				plan.localWork.addFragment(
+						VoltSystemProcedure.fragIdToHash(0L),
+						depsToResumeList.get(i), createDummyParameterSet());
+			}
 
-       for (int i = 0; i < depsForLocalTask.size(); i++) {
-           if (depsForLocalTask.get(i) < 0) continue;
-           plan.localWork.addInputDepId(i, depsForLocalTask.get(i));
-       }
-       // create the FragmentResponse for the BorrowTask
-       FragmentResponseMessage resp =
-           new FragmentResponseMessage(plan.remoteWork, remoteHSIds[0]);
-       resp.setStatus(FragmentResponseMessage.SUCCESS, null);
-       for (int j = 0; j < batchSize ; j++) {
-           resp.addDependency(depsToResumeList.get(j),
-                              new VoltTable(new VoltTable.ColumnInfo("BOGO",
-                                                                     VoltType.BIGINT)));
-       }
-       System.out.println("BORROW RESPONSE: " + resp);
-       plan.generatedResponses.add(resp);
+			for (int i = 0; i < depsForLocalTask.size(); i++) {
+				if (depsForLocalTask.get(i) < 0)
+					continue;
+				plan.localWork.addInputDepId(i, depsForLocalTask.get(i));
+			}
 
-       System.out.println("LOCAL TASK: " + plan.localWork.toString());
+			// create the FragmentResponse for the BorrowTask
+			FragmentResponseMessage resp = new FragmentResponseMessage(
+					plan.remoteWork, remoteHSIds[0]);
+			resp.setStatus(FragmentResponseMessage.SUCCESS, null);
+			for (int j = 0; j < batchSize; j++) {
+				resp.addDependency(depsToResumeList.get(j), new VoltTable(
+						new VoltTable.ColumnInfo("BOGO", VoltType.BIGINT)));
+			}
+			System.out.println("BORROW RESPONSE: " + resp);
+			plan.generatedResponses.add(resp);
 
+			System.out.println("LOCAL TASK: " + plan.localWork.toString());
+		}
        return plan;
     }
 
@@ -242,7 +257,7 @@ public class TestMpTransactionState extends TestCase
         dut.createLocalFragmentWork(plan.localWork, false);
 
         // This will be passed a FragmentTaskMessage with no deps
-        dut.createAllParticipatingFragmentWork(plan.remoteWork);
+        dut.createAllParticipatingFragmentWork(plan.remoteWork, plan.isReplicatedRead);
         // we should send one message
         verify(mailbox).send(eq(new long[] {buddyHSId}), (VoltMessage)any());
 
@@ -297,8 +312,8 @@ public class TestMpTransactionState extends TestCase
         dut.setupProcedureResume(true, plan.depsToResume);
         dut.createLocalFragmentWork(plan.localWork, false);
 
-        // This will be passed a FragmentTaskMessage with no deps
-        dut.createAllParticipatingFragmentWork(plan.remoteWork);
+        // This will be passed a FragmentTaskMessage with no deps        
+        dut.createAllParticipatingFragmentWork(plan.remoteWork, plan.isReplicatedRead);
         // we should send 6 messages
         verify(mailbox).send(eq(non_local), (VoltMessage)any());
 
@@ -335,7 +350,7 @@ public class TestMpTransactionState extends TestCase
                     0,
                     false);
         int hsids = 6;
-        buddyHSId = 3;
+        buddyHSId = 0;
         long[] non_local = configureHSIds(hsids);
 
         MpTestPlan plan = createTestPlan(batch_size, true, true, false, non_local);
@@ -348,13 +363,13 @@ public class TestMpTransactionState extends TestCase
 
         // emulate ProcedureRunner's use for a single local fragment
         dut.setupProcedureResume(true, plan.depsToResume);
+        // this local work is trivial: real work is done in distributed part
         dut.createLocalFragmentWork(plan.localWork, false);
 
-        // This will be passed a FragmentTaskMessage with no deps
-        dut.createAllParticipatingFragmentWork(plan.remoteWork);
-        // verify no messages sent to non-3 HSIDs for read-only
-        verify(mailbox, never()).send(anyLong(), (VoltMessage)any());
-        verify(mailbox, never()).send(new long[] {anyLong()}, (VoltMessage)any());
+    	// most sites get trivial distrib. work, only buddy gets real work
+        dut.createAllParticipatingFragmentWork(plan.remoteWork, plan.isReplicatedRead);
+        // replicated reads use buddy for one message for distributed work
+        verify(mailbox).send(eq(buddyHSId), (FragmentTaskMessage)any());
 
         // to simplify, offer messages first
         // offer all the necessary fragment responses to satisfy deps
@@ -363,8 +378,8 @@ public class TestMpTransactionState extends TestCase
         }
 
         // if we've satisfied everything, this should run to completion
+        // no more messages are needed in this case
         Map<Integer, List<VoltTable>> results = dut.recursableRun(siteConnection);
-        verify(mailbox).send(eq(buddyHSId), (BorrowTaskMessage)any());
 
         // verify returned deps/tables
         assertEquals(batch_size, results.size());
@@ -406,7 +421,7 @@ public class TestMpTransactionState extends TestCase
         dut.createLocalFragmentWork(plan.localWork, false);
 
         // This will be passed a FragmentTaskMessage with no deps
-        dut.createAllParticipatingFragmentWork(plan.remoteWork);
+         dut.createAllParticipatingFragmentWork(plan.remoteWork, plan.isReplicatedRead);
         // we should send one message
         verify(mailbox).send(eq(new long[] {0}), (VoltMessage)any());
 
@@ -466,7 +481,7 @@ public class TestMpTransactionState extends TestCase
         dut.createLocalFragmentWork(plan.localWork, false);
 
         // This will be passed a FragmentTaskMessage with no deps
-        dut.createAllParticipatingFragmentWork(plan.remoteWork);
+        dut.createAllParticipatingFragmentWork(plan.remoteWork, plan.isReplicatedRead);
         // we should send one message
         verify(mailbox).send(eq(new long[] {buddyHSId}), (VoltMessage)any());
 
@@ -492,7 +507,7 @@ public class TestMpTransactionState extends TestCase
             }
         }
         assertTrue(threw);
-    }
+     }
 
 
     @Test
@@ -507,7 +522,8 @@ public class TestMpTransactionState extends TestCase
         FragmentTaskMessage localFrag = mock(FragmentTaskMessage.class);
         FragmentTaskMessage remoteFrag = mock(FragmentTaskMessage.class);
         when(remoteFrag.getFragmentCount()).thenReturn(1);
-
+        int hsids = 1;
+        configureHSIds(hsids);
         buddyHSId = 0;
         Mailbox mailbox = mock(Mailbox.class);
 
@@ -520,7 +536,11 @@ public class TestMpTransactionState extends TestCase
         verify(dut.m_localWork).setTruncationHandle(truncPt);
 
         // same with partcipating work.
-        dut.createAllParticipatingFragmentWork(remoteFrag);
+        // With only one frag, don't need read/write order special handling
+        // that goes with replicated reads
+        assert(remoteFrag.getFragmentCount()==1);
+    	boolean[] isReplicatedRead = new boolean[remoteFrag.getFragmentCount()];
+        dut.createAllParticipatingFragmentWork(remoteFrag, isReplicatedRead);
         verify(dut.m_remoteWork).setTruncationHandle(truncPt);
     }
 
@@ -571,7 +591,7 @@ public class TestMpTransactionState extends TestCase
         dut.createLocalFragmentWork(plan.localWork, false);
 
         // This will be passed a FragmentTaskMessage with no deps
-        dut.createAllParticipatingFragmentWork(plan.remoteWork);
+        dut.createAllParticipatingFragmentWork(plan.remoteWork, plan.isReplicatedRead);
         // we should send 6 messages
         verify(mailbox).send(eq(non_local), (VoltMessage)any());
 
