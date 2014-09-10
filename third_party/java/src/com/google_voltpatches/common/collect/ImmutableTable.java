@@ -19,7 +19,7 @@ package com.google_voltpatches.common.collect;
 import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
-import com.google_voltpatches.common.base.Objects;
+import com.google_voltpatches.common.base.MoreObjects;
 
 import java.util.Comparator;
 import java.util.Iterator;
@@ -32,7 +32,7 @@ import javax.annotation_voltpatches.Nullable;
  * An immutable {@link Table} with reliable user-specified iteration order.
  * Does not permit null keys or values.
  *
- * <p><b>Note</b>: Although this class is not final, it cannot be subclassed as
+ * <p><b>Note:</b> Although this class is not final, it cannot be subclassed as
  * it has no public or protected constructors. Thus, instances of this class are
  * guaranteed to be immutable.
  *
@@ -281,7 +281,7 @@ public abstract class ImmutableTable<R, C, V> extends AbstractTable<R, C, V> {
    */
   @Override public ImmutableMap<R, V> column(C columnKey) {
     checkNotNull(columnKey);
-    return Objects.firstNonNull(
+    return MoreObjects.firstNonNull(
         (ImmutableMap<R, V>) columnMap().get(columnKey),
         ImmutableMap.<R, V>of());
   }
@@ -305,7 +305,7 @@ public abstract class ImmutableTable<R, C, V> extends AbstractTable<R, C, V> {
    */
   @Override public ImmutableMap<C, V> row(R rowKey) {
     checkNotNull(rowKey);
-    return Objects.firstNonNull(
+    return MoreObjects.firstNonNull(
         (ImmutableMap<C, V>) rowMap().get(rowKey),
         ImmutableMap.<C, V>of());
   }

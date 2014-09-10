@@ -715,7 +715,7 @@ public final class Multisets {
    * {@link Multiset#removeAll removeAll}{@code (occurrencesToRemove)}, which
    * removes all occurrences of elements that appear in
    * {@code occurrencesToRemove}. However, this operation <i>is</i> equivalent
-   * to, albeit more efficient than, the following: <pre>   {@code
+   * to, albeit sometimes more efficient than, the following: <pre>   {@code
    *
    *   for (E e : occurrencesToRemove) {
    *     multisetToModify.remove(e);
@@ -723,15 +723,32 @@ public final class Multisets {
    *
    * @return {@code true} if {@code multisetToModify} was changed as a result of
    *         this operation
-   * @since 10.0
+   * @since 18.0 (present in 10.0 with a requirement that the second parameter
+   *     be a {@code Multiset})
    */
   public static boolean removeOccurrences(
-      Multiset<?> multisetToModify, Multiset<?> occurrencesToRemove) {
-    return removeOccurrencesImpl(multisetToModify, occurrencesToRemove);
+      Multiset<?> multisetToModify, Iterable<?> occurrencesToRemove) {
+    if (occurrencesToRemove instanceof Multiset) {
+      return removeOccurrencesImpl(
+          multisetToModify, (Multiset<?>) occurrencesToRemove);
+    } else {
+      return removeOccurrencesImpl(multisetToModify, occurrencesToRemove);
+    }
+  }
+
+  private static boolean removeOccurrencesImpl(
+      Multiset<?> multisetToModify, Iterable<?> occurrencesToRemove) {
+    checkNotNull(multisetToModify);
+    checkNotNull(occurrencesToRemove);
+    boolean changed = false;
+    for (Object o : occurrencesToRemove) {
+      changed |= multisetToModify.remove(o);
+    }
+    return changed;
   }
 
   /**
-   * Delegate that cares about the element types in occurrencesToRemove.
+   * Delegate that cares about the element types in multisetToModify.
    */
   private static <E> boolean removeOccurrencesImpl(
       Multiset<E> multisetToModify, Multiset<?> occurrencesToRemove) {
