@@ -3190,82 +3190,124 @@ public class TestFunctionsSuite extends RegressionSuite {
     }
 
     // ENG-3283
-    public void testAliaseOfSomeStringFunction() throws IOException, ProcCallException {
+    public void testAliasesOfSomeStringFunctions() throws IOException, ProcCallException {
         String sql;
         VoltTable result;
         Client cl = getClient();
-        ClientResponse cr = cl.callProcedure("P1.insert", 0, "abcABC", null, null,
+        ClientResponse cr = cl.callProcedure("P1.insert", 0, "abc123ABC", null, null,
                 Timestamp.valueOf("2014-07-15 01:02:03.456"));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         // LTRIM and RTRIM has been implemented and tested
 
         // SUBSTR
-        if (!isHSQL()){ // surprisingly, hsql doesn't work
-            sql = "select SUBSTR('abc123ABC', 1, 2) from p1 where id = 0;";
-            cr = cl.callProcedure("@AdHoc", sql);
-            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-            result = cr.getResults()[0];
-            validateTableColumnOfScalarVarchar(result, new String[]{"ab"});
+        sql = "select SUBSTR(DESC, 1, 2) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"ab"});
 
-            // some wired cases can pass test
-            sql = "select SUBSTR('abc123ABC', 0, 2) from p1 where id = 0;";
-            cr = cl.callProcedure("@AdHoc", sql);
-            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-            result = cr.getResults()[0];
-            validateTableColumnOfScalarVarchar(result, new String[]{"ab"});
+        sql = "select SUBSTR(DESC, 4, 3) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"123"});
 
-            sql = "select SUBSTR('abc123ABC', -1, 2) from p1 where id = 0;";
-            cr = cl.callProcedure("@AdHoc", sql);
-            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-            result = cr.getResults()[0];
-            validateTableColumnOfScalarVarchar(result, new String[]{"ab"});
+        sql = "select SUBSTR(DESC, 3) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"c123ABC"});
 
-            sql = "select SUBSTR('abc123ABC', 3) from p1 where id = 0;";
-            cr = cl.callProcedure("@AdHoc", sql);
-            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-            result = cr.getResults()[0];
-            validateTableColumnOfScalarVarchar(result, new String[]{"c123ABC"});
+        // Test spelled out SUBSTRING with comma delimiters vs. old-school FROM and FOR keywords.
+        sql = "select SUBSTRING(DESC, 1, 2) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"ab"});
 
-            sql = "select SUBSTRING('abc123ABC', 3) from p1 where id = 0;";
-            cr = cl.callProcedure("@AdHoc", sql);
-            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-            result = cr.getResults()[0];
-            validateTableColumnOfScalarVarchar(result, new String[]{"c123ABC"});
-        }
+        sql = "select SUBSTRING(DESC, 4, 3) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"123"});
+
+        sql = "select SUBSTRING(DESC, 3) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"c123ABC"});
+
+        // Some weird cases -- the SQL-2003 standard says that even START < 1
+        // moves the end point (in this case, to the left) which is based on (LENGTH + START).
+        sql = "select SUBSTR(DESC, 0, 2) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"a"}); // not "ab" !
+
+        sql = "select SUBSTR(DESC, -1, 2) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{""}); // not "ab" !
+
+        sql = "select SUBSTR(DESC, -1, 1) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{""}); // not "a" !
+
+        sql = "select SUBSTRING(DESC, 0, 2) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"a"}); // not "ab" !
+
+        sql = "select SUBSTRING(DESC, -1, 2) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{""}); // not "ab" !
+
+        sql = "select SUBSTRING(DESC, -1, 1) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{""}); // not "a" !
 
         // LCASE and UCASE
-        sql = "select LCASE('abc123ABC') from p1 where id = 0;";
+        sql = "select LCASE(DESC) from p1 where id = 0;";
         cr = cl.callProcedure("@AdHoc", sql);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         validateTableColumnOfScalarVarchar(result, new String[]{"abc123abc"});
 
-        sql = "select UCASE('abc123ABC') from p1 where id = 0;";
+        sql = "select UCASE(DESC) from p1 where id = 0;";
         cr = cl.callProcedure("@AdHoc", sql);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         validateTableColumnOfScalarVarchar(result, new String[]{"ABC123ABC"});
 
         // INSERT
-        sql = "select INSERT('abc123ABC', 1, 3,'ABC') from p1 where id = 0;";
+        sql = "select INSERT(DESC, 1, 3,'ABC') from p1 where id = 0;";
         cr = cl.callProcedure("@AdHoc", sql);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         validateTableColumnOfScalarVarchar(result, new String[]{"ABC123ABC"});
 
-        sql = "select INSERT('abc123ABC', 1, 1,'ABC') from p1 where id = 0;";
+        sql = "select INSERT(DESC, 1, 1,'ABC') from p1 where id = 0;";
         cr = cl.callProcedure("@AdHoc", sql);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         validateTableColumnOfScalarVarchar(result, new String[]{"ABCbc123ABC"});
 
-        sql = "select INSERT('abc123ABC', 1, 4,'ABC') from p1 where id = 0;";
+        sql = "select INSERT(DESC, 1, 4,'ABC') from p1 where id = 0;";
         cr = cl.callProcedure("@AdHoc", sql);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         validateTableColumnOfScalarVarchar(result, new String[]{"ABC23ABC"});
 
-        sql = "select INSERT('abc123ABC', 1, 0,'ABC') from p1 where id = 0;";
+        sql = "select INSERT(DESC, 1, 0,'ABC') from p1 where id = 0;";
         cr = cl.callProcedure("@AdHoc", sql);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];

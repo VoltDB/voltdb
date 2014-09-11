@@ -895,7 +895,12 @@ public class FunctionSQL extends Expression {
                 long offset = ((Number) value).longValue() - 1;
                 long length = 0;
 
+                // A VoltDB extension to make the third parameter optional and ignored vs. broken and disabled
+                /* disable 1 line ...
                 if (nodes[2] != null) {
+                ... disabled 1 line */
+                if (nodes.length > 2 && nodes[2] != null) {
+                // End of VoltDB extension
                     if (data[2] == null) {
                         return null;
                     }
@@ -905,6 +910,8 @@ public class FunctionSQL extends Expression {
                     length = ((Number) value).longValue();
                 }
 
+                // A VoltDB extension to make the fourth parameter optional and ignored vs. broken and disabled
+                /* disable 9 lines ...
                 if (nodes[3] != null
                         && ((Number) nodes[2].valueData).intValue()
                            == Tokens.OCTETS) {
@@ -914,6 +921,11 @@ public class FunctionSQL extends Expression {
 
                 return ((CharacterType) dataType).substring(session, data[0],
                         offset, length, nodes[2] != null, false);
+                ... disabled 9 lines */
+
+                return ((CharacterType) dataType).substring(session, data[0],
+                		offset, length, (nodes.length > 2 && nodes[2] != null), false);
+                // End of VoltDB extension
             }
             /*
             case FUNCTION_SUBSTRING_REG_EXPR :
