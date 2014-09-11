@@ -97,6 +97,9 @@ private:
 
     uint32_t m_blockOffset;
     TBPtr m_currentBlock;
+public:
+    int32_t m_skippedDirtyRows;
+    int32_t m_skippedInactiveRows;
 };
 }
 

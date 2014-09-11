@@ -24,7 +24,15 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.Stack;
 
+import org.apache.commons.lang3.StringUtils;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -42,19 +50,273 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
     static final String vcDefault = "dachshund";
     static final long intDefault = 121;
 
-    static public junit.framework.Test suite() {
-        VoltServerConfig config = null;
-        final MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestInsertIntoSelectSuite.class);
+    static private class ProcedureTemplate {
 
-        final VoltProjectBuilder project = new VoltProjectBuilder();
+        static List<String> partitionedSourceTables = null;
+        static List<String> replicatedSourceTables = null;
+        static List<String> partitionedAndReplicatedSourceTables = null;
 
-        try {
-            String schema =
+        private static List<String> getPartitionedSourceTables() {
+            if (partitionedSourceTables == null) {
+                partitionedSourceTables = new ArrayList<String>(2);
+                partitionedSourceTables.add("source_p1");
+                partitionedSourceTables.add("source_p2");
+            }
+            return partitionedSourceTables;
+        }
+
+        private static List<String> getReplicatedSourceTables() {
+            if (replicatedSourceTables == null) {
+                replicatedSourceTables = new ArrayList<String>(2);
+                replicatedSourceTables.add("source_r1");
+                replicatedSourceTables.add("source_r2");
+            }
+            return replicatedSourceTables;
+        }
+
+        private static List<String> getPartitionedAndReplicatedSourceTables() {
+            if (partitionedAndReplicatedSourceTables == null) {
+                partitionedAndReplicatedSourceTables = new ArrayList<String>();
+                partitionedAndReplicatedSourceTables.addAll(getPartitionedSourceTables());
+                partitionedAndReplicatedSourceTables.addAll(getReplicatedSourceTables());
+            }
+            return partitionedAndReplicatedSourceTables;
+        }
+
+        private static final String partitionedTargetTable = "target_p";
+        private static final String replicatedTargetTable = "target_r";
+
+        // Instance Data
+
+        private final String m_queryFormat;
+        private final String m_label;
+
+        private int m_comboCounter = 0;
+
+        private final Map<String, List<String>> m_procNameToStmts = new HashMap<>();
+
+        ProcedureTemplate(String label, String queryFormat) {
+            m_queryFormat = queryFormat;
+            m_label = label;
+            generateStatements();
+        }
+
+        private void formatQueryAndGenerateStatements(String queryFormat,
+                boolean partitionProcedure,
+                String targetTable,
+                Collection<String> sourceTables1,
+                Collection<String> sourceTables2) {
+            Stack<String> formatStack = new Stack<String>();
+
+            formatStack.push(queryFormat);
+            while (! formatStack.empty()) {
+                String format = formatStack.pop();
+
+                int numTablesNeeded = StringUtils.countMatches(format, "%s");
+                if (numTablesNeeded > 0) {
+
+                    Collection<String> whichSet = null;
+                    if (numTablesNeeded == 2 ) {
+                        // First table should be from
+                        whichSet = sourceTables1;
+                    } else {
+                        whichSet = sourceTables2;
+                    }
+
+
+                    for (String sourceTable : whichSet) {
+                        String newFormat = format.replaceFirst("%s", sourceTable);
+                        formatStack.push(newFormat);
+                    }
+                } else {
+                    generateStatementsForProcedure(partitionProcedure, targetTable, format);
+                }
+            }
+        }
+
+        private void generateStatements() {
+
+            int numParams = StringUtils.countMatches(m_queryFormat, "?");
+
+            if (numParams > 0) {
+                // generate stored procedures from this template that insert into a partitioned table,
+                // selecting from both partitioned and replicated tables.
+                // partitioned the stored procedures
+                formatQueryAndGenerateStatements(m_queryFormat, true, partitionedTargetTable,
+                        getPartitionedAndReplicatedSourceTables(), getPartitionedAndReplicatedSourceTables());
+            }
+
+            // As above, except that stored procedures are not marked as single-partition
+            formatQueryAndGenerateStatements(m_queryFormat, false, partitionedTargetTable,
+                    getPartitionedSourceTables(), getPartitionedAndReplicatedSourceTables());
+
+            // generated procedures that insert into replicated tables, selecting from replicated tables
+            formatQueryAndGenerateStatements(m_queryFormat, false, replicatedTargetTable,
+                    getReplicatedSourceTables(), getReplicatedSourceTables());
+        }
+
+        private String generateProcedureName(boolean partitioned, String targetTable) {
+            String procName = "insert_into_select_" + m_label + "_" + targetTable;
+            String combo = String.format("_combo%02d", (Object)m_comboCounter);
+            m_comboCounter++;
+
+            procName += combo;
+            if (partitioned) {
+                procName += "_partitioned";
+            }
+
+            return procName;
+        }
+
+
+
+        private void generateStatementsForProcedure(boolean partitionProcedure, String targetTable, String query) {
+            String procName = generateProcedureName(partitionProcedure, targetTable);
+
+            // Create a map
+            //
+            // procedureName ->   Ad hoc statement
+            //                    create procedure statement (and maybe partition procedure statement)
+            //                    verify procedure
+            //                    result set produced by HSQL?
+
+            StringBuilder adHocStmt = new StringBuilder();
+            adHocStmt.append("INSERT INTO " + targetTable + "\n");
+            adHocStmt.append("  " + query + ";\n");
+
+            StringBuilder insertProc = new StringBuilder();
+            insertProc.append("\nCREATE PROCEDURE " + procName + " AS\n");
+            insertProc.append(adHocStmt.toString());
+            if (partitionProcedure) {
+                insertProc.append("PARTITION PROCEDURE " + procName + " ON TABLE " + targetTable + " COLUMN bi;\n");
+            }
+
+            StringBuilder verifyProc = new StringBuilder();
+            verifyProc.append("\nCREATE PROCEDURE verify_" + procName + " AS \n");
+            verifyProc.append("  " + query + "\n");
+            verifyProc.append("  ORDER BY 1, 2, 3, 4;\n");
+
+            ArrayList<String> stmts = new ArrayList<>();
+            stmts.add(adHocStmt.toString());
+            stmts.add(insertProc.toString());
+            stmts.add(verifyProc.toString());
+            m_procNameToStmts.put(procName, stmts);
+        }
+
+        Map<String, List<String>> getGeneratedStatements() {
+            return m_procNameToStmts;
+        }
+    }
+
+
+    static final ProcedureTemplate procedureTemplates[] = new ProcedureTemplate[] {
+        new ProcedureTemplate("simple",
+                              "select * from %s where bi = ?"),
+        new ProcedureTemplate("simple_noparam",
+                              "select * from %s"),
+        new ProcedureTemplate("join",
+                              "select t1.bi, t1.vc, t2.ii, t2.ti " +
+                              "from %s as t1 inner join %s as t2 on t1.bi = t2.bi and t1.ii = t2.ii " +
+                              "where t1.bi = ?"),
+        new ProcedureTemplate("join_noparam",
+                              "select t1.bi, t1.vc, t2.ii, t2.ti " +
+                              "from %s as t1 inner join %s as t2 on t1.bi = t2.bi and t1.ii = t2.ii"),
+        new ProcedureTemplate("subquery",
+                              "select * " +
+                              "from (select bi, 'subq + ' || vc as vc, ii, ti from %s) as t1_subq " +
+                              "where t1_subq.bi = ?"),
+        new ProcedureTemplate("subquery_noparam",
+                              "select * " +
+                              "from (select bi, 'subq + ' || vc as vc, ii, ti from %s) as t1_subq"),
+        new ProcedureTemplate("subquery_inner_filter",
+                              "select * " +
+                              "from (select bi, 'subq + ' || vc as vc, ii, ti from %s where bi = ?) as t1_subq"),
+        new ProcedureTemplate("subquery_inner_filter_noparam",
+                              "select * " +
+                              "from (select bi, 'subq + ' || vc as vc, ii, ti from %s) as t1_subq"),
+        new ProcedureTemplate("subquery_join",
+                              "select t1_subq.bi, t1_subq.vc, t2.ii, t2.ti " +
+                              "from (select bi, 'subq + ' || vc as vc, ii, ti from %s) as t1_subq " +
+                              "inner join %s as t2 on t1_subq.bi = t2.bi and t1_subq.ii = t2.ii " +
+                              "where t1_subq.bi = ?"),
+        new ProcedureTemplate("subquery_join_noparam",
+                              "select t1_subq.bi, t1_subq.vc, t2.ii, t2.ti " +
+                              "from (select bi, 'subq + ' || vc as vc, ii, ti from %s) as t1_subq " +
+                              "inner join %s as t2 on t1_subq.bi = t2.bi and t1_subq.ii = t2.ii"),
+        new ProcedureTemplate("join_two_subqueries",
+                              "select t1_subq.bi, t1_subq.vc, t2_subq.ii, t2_subq.ti " +
+                              "from (select bi, 'subq + ' || vc as vc, ii, ti from %s) as t1_subq " +
+                              "inner join (select bi, '2nd_subq + ' || vc as vc, ii, ti from %s) as t2_subq " +
+                              "on t1_subq.bi = t2_subq.bi and t1_subq.ii = t2_subq.ii " +
+                              "where t1_subq.bi = ?"),
+        new ProcedureTemplate("join_two_subqueries_noparam",
+                              "select t1_subq.bi, t1_subq.vc, t2_subq.ii, t2_subq.ti " +
+                              "from (select bi, 'subq + ' || vc as vc, ii, ti from %s) as t1_subq " +
+                              "inner join (select bi, '2nd_subq + ' || vc as vc, ii, ti from %s) as t2_subq " +
+                              "on t1_subq.bi = t2_subq.bi and t1_subq.ii = t2_subq.ii"),
+        new ProcedureTemplate("nest_subqueries",
+                              "select t1_subq.bi, t1_subq.vc, t2_subq.ii, t2_subq.ti " +
+                              "from (select bi, 'subq + ' || vc as vc, ii, ti from " +
+                              "(select bi, 'nested ' || vc as vc, ii, ti from %s) as t1_subq_subq) as t1_subq " +
+                              "inner join (select bi, '2nd_subq + ' || vc as vc, ii, ti from %s) as t2_subq " +
+                              "on t1_subq.bi = t2_subq.bi and t1_subq.ii = t2_subq.ii " +
+                              "where t1_subq.bi = ?"),
+        new ProcedureTemplate("nest_subqueries_noparam",
+                              "select t1_subq.bi, t1_subq.vc, t2_subq.ii, t2_subq.ti " +
+                              "from (select bi, 'subq + ' || vc as vc, ii, ti from " +
+                              "(select bi, 'nested ' || vc as vc, ii, ti from %s) as t1_subq_subq) as t1_subq " +
+                              "inner join (select bi, '2nd_subq + ' || vc as vc, ii, ti from %s) as t2_subq " +
+                              "on t1_subq.bi = t2_subq.bi and t1_subq.ii = t2_subq.ii")
+    };
+
+    private static Map<String, List<String>> generatedStmtMap = null;
+
+    private static Map<String, List<String>> mapOfAllGeneratedStatements() {
+
+        if (generatedStmtMap == null) {
+            generatedStmtMap = new HashMap<>();
+            for (ProcedureTemplate t : procedureTemplates) {
+                for (Map.Entry<String, List<String>> e : t.getGeneratedStatements().entrySet()) {
+                    generatedStmtMap.put(e.getKey(), e.getValue());
+                }
+            }
+        }
+
+        return generatedStmtMap;
+    }
+
+    private static int numberOfParametersNeeded(String procName) {
+        List<String> stmts = mapOfAllGeneratedStatements().get(procName);
+        int numParams = StringUtils.countMatches(stmts.get(0), "?");
+        return numParams;
+    }
+
+    private static List<String> generatedProcedures() {
+        List<String> procs = new ArrayList<>();
+        for (List<String> stmts : mapOfAllGeneratedStatements().values()) {
+            procs.add(stmts.get(1));
+            procs.add(stmts.get(2));
+        }
+
+        return procs;
+    }
+
+    static private String generateSchema() {
+        StringBuilder sb = new StringBuilder();
+
+        // Target tables: 1 partitioned, 1 replicated
+        // Source tables: 2 partitioned, 2 replicated
+        sb.append(
                 "CREATE TABLE target_p (bi bigint not null," +
                 "vc varchar(100) default '" + vcDefault +"'," +
                 "ii integer default " + intDefault + "," +
                 "ti tinyint default " + intDefault + " not null);" +
                 "partition table target_p on column bi;" +
+
+                "CREATE TABLE target_r (bi bigint not null," +
+                "vc varchar(100) default '" + vcDefault +"'," +
+                "ii integer default " + intDefault + "," +
+                "ti tinyint default " + intDefault + " not null);" +
 
                 "CREATE TABLE source_p1 (bi bigint not null," +
                 "vc varchar(100)," +
@@ -68,22 +330,36 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
                 "ti tinyint);" +
                 "partition table source_p2 on column bi;" +
 
-                "CREATE TABLE source_r (bi bigint not null," +
-                "vc varchar(4)," +
+                "CREATE TABLE source_r1 (bi bigint not null," +
+                "vc varchar(100)," +
                 "ii integer," +
                 "ti tinyint);" +
 
-                "create procedure get_all_target_rows as select * from target_p order by bi, vc, ii, ti;" +
+                "CREATE TABLE source_r2 (bi bigint not null," +
+                "vc varchar(4)," +
+                "ii integer," +
+                "ti tinyint);"
+                );
 
+        sb.append(
+
+                // select all rows from target tables, to verify inserted rows
+                "create procedure get_all_target_p_rows as select * from target_p order by bi, vc, ii, ti;" +
+                "create procedure get_all_target_r_rows as select * from target_r order by bi, vc, ii, ti;" +
+
+                // A very simple insert into select statement
                 "create procedure insert_p_source_p as insert into target_p (bi, vc, ii, ti) select * from source_p1 where bi = ?;" +
                 "partition procedure insert_p_source_p on table target_p column bi;" +
 
+                // an insert into select statement that makes use of default values
                 "create procedure insert_p_use_defaults as insert into target_p (bi, ti) select bi, ti from source_p1 where bi = ?;" +
                 "partition procedure insert_p_use_defaults on table target_p column bi;" +
 
+                // an insert into select statement with unordered columns
                 "create procedure insert_p_use_defaults_reorder as insert into target_p (ti, bi) select ti, bi from source_p1 where bi = ?;" +
                 "partition procedure insert_p_use_defaults_reorder on table target_p column bi;" +
 
+                // group by in the subquery
                 "create procedure insert_p_source_p_agg as insert into target_p (bi, vc, ii, ti) " +
                 "select bi, max(vc), max(ii), min(ti)" + " from source_p1 where bi = ? group by bi;" +
                 "partition procedure insert_p_source_p_agg on table target_p column bi;" +
@@ -102,133 +378,49 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
                 "create procedure insert_p_source_p_nonsensical_cast as insert into target_p (bi, ii, vc, ti) select * from source_p1 where bi = ?;" +
                 "partition procedure insert_p_source_p_nonsensical_cast on table target_p column bi;" +
 
+                // Target table and source table the same
                 "create procedure select_and_insert_into_source as " +
                 "insert into source_p1 (bi, vc, ti, ii) select bi, vc, ti, 1000 * ii from source_p1 where bi = ? order by bi, ti;" +
                 "partition procedure select_and_insert_into_source on table source_p1 column bi;" +
 
                 // HSQL seems to want a cast for the parameter
-                // Note that there is no filter in source_r
+                // Note that there is no filter in source_r2
                 "create procedure insert_param_in_select_list as " +
                 "insert into target_p (bi, vc, ii, ti) " +
-                "select cast(? as bigint), vc, ii, ti from source_r order by ii;" +
+                "select cast(? as bigint), vc, ii, ti from source_r2 order by ii;" +
                 "partition procedure insert_param_in_select_list on table target_p column bi;" +
 
+                // try to insert into the wrong partition
                 "create procedure insert_wrong_partition as " +
-                "insert into target_p (bi, ti) select ti, cast(? as tinyint) from source_r; " +
+                "insert into target_p (bi, ti) select ti, cast(? as tinyint) from source_r2; " +
                 "partition procedure insert_wrong_partition on table target_p column bi; " +
 
+                // try to violate a not null constraint
                 "create procedure insert_select_violate_constraint as " +
                 "insert into target_p (bi, ti) " +
                 "select bi, case ti when 55 then null else ti end from source_p1 where bi = ? order by ti asc;" +
                 "partition procedure insert_select_violate_constraint on table target_p column bi; " +
 
-                // More complex insert-into-select stored procedures below.
-                // Each procedure has a "verify_" partner that produces the rows to be inserted
-                // The verify procedures are not partitioned, to avoid masking potential issues
+                ""
+                );
 
-                // join two partitioned tables
-                "create procedure insert_select_with_join as " +
-                "insert into target_p " +
-                "select sp1.bi, sp1.vc, sp2.ii, sp2.ti " +
-                "from source_p1 as sp1 inner join source_p2 as sp2 on sp1.bi = sp2.bi and sp1.ii = sp2.ii " +
-                "where sp1.bi = ?;" +
-                "partition procedure insert_select_with_join on table target_p column bi;" +
+        // Generate CREATE STORED PROCEDURE, PARTITION STORED PROCEDURE statements from each procedure template,
+        // as well as verify procedures for checking results
+        for (String proc : generatedProcedures()) {
+            sb.append(proc);
+        }
 
-                "create procedure verify_insert_select_with_join as " +
-                "select sp1.bi, sp1.vc, sp2.ii, sp2.ti " +
-                "from source_p1 as sp1 inner join source_p2 as sp2 on sp1.bi = sp2.bi and sp1.ii = sp2.ii " +
-                "where sp1.bi = ? order by sp1.bi, sp1.vc, sp2.ii, sp2.ti;" +
+        return sb.toString();
+    }
 
-                // Join partitioned to replicated table
-                "create procedure insert_select_join_replicated as " +
-                "insert into target_p " +
-                "select sp1.bi, sp1.vc, sr.ii, sr.ti from source_p1 as sp1 inner join source_r as sr on " +
-                "sr.bi = sp1.bi and sr.ii = sp1.ii where sp1.bi = ?; " +
-                "partition procedure insert_select_join_replicated on table target_p column bi;" +
+    static public junit.framework.Test suite() {
+        VoltServerConfig config = null;
+        final MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestInsertIntoSelectSuite.class);
 
-                "create procedure verify_insert_select_join_replicated as " +
-                "select sp1.bi, sp1.vc, sr.ii, sr.ti from source_p1 as sp1 inner join source_r as sr on " +
-                "sr.bi = sp1.bi and sr.ii = sp1.ii where sp1.bi = ?" +
-                "order by sp1.bi, sp1.vc, sr.ii, sr.ti; " +
+        final VoltProjectBuilder project = new VoltProjectBuilder();
 
-                // select from subquery
-                "create procedure insert_select_subquery as " +
-                "insert into target_p " +
-                "select * " +
-                "from (select bi, 'subq + ' || vc as vc, ii, ti from source_p1) as sp1_subq " +
-                "where sp1_subq.bi = ?; " +
-                "partition procedure insert_select_subquery on table target_p column bi;" +
-
-                "create procedure verify_insert_select_subquery as " +
-                "select * " +
-                "from (select bi, 'subq + ' || vc as vc, ii, ti from source_p1) as sp1_subq " +
-                "where sp1_subq.bi = ? order by bi, vc, ii, ti; " +
-
-                // select from subquery---partitioning predicate is inside subquery
-                "create procedure insert_select_subquery_inner_filter as " +
-                "insert into target_p " +
-                "select * " +
-                "from (select bi, 'subq + ' || vc as vc, ii, ti from source_p1 where bi = ?) as sp1_subq; " +
-                "partition procedure insert_select_subquery_inner_filter on table target_p column bi;" +
-
-                "create procedure verify_insert_select_subquery_inner_filter as " +
-                "select * " +
-                "from (select bi, 'subq + ' || vc as vc, ii, ti from source_p1 where bi = ?) as sp1_subq " +
-                "order by bi, vc, ii, ti; " +
-
-                // select from subquery joined with table
-                "create procedure insert_select_subquery_join as " +
-                "insert into target_p " +
-                "select sp1_subq.bi, sp1_subq.vc, sp2.ii, sp2.ti " +
-                "from (select bi, 'subq + ' || vc as vc, ii, ti from source_p1) as sp1_subq " +
-                "inner join source_p2 as sp2 on sp1_subq.bi = sp2.bi and sp1_subq.ii = sp2.ii " +
-                "where sp1_subq.bi = ?; " +
-                "partition procedure insert_select_subquery_join on table target_p column bi; " +
-
-                "create procedure verify_insert_select_subquery_join as " +
-                "select sp1_subq.bi, sp1_subq.vc, sp2.ii, sp2.ti " +
-                "from (select bi, 'subq + ' || vc as vc, ii, ti from source_p1) as sp1_subq " +
-                "inner join source_p2 as sp2 on sp1_subq.bi = sp2.bi and sp1_subq.ii = sp2.ii " +
-                "where sp1_subq.bi = ? order by sp1_subq.bi, sp1_subq.vc, sp2.ii, sp2.ti; " +
-
-                // select from two subqueries and join them
-                "create procedure insert_select_join_two_subqueries as " +
-                "insert into target_p " +
-                "select sp1_subq.bi, sp1_subq.vc, sp2_subq.ii, sp2_subq.ti " +
-                "from (select bi, 'subq + ' || vc as vc, ii, ti from source_p1) as sp1_subq " +
-                "inner join (select bi, '2nd_subq + ' || vc as vc, ii, ti from source_p2) as sp2_subq " +
-                "on sp1_subq.bi = sp2_subq.bi and sp1_subq.ii = sp2_subq.ii " +
-                "where sp1_subq.bi = ?; " +
-                "partition procedure insert_select_join_two_subqueries on table target_p column bi; " +
-
-                "create procedure verify_insert_select_join_two_subqueries as " +
-                "select sp1_subq.bi, sp1_subq.vc, sp2_subq.ii, sp2_subq.ti " +
-                "from (select bi, 'subq + ' || vc as vc, ii, ti from source_p1) as sp1_subq " +
-                "inner join (select bi, '2nd_subq + ' || vc as vc, ii, ti from source_p2) as sp2_subq " +
-                "on sp1_subq.bi = sp2_subq.bi and sp1_subq.ii = sp2_subq.ii " +
-                "where sp1_subq.bi = ? " +
-                "order by sp1_subq.bi, sp1_subq.vc, sp2_subq.ii, sp2_subq.ti; " +
-
-                // select from two nested subqueries joined to another subquery
-                "create procedure insert_select_nested_subqueries  as " +
-                "insert into target_p " +
-                "select sp1_subq.bi, sp1_subq.vc, sp2_subq.ii, sp2_subq.ti " +
-                "from (select bi, 'subq + ' || vc as vc, ii, ti from (select bi, 'nested ' || vc as vc, ii, ti from source_p1) as sp1_subq_subq) as sp1_subq " +
-                "inner join (select bi, '2nd_subq + ' || vc as vc, ii, ti from source_p2) as sp2_subq " +
-                "on sp1_subq.bi = sp2_subq.bi and sp1_subq.ii = sp2_subq.ii " +
-                "where sp1_subq.bi = ?; " +
-                "partition procedure insert_select_nested_subqueries  on table target_p column bi; " +
-
-                "create procedure verify_insert_select_nested_subqueries  as " +
-                "select sp1_subq.bi, sp1_subq.vc, sp2_subq.ii, sp2_subq.ti " +
-                "from (select bi, 'subq + ' || vc as vc, ii, ti from (select bi, 'nested ' || vc as vc, ii, ti from source_p1) as sp1_subq_subq) as sp1_subq " +
-                "inner join (select bi, '2nd_subq + ' || vc as vc, ii, ti from source_p2) as sp2_subq " +
-                "on sp1_subq.bi = sp2_subq.bi and sp1_subq.ii = sp2_subq.ii " +
-                "where sp1_subq.bi = ? " +
-                "order by sp1_subq.bi, sp1_subq.vc, sp2_subq.ii, sp2_subq.ti; " +
-
-                "";
-            project.addLiteralSchema(schema);
+        try {
+            project.addLiteralSchema(generateSchema());
         } catch (IOException error) {
             fail(error.getMessage());
         }
@@ -256,10 +448,12 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
         return builder;
     }
 
-    private static void clearTargetTable(Client client) throws Exception {
+    private static void clearTargetTables(Client client) throws Exception {
         ClientResponse resp = client.callProcedure("@AdHoc", "delete from target_p");
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
 
+        resp = client.callProcedure("@AdHoc", "delete from target_r");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
     }
 
     private static void clearTables(Client client) throws Exception {
@@ -269,7 +463,13 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
         resp = client.callProcedure("@AdHoc", "delete from source_p2");
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
 
-        clearTargetTable(client);
+        resp = client.callProcedure("@AdHoc", "delete from source_r1");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+        resp = client.callProcedure("@AdHoc", "delete from source_r2");
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+        clearTargetTables(client);
     }
 
     private static void initializeTables(Client client) throws Exception {
@@ -292,6 +492,19 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
             resp = client.callProcedure("SOURCE_P1.insert", i, Long.toHexString(i * -11), i * -11, i * -11);
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
 
+
+            resp = client.callProcedure("SOURCE_R1.insert", i, Long.toHexString(i), i, i);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+            resp = client.callProcedure("SOURCE_R1.insert", i, Long.toHexString(-i), -i, -i);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+            resp = client.callProcedure("SOURCE_R1.insert", i, Long.toHexString(i * 11), i * 11, i * 11);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
+            resp = client.callProcedure("SOURCE_R1.insert", i, Long.toHexString(i * -11), i * -11, i * -11);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+
             int j = i + 5;
 
             resp = client.callProcedure("SOURCE_P2.insert", j, Long.toHexString(j), j, j);
@@ -307,29 +520,24 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
 
 
-            resp = client.callProcedure("SOURCE_R.insert", j, Long.toHexString(j), j, j);
+            resp = client.callProcedure("SOURCE_R2.insert", j, Long.toHexString(j), j, j);
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
 
-            resp = client.callProcedure("SOURCE_R.insert", j, Long.toHexString(-j).substring(0, 3), -j, -j);
+            resp = client.callProcedure("SOURCE_R2.insert", j, Long.toHexString(-j).substring(0, 3), -j, -j);
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
 
-            resp = client.callProcedure("SOURCE_R.insert", j, Long.toHexString(j * 11), j * 11, (j * 11) % 128);
+            resp = client.callProcedure("SOURCE_R2.insert", j, Long.toHexString(j * 11), j * 11, (j * 11) % 128);
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
 
-            resp = client.callProcedure("SOURCE_R.insert", j, Long.toHexString(j * -11).substring(0, 3), j * -11, -((j * 11) % 128));
+            resp = client.callProcedure("SOURCE_R2.insert", j, Long.toHexString(j * -11).substring(0, 3), j * -11, -((j * 11) % 128));
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
         }
     }
 
-  private static VoltTable getRows(Client client, String adHocQuery) throws NoConnectionsException, IOException, ProcCallException {
-  ClientResponse resp = client.callProcedure("@AdHoc", adHocQuery);
-  assertEquals(ClientResponse.SUCCESS, resp.getStatus());
-  return resp.getResults()[0];
-}
-
-    public void testInsertIntoSelectAdHocFails() throws IOException {
-        // for now only SP/SP is supported for insert-into-select
-        verifyStmtFails(getClient(), "insert into target_p select * from source_p1", "only supported for single-partition stored procedures");
+    private static VoltTable getRows(Client client, String adHocQuery) throws NoConnectionsException, IOException, ProcCallException {
+        ClientResponse resp = client.callProcedure("@AdHoc", adHocQuery);
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        return resp.getResults()[0];
     }
 
     public void testPartitionedTableSimple() throws Exception
@@ -422,56 +630,6 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
                 "insert_p_source_p_nonsensical_cast", partitioningValue);
     }
 
-    public void testInsertIntoComplexSelect() throws Exception
-    {
-        final Client client = getClient();
-        initializeTables(client);
-
-        String[] procs = new String[] {
-                "insert_select_with_join",
-                "insert_select_join_replicated",
-                "insert_select_subquery",
-                "insert_select_subquery_inner_filter",
-                "insert_select_subquery_join",
-                "insert_select_join_two_subqueries",
-                "insert_select_nested_subqueries"
-                };
-        final long partitioningValue = 7;
-
-        for (int i = 0; i < procs.length; ++i) {
-            clearTargetTable(client);
-
-            // insert rows with stored procedure
-            ClientResponse resp = client.callProcedure(procs[i], partitioningValue);
-            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
-            VoltTable insertResult = resp.getResults()[0];
-            insertResult.advanceRow();
-
-            // make sure we actually inserted something
-            assertTrue(insertResult.getLong(0) > 0);
-
-            // fetch the rows we just inserted
-            resp = client.callProcedure("get_all_target_rows");
-            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
-            VoltTable actualRows = resp.getResults()[0];
-
-            resp = client.callProcedure("verify_" + procs[i], partitioningValue);
-            // Fetch the rows we expect to have inserted
-            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
-            VoltTable expectedRows = resp.getResults()[0];
-
-            while(expectedRows.advanceRow()) {
-                assertTrue(actualRows.advanceRow());
-
-                assertEquals(expectedRows.getLong(0), actualRows.getLong(0));
-                assertEquals(expectedRows.getString(1), actualRows.getString(1));
-                assertEquals(expectedRows.getLong(2), actualRows.getLong(2));
-                assertEquals(expectedRows.getLong(3), actualRows.getLong(3));
-            }
-            assertFalse(actualRows.advanceRow());
-        }
-    }
-
     public void testInsertIntoSelectWithDefaults() throws Exception {
         final Client client = getClient();
 
@@ -551,7 +709,7 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, resp.getStatus());
 
         // tables should be identical except for "bi"
-        VoltTable sourceRows = getRows(client, "select * from source_r order by ii");
+        VoltTable sourceRows = getRows(client, "select * from source_r2 order by ii");
         VoltTable targetRows = getRows(client, "select * from target_p order by ii");
 
         //fail("target: " + targetRows);
@@ -590,4 +748,173 @@ public class TestInsertIntoSelectSuite extends RegressionSuite {
         }
     }
 
+    public void testFailureToPlan() throws Exception {
+        // queries which try to copy rows from one partition to another should fail
+        Client client = getClient();
+        initializeTables(client);
+
+        verifyStmtFails(client, "insert into target_p " +
+                        "select sp1.bi, sp2.vc, sp1.ii, sp2.ti " +
+                        "from source_p1 as sp1 inner join source_p2 as sp2 " +
+                        "on sp1.ii = sp2.ii",
+                        "Subquery statement for table __VOLT_INSERT_SUBQUERY__ has error: "
+                        + "Join of multiple partitioned tables has insufficient join criteria");
+
+        verifyStmtFails(client, "insert into target_r " +
+                        "select sr1.bi, sr1.vc, sr1.ii, sr1.ti  " +
+                        "from source_r1 as sr1, source_p1 as sp1 where sr1.bi = sp1.bi",
+                        "statement may not access partitioned data for insertion into replicated table");
+
+        verifyStmtFails(client, "insert into target_p (vc, ii, ti) " +
+                        "select vc, ii, ti from source_p1",
+                        "Partitioning column must be assigned a value produced " +
+                        "by the subquery in an INSERT INTO ... SELECT statement.");
+
+        verifyStmtFails(client, "insert into target_p " +
+                "select bi + 1, vc, ii, ti from source_p1",
+                "Partitioning could not be determined for INSERT INTO ... SELECT statement");
+
+        // two fragment plan for subquery
+        verifyStmtFails(client, "insert into target_p " +
+                        "select max(bi), max(vc), ii, min(ti) from source_p2 " +
+                        "group by source_p2.ii",
+                        "INSERT INTO ... SELECT statement subquery is too complex");
+    }
+
+    public void testSelectListConstants() throws Exception {
+        Client client = getClient();
+
+        // This statements illustrate existing limitations
+        // of partitioning inference.
+        //
+        // Constants in the select list of the subquery
+        // do not help refine partitioning.
+
+        // In this example, the subquery is multipart, but
+        // we are only inserting into one partition---only two fragments
+        // are required in this plan.
+        verifyStmtFails(client, "insert into target_p " +
+                "select 9, vc, ii, ti " +
+                "from source_p1 as sp1",
+                "Partitioning could not be determined");
+
+        // this whole statement should be single-partition!
+        verifyStmtFails(client, "insert into target_p " +
+                "select 9, vc, ii, ti " +
+                "from source_p1 as sp1 where sp1.bi = 9",
+                "Partitioning could not be determined");
+
+        // Note however that this issue is not specific to
+        // INSERT INTO ... SELECT.  This fails to plan as well:
+        verifyStmtFails(client,
+                "select count(*) " +
+                "from target_p " +
+                "inner join " +
+                "(select 9 as bi, vc, ii, ti from source_p1) as ins_sq " +
+                "on target_p.bi = ins_sq.bi",
+                "Join of multiple partitioned tables " +
+                "has insufficient join criteria"
+                );
+    }
+
+    public void testInsertIntoSelectGeneratedProcs() throws Exception
+    {
+        Set<Map.Entry<String, List<String>>> allEntries = mapOfAllGeneratedStatements().entrySet();
+        System.out.println("\n\nRUNNING testInsertIntoSelectGeneratedProcs with " +
+                allEntries.size() + " stored procedures\n\n");
+
+        final Client client = getClient();
+        initializeTables(client);
+
+        for (long partitioningValue = 4; partitioningValue < 11; partitioningValue++) {
+            for (Map.Entry<String, List<String>> e : allEntries) {
+                clearTargetTables(client);
+
+                // The strategy here is:
+                //   Insert rows via stored procedure that invokes INSERT INTO ... <some_query>.
+                //   Select the inserted rows back, compare with the table produced by <some_query>,
+                //     verify the tables are equal.
+                //   Do the same verification with ad hoc SQL.
+
+                String proc = e.getKey();
+                boolean needsParams = (numberOfParametersNeeded(proc) > 0);
+
+                String prefix = "Assertion failed running stored procedure " + proc + ": ";
+
+                // insert rows with stored procedure
+                ClientResponse resp;
+                if (needsParams) {
+                    resp = client.callProcedure(proc, partitioningValue);
+                }
+                else {
+                    resp = client.callProcedure(proc);
+                }
+                assertEquals(prefix + "procedure call failed", ClientResponse.SUCCESS, resp.getStatus());
+                VoltTable insertResult = resp.getResults()[0];
+                insertResult.advanceRow();
+
+                // make sure we actually inserted something
+                long numRowsInserted = insertResult.getLong(0);
+
+                // fetch the rows we just inserted
+                if (proc.contains("target_p")) {
+                    resp = client.callProcedure("get_all_target_p_rows");
+                }
+                else {
+                    resp = client.callProcedure("get_all_target_r_rows");
+                }
+                assertEquals(prefix + "could not fetch rows of target table", ClientResponse.SUCCESS, resp.getStatus());
+                VoltTable actualRows = resp.getResults()[0];
+
+                if (needsParams) {
+                    resp = client.callProcedure("verify_" + proc, partitioningValue);
+                }
+                else {
+                    resp = client.callProcedure("verify_" + proc);
+                }
+                // Fetch the rows we expect to have inserted
+                assertEquals(prefix + "could not verify rows of target table", ClientResponse.SUCCESS, resp.getStatus());
+                VoltTable expectedRows = resp.getResults()[0];
+
+                assertTablesAreEqual(prefix, expectedRows, actualRows);
+                int actualNumRows = actualRows.getRowCount();
+                assertEquals(prefix + "insert statement returned " + numRowsInserted + " but only " + actualNumRows + " rows selected from target table",
+                        actualNumRows, numRowsInserted);
+
+                // Now try the corresponding ad hoc statement
+                String adHocQuery = e.getValue().get(0);
+                prefix = "Assertion failed running ad hoc SQL: " + adHocQuery;
+                clearTargetTables(client);
+
+                // insert rows with stored procedure
+                if (needsParams) {
+                    resp = client.callProcedure("@AdHoc", adHocQuery, partitioningValue);
+                }
+                else {
+                    resp = client.callProcedure("@AdHoc", adHocQuery);
+                }
+                assertEquals(prefix + "ad hoc statement failed", ClientResponse.SUCCESS, resp.getStatus());
+                insertResult = resp.getResults()[0];
+                insertResult.advanceRow();
+
+                numRowsInserted = insertResult.getLong(0);
+
+                // fetch the rows we just inserted
+                if (proc.contains("target_p")) {
+                    resp = client.callProcedure("get_all_target_p_rows");
+                }
+                else {
+                    resp = client.callProcedure("get_all_target_r_rows");
+                }
+                assertEquals(prefix + "could not fetch rows of target table", ClientResponse.SUCCESS, resp.getStatus());
+                actualRows = resp.getResults()[0];
+
+                expectedRows.resetRowPosition();
+                assertTablesAreEqual(prefix, expectedRows, actualRows);
+                actualNumRows = actualRows.getRowCount();
+                assertEquals(prefix + "insert statement returned " + numRowsInserted + " but only " + actualNumRows + " rows selected from target table",
+                        actualNumRows, numRowsInserted);
+            }
+        }
+    }
 }

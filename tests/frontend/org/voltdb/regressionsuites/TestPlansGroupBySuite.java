@@ -669,6 +669,50 @@ public class TestPlansGroupBySuite extends RegressionSuite {
         }
     }
 
+    // Fix bug: serial grouping by an inline varchar field only has one group
+    public void testENG6732_serialAggInlineVarchar() throws IOException, ProcCallException, InterruptedException {
+        System.out.println("STARTING serial/parital aggregate test.....");
+        String sql;
+        VoltTable vt;
+
+        Client client = this.getClient();
+
+        String[] tbNames = {"VOTES", "VOTESBYTES"};
+
+        for (String tbName : tbNames) {
+            String proc = tbName + ".insert";
+            client.callProcedure(proc, 1, "MA", 1);
+            client.callProcedure(proc, 2, "RI", 2);
+            client.callProcedure(proc, 3, "CA", 1);
+            client.callProcedure(proc, 4, "MA", 2);
+            client.callProcedure(proc, 5, "CA", 1);
+
+
+            sql = "select state, count(*) from " + tbName + " group by state order by 1, 2";
+            vt = client.callProcedure("@Explain", sql).getResults()[0];
+            assertTrue(vt.toString().toLowerCase().contains("serial"));
+
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            assertEquals(3, vt.getRowCount());
+            vt.advanceRow(); assertEquals("CA", vt.getString(0)); assertEquals(2, vt.getLong(1));
+            vt.advanceRow(); assertEquals("MA", vt.getString(0)); assertEquals(2, vt.getLong(1));
+            vt.advanceRow(); assertEquals("RI", vt.getString(0)); assertEquals(1, vt.getLong(1));
+
+            // test partial serial aggregate
+            sql = " select state, contestant_number, count(*) from  " + tbName +
+                  " group by state, contestant_number order by 1, 2";
+            vt = client.callProcedure("@Explain", sql).getResults()[0];
+            assertTrue(vt.toString().toLowerCase().contains("partial"));
+
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            assertEquals(4, vt.getRowCount());
+            vt.advanceRow(); assertEquals("CA", vt.getString(0)); assertEquals(1, vt.getLong(1)); assertEquals(2, vt.getLong(2));
+            vt.advanceRow(); assertEquals("MA", vt.getString(0)); assertEquals(1, vt.getLong(1)); assertEquals(1, vt.getLong(2));
+            vt.advanceRow(); assertEquals("MA", vt.getString(0)); assertEquals(2, vt.getLong(1)); assertEquals(1, vt.getLong(2));
+            vt.advanceRow(); assertEquals("RI", vt.getString(0)); assertEquals(2, vt.getLong(1)); assertEquals(1, vt.getLong(2));
+        }
+    }
+
 
     public void testPartialAggregate() throws IOException, ProcCallException, InterruptedException {
         System.out.println("STARTING partial aggregate test.....");

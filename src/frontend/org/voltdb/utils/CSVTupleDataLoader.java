@@ -42,7 +42,7 @@ public class CSVTupleDataLoader implements CSVDataLoader {
     private final Client m_client;
     private final String m_insertProcedure;
     private final VoltType[] m_columnTypes;
-    private final CSVLoaderErrorHandler m_errHandler;
+    private final BulkLoaderErrorHandler m_errHandler;
 
     final AtomicLong m_processedCount = new AtomicLong(0);
     final AtomicLong m_failedCount = new AtomicLong(0);
@@ -55,9 +55,9 @@ public class CSVTupleDataLoader implements CSVDataLoader {
 
     //Callback for single row procedure invoke called for rows in failed batch.
     private class PartitionSingleExecuteProcedureCallback implements ProcedureCallback {
-        final CSVLineWithMetaData m_csvLine;
+        final RowWithMetaData m_csvLine;
 
-        public PartitionSingleExecuteProcedureCallback(CSVLineWithMetaData csvLine) {
+        public PartitionSingleExecuteProcedureCallback(RowWithMetaData csvLine) {
             m_csvLine = csvLine;
         }
 
@@ -77,7 +77,7 @@ public class CSVTupleDataLoader implements CSVDataLoader {
         }
     }
 
-    public CSVTupleDataLoader(ClientImpl client, String procName, CSVLoaderErrorHandler errHandler)
+    public CSVTupleDataLoader(ClientImpl client, String procName, BulkLoaderErrorHandler errHandler)
             throws IOException, ProcCallException
     {
         m_client = client;
@@ -114,7 +114,7 @@ public class CSVTupleDataLoader implements CSVDataLoader {
     }
 
     @Override
-    public void insertRow(CSVLineWithMetaData metaData, String[] values) throws InterruptedException {
+    public void insertRow(RowWithMetaData metaData, Object[] values) throws InterruptedException {
         try {
             PartitionSingleExecuteProcedureCallback cbmt =
                     new PartitionSingleExecuteProcedureCallback(metaData);

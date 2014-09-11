@@ -62,9 +62,9 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
     public void setRowData(AbstractExpression tableData) {
         assert(tableData instanceof VectorValueExpression || tableData instanceof ParameterValueExpression);
         m_tableData = tableData;
-        m_outputExpression.setValueType(m_tableData.getValueType());
-        m_outputExpression.setValueSize(m_tableData.getValueSize());
-        m_outputExpression.setInBytes(m_tableData.getInBytes());
+
+        m_outputExpression.setTypeSizeBytes(m_tableData.getValueType(), m_tableData.getValueSize(),
+                m_tableData.getInBytes());
     }
 
     public void setSortDirection(SortDirectionType direction) {

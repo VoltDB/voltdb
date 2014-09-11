@@ -47,8 +47,8 @@ import org.voltdb.types.PlanNodeType;
 public class StmtSubqueryScan extends StmtTableScan {
     // Sub-Query
     private final AbstractParsedStmt m_subqueryStmt;
-    private ArrayList<SchemaColumn> m_outputColumnList = new ArrayList<>();
-    private Map<String, Integer> m_outputColumnIndexMap = new HashMap<String, Integer>();
+    private final ArrayList<SchemaColumn> m_outputColumnList = new ArrayList<>();
+    private final Map<String, Integer> m_outputColumnIndexMap = new HashMap<String, Integer>();
 
     private CompiledPlan m_bestCostPlan = null;
 
@@ -168,6 +168,7 @@ public class StmtSubqueryScan extends StmtTableScan {
 
         if (m_subqueriesPartitioning.getCountOfPartitionedTables() > 0) {
             for (StmtTableScan tableScan : m_subqueryStmt.m_tableAliasMap.values()) {
+
                 List<SchemaColumn> scols;
                 scols = tableScan.getPartitioningColumns();
                 addPartitioningColumns(scols);
@@ -282,9 +283,9 @@ public class StmtSubqueryScan extends StmtTableScan {
         SchemaColumn schemaCol = m_outputColumnList.get(idx.intValue());
 
         expr.setColumnIndex(idx.intValue());
-        expr.setValueType(schemaCol.getType());
-        expr.setValueSize(schemaCol.getSize());
-        expr.setInBytes(schemaCol.getExpression().getInBytes());
+        expr.setTypeSizeBytes(schemaCol.getType(), schemaCol.getSize(),
+                schemaCol.getExpression().getInBytes());
+
     }
 
 
@@ -388,6 +389,14 @@ public class StmtSubqueryScan extends StmtTableScan {
         return m_tableAggregateSubquery;
     }
 
+    /** Produce a tuple value expression for a column produced by this subquery */
+    public TupleValueExpression getOutputExpression(int index) {
+        SchemaColumn schemaCol = m_outputColumnList.get(index);
+        TupleValueExpression tve = new TupleValueExpression(getTableAlias(), getTableAlias(),
+                schemaCol.getColumnAlias(), schemaCol.getColumnAlias(), index);
+        return tve;
+    }
+
     /**
      * Remove the coordinator send/receive pair if any from the graph.
      *
@@ -431,5 +440,4 @@ public class StmtSubqueryScan extends StmtTableScan {
             return root;
         }
     }
-
 }

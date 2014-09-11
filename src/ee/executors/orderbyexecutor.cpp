@@ -69,7 +69,7 @@ OrderByExecutor::p_init(AbstractPlanNode* abstract_node,
 
     OrderByPlanNode* node = dynamic_cast<OrderByPlanNode*>(abstract_node);
     assert(node);
-    assert(node->getInputTables().size() == 1);
+    assert(node->getInputTableCount() == 1);
 
     assert(node->getChildren()[0] != NULL);
 
@@ -79,8 +79,8 @@ OrderByExecutor::p_init(AbstractPlanNode* abstract_node,
     node->
         setOutputTable(TableFactory::
                        getCopiedTempTable(node->databaseId(),
-                                          node->getInputTables()[0]->name(),
-                                          node->getInputTables()[0],
+                                          node->getInputTable()->name(),
+                                          node->getInputTable(),
                                           limits));
 
     // pickup an inlined limit, if one exists
@@ -141,7 +141,7 @@ OrderByExecutor::p_execute(const NValueArray &params)
     assert(node);
     TempTable* output_table = dynamic_cast<TempTable*>(node->getOutputTable());
     assert(output_table);
-    Table* input_table = node->getInputTables()[0];
+    Table* input_table = node->getInputTable();
     assert(input_table);
 
     //

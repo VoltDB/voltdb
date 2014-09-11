@@ -435,10 +435,10 @@ public abstract class CatalogSchemaTools {
      * @param String[] classNames
      * @return Set of Catalog Tables.
      */
-    public static void toSchema(StringBuilder sb, String[] classNames)
+    public static void toSchema(StringBuilder sb, String[] importLines)
     {
-        for (String className : classNames) {
-            sb.append("IMPORT CLASS " + className + ";\n");
+        for (String importLine : importLines) {
+            sb.append(importLine);
         }
     }
 
@@ -448,12 +448,14 @@ public abstract class CatalogSchemaTools {
      * @param String[] classNames
      * @return String of DDL statements.
      */
-    public static String toSchema(Catalog catalog, String[] classNames)
+    public static String toSchema(Catalog catalog, String[] importLines)
     {
         StringBuilder sb = new StringBuilder();
 
         for (Cluster cluster : catalog.getClusters()) {
             for (Database db : cluster.getDatabases()) {
+                toSchema(sb, importLines);
+
                 for (Group grp : db.getGroups()) {
                     toSchema(sb, grp);
                 }
@@ -480,8 +482,6 @@ public abstract class CatalogSchemaTools {
                     toSchema(sb, proc);
                 }
                 sb.append("\n");
-
-                toSchema(sb, classNames);
             }
         }
 

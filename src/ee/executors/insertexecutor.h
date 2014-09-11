@@ -73,6 +73,7 @@ public:
         m_isStreamed(false),
         m_templateTuple(),
         m_memoryPool(),
+        m_nowFields(),
         m_engine(engine)
     {
     }
@@ -98,6 +99,11 @@ public:
 
         /** A memory pool for allocating non-inlined varchar and varbinary default values */
         Pool m_memoryPool;
+
+        /** A list of indexes of each column in the template tuple
+         * that has a DEFAULT of NOW, which must be set on each
+         * execution of this plan. */
+        std::vector<int> m_nowFields;
 
     protected:
         /** reference to the engine/context to store the number of modified tuples */

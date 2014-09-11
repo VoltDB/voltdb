@@ -28,7 +28,9 @@ CopyOnWriteIterator::CopyOnWriteIterator(
         m_tupleLength(table->getTupleLength()),
         m_location(NULL),
         m_blockOffset(0),
-        m_currentBlock(NULL) {
+        m_currentBlock(NULL),
+        m_skippedDirtyRows(0),
+        m_skippedInactiveRows(0) {
     //Prime the pump
     if (m_blockIterator != m_end) {
         m_surgeon->snapshotFinishedScanningBlock(m_currentBlock, m_blockIterator.data());
@@ -79,6 +81,10 @@ bool CopyOnWriteIterator::next(TableTuple &out) {
         out.move(m_location);
         const bool active = out.isActive();
         const bool dirty = out.isDirty();
+
+        if (dirty) m_skippedDirtyRows++;
+        if (!active) m_skippedInactiveRows++;
+
         // Return this tuple only when this tuple is not marked as deleted and isn't dirty
         if (active && !dirty) {
             out.setDirtyFalse();

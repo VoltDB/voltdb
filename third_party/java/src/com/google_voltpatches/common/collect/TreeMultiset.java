@@ -18,11 +18,12 @@ package com.google_voltpatches.common.collect;
 
 import static com.google_voltpatches.common.base.Preconditions.checkArgument;
 import static com.google_voltpatches.common.base.Preconditions.checkState;
+import static com.google_voltpatches.common.collect.CollectPreconditions.checkNonnegative;
 import static com.google_voltpatches.common.collect.CollectPreconditions.checkRemove;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.annotations.GwtIncompatible;
-import com.google_voltpatches.common.base.Objects;
+import com.google_voltpatches.common.base.MoreObjects;
 import com.google_voltpatches.common.primitives.Ints;
 
 import java.io.IOException;
@@ -242,7 +243,7 @@ public final class TreeMultiset<E> extends AbstractSortedMultiset<E> implements 
 
   @Override
   public int add(@Nullable E element, int occurrences) {
-    checkArgument(occurrences >= 0, "occurrences must be >= 0 but was %s", occurrences);
+    checkNonnegative(occurrences, "occurrences");
     if (occurrences == 0) {
       return count(element);
     }
@@ -263,7 +264,7 @@ public final class TreeMultiset<E> extends AbstractSortedMultiset<E> implements 
 
   @Override
   public int remove(@Nullable Object element, int occurrences) {
-    checkArgument(occurrences >= 0, "occurrences must be >= 0 but was %s", occurrences);
+    checkNonnegative(occurrences, "occurrences");
     if (occurrences == 0) {
       return count(element);
     }
@@ -288,7 +289,7 @@ public final class TreeMultiset<E> extends AbstractSortedMultiset<E> implements 
 
   @Override
   public int setCount(@Nullable E element, int count) {
-    checkArgument(count >= 0);
+    checkNonnegative(count, "count");
     if (!range.contains(element)) {
       checkArgument(count == 0);
       return 0;
@@ -309,8 +310,8 @@ public final class TreeMultiset<E> extends AbstractSortedMultiset<E> implements 
 
   @Override
   public boolean setCount(@Nullable E element, int oldCount, int newCount) {
-    checkArgument(newCount >= 0);
-    checkArgument(oldCount >= 0);
+    checkNonnegative(newCount, "newCount");
+    checkNonnegative(oldCount, "oldCount");
     checkArgument(range.contains(element));
 
     AvlNode<E> root = rootReference.get();
@@ -898,7 +899,7 @@ public final class TreeMultiset<E> extends AbstractSortedMultiset<E> implements 
     @Nullable private AvlNode<E> ceiling(Comparator<? super E> comparator, E e) {
       int cmp = comparator.compare(e, elem);
       if (cmp < 0) {
-        return (left == null) ? this : Objects.firstNonNull(left.ceiling(comparator, e), this);
+        return (left == null) ? this : MoreObjects.firstNonNull(left.ceiling(comparator, e), this);
       } else if (cmp == 0) {
         return this;
       } else {
@@ -909,7 +910,7 @@ public final class TreeMultiset<E> extends AbstractSortedMultiset<E> implements 
     @Nullable private AvlNode<E> floor(Comparator<? super E> comparator, E e) {
       int cmp = comparator.compare(e, elem);
       if (cmp > 0) {
-        return (right == null) ? this : Objects.firstNonNull(right.floor(comparator, e), this);
+        return (right == null) ? this : MoreObjects.firstNonNull(right.floor(comparator, e), this);
       } else if (cmp == 0) {
         return this;
       } else {

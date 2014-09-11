@@ -196,6 +196,16 @@ public class TupleValueExpression extends AbstractValueExpression {
         m_tableIdx = idx;
     }
 
+    public void setTypeSizeBytes(VoltType SchemaColumnType, int size, boolean bytes) {
+        setValueType(SchemaColumnType);
+        setValueSize(size);
+        m_inBytes = bytes;
+    }
+
+    public void setTypeSizeBytes(int columnType, int size, boolean bytes) {
+        setTypeSizeBytes(VoltType.get((byte)columnType), size, bytes);
+    }
+
     @Override
     public boolean equals(Object obj) {
         if (obj instanceof TupleValueExpression == false) {
@@ -278,9 +288,8 @@ public class TupleValueExpression extends AbstractValueExpression {
         assert(column != null);
         m_tableName = table.getTypeName();
         m_columnIndex = column.getIndex();
-        setValueType(VoltType.get((byte)column.getType()));
-        setValueSize(column.getSize());
-        setInBytes(column.getInbytes());
+
+        setTypeSizeBytes(column.getType(), column.getSize(), column.getInbytes());
     }
 
     /**
@@ -293,9 +302,8 @@ public class TupleValueExpression extends AbstractValueExpression {
             // In case of sub-queries the TVE may not have its value type and size
             // resolved yet. Try to resolve it now
             SchemaColumn inputColumn = inputSchema.getColumns().get(index);
-            setValueType(inputColumn.getType());
-            setValueSize(inputColumn.getSize());
-            setInBytes(inputColumn.getExpression().getInBytes());
+            setTypeSizeBytes(inputColumn.getType(), inputColumn.getSize(),
+                    inputColumn.getExpression().getInBytes());
         }
         return index;
     }

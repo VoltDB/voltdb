@@ -22,6 +22,7 @@ import static com.google_voltpatches.common.base.Preconditions.checkState;
 
 import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.annotations.VisibleForTesting;
+import com.google_voltpatches.common.base.Joiner;
 import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.collect.FluentIterable;
 import com.google_voltpatches.common.collect.ForwardingSet;
@@ -212,7 +213,9 @@ public abstract class TypeToken<T> extends TypeCapture<T> implements Serializabl
    */
   public final <X> TypeToken<T> where(TypeParameter<X> typeParam, TypeToken<X> typeArg) {
     TypeResolver resolver = new TypeResolver()
-        .where(ImmutableMap.of(typeParam.typeVariable, typeArg.runtimeType));
+        .where(ImmutableMap.of(
+            new TypeResolver.TypeVariableKey(typeParam.typeVariable),
+            typeArg.runtimeType));
     // If there's any type error, we'd report now rather than later.
     return new SimpleTypeToken<T>(resolver.resolveType(runtimeType));
   }
@@ -504,6 +507,9 @@ public abstract class TypeToken<T> extends TypeCapture<T> implements Serializabl
       @Override public TypeToken<T> getOwnerType() {
         return TypeToken.this;
       }
+      @Override public String toString() {
+        return getOwnerType() + "." + super.toString();
+      }
     };
   }
 
@@ -527,6 +533,9 @@ public abstract class TypeToken<T> extends TypeCapture<T> implements Serializabl
       }
       @Override public TypeToken<T> getOwnerType() {
         return TypeToken.this;
+      }
+      @Override public String toString() {
+        return getOwnerType() + "(" + Joiner.on(", ").join(getGenericParameterTypes()) + ")";
       }
     };
   }

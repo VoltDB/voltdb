@@ -45,53 +45,29 @@
 
 #include "receivenode.h"
 
-#include "storage/table.h"
-
 #include <sstream>
 
-using namespace std;
-using namespace voltdb;
+namespace voltdb {
 
-ReceivePlanNode::ReceivePlanNode(CatalogId id) : AbstractPlanNode(id)
-{
-    // Do nothing
-}
+ReceivePlanNode::~ReceivePlanNode() { }
 
-ReceivePlanNode::ReceivePlanNode() : AbstractPlanNode()
-{
-    // Do nothing
-}
+PlanNodeType ReceivePlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_RECEIVE; }
 
-ReceivePlanNode::~ReceivePlanNode()
+std::string ReceivePlanNode::debugInfo(const std::string& spacer) const
 {
-    delete getOutputTable();
-    setOutputTable(NULL);
-}
-
-PlanNodeType
-ReceivePlanNode::getPlanNodeType() const
-{
-    return PLAN_NODE_TYPE_RECEIVE;
-}
-string
-ReceivePlanNode::debugInfo(const string& spacer) const
-{
-    ostringstream buffer;
+    std::ostringstream buffer;
     buffer << spacer << "Incoming Table Columns["
            << getOutputSchema().size() << "]:\n";
-    for (int ctr = 0, cnt = (int)getOutputSchema().size(); ctr < cnt; ctr++)
-    {
+    for (int ctr = 0, cnt = (int)getOutputSchema().size(); ctr < cnt; ctr++) {
         SchemaColumn* col = getOutputSchema()[ctr];
         buffer << spacer << "  [" << ctr << "] ";
         buffer << "name=" << col->getColumnName() << " : ";
         buffer << "size=" << col->getExpression()->getValueSize() << " : ";
         buffer << "type=" << col->getExpression()->getValueType() << "\n";
     }
-    return (buffer.str());
+    return buffer.str();
 }
 
-void
-ReceivePlanNode::loadFromJSONObject(PlannerDomValue obj)
-{
-    // This space intentionally left blank.
-}
+void ReceivePlanNode::loadFromJSONObject(PlannerDomValue obj) { }
+
+} // namespace voltdb

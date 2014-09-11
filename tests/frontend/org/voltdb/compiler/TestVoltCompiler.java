@@ -1281,6 +1281,17 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(success);
     }
 
+    public void testUseInnerClassAsProc() throws Exception {
+        final String simpleSchema =
+            "create procedure from class org.voltdb_testprocs.regressionsuites.fixedsql.TestENG2423$InnerProc;";
+        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+        final String schemaPath = schemaFile.getPath();
+
+        VoltCompiler compiler = new VoltCompiler();
+        boolean success = compiler.compileFromDDL(testout_jar, schemaPath);
+        assertTrue(success);
+    }
+
     public void testMaterializedView() throws IOException {
         final String simpleSchema =
             "create table books (cash integer default 23 NOT NULL, title varchar(10) default 'foo', PRIMARY KEY(cash));\n" +

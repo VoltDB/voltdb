@@ -26,7 +26,6 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
@@ -38,6 +37,7 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
 import org.voltdb_testprocs.regressionsuites.fixedsql.TestENG1232;
 import org.voltdb_testprocs.regressionsuites.fixedsql.TestENG1232_2;
+import org.voltdb_testprocs.regressionsuites.fixedsql.TestENG2423;
 
 /**
  * Actual regression tests for SQL that I found that was broken and
@@ -47,17 +47,9 @@ import org.voltdb_testprocs.regressionsuites.fixedsql.TestENG1232_2;
 
 public class TestFixedSQLSuite extends RegressionSuite {
 
-    /**
-     * Inner class procedure to see if we can invoke it.
-     */
-    public static class InnerProc extends VoltProcedure {
-        public long run() {
-            return 0L;
-        }
-    }
-
     /** Procedures used by this suite */
-    static final Class<?>[] PROCEDURES = { Insert.class, TestENG1232.class, TestENG1232_2.class, InnerProc.class };
+    static final Class<?>[] PROCEDURES = { Insert.class, TestENG1232.class, TestENG1232_2.class,
+        TestENG2423.InnerProc.class };
 
     static final int VARCHAR_VARBINARY_THRESHOLD = 100;
 
@@ -1242,11 +1234,11 @@ public class TestFixedSQLSuite extends RegressionSuite {
     // make sure we can call an inner proc
     public void testTicket2423() throws NoConnectionsException, IOException, ProcCallException, InterruptedException {
         Client client = getClient();
-        client.callProcedure("TestFixedSQLSuite$InnerProc");
+        client.callProcedure("TestENG2423$InnerProc");
         releaseClient(client);
         // get it again to make sure the server is all good
         client = getClient();
-        client.callProcedure("TestFixedSQLSuite$InnerProc");
+        client.callProcedure("TestENG2423$InnerProc");
     }
 
     // Ticket: ENG-5151
@@ -1667,6 +1659,103 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
     }
 
+    // This is a regression test for ENG-6792
+    public void testInlineVarcharAggregation() throws IOException, ProcCallException {
+        Client client = getClient();
+        ClientResponse cr;
+
+        cr = client.callProcedure("VARCHARTB.insert",  1, "zz", "panda");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("VARCHARTB.insert", 6, "a", "panda");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("VARCHARTB.insert", 7, "mm", "panda");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("VARCHARTB.insert",  8, "z", "orangutan");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("VARCHARTB.insert", 9, "aa", "orangutan");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("VARCHARTB.insert", 10, "n", "orangutan");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc", "select max(var2), min(var2) from VarcharTB");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        VoltTable vt = cr.getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals("zz", vt.getString(0));
+        assertEquals("a", vt.getString(1));
+
+        // Hash aggregation may have the same problem, so let's
+        // test it here as well.
+        String sql = "select var80, max(var2) as maxvar2, min(var2) as minvar2 " +
+                "from VarcharTB " +
+                "group by var80 " +
+                "order by maxvar2, minvar2";
+                cr = client.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        assertTrue(vt.advanceRow());
+
+        // row 1: panda, zz, a
+        // row 2: orangutan, z, aa
+        assertEquals("orangutan", vt.getString(0));
+        assertEquals("z", vt.getString(1));
+        assertEquals("aa", vt.getString(2));
+
+        assertTrue(vt.advanceRow());
+        assertEquals("panda", vt.getString(0));
+        assertEquals("zz", vt.getString(1));
+        assertEquals("a", vt.getString(2));
+
+        cr = client.callProcedure("PWEE_WITH_INDEX.insert", 0, "MM", 88);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("PWEE_WITH_INDEX.insert", 1, "ZZ", 88);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("PWEE_WITH_INDEX.insert", 2, "AA", 88);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("PWEE_WITH_INDEX.insert", 3, "NN", 88);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("@AdHoc", "select num, max(wee), min(wee) " +
+                "from pwee_with_index group by num order by num");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = cr.getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertEquals("ZZ", vt.getString(1));
+        assertEquals("AA", vt.getString(2));
+    }
+
+    // Bug: parser drops extra predicates over certain numbers e.g. 10.
+    public void testENG6870() throws IOException, ProcCallException {
+        System.out.println("test ENG6870...");
+
+        Client client = this.getClient();
+        VoltTable vt;
+        String sql;
+
+        client.callProcedure("ENG6870.insert",
+                1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                1, 1, null, 1, 1);
+
+        client.callProcedure("ENG6870.insert",
+                2, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                1, 1, 1, 1, 1);
+
+        client.callProcedure("ENG6870.insert",
+                3, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                1, 1, 1, 1, 1);
+
+        sql = "SELECT COUNT(*) FROM ENG6870 "
+                + "WHERE C14 = 1 AND C1 IS NOT NULL AND C2 IS NOT NULL "
+                + "AND C5  = 3 AND C7 IS NOT NULL AND C8 IS NOT NULL "
+                + "AND C0 IS NOT NULL AND C10 IS NOT NULL "
+                + "AND C11 IS NOT NULL AND C13 IS NOT NULL  "
+                + "AND C12 IS NOT NULL;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        System.err.println(vt);
+        validateTableOfScalarLongs(vt, new long[]{0});
+    }
+
 
     //
     // JUnit / RegressionSuite boilerplate
@@ -1686,7 +1775,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         project.addSchema(Insert.class.getResource("fixed-sql-ddl.sql"));
         project.addProcedures(PROCEDURES);
 
-        //TODO: Now that this fails to compile with an overflow error, it should be migrated to a
+        // Now that this fails to compile with an overflow error, it should be migrated to a
         // Failures suite.
         //project.addStmtProcedure("Crap", "insert into COUNT_NULL values (" + Long.MIN_VALUE + ", 1, 200)");
 
