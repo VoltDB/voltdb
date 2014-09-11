@@ -17,6 +17,10 @@
 
 package org.voltdb;
 
+import java.util.concurrent.ExecutionException;
+
+import org.apache.zookeeper_voltpatches.KeeperException;
+
 
 // Interface through which the outside world can interact with the replica-side
 // of DR. Currently, there's not much to do here, since the subsystem is
@@ -30,4 +34,30 @@ public abstract class ReplicaDRGateway extends Thread implements Promotable {
     public abstract void shutdown();
 
     public abstract void promotePartition(int partitionId);
+
+    public abstract void notifyOfLastAppliedSpUniqueId(int dataCenter, long spUniqueId);
+
+    public static class DummyReplicaDRGateway extends ReplicaDRGateway {
+        @Override
+        public void run() {}
+
+        @Override
+        public void acceptPromotion() throws InterruptedException,
+                ExecutionException, KeeperException {}
+
+        @Override
+        public void updateCatalog(CatalogContext catalog) {}
+
+        @Override
+        public boolean isActive() { return false; }
+
+        @Override
+        public void shutdown() {}
+
+        @Override
+        public void promotePartition(int partitionId) {}
+
+        @Override
+        public void notifyOfLastAppliedSpUniqueId(int dataCenter, long spUniqueId) {};
+    }
 }

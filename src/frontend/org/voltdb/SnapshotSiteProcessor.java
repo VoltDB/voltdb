@@ -735,7 +735,7 @@ public class SnapshotSiteProcessor {
                             logSnapshotCompleteToZK(txnId,
                                                     snapshotSucceeded,
                                                     exportSequenceNumbers,
-                                                    m_remoteDCLastSeenUniqueIds);
+                                                    remoteDCLastUniqueIds);
                         }
                     }
                 };
