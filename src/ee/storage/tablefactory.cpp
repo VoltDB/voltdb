@@ -69,7 +69,8 @@ Table* TableFactory::getPersistentTable(
             bool exportOnly,
             int tableAllocationTargetSize,
             int tupleLimit,
-            int32_t compactionThreshold)
+            int32_t compactionThreshold,
+            bool drEnabled)
 {
     Table *table = NULL;
 
@@ -77,7 +78,7 @@ Table* TableFactory::getPersistentTable(
         table = new StreamedTable(exportEnabled);
     }
     else {
-        table = new PersistentTable(partitionColumn, signature, tableIsMaterialized, tableAllocationTargetSize, tupleLimit);
+        table = new PersistentTable(partitionColumn, signature, tableIsMaterialized, tableAllocationTargetSize, tupleLimit, drEnabled);
     }
 
     initCommon(databaseId, table, name, schema, columnNames, true, compactionThreshold);

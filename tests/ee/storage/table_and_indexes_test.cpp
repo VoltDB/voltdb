@@ -307,6 +307,7 @@ class TableAndIndexTest : public Test {
  */
 TEST_F(TableAndIndexTest, DrTest) {
     drStream.m_enabled = true;
+    districtTable->setDR(true);
     //Prepare to insert in a new txn
     engine->setupForPlanFragments( NULL, addPartitionId(99), addPartitionId(99), addPartitionId(98), addPartitionId(70), addPartitionId(70));
 
@@ -353,8 +354,10 @@ TEST_F(TableAndIndexTest, DrTest) {
     //Add a length prefix for test, then apply it
     *reinterpret_cast<int32_t*>(&data.get()[4]) = htonl(static_cast<int32_t>(sb->offset()));
     drStream.m_enabled = false;
+    districtTable->setDR(false);
     sink.apply(&data[4], tables, &pool);
     drStream.m_enabled = true;
+    districtTable->setDR(true);
 
     //Should have one row from the insert
     EXPECT_EQ( 1, districtTableReplica->activeTupleCount());
@@ -392,8 +395,10 @@ TEST_F(TableAndIndexTest, DrTest) {
     //Add a length prefix for test and apply it
     *reinterpret_cast<int32_t*>(&data.get()[4]) = htonl(static_cast<int32_t>(sb->offset()));
     drStream.m_enabled = false;
+    districtTable->setDR(false);
     sink.apply(&data[4], tables, &pool);
     drStream.m_enabled = true;
+    districtTable->setDR(true);
 
     //Expect one row with the update
     EXPECT_EQ( 1, districtTableReplica->activeTupleCount());
@@ -421,8 +426,10 @@ TEST_F(TableAndIndexTest, DrTest) {
     //Add a length prefix for test, and apply the update
     *reinterpret_cast<int32_t*>(&data.get()[4]) = htonl(static_cast<int32_t>(sb->offset()));
     drStream.m_enabled = false;
+    districtTable->setDR(false);
     sink.apply(&data[4], tables, &pool);
     drStream.m_enabled = true;
+    districtTable->setDR(true);
 
     //Expect no rows after the delete propagates
     EXPECT_EQ( 0, districtTableReplica->activeTupleCount());
