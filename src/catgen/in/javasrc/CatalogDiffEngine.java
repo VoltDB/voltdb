@@ -701,42 +701,6 @@ public class CatalogDiffEngine {
             }
         }
 
-        // add non-null and make types narrower
-        if (prevType instanceof Column) {
-            CatalogType parent = suspect.getParent();
-            assert(parent instanceof Table);
-            // now assume parent is a Table
-            Table parentTable = (Table) parent;
-            Database db = (Database) prevType.getParent();
-
-            // table name
-            retval[0] = parentTable.getTypeName();
-
-            // for now, no changes to export tables
-            if (CatalogUtil.isTableExportOnly(db, parentTable)) {
-                return null;
-            }
-
-            if (field.equals("nullable")) {
-                // table name
-                retval[0] = parentTable.getTypeName();
-                // error message
-                retval[1] = String.format(
-                        "Unable to add a non-null constraint to column %s in table %s unless the table is empty.",
-                        prevType.getTypeName(),
-                        retval[0]);
-                return retval;
-            }
-            else if (field.equals("type") || field.equals("size") || field.equals("inbytes")) {
-                // error message
-                retval[1] = String.format(
-                        "Unable to make a potentially lossy change to the type of column %s in table %s unless the table is empty.",
-                        prevType.getTypeName(),
-                        retval[0]);
-                return retval;
-            }
-        }
-
         return null;
     }
 
