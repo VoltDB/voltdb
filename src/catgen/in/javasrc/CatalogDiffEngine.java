@@ -511,7 +511,9 @@ public class CatalogDiffEngine {
         if (suspect instanceof Constraint && field.equals("index"))
             return true;
         if (suspect instanceof Table) {
-            if (field.equals("signature") || field.equals("tuplelimit"))
+            if (field.equals("signature") ||
+                field.equals("tuplelimit") ||
+                field.equals("isDRed"))
                 return true;
         }
 

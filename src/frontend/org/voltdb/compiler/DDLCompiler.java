@@ -391,13 +391,25 @@ public class DDLCompiler {
      *      | -- or
      *      \\A -- beginning of statement
      *      EXPORT -- token
+     *      | -- or
+     *      \\A -- beginning of statement
+     *      DR -- token
      * \\s -- one space
      * </pre>
      */
     static final Pattern voltdbStatementPrefixPattern = Pattern.compile(
             "(?i)((?<=\\ACREATE\\s{0,1024})" +
             "(?:PROCEDURE|ROLE)|" +
-            "\\ADROP|\\APARTITION|\\AREPLICATE|\\AEXPORT|\\AIMPORT)\\s"
+            "\\ADROP|\\APARTITION|\\AREPLICATE|\\AEXPORT|\\AIMPORT|\\ADR)\\s"
+            );
+
+    static final Pattern drTablePattern = Pattern.compile(
+            "(?i)" +                                // (ignore case)
+            "\\A"  +                                // start statement
+            "DR\\s+TABLE\\s+" +                     // DR TABLE
+            "([\\w.$|\\\\*]+)" +                          // (1) <table name>
+            "(?:\\s+(DISABLE))?" +                  //     (2) optional DISABLE argument
+            "\\s*;\\z"                              // (end statement)
             );
 
     static final String TABLE = "TABLE";
@@ -406,6 +418,7 @@ public class DDLCompiler {
     static final String REPLICATE = "REPLICATE";
     static final String EXPORT = "EXPORT";
     static final String ROLE = "ROLE";
+    static final String DR = "DR";
 
     enum Permission {
         adhoc,
@@ -643,7 +656,7 @@ public class DDLCompiler {
             return false;
         }
 
-        // either PROCEDURE, REPLICATE, PARTITION, ROLE, or EXPORT
+        // either PROCEDURE, REPLICATE, PARTITION, ROLE, EXPORT or DR
         String commandPrefix = statementMatcher.group(1).toUpperCase();
 
         // matches if it is CREATE PROCEDURE [ALLOW <role> ...] FROM CLASS <class-name>;
@@ -919,6 +932,27 @@ public class DDLCompiler {
             return true;
         }
 
+        // matches if it is DR TABLE <table-name> [DISABLE]
+        // group 1 -- table name
+        // group 2 -- NULL: enable dr
+        //            NOT NULL: disable dr
+        // TODO: maybe I should write one fit all regex for this.
+        statementMatcher = drTablePattern.matcher(statement);
+        if (statementMatcher.matches()) {
+            String tableName;
+            if (statementMatcher.group(1).equalsIgnoreCase("*")) {
+                tableName = "*";
+            } else {
+                tableName = checkIdentifierStart(statementMatcher.group(1), statement);
+            }
+            if (statementMatcher.group(2) != null) {
+                m_tracker.addDRedTable(tableName, "DISABLE");
+            } else {
+                m_tracker.addDRedTable(tableName, "ENABLE");
+            }
+            return true;
+        }
+
         /*
          * if no correct syntax regex matched above then at this juncture
          * the statement is syntax incorrect
@@ -960,6 +994,13 @@ public class DDLCompiler {
             throw m_compiler.new VoltCompilerException(String.format(
                     "Invalid EXPORT TABLE statement: \"%s\", " +
                     "expected syntax: EXPORT TABLE <table>",
+                    statement.substring(0,statement.length()-1))); // remove trailing semicolon
+        }
+
+        if (DR.equals(commandPrefix)) {
+            throw m_compiler.new VoltCompilerException(String.format(
+                    "Invalid DR TABLE statement: \"%s\", " +
+                    "expected syntax: DR TABLE <table> [DISABLE]",
                     statement.substring(0,statement.length()-1))); // remove trailing semicolon
         }
 

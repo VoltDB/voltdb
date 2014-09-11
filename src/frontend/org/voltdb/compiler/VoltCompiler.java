@@ -1073,6 +1073,11 @@ public class VoltCompiler {
             compileExport(export, db);
         }
 
+        // process DRed tables
+        for (Entry<String, String> drNode: voltDdlTracker.getDRedTables().entrySet()) {
+            compileDRTable(drNode, db);
+        }
+
         if (whichProcs != DdlProceduresToLoad.NO_DDL_PROCEDURES) {
             Collection<ProcedureDescriptor> allProcs = voltDdlTracker.getProcedureDescriptors();
             compileProcedures(db, hsql, allProcs, classDependencies, whichProcs, jarOutput);
@@ -1937,6 +1942,35 @@ public class VoltCompiler {
                     ));
         }
 
+    }
+
+    void compileDRTable(final Entry<String, String> drNode, final Database db)
+            throws VoltCompilerException
+    {
+        String tableName = drNode.getKey();
+        String action = drNode.getValue();
+
+        if (tableName.equalsIgnoreCase("*")) {
+            // star wildcard support
+            for (Table table : db.getTables()) {
+                if (action.equalsIgnoreCase("DISABLE")) {
+                    table.setIsdred(false);
+                } else {
+                    table.setIsdred(true);
+                }
+            }
+            return;
+        }
+
+        org.voltdb.catalog.Table tableref = db.getTables().getIgnoreCase(tableName);
+        if (tableref == null) {
+            throw new VoltCompilerException("While configuring dr, table " + tableName + " was not present in the catalog");
+        }
+        if (action.equalsIgnoreCase("DISABLE")) {
+            tableref.setIsdred(false);
+        } else {
+            tableref.setIsdred(true);
+        }
     }
 
     // Usage messages for new and legacy syntax.

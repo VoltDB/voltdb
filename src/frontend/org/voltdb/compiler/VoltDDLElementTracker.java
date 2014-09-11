@@ -22,6 +22,7 @@ import static org.voltdb.compiler.ProcedureCompiler.deriveShortProcedureName;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -43,6 +44,7 @@ public class VoltDDLElementTracker {
     final Set<String> m_exports = new HashSet<String>();
     // additional non-procedure classes for the jar
     final Set<String> m_extraClassses = new TreeSet<String>();
+    final Map<String, String> m_drTables = new LinkedHashMap<String, String>();
 
     /**
      * Constructor needs a compiler instance to throw VoltCompilerException.
@@ -202,6 +204,18 @@ public class VoltDDLElementTracker {
      */
     Collection<String> getExportedTables() {
         return m_exports;
+    }
+
+    void addDRedTable(String tableName, String action)
+        throws VoltCompilerException
+    {
+        assert tableName != null && ! tableName.trim().isEmpty();
+
+        m_drTables.put(tableName, action);
+    }
+
+    Map<String, String> getDRedTables() {
+        return m_drTables;
     }
 
 }
