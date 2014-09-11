@@ -220,7 +220,7 @@ public class StoredProcedureInvocation implements JSONString {
         buf.putLong(clientHandle);
         if (serializedParams != null)
         {
-            if (!serializedParams.isReadOnly())
+            if (serializedParams.hasArray())
             {
                 // if position can be non-zero, then the dup/rewind logic below
                 // would be wrong?

@@ -72,6 +72,8 @@ public:
     bool checkOpenTransaction(StreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso);
 
     bool m_enabled;
+
+    static int32_t getTestDRBuffer(char *out);
 private:
     CatalogId m_partitionId;
     size_t m_secondaryCapacity;

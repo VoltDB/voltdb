@@ -508,7 +508,6 @@ IndexLookupType stringToIndexLookup(std::string str );
 int64_t getMaxTypeValue (ValueType type);
 
 bool hexDecodeToBinary(unsigned char *bufferdst, const char *hexString);
-
 }
 
 #endif
