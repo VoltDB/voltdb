@@ -72,6 +72,7 @@ import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.VoltTypeUtil;
 
 
@@ -391,13 +392,25 @@ public class DDLCompiler {
      *      | -- or
      *      \\A -- beginning of statement
      *      EXPORT -- token
+     *      | -- or
+     *      \\A -- beginning of statement
+     *      DR -- token
      * \\s -- one space
      * </pre>
      */
     static final Pattern voltdbStatementPrefixPattern = Pattern.compile(
             "(?i)((?<=\\ACREATE\\s{0,1024})" +
             "(?:PROCEDURE|ROLE)|" +
-            "\\ADROP|\\APARTITION|\\AREPLICATE|\\AEXPORT|\\AIMPORT)\\s"
+            "\\ADROP|\\APARTITION|\\AREPLICATE|\\AEXPORT|\\AIMPORT|\\ADR)\\s"
+            );
+
+    static final Pattern drTablePattern = Pattern.compile(
+            "(?i)" +                                // (ignore case)
+            "\\A"  +                                // start statement
+            "DR\\s+TABLE\\s+" +                     // DR TABLE
+            "([\\w.$|\\\\*]+)" +                          // (1) <table name>
+            "(?:\\s+(DISABLE))?" +                  //     (2) optional DISABLE argument
+            "\\s*;\\z"                              // (end statement)
             );
 
     static final String TABLE = "TABLE";
@@ -406,6 +419,7 @@ public class DDLCompiler {
     static final String REPLICATE = "REPLICATE";
     static final String EXPORT = "EXPORT";
     static final String ROLE = "ROLE";
+    static final String DR = "DR";
 
     enum Permission {
         adhoc,
@@ -426,6 +440,9 @@ public class DDLCompiler {
     final VoltDDLElementTracker m_tracker;
 
     // used to match imported class with those in the classpath
+    // For internal cluster compilation, this will point to the
+    // InMemoryJarfile for the current catalog, so that we can
+    // find classes provided as part of the application.
     ClassMatcher m_classMatcher = new ClassMatcher();
 
     HashMap<String, Column> columnMap = new HashMap<String, Column>();
@@ -643,7 +660,7 @@ public class DDLCompiler {
             return false;
         }
 
-        // either PROCEDURE, REPLICATE, PARTITION, ROLE, or EXPORT
+        // either PROCEDURE, REPLICATE, PARTITION, ROLE, EXPORT or DR
         String commandPrefix = statementMatcher.group(1).toUpperCase();
 
         // matches if it is CREATE PROCEDURE [ALLOW <role> ...] FROM CLASS <class-name>;
@@ -844,23 +861,35 @@ public class DDLCompiler {
         statementMatcher = importClassPattern.matcher(statement);
         if (statementMatcher.matches()) {
             if (whichProcs == DdlProceduresToLoad.ALL_DDL_PROCEDURES) {
-                // Only process the statement if this is not for the StatementPlanner
-                String classNameStr = statementMatcher.group(1);
+                // Semi-hacky way of determining if we're doing a cluster-internal compilation.
+                // Command-line compilation will never have an InMemoryJarfile.
+                if (!(m_classLoader instanceof InMemoryJarfile.JarLoader)) {
+                    // Only process the statement if this is not for the StatementPlanner
+                    String classNameStr = statementMatcher.group(1);
 
-                // check that the match pattern is a valid match pattern
-                checkIdentifierWithWildcard(classNameStr, statement);
+                    // check that the match pattern is a valid match pattern
+                    checkIdentifierWithWildcard(classNameStr, statement);
 
-                ClassNameMatchStatus matchStatus = m_classMatcher.addPattern(classNameStr);
-                if (matchStatus == ClassNameMatchStatus.NO_EXACT_MATCH) {
-                    throw m_compiler.new VoltCompilerException(String.format(
-                            "IMPORT CLASS not found: '%s'",
-                            classNameStr)); // remove trailing semicolon
+                    ClassNameMatchStatus matchStatus = m_classMatcher.addPattern(classNameStr);
+                    if (matchStatus == ClassNameMatchStatus.NO_EXACT_MATCH) {
+                        throw m_compiler.new VoltCompilerException(String.format(
+                                    "IMPORT CLASS not found: '%s'",
+                                    classNameStr)); // remove trailing semicolon
+                    }
+                    else if (matchStatus == ClassNameMatchStatus.NO_WILDCARD_MATCH) {
+                        m_compiler.addWarn(String.format(
+                                    "IMPORT CLASS no match for wildcarded class: '%s'",
+                                    classNameStr), ddlStatement.lineNo);
+                    }
                 }
-                else if (matchStatus == ClassNameMatchStatus.NO_WILDCARD_MATCH) {
-                    m_compiler.addWarn(String.format(
-                            "IMPORT CLASS no match for wildcarded class: '%s'",
-                            classNameStr), ddlStatement.lineNo);
+                else {
+                    m_compiler.addInfo("Internal cluster recompilation ignoring IMPORT CLASS line: " +
+                            statement);
                 }
+                // Need to track the IMPORT CLASS lines even on internal compiles so that
+                // we don't lose them from the DDL source.  When the @UAC path goes away,
+                // we could change this.
+                m_tracker.addImportLine(statement);
             }
 
             return true;
@@ -919,6 +948,27 @@ public class DDLCompiler {
             return true;
         }
 
+        // matches if it is DR TABLE <table-name> [DISABLE]
+        // group 1 -- table name
+        // group 2 -- NULL: enable dr
+        //            NOT NULL: disable dr
+        // TODO: maybe I should write one fit all regex for this.
+        statementMatcher = drTablePattern.matcher(statement);
+        if (statementMatcher.matches()) {
+            String tableName;
+            if (statementMatcher.group(1).equalsIgnoreCase("*")) {
+                tableName = "*";
+            } else {
+                tableName = checkIdentifierStart(statementMatcher.group(1), statement);
+            }
+            if (statementMatcher.group(2) != null) {
+                m_tracker.addDRedTable(tableName, "DISABLE");
+            } else {
+                m_tracker.addDRedTable(tableName, "ENABLE");
+            }
+            return true;
+        }
+
         /*
          * if no correct syntax regex matched above then at this juncture
          * the statement is syntax incorrect
@@ -960,6 +1010,13 @@ public class DDLCompiler {
             throw m_compiler.new VoltCompilerException(String.format(
                     "Invalid EXPORT TABLE statement: \"%s\", " +
                     "expected syntax: EXPORT TABLE <table>",
+                    statement.substring(0,statement.length()-1))); // remove trailing semicolon
+        }
+
+        if (DR.equals(commandPrefix)) {
+            throw m_compiler.new VoltCompilerException(String.format(
+                    "Invalid DR TABLE statement: \"%s\", " +
+                    "expected syntax: DR TABLE <table> [DISABLE]",
                     statement.substring(0,statement.length()-1))); // remove trailing semicolon
         }
 

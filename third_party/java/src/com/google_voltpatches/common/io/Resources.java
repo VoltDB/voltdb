@@ -21,12 +21,11 @@ import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
 import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.base.Charsets;
-import com.google_voltpatches.common.base.Objects;
+import com.google_voltpatches.common.base.MoreObjects;
 import com.google_voltpatches.common.collect.Lists;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.URL;
 import java.nio.charset.Charset;
@@ -47,17 +46,6 @@ import java.util.List;
 @Beta
 public final class Resources {
   private Resources() {}
-
-  /**
-   * Returns a factory that will supply instances of {@link InputStream} that
-   * read from the given URL.
-   *
-   * @param url the URL to read from
-   * @return the factory
-   */
-  public static InputSupplier<InputStream> newInputStreamSupplier(URL url) {
-    return ByteStreams.asInputSupplier(asByteSource(url));
-  }
 
   /**
    * Returns a {@link ByteSource} that reads from the given URL.
@@ -91,21 +79,8 @@ public final class Resources {
   }
 
   /**
-   * Returns a factory that will supply instances of
-   * {@link InputStreamReader} that read a URL using the given character set.
-   *
-   * @param url the URL to read from
-   * @param charset the charset used to decode the input stream; see {@link
-   *     Charsets} for helpful predefined constants
-   * @return the factory
-   */
-  public static InputSupplier<InputStreamReader> newReaderSupplier(
-      URL url, Charset charset) {
-    return CharStreams.asInputSupplier(asCharSource(url, charset));
-  }
-
-  /**
-   * Returns a {@link CharSource} that reads from the given URL using the given character set.
+   * Returns a {@link CharSource} that reads from the given URL using the given
+   * character set.
    *
    * @since 14.0
    */
@@ -151,7 +126,7 @@ public final class Resources {
    */
   public static <T> T readLines(URL url, Charset charset,
       LineProcessor<T> callback) throws IOException {
-    return CharStreams.readLines(newReaderSupplier(url, charset), callback);
+    return asCharSource(url, charset).readLines(callback);
   }
 
   /**
@@ -215,7 +190,7 @@ public final class Resources {
    * @throws IllegalArgumentException if the resource is not found
    */
   public static URL getResource(String resourceName) {
-    ClassLoader loader = Objects.firstNonNull(
+    ClassLoader loader = MoreObjects.firstNonNull(
         Thread.currentThread().getContextClassLoader(),
         Resources.class.getClassLoader());
     URL url = loader.getResource(resourceName);

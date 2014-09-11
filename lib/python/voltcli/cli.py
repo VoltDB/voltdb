@@ -421,7 +421,7 @@ class CLIParser(ExtendedHelpOptionParser):
         show_usage = False
         if exceptions:
             msg = 'Argument value %s:' % utility.pluralize('error', len(exceptions))
-            utility.error(msg, [e.message for e in exceptions])
+            utility.error(msg, [str(e) for e in exceptions])
             had_errors += 1
         if iarg < len(args):
             self._abort('Extra arguments were provided:', args[iarg:])

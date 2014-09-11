@@ -18,6 +18,8 @@ package com.google_voltpatches.common.io;
 
 import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
+import com.google_voltpatches.common.annotations.Beta;
+import com.google_voltpatches.common.base.Ascii;
 import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.collect.AbstractIterator;
 import com.google_voltpatches.common.collect.ImmutableList;
@@ -60,7 +62,12 @@ import javax.annotation_voltpatches.Nullable;
  * @since 14.0
  * @author Colin Decker
  */
-public abstract class CharSource implements InputSupplier<Reader> {
+public abstract class CharSource {
+
+  /**
+   * Constructor for use by subclasses.
+   */
+  protected CharSource() {}
 
   /**
    * Opens a new {@link Reader} for reading from this source. This method should return a new,
@@ -71,21 +78,6 @@ public abstract class CharSource implements InputSupplier<Reader> {
    * @throws IOException if an I/O error occurs in the process of opening the reader
    */
   public abstract Reader openStream() throws IOException;
-
-  /**
-   * This method is a temporary method provided for easing migration from suppliers to sources and
-   * sinks.
-   *
-   * @since 15.0
-   * @deprecated This method is only provided for temporary compatibility with the
-   *     {@link InputSupplier} interface and should not be called directly. Use {@link #openStream}
-   *     instead.
-   */
-  @Override
-  @Deprecated
-  public final Reader getInput() throws IOException {
-    return openStream();
-  }
 
   /**
    * Opens a new {@link BufferedReader} for reading from this source. This method should return a
@@ -202,6 +194,35 @@ public abstract class CharSource implements InputSupplier<Reader> {
         result.add(line);
       }
       return ImmutableList.copyOf(result);
+    } catch (Throwable e) {
+      throw closer.rethrow(e);
+    } finally {
+      closer.close();
+    }
+  }
+
+  /**
+   * Reads lines of text from this source, processing each line as it is read using the given
+   * {@link LineProcessor processor}. Stops when all lines have been processed or the processor
+   * returns {@code false} and returns the result produced by the processor.
+   *
+   * <p>Like {@link BufferedReader}, this method breaks lines on any of {@code \n}, {@code \r} or
+   * {@code \r\n}, does not include the line separator in the lines passed to the {@code processor}
+   * and does not consider there to be an extra empty line at the end if the content is terminated
+   * with a line separator.
+   *
+   * @throws IOException if an I/O error occurs in the process of reading from this source or if
+   *     {@code processor} throws an {@code IOException}
+   * @since 16.0
+   */
+  @Beta
+  public <T> T readLines(LineProcessor<T> processor) throws IOException {
+    checkNotNull(processor);
+
+    Closer closer = Closer.create();
+    try {
+      Reader reader = closer.register(openStream());
+      return CharStreams.readLines(reader, processor);
     } catch (Throwable e) {
       throw closer.rethrow(e);
     } finally {
@@ -367,9 +388,18 @@ public abstract class CharSource implements InputSupplier<Reader> {
     }
 
     @Override
+    public <T> T readLines(LineProcessor<T> processor) throws IOException {
+      for (String line : lines()) {
+        if (!processor.processLine(line)) {
+          break;
+        }
+      }
+      return processor.getResult();
+    }
+
+    @Override
     public String toString() {
-      CharSequence shortened = (seq.length() <= 15) ? seq : seq.subSequence(0, 12) + "...";
-      return "CharSource.wrap(" + shortened + ")";
+      return "CharSource.wrap(" + Ascii.truncate(seq, 30, "...") + ")";
     }
   }
 

@@ -373,6 +373,11 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
         return m_tupleLimit;
     }
 
+    bool isDREnabled() const { return m_drEnabled; }
+
+    // for test purpose
+    void setDR(bool flag) { m_drEnabled = flag; }
+
     void setTupleLimit(int32_t newLimit) {
         m_tupleLimit = newLimit;
     }
@@ -427,7 +432,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
   private:
 
     // Zero allocation size uses defaults.
-    PersistentTable(int partitionColumn, char *signature, bool isMaterialized, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX);
+    PersistentTable(int partitionColumn, char *signature, bool isMaterialized, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX, bool drEnabled = false);
 
     /**
      * Prepare table for streaming from serialized data (internal for tests).
@@ -562,6 +567,9 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     //Cache config info, is this a materialized view
     bool m_isMaterialized;
+
+    // is DR enabled
+    bool m_drEnabled;
 
     //SHA-1 of signature string
     char m_signature[20];

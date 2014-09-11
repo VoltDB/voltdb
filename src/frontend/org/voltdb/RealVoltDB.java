@@ -169,9 +169,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    static final String m_defaultVersionString = "4.6";
+    static final String m_defaultVersionString = "4.7";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q4.6\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q4.7\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -1679,6 +1679,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         SortedMap<String, String> dbgMap = m_catalogContext.getDebuggingInfoFromCatalog();
         for (String line : dbgMap.values()) {
             hostLog.info(line);
+        }
+
+        if (m_catalogContext.cluster.getUseadhocschema()) {
+            consoleLog.warn("Cluster is configured to use live DDL for application changes. " +
+                  "This feature is currently a preview of work-in-progress and not recommended for " +
+                  "production environments.  Remove the schema attribute in the <cluster> " +
+                  "element of your deployment file if you did not intend to use the preview.");
         }
 
         // print out a bunch of useful system info

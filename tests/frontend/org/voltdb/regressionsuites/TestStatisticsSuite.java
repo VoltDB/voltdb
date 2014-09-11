@@ -48,7 +48,6 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.join.BalancePartitionsStatistics;
 import org.voltdb.utils.MiscUtils;
-import org.voltdb.regressionsuites.SaveRestoreBase;
 import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
 
 public class TestStatisticsSuite extends SaveRestoreBase {
@@ -387,7 +386,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         System.out.println("\n\nTESTING MEMORY STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
-        ColumnInfo[] expectedSchema = new ColumnInfo[12];
+        ColumnInfo[] expectedSchema = new ColumnInfo[13];
         expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
         expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
@@ -400,6 +399,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         expectedSchema[9] = new ColumnInfo("STRINGMEMORY", VoltType.INTEGER);
         expectedSchema[10] = new ColumnInfo("TUPLECOUNT", VoltType.BIGINT);
         expectedSchema[11] = new ColumnInfo("POOLEDMEMORY", VoltType.BIGINT);
+        expectedSchema[12] = new ColumnInfo("PHYSICALMEMORY", VoltType.BIGINT);
         VoltTable expectedTable = new VoltTable(expectedSchema);
 
         VoltTable[] results = null;

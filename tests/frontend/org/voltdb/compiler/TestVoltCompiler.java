@@ -1281,6 +1281,17 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(success);
     }
 
+    public void testUseInnerClassAsProc() throws Exception {
+        final String simpleSchema =
+            "create procedure from class org.voltdb_testprocs.regressionsuites.fixedsql.TestENG2423$InnerProc;";
+        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+        final String schemaPath = schemaFile.getPath();
+
+        VoltCompiler compiler = new VoltCompiler();
+        boolean success = compiler.compileFromDDL(testout_jar, schemaPath);
+        assertTrue(success);
+    }
+
     public void testMaterializedView() throws IOException {
         final String simpleSchema =
             "create table books (cash integer default 23 NOT NULL, title varchar(10) default 'foo', PRIMARY KEY(cash));\n" +
@@ -3244,6 +3255,74 @@ public class TestVoltCompiler extends TestCase {
                 "create table e1( id integer, f1 varchar(16), f2 varchar(12));",
                 "export table e1;",
                 "export table E1;"
+                );
+    }
+
+    public void testGoodDRTable() throws Exception {
+        Database db;
+
+        db = goodDDLAgainstSimpleSchema(
+                "create table e1 (id integer, f1 varchar(16));",
+                "dr table e1;"
+                );
+        assertTrue(db.getTables().getIgnoreCase("e1").getIsdred());
+
+        db = goodDDLAgainstSimpleSchema(
+                "create table e1 (id integer, f1 varchar(16));",
+                "create table e2 (id integer, f1 varchar(16));",
+                "dr table e1;",
+                "DR TABLE E2;"
+                );
+        assertTrue(db.getTables().getIgnoreCase("e1").getIsdred());
+        assertTrue(db.getTables().getIgnoreCase("e2").getIsdred());
+
+        db = goodDDLAgainstSimpleSchema(
+                "create table e1 (id integer, f1 varchar(16));",
+                "create table e2 (id integer, f1 varchar(16));",
+                "dr table *;"
+                );
+        assertTrue(db.getTables().getIgnoreCase("e1").getIsdred());
+        assertTrue(db.getTables().getIgnoreCase("e2").getIsdred());
+
+        // DR statement is order sensitive
+        db = goodDDLAgainstSimpleSchema(
+                "create table e1 (id integer, f1 varchar(16));",
+                "create table e2 (id integer, f1 varchar(16));",
+                "dr table *;",
+                "dr table e2 disable;"
+                );
+        assertTrue(db.getTables().getIgnoreCase("e1").getIsdred());
+        assertFalse(db.getTables().getIgnoreCase("e2").getIsdred());
+
+        db = goodDDLAgainstSimpleSchema(
+                "create table e1 (id integer, f1 varchar(16));",
+                "create table e2 (id integer, f1 varchar(16));",
+                "dr table e2 disable;",
+                "dr table *;"
+                );
+        assertTrue(db.getTables().getIgnoreCase("e1").getIsdred());
+        assertTrue(db.getTables().getIgnoreCase("e2").getIsdred());
+    }
+
+    public void testBadDRTable() throws Exception {
+        badDDLAgainstSimpleSchema(".+\\sdr, table non_existant was not present in the catalog.*",
+                "dr table non_existant;"
+                );
+
+        badDDLAgainstSimpleSchema(".+contains invalid identifier \"1table_name_not_valid\".*",
+                "dr table 1table_name_not_valid;"
+                );
+
+        badDDLAgainstSimpleSchema(".+Invalid DR TABLE statement.*",
+                "dr table one, two, three;"
+                );
+
+        badDDLAgainstSimpleSchema(".+Invalid DR TABLE statement.*",
+                "dr dr table one;"
+                );
+
+        badDDLAgainstSimpleSchema(".+Invalid DR TABLE statement.*",
+                "dr table table one;"
                 );
     }
 

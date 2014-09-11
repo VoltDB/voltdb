@@ -544,34 +544,11 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
         return this.NativeConnection.getClientStatsContext();
     }
 
-    // IVoltDBConnection extended method
-    // Return global performance statistics for the underlying connection (pooled information)
-    @Override
-    public JDBC4PerfCounterMap getStatistics()
-    {
-        return this.NativeConnection.getStatistics();
-    }
-
-    // Return performance statistics for a specific procedure, for the underlying connection (pooled information)
-    @Override
-    public JDBC4PerfCounter getStatistics(String procedure)
-    {
-        return this.NativeConnection.getStatistics(procedure);
-    }
-
-    // Return performance statistics for a list of procedures, for the underlying connection (pooled information)
-    @Override
-    public JDBC4PerfCounter getStatistics(String... procedures)
-    {
-        return this.NativeConnection.getStatistics(procedures);
-    }
-
     // Save statistics to a file
-    @Deprecated
     @Override
-    public void saveStatistics(String file) throws IOException
+    public void saveStatistics(ClientStats stats, String file) throws IOException
     {
-        this.NativeConnection.saveStatistics(file);
+        this.NativeConnection.saveStatistics(stats, file);
     }
 
     public void setSchema(String schema) throws SQLException {

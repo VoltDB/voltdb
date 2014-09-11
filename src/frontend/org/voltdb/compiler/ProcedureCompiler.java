@@ -611,7 +611,15 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
         }
 
         // put the compiled code for this procedure into the jarfile
-        compiler.addClassToJar(jarOutput, procClass);
+        // need to find the outermost ancestor class for the procedure in the event
+        // that it's actually an inner (or inner inner...) class.
+        // addClassToJar recursively adds all the children, which should include this
+        // class
+        Class<?> ancestor = procClass;
+        while (ancestor.getEnclosingClass() != null) {
+            ancestor = ancestor.getEnclosingClass();
+        }
+        compiler.addClassToJar(jarOutput, ancestor);
     }
 
     static void compileSingleStmtProcedure(VoltCompiler compiler, HSQLInterface hsql,

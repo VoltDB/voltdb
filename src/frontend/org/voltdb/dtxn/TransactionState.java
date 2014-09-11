@@ -64,15 +64,29 @@ public abstract class TransactionState extends OrderableTransaction  {
     protected TransactionState(Mailbox mbox,
                                TransactionInfoBaseMessage notice)
     {
+        this(mbox, notice, notice.isReadOnly());
+    }
+
+    /**
+     * This constructor is only reserved for BorrowTransactionState, which is read only now.
+     * @param mbox
+     * @param notice
+     * @param readOnly
+     */
+    protected TransactionState(Mailbox mbox,
+                               TransactionInfoBaseMessage notice,
+                               boolean readOnly)
+    {
         super(notice.getTxnId(), notice.getUniqueId(), notice.getInitiatorHSId());
         m_spHandle = notice.getSpHandle();
         m_spUniqueId = notice.getSpUniqueId();
         m_mbox = mbox;
         m_notice = notice;
-        m_isReadOnly = notice.isReadOnly();
+        m_isReadOnly = readOnly;
         m_beginUndoToken = Site.kInvalidUndoToken;
         m_isForReplay = notice.isForReplay();
     }
+
 
     final public TransactionInfoBaseMessage getNotice() {
         return m_notice;

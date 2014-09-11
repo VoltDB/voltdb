@@ -117,7 +117,9 @@ public class FunctionForVoltDB extends FunctionSQL {
 
         static final int FUNC_VOLT_FROM_UNIXTIME          = 20023;
 
-        static final int FUNC_VOLT_FORMAT_CURRENCY        = 20024;
+        static final int FUNC_VOLT_SET_FIELD              = 20024;
+
+        static final int FUNC_VOLT_FORMAT_CURRENCY        = 20025;
 
         static final int FUNC_CONCAT                      = 124;
 
@@ -139,6 +141,14 @@ public class FunctionForVoltDB extends FunctionSQL {
                     new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
                                   Tokens.COMMA, Tokens.QUESTION,
                                   Tokens.CLOSEBRACKET}),
+
+// Disable SET_FIELD at the parser level until its exact semantics can be ironed out.
+//            new FunctionId("set_field", Type.SQL_VARCHAR, FUNC_VOLT_SET_FIELD, -1,
+//                    new Type[] { Type.SQL_VARCHAR, Type.SQL_VARCHAR, Type.SQL_VARCHAR },
+//                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
+//                                  Tokens.COMMA, Tokens.QUESTION,
+//                                  Tokens.COMMA, Tokens.QUESTION,
+//                                  Tokens.CLOSEBRACKET }),
 
             new FunctionId("array_element", Type.SQL_VARCHAR, FUNC_VOLT_ARRAY_ELEMENT, -1,
                     new Type[] { Type.SQL_VARCHAR, Type.SQL_INTEGER },
@@ -186,6 +196,7 @@ public class FunctionForVoltDB extends FunctionSQL {
                     new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA, Tokens.QUESTION,
                                   Tokens.X_REPEAT, 2, Tokens.COMMA, Tokens.QUESTION,
                                   Tokens.CLOSEBRACKET }),
+
         };
 
         private static Map<String, FunctionId> by_LC_name = new HashMap<String, FunctionId>();
@@ -481,6 +492,17 @@ public class FunctionForVoltDB extends FunctionSQL {
             case FunctionId.FUNC_VOLT_FROM_UNIXTIME: {
                 sb.append(name).append(Tokens.T_OPENBRACKET).append(nodes[0].getSQL());
                 sb.append(Tokens.T_CLOSEBRACKET);
+
+                return sb.toString();
+            }
+            case FunctionId.FUNC_VOLT_SET_FIELD: {
+                sb.append(name).append(Tokens.T_OPENBRACKET);
+                sb.append(nodes[0].getSQL());
+                sb.append(Tokens.T_COMMA).append(nodes[1].getSQL());
+                sb.append(Tokens.T_COMMA).append(nodes[2].getSQL());
+                sb.append(Tokens.T_CLOSEBRACKET);
+
+                return sb.toString();
             }
             default :
                 return super.getSQL();

@@ -28,14 +28,14 @@ public class SQLLexer
     // Simplest possible SQL DDL token lexer
     private static final Pattern DDL_MATCH = Pattern.compile(
             "^\\s*" +  // start of line, 0 or more whitespace
-            "(alter|create|drop|export|import|partition)" + // tokens we consider DDL
+            "(alter|create|drop|export|import|partition|dr)" + // tokens we consider DDL
             "\\s+", // one or more whitespace
             Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL
             );
 
     private static final Pattern WHITELIST_1 = Pattern.compile(
             "^\\s*" +  // start of line, 0 or more whitespace
-            "(alter|create|drop|partition)" + // DDL we're ready to handle
+            "(alter|create|drop|partition|dr)" + // DDL we're ready to handle
             "\\s+" + // one or more whitespace
             "(table|assumeunique|unique|index|view|procedure)" +
             "\\s+" + // one or more whitespace

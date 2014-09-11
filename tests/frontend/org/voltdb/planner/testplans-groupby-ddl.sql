@@ -176,6 +176,8 @@ CREATE TABLE votes
 
 PARTITION TABLE votes ON COLUMN phone_number;
 
+CREATE INDEX votes_state_tree1 ON votes (state);
+
 CREATE VIEW v_votes_by_contestant_number_state
 (
   contestant_number
@@ -190,4 +192,17 @@ AS
  GROUP BY contestant_number
         , state
 ;
+
+
+CREATE TABLE votesBytes
+(
+  phone_number       bigint     NOT NULL
+, state              varchar(63 bytes) NOT NULL
+, contestant_number  integer    NOT NULL
+);
+
+PARTITION TABLE votesBytes ON COLUMN phone_number;
+
+CREATE INDEX votesBytes_state_tree1 ON votesBytes (state);
+
 

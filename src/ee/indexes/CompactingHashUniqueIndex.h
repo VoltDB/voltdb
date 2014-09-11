@@ -157,7 +157,7 @@ class CompactingHashUniqueIndex : public TableIndex
 
     TableIndex *cloneEmptyNonCountingTreeIndex() const
     {
-        return new CompactingTreeUniqueIndex<KeyType, false >(TupleSchema::createTupleSchema(getKeySchema()), m_scheme);
+        return new CompactingTreeUniqueIndex<NormalKeyValuePair<KeyType, void const *>, false >(TupleSchema::createTupleSchema(getKeySchema()), m_scheme);
     }
 
     // Non-virtual (so "really-private") helper methods.
