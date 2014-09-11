@@ -1011,6 +1011,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     class StartActionWatcher implements Watcher {
         @Override
         public void process(WatchedEvent event) {
+            if (m_mode == OperationMode.SHUTTINGDOWN) return;
             m_es.submit(new Runnable() {
                 @Override
                 public void run() {
