@@ -40,6 +40,7 @@ import org.hsqldb_voltpatches.FunctionSQL;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.hsqldb_voltpatches.VoltXMLElement.VoltXMLDiff;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.utils.CoreUtils;
@@ -421,6 +422,7 @@ public class DDLCompiler {
 
     // Partition descriptors parsed from DDL PARTITION or REPLICATE statements.
     final VoltDDLElementTracker m_tracker;
+    VoltXMLElement m_schema = new VoltXMLElement(HSQLInterface.XML_SCHEMA_NAME);
 
     // used to match imported class with those in the classpath
     // For internal cluster compilation, this will point to the
@@ -517,7 +519,8 @@ public class DDLCompiler {
                     // avoid embedded newlines so we can delimit statements
                     // with newline.
                     m_fullDDL += Encoder.hexEncode(stmt.statement) + "\n";
-                    m_hsql.runDDLCommand(stmt.statement);
+                    VoltXMLDiff thisStmtDiff = m_hsql.runDDLCommand(stmt.statement);
+                    m_schema.applyDiff(thisStmtDiff);
                 } catch (HSQLParseException e) {
                     String msg = "DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
                     throw m_compiler.new VoltCompilerException(msg, stmt.lineNo);
@@ -993,6 +996,11 @@ public class DDLCompiler {
         try
         {
             xmlCatalog = m_hsql.getXMLFromCatalog();
+            if (!xmlCatalog.toMinString().equals(m_schema.toMinString())) {
+                System.out.println("FULL CATALOG: " + xmlCatalog.toString());
+                System.out.println("DIFF BUILT  : " + m_schema.toString());
+            }
+            //assert(xmlCatalog.toMinString().equals(m_schema.toMinString()));
         }
         catch (HSQLParseException e)
         {

@@ -19,6 +19,7 @@ package org.hsqldb_voltpatches;
 
 import java.util.TimeZone;
 
+import org.hsqldb_voltpatches.VoltXMLElement.VoltXMLDiff;
 import org.hsqldb_voltpatches.lib.HashMappedList;
 import org.hsqldb_voltpatches.persist.HsqlProperties;
 import org.hsqldb_voltpatches.result.Result;
@@ -36,6 +37,8 @@ import org.hsqldb_voltpatches.result.Result;
  * </ul>
  */
 public class HSQLInterface {
+
+    static public String XML_SCHEMA_NAME = "databaseschema";
     /**
      * Naming conventions for unnamed indexes and constraints
      */
@@ -86,6 +89,8 @@ public class HSQLInterface {
     }
 
     Session sessionProxy;
+    // Initialize to an empty schema
+    VoltXMLElement lastSchema = new VoltXMLElement(XML_SCHEMA_NAME);
     static int instanceId = 0;
 
     private HSQLInterface(Session sessionProxy) {
@@ -135,11 +140,15 @@ public class HSQLInterface {
      * @throws HSQLParseException Throws exception if SQL parse error is
      * encountered.
      */
-    public void runDDLCommand(String ddl) throws HSQLParseException {
+    public VoltXMLDiff runDDLCommand(String ddl) throws HSQLParseException {
         Result result = sessionProxy.executeDirectStatement(ddl);
         if (result.hasError()) {
             throw new HSQLParseException(result.getMainString());
         }
+        VoltXMLElement thisSchema = getXMLFromCatalog();
+        VoltXMLDiff diff = VoltXMLElement.computeDiff(lastSchema, thisSchema);
+        lastSchema = thisSchema;
+        return diff;
     }
 
     /**
@@ -350,7 +359,7 @@ public class HSQLInterface {
      * @throws HSQLParseException
      */
     public VoltXMLElement getXMLFromCatalog() throws HSQLParseException {
-        VoltXMLElement xml = new VoltXMLElement("databaseschema");
+        VoltXMLElement xml = new VoltXMLElement(XML_SCHEMA_NAME);
 
         String schemaName = null;
         try {
