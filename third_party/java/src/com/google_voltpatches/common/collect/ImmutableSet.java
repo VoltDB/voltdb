@@ -298,7 +298,7 @@ public abstract class ImmutableSet<E> extends ImmutableCollection<E>
    */
   public static <E> ImmutableSet<E> copyOf(Iterable<? extends E> elements) {
     return (elements instanceof Collection)
-        ? copyOf(Collections2.cast(elements))
+        ? copyOf((Collection<? extends E>) elements)
         : copyOf(elements.iterator());
   }
 
@@ -369,14 +369,15 @@ public abstract class ImmutableSet<E> extends ImmutableCollection<E>
         return set;
       }
     } else if (elements instanceof EnumSet) {
-      EnumSet<?> enumSet = EnumSet.copyOf((EnumSet<?>) elements);
-      @SuppressWarnings("unchecked")
-      // immutable collections are safe for covariant casts
-      ImmutableSet<E> result = (ImmutableSet<E>) ImmutableEnumSet.asImmutable(enumSet);
-      return result;
+      return copyOfEnumSet((EnumSet) elements);
     }
     Object[] array = elements.toArray();
     return construct(array.length, array);
+  }
+
+  private static <E extends Enum<E>> ImmutableSet<E> copyOfEnumSet(
+      EnumSet<E> enumSet) {
+    return ImmutableEnumSet.asImmutable(EnumSet.copyOf(enumSet));
   }
 
   ImmutableSet() {}

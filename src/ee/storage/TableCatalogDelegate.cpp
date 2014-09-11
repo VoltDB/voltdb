@@ -365,6 +365,7 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
 
     bool exportEnabled = isExportEnabledForTable(catalogDatabase, table_id);
     bool tableIsExportOnly = isTableExportOnly(catalogDatabase, table_id);
+    bool drEnabled = catalogTable.isDRed();
     materialized = isTableMaterialized(catalogTable);
     const string& tableName = catalogTable.name();
     int32_t databaseId = catalogDatabase.relativeIndex();
@@ -373,12 +374,14 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
     SHA1_Update(&shaCTX, reinterpret_cast<const uint8_t *>(catalogTable.signature().c_str()), ::strlen(catalogTable.signature().c_str()));
     SHA1_Final(&shaCTX, reinterpret_cast<uint8_t*>(signatureHash));
     Table *table = TableFactory::getPersistentTable(databaseId, tableName,
-                                                    schema, columnNames, signatureHash, materialized,
+                                                    schema, columnNames, signatureHash,
+                                                    materialized,
                                                     partitionColumnIndex, exportEnabled,
                                                     tableIsExportOnly,
                                                     0,
                                                     catalogTable.tuplelimit(),
-                                                    compactionThreshold);
+                                                    compactionThreshold,
+                                                    drEnabled);
 
     // add a pkey index if one exists
     if (pkey_index_id.size() != 0) {
@@ -476,6 +479,8 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database const &catalogDatab
                                            catalog::Table const &catalogTable,
                                            std::map<std::string, CatalogDelegate*> const &delegatesByName)
 {
+    DRTupleStreamDisableGuard guard(ExecutorContext::getExecutorContext()->drStream());
+
     ///////////////////////////////////////////////
     // Create a new table so two tables exist
     ///////////////////////////////////////////////
@@ -668,19 +673,25 @@ static bool isDefaultNow(const std::string& defaultValue) {
 }
 
 // This method produces a row containing all the default values for
-// the table.  Note that if there are timestamp columns in the table
-// with a default value of "now", then the column will be populated
-// with whatever time you call this function.
-void TableCatalogDelegate::initTemplateTuple(Pool* pool, catalog::Table const *catalogTable, TableTuple& tbTuple) {
+// the table, skipping over fields explictly set, and adding "default
+// now" fields to nowFields.
+void TableCatalogDelegate::initTupleWithDefaultValues(Pool* pool,
+                                                      catalog::Table const *catalogTable,
+                                                      const std::set<int>& fieldsExplicitlySet,
+                                                      TableTuple& tbTuple,
+                                                      std::vector<int>& nowFields) {
     catalog::CatalogMap<catalog::Column>::field_map_iter colIter;
     for (colIter = catalogTable->columns().begin();
          colIter != catalogTable->columns().end();
          colIter++) {
 
-        // TODO an optimization: can skip over the fields which will be
-        // overwritten by values from child node.
-
         catalog::Column *col = colIter->second;
+        if (fieldsExplicitlySet.find(col->index()) != fieldsExplicitlySet.end()) {
+            // this field will be set explicitly so no need to
+            // serialize the default value
+            continue;
+        }
+
         ValueType defaultColType = static_cast<ValueType>(col->defaulttype());
 
         switch (defaultColType) {
@@ -690,7 +701,9 @@ void TableCatalogDelegate::initTemplateTuple(Pool* pool, catalog::Table const *c
 
         case VALUE_TYPE_TIMESTAMP:
             if (isDefaultNow(col->defaultvalue())) {
-                tbTuple.setNValue(col->index(), NValue::callConstant<FUNC_CURRENT_TIMESTAMP>());
+                // Caller will need to set this to the current
+                // timestamp at the appropriate time
+                nowFields.push_back(col->index());
                 break;
             }
             // else, fall through to default case

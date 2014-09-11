@@ -1922,7 +1922,7 @@ public class Expression {
             if (id_list.size() > 0) {
                 // Flatten the id list, intern it, and then do the same trick from above
                 for (String temp : id_list)
-                    this.cached_id += temp;
+                    this.cached_id += "+" + temp;
                 hashCode = this.cached_id.intern().hashCode();
             }
             else

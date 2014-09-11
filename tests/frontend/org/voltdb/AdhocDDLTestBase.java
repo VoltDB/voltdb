@@ -32,11 +32,6 @@ import org.voltdb.common.Constants;
 
 public class AdhocDDLTestBase extends TestCase {
 
-    // Still need to write these tests somewhere --izzy
-    //adHocQuery = "CREATE INDEX IDX_PROJ_PNAME ON PROJ(PNAME);";
-    //adHocQuery = "CREATE PROCEDURE AS SELECT 1 FROM PROJ;";
-    //adHocQuery = "CREATE PROCEDURE FROM CLASS bar.Foo;";
-
     protected ServerThread m_localServer;
     protected Client m_client;
 

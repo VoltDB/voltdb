@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.utils.PlatformProperties;
 import org.voltdb.utils.SystemStatsCollector;
 
 public class MemoryStats extends StatsSource {
@@ -79,6 +80,7 @@ public class MemoryStats extends StatsSource {
         columns.add(new VoltTable.ColumnInfo("STRINGMEMORY", VoltType.INTEGER));
         columns.add(new VoltTable.ColumnInfo("TUPLECOUNT", VoltType.BIGINT));
         columns.add(new VoltTable.ColumnInfo("POOLEDMEMORY", VoltType.BIGINT));
+        columns.add(new VoltTable.ColumnInfo("PHYSICALMEMORY", VoltType.BIGINT));
     }
 
     @Override
@@ -113,6 +115,8 @@ public class MemoryStats extends StatsSource {
         rowValues[columnNameToIndex.get("STRINGMEMORY")] = totals.stringMem;
         rowValues[columnNameToIndex.get("TUPLECOUNT")] = totals.tupleCount;
         rowValues[columnNameToIndex.get("POOLEDMEMORY")] = totals.pooledMem / 1024;
+        //in kb to make math simpler with other mem values.
+        rowValues[columnNameToIndex.get("PHYSICALMEMORY")] = PlatformProperties.getPlatformProperties().ramInMegabytes * 1024;
         super.updateStatsRow(rowKey, rowValues);
     }
 

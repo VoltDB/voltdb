@@ -152,13 +152,13 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         assertEquals(resp.getResults()[0].getRowCount(), 1);
 
         m_client.callProcedure("T5.insert", "hahahaha");
-        resp = m_client.callProcedure("@AdHoc", "select * from T5;");
+        resp = m_client.callProcedure("@AdHoc", "select * from T5 order by c;");
         vt = resp.getResults()[0];
         assertEquals(vt.getRowCount(), 2);
         vt.advanceToRow(0);
-        assertEquals(vt.get(0, VoltType.STRING), "test");
-        vt.advanceToRow(1);
         assertEquals(vt.get(0, VoltType.STRING), "hahahaha");
+        vt.advanceToRow(1);
+        assertEquals(vt.get(0, VoltType.STRING), "test");
 
         m_client.callProcedure("T6.insert", "test");
         resp = m_client.callProcedure("@AdHoc", "select * from T6;");

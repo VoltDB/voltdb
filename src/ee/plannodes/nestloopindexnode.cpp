@@ -42,32 +42,12 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-
 #include "nestloopindexnode.h"
 
-#include "storage/table.h"
+namespace voltdb {
 
-using namespace voltdb;
+NestLoopIndexPlanNode::~NestLoopIndexPlanNode() { }
 
-NestLoopIndexPlanNode::NestLoopIndexPlanNode(CatalogId id)
-  : AbstractJoinPlanNode(id)
-{
-    // Do nothing
-}
+PlanNodeType NestLoopIndexPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_NESTLOOPINDEX; }
 
-NestLoopIndexPlanNode::NestLoopIndexPlanNode()
-  : AbstractJoinPlanNode()
-{
-    // Do nothing
-}
-
-NestLoopIndexPlanNode::~NestLoopIndexPlanNode()
-{
-    delete getOutputTable();
-    setOutputTable(NULL);
-}
-
-PlanNodeType NestLoopIndexPlanNode::getPlanNodeType() const
-{
-    return PLAN_NODE_TYPE_NESTLOOPINDEX;
-}
+} // namespace voltdb

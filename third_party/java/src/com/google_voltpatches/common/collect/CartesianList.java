@@ -22,6 +22,7 @@ import com.google_voltpatches.common.math.IntMath;
 import java.util.AbstractList;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.RandomAccess;
 
 import javax.annotation_voltpatches.Nullable;
 
@@ -31,7 +32,7 @@ import javax.annotation_voltpatches.Nullable;
  * @author Louis Wasserman
  */
 @GwtCompatible
-final class CartesianList<E> extends AbstractList<List<E>> {
+final class CartesianList<E> extends AbstractList<List<E>> implements RandomAccess {
 
   private transient final ImmutableList<List<E>> axes;
   private transient final int[] axesSizeProduct;

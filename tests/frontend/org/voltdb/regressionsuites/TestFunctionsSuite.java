@@ -748,9 +748,25 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(2, vt.getLong(0));
         // Test NULL
 
-        assertTrue(after.getTime()*1000 >= vt.getTimestampAsLong(2));
-        assertTrue(before.getTime()*1000 <= vt.getTimestampAsLong(2));
-        assertEquals(vt.getTimestampAsLong(2), vt.getTimestampAsLong(3));
+        long t2FirstRow = vt.getTimestampAsLong(2);
+        long t3FirstRow = vt.getTimestampAsLong(3);
+
+        assertTrue(after.getTime()*1000 >= t2FirstRow);
+        assertTrue(before.getTime()*1000 <= t2FirstRow);
+        assertEquals(t2FirstRow, t3FirstRow);
+
+        // execute the same insert again, to assert that we get a newer timestamp
+        // even if we are re-using the same plan (ENG-6755)
+
+        // sleep a quarter of a second just to be certain we get a different timestamp
+        Thread.sleep(250);
+
+        cr = client.callProcedure("@AdHoc", "Insert into R_TIME (ID) VALUES(2);");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = client.callProcedure("@AdHoc", "SELECT C1, T1, T2, T3 FROM R_TIME WHERE ID = 2;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        long t2SecondRow = vt.getTimestampAsLong(2);
+        assertTrue(t2FirstRow < t2SecondRow);
 
         before = new Date();
         vt = client.callProcedure("@AdHoc", "SELECT NOW, CURRENT_TIMESTAMP FROM R_TIME;").getResults()[0];
@@ -1911,7 +1927,24 @@ public class TestFunctionsSuite extends RegressionSuite {
         Client client = getClient();
         insertNumbers(client, values, values.length);
         subtestVarCharCasts(client);
+        subtestInlineVarCharCast(client);
         System.out.println("ENDING test of TO VARCHAR CAST");
+    }
+
+    private void subtestInlineVarCharCast(Client client) throws Exception {
+        // This is regression test coverage for ENG-6666.
+        String sql = "INSERT INTO INLINED_VC_VB_TABLE (ID, VC1, VC2, VB1, VB2) " +
+            "VALUES (22, 'FOO', 'BAR', 'DEADBEEF', 'CDCDCDCD');";
+        client.callProcedure("@AdHoc", sql);
+        sql = "SELECT CAST(VC1 AS VARCHAR) FROM INLINED_VC_VB_TABLE WHERE ID = 22;";
+        VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        vt.advanceRow();
+        assertEquals("FOO", vt.getString(0));
+
+        sql = "SELECT CAST(VB1 AS VARBINARY) FROM INLINED_VC_VB_TABLE WHERE ID = 22;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        vt.advanceRow();
+        assertTrue(VoltType.varbinaryToPrintableString(vt.getVarbinary(0)).contains("DEADBEEF"));
     }
 
     private void subtestVarCharCasts(Client client) throws Exception
@@ -2743,6 +2776,21 @@ public class TestFunctionsSuite extends RegressionSuite {
             assertTrue(vt.getString(1).equals("Memsql:Bad"));
         }
 
+        // Test inlined varchar/varbinary value produced by CASE WHEN.
+        // This is regression coverage for ENG-6666.
+        sql = "INSERT INTO INLINED_VC_VB_TABLE (ID, VC1, VC2, VB1, VB2) " +
+            "VALUES (72, 'FOO', 'BAR', 'DEADBEEF', 'CDCDCDCD');";
+        cl.callProcedure("@AdHoc", sql);
+        sql = "SELECT CASE WHEN ID > 11 THEN VC1 ELSE VC2 END FROM INLINED_VC_VB_TABLE WHERE ID = 72;";
+        vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
+        vt.advanceRow();
+        assertEquals("FOO", vt.getString(0));
+
+        sql = "SELECT CASE WHEN ID > 11 THEN VB1 ELSE VB2 END FROM INLINED_VC_VB_TABLE WHERE ID = 72;";
+        vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
+        vt.advanceRow();
+        assertTrue(VoltType.varbinaryToPrintableString(vt.getVarbinary(0)).contains("DEADBEEF"));
+
         cl.callProcedure("R1.insert", 3, "ORACLE",  8, 8.0, new Timestamp(1000000000000L));
         // Test nested case when
         sql = "SELECT ID, CASE WHEN num < 5 THEN num * 5 " +
@@ -3246,6 +3294,12 @@ public class TestFunctionsSuite extends RegressionSuite {
                 "PRIMARY KEY (ID) ); " +
                 "PARTITION TABLE C_NULL ON COLUMN ID;" +
 
+                "CREATE TABLE INLINED_VC_VB_TABLE (" +
+                "ID INTEGER DEFAULT 0 NOT NULL," +
+                "VC1 VARCHAR(6)," +     // inlined
+                "VC2 VARCHAR(16)," +    // not inlined
+                "VB1 VARBINARY(6)," +   // inlined
+                "VB2 VARBINARY(64));" + // not inlined
                 "";
         try {
             project.addLiteralSchema(literalSchema);
