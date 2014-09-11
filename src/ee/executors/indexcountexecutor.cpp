@@ -32,6 +32,23 @@
 
 using namespace voltdb;
 
+static long countNulls(TableIndex * tableIndex, AbstractExpression * countNULLExpr,
+        IndexCursor& indexCursor) {
+    if (countNULLExpr == NULL) {
+        return 0;
+    }
+    long numNULLs = 0;
+    TableTuple tuple;
+    while ( ! (tuple = tableIndex->nextValue(indexCursor)).isNullTuple()) {
+         if ( ! countNULLExpr->eval(&tuple, NULL).isTrue()) {
+             break;
+         }
+        numNULLs++;
+    }
+    return numNULLs;
+}
+
+
 bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
                                 TempTableLimits* limits)
 {
@@ -128,7 +145,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     // update local target table with its most recent reference
     Table* targetTable = m_node->getTargetTable();
     TableIndex * tableIndex = targetTable->index(m_node->getTargetIndexName());
-    boost::scoped_ptr<IndexCursor> indexCursor (new IndexCursor(tableIndex->getTupleSchema()));
+    IndexCursor indexCursor(tableIndex->getTupleSchema());
 
     TableTuple searchKey, endKey;
     if (m_numOfSearchkeys != 0) {
@@ -289,26 +306,26 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                    localLookupType, activeNumOfSearchKeys, searchKey.debugNoHeader().c_str());
         if (searchKeyUnderflow == false) {
             if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
-                rkStart = tableIndex->getCounterLET(&searchKey, true, indexCursor.get());
+                rkStart = tableIndex->getCounterLET(&searchKey, true, indexCursor);
             } else {
                 // handle start inclusive cases.
                 if (tableIndex->hasKey(&searchKey)) {
                     leftIncluded = 1;
-                    rkStart = tableIndex->getCounterLET(&searchKey, false, indexCursor.get());
+                    rkStart = tableIndex->getCounterLET(&searchKey, false, indexCursor);
 
                     if (reverseScanNullEdgeCase) {
-                        tableIndex->moveToKeyOrGreater(&searchKey, indexCursor.get());
+                        tableIndex->moveToKeyOrGreater(&searchKey, indexCursor);
                         reverseScanMovedIndexToScan = true;
                     }
                 } else {
-                    rkStart = tableIndex->getCounterLET(&searchKey, true, indexCursor.get());
+                    rkStart = tableIndex->getCounterLET(&searchKey, true, indexCursor);
                 }
             }
         } else {
             // Do not count null row or columns
-            tableIndex->moveToKeyOrGreater(&searchKey, indexCursor.get());
+            tableIndex->moveToKeyOrGreater(&searchKey, indexCursor);
             assert(countNULLExpr);
-            long numNULLs = countNulls(tableIndex, countNULLExpr, indexCursor.get());
+            long numNULLs = countNulls(tableIndex, countNULLExpr, indexCursor);
             rkStart += numNULLs;
             VOLT_DEBUG("Index count[underflow case]: "
                     "find out %ld null rows or columns are not counted in.", numNULLs);
@@ -318,10 +335,10 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     if (reverseScanNullEdgeCase) {
         // reverse scan case
         if (!reverseScanMovedIndexToScan && localLookupType != INDEX_LOOKUP_TYPE_GT) {
-            tableIndex->moveToEnd(true, indexCursor.get());
+            tableIndex->moveToEnd(true, indexCursor);
         }
         assert(countNULLExpr);
-        long numNULLs = countNulls(tableIndex, countNULLExpr, indexCursor.get());
+        long numNULLs = countNulls(tableIndex, countNULLExpr, indexCursor);
         rkStart += numNULLs;
         VOLT_DEBUG("Index count[reverse case]: "
                 "find out %ld null rows or columns are not counted in.", numNULLs);
@@ -329,17 +346,17 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
 
     if (m_numOfEndkeys != 0) {
         if (endKeyOverflow) {
-            rkEnd = tableIndex->getCounterGET(&endKey, true, indexCursor.get());
+            rkEnd = tableIndex->getCounterGET(&endKey, true, indexCursor);
         } else {
             IndexLookupType localEndType = m_endType;
             if (localEndType == INDEX_LOOKUP_TYPE_LT) {
-                rkEnd = tableIndex->getCounterGET(&endKey, false, indexCursor.get());
+                rkEnd = tableIndex->getCounterGET(&endKey, false, indexCursor);
             } else {
                 if (tableIndex->hasKey(&endKey)) {
                     rightIncluded = 1;
-                    rkEnd = tableIndex->getCounterGET(&endKey, true, indexCursor.get());
+                    rkEnd = tableIndex->getCounterGET(&endKey, true, indexCursor);
                 } else {
-                    rkEnd = tableIndex->getCounterGET(&endKey, false, indexCursor.get());
+                    rkEnd = tableIndex->getCounterGET(&endKey, false, indexCursor);
                 }
             }
         }
@@ -356,24 +373,6 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     VOLT_DEBUG ("Index Count :\n %s", m_outputTable->debug().c_str());
     return true;
 }
-
-
-long IndexCountExecutor::countNulls(TableIndex * tableIndex, AbstractExpression * countNULLExpr,
-        IndexCursor* cursor) {
-    if (countNULLExpr == NULL) {
-        return 0;
-    }
-    long numNULLs = 0;
-    TableTuple tuple;
-    while ( ! (tuple = tableIndex->nextValue(cursor)).isNullTuple()) {
-         if ( ! countNULLExpr->eval(&tuple, NULL).isTrue()) {
-             break;
-         }
-        numNULLs++;
-    }
-    return numNULLs;
-}
-
 
 IndexCountExecutor::~IndexCountExecutor() {
     if (m_numOfSearchkeys != 0) {

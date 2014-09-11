@@ -165,7 +165,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     // update local target table with its most recent reference
     Table* targetTable = m_node->getTargetTable();
     TableIndex *tableIndex = targetTable->index(m_node->getTargetIndexName());
-    boost::scoped_ptr<IndexCursor> indexCursor (new IndexCursor(tableIndex->getTupleSchema()));
+    IndexCursor indexCursor(tableIndex->getTupleSchema());
 
     TableTuple searchKey(tableIndex->getKeySchema());
     searchKey.moveNoHeader(m_searchKeyBackingStore);
@@ -331,33 +331,33 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                 localLookupType, activeNumOfSearchKeys, searchKey.debugNoHeader().c_str());
 
         if (localLookupType == INDEX_LOOKUP_TYPE_EQ) {
-            tableIndex->moveToKey(&searchKey, indexCursor.get());
+            tableIndex->moveToKey(&searchKey, indexCursor);
         }
         else if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
-            tableIndex->moveToGreaterThanKey(&searchKey, indexCursor.get());
+            tableIndex->moveToGreaterThanKey(&searchKey, indexCursor);
         }
         else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
-            tableIndex->moveToKeyOrGreater(&searchKey, indexCursor.get());
+            tableIndex->moveToKeyOrGreater(&searchKey, indexCursor);
         } else if (localLookupType == INDEX_LOOKUP_TYPE_LT) {
-            tableIndex->moveToLessThanKey(&searchKey, indexCursor.get());
+            tableIndex->moveToLessThanKey(&searchKey, indexCursor);
         } else if (localLookupType == INDEX_LOOKUP_TYPE_LTE) {
             // find the entry whose key is greater than search key,
             // do a forward scan using initialExpr to find the correct
             // start point to do reverse scan
-            bool isEnd = tableIndex->moveToGreaterThanKey(&searchKey, indexCursor.get());
+            bool isEnd = tableIndex->moveToGreaterThanKey(&searchKey, indexCursor);
             if (isEnd) {
-                tableIndex->moveToEnd(false, indexCursor.get());
+                tableIndex->moveToEnd(false, indexCursor);
             } else {
-                while (!(tuple = tableIndex->nextValue(indexCursor.get())).isNullTuple()) {
+                while (!(tuple = tableIndex->nextValue(indexCursor)).isNullTuple()) {
                     pmp.countdownProgress();
                     if (initial_expression != NULL && !initial_expression->eval(&tuple, NULL).isTrue()) {
                         // just passed the first failed entry, so move 2 backward
-                        tableIndex->moveToBeforePriorEntry(indexCursor.get());
+                        tableIndex->moveToBeforePriorEntry(indexCursor);
                         break;
                     }
                 }
                 if (tuple.isNullTuple()) {
-                    tableIndex->moveToEnd(false, indexCursor.get());
+                    tableIndex->moveToEnd(false, indexCursor);
                 }
             }
         }
@@ -366,7 +366,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         }
     } else {
         bool toStartActually = (localSortDirection != SORT_DIRECTION_TYPE_DESC);
-        tableIndex->moveToEnd(toStartActually, indexCursor.get());
+        tableIndex->moveToEnd(toStartActually, indexCursor);
     }
 
     int tuple_ctr = 0;
@@ -382,9 +382,9 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     //
     while ((limit == -1 || tuple_ctr < limit) &&
             ((localLookupType == INDEX_LOOKUP_TYPE_EQ &&
-                    !(tuple = tableIndex->nextValueAtKey(indexCursor.get())).isNullTuple()) ||
+                    !(tuple = tableIndex->nextValueAtKey(indexCursor)).isNullTuple()) ||
                     ((localLookupType != INDEX_LOOKUP_TYPE_EQ || activeNumOfSearchKeys == 0) &&
-                            !(tuple = tableIndex->nextValue(indexCursor.get())).isNullTuple()))) {
+                            !(tuple = tableIndex->nextValue(indexCursor)).isNullTuple()))) {
         VOLT_TRACE("LOOPING in indexscan: tuple: '%s'\n", tuple.debug("tablename").c_str());
         pmp.countdownProgress();
         //

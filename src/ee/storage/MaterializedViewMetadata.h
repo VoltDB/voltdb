@@ -105,11 +105,9 @@ private:
     // the primary index on the view table whose columns
     // are the same as the group by in the view query
     TableIndex *m_index;
-    boost::scoped_ptr<IndexCursor> m_indexCursor;
 
     // the index on srcTable which can be used to maintain min/max
     TableIndex *m_indexForMinMax;
-    boost::scoped_ptr<IndexCursor> m_minMaxCursor;
 
     // space to store temp view tuples
     TableTuple m_existingTuple;

@@ -257,7 +257,7 @@ public:
      * @see moveToKeyOrGreater(const TableTuple *)
      * @return true if the value is found. false if not.
      */
-    virtual bool moveToKey(const TableTuple *searchKey, IndexCursor* cursor) = 0;
+    virtual bool moveToKey(const TableTuple *searchKey, IndexCursor& cursor) = 0;
 
     /**
      * This method moves to the first tuple equal or greater than
@@ -269,7 +269,7 @@ public:
      *      data, but chosen values for this index.  So, searchKey has
      *      to contain values in this index's entry order.
      */
-    virtual void moveToKeyOrGreater(const TableTuple *searchKey, IndexCursor* cursor)
+    virtual void moveToKeyOrGreater(const TableTuple *searchKey, IndexCursor& cursor)
     {
         throwFatalException("Invoked TableIndex virtual method moveToKeyOrGreater which has no implementation");
     };
@@ -282,17 +282,17 @@ public:
      *      data, but chosen values for this index.  So, searchKey has
      *      to contain values in this index's entry order.
      */
-    virtual bool moveToGreaterThanKey(const TableTuple *searchKey, IndexCursor* cursor)
+    virtual bool moveToGreaterThanKey(const TableTuple *searchKey, IndexCursor& cursor)
     {
         throwFatalException("Invoked TableIndex virtual method moveToGreaterThanKey which has no implementation");
     };
 
-    virtual void moveToLessThanKey(const TableTuple *searchKey, IndexCursor* cursor)
+    virtual void moveToLessThanKey(const TableTuple *searchKey, IndexCursor& cursor)
     {
         throwFatalException("Invoked TableIndex virtual method moveToLessThanKey which has no implementation");
     };
 
-    virtual void moveToBeforePriorEntry(IndexCursor* cursor)
+    virtual void moveToBeforePriorEntry(IndexCursor& cursor)
     {
         throwFatalException("Invoked TableIndex virtual method moveToBeforePriorEntry which has no implementation");
     }
@@ -303,7 +303,7 @@ public:
      *
      * @see begin true to move to the beginning, false to the end.
      */
-    virtual void moveToEnd(bool begin, IndexCursor* cursor)
+    virtual void moveToEnd(bool begin, IndexCursor& cursor)
     {
         throwFatalException("Invoked TableIndex virtual method moveToEnd which has no implementation");
     }
@@ -316,7 +316,7 @@ public:
      * @return true if any entry to return, false if reached the end
      * of this index.
      */
-    virtual TableTuple nextValue(IndexCursor* cursor)
+    virtual TableTuple nextValue(IndexCursor& cursor)
     {
         throwFatalException("Invoked TableIndex virtual method nextValue which has no implementation");
     };
@@ -328,7 +328,7 @@ public:
      *
      * @return true if any entry to return, false if not.
      */
-    virtual TableTuple nextValueAtKey(IndexCursor* cursor) = 0;
+    virtual TableTuple nextValueAtKey(IndexCursor& cursor) = 0;
 
     /**
      * sets the tuple to point the entry next to the one found by
@@ -344,7 +344,7 @@ public:
      *
      * @return true if any entry to return, false if not.
      */
-    virtual bool advanceToNextKey(IndexCursor* cursor)
+    virtual bool advanceToNextKey(IndexCursor& cursor)
     {
         throwFatalException("Invoked TableIndex virtual method advanceToNextKey which has no implementation");
     };
@@ -392,7 +392,7 @@ public:
      * @Return great than rank value as "m_entries.size() + 1"  for given
      * searchKey that is larger than all keys.
      */
-    virtual int64_t getCounterGET(const TableTuple *searchKey, bool isUpper, IndexCursor* cursor)
+    virtual int64_t getCounterGET(const TableTuple *searchKey, bool isUpper, IndexCursor& cursor)
     {
         throwFatalException("Invoked non-countable TableIndex virtual method getCounterGET which has no implementation");
     }
@@ -407,7 +407,7 @@ public:
      * @Return less than rank value as "m_entries.size()"  for given
      * searchKey that is larger than all keys.
      */
-    virtual int64_t getCounterLET(const TableTuple *searchKey, bool isUpper, IndexCursor* cursor)
+    virtual int64_t getCounterLET(const TableTuple *searchKey, bool isUpper, IndexCursor& cursor)
     {
         throwFatalException("Invoked non-countable TableIndex virtual method getCounterLET which has no implementation");
     }

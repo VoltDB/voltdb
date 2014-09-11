@@ -68,8 +68,8 @@ class CompactingHashMultiMapIndex : public TableIndex
 
     ~CompactingHashMultiMapIndex() {};
 
-    static MapIterator& castToIter(IndexCursor* cursor) {
-        return *reinterpret_cast<MapIterator*> (cursor->m_keyIter);
+    static MapIterator& castToIter(IndexCursor& cursor) {
+        return *reinterpret_cast<MapIterator*> (cursor.m_keyIter);
     }
 
     bool addEntry(const TableTuple *tuple)
@@ -123,31 +123,31 @@ class CompactingHashMultiMapIndex : public TableIndex
         return ! findTuple(*persistentTuple).isEnd();
     }
 
-    bool moveToKey(const TableTuple *searchKey, IndexCursor* cursor) {
+    bool moveToKey(const TableTuple *searchKey, IndexCursor& cursor) {
         ++m_lookups;
 
         MapIterator &mapIter = castToIter(cursor);
         mapIter = findKey(searchKey);
         if (mapIter.isEnd()) {
-            cursor->m_match.move(NULL);
+            cursor.m_match.move(NULL);
             return false;
         }
-        cursor->m_match.move(const_cast<void*>(mapIter.value()));
+        cursor.m_match.move(const_cast<void*>(mapIter.value()));
         return true;
     }
 
-    TableTuple nextValueAtKey(IndexCursor* cursor) {
-        if (cursor->m_match.isNullTuple()) {
-            return cursor->m_match;
+    TableTuple nextValueAtKey(IndexCursor& cursor) {
+        if (cursor.m_match.isNullTuple()) {
+            return cursor.m_match;
         }
-        TableTuple retval = cursor->m_match;
+        TableTuple retval = cursor.m_match;
 
         MapIterator &mapIter = castToIter(cursor);
         mapIter.moveNext();
         if (mapIter.isEnd()) {
-            cursor->m_match.move(NULL);
+            cursor.m_match.move(NULL);
         } else {
-            cursor->m_match.move(const_cast<void*>(mapIter.value()));
+            cursor.m_match.move(const_cast<void*>(mapIter.value()));
         }
         return retval;
     }

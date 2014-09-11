@@ -68,8 +68,8 @@ class CompactingHashUniqueIndex : public TableIndex
 
     ~CompactingHashUniqueIndex() {};
 
-    static MapIterator& castToIter(IndexCursor* cursor) {
-        return *reinterpret_cast<MapIterator*> (cursor->m_keyIter);
+    static MapIterator& castToIter(IndexCursor& cursor) {
+        return *reinterpret_cast<MapIterator*> (cursor.m_keyIter);
     }
 
     bool addEntry(const TableTuple *tuple) {
@@ -118,24 +118,24 @@ class CompactingHashUniqueIndex : public TableIndex
         return ! findTuple(*persistentTuple).isEnd();
     }
 
-    bool moveToKey(const TableTuple *searchKey, IndexCursor* cursor) {
+    bool moveToKey(const TableTuple *searchKey, IndexCursor& cursor) {
         ++m_lookups;
 
         MapIterator &mapIter = castToIter(cursor);
         mapIter = findKey(searchKey);
 
         if (mapIter.isEnd()) {
-            cursor->m_match.move(NULL);
+            cursor.m_match.move(NULL);
             return false;
         }
-        cursor->m_match.move(const_cast<void*>(mapIter.value()));
+        cursor.m_match.move(const_cast<void*>(mapIter.value()));
 
         return true;
     }
 
-    TableTuple nextValueAtKey(IndexCursor* cursor) {
-        TableTuple retval = cursor->m_match;
-        cursor->m_match.move(NULL);
+    TableTuple nextValueAtKey(IndexCursor& cursor) {
+        TableTuple retval = cursor.m_match;
+        cursor.m_match.move(NULL);
         return retval;
     }
 

@@ -70,8 +70,8 @@ class CompactingTreeUniqueIndex : public TableIndex
 
     ~CompactingTreeUniqueIndex() {};
 
-    static MapIterator& castToIter(IndexCursor* cursor) {
-        return *reinterpret_cast<MapIterator*> (cursor->m_keyIter);
+    static MapIterator& castToIter(IndexCursor& cursor) {
+        return *reinterpret_cast<MapIterator*> (cursor.m_keyIter);
     }
 
     bool addEntry(const TableTuple *tuple)
@@ -123,41 +123,41 @@ class CompactingTreeUniqueIndex : public TableIndex
         return ! findTuple(*persistentTuple).isEnd();
     }
 
-    bool moveToKey(const TableTuple *searchKey, IndexCursor* cursor)
+    bool moveToKey(const TableTuple *searchKey, IndexCursor& cursor)
     {
         ++m_lookups;
-        cursor->m_forward = true;
+        cursor.m_forward = true;
         MapIterator &mapIter = castToIter(cursor);
         mapIter = findKey(searchKey);
 
         if (mapIter.isEnd()) {
-            cursor->m_match.move(NULL);
+            cursor.m_match.move(NULL);
             return false;
         }
-        cursor->m_match.move(const_cast<void*>(mapIter.value()));
+        cursor.m_match.move(const_cast<void*>(mapIter.value()));
         return true;
     }
 
-    void moveToKeyOrGreater(const TableTuple *searchKey, IndexCursor* cursor)
+    void moveToKeyOrGreater(const TableTuple *searchKey, IndexCursor& cursor)
     {
         ++m_lookups;
-        cursor->m_forward = true;
+        cursor.m_forward = true;
         MapIterator &mapIter = castToIter(cursor);
 
         mapIter = m_entries.lowerBound(KeyType(searchKey));
     }
 
-    bool moveToGreaterThanKey(const TableTuple *searchKey, IndexCursor* cursor)
+    bool moveToGreaterThanKey(const TableTuple *searchKey, IndexCursor& cursor)
     {
         ++m_lookups;
-        cursor->m_forward = true;
+        cursor.m_forward = true;
         MapIterator &mapIter = castToIter(cursor);
         mapIter = m_entries.upperBound(KeyType(searchKey));
 
         return mapIter.isEnd();
     }
 
-    void moveToLessThanKey(const TableTuple *searchKey, IndexCursor* cursor)
+    void moveToLessThanKey(const TableTuple *searchKey, IndexCursor& cursor)
     {
         // do moveToKeyOrGreater()
         ++m_lookups;
@@ -168,16 +168,16 @@ class CompactingTreeUniqueIndex : public TableIndex
         if (mapIter.isEnd()) {
             moveToEnd(false, cursor);
         } else {
-            cursor->m_forward = false;
+            cursor.m_forward = false;
             mapIter.movePrev();
         }
     }
 
     // only be called after moveToGreaterThanKey() for LTE case
-    void moveToBeforePriorEntry(IndexCursor* cursor)
+    void moveToBeforePriorEntry(IndexCursor& cursor)
     {
-        assert(cursor->m_forward);
-        cursor->m_forward = false;
+        assert(cursor.m_forward);
+        cursor.m_forward = false;
         MapIterator &mapIter = castToIter(cursor);
 
         if (mapIter.isEnd()) {
@@ -192,10 +192,10 @@ class CompactingTreeUniqueIndex : public TableIndex
         mapIter.movePrev();
     }
 
-    void moveToEnd(bool begin, IndexCursor* cursor)
+    void moveToEnd(bool begin, IndexCursor& cursor)
     {
         ++m_lookups;
-        cursor->m_forward = begin;
+        cursor.m_forward = begin;
         MapIterator &mapIter = castToIter(cursor);
 
         if (begin)
@@ -204,7 +204,7 @@ class CompactingTreeUniqueIndex : public TableIndex
             mapIter = m_entries.rbegin();
     }
 
-    TableTuple nextValue(IndexCursor* cursor)
+    TableTuple nextValue(IndexCursor& cursor)
     {
         TableTuple retval(getTupleSchema());
 
@@ -212,7 +212,7 @@ class CompactingTreeUniqueIndex : public TableIndex
 
         if (! mapIter.isEnd()) {
             retval.move(const_cast<void*>(mapIter.value()));
-            if (cursor->m_forward) {
+            if (cursor.m_forward) {
                 mapIter.moveNext();
             } else {
                 mapIter.movePrev();
@@ -222,29 +222,29 @@ class CompactingTreeUniqueIndex : public TableIndex
         return retval;
     }
 
-    TableTuple nextValueAtKey(IndexCursor* cursor)
+    TableTuple nextValueAtKey(IndexCursor& cursor)
     {
-        TableTuple retval = cursor->m_match;
-        cursor->m_match.move(NULL);
+        TableTuple retval = cursor.m_match;
+        cursor.m_match.move(NULL);
         return retval;
     }
 
-    bool advanceToNextKey(IndexCursor* cursor)
+    bool advanceToNextKey(IndexCursor& cursor)
     {
         MapIterator &mapIter = castToIter(cursor);
 
-        if (cursor->m_forward) {
+        if (cursor.m_forward) {
             mapIter.moveNext();
         } else {
             mapIter.movePrev();
         }
         if (mapIter.isEnd())
         {
-            cursor->m_match.move(NULL);
+            cursor.m_match.move(NULL);
             return false;
         }
 
-        cursor->m_match.move(const_cast<void*>(mapIter.value()));
+        cursor.m_match.move(const_cast<void*>(mapIter.value()));
         return true;
     }
 
@@ -267,7 +267,7 @@ class CompactingTreeUniqueIndex : public TableIndex
     /**
      * @See comments in parent class TableIndex
      */
-    int64_t getCounterGET(const TableTuple* searchKey, bool isUpper, IndexCursor* cursor) {
+    int64_t getCounterGET(const TableTuple* searchKey, bool isUpper, IndexCursor& cursor) {
         if (!hasRank) {
             return -1;
         }
@@ -283,7 +283,7 @@ class CompactingTreeUniqueIndex : public TableIndex
     /**
      * See comments in parent class TableIndex
      */
-    int64_t getCounterLET(const TableTuple* searchKey, bool isUpper, IndexCursor* cursor) {
+    int64_t getCounterLET(const TableTuple* searchKey, bool isUpper, IndexCursor& cursor) {
         if (!hasRank) {
            return -1;
         }
@@ -349,8 +349,6 @@ class CompactingTreeUniqueIndex : public TableIndex
     }
 
     MapType m_entries;
-
-    // iteration stuffs are packed into a cursor object for re-entrant index access
 
     // comparison stuff
     KeyComparator m_cmp;

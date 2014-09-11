@@ -82,7 +82,6 @@ struct Command {
 
 vector<voltdb::TableIndex*> currentIndexes;
 voltdb::TableIndex *currentIndex;
-voltdb::IndexCursor * indexCursor;
 
 vector<voltdb::ValueType> currentColumnTypes;
 vector<int32_t> currentColumnLengths;
@@ -114,6 +113,8 @@ bool commandLS(voltdb::TableTuple &key)
 {
     //cout << "running ls" << endl;
     //cout << " candidate key : " << key.tupleLength() << " - " << key.debug("") << endl;
+    IndexCursor indexCursor(currentIndex->getTupleSchema());
+
     bool result = currentIndex->moveToKey(&key, indexCursor);
     if (!result) {
         cout << "ls FAIL(moveToKey()) key length: " << key.tupleLength() << endl << key.debug("") << endl;
@@ -139,6 +140,7 @@ bool commandLF(voltdb::TableTuple &key)
 
     // Don't just call !commandLS(key) here. That does an equality check.
     // Here, the valid test is for existence, not equality.
+    IndexCursor indexCursor(currentIndex->getTupleSchema());
     return !(currentIndex->moveToKey(&key, indexCursor));
 }
 
@@ -272,9 +274,6 @@ void runTest()
 
         currentIndex = currentIndexes.back();
         currentIndexes.pop_back();
-
-        boost::scoped_ptr<IndexCursor> cursor(new IndexCursor(currentIndex->getTupleSchema()));
-        indexCursor = cursor.get(); // assign the global index pointer
 
         gettimeofday(&tStart, NULL);
 

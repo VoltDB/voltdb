@@ -446,8 +446,7 @@ TEST_F(IndexTest, IntsUnique) {
     TableIndex* index = table->index("ixu");
     EXPECT_EQ(true, index != NULL);
 
-    boost::scoped_ptr<IndexCursor> cursor(new IndexCursor(index->getTupleSchema()));
-    IndexCursor *indexCursor = cursor.get();
+    IndexCursor indexCursor(index->getTupleSchema());
 
     //EXPECT_EQ( 62520, index->getMemoryEstimate());
 
@@ -610,8 +609,7 @@ TEST_F(IndexTest, IntsMulti) {
 
     TableIndex* index = table->index("ixm2");
     EXPECT_EQ(true, index != NULL);
-    boost::scoped_ptr<IndexCursor> cursor(new IndexCursor(index->getTupleSchema()));
-    IndexCursor *indexCursor = cursor.get();
+    IndexCursor indexCursor(index->getTupleSchema());
 
     //EXPECT_EQ( 52000, index->getMemoryEstimate());
 
@@ -768,8 +766,7 @@ TEST_F(IndexTest, TupleKeyUnique) {
     TableIndex* index = table->index("ixu_wide");
     EXPECT_EQ(true, index != NULL);
 
-    boost::scoped_ptr<IndexCursor> cursor(new IndexCursor(index->getTupleSchema()));
-    IndexCursor *indexCursor = cursor.get();
+    IndexCursor indexCursor(index->getTupleSchema());
 
     //EXPECT_EQ( 280, index->getMemoryEstimate());
 
@@ -821,13 +818,11 @@ TEST_F(IndexTest, TupleKeyUnique) {
 
     // TEST moveToEnd
 
-
-
     TupleSchema::freeTupleSchema(keySchema);
     delete[] searchkey.address();
 }
 
-TEST_F(IndexTest, Re_entrant_index_unique) {
+TEST_F(IndexTest, ReentrantIndexUnique) {
     vector<int> ixu_column_indices;
     vector<ValueType> ixu_column_types;
     ixu_column_indices.push_back(4);
@@ -843,8 +838,7 @@ TEST_F(IndexTest, Re_entrant_index_unique) {
     TableIndex* index = table->index("ixu");
     EXPECT_EQ(true, index != NULL);
 
-    boost::scoped_ptr<IndexCursor> cursor(new IndexCursor(index->getTupleSchema()));
-    IndexCursor *indexCursor = cursor.get();
+    IndexCursor indexCursor(index->getTupleSchema());
 
     TableTuple tuple(table->schema());
     vector<ValueType> keyColumnTypes(2, VALUE_TYPE_BIGINT);
@@ -877,8 +871,7 @@ TEST_F(IndexTest, Re_entrant_index_unique) {
     //
     // Before index moves to the next value, re-use the same index to iterate
     //
-    boost::scoped_ptr<IndexCursor> cursor1(new IndexCursor(index->getTupleSchema()));
-    IndexCursor *indexCursorNew = cursor1.get();
+    IndexCursor indexCursorNew(index->getTupleSchema());
 
     searchkey.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(440)));
     searchkey.setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(10000000)));
@@ -907,10 +900,8 @@ TEST_F(IndexTest, Re_entrant_index_unique) {
             op_equals(tuple.getNValue(4)).isTrue());
 
     // moveToGreaterThanKey test on the re-entrant-index
-    searchkey.
-    setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(330)));
-    searchkey.
-    setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(30%3)));
+    searchkey.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(330)));
+    searchkey.setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(30%3)));
     index->moveToGreaterThanKey(&searchkey, indexCursorNew);
     EXPECT_FALSE((tuple = index->nextValue(indexCursorNew)).isNullTuple());
     EXPECT_TRUE(ValueFactory::getBigIntValue(31).
@@ -961,7 +952,7 @@ TEST_F(IndexTest, Re_entrant_index_unique) {
 }
 
 
-TEST_F(IndexTest, Re_entrant_index_multiple) {
+TEST_F(IndexTest, ReentrantIndexMultiple) {
     vector<int> ixm_column_indices;
     vector<ValueType> ixm_column_types;
     ixm_column_indices.push_back(4);
@@ -976,13 +967,11 @@ TEST_F(IndexTest, Re_entrant_index_multiple) {
 
     TableIndex* index = table->index("ixm2");
     EXPECT_EQ(true, index != NULL);
-    boost::scoped_ptr<IndexCursor> cursor(new IndexCursor(index->getTupleSchema()));
-    IndexCursor *indexCursor = cursor.get();
+    IndexCursor indexCursor(index->getTupleSchema());
 
     TableTuple tuple(table->schema());
     vector<ValueType> keyColumnTypes(2, VALUE_TYPE_BIGINT);
-    vector<int32_t>
-        keyColumnLengths(2, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+    vector<int32_t>keyColumnLengths(2, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
     vector<bool> keyColumnAllowNull(2, true);
     TupleSchema* keySchema =
         TupleSchema::createTupleSchemaForTest(keyColumnTypes,
@@ -1016,8 +1005,7 @@ TEST_F(IndexTest, Re_entrant_index_multiple) {
     //
     // Before index moves to the next value, re-use the same index to iterate
     //
-    boost::scoped_ptr<IndexCursor> cursor1(new IndexCursor(index->getTupleSchema()));
-    IndexCursor *indexCursorNew = cursor1.get();
+    IndexCursor indexCursorNew(index->getTupleSchema());
 
     searchkey.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(440)));
     searchkey.setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(10000000)));

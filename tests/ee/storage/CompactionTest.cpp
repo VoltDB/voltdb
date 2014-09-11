@@ -310,8 +310,7 @@ TEST_F(CompactionTest, BasicCompaction) {
     boost::scoped_array<char> backingStore(new char[pkeyIndex->getKeySchema()->tupleLength()]);
     key.moveNoHeader(backingStore.get());
 
-    boost::scoped_ptr<IndexCursor> cursor(new IndexCursor(pkeyIndex->getTupleSchema()));
-    IndexCursor *indexCursor = cursor.get();
+    IndexCursor indexCursor(pkeyIndex->getTupleSchema());
 
     for (std::vector<int32_t>::iterator ii = pkeysToDelete.begin(); ii != pkeysToDelete.end(); ii++) {
         key.setNValue(0, ValueFactory::getIntegerValue(*ii));
@@ -453,8 +452,7 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
         boost::scoped_array<char> backingStore(new char[pkeyIndex->getKeySchema()->tupleLength()]);
         key.moveNoHeader(backingStore.get());
 
-        boost::scoped_ptr<IndexCursor> cursor(new IndexCursor(pkeyIndex->getTupleSchema()));
-        IndexCursor *indexCursor = cursor.get();
+        IndexCursor indexCursor(pkeyIndex->getTupleSchema());
         for (std::vector<int32_t>::iterator ii = pkeysToDelete[qq].begin(); ii != pkeysToDelete[qq].end(); ii++) {
             key.setNValue(0, ValueFactory::getIntegerValue(*ii));
             ASSERT_TRUE(pkeyIndex->moveToKey(&key, indexCursor));
@@ -534,8 +532,7 @@ TEST_F(CompactionTest, TestENG897) {
     boost::scoped_array<char> backingStore(new char[pkeyIndex->getKeySchema()->tupleLength()]);
     key.moveNoHeader(backingStore.get());
 
-    boost::scoped_ptr<IndexCursor> cursor(new IndexCursor(pkeyIndex->getTupleSchema()));
-    IndexCursor *indexCursor = cursor.get();
+    IndexCursor indexCursor(pkeyIndex->getTupleSchema());
 
     for (int ii = 0; ii < 32263 * 5; ii++) {
         if (ii % 2 == 0) {

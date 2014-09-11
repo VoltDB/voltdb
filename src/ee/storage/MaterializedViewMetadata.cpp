@@ -56,8 +56,6 @@ MaterializedViewMetadata::MaterializedViewMetadata(PersistentTable *srcTable,
     m_target->incrementRefcount();
     srcTable->addMaterializedView(this);
 
-    m_indexCursor.reset(new IndexCursor(m_index->getTupleSchema()));
-
     // When updateTupleWithSpecificIndexes needs to be called,
     // the context is lost that identifies which base table columns potentially changed.
     // So the minimal set of indexes that MIGHT need to be updated must include
@@ -108,7 +106,6 @@ void MaterializedViewMetadata::setTargetTable(PersistentTable * target)
 
     // Re-initialize dependencies on the target table, allowing for widened columns
     m_index = m_target->primaryKeyIndex();
-    m_indexCursor.reset(new IndexCursor(m_index->getTupleSchema()));
 
     freeBackedTuples();
     allocateBackedTuples();
@@ -124,7 +121,6 @@ void MaterializedViewMetadata::setIndexForMinMax(std::string indexForMinOrMax)
         for (int i = 0; i < candidates.size(); i++) {
             if (indexForMinOrMax.compare(candidates[i]->getName()) == 0) {
                 m_indexForMinMax = candidates[i];
-                m_minMaxCursor.reset(new IndexCursor(m_indexForMinMax->getTupleSchema()));
                 break;
             }
         }
@@ -284,10 +280,12 @@ NValue MaterializedViewMetadata::findMinMaxFallbackValueIndexed(const TableTuple
         srcColIdx = m_aggColIndexes[aggIndex];
     }
     NValue newVal = initialNull;
-    m_indexForMinMax->moveToKey(&m_searchKeyTuple, m_minMaxCursor.get());
+    IndexCursor minMaxCursor(m_indexForMinMax->getTupleSchema());
+
+    m_indexForMinMax->moveToKey(&m_searchKeyTuple, minMaxCursor);
     VOLT_TRACE("Starting to scan tuples using index %s\n", m_indexForMinMax->debug().c_str());
     TableTuple tuple;
-    while (!(tuple = m_indexForMinMax->nextValueAtKey(m_minMaxCursor.get())).isNullTuple()) {
+    while (!(tuple = m_indexForMinMax->nextValueAtKey(minMaxCursor)).isNullTuple()) {
         // skip the oldTuple and apply post filter
         if (tuple.equals(oldTuple) ||
             (m_filterPredicate && !m_filterPredicate->eval(&tuple, NULL).isTrue())) {
@@ -567,9 +565,10 @@ bool MaterializedViewMetadata::findExistingTuple(const TableTuple &tuple)
         m_searchKeyTuple.setNValue(colindex, value);
     }
 
+    IndexCursor indexCursor(m_index->getTupleSchema());
     // determine if the row exists (create the empty one if it doesn't)
-    m_index->moveToKey(&m_searchKeyTuple, m_indexCursor.get());
-    m_existingTuple = m_index->nextValueAtKey(m_indexCursor.get());
+    m_index->moveToKey(&m_searchKeyTuple, indexCursor);
+    m_existingTuple = m_index->nextValueAtKey(indexCursor);
     return ! m_existingTuple.isNullTuple();
 }
 
