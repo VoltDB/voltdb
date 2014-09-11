@@ -104,5 +104,12 @@ public class TestVoltXMLElement extends TestCase {
         assertTrue(child2.getChangedNodes().containsKey("changedgrandchild"));
         VoltXMLDiff grandchild = child2.getChangedNodes().get("changedgrandchild");
         assertTrue(findNamedNode(grandchild.getRemovedNodes(), "doomeddescendent") != null);
+
+        VoltXMLElement third = first.duplicate();
+        third.applyDiff(diff);
+        System.out.println(first.toMinString());
+        System.out.println(second.toMinString());
+        System.out.println(third.toMinString());
+        assertEquals(second.toMinString(), third.toMinString());
     }
 }

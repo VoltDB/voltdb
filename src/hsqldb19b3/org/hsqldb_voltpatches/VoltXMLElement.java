@@ -46,6 +46,10 @@ public class VoltXMLElement {
         return this;
     }
 
+    public String getRealName() {
+        return attributes.get("name");
+    }
+
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
@@ -169,6 +173,29 @@ public class VoltXMLElement {
                     m_removedAttributes.isEmpty() &&
                     m_changedAttributes.isEmpty());
         }
+
+        @Override
+        public String toString() {
+            StringBuilder sb = new StringBuilder();
+            sb.append("NAME: " + m_name + "\n");
+            sb.append("ADDED: " + m_addedAttributes + "\n");
+            sb.append("REMOVED: " + m_removedAttributes + "\n");
+            sb.append("CHANGED: " + m_changedAttributes + "\n");
+            sb.append("NEW CHILDREN:\n");
+            for (VoltXMLElement add : m_addedNodes) {
+                sb.append(add.toString());
+            }
+            sb.append("DEAD CHILDREN:\n");
+            for (VoltXMLElement remove : m_removedNodes) {
+                sb.append(remove.toString());
+            }
+            sb.append("CHANGED CHILDREN:\n");
+            for (VoltXMLDiff change : m_changedNodes.values()) {
+                sb.append(change.toString());
+            }
+            sb.append("\n\n");
+            return sb.toString();
+        }
     }
 
     static public VoltXMLDiff computeDiff(VoltXMLElement first, VoltXMLElement second)
@@ -253,6 +280,19 @@ public class VoltXMLElement {
         }
         for (Entry<String,String> e : diff.getChangedAttributes().entrySet()) {
             attributes.put(e.getKey(), e.getValue());
+        }
+
+        // Do the node removals and additions
+        for (VoltXMLElement e : diff.getRemovedNodes()) {
+            children.remove(findChild(e.name));
+        }
+        for (VoltXMLElement e : diff.getAddedNodes()) {
+            children.add(e);
+        }
+
+        // To do the node changes, recursively apply the inner diffs to the children
+        for (Entry<String, VoltXMLDiff> e : diff.getChangedNodes().entrySet()) {
+            findChild(e.getKey()).applyDiff(e.getValue());
         }
 
         return true;
