@@ -20,7 +20,7 @@ import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.annotations.GwtIncompatible;
 import com.google_voltpatches.common.annotations.VisibleForTesting;
-import com.google_voltpatches.common.base.Objects;
+import com.google_voltpatches.common.base.MoreObjects;
 
 import java.util.Collection;
 import java.util.Comparator;
@@ -506,7 +506,6 @@ public class TreeRangeSet<C extends Comparable<?>>
 
     @Override
     Iterator<Entry<Cut<C>, Range<C>>> descendingEntryIterator() {
-      Iterator<Range<C>> itr;
       /*
        * firstComplementRangeUpperBound is the upper bound of the last complement range with lower
        * bound inside complementLowerBoundWindow.
@@ -534,7 +533,8 @@ public class TreeRangeSet<C extends Comparable<?>>
       } else {
         cut = positiveRangesByLowerBound.higherKey(Cut.<C>belowAll());
       }
-      final Cut<C> firstComplementRangeUpperBound = Objects.firstNonNull(cut, Cut.<C>aboveAll());
+      final Cut<C> firstComplementRangeUpperBound =
+          MoreObjects.firstNonNull(cut, Cut.<C>aboveAll());
       return new AbstractIterator<Entry<Cut<C>, Range<C>>>() {
         Cut<C> nextComplementRangeUpperBound = firstComplementRangeUpperBound;
 
