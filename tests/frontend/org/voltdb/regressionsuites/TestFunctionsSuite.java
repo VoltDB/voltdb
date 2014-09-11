@@ -3257,6 +3257,12 @@ public class TestFunctionsSuite extends RegressionSuite {
         result = cr.getResults()[0];
         validateTableColumnOfScalarVarchar(result, new String[]{""}); // not "a" !
 
+        sql = "select SUBSTR(DESC, -3, 1) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{""}); // not an error !
+
         sql = "select SUBSTRING(DESC, 0, 2) from p1 where id = 0;";
         cr = cl.callProcedure("@AdHoc", sql);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -3274,6 +3280,12 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         validateTableColumnOfScalarVarchar(result, new String[]{""}); // not "a" !
+
+        sql = "select SUBSTRING(DESC, -3, 1) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{""}); // not an error !
 
         // LCASE and UCASE
         sql = "select LCASE(DESC) from p1 where id = 0;";
