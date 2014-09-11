@@ -56,7 +56,6 @@ TableIndex::TableIndex(const TupleSchema *keySchema, const TableIndexScheme &sch
     m_id(TableCatalogDelegate::getIndexIdString(scheme)),
 
     // initialize all the counters to zero
-    m_lookups(0),
     m_inserts(0),
     m_deletes(0),
     m_updates(0),
@@ -117,7 +116,6 @@ void TableIndex::printReport()
 {
     std::cout << m_scheme.name << ",";
     std::cout << getTypeName() << ",";
-    std::cout << m_lookups << ",";
     std::cout << m_inserts << ",";
     std::cout << m_deletes << ",";
     std::cout << m_updates << std::endl;

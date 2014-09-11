@@ -112,20 +112,17 @@ class CompactingHashMultiMapIndex : public TableIndex
         return true;
     }
 
-    bool keyUsesNonInlinedMemory() { return KeyType::keyUsesNonInlinedMemory(); }
+    bool keyUsesNonInlinedMemory() const { return KeyType::keyUsesNonInlinedMemory(); }
 
-    bool checkForIndexChange(const TableTuple *lhs, const TableTuple *rhs) {
+    bool checkForIndexChange(const TableTuple *lhs, const TableTuple *rhs) const {
         return !(m_eq(setKeyFromTuple(lhs), setKeyFromTuple(rhs)));
     }
 
-    bool exists(const TableTuple *persistentTuple) {
-        ++m_lookups;
+    bool exists(const TableTuple *persistentTuple) const {
         return ! findTuple(*persistentTuple).isEnd();
     }
 
-    bool moveToKey(const TableTuple *searchKey, IndexCursor& cursor) {
-        ++m_lookups;
-
+    bool moveToKey(const TableTuple *searchKey, IndexCursor& cursor) const {
         MapIterator &mapIter = castToIter(cursor);
         mapIter = findKey(searchKey);
         if (mapIter.isEnd()) {
@@ -136,7 +133,7 @@ class CompactingHashMultiMapIndex : public TableIndex
         return true;
     }
 
-    TableTuple nextValueAtKey(IndexCursor& cursor) {
+    TableTuple nextValueAtKey(IndexCursor& cursor) const {
         if (cursor.m_match.isNullTuple()) {
             return cursor.m_match;
         }
@@ -152,7 +149,7 @@ class CompactingHashMultiMapIndex : public TableIndex
         return retval;
     }
 
-    bool hasKey(const TableTuple *searchKey) {
+    bool hasKey(const TableTuple *searchKey) const {
         return ! findKey(searchKey).isEnd();
     }
 
@@ -166,17 +163,17 @@ class CompactingHashMultiMapIndex : public TableIndex
     std::string getTypeName() const { return "CompactingHashMultiMapIndex"; };
 
     // Non-virtual (so "really-private") helper methods.
-    MapIterator findKey(const TableTuple *searchKey)
+    MapIterator findKey(const TableTuple *searchKey) const
     {
         return m_entries.find(KeyType(searchKey));
     }
 
-    MapIterator findTuple(const TableTuple &originalTuple)
+    MapIterator findTuple(const TableTuple &originalTuple) const
     {
         return m_entries.find(setKeyFromTuple(&originalTuple), originalTuple.address());
     }
 
-    const KeyType setKeyFromTuple(const TableTuple *tuple)
+    const KeyType setKeyFromTuple(const TableTuple *tuple) const
     {
         KeyType result(tuple, m_scheme.columnIndices, m_scheme.indexedExpressions, m_keySchema);
         return result;

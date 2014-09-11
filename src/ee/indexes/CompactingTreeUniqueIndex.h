@@ -110,22 +110,20 @@ class CompactingTreeUniqueIndex : public TableIndex
         return true;
     }
 
-    bool keyUsesNonInlinedMemory() { return KeyType::keyUsesNonInlinedMemory(); }
+    bool keyUsesNonInlinedMemory() const { return KeyType::keyUsesNonInlinedMemory(); }
 
-    bool checkForIndexChange(const TableTuple* lhs, const TableTuple* rhs)
+    bool checkForIndexChange(const TableTuple* lhs, const TableTuple* rhs) const
     {
         return  0 != m_cmp(setKeyFromTuple(lhs), setKeyFromTuple(rhs));
     }
 
-    bool exists(const TableTuple *persistentTuple)
+    bool exists(const TableTuple *persistentTuple) const
     {
-        ++m_lookups;
         return ! findTuple(*persistentTuple).isEnd();
     }
 
-    bool moveToKey(const TableTuple *searchKey, IndexCursor& cursor)
+    bool moveToKey(const TableTuple *searchKey, IndexCursor& cursor) const
     {
-        ++m_lookups;
         cursor.m_forward = true;
         MapIterator &mapIter = castToIter(cursor);
         mapIter = findKey(searchKey);
@@ -138,18 +136,16 @@ class CompactingTreeUniqueIndex : public TableIndex
         return true;
     }
 
-    void moveToKeyOrGreater(const TableTuple *searchKey, IndexCursor& cursor)
+    void moveToKeyOrGreater(const TableTuple *searchKey, IndexCursor& cursor) const
     {
-        ++m_lookups;
         cursor.m_forward = true;
         MapIterator &mapIter = castToIter(cursor);
 
         mapIter = m_entries.lowerBound(KeyType(searchKey));
     }
 
-    bool moveToGreaterThanKey(const TableTuple *searchKey, IndexCursor& cursor)
+    bool moveToGreaterThanKey(const TableTuple *searchKey, IndexCursor& cursor) const
     {
-        ++m_lookups;
         cursor.m_forward = true;
         MapIterator &mapIter = castToIter(cursor);
         mapIter = m_entries.upperBound(KeyType(searchKey));
@@ -157,10 +153,9 @@ class CompactingTreeUniqueIndex : public TableIndex
         return mapIter.isEnd();
     }
 
-    void moveToLessThanKey(const TableTuple *searchKey, IndexCursor& cursor)
+    void moveToLessThanKey(const TableTuple *searchKey, IndexCursor& cursor) const
     {
         // do moveToKeyOrGreater()
-        ++m_lookups;
         MapIterator &mapIter = castToIter(cursor);
         mapIter = m_entries.lowerBound(KeyType(searchKey));
 
@@ -174,7 +169,7 @@ class CompactingTreeUniqueIndex : public TableIndex
     }
 
     // only be called after moveToGreaterThanKey() for LTE case
-    void moveToBeforePriorEntry(IndexCursor& cursor)
+    void moveToBeforePriorEntry(IndexCursor& cursor) const
     {
         assert(cursor.m_forward);
         cursor.m_forward = false;
@@ -192,9 +187,8 @@ class CompactingTreeUniqueIndex : public TableIndex
         mapIter.movePrev();
     }
 
-    void moveToEnd(bool begin, IndexCursor& cursor)
+    void moveToEnd(bool begin, IndexCursor& cursor) const
     {
-        ++m_lookups;
         cursor.m_forward = begin;
         MapIterator &mapIter = castToIter(cursor);
 
@@ -204,7 +198,7 @@ class CompactingTreeUniqueIndex : public TableIndex
             mapIter = m_entries.rbegin();
     }
 
-    TableTuple nextValue(IndexCursor& cursor)
+    TableTuple nextValue(IndexCursor& cursor) const
     {
         TableTuple retval(getTupleSchema());
 
@@ -222,14 +216,14 @@ class CompactingTreeUniqueIndex : public TableIndex
         return retval;
     }
 
-    TableTuple nextValueAtKey(IndexCursor& cursor)
+    TableTuple nextValueAtKey(IndexCursor& cursor) const
     {
         TableTuple retval = cursor.m_match;
         cursor.m_match.move(NULL);
         return retval;
     }
 
-    bool advanceToNextKey(IndexCursor& cursor)
+    bool advanceToNextKey(IndexCursor& cursor) const
     {
         MapIterator &mapIter = castToIter(cursor);
 
@@ -248,9 +242,8 @@ class CompactingTreeUniqueIndex : public TableIndex
         return true;
     }
 
-    TableTuple uniqueMatchingTuple(const TableTuple &searchTuple)
+    TableTuple uniqueMatchingTuple(const TableTuple &searchTuple) const
     {
-        ++m_lookups;
         TableTuple retval(getTupleSchema());
         const MapIterator keyIter = findTuple(searchTuple);
         if ( ! keyIter.isEnd()) {
@@ -259,7 +252,7 @@ class CompactingTreeUniqueIndex : public TableIndex
         return retval;
     }
 
-    bool hasKey(const TableTuple *searchKey)
+    bool hasKey(const TableTuple *searchKey) const
     {
         return ! findKey(searchKey).isEnd();
     }
@@ -267,7 +260,7 @@ class CompactingTreeUniqueIndex : public TableIndex
     /**
      * @See comments in parent class TableIndex
      */
-    int64_t getCounterGET(const TableTuple* searchKey, bool isUpper, IndexCursor& cursor) {
+    int64_t getCounterGET(const TableTuple* searchKey, bool isUpper, IndexCursor& cursor) const {
         if (!hasRank) {
             return -1;
         }
@@ -283,11 +276,10 @@ class CompactingTreeUniqueIndex : public TableIndex
     /**
      * See comments in parent class TableIndex
      */
-    int64_t getCounterLET(const TableTuple* searchKey, bool isUpper, IndexCursor& cursor) {
+    int64_t getCounterLET(const TableTuple* searchKey, bool isUpper, IndexCursor& cursor) const {
         if (!hasRank) {
            return -1;
         }
-        ++m_lookups;
         const KeyType tmpKey(searchKey);
         MapIterator mapIter = m_entries.lowerBound(tmpKey);
         if (mapIter.isEnd()) {
@@ -334,15 +326,15 @@ class CompactingTreeUniqueIndex : public TableIndex
     }
 
 
-    MapIterator findKey(const TableTuple *searchKey) {
+    MapIterator findKey(const TableTuple *searchKey) const {
         return m_entries.find(KeyType(searchKey));
     }
 
-    MapIterator findTuple(const TableTuple &originalTuple) {
+    MapIterator findTuple(const TableTuple &originalTuple) const {
         return m_entries.find(setKeyFromTuple(&originalTuple));
     }
 
-    const KeyType setKeyFromTuple(const TableTuple *tuple)
+    const KeyType setKeyFromTuple(const TableTuple *tuple) const
     {
         KeyType result(tuple, m_scheme.columnIndices, m_scheme.indexedExpressions, m_keySchema);
         return result;
