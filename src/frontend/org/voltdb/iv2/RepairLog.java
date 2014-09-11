@@ -170,7 +170,8 @@ public class RepairLog
                 m_maxSeenSpUniqueId = Math.max(m_maxSeenSpUniqueId, m.getSpUniqueId());
                 if ("@ApplyBinaryLogSP".equals(m.getStoredProcedureName())) {
                     StoredProcedureInvocation spi = m.getStoredProcedureInvocation();
-                    m_maxSeenBinaryLogUniqueId = Math.max(m_maxSeenBinaryLogUniqueId, spi.getOriginalUniqueId());
+                    // params[3] is the end sp unique id from the original cluster
+                    m_maxSeenBinaryLogUniqueId = Math.max(m_maxSeenBinaryLogUniqueId, (long)spi.getParams().getParam(3));
                 }
             }
         } else if (msg instanceof FragmentTaskMessage) {

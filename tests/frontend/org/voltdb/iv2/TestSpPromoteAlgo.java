@@ -49,7 +49,7 @@ import org.junit.Test;
 import org.mockito.InOrder;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
-import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.ParameterSet;
 import org.voltdb.TheHashinator;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.iv2.RepairAlgo.RepairResult;
@@ -413,9 +413,9 @@ public class TestSpPromoteAlgo
         if (msg instanceof Iv2InitiateTaskMessage) {
             Iv2InitiateTaskMessage taskMsg = (Iv2InitiateTaskMessage) msg;
             if ("@ApplyBinaryLogSP".equals(taskMsg.getStoredProcedureName())) {
-                StoredProcedureInvocation spi = taskMsg.getStoredProcedureInvocation();
+                ParameterSet params = taskMsg.getStoredProcedureInvocation().getParams();
                 long uid = uig.getNextUniqueId();
-                when(spi.getOriginalUniqueId()).thenReturn(uid);
+                when(params.getParam(3)).thenReturn(uid);
                 return uid;
             }
         }

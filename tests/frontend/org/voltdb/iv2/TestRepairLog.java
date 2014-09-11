@@ -40,6 +40,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
+import org.voltdb.ParameterSet;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TheHashinator;
 import org.voltdb.TheHashinator.HashinatorType;
@@ -259,9 +260,9 @@ public class TestRepairLog
         if (msg instanceof Iv2InitiateTaskMessage) {
             Iv2InitiateTaskMessage taskMsg = (Iv2InitiateTaskMessage) msg;
             if ("@ApplyBinaryLogSP".equals(taskMsg.getStoredProcedureName())) {
-                StoredProcedureInvocation spi = taskMsg.getStoredProcedureInvocation();
+                ParameterSet params = taskMsg.getStoredProcedureInvocation().getParams();
                 long uid = uig.getNextUniqueId();
-                when(spi.getOriginalUniqueId()).thenReturn(uid);
+                when(params.getParam(3)).thenReturn(uid);
                 return uid;
             }
         }
@@ -349,5 +350,26 @@ public class TestRepairLog
             items.add(item);
         }
         Collections.sort(items, dut.m_handleComparator);
+    }
+
+    @Test
+    public void testTrackBinaryLogUniqueId() {
+        // The end unique id for an @ApplyBinaryLogSP invocation is recorded
+        // as its forth parameter. Create a realistic invocation, deliver it
+        // to the repair log, and see what we get
+        final long endUniqueId = 42;
+        StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        spi.setProcName("@ApplyBinaryLogSP");
+        spi.setParams(0, new byte[]{0}, endUniqueId - 10, endUniqueId);
+        spi.setOriginalUniqueId(endUniqueId - 10);
+        spi.setOriginalTxnId(endUniqueId -15);
+
+        Iv2InitiateTaskMessage msg =
+                new Iv2InitiateTaskMessage(0l, 0l, 0l, Long.MIN_VALUE, 0l, false, true,
+                        spi, 0l, 0l, false);
+        msg.setSpHandleAndSpUniqueId(900l, 999l);
+        RepairLog log = new RepairLog();
+        log.deliver(msg);
+        validateRepairLog(log.contents(1l, false), endUniqueId);
     }
 }
