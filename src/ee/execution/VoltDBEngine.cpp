@@ -659,8 +659,7 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp )
     // delete any empty persistent tables, forcing them to be rebuilt
     // (Unless the are actually being deleted -- then this does nothing)
 
-    typedef pair<string, CatalogDelegate*> DelegatePair;
-    BOOST_FOREACH(DelegatePair delegatePair, m_catalogDelegates) {
+    BOOST_FOREACH(LabeledCD delegatePair, m_catalogDelegates) {
         CatalogDelegate *delegate = delegatePair.second;
         TableCatalogDelegate *tcd = dynamic_cast<TableCatalogDelegate*>(delegate);
         Table* table = tcd->getTable();

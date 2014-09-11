@@ -1096,7 +1096,7 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiff(catOriginal, catUpdated);
     }
 
-    public void testChangeTableReplicationSettingOfElasticTable() throws IOException {
+    public void testChangeTableReplicationSettingOfExportTable() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 
         VoltProjectBuilder builder = new VoltProjectBuilder();

@@ -298,7 +298,7 @@ public class TestLiveTableSchemaMigration extends TestCase {
             assertTrue(cri.getStatusString().contains("Unable to change"));
         }
         catch (Exception e) {
-            fail(); // not expecting a different exception
+            fail("Expected ProcCallException but got: " + e);
         }
 
         // change partition key with data should fail
@@ -312,7 +312,7 @@ public class TestLiveTableSchemaMigration extends TestCase {
             assertTrue(cri.getStatusString().contains("Unable to change"));
         }
         catch (Exception e) {
-            fail(); // not expecting a different exception
+            fail("Expected ProcCallException but got: " + e);
         }
     }
 

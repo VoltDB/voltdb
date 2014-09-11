@@ -184,7 +184,6 @@ public class TestAdhocCreateTable extends AdhocDDLTestBase {
             }
             assertFalse("Failed to partition an already created table.", threw);
             resp = m_client.callProcedure("@SystemCatalog", "TABLES");
-            // Table will exist but not be partitioned
             assertTrue(findTableInSystemCatalogResults("BAR"));
             assertTrue(isColumnPartitionColumn("BAR", "ID"));
         }

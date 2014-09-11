@@ -136,7 +136,7 @@ public class CatalogDiffEngine {
     }
 
     public String[] reasonsWhyTablesMustBeEmpty() {
-        // this lines up with reasonsWhyTablesMustBeEmpty because SortedMap/TreeMap has order
+        // this lines up with tablesThatMustBeEmpty because SortedMap/TreeMap has order
         return m_tablesThatMustBeEmpty.values().toArray(new String[0]);
     }
 
@@ -418,7 +418,7 @@ public class CatalogDiffEngine {
      * String 1 is name of a table if the change could be made if the table of that name had no tuples.
      * String 2 is the error message to show the user if that table isn't empty.
      */
-    private String[] checkAddDropIfEmptyTableWhitelist(final CatalogType suspect, final ChangeType changeType) {
+    private String[] checkAddDropIfTableIsEmptyWhitelist(final CatalogType suspect, final ChangeType changeType) {
         // Nothing for now. Will need content here to support adding a unique index for example.
         return null;
     }
@@ -676,6 +676,9 @@ public class CatalogDiffEngine {
             Table prevTable = (Table) prevType; // safe because of enclosing if-block
             Database db = (Database) prevType.getParent();
 
+            // table name
+            retval[0] = suspect.getTypeName();
+
             // for now, no changes to export tables
             if (CatalogUtil.isTableExportOnly(db, prevTable)) {
                 return null;
@@ -683,24 +686,57 @@ public class CatalogDiffEngine {
 
             // allowed changes to a table
             if (field.equalsIgnoreCase("isreplicated")) {
-                // table name
-                retval[0] = suspect.getTypeName();
                 // error message
                 retval[1] = String.format(
-                        "Unable to change whether table %s is replicated unless it is empty.",
+                        "Unable to change whether table %s is replicated because it is not empty.",
                         retval[0]);
                 return retval;
             }
             if (field.equalsIgnoreCase("partitioncolumn")) {
-                // table name
-                retval[0] = suspect.getTypeName();
                 // error message
                 retval[1] = String.format(
-                        "Unable to change the partition column of table %s unless it is empty.",
+                        "Unable to change the partition column of table %s because it is not empty.",
                         retval[0]);
                 return retval;
             }
         }
+
+        // add non-null and make types narrower
+        if (prevType instanceof Column) {
+            CatalogType parent = suspect.getParent();
+            assert(parent instanceof Table);
+            // now assume parent is a Table
+            Table parentTable = (Table) parent;
+            Database db = (Database) prevType.getParent();
+
+            // table name
+            retval[0] = parentTable.getTypeName();
+
+            // for now, no changes to export tables
+            if (CatalogUtil.isTableExportOnly(db, parentTable)) {
+                return null;
+            }
+
+            if (field.equals("nullable")) {
+                // table name
+                retval[0] = parentTable.getTypeName();
+                // error message
+                retval[1] = String.format(
+                        "Unable to add a non-null constraint to column %s in table %s unless the table is empty.",
+                        prevType.getTypeName(),
+                        retval[0]);
+                return retval;
+            }
+            else if (field.equals("type") || field.equals("size") || field.equals("inbytes")) {
+                // error message
+                retval[1] = String.format(
+                        "Unable to make a potentially lossy change to the type of column %s in table %s unless the table is empty.",
+                        prevType.getTypeName(),
+                        retval[0]);
+                return retval;
+            }
+        }
+
         return null;
     }
 
@@ -746,9 +782,8 @@ public class CatalogDiffEngine {
      * is basically in this method so it's not repeated 3 times for modify, add
      * and delete. See where it's called for context.
      */
-    void processModifyResponses(String errorMessage, String[] response) {
+    private void processModifyResponses(String errorMessage, String[] response) {
         assert(errorMessage != null);
-        assert((response == null) || (response.length == 2));
 
         // if no tablename, then it's just not possible
         if (response == null) {
@@ -792,7 +827,7 @@ public class CatalogDiffEngine {
 
         // if it's not possible with non-empty tables, check for possible with empty tables
         if (errorMessage != null) {
-            String[] response = checkAddDropIfEmptyTableWhitelist(prevType, ChangeType.DELETION);
+            String[] response = checkAddDropIfTableIsEmptyWhitelist(prevType, ChangeType.DELETION);
             // handle all the error messages and state from the modify check
             processModifyResponses(errorMessage, response);
         }
@@ -820,7 +855,7 @@ public class CatalogDiffEngine {
 
         // if it's not possible with non-empty tables, check for possible with empty tables
         if (errorMessage != null) {
-            String[] response = checkAddDropIfEmptyTableWhitelist(newType, ChangeType.ADDITION);
+            String[] response = checkAddDropIfTableIsEmptyWhitelist(newType, ChangeType.ADDITION);
             // handle all the error messages and state from the modify check
             processModifyResponses(errorMessage, response);
         }

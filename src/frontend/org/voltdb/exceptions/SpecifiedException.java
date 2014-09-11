@@ -60,7 +60,7 @@ public class SpecifiedException extends SerializableException {
 
     @Override
     protected SerializableExceptions getExceptionType() {
-        return SerializableExceptions.ConstraintFailureException;
+        return SerializableExceptions.SpecifiedException;
     }
 
     @Override
