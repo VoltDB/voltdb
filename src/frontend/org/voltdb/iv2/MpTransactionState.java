@@ -60,7 +60,7 @@ public class MpTransactionState extends TransactionState
     public static class FragmentFailureException extends RuntimeException {
         private static final long serialVersionUID = 1L;
     }
-    
+
     final Iv2InitiateTaskMessage m_initiationMsg;
 
     LinkedBlockingDeque<FragmentResponseMessage> m_newDeps =
@@ -153,19 +153,19 @@ public class MpTransactionState extends TransactionState
 
     @Override
     public void createAllParticipatingFragmentWork(FragmentTaskMessage task, boolean[]isReplicatedRead)
-    { 	
+    {
         // Don't generate remote work or dependency tracking or anything if
         // there are no fragments to be done in this message
-        // At some point maybe ProcedureRunner.slowPath() can get smarter  	
+        // At some point maybe ProcedureRunner.slowPath() can get smarter
         if (task.getFragmentCount() > 0) {
-        	// If any replicated reads exist in task, create a special task without those reads
-        	// filteredRemoteWork will be null if there are no replicated reads in task
-        	// in which case all the sites execute the batch m_remoteWork
-          	FragmentTaskMessage filteredRemoteWork = createFilteredRemoteWork(task, isReplicatedRead);
+            // If any replicated reads exist in task, create a special task without those reads
+            // filteredRemoteWork will be null if there are no replicated reads in task
+            // in which case all the sites execute the batch m_remoteWork
+              FragmentTaskMessage filteredRemoteWork = createFilteredRemoteWork(task, isReplicatedRead);
 
-        	assert(filteredRemoteWork == null || filteredRemoteWork.getFragmentCount() < task.getFragmentCount());
-        	boolean taskHasReplicatedReads = filteredRemoteWork != null;
-        	
+            assert(filteredRemoteWork == null || filteredRemoteWork.getFragmentCount() < task.getFragmentCount());
+            boolean taskHasReplicatedReads = filteredRemoteWork != null;
+
             // Distribute the initiate task for command log replay.
             // Command log must log the initiate task;
             // Only send the fragment once.
@@ -173,89 +173,87 @@ public class MpTransactionState extends TransactionState
                 m_haveDistributedInitTask = true;
                 task.setStateForDurability((Iv2InitiateTaskMessage) getNotice(), m_masterHSIds.keySet());
                 if (filteredRemoteWork != null)
-                	filteredRemoteWork.setStateForDurability((Iv2InitiateTaskMessage) getNotice(), m_masterHSIds.keySet());
+                    filteredRemoteWork.setStateForDurability((Iv2InitiateTaskMessage) getNotice(), m_masterHSIds.keySet());
             }
 
             if (m_initiationMsg.getStoredProcedureInvocation().getType() == ProcedureInvocationType.REPLICATED) {
                 task.setOriginalTxnId(m_initiationMsg.getStoredProcedureInvocation().getOriginalTxnId());
                 if (filteredRemoteWork != null)
-                	filteredRemoteWork.setOriginalTxnId(m_initiationMsg.getStoredProcedureInvocation().getOriginalTxnId());
+                    filteredRemoteWork.setOriginalTxnId(m_initiationMsg.getStoredProcedureInvocation().getOriginalTxnId());
             }
 
             m_remoteWork = task;
             m_isReplicatedRead = isReplicatedRead;
             m_remoteWork.setTruncationHandle(m_initiationMsg.getTruncationHandle());
             if (filteredRemoteWork != null)
-            	filteredRemoteWork.setTruncationHandle(m_initiationMsg.getTruncationHandle());
-            
+                filteredRemoteWork.setTruncationHandle(m_initiationMsg.getTruncationHandle());
             // Distribute fragments to remote destinations
             // non_local_hsids doesn't include buddy site in case of replicated reads
             long[] non_local_hsids = new long[m_useHSIds.size() - (taskHasReplicatedReads? 1:0)];
             int i1 = 0;
             for (int i = 0; i < m_useHSIds.size(); i++) {
-             	if (!taskHasReplicatedReads || m_useHSIds.get(i).longValue() != m_buddyHSId)
+                 if (!taskHasReplicatedReads || m_useHSIds.get(i).longValue() != m_buddyHSId)
                    non_local_hsids[i1++] = m_useHSIds.get(i);
             }
             // send to all non-local sites, except buddy in case of replicated reads
             if (non_local_hsids.length > 0) {
-            	// send alternative work (without replicated reads) or the original task if it has no replicated reads
+                // send alternative work (without replicated reads) or the original task if it has no replicated reads
                 m_mbox.send(non_local_hsids, (taskHasReplicatedReads? filteredRemoteWork: m_remoteWork));
-            }  
+            }
             if (taskHasReplicatedReads) {
-            	m_mbox.send(m_buddyHSId, m_remoteWork);  // buddy gets full task with replicated reads
+                m_mbox.send(m_buddyHSId, m_remoteWork);  // buddy gets full task with replicated reads
             }
         }
         else {
             m_remoteWork = null;
         }
     }
-    
     // Create a version of remote distributed work that has no replicated reads
     // for sending to all sites except buddy site
     // Return null if the task has no replicated reads, in which case
     // we can send the original distributed task to all sites
-	private FragmentTaskMessage createFilteredRemoteWork(FragmentTaskMessage task,
-			boolean[] isReplicatedRead) {
-		// First see if we need a special version, i.e., are there any
-		// replicated reads in the work?
-		assert (task.getFragmentCount() == isReplicatedRead.length);
-		boolean hasReplicatedReads = false;
-		for (int i = 0; i < isReplicatedRead.length; i++)
-			if (isReplicatedRead[i]) {
-				hasReplicatedReads = true;
-				break;
-			}
-		if (!hasReplicatedReads)
-			return null; 
+    private FragmentTaskMessage createFilteredRemoteWork(FragmentTaskMessage task,
+            boolean[] isReplicatedRead) {
+        // First see if we need a special version, i.e., are there any
+        // replicated reads in the work?
+        assert (task.getFragmentCount() == isReplicatedRead.length);
+        boolean hasReplicatedReads = false;
+        for (int i = 0; i < isReplicatedRead.length; i++)
+            if (isReplicatedRead[i]) {
+                hasReplicatedReads = true;
+                break;
+            }
+        if (!hasReplicatedReads)
+            return null;
 
-		// create filtered work: same as task except no replicated reads
-		FragmentTaskMessage filteredRemoteWork = new FragmentTaskMessage(
-				task.getInitiatorHSId(), task.getCoordinatorHSId(),
-				task.getTxnId(), task.getUniqueId(), task.isReadOnly(),
-				task.isFinalTask(), task.isForReplay());
-		filteredRemoteWork.setProcedureName(task.getProcedureName());
-		
-		// copy non-replicated-read fragments into filtered batch
-		for (int i1 = 0; i1 < task.getFragmentCount(); i1++) {
-			if (!isReplicatedRead[i1]) { // skip replicated read fragment
-				if (task.getFragmentPlan(i1) == null)
-					filteredRemoteWork.addFragment(task.getPlanHash(i1),
-							task.getOutputDepId(i1),
-							task.getParameterDataForFragment(i1));
-				else { // custom fragment 
-					filteredRemoteWork.addCustomFragment(
-							task.getPlanHash(i1), task.getOutputDepId(i1),
-							task.getParameterDataForFragment(i1),
-							task.getFragmentPlan(i1));
-				}
-			}
-		}
-		return filteredRemoteWork;
-	}
+        // create filtered work: same as task except no replicated reads
+        FragmentTaskMessage filteredRemoteWork = new FragmentTaskMessage(
+                task.getInitiatorHSId(), task.getCoordinatorHSId(),
+                task.getTxnId(), task.getUniqueId(), task.isReadOnly(),
+                task.isFinalTask(), task.isForReplay());
+        filteredRemoteWork.setProcedureName(task.getProcedureName());
+
+        // copy non-replicated-read fragments into filtered batch
+        for (int i1 = 0; i1 < task.getFragmentCount(); i1++) {
+            if (!isReplicatedRead[i1]) { // skip replicated read fragment
+                if (task.getFragmentPlan(i1) == null)
+                    filteredRemoteWork.addFragment(task.getPlanHash(i1),
+                            task.getOutputDepId(i1),
+                            task.getParameterDataForFragment(i1));
+                else { // custom fragment
+                    filteredRemoteWork.addCustomFragment(
+                            task.getPlanHash(i1), task.getOutputDepId(i1),
+                            task.getParameterDataForFragment(i1),
+                            task.getFragmentPlan(i1));
+                }
+            }
+        }
+        return filteredRemoteWork;
+    }
 
     private Map<Integer, Set<Long>>
     createTrackedDependenciesFromTask(FragmentTaskMessage task,
-    									boolean[] isReplicatedRead,
+                                        boolean[] isReplicatedRead,
                                       List<Long> expectedHSIds)
     {
         Map<Integer, Set<Long>> depMap = new HashMap<Integer, Set<Long>>();
@@ -264,11 +262,11 @@ public class MpTransactionState extends TransactionState
             Set<Long> scoreboard = new HashSet<Long>();
             depMap.put(dep, scoreboard);
             if (isReplicatedRead[i]) {
-            	scoreboard.add(m_buddyHSId);  // just one site sends data
+                scoreboard.add(m_buddyHSId);  // just one site sends data
             } else {
-	            for (long hsid : expectedHSIds) {
-	                scoreboard.add(hsid);    // all the sites send data
-	            }
+                for (long hsid : expectedHSIds) {
+                    scoreboard.add(hsid);    // all the sites send data
+                }
             }
         }
         return depMap;
@@ -313,18 +311,18 @@ public class MpTransactionState extends TransactionState
         // Do distributed fragments, if any
         if (m_remoteWork != null) {
             // Create some record of expected dependencies for tracking
-        	// This includes replicated reads, where only one site is involved
+            // This includes replicated reads, where only one site is involved
             m_remoteDeps = createTrackedDependenciesFromTask(m_remoteWork,
-            												 m_isReplicatedRead,
+                                                             m_isReplicatedRead,
                                                              m_useHSIds);
             // if there are remote deps, block on them
             // FragmentResponses indicating failure will throw an exception
             // which will propagate out of handleReceivedFragResponse and
-            // cause ProcedureRunner to do the right thing and cause rollback.          
+            // cause ProcedureRunner to do the right thing and cause rollback.
             while (!checkDoneReceivingFragResponses()) {
                 FragmentResponseMessage msg = pollForResponses();
                 if (msg.getExecutorSiteId() == m_buddyHSId) {
-                	buddyFirstResponse = msg; // needed for its replicated read reaults
+                    buddyFirstResponse = msg; // needed for its replicated read reaults
                  }
                 handleReceivedFragResponse(msg);
             }
@@ -332,51 +330,51 @@ public class MpTransactionState extends TransactionState
         // satisified. Clear this defensively. Procedure runner is sloppy with
         // cleaning up if it decides new work is necessary that is local-only.
         m_remoteWork = null;
-        
+
         FragmentResponseMessage msg = null; // borrow message response
         // Note we can have trivial localWork if the task is all replicated reads
-		if (m_localWork.getFragmentCount() > 0) {
-			BorrowTaskMessage borrowmsg = new BorrowTaskMessage(m_localWork);
-			m_localWork.m_sourceHSId = m_mbox.getHSId();
-			// if we created a bogus fragment to distribute to serialize restart
-			// and borrow tasks, don't include the empty dependencies we got back in the borrow
-			// fragment.
-			if (!usedNullFragment) {
-				borrowmsg.addInputDepMap(m_remoteDepTables);
-			}
-			m_mbox.send(m_buddyHSId, borrowmsg);
+        if (m_localWork.getFragmentCount() > 0) {
+            BorrowTaskMessage borrowmsg = new BorrowTaskMessage(m_localWork);
+            m_localWork.m_sourceHSId = m_mbox.getHSId();
+            // if we created a bogus fragment to distribute to serialize restart
+            // and borrow tasks, don't include the empty dependencies we got back in the borrow
+            // fragment.
+            if (!usedNullFragment) {
+                borrowmsg.addInputDepMap(m_remoteDepTables);
+            }
+            m_mbox.send(m_buddyHSId, borrowmsg);
 
-			msg = pollForResponses();
-		}
+            msg = pollForResponses();
+        }
         m_localWork = null;
- 
+
         // Build results from the FragmentResponseMessages
         // This is similar to dependency tracking...maybe some
         // sane way to merge it
         Map<Integer, List<VoltTable>> results =
             new HashMap<Integer, List<VoltTable>>();
-		int i2 = 0; // index into second buddy results
-		for (int i1 = 0; i1 < m_isReplicatedRead.length; i1++) {
-			int this_depId;
-			VoltTable this_dep;
-			if (m_isReplicatedRead[i1]) {
-				// get results from first buddy execution
-				this_depId = buddyFirstResponse.getTableDependencyIdAtIndex(i1);
-				this_dep = buddyFirstResponse.getTableAtIndex(i1);
-			} else {
-				// get results from second buddy execution
-				assert(msg != null);
-				this_depId = msg.getTableDependencyIdAtIndex(i2);
-				this_dep = msg.getTableAtIndex(i2++);
-			}
-			List<VoltTable> tables = results.get(this_depId);
-			if (tables == null) {
-				tables = new ArrayList<VoltTable>();
-				results.put(this_depId, tables);
-			}
- 			tables.add(this_dep);
-		}
-		assert (i2 == msg.getTableCount());
+        int i2 = 0; // index into second buddy results
+        for (int i1 = 0; i1 < m_isReplicatedRead.length; i1++) {
+            int this_depId;
+            VoltTable this_dep;
+            if (m_isReplicatedRead[i1]) {
+                // get results from first buddy execution
+                this_depId = buddyFirstResponse.getTableDependencyIdAtIndex(i1);
+                this_dep = buddyFirstResponse.getTableAtIndex(i1);
+            } else {
+                // get results from second buddy execution
+                assert(msg != null);
+                this_depId = msg.getTableDependencyIdAtIndex(i2);
+                this_dep = msg.getTableAtIndex(i2++);
+            }
+            List<VoltTable> tables = results.get(this_depId);
+            if (tables == null) {
+                tables = new ArrayList<VoltTable>();
+                results.put(this_depId, tables);
+            }
+             tables.add(this_dep);
+        }
+        assert (i2 == msg.getTableCount());
         // Need some sanity check that we got all of the expected output dependencies?
         return results;
     }

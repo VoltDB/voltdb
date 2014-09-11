@@ -1150,7 +1150,7 @@ public class ProcedureRunner {
        final int[] m_depsToResume;
 
        // these dependencies need to be received before the local stuff can run
-       // Since replicated reads are not handled in the local task, 
+       // Since replicated reads are not handled in the local task,
        // this list has variable length, so assemble it first in an ArrayList
        // and later convert it to the array
        private List<Integer> m_depsForLocalTaskList = new ArrayList<Integer>();
@@ -1161,11 +1161,11 @@ public class ProcedureRunner {
 
        // the data and message for locally processed fragments
        final FragmentTaskMessage m_localTask;
-              
+
        // the data and message for all sites in the transaction
        final FragmentTaskMessage m_distributedTask;
        // for each of m_distributedTask's fragments: which ones are replicated reads
-       boolean[] m_isReplicatedRead = null; 
+       boolean[] m_isReplicatedRead = null;
 
        // holds query results
        final VoltTable[] m_results;
@@ -1217,9 +1217,9 @@ public class ProcedureRunner {
            // single replicated read fragment
            if (stmt.collector == null) {
                // Replicated read: will be done only on one site in distributed work phase
-        	   //   in its proper place with respect to other reads and writes
-        	   //   Arrange to deliver its results directly to the stored procedure
-        	   m_isReplicatedRead[index] = true;  // mark position in m_distributedTask as replicated read
+               //   in its proper place with respect to other reads and writes
+               //   Arrange to deliver its results directly to the stored procedure
+               m_isReplicatedRead[index] = true;  // mark position in m_distributedTask as replicated read
                if (stmt.inCatalog) {
                    m_distributedTask.addFragment(stmt.aggregator.planHash, m_depsToResume[index], params);
                }
@@ -1227,7 +1227,6 @@ public class ProcedureRunner {
                    byte[] planBytes = ActivePlanRepository.planForFragmentId(stmt.aggregator.id);
                    m_distributedTask.addCustomFragment(stmt.aggregator.planHash, m_depsToResume[index], params, planBytes);
                }
-              
            }
            // two fragments
            else {
@@ -1249,14 +1248,14 @@ public class ProcedureRunner {
                }
            }
            if (index == m_batchSize - 1) {
-	    	   // end of adding statements, now convert list to array
-	    	   m_depsForLocalTask = new int[m_depsForLocalTaskList.size()];
-	    	   for (int i=0; i< m_depsForLocalTaskList.size(); i++)
-	    		   m_depsForLocalTask[i] = m_depsForLocalTaskList.get(i); 
-	       }
+               // end of adding statements, now convert list to array
+               m_depsForLocalTask = new int[m_depsForLocalTaskList.size()];
+               for (int i=0; i< m_depsForLocalTaskList.size(); i++)
+                   m_depsForLocalTask[i] = m_depsForLocalTaskList.get(i);
+           }
        }
    }
-   
+
    /*
     * Execute a batch of queries, possibly a mix of reads and writes.
     * Execution of reads vs. writes in the correct order is ensured by
@@ -1322,11 +1321,10 @@ public class ProcedureRunner {
        // note: non-transactional work only helps us if it's final work
        m_txnState.createLocalFragmentWork(state.m_localTask,
                                           state.m_localFragsAreNonTransactional && finalTask);
-        
        if(!state.m_distributedTask.isEmpty()){
-    	   state.m_distributedTask.setBatch(m_batchIndex);
-    	   m_txnState.createAllParticipatingFragmentWork
-    	   				(state.m_distributedTask, state.m_isReplicatedRead);
+           state.m_distributedTask.setBatch(m_batchIndex);
+           m_txnState.createAllParticipatingFragmentWork
+                           (state.m_distributedTask, state.m_isReplicatedRead);
        }
        // recursively call recursableRun and don't allow it to shutdown
        Map<Integer,List<VoltTable>> mapResults =

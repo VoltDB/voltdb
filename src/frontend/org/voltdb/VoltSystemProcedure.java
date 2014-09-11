@@ -394,9 +394,9 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
 
             if (pf.multipartition) {
                 // create a workunit for every execution site
-            	assert(task.getFragmentCount()==1);
-            	// With one fragment, no need for special handling re replicated reads
-            	boolean[] isReplicatedRead = new boolean[task.getFragmentCount()];
+                assert(task.getFragmentCount()==1);
+                // With one fragment, no need for special handling re replicated reads
+                boolean[] isReplicatedRead = new boolean[task.getFragmentCount()];
                 txnState.createAllParticipatingFragmentWork(task, isReplicatedRead);
             } else {
                 // create one workunit for the current site
