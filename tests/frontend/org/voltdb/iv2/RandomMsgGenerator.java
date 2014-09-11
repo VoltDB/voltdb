@@ -69,6 +69,8 @@ public class RandomMsgGenerator
                     0l, 0l, false);
         if (binaryLog) {
             when(spi.getProcName()).thenReturn("@ApplyBinaryLogSP");
+            // dummy end unique id
+            when(ps.getParam(3)).thenReturn(Long.MIN_VALUE);
         }
         return msg;
     }
