@@ -40,6 +40,7 @@ import java.net.URL;
 import java.net.URLDecoder;
 
 import org.junit.Test;
+import org.voltcore.utils.PortGenerator;
 import org.voltdb.AdhocDDLTestBase;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
@@ -94,7 +95,9 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
         VoltProjectBuilder builder = new VoltProjectBuilder();
 
         builder.setUseAdhocSchema(true);
-        builder.setHTTPDPort(8080);
+        PortGenerator pg = new PortGenerator();
+        int httpdPort = pg.next();
+        builder.setHTTPDPort(httpdPort);
         boolean success = builder.compile(pathToCatalog);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
@@ -108,12 +111,12 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
         String roundtripDDL;
 
         assertTrue(callSQLcmd(firstCanonicalDDL));
-        roundtripDDL = getDDLFromHTTP();
+        roundtripDDL = getDDLFromHTTP(httpdPort);
         // IZZY: we force single statement SQL keywords to lower case, it seems
         assertTrue(firstCanonicalDDL.equalsIgnoreCase(roundtripDDL));
 
         assertTrue(callSQLcmd("CREATE TABLE NONSENSE (id INTEGER);\n"));
-        roundtripDDL = getDDLFromHTTP();
+        roundtripDDL = getDDLFromHTTP(httpdPort);
         assertFalse(firstCanonicalDDL.equals(roundtripDDL));
 
         teardownSystem();
@@ -155,8 +158,8 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
         }
     }
 
-    public String getDDLFromHTTP() throws Exception {
-        URL ddlURL = new URL("http://localhost:8080/ddl/");
+    public String getDDLFromHTTP(int httpdPort) throws Exception {
+        URL ddlURL = new URL(String.format("http://localhost:%d/ddl/", httpdPort));
 
         HttpURLConnection conn = (HttpURLConnection) ddlURL.openConnection();
         conn.setRequestMethod("POST");
