@@ -424,7 +424,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     /*
                      * Enforce a limit on the maximum number of connections
                      */
-                    if (m_numConnections.get() == MAX_CONNECTIONS.get()) {
+                    if (m_numConnections.get() >= MAX_CONNECTIONS.get()) {
                         networkLog.warn("Rejected connection from " +
                                 socket.socket().getRemoteSocketAddress() +
                                 " because the connection limit of " + MAX_CONNECTIONS + " has been reached");
