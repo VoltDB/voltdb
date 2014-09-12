@@ -865,14 +865,6 @@ TEST_F(IndexTest, ReentrantTreeUnique) {
 
     EXPECT_TRUE(ValueFactory::getBigIntValue(40).
             op_equals(tuple.getNValue(0)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(40 % 2).
-            op_equals(tuple.getNValue(1)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(40 % 3).
-            op_equals(tuple.getNValue(2)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(40 + 20).
-            op_equals(tuple.getNValue(3)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(40 * 11).
-            op_equals(tuple.getNValue(4)).isTrue());
     //
     // Before index moves to the next value, re-use the same index to iterate
     //
@@ -884,25 +876,9 @@ TEST_F(IndexTest, ReentrantTreeUnique) {
     EXPECT_FALSE((tuple = index->nextValue(indexCursorNew)).isNullTuple());
     EXPECT_TRUE(ValueFactory::getBigIntValue(41).
             op_equals(tuple.getNValue(0)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(41 % 2).
-            op_equals(tuple.getNValue(1)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(41 % 3).
-            op_equals(tuple.getNValue(2)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(41 + 20).
-            op_equals(tuple.getNValue(3)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(41 * 11).
-            op_equals(tuple.getNValue(4)).isTrue());
     EXPECT_FALSE((tuple = index->nextValue(indexCursorNew)).isNullTuple());
     EXPECT_TRUE(ValueFactory::getBigIntValue(42).
             op_equals(tuple.getNValue(0)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(42 % 2).
-            op_equals(tuple.getNValue(1)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(42 % 3).
-            op_equals(tuple.getNValue(2)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(42 + 20).
-            op_equals(tuple.getNValue(3)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(42 * 11).
-            op_equals(tuple.getNValue(4)).isTrue());
 
     // moveToGreaterThanKey test on the re-entrant-index
     searchkey.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(330)));
@@ -911,14 +887,6 @@ TEST_F(IndexTest, ReentrantTreeUnique) {
     EXPECT_FALSE((tuple = index->nextValue(indexCursorNew)).isNullTuple());
     EXPECT_TRUE(ValueFactory::getBigIntValue(31).
             op_equals(tuple.getNValue(0)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(31 % 2).
-            op_equals(tuple.getNValue(1)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(31 % 3).
-            op_equals(tuple.getNValue(2)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(31 + 20).
-            op_equals(tuple.getNValue(3)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(31 * 11).
-            op_equals(tuple.getNValue(4)).isTrue());
 
     //
     // Go back to the original index places and continue to iterate the next value
@@ -926,14 +894,6 @@ TEST_F(IndexTest, ReentrantTreeUnique) {
     EXPECT_FALSE((tuple = index->nextValue(indexCursor)).isNullTuple());
     EXPECT_TRUE(ValueFactory::getBigIntValue(41).
             op_equals(tuple.getNValue(0)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(41 % 2).
-            op_equals(tuple.getNValue(1)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(41 % 3).
-            op_equals(tuple.getNValue(2)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(41 + 20).
-            op_equals(tuple.getNValue(3)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(41 * 11).
-            op_equals(tuple.getNValue(4)).isTrue());
 
     // go to indexCursorNew again
     searchkey.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(550)));
@@ -943,10 +903,6 @@ TEST_F(IndexTest, ReentrantTreeUnique) {
     tuple = index->nextValueAtKey(indexCursorNew);
     EXPECT_FALSE(tuple.isNullTuple());
     EXPECT_TRUE(ValueFactory::getBigIntValue(50).op_equals(tuple.getNValue(0)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(50 % 2).op_equals(tuple.getNValue(1)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(50 % 3).op_equals(tuple.getNValue(2)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(50 + 20).op_equals(tuple.getNValue(3)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(50 * 11).op_equals(tuple.getNValue(4)).isTrue());
 
     tuple = index->nextValueAtKey(indexCursorNew);
     EXPECT_TRUE(tuple.isNullTuple());
@@ -1002,14 +958,6 @@ TEST_F(IndexTest, ReentrantTreeMultiple) {
     EXPECT_FALSE((tuple = index->nextValue(indexCursor)).isNullTuple());
     EXPECT_TRUE(ValueFactory::getBigIntValue(40).
                 op_equals(tuple.getNValue(0)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(40 % 2).
-                op_equals(tuple.getNValue(1)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(40 % 3).
-                op_equals(tuple.getNValue(2)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(40 + 20).
-                op_equals(tuple.getNValue(3)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(40 * 11).
-                op_equals(tuple.getNValue(4)).isTrue());
 
     //
     // Before index moves to the next value, re-use the same index to iterate
@@ -1022,25 +970,6 @@ TEST_F(IndexTest, ReentrantTreeMultiple) {
     EXPECT_FALSE((tuple = index->nextValue(indexCursorNew)).isNullTuple());
     EXPECT_TRUE(ValueFactory::getBigIntValue(41).
             op_equals(tuple.getNValue(0)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(41 % 2).
-            op_equals(tuple.getNValue(1)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(41 % 3).
-            op_equals(tuple.getNValue(2)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(41 + 20).
-            op_equals(tuple.getNValue(3)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(41 * 11).
-            op_equals(tuple.getNValue(4)).isTrue());
-    EXPECT_FALSE((tuple = index->nextValue(indexCursorNew)).isNullTuple());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(42).
-            op_equals(tuple.getNValue(0)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(42 % 2).
-            op_equals(tuple.getNValue(1)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(42 % 3).
-            op_equals(tuple.getNValue(2)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(42 + 20).
-            op_equals(tuple.getNValue(3)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(42 * 11).
-            op_equals(tuple.getNValue(4)).isTrue());
 
     // moveToGreaterThanKey test
     searchkey.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(330)));
@@ -1050,14 +979,6 @@ TEST_F(IndexTest, ReentrantTreeMultiple) {
     EXPECT_FALSE((tuple = index->nextValue(indexCursorNew)).isNullTuple());
     EXPECT_TRUE(ValueFactory::getBigIntValue(31).
                 op_equals(tuple.getNValue(0)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(31 % 2).
-                op_equals(tuple.getNValue(1)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(31 % 3).
-                op_equals(tuple.getNValue(2)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(31 + 20).
-                op_equals(tuple.getNValue(3)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(31 * 11).
-                op_equals(tuple.getNValue(4)).isTrue());
 
     //
     // Go back to the original index places and continue to iterate the next value
@@ -1065,14 +986,6 @@ TEST_F(IndexTest, ReentrantTreeMultiple) {
     EXPECT_FALSE((tuple = index->nextValue(indexCursor)).isNullTuple());
     EXPECT_TRUE(ValueFactory::getBigIntValue(41).
                 op_equals(tuple.getNValue(0)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(41 % 2).
-                op_equals(tuple.getNValue(1)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(41 % 3).
-                op_equals(tuple.getNValue(2)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(41 + 20).
-                op_equals(tuple.getNValue(3)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(41 * 11).
-                op_equals(tuple.getNValue(4)).isTrue());
 
     // go to indexCursorNew again
     searchkey.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(550)));
@@ -1082,10 +995,6 @@ TEST_F(IndexTest, ReentrantTreeMultiple) {
     tuple = index->nextValueAtKey(indexCursorNew);
     EXPECT_FALSE(tuple.isNullTuple());
     EXPECT_TRUE(ValueFactory::getBigIntValue(50).op_equals(tuple.getNValue(0)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(50 % 2).op_equals(tuple.getNValue(1)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(50 % 3).op_equals(tuple.getNValue(2)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(50 + 20).op_equals(tuple.getNValue(3)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(50 * 11).op_equals(tuple.getNValue(4)).isTrue());
 
     tuple = index->nextValueAtKey(indexCursorNew);
     EXPECT_TRUE(tuple.isNullTuple());
@@ -1125,6 +1034,9 @@ TEST_F(IndexTest, ReentrantHashUnique) {
     searchkey.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(550)));
     searchkey.setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(2)));
     EXPECT_TRUE(index->moveToKey(&searchkey, indexCursor));
+    tuple = index->nextValueAtKey(indexCursor);
+    EXPECT_FALSE(tuple.isNullTuple());
+    EXPECT_TRUE(ValueFactory::getBigIntValue(50).op_equals(tuple.getNValue(0)).isTrue());
 
     //
     // Before index moves to the next value, re-use the same index to iterate
@@ -1137,26 +1049,9 @@ TEST_F(IndexTest, ReentrantHashUnique) {
     EXPECT_FALSE((tuple = index->nextValueAtKey(indexCursorNew)).isNullTuple());
     EXPECT_TRUE(ValueFactory::getBigIntValue(40).
             op_equals(tuple.getNValue(0)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(40 % 2).
-            op_equals(tuple.getNValue(1)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(40 % 3).
-            op_equals(tuple.getNValue(2)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(40 + 20).
-            op_equals(tuple.getNValue(3)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(40 * 11).
-            op_equals(tuple.getNValue(4)).isTrue());
-
     //
     // Go back to the original index places and continue to iterate the next value
     //
-    tuple = index->nextValueAtKey(indexCursor);
-    EXPECT_FALSE(tuple.isNullTuple());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(50).op_equals(tuple.getNValue(0)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(50 % 2).op_equals(tuple.getNValue(1)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(50 % 3).op_equals(tuple.getNValue(2)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(50 + 20).op_equals(tuple.getNValue(3)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(50 * 11).op_equals(tuple.getNValue(4)).isTrue());
-
     tuple = index->nextValueAtKey(indexCursor);
     EXPECT_TRUE(tuple.isNullTuple());
 
@@ -1195,6 +1090,9 @@ TEST_F(IndexTest, ReentrantHashMultiple) {
     searchkey.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(550)));
     searchkey.setNValue(1, ValueFactory::getBigIntValue(static_cast<int64_t>(2)));
     EXPECT_TRUE(index->moveToKey(&searchkey, indexCursor));
+    tuple = index->nextValueAtKey(indexCursor);
+    EXPECT_FALSE(tuple.isNullTuple());
+    EXPECT_TRUE(ValueFactory::getBigIntValue(50).op_equals(tuple.getNValue(0)).isTrue());
 
     //
     // Before index moves to the next value, re-use the same index to iterate
@@ -1207,26 +1105,10 @@ TEST_F(IndexTest, ReentrantHashMultiple) {
     EXPECT_FALSE((tuple = index->nextValueAtKey(indexCursorNew)).isNullTuple());
     EXPECT_TRUE(ValueFactory::getBigIntValue(40).
             op_equals(tuple.getNValue(0)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(40 % 2).
-            op_equals(tuple.getNValue(1)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(40 % 3).
-            op_equals(tuple.getNValue(2)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(40 + 20).
-            op_equals(tuple.getNValue(3)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(40 * 11).
-            op_equals(tuple.getNValue(4)).isTrue());
 
     //
     // Go back to the original index places and continue to iterate the next value
     //
-    tuple = index->nextValueAtKey(indexCursor);
-    EXPECT_FALSE(tuple.isNullTuple());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(50).op_equals(tuple.getNValue(0)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(50 % 2).op_equals(tuple.getNValue(1)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(50 % 3).op_equals(tuple.getNValue(2)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(50 + 20).op_equals(tuple.getNValue(3)).isTrue());
-    EXPECT_TRUE(ValueFactory::getBigIntValue(50 * 11).op_equals(tuple.getNValue(4)).isTrue());
-
     tuple = index->nextValueAtKey(indexCursor);
     EXPECT_TRUE(tuple.isNullTuple());
 
