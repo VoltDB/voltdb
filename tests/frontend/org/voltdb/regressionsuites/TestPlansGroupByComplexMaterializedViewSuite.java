@@ -395,8 +395,8 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
             e.printStackTrace();
         }
 //        "CREATE VIEW V_R3_short (V_R3_G1,V_R3_CNT, V_R3_sum_wage) " +
-//        "AS SELECT substring(vshort,0,1), count(*), SUM(wage) " +
-//        "FROM R3 GROUP BY substring(vshort,0,1);" +
+//        "AS SELECT substring(vshort,1,1), count(*), SUM(wage) " +
+//        "FROM R3 GROUP BY substring(vshort,1,1);" +
 
         if (vt.getRowCount() != 0) {
             assertEquals(expected.length, vt.getRowCount());
@@ -619,7 +619,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         throws IOException, NoConnectionsException, ProcCallException, ParseException
     {
         VoltTable table = client.callProcedure("@AdHoc", "SELECT * FROM V_R2_MIN_MAX ORDER BY DEPT").getResults()[0];
-        System.out.println(table);
+        //* enable for debug*/ System.out.println(table);
         validateTableOfLongs(table, expected);
     }
 
@@ -731,7 +731,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
         VoltTable table = client.callProcedure("@AdHoc",
             "SELECT DEPT, CNT, CAST(MAX_WAGE AS INTEGER)*2, CAST(MIN_TM AS INTEGER) " +
             "FROM V_R5_MIN_MAX ORDER BY DEPT").getResults()[0];
-        System.out.println(table);
+        //* enable for debug*/ System.out.println(table);
         validateTableOfLongs(table, expected);
     }
 
@@ -1255,13 +1255,13 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                         "order by v_p1.v_cnt;";
                 sql = sql.replace("v_p1", tb);
                 vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-                System.out.println(vt);
+                //* enable for debug*/ System.out.println(vt);
                 validateTableOfScalarLongs(vt, new long[] {2, 2, 2, 2, 3, 3, 3,3});
 
                 // Join on different column names.
                 sql = "select v_p1.v_cnt from v_r4 inner join v_p1 on v_r4.v_sum_rent = v_p1.v_sum_age";
                 vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-                System.out.println(vt);
+                //* enable for debug*/ System.out.println(vt);
                 validateTableOfScalarLongs(vt, new long[] {});
 
                 // test where clause.
@@ -1297,7 +1297,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                         "order by c0, c1, c2 ";
                 sql = sql.replace("v_p1", tb);
                 vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-                System.out.println(vt);
+                //* enable for debug*/ System.out.println(vt);
                 validateTableOfLongs(vt, new long[][] {{2, 93, 13}, {3, 170, 37}});
 
 
@@ -1421,7 +1421,7 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                     "left join v_r4 on V_P1_ENG5386.v_g1 < v_r4.v_g1 GROUP BY V_P1_ENG5386.v_g1 ORDER BY 1;";
             sql = sql.replace("V_P1_ENG5386", tb);
             vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-            System.out.println(vt);
+            //* enable for debug*/ System.out.println(vt);
             long voltNullLong = Long.MIN_VALUE;
             if (isHSQL()) {
                 voltNullLong = 0l;
@@ -1596,8 +1596,8 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                 "PRIMARY KEY (ID) );" +
 
                 "CREATE VIEW V_R3_test1 (V_R3_G1,V_R3_CNT, V_R3_sum_wage) " +
-                "AS SELECT substring(vshort,0,2), count(*), SUM(wage) " +
-                "FROM R3 GROUP BY substring(vshort,0,2) ;" +
+                "AS SELECT substring(vshort,1,2), count(*), SUM(wage) " +
+                "FROM R3 GROUP BY substring(vshort,1,2) ;" +
 
                 "CREATE VIEW V_R3_test2 (V_R3_G1,V_R3_CNT, V_R3_sum_wage) " +
                 "AS SELECT vshort || '" + longStr + "', " +
@@ -1605,8 +1605,8 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
                 "FROM R3 GROUP BY vshort || '" + longStr + "';" +
 
                 "CREATE VIEW V_R3_test3 (V_R3_G1,V_R3_CNT, V_R3_sum_wage) " +
-                "AS SELECT substring(vlong,0,2), count(*), SUM(wage) " +
-                "FROM R3 GROUP BY substring(vlong,0,2);" +
+                "AS SELECT substring(vlong,1,2), count(*), SUM(wage) " +
+                "FROM R3 GROUP BY substring(vlong,1,2);" +
 
                 "CREATE VIEW V_R3_test4 (V_R3_G1,V_R3_CNT, V_R3_sum_wage) " +
                 "AS SELECT vlong || '" + longStr + "', " +
