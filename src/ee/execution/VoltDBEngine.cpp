@@ -625,14 +625,14 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const string &catalogPay
     }
 
     // load up all the tables, adding all tables
-    if (processCatalogAdditions(true, timestamp) == false) {
+    if (processCatalogAdditions(timestamp) == false) {
         return false;
     }
 
     rebuildTableCollections();
 
     // load up all the materialized views
-    initMaterializedViews(true);
+    initMaterializedViews();
 
     VOLT_DEBUG("Loaded catalog...");
     return true;
@@ -652,9 +652,31 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const string &catalogPay
 void
 VoltDBEngine::processCatalogDeletes(int64_t timestamp )
 {
-    vector<string> deletions;
-    m_catalog->getDeletedPaths(deletions);
+    vector<string> deletion_vector;
+    m_catalog->getDeletedPaths(deletion_vector);
+    set<string> deletions(deletion_vector.begin(), deletion_vector.end());
 
+    // delete any empty persistent tables, forcing them to be rebuilt
+    // (Unless the are actually being deleted -- then this does nothing)
+
+    BOOST_FOREACH(LabeledCD delegatePair, m_catalogDelegates) {
+        CatalogDelegate *delegate = delegatePair.second;
+        TableCatalogDelegate *tcd = dynamic_cast<TableCatalogDelegate*>(delegate);
+        Table* table = tcd->getTable();
+
+        // skip export tables for now
+        StreamedTable *streamedtable = dynamic_cast<StreamedTable*>(table);
+        if (streamedtable) {
+            continue;
+        }
+
+        // identify empty tables and mark for deletion
+        if (table->activeTupleCount() == 0) {
+            deletions.insert(delegatePair.first);
+        }
+    }
+
+    // delete tables in the set
     BOOST_FOREACH (string path, deletions) {
         VOLT_TRACE("delete path:");
 
@@ -744,23 +766,28 @@ static bool haveDifferentSchema(catalog::Table *t1, voltdb::Table *t2)
  * data.
  */
 bool
-VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
+VoltDBEngine::processCatalogAdditions(int64_t timestamp)
 {
     // iterate over all of the tables in the new catalog
     BOOST_FOREACH (LabeledTable labeledTable, m_database->tables()) {
         // get the catalog's table object
         catalog::Table *catalogTable = labeledTable.second;
-        if (addAll || catalogTable->wasAdded()) {
-            VOLT_TRACE("add a completely new table...");
+
+        // get the delegate for the table... add the table if it's null
+        CatalogDelegate* delegate = findInMapOrNull(catalogTable->path(), m_catalogDelegates);
+        TableCatalogDelegate *tcd = dynamic_cast<TableCatalogDelegate*>(delegate);
+
+        if (!tcd) {
+            VOLT_TRACE("add a completely new table or rebuild an empty table...");
 
             //////////////////////////////////////////
             // add a completely new table
             //////////////////////////////////////////
 
-            TableCatalogDelegate *tcd = new TableCatalogDelegate(catalogTable->relativeIndex(),
-                                                                 catalogTable->path(),
-                                                                 catalogTable->signature(),
-                                                                 m_compactionThreshold);
+            tcd = new TableCatalogDelegate(catalogTable->relativeIndex(),
+                                           catalogTable->path(),
+                                           catalogTable->signature(),
+                                           m_compactionThreshold);
 
             // use the delegate to init the table and create indexes n' stuff
             if (tcd->init(*m_database, *catalogTable) != 0) {
@@ -785,14 +812,6 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
             // add/modify/remove indexes that have changed
             //  in the catalog
             //////////////////////////////////////////////
-
-            // get the delegate and bail if it's not here
-            // - JHH: I'm not sure why not finding a delegate is safe to ignore
-            CatalogDelegate* delegate = findInMapOrNull(catalogTable->path(), m_catalogDelegates);
-            TableCatalogDelegate *tcd = dynamic_cast<TableCatalogDelegate*>(delegate);
-            if (!tcd) {
-                continue;
-            }
 
             Table *table = tcd->getTable();
 
@@ -1006,14 +1025,14 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const string &catalogPayloa
 
     processCatalogDeletes(timestamp);
 
-    if (processCatalogAdditions(false, timestamp) == false) {
+    if (processCatalogAdditions(timestamp) == false) {
         VOLT_ERROR("Error processing catalog additions.");
         return false;
     }
 
     rebuildTableCollections();
 
-    initMaterializedViews(false);
+    initMaterializedViews();
 
     m_catalog->purgeDeletions();
     VOLT_DEBUG("Updated catalog...");
@@ -1247,9 +1266,8 @@ void VoltDBEngine::initPlanNode(const int64_t fragId,
  * that object to the source table.
  *
  * Assumes all tables (sources and destinations) have been constructed.
- * @param addAll Pass true to add all views. Pass false to only add new views.
  */
-void VoltDBEngine::initMaterializedViews(bool addAll) {
+void VoltDBEngine::initMaterializedViews() {
     // walk tables
     BOOST_FOREACH (LabeledTable labeledTable, m_database->tables()) {
         catalog::Table *srcCatalogTable = labeledTable.second;
@@ -1265,14 +1283,9 @@ void VoltDBEngine::initMaterializedViews(bool addAll) {
             const catalog::Table *destCatalogTable = catalogView->dest();
             PersistentTable *destTable = dynamic_cast<PersistentTable*>(m_tables[destCatalogTable->relativeIndex()]);
             assert(destTable);
-            // connect source and destination tables
-            if (addAll || catalogView->wasAdded()) {
-                // This is not a leak -- the materialized view is self-installing into srcTable.
-                new MaterializedViewMetadata(srcPTable, destTable, catalogView);
-            } else {
-                // Ensure that the materialized view is using the latest version of the target table.
-                srcPTable->updateMaterializedViewTargetTable(destTable, catalogView);
-            }
+            // Either connect source and destination tables with a new link...
+            // Or Ensure that the materialized view is using the latest version of the target table.
+            srcPTable->updateMaterializedViewTargetTable(destTable, catalogView);
         }
     }
 }

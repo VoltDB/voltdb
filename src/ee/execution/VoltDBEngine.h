@@ -171,7 +171,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         bool loadCatalog(const int64_t timestamp, const std::string &catalogPayload);
         bool updateCatalog(const int64_t timestamp, const std::string &catalogPayload);
-        bool processCatalogAdditions(bool addAll, int64_t timestamp);
+        bool processCatalogAdditions(int64_t timestamp);
 
         /**
         * Load table data into a persistent table specified by the tableId parameter.
@@ -363,7 +363,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         void initPlanNode(const int64_t fragId, AbstractPlanNode* node, TempTableLimits* limits);
         void processCatalogDeletes(int64_t timestamp);
-        void initMaterializedViews(bool addAll);
+        void initMaterializedViews();
         bool updateCatalogDatabaseReference();
 
         /**
