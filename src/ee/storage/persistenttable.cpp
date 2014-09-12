@@ -983,6 +983,8 @@ PersistentTable::updateMaterializedViewTargetTable(PersistentTable* target, cata
     // find the materialized view that uses the table or its precursor (by the same name).
     BOOST_FOREACH(MaterializedViewMetadata* currView, m_views) {
         PersistentTable* currTarget = currView->targetTable();
+
+        // found: target is alreafy set
         if (currTarget == target) {
             // The view is already up to date.
             // but still need to update the index used for min/max
@@ -992,6 +994,7 @@ PersistentTable::updateMaterializedViewTargetTable(PersistentTable* target, cata
             return;
         }
 
+        // found: this is the table to set the
         std::string currName = currTarget->name();
         if (currName == targetName) {
             // A match on name only indicates that the target table has been re-defined since
@@ -1001,7 +1004,10 @@ PersistentTable::updateMaterializedViewTargetTable(PersistentTable* target, cata
             return;
         }
     }
-    assert(false); // Should have found an existing view for the table.
+
+    // The connection needs to be made using a new MaterializedViewMetadata
+    // This is not a leak -- the materialized view is self-installing into srcTable.
+    new MaterializedViewMetadata(this, target, targetMvInfo);
 }
 
 // ------------------------------------------------------------------

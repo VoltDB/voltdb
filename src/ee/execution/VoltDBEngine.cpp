@@ -632,7 +632,7 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const string &catalogPay
     rebuildTableCollections();
 
     // load up all the materialized views
-    initMaterializedViews(true);
+    initMaterializedViews();
 
     VOLT_DEBUG("Loaded catalog...");
     return true;
@@ -1032,7 +1032,7 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const string &catalogPayloa
 
     rebuildTableCollections();
 
-    initMaterializedViews(false);
+    initMaterializedViews();
 
     m_catalog->purgeDeletions();
     VOLT_DEBUG("Updated catalog...");
@@ -1266,9 +1266,8 @@ void VoltDBEngine::initPlanNode(const int64_t fragId,
  * that object to the source table.
  *
  * Assumes all tables (sources and destinations) have been constructed.
- * @param addAll Pass true to add all views. Pass false to only add new views.
  */
-void VoltDBEngine::initMaterializedViews(bool addAll) {
+void VoltDBEngine::initMaterializedViews() {
     // walk tables
     BOOST_FOREACH (LabeledTable labeledTable, m_database->tables()) {
         catalog::Table *srcCatalogTable = labeledTable.second;
@@ -1284,14 +1283,9 @@ void VoltDBEngine::initMaterializedViews(bool addAll) {
             const catalog::Table *destCatalogTable = catalogView->dest();
             PersistentTable *destTable = dynamic_cast<PersistentTable*>(m_tables[destCatalogTable->relativeIndex()]);
             assert(destTable);
-            // connect source and destination tables
-            if (addAll || catalogView->wasAdded()) {
-                // This is not a leak -- the materialized view is self-installing into srcTable.
-                new MaterializedViewMetadata(srcPTable, destTable, catalogView);
-            } else {
-                // Ensure that the materialized view is using the latest version of the target table.
-                srcPTable->updateMaterializedViewTargetTable(destTable, catalogView);
-            }
+            // Either connect source and destination tables with a new link...
+            // Or Ensure that the materialized view is using the latest version of the target table.
+            srcPTable->updateMaterializedViewTargetTable(destTable, catalogView);
         }
     }
 }

@@ -363,7 +363,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         void initPlanNode(const int64_t fragId, AbstractPlanNode* node, TempTableLimits* limits);
         void processCatalogDeletes(int64_t timestamp);
-        void initMaterializedViews(bool addAll);
+        void initMaterializedViews();
         bool updateCatalogDatabaseReference();
 
         /**
