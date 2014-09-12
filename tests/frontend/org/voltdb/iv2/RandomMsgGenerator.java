@@ -28,13 +28,14 @@ import static org.mockito.Mockito.when;
 
 import java.util.Random;
 
-import com.google_voltpatches.common.collect.Sets;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.ParameterSet;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
+
+import com.google_voltpatches.common.collect.Sets;
 
 // Generate a random stream of messages seen by an SPI.
 public class RandomMsgGenerator
@@ -48,6 +49,7 @@ public class RandomMsgGenerator
     static final double MPDONECHANCE = .75;
     static final double READCHANCE = .50;
     static final double MPRESTARTCHANCE = 0.20;
+    static final double BINARYLOGCHANCE = 0.75;
 
     RandomMsgGenerator()
     {
@@ -57,7 +59,7 @@ public class RandomMsgGenerator
         m_mpiTxnEgo = TxnEgo.makeZero(MpInitiator.MP_INIT_PID);
     }
 
-    private Iv2InitiateTaskMessage makeIv2InitiateTaskMsg(boolean readOnly)
+    private Iv2InitiateTaskMessage makeIv2InitiateTaskMsg(boolean readOnly, boolean binaryLog)
     {
         StoredProcedureInvocation spi = mock(StoredProcedureInvocation.class);
         ParameterSet ps = mock(ParameterSet.class);
@@ -65,6 +67,11 @@ public class RandomMsgGenerator
         Iv2InitiateTaskMessage msg =
             new Iv2InitiateTaskMessage(0l, 0l, 0l, Long.MIN_VALUE, 0l, readOnly, true, spi,
                     0l, 0l, false);
+        if (binaryLog) {
+            when(spi.getProcName()).thenReturn("@ApplyBinaryLogSP");
+            // dummy end unique id
+            when(ps.getParam(3)).thenReturn(Long.MIN_VALUE);
+        }
         return msg;
     }
 
@@ -87,8 +94,10 @@ public class RandomMsgGenerator
     public TransactionInfoBaseMessage generateRandomMessageInStream()
     {
         if (m_rand.nextDouble() > MPCHANCE) {
-            boolean readOnly = (m_rand.nextDouble() < READCHANCE);
-            Iv2InitiateTaskMessage msg = makeIv2InitiateTaskMsg(readOnly);
+            double type = m_rand.nextDouble();
+            boolean readOnly = (type < READCHANCE);
+            boolean binaryLog = (!readOnly && type < BINARYLOGCHANCE);
+            Iv2InitiateTaskMessage msg = makeIv2InitiateTaskMsg(readOnly, binaryLog);
             return msg;
         }
         else if (!m_mpInProgress) {

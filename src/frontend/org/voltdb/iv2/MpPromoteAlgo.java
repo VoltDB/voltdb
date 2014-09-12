@@ -26,7 +26,6 @@ import java.util.Map.Entry;
 import java.util.TreeSet;
 import java.util.concurrent.Future;
 
-import com.google_voltpatches.common.util.concurrent.SettableFuture;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
@@ -37,6 +36,8 @@ import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
+
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 public class MpPromoteAlgo implements RepairAlgo
 {
@@ -52,7 +53,7 @@ public class MpPromoteAlgo implements RepairAlgo
     private Pair<Long, byte[]> m_newestHashinatorConfig = Pair.of(Long.MIN_VALUE,new byte[0]);
     // Each Term can process at most one promotion; if promotion fails, make
     // a new Term and try again (if that's your big plan...)
-    private final SettableFuture<Pair<Long, Long>> m_promotionResult = SettableFuture.create();
+    private final SettableFuture<RepairResult> m_promotionResult = SettableFuture.create();
 
     long getRequestId()
     {
@@ -118,7 +119,7 @@ public class MpPromoteAlgo implements RepairAlgo
     }
 
     @Override
-    public Future<Pair<Long, Long>> start()
+    public Future<RepairResult> start()
     {
         try {
             prepareForFaultRecovery();
@@ -253,7 +254,7 @@ public class MpPromoteAlgo implements RepairAlgo
             m_mailbox.repairReplicasWith(m_survivors, repairMsg);
         }
 
-        m_promotionResult.set(Pair.of(m_maxSeenTxnId, m_maxSeenUniqueId));
+        m_promotionResult.set(new RepairResult(m_maxSeenTxnId, m_maxSeenUniqueId, Long.MIN_VALUE));
     }
 
     //
