@@ -23,7 +23,7 @@ import static com.google_voltpatches.common.collect.CollectPreconditions.checkRe
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.annotations.GwtIncompatible;
-import com.google_voltpatches.common.base.Objects;
+import com.google_voltpatches.common.base.MoreObjects;
 import com.google_voltpatches.common.primitives.Ints;
 
 import java.io.IOException;
@@ -899,7 +899,7 @@ public final class TreeMultiset<E> extends AbstractSortedMultiset<E> implements 
     @Nullable private AvlNode<E> ceiling(Comparator<? super E> comparator, E e) {
       int cmp = comparator.compare(e, elem);
       if (cmp < 0) {
-        return (left == null) ? this : Objects.firstNonNull(left.ceiling(comparator, e), this);
+        return (left == null) ? this : MoreObjects.firstNonNull(left.ceiling(comparator, e), this);
       } else if (cmp == 0) {
         return this;
       } else {
@@ -910,7 +910,7 @@ public final class TreeMultiset<E> extends AbstractSortedMultiset<E> implements 
     @Nullable private AvlNode<E> floor(Comparator<? super E> comparator, E e) {
       int cmp = comparator.compare(e, elem);
       if (cmp > 0) {
-        return (right == null) ? this : Objects.firstNonNull(right.floor(comparator, e), this);
+        return (right == null) ? this : MoreObjects.firstNonNull(right.floor(comparator, e), this);
       } else if (cmp == 0) {
         return this;
       } else {

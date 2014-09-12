@@ -16,12 +16,12 @@
 
 package com.google_voltpatches.common.collect;
 
-import static com.google_voltpatches.common.base.Objects.firstNonNull;
 import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 import static java.util.Arrays.asList;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.annotations.GwtIncompatible;
+import com.google_voltpatches.common.base.MoreObjects;
 
 import java.io.IOException;
 import java.io.InvalidObjectException;
@@ -357,7 +357,7 @@ public class ImmutableSetMultimap<K, V>
   @Override public ImmutableSet<V> get(@Nullable K key) {
     // This cast is safe as its type is known in constructor.
     ImmutableSet<V> set = (ImmutableSet<V>) map.get(key);
-    return firstNonNull(set, emptySet);
+    return MoreObjects.firstNonNull(set, emptySet);
   }
 
   private transient ImmutableSetMultimap<V, K> inverse;

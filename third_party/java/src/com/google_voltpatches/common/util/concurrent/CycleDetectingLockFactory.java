@@ -16,11 +16,11 @@
 
 package com.google_voltpatches.common.util.concurrent;
 
-import static com.google_voltpatches.common.base.Objects.firstNonNull;
 import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
 import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.annotations.VisibleForTesting;
+import com.google_voltpatches.common.base.MoreObjects;
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Lists;
@@ -312,7 +312,7 @@ public class CycleDetectingLockFactory {
     }
     Map<? extends Enum, LockGraphNode> created = createNodes(clazz);
     existing = lockGraphNodesPerType.putIfAbsent(clazz, created);
-    return firstNonNull(existing, created);
+    return MoreObjects.firstNonNull(existing, created);
   }
 
   /**

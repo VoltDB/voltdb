@@ -24,7 +24,7 @@ import static com.google_voltpatches.common.base.Predicates.not;
 
 import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.annotations.GwtIncompatible;
-import com.google_voltpatches.common.base.Objects;
+import com.google_voltpatches.common.base.MoreObjects;
 import com.google_voltpatches.common.base.Predicate;
 
 import java.util.AbstractMap;
@@ -529,9 +529,8 @@ public final class TreeRangeMap<K extends Comparable, V> implements RangeMap<K, 
             if (subRange.isEmpty()) {
               return Iterators.emptyIterator();
             }
-            Cut<K> cutToStart = Objects.firstNonNull(
-                entriesByLowerBound.floorKey(subRange.lowerBound),
-                subRange.lowerBound);
+            Cut<K> cutToStart = MoreObjects.firstNonNull(
+                entriesByLowerBound.floorKey(subRange.lowerBound), subRange.lowerBound);
             final Iterator<RangeMapEntry<K, V>> backingItr = 
                 entriesByLowerBound.tailMap(cutToStart, true).values().iterator();
             return new AbstractIterator<Entry<Range<K>, V>>() {
