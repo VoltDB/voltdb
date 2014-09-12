@@ -1191,11 +1191,12 @@ size_t PersistentTable::hashCode() {
         pkeyIndex->addEntry(&tuple);
     }
 
-    pkeyIndex->moveToEnd(true);
+    IndexCursor indexCursor(pkeyIndex->getTupleSchema());
+    pkeyIndex->moveToEnd(true, indexCursor);
 
     size_t hashCode = 0;
     while (true) {
-         tuple = pkeyIndex->nextValue();
+         tuple = pkeyIndex->nextValue(indexCursor);
          if (tuple.isNullTuple()) {
              break;
          }
