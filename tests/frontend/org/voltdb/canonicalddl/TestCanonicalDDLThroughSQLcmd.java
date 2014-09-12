@@ -110,6 +110,7 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
 
         String roundtripDDL;
 
+        assert(firstCanonicalDDL != null);
         assertTrue(callSQLcmd(firstCanonicalDDL));
         roundtripDDL = getDDLFromHTTP(httpdPort);
         // IZZY: we force single statement SQL keywords to lower case, it seems
@@ -127,9 +128,16 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
         f.deleteOnExit();
         FileOutputStream fos = new FileOutputStream(f);
         fos.write(ddl.getBytes());
+        fos.close();
+
+        File out = new File("out.log");
+
+        File error = new File("error.log");
 
         ProcessBuilder pb = new ProcessBuilder("bin/sqlcmd");
         pb.redirectInput(f);
+        pb.redirectOutput(out);
+        pb.redirectError(error);
         Process process = pb.start();
 
         // Set timeout to 1 minute
@@ -150,12 +158,7 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
             }
         }
 
-        if(exitValue == 0) {
-            return true;
-        }
-        else {
-            return false;
-        }
+        return (exitValue == 0);
     }
 
     public String getDDLFromHTTP(int httpdPort) throws Exception {
