@@ -923,11 +923,11 @@ public class SnapshotSiteProcessor {
                  * Check that the sequence number is the same everywhere and log if it isn't.
                  * Not going to crash because we are worried about poison pill transactions.
                  */
-                if (dcUniqueIdMap.has(partitionIdString)) {
-                    long existingEntry = dcUniqueIdMap.getLong(partitionIdString);
-                    dcUniqueIdMap.put(partitionIdString, Math.max(existingEntry, lastSeenUniqueIdLong));
+                if (lastSeenUniqueIds.has(partitionIdString)) {
+                    long existingEntry = lastSeenUniqueIds.getLong(partitionIdString);
+                    lastSeenUniqueIds.put(partitionIdString, Math.max(existingEntry, lastSeenUniqueIdLong));
                 } else {
-                    dcUniqueIdMap.put(partitionIdString, lastSeenUniqueIdLong);
+                    lastSeenUniqueIds.put(partitionIdString, lastSeenUniqueIdLong.longValue());
                 }
             }
         }
