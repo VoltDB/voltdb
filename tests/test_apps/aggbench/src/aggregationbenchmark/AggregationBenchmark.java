@@ -70,6 +70,9 @@ public class AggregationBenchmark {
         @Option(desc = "Restore the data from snapshot or not.")
         int restore = 0;
         
+        @Option(desc = "Snapshot path.")
+        String snapshotpath = "";
+
         @Option(desc = "Stored procedure number ( an integer from 1 to 20 )")
         int proc = 1;
 
@@ -167,12 +170,14 @@ public class AggregationBenchmark {
         connections.await();
     }
     
-    void restoreDatabase() {
-    	try {
-    		client.callProcedure("@SnapshotRestore", "/tmp/xin/", "TestBackup");
-    	} catch (Exception ex) {
-    		ex.printStackTrace();
-    	}
+    void restoreDatabase() throws Exception {
+        ClientResponse resp = null;
+        try {
+            resp = client.callProcedure("@SnapshotRestore", config.snapshotpath, "TestBackupAggBench");
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            System.exit(-1);
+        }
     }
     
     /**
