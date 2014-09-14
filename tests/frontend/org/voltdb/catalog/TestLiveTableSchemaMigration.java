@@ -38,6 +38,8 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -285,21 +287,52 @@ public class TestLiveTableSchemaMigration extends TestCase {
         // drop a column
         migrateSchema("FOO (A:BIGINT, B:TINYINT, C:INTEGER)", "FOO (B:SMALLINT, C:INTEGER)");
 
-        // change partitioning on an empty table - does not work yet
-        //migrateSchema("FOO (A:INTEGER-N, B:TINYINT) P(A)", "FOO (A:INTEGER-N, B:TINYINT)", false);
+        // change partitioning to replicated with data should fail
+        try {
+            migrateSchema("FOO (A:INTEGER-N, B:TINYINT) P(A)", "FOO (A:INTEGER-N, B:TINYINT)");
+            fail();
+        }
+        catch (ProcCallException e) {
+            ClientResponseImpl cri = (ClientResponseImpl) e.getClientResponse();
+            assertEquals(cri.getStatus(), ClientResponse.GRACEFUL_FAILURE);
+            assertTrue(cri.getStatusString().contains("Unable to change"));
+        }
+        catch (Exception e) {
+            fail("Expected ProcCallException but got: " + e);
+        }
+
+        // change partition key with data should fail
+        try {
+            migrateSchema("FOO (A:INTEGER-N, B:TINYINT-N) P(A)", "FOO (A:INTEGER-N, B:TINYINT-N) P(B)");
+            fail();
+        }
+        catch (ProcCallException e) {
+            ClientResponseImpl cri = (ClientResponseImpl) e.getClientResponse();
+            assertEquals(cri.getStatus(), ClientResponse.GRACEFUL_FAILURE);
+            assertTrue(cri.getStatusString().contains("Unable to change"));
+        }
+        catch (Exception e) {
+            fail("Expected ProcCallException but got: " + e);
+        }
     }
 
     public void testFixedSchemasNoData() throws Exception {
-        migrateSchema("FOO (A:INTEGER, B:TINYINT)", "FOO (A:INTEGER, B:TINYINT)");
+        migrateSchema("FOO (A:INTEGER, B:TINYINT)", "FOO (A:INTEGER, B:TINYINT)", false);
+
+        // change partitioned to replicated on an empty table
+        migrateSchema("FOO (A:INTEGER-N, B:TINYINT) P(A)", "FOO (A:INTEGER-N, B:TINYINT)", false);
+
+        // change partition key on an empty table
+        migrateSchema("FOO (A:INTEGER-N, B:TINYINT-N) P(A)", "FOO (A:INTEGER-N, B:TINYINT-N) P(B)", false);
     }
 
-    /**
-     * Create and mutate a bunch of random schemas and data in java,
-     * then compare the mutated results with a schema change in the EE.
-     *
-     * The number of times the loop is run can be changed to make the test
-     * better at the cost of runtime.
-     */
+    //
+    // Create and mutate a bunch of random schemas and data in java,
+    // then compare the mutated results with a schema change in the EE.
+    //
+    // The number of times the loop is run can be changed to make the test
+    // better at the cost of runtime.
+    //
     public void testRandomSchemas() throws Exception {
         int count = 15;
         Random rand = new Random(0);

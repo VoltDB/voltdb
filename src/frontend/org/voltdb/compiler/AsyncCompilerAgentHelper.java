@@ -48,6 +48,7 @@ public class AsyncCompilerAgentHelper
         retval.invocationType = work.invocationType;
         retval.originalTxnId = work.originalTxnId;
         retval.originalUniqueId = work.originalUniqueId;
+        retval.tablesThatMustBeEmpty = new String[0]; // ensure non-null
 
         try {
             // catalog change specific boiler plate
@@ -192,6 +193,8 @@ public class AsyncCompilerAgentHelper
 
             // since diff commands can be stupidly big, compress them here
             retval.encodedDiffCommands = Encoder.compressAndBase64Encode(diff.commands());
+            retval.tablesThatMustBeEmpty = diff.tablesThatMustBeEmpty();
+            retval.reasonsForEmptyTables = diff.reasonsWhyTablesMustBeEmpty();
             retval.requiresSnapshotIsolation = diff.requiresSnapshotIsolation();
             retval.worksWithElastic = diff.worksWithElastic();
         }

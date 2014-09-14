@@ -449,10 +449,13 @@ public class SocketJoiner {
 
         if (remoteVersionString.equals(localVersionString)) {
             if (localBuildString.equals(remoteBuildString) == false) {
-                VoltDB.crashLocalVoltDB("For VoltDB version " + localVersionString +
-                        " git tag/hash is not identical across the cluster. Node join failed.\n" +
-                        "  joining build string:  " + localBuildString + "\n" +
-                        "  existing build string: " + remoteBuildString, false, null);
+                // ignore test/eclipse build string so tests still work
+                if (!localBuildString.equals("VoltDB") && !remoteBuildString.equals("VoltDB")) {
+                    VoltDB.crashLocalVoltDB("For VoltDB version " + localVersionString +
+                            " git tag/hash is not identical across the cluster. Node join failed.\n" +
+                            "  joining build string:  " + localBuildString + "\n" +
+                            "  existing build string: " + remoteBuildString, false, null);
+                }
             }
         }
         else if (!remoteAcceptsLocalVersion) {
