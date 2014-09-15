@@ -65,10 +65,10 @@ public class TestVoltXMLElement extends TestCase {
         second.attributes.put("added", "addedval");
         second.attributes.put("changes", "newvalue");
         second.children.add(new VoltXMLElement("addedchild"));
-        second.children.remove(second.findChild("deletedchild"));
-        second.findChild("changedchild1").attributes.remove("deleteme");
-        VoltXMLElement temp = second.findChild("changedchild2").findChild("changedgrandchild");
-        temp.children.remove(temp.findChild("doomeddescendent"));
+        second.children.remove(second.findChild("deletedchilddefault"));
+        second.findChild("changedchild1default").attributes.remove("deleteme");
+        VoltXMLElement temp = second.findChild("changedchild2default").findChild("changedgrandchilddefault");
+        temp.children.remove(temp.findChild("doomeddescendentdefault"));
 
         VoltXMLDiff diff = VoltXMLElement.computeDiff(first, second);
 
@@ -96,13 +96,13 @@ public class TestVoltXMLElement extends TestCase {
 
         Map<String, VoltXMLDiff> changed = diff.getChangedNodes();
         assertEquals(2, changed.size());
-        assertTrue(changed.containsKey("changedchild1"));
-        VoltXMLDiff child1 = changed.get("changedchild1");
+        assertTrue(changed.containsKey("changedchild1default"));
+        VoltXMLDiff child1 = changed.get("changedchild1default");
         assertTrue(child1.getRemovedAttributes().contains("deleteme"));
-        assertTrue(changed.containsKey("changedchild2"));
-        VoltXMLDiff child2 = changed.get("changedchild2");
-        assertTrue(child2.getChangedNodes().containsKey("changedgrandchild"));
-        VoltXMLDiff grandchild = child2.getChangedNodes().get("changedgrandchild");
+        assertTrue(changed.containsKey("changedchild2default"));
+        VoltXMLDiff child2 = changed.get("changedchild2default");
+        assertTrue(child2.getChangedNodes().containsKey("changedgrandchilddefault"));
+        VoltXMLDiff grandchild = child2.getChangedNodes().get("changedgrandchilddefault");
         assertTrue(findNamedNode(grandchild.getRemovedNodes(), "doomeddescendent") != null);
 
         VoltXMLElement third = first.duplicate();
