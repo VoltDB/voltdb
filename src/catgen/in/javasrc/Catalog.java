@@ -186,10 +186,6 @@ public class Catalog extends CatalogType {
         return parent.getCollection(collection).get(name);
     }
 
-    void registerGlobally(CatalogType x) {
-        m_pathCache.put(x.getCatalogPath(), x);
-    }
-
     /**
      * Serialize the catalog to a string representation. This actually
      * creates a set of catalog commands which, re-run in order on an

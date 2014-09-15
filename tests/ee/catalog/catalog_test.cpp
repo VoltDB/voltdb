@@ -54,9 +54,6 @@
 #include "catalog/catalog.h"
 #include "catalog/cluster.h"
 #include "catalog/database.h"
-#include "catalog/procedure.h"
-#include "catalog/statement.h"
-#include "catalog/stmtparameter.h"
 
 using namespace catalog;
 using namespace std;

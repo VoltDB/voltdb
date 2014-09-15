@@ -301,8 +301,6 @@ public abstract class CatalogType implements Comparable<CatalogType> {
 
         copyFields(copy);
 
-        catalog.registerGlobally(copy);
-
         return copy;
     }
 

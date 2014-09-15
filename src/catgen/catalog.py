@@ -58,7 +58,7 @@ def javaobjectify( x ):
     elif x[-1] == '?': return x.rstrip('?')
     else: raise Exception( 'bad type: ' + x )
 
-def genjava( classes, prepath, postpath, package ):
+def genjava( classes, javaOnlyClasses, prepath, postpath, package ):
     ##########
     # SETUP
     ##########
@@ -288,7 +288,7 @@ def cpptypify( x ):
     elif x[-1] == '?': return 'CatalogType*'
     else: raise Exception( 'bad type: ' + x )
 
-def gencpp( classes, prepath, postpath ):
+def gencpp( classes, javaOnlyClasses, prepath, postpath ):
     ##########
     # SETUP
     ##########
@@ -304,10 +304,22 @@ def gencpp( classes, prepath, postpath ):
     # WRITE THE SOURCE FILES
     ##########
     for cls in reversed( classes ):
+        # skip classes that don't need to be in c++
+        if not cls.hasEE:
+            continue
+
         clsname = cls.name
 
-        referencedClasses = []
+        actualFields = []
         for field in cls.fields:
+            classType = field.type[:-1]
+            if (field.type[-1] == "*") or (field.type[-1] == '?'):
+                if classType in javaOnlyClasses:
+                    continue
+            actualFields.append(field)
+
+        referencedClasses = []
+        for field in actualFields:
             classType = field.type[:-1]
             if (field.type[-1] == "*") or (field.type[-1] == '?'):
                 if classType not in referencedClasses:
@@ -352,7 +364,7 @@ def gencpp( classes, prepath, postpath ):
         write( '    ' + clsname + '(Catalog * catalog, CatalogType * parent, const std::string &path, const std::string &name);' )
 
         # Field Member variables.
-        for field in cls.fields:
+        for field in actualFields:
             ftype = cpptypify( field.type )
             privname = 'm_' + field.name
             write( interp( '    $ftype $privname;', locals() ) )
@@ -376,7 +388,7 @@ def gencpp( classes, prepath, postpath ):
         write('    ~' + clsname + '();\n');
 
         # getter methods
-        for field in cls.fields:
+        for field in actualFields:
             ftype = cpptypify( field.type )
             privname = 'm_' + field.name
             pubname = field.name
@@ -411,7 +423,7 @@ def gencpp( classes, prepath, postpath ):
         write ( '#include <cassert>' )
         write ( interp( '#include "$filename.h"', locals() ) )
         write ( '#include "catalog.h"' )
-        otherhdrs = ['#include "%s.h"' % field.type[:-1].lower() for field in cls.fields if field.type[-1] in ['*', '?'] ]
+        otherhdrs = ['#include "%s.h"' % field.type[:-1].lower() for field in actualFields if field.type[-1] in ['*', '?'] ]
         uniques = {}
         for hdr in otherhdrs:
             uniques[hdr] = hdr
@@ -421,20 +433,20 @@ def gencpp( classes, prepath, postpath ):
         write ( 'using namespace std;\n' )
 
         # write the constructor
-        mapcons = ["m_%s(catalog)" % field.name for field in cls.fields if field.type[-1] == '*']
+        mapcons = ["m_%s(catalog)" % field.name for field in actualFields if field.type[-1] == '*']
         write ( interp( '$clsname::$clsname(Catalog *catalog, CatalogType *parent, const string &path, const string &name)', locals() ) )
         comma = ''
         if len(mapcons): comma = ','
         write ( interp( ': CatalogType(catalog, parent, path, name)$comma', locals()))
 
-        mapcons = ["m_%s(catalog, this, path + \"/\" + \"%s\")" % (field.name, field.name) for field in cls.fields if field.type[-1] == '*']
+        mapcons = ["m_%s(catalog, this, path + \"/\" + \"%s\")" % (field.name, field.name) for field in actualFields if field.type[-1] == '*']
         if len(mapcons) > 0:
             write( "  " + ", ".join(mapcons))
         write('{')
 
         # init the fields and childCollections
         write( '    CatalogValue value;' )
-        for field in cls.fields:
+        for field in actualFields:
             ftype = cpptypify( field.type )
             privname = 'm_' + field.name
             pubname = field.name
@@ -446,7 +458,7 @@ def gencpp( classes, prepath, postpath ):
 
         # write the destructor
         write(clsname + '::~' + clsname + '() {');
-        for field in cls.fields:
+        for field in actualFields:
             if field.type[-1] == '*':
                 ftype = field.type.rstrip('*')
                 itr = ftype.lower() + '_iter'
@@ -462,7 +474,7 @@ def gencpp( classes, prepath, postpath ):
 
         # write update()
         write ( interp( 'void $clsname::update() {', locals() ) )
-        for field in cls.fields:
+        for field in actualFields:
             ftype = cpptypify( field.type )
             privname = 'm_' + field.name
             pubname = field.name
@@ -478,7 +490,7 @@ def gencpp( classes, prepath, postpath ):
 
         # write add(...)
         write ( interp( 'CatalogType * $clsname::addChild(const std::string &collectionName, const std::string &childName) {', locals() ) )
-        for field in cls.fields:
+        for field in actualFields:
             if field.type[-1] == "*":
                 privname = 'm_' + field.name
                 pubname = field.name
@@ -490,7 +502,7 @@ def gencpp( classes, prepath, postpath ):
 
         # write getChild(...)
         write ( interp( 'CatalogType * $clsname::getChild(const std::string &collectionName, const std::string &childName) const {', locals() ) )
-        for field in cls.fields:
+        for field in actualFields:
             if field.type[-1] == "*":
                 privname = 'm_' + field.name
                 pubname = field.name
@@ -501,7 +513,7 @@ def gencpp( classes, prepath, postpath ):
         # write removeChild(...)
         write ( interp( 'bool $clsname::removeChild(const std::string &collectionName, const std::string &childName) {', locals() ) )
         write ( interp( '    assert (m_childCollections.find(collectionName) != m_childCollections.end());', locals() ) )
-        for field in cls.fields:
+        for field in actualFields:
             if field.type[-1] == "*":
                 privname = 'm_' + field.name
                 pubname = field.name
@@ -512,7 +524,7 @@ def gencpp( classes, prepath, postpath ):
         write ( '}\n' )
 
         # write field getters
-        for field in cls.fields:
+        for field in actualFields:
             ftype = cpptypify( field.type )
             privname = 'm_' + field.name
             pubname = field.name
@@ -539,8 +551,8 @@ def main():
     java_prepath = 'in/javasrc'
     java_postpath = 'out/javasrc'
     f =  file( specpath )
-    classes = parse( f.read() )
-    genjava( classes, java_prepath, java_postpath, javapkg )
-    gencpp( classes, cpp_prepath, cpp_postpath )
+    classes, javaOnlyClasses = parse( f.read() )
+    genjava( classes, javaOnlyClasses, java_prepath, java_postpath, javapkg )
+    gencpp( classes, javaOnlyClasses, cpp_prepath, cpp_postpath )
 
 main()

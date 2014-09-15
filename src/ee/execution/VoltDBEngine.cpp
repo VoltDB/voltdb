@@ -54,8 +54,6 @@
 #include "catalog/database.h"
 #include "catalog/index.h"
 #include "catalog/materializedviewinfo.h"
-#include "catalog/procedure.h"
-#include "catalog/statement.h"
 #include "catalog/table.h"
 #include "common/ElasticHashinator.h"
 #include "common/executorcontext.hpp"

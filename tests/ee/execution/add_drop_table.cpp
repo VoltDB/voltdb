@@ -461,45 +461,6 @@ TEST_F(AddDropTableTest, StatsWithDropTable)
     ASSERT_TRUE(statresult == 1);
 }
 
-/*
- * Test on engine.
- * Remove a non-existent table.
- */
-TEST_F(AddDropTableTest, BadDropTable)
-{
-    bool result;
-    result = m_engine->updateCatalog( 0, tableACmds());
-    ASSERT_TRUE(result);
-
-    try {
-        result = m_engine->updateCatalog( 1, tableBDeleteCmd());
-        ASSERT_TRUE(false);
-    }
-    catch (SerializableEEException ex) {
-        ASSERT_TRUE(true);
-    }
-}
-
-/*
- * Test on engine.
- * Add a table twice.
- */
-TEST_F(AddDropTableTest, BadAddTable)
-{
-    bool result;
-    result = m_engine->updateCatalog( 0, tableACmds());
-    ASSERT_TRUE(result);
-
-    try {
-        result = m_engine->updateCatalog( 1, tableACmds());
-        ASSERT_TRUE(false);
-    }
-    catch (SerializableEEException ex) {
-        ASSERT_TRUE(true);
-    }
-}
-
-
 int main() {
     return TestSuite::globalInstance()->runAll();
 }
