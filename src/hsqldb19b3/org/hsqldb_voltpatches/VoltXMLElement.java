@@ -46,8 +46,12 @@ public class VoltXMLElement {
         return this;
     }
 
-    public String getRealName() {
-        return attributes.get("name");
+    public String getUniqueName() {
+        String nameAttribute = "default";
+        if (attributes.containsKey("name")) {
+            nameAttribute = attributes.get("name");
+        }
+        return name + nameAttribute;
     }
 
     @Override
@@ -82,10 +86,11 @@ public class VoltXMLElement {
         return retval;
     }
 
-    public VoltXMLElement findChild(String name)
+    // Takes the unique name
+    public VoltXMLElement findChild(String uniqueName)
     {
         for (VoltXMLElement vxe : children) {
-            if (name.equals(vxe.name)) {
+            if (uniqueName.equals(vxe.getUniqueName())) {
                 return vxe;
             }
         }
@@ -127,10 +132,9 @@ public class VoltXMLElement {
         Set<String> m_removedAttributes = new HashSet<String>();
         Map<String, String> m_changedAttributes = new HashMap<String, String>();
 
+        // Takes the VoltXMLElement unique name
         public VoltXMLDiff(String name)
         {
-            // May need to change this to the toMinString() result for the VoltXMLElement
-            // it matches instead
             m_name = name;
         }
 
@@ -201,12 +205,12 @@ public class VoltXMLElement {
     static public VoltXMLDiff computeDiff(VoltXMLElement first, VoltXMLElement second)
     {
         // Top level call needs both names to match (I think this makes sense)
-        if (!first.name.equals(second.name)) {
+        if (!first.getUniqueName().equals(second.getUniqueName())) {
             // not sure this is best behavior, ponder as progress is made
             return null;
         }
 
-        VoltXMLDiff result = new VoltXMLDiff(first.name);
+        VoltXMLDiff result = new VoltXMLDiff(first.getUniqueName());
         // first, check the attributes
         Set<String> firstKeys = first.attributes.keySet();
         Set<String> secondKeys = new HashSet<String>();
@@ -234,30 +238,31 @@ public class VoltXMLElement {
         // Lists.
         Set<String> firstChildren = new HashSet<String>();
         for (VoltXMLElement child : first.children) {
-            firstChildren.add(child.name);
+            firstChildren.add(child.getUniqueName());
         }
         Set<String> secondChildren = new HashSet<String>();
         for (VoltXMLElement child : second.children) {
-            secondChildren.add(child.name);
+            secondChildren.add(child.getUniqueName());
         }
         Set<String> commonNames = new HashSet<String>();
         for (VoltXMLElement firstChild : first.children) {
-            if (!secondChildren.contains(firstChild.name)) {
+            if (!secondChildren.contains(firstChild.getUniqueName())) {
                 result.m_removedNodes.add(firstChild);
             }
             else {
-                commonNames.add(firstChild.name);
+                commonNames.add(firstChild.getUniqueName());
             }
         }
         for (VoltXMLElement secondChild : second.children) {
-            if (!firstChildren.contains(secondChild.name)) {
+            if (!firstChildren.contains(secondChild.getUniqueName())) {
                 result.m_addedNodes.add(secondChild);
             }
             else {
-                assert(commonNames.contains(secondChild.name));
+                assert(commonNames.contains(secondChild.getUniqueName()));
             }
         }
 
+        // This set contains uniquenames
         for (String name : commonNames) {
             VoltXMLDiff childDiff = computeDiff(first.findChild(name), second.findChild(name));
             if (!childDiff.isEmpty()) {
@@ -271,7 +276,7 @@ public class VoltXMLElement {
     public boolean applyDiff(VoltXMLDiff diff)
     {
         // Can only apply a diff to the root at which it was generated
-        assert(name.equals(diff.m_name));
+        assert(getUniqueName().equals(diff.m_name));
 
         // Do the attribute changes
         attributes.putAll(diff.getAddedAttributes());
@@ -284,7 +289,7 @@ public class VoltXMLElement {
 
         // Do the node removals and additions
         for (VoltXMLElement e : diff.getRemovedNodes()) {
-            children.remove(findChild(e.name));
+            children.remove(findChild(e.getUniqueName()));
         }
         for (VoltXMLElement e : diff.getAddedNodes()) {
             children.add(e);
