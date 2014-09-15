@@ -56,7 +56,7 @@ import org.voltdb.client.ClientResponse;
  * maxerror and additional errors may occur. Only first maxerror indicated errors will be reported.
  *
  */
-public class CSVLoader implements CSVLoaderErrorHandler {
+public class CSVLoader implements BulkLoaderErrorHandler {
 
     /**
      * Path of invalid row file that will be created.
@@ -179,7 +179,7 @@ public class CSVLoader implements CSVLoaderErrorHandler {
     }
 
     @Override
-    public boolean handleError(CSVLineWithMetaData metaData, ClientResponse response, String error) {
+    public boolean handleError(RowWithMetaData metaData, ClientResponse response, String error) {
         synchronized (m_errorInfo) {
             //Dont collect more than we want to report.
             if (m_errorCount + m_errorInfo.size() >= config.maxerrors) {

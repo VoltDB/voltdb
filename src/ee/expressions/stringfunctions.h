@@ -450,12 +450,22 @@ template<> inline NValue NValue::call<FUNC_SUBSTRING_CHAR>(const std::vector<NVa
     const int32_t valueUTF8Length = strValue.getObjectLength_withoutNull();
     const char *valueChars = reinterpret_cast<char*>(strValue.getObjectValue_withoutNull());
     const char *valueEnd = valueChars+valueUTF8Length;
-    int64_t start = std::max(startArg.castAsBigIntAndGetValue(), static_cast<int64_t>(1L));
+    int64_t start = startArg.castAsBigIntAndGetValue();
     int64_t length = lengthArg.castAsBigIntAndGetValue();
     if (length < 0) {
         char message[128];
         snprintf(message, 128, "data exception -- substring error, negative length argument %ld", (long)length);
-        throw SQLException( SQLException::data_exception_numeric_value_out_of_range, message);
+        throw SQLException(SQLException::data_exception_numeric_value_out_of_range, message);
+    }
+    if (start < 1) {
+        // According to the standard, START < 1 effectively moves the end point based on (LENGTH + START)
+        // to the left while fixing the start point at 1.
+        length += (start - 1); // This moves endChar in.
+        start = 1;
+        if (length < 0) {
+            // The standard considers this a 0-length result -- not a substring error.
+            length = 0;
+        }
     }
     UTF8Iterator iter(valueChars, valueEnd);
     const char* startChar = iter.skipCodePoints(start-1);

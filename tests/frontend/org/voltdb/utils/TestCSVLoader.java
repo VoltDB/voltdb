@@ -818,6 +818,7 @@ public class TestCSVLoader {
                 invalidlinecnt = Integer.parseInt(num.replaceAll("\\s",""));
             }
         }
+        csvreport.close();
         System.out.println(String.format("The rows infected: (%d,%s)", lineCount, rowct));
         assertEquals(lineCount, rowct);
         //assert validLineCnt specified equals the successfully inserted lineCount

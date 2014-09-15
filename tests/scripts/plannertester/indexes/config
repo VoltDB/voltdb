@@ -1,5 +1,5 @@
 DDL:
-../../frontend/org/voltdb_testprocs/regressionsuites/indexes/indexes-ddl.sql
+../../testprocs/org/voltdb_testprocs/regressionsuites/indexes/indexes-ddl.sql
 
 SQL:
 select * from P3 T where T.NUM > 100;

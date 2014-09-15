@@ -16,8 +16,8 @@
 
 package com.google_voltpatches.common.collect;
 
-import static com.google_voltpatches.common.base.Preconditions.checkArgument;
 import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
+import static com.google_voltpatches.common.collect.CollectPreconditions.checkNonnegative;
 import static com.google_voltpatches.common.collect.ObjectArrays.checkElementsNotNull;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
@@ -61,7 +61,7 @@ public abstract class ImmutableCollection<E> extends AbstractCollection<E>
     if (size == 0) {
       return ObjectArrays.EMPTY_ARRAY;
     }
-    Object[] result = new Object[size()];
+    Object[] result = new Object[size];
     copyIntoArray(result, 0);
     return result;
   }
@@ -318,7 +318,7 @@ public abstract class ImmutableCollection<E> extends AbstractCollection<E>
     int size;
     
     ArrayBasedBuilder(int initialCapacity) {
-      checkArgument(initialCapacity >= 0, "capacity must be >= 0 but was %s", initialCapacity);
+      checkNonnegative(initialCapacity, "initialCapacity");
       this.contents = new Object[initialCapacity];
       this.size = 0;
     }

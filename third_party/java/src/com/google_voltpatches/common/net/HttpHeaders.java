@@ -29,6 +29,7 @@ import com.google_voltpatches.common.annotations.GwtCompatible;
  * <li><a href="http://www.ietf.org/rfc/rfc5988.txt">RFC 5988</a>
  * </ul>
  *
+ *
  * @author Kurt Alfred Kluever
  * @since 11.0
  */
@@ -77,6 +78,13 @@ public final class HttpHeaders {
   public static final String EXPECT = "Expect";
   /** The HTTP {@code From} header field name. */
   public static final String FROM = "From";
+  /**
+   * The HTTP {@code Follow-Only-When-Prerender-Shown}</a> header field name.
+   *
+   * @since 17.0
+   */
+  @Beta
+  public static final String FOLLOW_ONLY_WHEN_PRERENDER_SHOWN = "Follow-Only-When-Prerender-Shown";
   /** The HTTP {@code Host} header field name. */
   public static final String HOST = "Host";
   /** The HTTP {@code If-Match} header field name. */

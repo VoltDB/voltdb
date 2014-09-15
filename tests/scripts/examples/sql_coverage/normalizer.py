@@ -36,6 +36,16 @@ from voltdbclient import FastSerializer
 
 from SQLCoverageReport import generate_html_reports
 
+# the compare function which can handle None
+def mycmp(x, y):
+    if x is None:
+        if y is None:
+            return 0
+        return -1
+    if y is None:
+        return 1
+    return cmp(x, y)
+
 # lame, but it matches at least up to 6 ORDER BY columns
 __EXPR = re.compile(r"ORDER BY\s(\w+\.(?P<column_1>\w+)(\s+\w+)?)"
                     r"(,\s+\w+\.(?P<column_2>\w+)(\s+\w+)?)?"
@@ -53,7 +63,7 @@ __NULL = {FastSerializer.VOLTTYPE_TINYINT: FastSerializer.NULL_TINYINT_INDICATOR
           FastSerializer.VOLTTYPE_FLOAT: FastSerializer.NULL_FLOAT_INDICATOR,
           FastSerializer.VOLTTYPE_STRING: FastSerializer.NULL_STRING_INDICATOR}
 
-SIGNIFICANT_DIGITS = 13
+SIGNIFICANT_DIGITS = 12
 
 def normalize_value(v, vtype):
     global __NULL
@@ -126,18 +136,18 @@ def sort(l, sorted_cols):
 
     for i in xrange(len(l)):
         if not sorted_cols:
-            l[:] = sorted(l, cmp=cmp, key=key)
+            l[:] = sorted(l, cmp=mycmp, key=key)
             return
 
         tmp = filter_sorted(l[i], sorted_cols)
         if prev != tmp:
             if prev is not None:
                 end = i
-                l[begin:end] = sorted(l[begin:end], cmp=cmp, key=key)
+                l[begin:end] = sorted(l[begin:end], cmp=mycmp, key=key)
             prev = tmp
             begin = i
 
-    l[begin:] = sorted(l[begin:], cmp=cmp, key=key)
+    l[begin:] = sorted(l[begin:], cmp=mycmp, key=key)
 
 def parse_sql(x):
     """Finds if the SQL statement contains ORDER BY command.

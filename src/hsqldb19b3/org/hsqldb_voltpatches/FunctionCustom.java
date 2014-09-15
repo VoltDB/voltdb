@@ -278,6 +278,9 @@ public class FunctionCustom extends FunctionSQL {
                 FunctionSQL function = new FunctionSQL(id);
 
                 function.parseList = tripleParamList;
+                // A VoltDB extension -- to make the third parameter optional
+                function.parseListAlt = doubleParamList;
+                // End of VoltDB extension
 
                 return function;
             }

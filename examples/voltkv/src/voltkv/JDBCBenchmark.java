@@ -57,6 +57,9 @@ public class JDBCBenchmark
     private static final AtomicLongArray PutStoreResults = new AtomicLongArray(2);
     private static final AtomicLongArray PutCompressionResults = new AtomicLongArray(2);
 
+    private static ClientStatsContext periodicStatsContext;
+    private static long benchmarkStartTS;
+
     // Reference to the database connection we will use in them main thread
     private static Connection Con;
 
@@ -210,6 +213,22 @@ public class JDBCBenchmark
         }
     }
 
+    /**
+     * Prints a one line update on performance that can be printed
+     * periodically during a benchmark.
+     */
+    public static synchronized void printStatistics() {
+        ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
+        long time = Math.round((stats.getEndTimestamp() - benchmarkStartTS) / 1000.0);
+
+        System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
+        System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
+        System.out.printf("Aborts/Failures %d/%d, ",
+                stats.getInvocationAborts(), stats.getInvocationErrors());
+        System.out.printf("Avg/95%% Latency %.2f/%.2fms\n", stats.getAverageLatency(),
+                stats.kPercentileLatencyAsDouble(0.95));
+    }
+
     // Application entry point
     public static void main(String[] args)
     {
@@ -249,6 +268,7 @@ public class JDBCBenchmark
 
             // Statistics manager objects from the connection, used to generate latency histogram
             ClientStatsContext fullStatsContext = ((IVoltDBConnection) Con).createStatsContext();
+            periodicStatsContext = ((IVoltDBConnection) Con).createStatsContext();
 
             System.out.println("Connected.  Starting benchmark.");
 
@@ -275,19 +295,18 @@ public class JDBCBenchmark
             }
             // start the stats
             fullStatsContext.fetchAndResetBaseline();
+            periodicStatsContext.fetchAndResetBaseline();
+            benchmarkStartTS = System.currentTimeMillis();
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 
             // Create a Timer task to display performance data on the operating procedures
             Timer timer = new Timer();
-            timer.scheduleAtFixedRate(new TimerTask()
-            {
+            TimerTask statsPrinting = new TimerTask() {
                 @Override
-                public void run()
-                {
-                    try { System.out.print(Con.unwrap(IVoltDBConnection.class).getStatistics("STORE.select", "STORE.upsert")); } catch(Exception x) {}
-                }
-            }
+                public void run() { printStatistics(); }
+            };
+            timer.scheduleAtFixedRate(statsPrinting
             , config.displayinterval*1000l
             , config.displayinterval*1000l
             );
@@ -352,20 +371,6 @@ public class JDBCBenchmark
             + ((double)PutCompressionResults.get(0) + (PutStoreResults.get(0)+PutStoreResults.get(1))*config.keysize)/(134217728d*config.duration)
             );
 
-            // 2. Overall performance statistics for GET/PUT operations
-            System.out.println(
-              "\n\n-------------------------------------------------------------------------------------\n"
-            + " System Statistics\n"
-            + "-------------------------------------------------------------------------------------\n\n");
-            System.out.print(Con.unwrap(IVoltDBConnection.class).getStatistics("STORE.select", "STORE.upsert").toString(false));
-
-            // 3. Per-procedure detailed performance statistics
-            System.out.println(
-              "\n\n-------------------------------------------------------------------------------------\n"
-            + " Detailed Statistics\n"
-            + "-------------------------------------------------------------------------------------\n\n");
-            System.out.print(Con.unwrap(IVoltDBConnection.class).getStatistics().toString(false));
-
             System.out.println(
                     "\n\n-------------------------------------------------------------------------------------\n"
                   + " Client Latency Statistics\n"
@@ -393,7 +398,7 @@ public class JDBCBenchmark
             System.out.println("\n\n" + stats.latencyHistoReport());
 
             // Dump statistics to a CSV file
-            Con.unwrap(IVoltDBConnection.class).saveStatistics(config.statsfile);
+            Con.unwrap(IVoltDBConnection.class).saveStatistics(stats, config.statsfile);
 
             Con.close();
 

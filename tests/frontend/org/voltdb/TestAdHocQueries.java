@@ -348,9 +348,9 @@ public class TestAdHocQueries extends AdHocQueryTester {
         return spResult;
     }
 
-    String m_catalogJar = "adhoc.jar";
-    String m_pathToCatalog = Configuration.getPathToCatalogForTest(m_catalogJar);
-    String m_pathToDeployment = Configuration.getPathToCatalogForTest("adhoc.xml");
+    public static String m_catalogJar = "adhoc.jar";
+    public static String m_pathToCatalog = Configuration.getPathToCatalogForTest(m_catalogJar);
+    public static String m_pathToDeployment = Configuration.getPathToCatalogForTest("adhoc.xml");
 
     @Test
     public void testSimple() throws Exception {
@@ -791,7 +791,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
     /**
      * Test environment with configured schema and server.
      */
-    private static class TestEnv {
+    public static class TestEnv {
 
         final VoltProjectBuilder m_builder;
         LocalCluster m_cluster;

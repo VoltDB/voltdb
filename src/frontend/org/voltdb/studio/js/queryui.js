@@ -48,6 +48,8 @@ function QueryUI(queryTab) {
             // statement with a semicolon.
             // For these other keywords, the usual statement splitting can be easily disabled in special
             // cases:
+            // - Any "select" that occurs in "insert into ... select"
+            //   -- handled with its own more elaborate pattern: insert into <table-identifier> [(<column-list>)] select
             // - Any SQL statement keyword after "explain ".
             // - Any "select " that follows open parentheses (with optional whitespace)
             //   -- these could either be subselects or the select statement arguments to a setop
@@ -63,6 +65,19 @@ function QueryUI(queryTab) {
             // keyword to prevent a statement-splitting semicolon from getting inserted before it.
             // If "explain" on ddl statements (?) (create|partition) is ever supported,
             // add them as options to the $2 suffix keyword pattern.
+            MatchNonBreakingInsertIntoSelect =
+                /(\s*insert\s+into(?=\"|\s)\s*(?:[a-z][a-z0-9_]*|\"(?:[^\"]|\"\")+\")\s*(?:\((?:\"(?:[^\"]|\"\")+\"|[^\")])+\))?[(\s]*)(select)/gim,
+            //   ($1------------------------------------------------------------------------------------------------------------------)($2----)
+            // Note on            (?=\"|\s) :
+            // This subpattern consumes no input itself but ensures that the next
+            // character is either whitespace or a double quote. This is handy
+            // when a keyword is followed by an identifier:
+            //   INSERT INTO"Foo"SELECT ...
+            // HSQL doesn't require whitespace between keywords and quoted
+            // identifiers.
+            // A more detailed explanation of the MatchNonBreakingInsertIntoSelect pattern
+            // can be found in the comments for the functionally identical InsertIntoSelect
+            // variable and related pattern variables in SQLCommand.java.
             MatchNonBreakingCompoundKeywords =
                 /(\s+(?:explain|union|intersect|except|all)\s|(?:\())\s*((?:(?:\s\()*select)|insert|update|delete|truncate)\s+/gim,
             //   ($1------------------------------------------------)   ($2-----------------------------------------------)
@@ -126,13 +141,17 @@ function QueryUI(queryTab) {
             // TODO: drop the following section when semi-colon injection is no longer supported
 
             // Disguise compound keywords temporarily to avoid triggering statement splits.
+            //* Enable this to debug in the browser */ console.log("pre-processed queries:'" + src + "'");
+            src = src.replace(MatchNonBreakingInsertIntoSelect, GenerateDisguisedCompoundKeywords);
             src = src.replace(MatchNonBreakingCompoundKeywords, GenerateDisguisedCompoundKeywords);
 
             // Start a new statement before each remaining statement keyword.
             src = src.replace(MatchStatementStarts, GenerateSplitStatements);
+            //* Enable this to debug in the browser */ console.log("mid-processed queries:'" + src + "'");
 
             // Restore disguised compound keywords post-statement-split.
             src = src.replace(MatchCompoundKeywordDisguise, '');
+            //* Enable this to debug in the browser */ console.log("post-processed queries:'" + src + "'");
 
             // TODO: drop the preceding section when semi-colon injection is no longer supported
 

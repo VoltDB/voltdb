@@ -170,9 +170,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
                 Column col = colRef.getColumn();
                 TupleValueExpression tve = new TupleValueExpression(m_targetTableName, m_targetTableAlias,
                         col.getTypeName(), col.getTypeName());
-                tve.setValueType(VoltType.get((byte)col.getType()));
-                tve.setValueSize(col.getSize());
-                tve.setInBytes(col.getInbytes());
+                tve.setTypeSizeBytes(col.getType(), col.getSize(), col.getInbytes());
+
                 indexedExprs.add(tve);
             }
         } else {

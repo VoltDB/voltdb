@@ -59,8 +59,6 @@ run.sh async-benchmark : same as run.sh client
 
 run.sh sync-benchmark  : start the multi-threaded sync client, [if needed, initialize the given number of key-value pairs (puts),] begin normal client processing (gets and puts)
 
-run.sh jdbc-benchmark  : start the JDBC client benchmark
-
 run.sh catalog         : compile sources and build the catalog
 
 run.sh clean           : remove compiled files
