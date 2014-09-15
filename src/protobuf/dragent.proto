@@ -29,6 +29,13 @@ message Subscribe {
     optional int32 partitionId = 1;
     optional fixed64 timestamp = 2;
     optional bool isCovering = 3;
+    optional fixed64 rewindToUniqueId = 4;
+}
+
+message EventAck {
+    optional int32 partitionId = 1;
+    optional bool lookForEvent = 2;
+    optional fixed64 lastAckedUniqueId = 3;
 }
 
 message Response {
@@ -76,6 +83,10 @@ message PartitionInfo {
     optional int64 outstandingByteCount = 7;
     optional bool isPaused = 8;
     optional bool isSynced = 9;
+    
+    // info for event synchronization
+    optional int64 nextUniqueId = 10;
+    optional bool isEnded = 11;
 }
 
 message CtrlEnvelope {
@@ -90,6 +101,7 @@ message CtrlEnvelope {
         STOP_SYNC = 8;
         CONNECT = 9;
         SUBSCRIBE = 10;
+        EVENT_ACK = 11;
     }
     required Type type = 1;
     required UUID id = 2;
@@ -99,4 +111,5 @@ message CtrlEnvelope {
     optional Response response = 6;
     optional SnapshotReq snapshotReq = 7;
     optional Subscribe subscribe = 8;
+    optional EventAck eventAck = 9;
 }

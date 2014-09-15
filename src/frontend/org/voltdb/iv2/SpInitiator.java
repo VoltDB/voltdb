@@ -106,7 +106,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
         // configure DR
         PartitionDRGateway drGateway =
                 PartitionDRGateway.getInstance(m_partitionId, nodeDRGateway,
-                        startAction.doesRejoin());
+                        startAction);
         ((SpScheduler) m_scheduler).setDRGateway(drGateway);
         m_replicaDRGateway = replicaDRGateway;
 

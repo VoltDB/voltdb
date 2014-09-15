@@ -651,9 +651,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     } else {
                         ndrgwClass = Class.forName("org.voltdb.dr.InvocationBufferServer");
                     }
-                    Constructor<?> ndrgwConstructor = ndrgwClass.getConstructor(File.class, boolean.class);
+                    Constructor<?> ndrgwConstructor = ndrgwClass.getConstructor(File.class, boolean.class, int.class);
                     m_nodeDRGateway = (NodeDRGateway) ndrgwConstructor.newInstance(drOverflowDir,
-                                                                                   m_replicationActive);
+                                                                                   m_replicationActive,
+                                                                                   m_configuredNumberOfPartitions);
                 } catch (Exception e) {
                     VoltDB.crashLocalVoltDB("Unable to load DR system", true, e);
                 }
@@ -2291,6 +2292,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         e);
                 VoltDB.crashLocalVoltDB("Error starting client interface.", true, e);
             }
+            if (m_nodeDRGateway != null && !m_nodeDRGateway.isStarted()) {
+                // Start listening on the DR ports
+                prepareReplication();
+            }
         }
 
         if (m_config.m_startAction == StartAction.REJOIN) {
@@ -2452,10 +2457,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     VoltDB.crashLocalVoltDB("Error starting client interface.", true, e);
                 }
             }
-        }
 
-        // Start listening on the DR ports
-        prepareReplication();
+            // Start listening on the DR ports
+            prepareReplication();
+        }
 
         if (m_startMode != null) {
             m_mode = m_startMode;
