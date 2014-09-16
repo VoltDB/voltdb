@@ -49,12 +49,12 @@ public class AggregationBenchmark {
     final AggConfig config;
     // Reference to the database connection we will use
     final Client client;
-   
+
     AtomicInteger total = new AtomicInteger();
-    
+
     // Statistics manager objects from the client
     final ClientStatsContext fullStatsContext;
-    
+
     /**
      * Uses included {@link CLIConfig} class to
      * declaratively state command line options with defaults
@@ -66,10 +66,10 @@ public class AggregationBenchmark {
 
         @Option(desc = "Number of invocations.")
         int invocations = 6;
-        
+
         @Option(desc = "Restore the data from snapshot or not.")
         int restore = 0;
-        
+
         @Option(desc = "Snapshot path.")
         String snapshotpath = "";
 
@@ -130,7 +130,7 @@ public class AggregationBenchmark {
         while (true) {
             try {
                 client.createConnection(server);
-                
+
                 break;
             }
             catch (Exception e) {
@@ -169,7 +169,7 @@ public class AggregationBenchmark {
         // block until all have connected
         connections.await();
     }
-    
+
     void restoreDatabase() throws Exception {
         ClientResponse resp = null;
         try {
@@ -179,7 +179,7 @@ public class AggregationBenchmark {
             System.exit(-1);
         }
     }
-    
+
     /**
      * Core benchmark code.
      * Connect. Initialize. Run the loop. Cleanup. Print Results.
@@ -191,44 +191,44 @@ public class AggregationBenchmark {
         connect(config.servers);
 
         if (config.restore > 0) {
-        	System.out.println("\nLoading data from snapshot...");
-        	restoreDatabase();
+            System.out.println("\nLoading data from snapshot...");
+            restoreDatabase();
         }
-        
+
         System.out.print(HORIZONTAL_RULE);
         System.out.println("\nRunning Benchmark");
         System.out.println(HORIZONTAL_RULE);
 
         // Benchmark start time
         long queryStartTS, queryElapse;
-        
+
         int counter = config.invocations;
         String procName = "Q" + config.proc;
         for (int i = 1; i <= counter; i++) {
-        	System.out.println(String.format("Running procedure %s for the %d times", procName, i));
-        	
-        	queryStartTS = System.nanoTime();
-        	
-        	VoltTable vt = client.callProcedure(procName).getResults()[0];
-        	
-        	queryElapse =  System.nanoTime() - queryStartTS;
-        	
-        	System.out.printf("\n\n(Returned %d rows in %.3fs)\n",
-        			vt.getRowCount(), queryElapse / 1000000000.0);
+            System.out.println(String.format("Running procedure %s for the %d times", procName, i));
+
+            queryStartTS = System.nanoTime();
+
+            VoltTable vt = client.callProcedure(procName).getResults()[0];
+
+            queryElapse =  System.nanoTime() - queryStartTS;
+
+            System.out.printf("\n\n(Returned %d rows in %.3fs)\n",
+                    vt.getRowCount(), queryElapse / 1000000000.0);
         }
 
         // block until all outstanding txns return
         client.drain();
-        
+
         //retrieve stats
-    	ClientStats stats = fullStatsContext.fetch().getStats();
-    	// write stats to file
-    	client.writeSummaryCSV(stats, config.statsfile);
+        ClientStats stats = fullStatsContext.fetch().getStats();
+        // write stats to file
+        client.writeSummaryCSV(stats, config.statsfile);
 
         // close down the client connections
         client.close();
     }
-    
+
     /**
      * Main routine creates a benchmark instance and kicks off the run method.
      *

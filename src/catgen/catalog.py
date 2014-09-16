@@ -189,7 +189,7 @@ def genjava( classes, javaOnlyClasses, prepath, postpath, package ):
 
         # set
         write(                     '    @Override' )
-        write(                     '    void set(String field, String value) {' ) 
+        write(                     '    void set(String field, String value) {' )
         write(                     '        if ((field == null) || (value == null)) {' )
         write(                     '            throw new CatalogException("Null value where it shouldn\'t be.");' )
         write(                     '        }\n' )
@@ -229,7 +229,7 @@ def genjava( classes, javaOnlyClasses, prepath, postpath, package ):
 
         # copyFields
         write(                     '    @Override' )
-        write(                     '    void copyFields(CatalogType obj) {' ) 
+        write(                     '    void copyFields(CatalogType obj) {' )
         if len(cls.fields) > 0:
             write(                 '        // this is safe from the caller' )
             write( interp(         '        $clsname other = ($clsname) obj;\n', locals() ) )
