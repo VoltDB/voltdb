@@ -250,7 +250,7 @@ public class AggregationBenchmark {
         //client.writeSummaryCSV(stats, config.statsfile);
 
         fw.append(String.format("%s,%d,-1,0,0,0,0,%f,0,0,0,0,0,0\n",
-                                procName,
+                                "Q" + String.format("%02d", config.proc),
                                 stats.getStartTimestamp(),
                                 avg/1000.0));
 
