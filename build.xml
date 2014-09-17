@@ -530,6 +530,7 @@ DISTRIBUTION
     </chmod>
 
     <!-- create an archive for distribution -->
+    <echo message="Archiving ${dist.version}"/>
     <exec executable="mv" failonerror="true">
         <arg value="${raw.dist.dir}/dist"/>
         <arg value="${raw.dist.dir}/voltdb-${dist.version}"/>
@@ -747,14 +748,25 @@ CLEANING
 JAR BUILDING
 ***************************************
 -->
+<target name="buildinfo" depends="set_buildstring, override_buildstring"
+        description="Set the buildstring.txt. Override it if -Dbuildstring=&quot;string&quot; is set"/>
 
-<target name="buildinfo">
+<target name="set_buildstring">
+  <echo message = "set_buildstring"/>
+  <delete file="altbuildstring.txt" quiet="true"/>
   <loadfile property='dist.version' srcFile='version.txt'>
       <filterchain><striplinebreaks/></filterchain>
   </loadfile>
   <exec dir="." executable="tools/getgitinfo.py">
       <arg line='${dist.version}' />
   </exec>
+</target>
+
+<target name="override_buildstring" if="buildstring">
+  <copy file="buildstring.txt" tofile="altbuildstring.txt"/>
+  <echo message = "Overriding buildstring. Setting it to &quot;${buildstring}&quot;"/>
+  <echo message= "Old buildstring saved to altbuildstring.txt"/>
+  <echo message="${buildstring}" file="buildstring.txt"/>
 </target>
 
 <target name="voltdb.jar" depends="compile, buildinfo">
@@ -789,7 +801,7 @@ JAR BUILDING
             <include name="org/voltdb/regressionsuites/RegressionSuite.class" />
             <include name="org/voltdb/regressionsuites/VoltServerConfig.class" />
         </fileset>
-        <fileset dir="."><include name="buildstring.txt"/></fileset>
+        <fileset dir="."><include name="buildstring.txt"/><include name="altbuildstring.txt"/></fileset>
         <manifest>
             <section name="Credits">
                 <attribute name="Author" value="VoltDB Inc." />
@@ -878,7 +890,7 @@ JAR BUILDING
         <fileset dir="${src.test.dir}" defaultexcludes="yes" >
             <include name="org/voltdb/**" />
         </fileset>
-        <fileset dir="."><include name="buildstring.txt"/></fileset>
+        <fileset dir="."><include name="buildstring.txt"/><include name="altbuildstring.txt"/></fileset>
         <manifest>
             <section name="Credits">
                 <attribute name="Author" value="VoltDB Inc." />
@@ -1853,6 +1865,7 @@ TEST CASES
     <copy todir="tests/scripts">
       <fileset dir=".">
         <include name="buildstring.txt"/>
+        <include name="altbuildstring.txt"/>
         <include name="version.txt"/>
       </fileset>
     </copy>
