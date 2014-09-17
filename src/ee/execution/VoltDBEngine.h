@@ -511,6 +511,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         voltdb::UndoLog m_undoLog;
         voltdb::UndoQuantum *m_currentUndoQuantum;
 
+        bool checkTempTableCleanup(ExecutorVector * execsForFrag);
+        void cleanupExecutors(ExecutorVector * execsForFrag);
+
         // -------------------------------------------------
         // Data Members
         // -------------------------------------------------
