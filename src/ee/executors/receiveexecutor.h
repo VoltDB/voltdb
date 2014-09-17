@@ -67,7 +67,6 @@ class ReceiveExecutor : public AbstractExecutor {
         this->engine = engine;
     }
         ~ReceiveExecutor();
-        bool needsPostExecuteClear() { return true; }
     protected:
         bool p_init(AbstractPlanNode*,
                     TempTableLimits* limits);

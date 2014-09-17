@@ -608,6 +608,7 @@ bool AggregateHashExecutor::p_execute(const NValueArray& params)
         delete aggregateRow;
     }
 
+    m_memoryPool.purge();
     return true;
 }
 
@@ -697,6 +698,7 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
     VOLT_TRACE("finalizing..");
     // There's one last group (or table) row in progress that needs to be output.
     insertOutputTuple(aggregateRow);
+
     return true;
 }
 
