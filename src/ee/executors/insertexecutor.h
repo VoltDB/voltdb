@@ -78,8 +78,6 @@ public:
                     TempTableLimits* limits);
         bool p_execute(const NValueArray &params);
 
-        virtual bool needsOutputTableClear() { return true; };
-
         InsertPlanNode* m_node;
 
         TempTable* m_inputTable;
