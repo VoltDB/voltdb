@@ -699,7 +699,6 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
     // There's one last group (or table) row in progress that needs to be output.
     insertOutputTuple(aggregateRow);
 
-    m_memoryPool.purge();
     return true;
 }
 
