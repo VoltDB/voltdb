@@ -202,6 +202,15 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
         case (voltdb::PLAN_NODE_TYPE_RECEIVE):
             ret = new voltdb::ReceivePlanNode();
             break;
+        // ------------------------------------------------------------------
+        // SemiSeqScan
+        // ------------------------------------------------------------------
+        case (voltdb::PLAN_NODE_TYPE_SEMISEQSCAN):
+            voltdb::SeqScanPlanNode* scan = new voltdb::SeqScanPlanNode();
+            // Set the flag to exit the scan on the first predicate hit
+            scan->setSemiScanFlag(true);
+            ret = scan;
+            break;
         // default: Don't provide a default, let the compiler enforce complete coverage.
     }
 

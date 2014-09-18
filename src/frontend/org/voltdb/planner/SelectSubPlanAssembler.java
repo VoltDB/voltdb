@@ -156,7 +156,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 newTrees.add(JoinNode.reconstructJoinTreeFromTableNodes(joinOrder));
             }
             //Collect all the join/where conditions to reassign them later
-            AbstractExpression combinedWhereExpr = subTree.getAllInnerJoinFilters();
+            AbstractExpression combinedWhereExpr = subTree.getAllFilters();
             for (JoinNode newTree : newTrees) {
                 if (combinedWhereExpr != null) {
                     newTree.setWhereExpression((AbstractExpression)combinedWhereExpr.clone());

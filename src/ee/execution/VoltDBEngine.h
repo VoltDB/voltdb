@@ -61,6 +61,7 @@
 
 #include "boost/scoped_ptr.hpp"
 #include "boost/unordered_map.hpp"
+#include "boost/shared_array.hpp"
 
 #include <map>
 #include <string>
@@ -105,6 +106,8 @@ const int64_t DEFAULT_TEMP_TABLE_MEMORY = 1024 * 1024 * 100;
  */
 // TODO(evanj): Used by JNI so must be exported. Remove when we only one .so
 class __attribute__((visibility("default"))) VoltDBEngine {
+    friend class ExecutorVector;
+
     public:
         /** The defaults apply to test code which does not enable JNI/IPC callbacks. */
         VoltDBEngine(Topend *topend = NULL, LogProxy *logProxy = new StdoutLogProxy());
@@ -350,6 +353,12 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         void rebuildTableCollections();
 
+        void cleanupExecutorList(std::vector<AbstractExecutor*>& executorList);
+
+        ExecutorVector * getCurrentExecutorVector() {
+            return m_currExecutorVec;
+        }
+
     private:
         /*
          * Tasks dispatched by executeTask
@@ -361,7 +370,10 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         // Initialization Functions
         // -------------------------------------------------
+        bool initCluster();
+
         void initPlanNode(const int64_t fragId, AbstractPlanNode* node, TempTableLimits* limits);
+
         void processCatalogDeletes(int64_t timestamp);
         void initMaterializedViews();
         bool updateCatalogDatabaseReference();
@@ -392,7 +404,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         ExecutorVector *getExecutorVectorForFragmentId(const int64_t fragId);
 
         bool checkTempTableCleanup(ExecutorVector * execsForFrag);
-        void cleanupExecutors(ExecutorVector * execsForFrag);
+        void resetCurrentExecutorVec();
+
+        void cleanupExecutors();
 
         // -------------------------------------------------
         // Data Members

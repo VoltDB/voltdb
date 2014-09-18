@@ -65,7 +65,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
             join(inlineScan.getOutputSchema()).copyAndReplaceWithTVE();
         m_hasSignificantOutputSchema = true;
 
-        generateRealOutputSchema();
+        generateRealOutputSchema(db);
     }
 
     @Override

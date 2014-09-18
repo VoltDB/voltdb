@@ -1756,7 +1756,6 @@ public class TestFixedSQLSuite extends RegressionSuite {
         validateTableOfScalarLongs(vt, new long[]{0});
     }
 
-
     //
     // JUnit / RegressionSuite boilerplate
     //

@@ -97,7 +97,8 @@ AbstractExecutor* getNewExecutor(VoltDBEngine *engine,
     case PLAN_NODE_TYPE_PROJECTION: return new ProjectionExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_RECEIVE: return new ReceiveExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_SEND: return new SendExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_SEQSCAN: return new SeqScanExecutor(engine, abstract_node);
+    case PLAN_NODE_TYPE_SEQSCAN:
+    case PLAN_NODE_TYPE_SEMISEQSCAN: return new SeqScanExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_TABLECOUNT: return new TableCountExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_UNION: return new UnionExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_UPDATE: return new UpdateExecutor(engine, abstract_node);
@@ -106,6 +107,34 @@ AbstractExecutor* getNewExecutor(VoltDBEngine *engine,
     }
     VOLT_ERROR( "Undefined plan node type %d", (int) type);
     return NULL;
+}
+
+int executeExecutionVector(std::vector<AbstractExecutor*>& executorList,
+                           const NValueArray& params) {
+    // Walk through the queue and execute each plannode.  The query
+    // planner guarantees that for a given plannode, all of its
+    // children are positioned before it in this list, therefore
+    // dependency tracking is not needed here.
+    size_t ttl = executorList.size();
+
+    for (int ctr = 0; ctr < ttl; ++ctr) {
+        AbstractExecutor *executor = executorList[ctr];
+        assert (executor);
+
+        try {
+            // Now call the execute method to actually perform whatever action
+            // it is that the node is supposed to do...
+            if (!executor->execute(params)) {
+                VOLT_TRACE("The Executor's execution at position '%d' failed", ctr);
+                return ENGINE_ERRORCODE_ERROR;
+            }
+        } catch (const SerializableEEException &e) {
+            VOLT_TRACE("The Executor's execution at position '%d' failed", ctr);
+            throw;
+        }
+    }
+
+    return ENGINE_ERRORCODE_SUCCESS;
 }
 
 }
