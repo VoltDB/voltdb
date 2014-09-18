@@ -237,6 +237,16 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public String getOfficialBuildString() {
+        return null;
+    }
+
+    @Override
+    public String getOfficialVersionString() {
+        return null;
+    }
+
+    @Override
     public CatalogContext getCatalogContext()
     {
         long now = System.currentTimeMillis();

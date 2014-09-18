@@ -162,8 +162,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
+    private String m_officialBuildString;
     private static final String m_defaultVersionString = "4.0.1.4";
     private String m_versionString = m_defaultVersionString;
+    private String m_officialVersionString = m_defaultVersionString;
     HostMessenger m_messenger = null;
     final List<ClientInterface> m_clientInterfaces = new CopyOnWriteArrayList<ClientInterface>();
     HTTPAdminListener m_adminListener;
@@ -843,6 +845,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 public void run() {
                     try {
                         m_myHostId = m_messenger.getHostId();
+                        hostLog.info(String.format("Build: %s(%s) %s %s",
+                                    m_officialVersionString, m_versionString,
+                                    m_officialBuildString,
+                                    (m_config.m_isEnterprise ? "Enterprise Edition" : "Community Edition")));
+                        hostLog.info("Cluster compatible build string: " + m_buildString);
                         hostLog.info(String.format("Host id of this node is: %d", m_myHostId));
                         hostLog.info("URL of deployment info: " + m_config.m_pathToDeployment);
                         logDebuggingInfo(m_config.m_adminPort, m_config.m_httpPort, m_httpPortExtraLogMessage, m_jsonEnabled);
@@ -1581,16 +1588,27 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     public static String[] extractBuildInfo() {
         StringBuilder sb = new StringBuilder(64);
-        String buildString = "VoltDB";
-        String versionString = m_defaultVersionString;
+        // This is the string that the 4.0.1.x branch needs to write
+        // to ZK in order to survive the cluster version check.  It
+        // will no longer contain the actual official VoltDB build string.
+        String clusterCompatibleBuildString = "VoltDB";
+        String clusterCompatibleVersionString = m_defaultVersionString;
+        // This will be the actual official VoltDB build string, filled
+        // in from altbuildstring.txt, if it exists, otherwise a copy of
+        // clusterCompatibleString
+        String voltSupportBuildString = "VoltDB";
+        String voltSupportVersionString = m_defaultVersionString;
         byte b = -1;
         try {
-            InputStream buildstringStream =
+            // Extract the cluster compatible string from buildstring.txt
+            // Filled in manually using the -Dbuildstring="string" switch
+            // to the ant build.
+            InputStream clusterCompatibleStringStream =
                 ClassLoader.getSystemResourceAsStream("buildstring.txt");
-            if (buildstringStream == null) {
+            if (clusterCompatibleStringStream == null) {
                 throw new RuntimeException("Unreadable or missing buildstring.txt file.");
             }
-            while ((b = (byte) buildstringStream.read()) != -1) {
+            while ((b = (byte) clusterCompatibleStringStream.read()) != -1) {
                 sb.append((char)b);
             }
             sb.append("\n");
@@ -1598,8 +1616,31 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             if (parts.length != 2) {
                 throw new RuntimeException("Invalid buildstring.txt file.");
             }
-            versionString = parts[0].trim();
-            buildString = parts[1].trim();
+            clusterCompatibleVersionString = parts[0].trim();
+            clusterCompatibleBuildString = parts[1].trim();
+            // Now, see if we can pull out the actual VoltDB version from altbuildstring.txt
+            InputStream voltSupportStringStream =
+                ClassLoader.getSystemResourceAsStream("altbuildstring.txt");
+            if (voltSupportStringStream != null) {
+                sb = new StringBuilder(64);
+                while ((b = (byte) voltSupportStringStream.read()) != -1) {
+                    sb.append((char)b);
+                }
+                sb.append("\n");
+                parts = sb.toString().split(" ", 2);
+                if (parts.length == 2) {
+                    voltSupportVersionString = parts[0].trim();
+                    voltSupportBuildString = parts[1].trim();
+                }
+                else {
+                    voltSupportVersionString = clusterCompatibleVersionString;
+                    voltSupportBuildString = clusterCompatibleBuildString;
+                }
+            }
+            else {
+                voltSupportVersionString = clusterCompatibleVersionString;
+                voltSupportBuildString = clusterCompatibleBuildString;
+            }
         } catch (Exception ignored) {
             try {
                 InputStream buildstringStream = new FileInputStream("version.txt");
@@ -1607,7 +1648,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     while ((b = (byte) buildstringStream.read()) != -1) {
                         sb.append((char)b);
                     }
-                    versionString = sb.toString().trim();
+                    clusterCompatibleVersionString = sb.toString().trim();
                 } finally {
                     buildstringStream.close();
                 }
@@ -1616,7 +1657,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 hostLog.l7dlog( Level.ERROR, LogKeys.org_voltdb_VoltDB_FailedToRetrieveBuildString.name(), null);
             }
         }
-        return new String[] { versionString, buildString };
+        return new String[] { clusterCompatibleVersionString,
+                              clusterCompatibleBuildString,
+                              voltSupportVersionString,
+                              voltSupportBuildString };
     }
 
     @Override
@@ -1624,7 +1668,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         String buildInfo[] = extractBuildInfo();
         m_versionString = buildInfo[0];
         m_buildString = buildInfo[1];
-        consoleLog.info(String.format("Build: %s %s %s", m_versionString, m_buildString, editionTag));
+        m_officialVersionString = buildInfo[2];
+        m_officialBuildString = buildInfo[3];
+        consoleLog.info(String.format("Build: %s(%s) %s %s",
+                    m_officialVersionString, m_versionString,
+                    m_officialBuildString,
+                    editionTag));
+        hostLog.info("Cluster compatible build string: " + m_buildString);
     }
 
     /**
@@ -1939,6 +1989,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     @Override
     public String getVersionString() {
         return m_versionString;
+    }
+
+    @Override
+    public String getOfficialBuildString() {
+        return m_officialBuildString;
+    }
+
+    @Override
+    public String getOfficialVersionString() {
+        return m_officialVersionString;
     }
 
     @Override
