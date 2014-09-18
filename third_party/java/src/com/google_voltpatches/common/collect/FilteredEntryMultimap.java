@@ -22,7 +22,7 @@ import static com.google_voltpatches.common.base.Predicates.not;
 import static com.google_voltpatches.common.collect.CollectPreconditions.checkNonnegative;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
-import com.google_voltpatches.common.base.Objects;
+import com.google_voltpatches.common.base.MoreObjects;
 import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.collect.Maps.ImprovedAbstractMap;
 
@@ -101,7 +101,7 @@ class FilteredEntryMultimap<K, V> extends AbstractMultimap<K, V> implements Filt
 
   @Override
   public Collection<V> removeAll(@Nullable Object key) {
-    return Objects.firstNonNull(asMap().remove(key), unmodifiableEmptyCollection());
+    return MoreObjects.firstNonNull(asMap().remove(key), unmodifiableEmptyCollection());
   }
 
   Collection<V> unmodifiableEmptyCollection() {

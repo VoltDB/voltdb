@@ -14,7 +14,6 @@
 
 package com.google_voltpatches.common.collect;
 
-import static com.google_voltpatches.common.base.Objects.firstNonNull;
 import static com.google_voltpatches.common.base.Preconditions.checkArgument;
 import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 import static com.google_voltpatches.common.base.Preconditions.checkState;
@@ -25,7 +24,7 @@ import com.google_voltpatches.common.annotations.GwtIncompatible;
 import com.google_voltpatches.common.base.Ascii;
 import com.google_voltpatches.common.base.Equivalence;
 import com.google_voltpatches.common.base.Function;
-import com.google_voltpatches.common.base.Objects;
+import com.google_voltpatches.common.base.MoreObjects;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.base.Ticker;
 import com.google_voltpatches.common.collect.MapMakerInternalMap.Strength;
@@ -153,7 +152,7 @@ public final class MapMaker extends GenericMapMaker<Object, Object> {
   }
 
   Equivalence<Object> getKeyEquivalence() {
-    return firstNonNull(keyEquivalence, getKeyStrength().defaultEquivalence());
+    return MoreObjects.firstNonNull(keyEquivalence, getKeyStrength().defaultEquivalence());
   }
 
   /**
@@ -278,7 +277,7 @@ public final class MapMaker extends GenericMapMaker<Object, Object> {
   }
 
   Strength getKeyStrength() {
-    return firstNonNull(keyStrength, Strength.STRONG);
+    return MoreObjects.firstNonNull(keyStrength, Strength.STRONG);
   }
 
   /**
@@ -327,7 +326,7 @@ public final class MapMaker extends GenericMapMaker<Object, Object> {
    *     com.google_voltpatches.common.cache.CacheBuilder}, with {@link #softValues} being replaced by {@link
    *     com.google_voltpatches.common.cache.CacheBuilder#softValues}. Note that {@code CacheBuilder} is simply
    *     an enhanced API for an implementation which was branched from {@code MapMaker}. <b>This
-   *     method is scheduled for deletion in September 2014.</b>
+   *     method is scheduled for removal in March 2015.</b>
    */
   @Deprecated
   @GwtIncompatible("java.lang.ref.SoftReference")
@@ -347,7 +346,7 @@ public final class MapMaker extends GenericMapMaker<Object, Object> {
   }
 
   Strength getValueStrength() {
-    return firstNonNull(valueStrength, Strength.STRONG);
+    return MoreObjects.firstNonNull(valueStrength, Strength.STRONG);
   }
 
   /**
@@ -445,7 +444,7 @@ public final class MapMaker extends GenericMapMaker<Object, Object> {
   }
 
   Ticker getTicker() {
-    return firstNonNull(ticker, Ticker.systemTicker());
+    return MoreObjects.firstNonNull(ticker, Ticker.systemTicker());
   }
 
   /**
@@ -594,7 +593,7 @@ public final class MapMaker extends GenericMapMaker<Object, Object> {
    */
   @Override
   public String toString() {
-    Objects.ToStringHelper s = Objects.toStringHelper(this);
+    MoreObjects.ToStringHelper s = MoreObjects.toStringHelper(this);
     if (initialCapacity != UNSET_INT) {
       s.add("initialCapacity", initialCapacity);
     }

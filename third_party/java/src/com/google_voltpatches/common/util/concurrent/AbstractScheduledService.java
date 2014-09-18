@@ -16,6 +16,8 @@
 
 package com.google_voltpatches.common.util.concurrent;
 
+import static com.google_voltpatches.common.util.concurrent.MoreExecutors.directExecutor;
+
 import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Supplier;
@@ -299,7 +301,8 @@ public abstract class AbstractScheduledService implements Service {
       }
       @Override public void failed(State from, Throwable failure) {
         executor.shutdown();
-      }}, MoreExecutors.sameThreadExecutor());
+      }
+    }, directExecutor());
     return executor;
   }
 

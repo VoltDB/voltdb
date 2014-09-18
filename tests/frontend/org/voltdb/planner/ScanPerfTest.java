@@ -134,7 +134,7 @@ public class ScanPerfTest extends TestCase {
         LocalCluster cluster = null;
         Client client = null;
 
-        VoltTable pTable = TableHelper.quickTable("P (ID:BIGINT-N, VALUE:BIGINT-N) P(ID)");
+        VoltTable pTable = TableHelper.quickTable("P (ID:BIGINT-N, VALUE:BIGINT-N) PK(ID)");
 
         // build and compile a catalog
         System.out.println("Compiling catalog.");
