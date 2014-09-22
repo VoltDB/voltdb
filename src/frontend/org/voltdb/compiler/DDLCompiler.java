@@ -1009,10 +1009,10 @@ public class DDLCompiler {
         }
 
         // output the xml catalog to disk
-        BuildDirectoryUtils.writeFile("schema-xml", "hsql-catalog-output.xml", xmlCatalog.toString(), true);
+        BuildDirectoryUtils.writeFile("schema-xml", "hsql-catalog-output.xml", m_schema.toString(), true);
 
         // build the local catalog from the xml catalog
-        fillCatalogFromXML(db, xmlCatalog);
+        fillCatalogFromXML(db, m_schema);
     }
 
     /**
@@ -1340,14 +1340,16 @@ public class DDLCompiler {
         // map of index replacements for later constraint fixup
         Map<String, String> indexReplacementMap = new TreeMap<String, String>();
 
-        ArrayList<VoltType> columnTypes = new ArrayList<VoltType>();
+        TreeMap<Integer, VoltType> columnTypes = new TreeMap<Integer, VoltType>();
         for (VoltXMLElement subNode : node.children) {
 
             if (subNode.name.equals("columns")) {
                 int colIndex = 0;
                 for (VoltXMLElement columnNode : subNode.children) {
-                    if (columnNode.name.equals("column"))
-                        addColumnToCatalog(table, columnNode, colIndex++, columnTypes);
+                    if (columnNode.name.equals("column")) {
+                        addColumnToCatalog(table, columnNode, columnTypes);
+                        colIndex++;
+                    }
                 }
                 // limit the total number of columns in a table
                 if (colIndex > MAX_COLUMNS) {
@@ -1430,13 +1432,16 @@ public class DDLCompiler {
         }
     }
 
-    void addColumnToCatalog(Table table, VoltXMLElement node, int index, ArrayList<VoltType> columnTypes) throws VoltCompilerException {
+    void addColumnToCatalog(Table table, VoltXMLElement node,
+                            TreeMap<Integer, VoltType> columnTypes) throws VoltCompilerException
+    {
         assert node.name.equals("column");
 
         String name = node.attributes.get("name");
         String typename = node.attributes.get("valuetype");
         String nullable = node.attributes.get("nullable");
         String sizeString = node.attributes.get("size");
+        int index = Integer.valueOf(node.attributes.get("index"));
         String defaultvalue = null;
         String defaulttype = null;
 
@@ -1475,7 +1480,7 @@ public class DDLCompiler {
 
         // fyi: Historically, VoltType class initialization errors get reported on this line (?).
         VoltType type = VoltType.typeFromString(typename);
-        columnTypes.add(type);
+        columnTypes.put(index, type);
         if (defaultFuncID == -1) {
             if (defaultvalue != null && (type == VoltType.DECIMAL || type == VoltType.NUMERIC)) {
                 // Until we support deserializing scientific notation in the EE, we'll
