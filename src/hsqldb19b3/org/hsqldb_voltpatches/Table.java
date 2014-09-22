@@ -2672,6 +2672,7 @@ public class Table extends TableBase implements SchemaObject {
         for (int i : columnIndices) {
             ColumnSchema column = getColumn(i);
             VoltXMLElement colChild = column.voltGetColumnXML(session);
+            colChild.attributes.put("index", Integer.toString(i));
             columns.children.add(colChild);
             assert(colChild != null);
         }
