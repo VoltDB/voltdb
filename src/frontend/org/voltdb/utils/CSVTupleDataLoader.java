@@ -53,6 +53,11 @@ public class CSVTupleDataLoader implements CSVDataLoader {
         //no op
     }
 
+    @Override
+    public void flush() {
+        //no op
+    }
+
     //Callback for single row procedure invoke called for rows in failed batch.
     private class PartitionSingleExecuteProcedureCallback implements ProcedureCallback {
         final RowWithMetaData m_csvLine;
