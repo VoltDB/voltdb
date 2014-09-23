@@ -179,10 +179,11 @@ public class TestFunctionsForJSON extends RegressionSuite {
         }
         try {
             client.callProcedure(procName, parameters);
-            fail("document validity check failed for " + procDescription);
+            fail("document validity check failed for " + procDescription + "\nDid not get "
+                 + "error containing expected  message:\n'" + expectedErrorMessage + "'");
         } catch (ProcCallException pcex) {
             String actualMessage = pcex.getMessage();
-            assertTrue("For " + procDescription + "\nExpected error message containing: \n'"
+            assertTrue("For " + procDescription + "\nExpected error message containing:\n'"
                        + expectedErrorMessage + "'\nbut got:\n'" + actualMessage + "'",
                        actualMessage.contains(expectedErrorMessage));
         }
@@ -438,6 +439,8 @@ public class TestFunctionsForJSON extends RegressionSuite {
                                 client, "IdFieldProc", "arr[",     0);
         testProcWithInvalidJSON("Invalid JSON path: Missing ']' after array index [position 6]",
                                 client, "IdFieldProc", "arr[123",  0);
+        testProcWithInvalidJSON("Invalid JSON path: Invalid array index greater than the maximum integer value [position 14]",
+                                client, "IdFieldProc", "arr[10000000000]", 0);
     }
 
     /** Used to test ENG-6832 (invalid array index notation, for SET_FIELD). */
@@ -454,6 +457,11 @@ public class TestFunctionsForJSON extends RegressionSuite {
                                 client, "UpdateSetFieldProc", "arr[",     "-1", 1);
         testProcWithInvalidJSON("Invalid JSON path: Missing ']' after array index [position 6]",
                                 client, "UpdateSetFieldProc", "arr[123",  "-1", 1);
+        testProcWithInvalidJSON("Invalid JSON path: Invalid array index greater than the maximum integer value [position 14]",
+                                client, "UpdateSetFieldProc", "arr[10000000000]", "-1", 1);
+        // 1568 is the minimum array index that will trigger this error
+        testProcWithInvalidJSON("exceeds the size of the VARCHAR(8192) column",
+                                client, "UpdateSetFieldProc", "arr[1568]", "-1", 1);
     }
 
     /** Used to test ENG-6621, part 1 (without dotted path or array index notation). */
