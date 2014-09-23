@@ -19,6 +19,7 @@ package org.voltcore.utils;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 
 import com.google_voltpatches.common.base.Preconditions;
@@ -31,6 +32,31 @@ import com.google_voltpatches.common.base.Preconditions;
  */
 public class ByteBufferOutputStream extends OutputStream {
     protected static final int DEFAULT_ALLOCATION_SIZE = 256 * 1024;
+
+    static final Method cleaner;
+    static final Method clean;
+
+    static {
+        try {
+            ByteBuffer bb = ByteBuffer.allocateDirect(4096);
+            cleaner = bb.getClass().getMethod("cleaner");
+            cleaner.setAccessible(true);
+            clean = cleaner.getReturnType().getMethod("clean");
+            clean.setAccessible(true);
+            clean.invoke(cleaner.invoke(bb));
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException("cannot relfect direct byte buffer cleaner",e);
+        }
+    }
+
+    static void discardDirectByteBuffer(ByteBuffer bb) {
+        if (bb == null || !bb.isDirect()) return;
+        try {
+            clean.invoke(cleaner.invoke(bb));
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException("failed to invoke the direct byte buffer cleaner",e);
+        }
+    }
 
     protected ByteBuffer m_bb;
 
@@ -68,6 +94,7 @@ public class ByteBufferOutputStream extends OutputStream {
     @Override
     public void close() throws IOException {
         m_bb.clear();
+        discardDirectByteBuffer(m_bb);
         super.close();
     }
 
@@ -118,6 +145,7 @@ public class ByteBufferOutputStream extends OutputStream {
             ByteBuffer newbb = ByteBuffer.allocateDirect(newCapacity);
             newbb.put(oldbb);
 
+            discardDirectByteBuffer(m_bb);
             m_bb = newbb;
         }
     }
