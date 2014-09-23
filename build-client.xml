@@ -151,17 +151,35 @@ JAR BUILDING
 ***************************************
 -->
 
-<target name="buildinfo">
+<target name="buildinfo" depends="set_buildstring, override_buildstring"
+        description="Set the buildstring.txt. Override it if -Dbuildstring=&quot;string&quot; is set"/>
+
+<target name="set_buildstring">
+  <echo message = "set_buildstring"/>
+  <delete file="altbuildstring.txt" quiet="true"/>
+  <!--dist.version is the name used to wrap up the distribution in the .tar.gz -->
+  <!--version is the internal name for the .jar and .so files and internally in code -->
   <loadfile property='dist.version' srcFile='version.txt'>
       <filterchain><striplinebreaks/></filterchain>
   </loadfile>
+  <loadfile property='version' srcFile='version.txt'>
+      <filterchain><striplinebreaks/></filterchain>
+  </loadfile>
   <exec dir="." executable="tools/getgitinfo.py">
-      <arg line='${dist.version}' />
+      <arg line='${version}' />
   </exec>
+  <echo message="Kit version: ${dist.version}"/>
+</target>
+
+<target name="override_buildstring" if="buildstring">
+  <copy file="buildstring.txt" tofile="altbuildstring.txt"/>
+  <echo message = "Overriding buildstring. Setting it to &quot;${buildstring}&quot;"/>
+  <echo message= "Old buildstring saved to altbuildstring.txt"/>
+  <echo message="${buildstring}" file="buildstring.txt"/>
 </target>
 
 <target name="voltdbclient.jar" depends="compile, buildinfo">
-    <jar destfile="voltdb/voltdbclient-${dist.version}.jar">
+    <jar destfile="voltdb/voltdbclient-${version}.jar">
         <fileset dir="${build.client.dir}" defaultexcludes="yes" >
             <include name="**" />
         </fileset>

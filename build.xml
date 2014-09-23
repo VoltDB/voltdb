@@ -455,8 +455,8 @@ DISTRIBUTION
     <!-- populate java client and native libraries -->
     <copy todir="${dist.dir}/voltdb" flatten="true" >
         <fileset dir="voltdb" defaultexcludes="yes">
-            <include name="voltdbclient-${dist.version}.jar" />
-            <include name="voltdbclient-${dist.version}-javadoc.jar" />
+            <include name="voltdbclient-${version}.jar" />
+            <include name="voltdbclient-${version}-javadoc.jar" />
         </fileset>
     </copy>
     <copy todir="${dist.dir}/voltdb" flatten="true" >
@@ -501,8 +501,8 @@ DISTRIBUTION
     <!-- populate the voltdb java libraries -->
     <copy todir="${dist.dir}/voltdb" flatten="true" >
         <fileset dir="voltdb" defaultexcludes="yes">
-            <include name="voltdb-${dist.version}.jar" />
-            <include name="voltdb-${dist.version}-javadoc.jar" />
+            <include name="voltdb-${version}.jar" />
+            <include name="voltdb-${version}-javadoc.jar" />
         </fileset>
     </copy>
 
@@ -531,6 +531,7 @@ DISTRIBUTION
 
     <!-- create an archive for distribution -->
     <echo message="Archiving ${dist.version}"/>
+    <echo message="mv ${raw.dist.dir}/dist to ${raw.dist.dir}/voltdb-${dist.version}"/>
     <exec executable="mv" failonerror="true">
         <arg value="${raw.dist.dir}/dist"/>
         <arg value="${raw.dist.dir}/voltdb-${dist.version}"/>
@@ -617,7 +618,7 @@ DISTRIBUTION
 
     <!-- save the symbols from the shared library -->
     <exec dir='${dist.dir}/voltdb' executable='/bin/sh'>
-        <arg line="-c '/usr/bin/objcopy --only-keep-debug libvoltdb-${dist.version}.so ${build.dir}/voltdb-${dist.version}.sym'" />
+        <arg line="-c '/usr/bin/objcopy --only-keep-debug libvoltdb-${version}.so ${build.dir}/voltdb-${version}.sym'" />
     </exec>
 
     <!-- strip the voltbin shared library (~40x size reduction) -->
@@ -627,7 +628,7 @@ DISTRIBUTION
 
     <!-- embed the path to the symbol file into the ELF binary -->
     <exec dir='${dist.dir}/voltdb' executable='/bin/sh'>
-        <arg line="-c '/usr/bin/objcopy --add-gnu-debuglink=voltdb-${dist.version}.sym libvoltdb-${dist.version}.so'" />
+        <arg line="-c '/usr/bin/objcopy --add-gnu-debuglink=voltdb-${version}.sym libvoltdb-${version}.so'" />
     </exec>
 
 </target>
@@ -754,12 +755,18 @@ JAR BUILDING
 <target name="set_buildstring">
   <echo message = "set_buildstring"/>
   <delete file="altbuildstring.txt" quiet="true"/>
+  <!--dist.version is the name used to wrap up the distribution in the .tar.gz -->
+  <!--version is the internal name for the .jar and .so files and internally in code -->
   <loadfile property='dist.version' srcFile='version.txt'>
       <filterchain><striplinebreaks/></filterchain>
   </loadfile>
+  <loadfile property='version' srcFile='version.txt'>
+      <filterchain><striplinebreaks/></filterchain>
+  </loadfile>
   <exec dir="." executable="tools/getgitinfo.py">
-      <arg line='${dist.version}' />
+      <arg line='${version}' />
   </exec>
+  <echo message="Kit version: ${dist.version}"/>
 </target>
 
 <target name="override_buildstring" if="buildstring">
@@ -769,8 +776,9 @@ JAR BUILDING
   <echo message="${buildstring}" file="buildstring.txt"/>
 </target>
 
+
 <target name="voltdb.jar" depends="compile, buildinfo">
-    <jar destfile="voltdb/voltdb-${dist.version}.jar" duplicate="preserve">
+    <jar destfile="voltdb/voltdb-${version}.jar" duplicate="preserve">
         <fileset dir="${build.client.dir}" defaultexcludes="yes">
             <include name="**"/>
         </fileset>
@@ -1138,7 +1146,7 @@ NATIVE EE STUFF
     </exec>
     <copy todir='voltdb'>
         <fileset dir="${build.dir}/nativelibs">
-            <include name="libvoltdb-${dist.version}.*"/>
+            <include name="libvoltdb-${version}.*"/>
         </fileset>
     </copy>
 </target>
@@ -1175,7 +1183,7 @@ NATIVE EE STUFF
     </exec>
     <copy todir='voltdb'>
         <fileset dir="${build.dir}/nativelibs">
-            <include name="libvoltdb-${dist.version}.*"/>
+            <include name="libvoltdb-${version}.*"/>
         </fileset>
     </copy>
 </target>
@@ -1906,7 +1914,7 @@ TEST CASES
             excludeFilter="tools/findbugs-exclude.xml"
             output="xml"
             outputFile="${build.dir}/findbugs/findbugs.xml">
-    <class location="voltdb/voltdb-${dist.version}.jar" />
+    <class location="voltdb/voltdb-${version}.jar" />
     <auxClasspath>
       <fileset dir="${lib.dir}" includes ="*.jar" />
       <fileset dir="${vendor.lib.dir}" includes="*.jar" />
