@@ -73,7 +73,7 @@ public abstract class AbstractParsedStmt {
 
     // This list is used to identify the order of the table aliases returned by
     // the parser for possible use as a default join order.
-    protected ArrayList<String> m_tableAliasList = new ArrayList<String>();
+    public ArrayList<String> m_tableAliasList = new ArrayList<String>();
 
     protected final String[] m_paramValues;
     public final Database m_db;

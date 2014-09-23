@@ -126,4 +126,12 @@ public enum QueryType {
     public boolean isReadOnly() {
         return (this == SELECT) || (this == NOOP) || (this == INVALID);
     }
+
+    public static boolean isUpsert(String stmt) {
+        stmt = StringUtils.stripStart(stmt, null).substring(0, 6).toLowerCase();
+        if (stmt.startsWith("upsert")) {
+            return true;
+        }
+        return false;
+    }
 }

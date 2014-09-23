@@ -37,7 +37,7 @@ import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestSqlUpsertSuite extends RegressionSuite {
 
-    public void testUpsert() throws IOException, ProcCallException
+    public void testUpsertProcedure() throws IOException, ProcCallException
     {
         Client client = getClient();
         VoltTable vt = null;
@@ -74,6 +74,48 @@ public class TestSqlUpsertSuite extends RegressionSuite {
         }
     }
 
+    public void testUpsertAdHoc() throws IOException, ProcCallException
+    {
+        Client client = getClient();
+        VoltTable vt = null;
+
+        String[] tables = {"R1", "P1", "R2", "P2"};
+        for (String tb : tables) {
+            String query = "select ID, wage, dept from " + tb + " order by ID, dept";
+
+            vt = client.callProcedure("@AdHoc", String.format(
+                    "insert into %s values(%d, %d, %d)", tb, 1, 1, 1)).getResults()[0];
+            vt = client.callProcedure("@AdHoc", query).getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{1,1,1}});
+
+            vt = client.callProcedure("@AdHoc", String.format(
+                    "Upsert into %s values(%d, %d, %d)", tb, 2, 1, 1)).getResults()[0];
+            vt = client.callProcedure("@AdHoc", query).getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{1,1,1}, {2, 1, 1}});
+
+            vt = client.callProcedure("@AdHoc", String.format(
+                    "Upsert into %s values(%d, %d, %d)", tb, 2, 2, 1)).getResults()[0];
+            vt = client.callProcedure("@AdHoc", query).getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{1,1,1}, {2, 2, 1}});
+
+            vt = client.callProcedure("@AdHoc", String.format(
+                    "Upsert into %s values(%d, %d, %d)", tb, 1, 1, 1)).getResults()[0];
+            vt = client.callProcedure("@AdHoc", query).getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{1,1,1}, {2, 2, 1}});
+
+            vt = client.callProcedure("@AdHoc", String.format(
+                    "Upsert into %s values(%d, %d, %d)", tb, 1, 1, 2)).getResults()[0];
+            vt = client.callProcedure("@AdHoc", query).getResults()[0];
+            if (tb.equals("R1") || tb.equals("P1")) {
+                validateTableOfLongs(vt, new long[][] {{1,1,2}, {2, 2, 1}});
+            } else {
+                // multiple cols primary keys
+                validateTableOfLongs(vt, new long[][] {{1,1,1}, {1,1,2}, {2, 2, 1}});
+            }
+        }
+    }
+
+
     public void testUpsertWithoutPrimaryKey() throws IOException, ProcCallException {
         Client client = getClient();
 
@@ -87,15 +129,6 @@ public class TestSqlUpsertSuite extends RegressionSuite {
             } catch(Exception ex) {
                 assertEquals(errorMsg, ex.getMessage());
             }
-
-            errorMsg = "unexpected token: UPSERT";
-            try {
-                client.callProcedure("@AdHoc", "Upsert into "+ tb + " values(1, 1, 2)").getResults();
-                fail();
-            } catch(Exception ex) {
-                assertTrue(ex.getMessage().contains(errorMsg));
-            }
-
         }
     }
 
