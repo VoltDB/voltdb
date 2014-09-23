@@ -83,8 +83,9 @@ public class TestSqlUpsertSuite extends RegressionSuite {
         for (String tb : tables) {
             String query = "select ID, wage, dept from " + tb + " order by ID, dept";
 
+            // Insert here is on purpose for testing the cached AdHoc feature
             vt = client.callProcedure("@AdHoc", String.format(
-                    "insert into %s values(%d, %d, %d)", tb, 1, 1, 1)).getResults()[0];
+                    "Insert into %s values(%d, %d, %d)", tb, 1, 1, 1)).getResults()[0];
             vt = client.callProcedure("@AdHoc", query).getResults()[0];
             validateTableOfLongs(vt, new long[][] {{1,1,1}});
 
@@ -115,6 +116,65 @@ public class TestSqlUpsertSuite extends RegressionSuite {
         }
     }
 
+    public void testUpsertAdHocComplex() throws IOException, ProcCallException
+    {
+        Client client = getClient();
+        VoltTable vt = null;
+
+        // Test AdHoc UPSERT with default value and random column order values
+        String[] tables = {"R1", "P1", "R2", "P2"};
+        for (String tb : tables) {
+            String query = "select ID, wage, dept from " + tb + " order by ID, dept";
+
+            // Insert here is on purpose for testing the cached AdHoc feature
+            vt = client.callProcedure("@AdHoc", String.format(
+                    "Insert into %s values(%d, %d, %d)", tb, 1, 1, 1)).getResults()[0];
+            vt = client.callProcedure("@AdHoc", query).getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{1,1,1}});
+
+            // test UPSERT with default value
+            vt = client.callProcedure("@AdHoc", String.format(
+                    "Upsert into %s (id, dept) values (%d, %d)", tb, 2, 1)).getResults()[0];
+            vt = client.callProcedure("@AdHoc", query).getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{1,1,1}, {2, 1, 1}});
+
+            // test UPSERT with column name in random order
+            vt = client.callProcedure("@AdHoc", String.format(
+                    "Upsert into %s (dept, wage, id) values(%d, %d, %d)", tb, 1, 2, 2)).getResults()[0];
+            vt = client.callProcedure("@AdHoc", query).getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{1,1,1}, {2, 2, 1}});
+
+            // test UPSERT with default value
+            vt = client.callProcedure("@AdHoc", String.format(
+                    "Upsert into %s (dept, id) values(%d, %d)", tb, 1, 1)).getResults()[0];
+            vt = client.callProcedure("@AdHoc", query).getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{1,1,1}, {2, 2, 1}});
+        }
+
+        // Test AdHoc UPSER with SELECT
+        vt = client.callProcedure("@AdHoc", String.format(
+                "Upsert into R1 (dept, id) SELECT dept, id+1 FROM R2 ")).getResults()[0];
+        vt = client.callProcedure("@AdHoc",
+                "select ID, wage, dept from R1 order by ID, dept").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{1,1,1}, {2, 1, 1}, {3, 1, 1}});
+
+        // Without the order by in the SELECT clause, the result is content non-deterministic.
+        // This is different with INSERT INTO SELECT.
+        vt = client.callProcedure("@AdHoc", String.format(
+                "Upsert into P1 (dept, id) SELECT id, dept FROM P2 order by 1, 2 ")).getResults()[0];
+        vt = client.callProcedure("@AdHoc",
+                "select ID, wage, dept from P1 order by ID, dept").getResults()[0];
+        System.err.println(vt);
+        validateTableOfLongs(vt, new long[][] {{1, 1, 2}, {2, 2, 1}});
+
+        // also validate the partition to partition UPSERT
+        try {
+            vt = client.callProcedure("@AdHoc", String.format(
+                    "Upsert into P1 (dept, id) SELECT dept, id  FROM P2 order by 1, 2 ")).getResults()[0];
+            fail();
+        } catch (Exception ex) {
+        }
+    }
 
     public void testUpsertWithoutPrimaryKey() throws IOException, ProcCallException {
         Client client = getClient();
@@ -128,6 +188,16 @@ public class TestSqlUpsertSuite extends RegressionSuite {
                 fail();
             } catch(Exception ex) {
                 assertEquals(errorMsg, ex.getMessage());
+            }
+
+            errorMsg = "Unsupported UPSERT table without primary key: UPSERT";
+            try {
+                client.callProcedure("@AdHoc", "Upsert into "+ tb + " values(1, 1, 2)").getResults();
+                fail();
+            } catch(Exception ex) {
+                System.err.println("tablename: " + tb + "\n" +ex.getMessage());
+
+                assertTrue(ex.getMessage().contains(errorMsg));
             }
         }
     }
@@ -148,26 +218,26 @@ public class TestSqlUpsertSuite extends RegressionSuite {
         final String literalSchema =
                 "CREATE TABLE R1 ( " +
                 "ID INTEGER DEFAULT 0 NOT NULL, " +
-                "WAGE INTEGER, " +
+                "WAGE INTEGER DEFAULT 1, " +
                 "DEPT INTEGER, " +
                 "PRIMARY KEY (ID) );" +
 
                 "CREATE TABLE P1 ( " +
                 "ID INTEGER DEFAULT 0 NOT NULL, " +
-                "WAGE INTEGER NOT NULL, " +
+                "WAGE INTEGER DEFAULT 1, " +
                 "DEPT INTEGER NOT NULL, " +
                 "PRIMARY KEY (ID) );" +
                 "PARTITION TABLE P1 ON COLUMN ID;" +
 
                 "CREATE TABLE R2 ( " +
                 "ID INTEGER DEFAULT 0 NOT NULL, " +
-                "WAGE INTEGER NOT NULL, " +
+                "WAGE INTEGER DEFAULT 1, " +
                 "DEPT INTEGER NOT NULL, " +
                 "PRIMARY KEY (ID, DEPT) );" +
 
                 "CREATE TABLE P2 ( " +
                 "ID INTEGER DEFAULT 0 NOT NULL, " +
-                "WAGE INTEGER NOT NULL, " +
+                "WAGE INTEGER DEFAULT 1, " +
                 "DEPT INTEGER NOT NULL, " +
                 "PRIMARY KEY (ID, DEPT) );" +
                 "PARTITION TABLE P2 ON COLUMN DEPT;" +
@@ -175,30 +245,36 @@ public class TestSqlUpsertSuite extends RegressionSuite {
                 // Unsupported schema
                 "CREATE TABLE UR1 ( " +
                 "ID INTEGER NOT NULL, " +
+                "WAGE INTEGER DEFAULT 1, " +
                 "DEPT INTEGER);" +
 
                 "CREATE TABLE UR2 ( " +
                 "ID INTEGER NOT NULL UNIQUE, " +
+                "WAGE INTEGER DEFAULT 1, " +
                 "DEPT INTEGER);" +
 
                 "CREATE TABLE UP1 ( " +
                 "ID INTEGER NOT NULL, " +
+                "WAGE INTEGER DEFAULT 1, " +
                 "DEPT INTEGER);" +
                 "PARTITION TABLE UP1 ON COLUMN ID;" +
 
                 "CREATE TABLE UP2 ( " +
                 "ID INTEGER NOT NULL UNIQUE, " +
+                "WAGE INTEGER DEFAULT 1, " +
                 "DEPT INTEGER);" +
                 "PARTITION TABLE UP2 ON COLUMN ID;" +
 
                 // Export table
                 "CREATE TABLE UR3 ( " +
                 "ID INTEGER NOT NULL, " +
+                "WAGE INTEGER DEFAULT 1, " +
                 "DEPT INTEGER);" +
                 "EXPORT TABLE UR3;" +
 
                 "CREATE TABLE UP3 ( " +
                 "ID INTEGER NOT NULL, " +
+                "WAGE INTEGER DEFAULT 1, " +
                 "DEPT INTEGER);" +
                 "PARTITION TABLE UP3 ON COLUMN ID;" +
                 "EXPORT TABLE UP3;" +

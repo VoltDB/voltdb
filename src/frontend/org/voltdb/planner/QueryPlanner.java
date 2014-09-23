@@ -19,7 +19,6 @@ package org.voltdb.planner;
 
 import java.util.List;
 
-import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -37,7 +36,6 @@ import org.voltdb.plannodes.InsertPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
-import org.voltdb.plannodes.UpsertPlanNode;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.PlanNodeType;
 
@@ -148,8 +146,9 @@ public class QueryPlanner {
         AbstractPlanNode.resetPlanNodeIds();
 
         // determine the type of the query
-        m_sql = StringUtils.stripStart(m_sql, null).toUpperCase();
-        if (m_sql.startsWith("UPSERT")) {
+        m_sql = m_sql.trim();
+        String queryPrefix = m_sql.substring(0,6).toUpperCase();
+        if (queryPrefix.startsWith("UPSERT")) {
             m_isUpsert = true;
             m_sql = "INSERT" + m_sql.substring(6);
         }
@@ -227,11 +226,11 @@ public class QueryPlanner {
                 CompiledPlan plan = compileFromXML(m_paramzInfo.parameterizedXmlSQL,
                                                    m_paramzInfo.paramLiteralValues);
                 if (plan != null) {
+                    if (m_isUpsert) {
+                        replacePlanForUpsert(plan);
+                    }
                     m_wasParameterizedPlan = plan.extractParamValues(m_paramzInfo);
                     if (m_wasParameterizedPlan) {
-                        if (m_isUpsert) {
-                            replacePlanForUpsert(plan);
-                        }
                         return plan;
                     }
                 } else {
@@ -250,9 +249,9 @@ public class QueryPlanner {
                 m_recentErrorMsg = null;
             }
         }
-
         // if parameterization isn't requested or if it failed, plan here
         CompiledPlan plan = compileFromXML(m_xmlSQL, null);
+
         if (plan == null) {
             if (m_debuggingStaticModeToRetryOnError) {
                 plan = compileFromXML(m_xmlSQL, null);
@@ -289,14 +288,14 @@ public class QueryPlanner {
         AbstractParsedStmt parsedStmt = AbstractParsedStmt.parse(m_sql, xmlSQL, paramValues, m_db, m_joinOrder);
         if (parsedStmt == null)
         {
-            m_recentErrorMsg = "Failed to parse SQL statement: " + m_sql;
+            m_recentErrorMsg = "Failed to parse SQL statement: " + getOriginalSql();
             return null;
         }
 
         if (m_isUpsert) {
             // no insert/upsert with joins
             if (parsedStmt.m_tableList.size() != 1) {
-                m_recentErrorMsg = "UPSERT is support only with one single table: " + m_sql;
+                m_recentErrorMsg = "UPSERT is support only with one single table: " + getOriginalSql();
                 return null;
             }
 
@@ -310,7 +309,7 @@ public class QueryPlanner {
             }
 
             if (pkey == null) {
-                m_recentErrorMsg = "Unsupported UPSERT table without primary key: " + m_sql;
+                m_recentErrorMsg = "Unsupported UPSERT table without primary key: " + getOriginalSql();
                 return null;
             }
         }
@@ -366,7 +365,8 @@ public class QueryPlanner {
         List<AbstractPlanNode> receives = bestPlan.rootPlanGraph.findAllNodesOfType(PlanNodeType.RECEIVE);
         if (receives.size() > 1) {
             // Have too many receive node for two fragment plan limit
-            m_recentErrorMsg = "This join of multiple partitioned tables is too complex. Consider simplifying its subqueries: " + m_sql;
+            m_recentErrorMsg = "This join of multiple partitioned tables is too complex. "
+                    + "Consider simplifying its subqueries: " + getOriginalSql();
             return null;
         }
 
@@ -402,24 +402,17 @@ public class QueryPlanner {
         List<AbstractPlanNode> inserts = root.findAllNodesOfType(PlanNodeType.INSERT);
         if (inserts.size() == 1) {
             InsertPlanNode insertNode = (InsertPlanNode)inserts.get(0);
-
-            UpsertPlanNode upsertNode = new UpsertPlanNode(insertNode);
-
-            assert(insertNode.getParentCount() <= 1);
-            if (insertNode == root) {
-                root = upsertNode;
-            } else {
-                AbstractPlanNode parent = insertNode.getParent(0);
-                parent.clearChildren();
-                parent.addAndLinkChild(upsertNode);
-            }
-
-            assert(insertNode.getChildCount() == 1);
-            AbstractPlanNode child = insertNode.getChild(0);
-            child.clearParents();
-            upsertNode.addAndLinkChild(child);
+            insertNode.setUpsert(true);
         }
 
         return root;
+    }
+
+    private String getOriginalSql() {
+        if (! m_isUpsert) {
+            return m_sql;
+        }
+
+        return "UPSERT" + m_sql.substring(6);
     }
 }
