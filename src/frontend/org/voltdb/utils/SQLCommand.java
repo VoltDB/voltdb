@@ -69,7 +69,7 @@ public class SQLCommand
     private static final Pattern EscapedSingleQuote = Pattern.compile("''", Pattern.MULTILINE);
     private static final Pattern SingleLineComments = Pattern.compile("^\\s*(\\/\\/|--).*$", Pattern.MULTILINE);
     private static final Pattern Extract = Pattern.compile("'[^']*'", Pattern.MULTILINE);
-    private static final Pattern AutoSplit = Pattern.compile("(\\s|((\\(\\s*)+))(alter|create|drop|select|insert|update|delete|truncate|exec|execute|explain|explainproc)\\s", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+    private static final Pattern AutoSplit = Pattern.compile("(\\s|((\\(\\s*)+))(alter|create|drop|select|insert|update|upsert|delete|truncate|exec|execute|explain|explainproc)\\s", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     private static final Pattern SetOp = Pattern.compile("(\\s|\\))\\s*(union|except|intersect)(\\s\\s*all)?((\\s*\\({0,1}\\s*)*)select", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     private static final Pattern Subquery =
             Pattern.compile("(\\s*)(,|(?:\\s(?:from|in|exists|join)))((\\s*\\(\\s*)*)select",
@@ -174,7 +174,7 @@ public class SQLCommand
             Pattern.compile(
                     "(" +                  // start capturing group
                     "\\s*" +               // leading whitespace
-                    "insert\\s+into" + followedBySpaceOrQuote + "\\s*" +
+                    "insert|upsert\\s+into" + followedBySpaceOrQuote + "\\s*" +
                     idPattern + "\\s*" +   // <tablename>
                     optionalColumnList +   // (column, "anotherColumn", ...)
                     "[(\\s]*" +            // 0 or more spaces or left parentheses
@@ -192,7 +192,7 @@ public class SQLCommand
             ")" +  // end group 1
             "\\s+" + // one or more spaces
             "(" + // start group 2
-              "select|insert|update|delete" + // SQL CRUD statement verb
+              "select|insert|upsert|update|delete|truncate" + // SQL CRUD statement verb
             ")" + // end group 2
             "\\s+", // one or more spaces
             Pattern.MULTILINE|Pattern.CASE_INSENSITIVE
