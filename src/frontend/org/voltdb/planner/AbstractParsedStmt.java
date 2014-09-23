@@ -422,6 +422,7 @@ public abstract class AbstractParsedStmt {
             pve.setParameterIndex(paramIdx);
             pve.setValueSize(expr.getValueSize());
             pve.setValueType(expr.getValueType());
+            pve.setCorrelatedExpression(expr);
             m_parameterTveMap.put(paramIdx, expr);
             return pve;
         }

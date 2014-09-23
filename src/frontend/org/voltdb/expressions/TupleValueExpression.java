@@ -367,7 +367,7 @@ public class TupleValueExpression extends AbstractValueExpression {
 
     @Override
     public String explain(String impliedTableName) {
-        String tableName = m_tableName;
+        String tableName = (m_tableAlias != null) ? m_tableAlias : m_tableName;
         String columnName = m_columnName;
         if (columnName == null || columnName.equals("")) {
             columnName = "column#" + m_columnIndex;

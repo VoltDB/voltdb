@@ -42,6 +42,10 @@ public class ParameterValueExpression extends AbstractValueExpression {
     // The constant value does not need to participate in parameter value identity (equality/hashing)
     // or serialization (export to EE).
     private ConstantValueExpression m_originalValue = null;
+    // In case of subqueries, TVE from a parent query that is part of a correlated expression
+    // is substituted with the PVE within the child. The m_correlatedExpr points back to the
+    // original TVE for 'explain' purposes
+    private AbstractExpression m_correlatedExpr = null;
 
     public ParameterValueExpression() {
         super(ExpressionType.VALUE_PARAMETER);
@@ -53,6 +57,7 @@ public class ParameterValueExpression extends AbstractValueExpression {
         clone.m_paramIndex = m_paramIndex;
         clone.m_paramIsVector = m_paramIsVector;
         clone.m_originalValue = m_originalValue;
+        clone.m_correlatedExpr = m_correlatedExpr;
         return clone;
     }
 
@@ -202,8 +207,16 @@ public class ParameterValueExpression extends AbstractValueExpression {
         setValueSize(m_originalValue.getValueSize());
     }
 
+    public void setCorrelatedExpression(AbstractExpression expr) {
+        m_correlatedExpr = expr;
+    }
+
     public ConstantValueExpression getOriginalValue() {
         return m_originalValue;
+    }
+
+    public AbstractExpression getCorrealtedExpression() {
+        return m_correlatedExpr;
     }
 
     // Return this parameter in a list of bound parameters if the expr argument is in fact
@@ -223,7 +236,11 @@ public class ParameterValueExpression extends AbstractValueExpression {
 
     @Override
     public String explain(String unused) {
-        return "?" + m_paramIndex;
+        if (m_correlatedExpr == null) {
+            return "?" + m_paramIndex;
+        } else {
+            return m_correlatedExpr.explain(unused);
+        }
     }
 
     // Mark a parameter as vector-valued, so that it can properly drive argument type checking for

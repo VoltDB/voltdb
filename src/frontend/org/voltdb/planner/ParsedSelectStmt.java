@@ -1156,6 +1156,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             pve.setParameterIndex(paramIdx);
             pve.setValueSize(expr.getValueSize());
             pve.setValueType(expr.getValueType());
+            pve.setCorrelatedExpression(expr);
             // for the aggregate expression we still need to replace all children TVEs
             // that originate at the parent statement with the PVEs.
             // These TVEs themselves are parameters to the aggregted expression and will be
