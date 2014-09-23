@@ -60,9 +60,9 @@ function catalog() {
     echo "Compiling the kvbenchmark application catalog."
     echo "To perform this action manually, use the command line: "
     echo
-    echo "voltdb compile --classpath obj -o $APPNAME.jar ddl.sql"
+    echo "voltdb compile --classpath obj -o $APPNAME.jar agg_ddl.sql"
     echo
-    $VOLTDB compile --classpath obj -o $APPNAME.jar ddl.sql
+    $VOLTDB compile --classpath obj -o $APPNAME.jar agg_ddl.sql
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
