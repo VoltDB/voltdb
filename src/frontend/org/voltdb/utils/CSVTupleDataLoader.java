@@ -55,7 +55,15 @@ public class CSVTupleDataLoader implements CSVDataLoader {
 
     @Override
     public void flush() {
-        //no op
+        if (m_client != null) {
+            try {
+                m_client.drain();
+            } catch (NoConnectionsException ex) {
+                m_log.info("Failed to flush: " + ex);
+            } catch (InterruptedException ex) {
+                m_log.info("Failed to flush: " + ex);
+            }
+        }
     }
 
     //Callback for single row procedure invoke called for rows in failed batch.
