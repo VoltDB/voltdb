@@ -318,7 +318,7 @@ public class TestCollector {
         File logDir = getLogDir(3);
         assertTrue(logDir.exists());
         assertTrue(logDir.listFiles().length > 0);
-        assertEquals(logDir.listFiles().length, 3);
+        assertEquals(logDir.listFiles().length, 2);
     }
 
     @Test

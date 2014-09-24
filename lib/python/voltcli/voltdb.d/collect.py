@@ -50,8 +50,8 @@
                            'exclude heap dump file from collection',
                            default = False),
         VOLT.IntegerOption(None, '--days', 'days',
-                           'number of days of files to collect (files included are log, crash files), Current day value is 0',
-                           default = 13)
+                           'number of days of files to collect (files included are log, crash files), Current day value is 1',
+                           default = 14)
     ),
     arguments = (
         VOLT.PathArgument('voltdbroot', 'the voltdbroot path', absolute = True)
