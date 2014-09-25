@@ -118,6 +118,9 @@ TTInt NValue::s_minDecimalValue("-9999999999"   //10 digits
 const double NValue::s_gtMaxDecimalAsDouble = 1E26;
 const double NValue::s_ltMinDecimalAsDouble = -1E26;
 
+TTInt NValue::s_maxInt64AsDecimal(TTInt(INT64_MAX) * kMaxScaleFactor);
+TTInt NValue::s_minInt64AsDecimal(TTInt(-INT64_MAX) * kMaxScaleFactor);
+
 /*
  * Produce a debugging string describing an NValue.
  */
@@ -305,7 +308,7 @@ struct NValueList {
     NValueList(size_t length, ValueType elementType) : m_length(length), m_elementType(elementType)
     { }
 
-    void deserializeNValues(SerializeInput &input, Pool *dataPool)
+    void deserializeNValues(SerializeInputBE &input, Pool *dataPool)
     {
         for (int ii = 0; ii < m_length; ++ii) {
             m_values[ii].deserializeFromAllocateForStorage(m_elementType, input, dataPool);
@@ -351,7 +354,7 @@ bool NValue::inList(const NValue& rhs) const
     return std::find(listOfNValues->begin(), listOfNValues->end(), value) != listOfNValues->end();
 }
 
-void NValue::deserializeIntoANewNValueList(SerializeInput &input, Pool *dataPool)
+void NValue::deserializeIntoANewNValueList(SerializeInputBE &input, Pool *dataPool)
 {
     ValueType elementType = (ValueType)input.readByte();
     size_t length = input.readShort();
@@ -459,160 +462,171 @@ inline static void throwTimestampFormatError(const std::string &str)
 {
     char message[4096];
     // No space separator for between the date and time
-    snprintf(message, 4096, "Attempted to cast \'%s\' to type %s failed. Supported format: \'YYYY-MM-DD HH:MM:SS.UUUUUU\'",
+    snprintf(message, 4096, "Attempted to cast \'%s\' to type %s failed. Supported format: \'YYYY-MM-DD HH:MM:SS.UUUUUU\'"
+             "or \'YYYY-MM-DD\'",
              str.c_str(), valueToString(VALUE_TYPE_TIMESTAMP).c_str());
     throw SQLException(SQLException::dynamic_sql_error, message);
 }
-
 
 int64_t NValue::parseTimestampString(const std::string &str)
 {
     // date_str
     std::string date_str(str);
-    // This is the std:string API for "ltrim".
+    // This is the std:string API for "ltrim" and "rtrim".
     date_str.erase(date_str.begin(), std::find_if(date_str.begin(), date_str.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
-    std::size_t sep_pos = date_str.find(' ');
-    if (sep_pos != 10) {
-        throwTimestampFormatError(str);
-    }
+    date_str.erase(std::find_if(date_str.rbegin(), date_str.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(), date_str.end());
+    std::size_t sep_pos;
 
-    // time_str
-    std::string time_str = date_str.substr(sep_pos + 1);
-    // This is the std:string API for "ltrim" and "rtrim"
-    time_str.erase(time_str.begin(), std::find_if(time_str.begin(), time_str.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
-    time_str.erase(std::find_if(time_str.rbegin(), time_str.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(), time_str.end());
-    if (time_str.length() != 15) {
-        throwTimestampFormatError(str);
-    }
 
-    std::string number_string;
-    const char * pch;
-
-    if (date_str.at(4) != '-' || date_str.at(7) != '-') {
-        throwTimestampFormatError(str);
-    }
-
-    number_string = date_str.substr(0,4);
-    pch = number_string.c_str();
     int year = 0;
     int month = 0;
     int day = 0;
     int hour = 0;
     int minute = 0;
     int second = 0;
+    int micro = 1000000;
+    // time_str
+    std::string time_str;
+    std::string number_string;
+    const char * pch;
 
-    // YYYY
-    year = atoi(pch);
-    // new years day 10000 is likely to cause problems.
-    // There's a boost library limitation against years before 1400.
-    if (year > 9999 || year < 1400) {
+    switch (date_str.size()) {
+    case 26:
+        sep_pos  = date_str.find(' ');
+        if (sep_pos != 10) {
+            throwTimestampFormatError(str);
+        }
+
+        time_str = date_str.substr(sep_pos + 1);
+        // This is the std:string API for "ltrim"
+        time_str.erase(time_str.begin(), std::find_if(time_str.begin(), time_str.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
+        if (time_str.length() != 15) {
+            throwTimestampFormatError(str);
+        }
+
+        // tokenize time_str: HH:MM:SS.mmmmmm
+        if (time_str.at(2) != ':' || time_str.at(5) != ':' || time_str.at(8) != '.') {
+            throwTimestampFormatError(str);
+        }
+
+        // HH
+        number_string = time_str.substr(0,2);
+        pch = number_string.c_str();
+        if (pch[0] == '0') {
+            hour = 0;
+        } else if (pch[0] == '1') {
+            hour = 10;
+        } else if (pch[0] == '2') {
+            hour = 20;
+        } else {
+            throwTimestampFormatError(str);
+        }
+        if (pch[1] > '9' || pch[1] < '0') {
+            throwTimestampFormatError(str);
+        }
+        hour += pch[1] - '0';
+        if (hour > 23 || hour < 0) {
+            throwTimestampFormatError(str);
+        }
+
+        // MM
+        number_string = time_str.substr(3,2);
+        pch = number_string.c_str();
+        if (pch[0] > '5' || pch[0] < '0') {
+            throwTimestampFormatError(str);
+        }
+        minute = 10*(pch[0] - '0');
+        if (pch[1] > '9' || pch[1] < '0') {
+            throwTimestampFormatError(str);
+        }
+        minute += pch[1] - '0';
+        if (minute > 59 || minute < 0) {
+            throwTimestampFormatError(str);
+        }
+
+        // SS
+        number_string = time_str.substr(6,2);
+        pch = number_string.c_str();
+        if (pch[0] > '5' || pch[0] < '0') {
+            throwTimestampFormatError(str);
+        }
+        second = 10*(pch[0] - '0');
+        if (pch[1] > '9' || pch[1] < '0') {
+            throwTimestampFormatError(str);
+        }
+        second += pch[1] - '0';
+        if (second > 59 || second < 0) {
+            throwTimestampFormatError(str);
+        }
+        // hack a '1' in the place if the decimal and use atoi to get a value that
+        // MUST be between 1 and 2 million if all 6 digits of micros were included.
+        number_string = time_str.substr(8,7);
+        number_string.at(0) = '1';
+        pch = number_string.c_str();
+        micro = atoi(pch);
+        if (micro >= 2000000 || micro < 1000000) {
+            throwTimestampFormatError(str);
+        }
+    case 10:
+        if (date_str.at(4) != '-' || date_str.at(7) != '-') {
+            throwTimestampFormatError(str);
+        }
+
+        number_string = date_str.substr(0,4);
+        pch = number_string.c_str();
+
+        // YYYY
+        year = atoi(pch);
+        // new years day 10000 is likely to cause problems.
+        // There's a boost library limitation against years before 1400.
+        if (year > 9999 || year < 1400) {
+            throwTimestampFormatError(str);
+        }
+
+        // MM
+        number_string = date_str.substr(5,2);
+        pch = number_string.c_str();
+        if (pch[0] == '0') {
+            month = 0;
+        } else if (pch[0] == '1') {
+            month = 10;
+        } else {
+            throwTimestampFormatError(str);
+        }
+        if (pch[1] > '9' || pch[1] < '0') {
+            throwTimestampFormatError(str);
+        }
+        month += pch[1] - '0';
+        if (month > 12 || month < 1) {
+            throwTimestampFormatError(str);
+        }
+
+        // DD
+        number_string = date_str.substr(8,2);
+        pch = number_string.c_str();
+        if (pch[0] == '0') {
+            day = 0;
+        } else if (pch[0] == '1') {
+            day = 10;
+        } else if (pch[0] == '2') {
+            day = 20;
+        } else if (pch[0] == '3') {
+            day = 30;
+        } else {
+            throwTimestampFormatError(str);
+        }
+        if (pch[1] > '9' || pch[1] < '0') {
+            throwTimestampFormatError(str);
+        }
+        day += pch[1] - '0';
+        if (day > 31 || day < 1) {
+            throwTimestampFormatError(str);
+        }
+        break;
+    default:
         throwTimestampFormatError(str);
     }
 
-    // MM
-    number_string = date_str.substr(5,2);
-    pch = number_string.c_str();
-    if (pch[0] == '0') {
-        month = 0;
-    } else if (pch[0] == '1') {
-        month = 10;
-    } else {
-        throwTimestampFormatError(str);
-    }
-    if (pch[1] > '9' || pch[1] < '0') {
-        throwTimestampFormatError(str);
-    }
-    month += pch[1] - '0';
-    if (month > 12 || month < 1) {
-        throwTimestampFormatError(str);
-    }
-
-    // DD
-    number_string = date_str.substr(8,2);
-    pch = number_string.c_str();
-    if (pch[0] == '0') {
-        day = 0;
-    } else if (pch[0] == '1') {
-        day = 10;
-    } else if (pch[0] == '2') {
-        day = 20;
-    } else if (pch[0] == '3') {
-        day = 30;
-    } else {
-        throwTimestampFormatError(str);
-    }
-    if (pch[1] > '9' || pch[1] < '0') {
-        throwTimestampFormatError(str);
-    }
-    day += pch[1] - '0';
-    if (day > 31 || day < 1) {
-        throwTimestampFormatError(str);
-    }
-
-    // tokenize time_str: HH:MM:SS.mmmmmm
-    if (time_str.at(2) != ':' || time_str.at(5) != ':' || time_str.at(8) != '.') {
-        throwTimestampFormatError(str);
-    }
-
-    // HH
-    number_string = time_str.substr(0,2);
-    pch = number_string.c_str();
-    if (pch[0] == '0') {
-        hour = 0;
-    } else if (pch[0] == '1') {
-        hour = 10;
-    } else if (pch[0] == '2') {
-        hour = 20;
-    } else {
-        throwTimestampFormatError(str);
-    }
-    if (pch[1] > '9' || pch[1] < '0') {
-        throwTimestampFormatError(str);
-    }
-    hour += pch[1] - '0';
-    if (hour > 23 || hour < 0) {
-        throwTimestampFormatError(str);
-    }
-
-    // MM
-    number_string = time_str.substr(3,2);
-    pch = number_string.c_str();
-    if (pch[0] > '5' || pch[0] < '0') {
-        throwTimestampFormatError(str);
-    }
-    minute = 10*(pch[0] - '0');
-    if (pch[1] > '9' || pch[1] < '0') {
-        throwTimestampFormatError(str);
-    }
-    minute += pch[1] - '0';
-    if (minute > 59 || minute < 0) {
-        throwTimestampFormatError(str);
-    }
-
-    // SS
-    number_string = time_str.substr(6,2);
-    pch = number_string.c_str();
-    if (pch[0] > '5' || pch[0] < '0') {
-        throwTimestampFormatError(str);
-    }
-    second = 10*(pch[0] - '0');
-    if (pch[1] > '9' || pch[1] < '0') {
-        throwTimestampFormatError(str);
-    }
-    second += pch[1] - '0';
-    if (second > 59 || second < 0) {
-        throwTimestampFormatError(str);
-    }
-
-    // hack a '1' in the place if the decimal and use atoi to get a value that
-    // MUST be between 1 and 2 million if all 6 digits of micros were included.
-    number_string = time_str.substr(8,7);
-    number_string.at(0) = '1';
-    pch = number_string.c_str();
-    int micro = atoi(pch);
-    if (micro >= 2000000 || micro < 1000000) {
-        throwTimestampFormatError(str);
-    }
     int64_t result = 0;
     try {
         result = epoch_microseconds_from_components(

@@ -128,16 +128,6 @@ public:
         return m_child->hasParameter();
     }
 
-    virtual void substitute(const NValueArray &params) {
-        assert (m_child);
-
-        if (!m_hasParameter)
-            return;
-
-        VOLT_TRACE("Substituting parameters for expression \n%s ...", debug(true).c_str());
-        m_child->substitute(params);
-    }
-
     NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
         assert (m_child);
         return (m_child->eval(tuple1, tuple2)).callUnary<F>();
@@ -175,18 +165,6 @@ public:
             }
         }
         return false;
-    }
-
-    virtual void substitute(const NValueArray &params) {
-        if (!m_hasParameter)
-            return;
-
-        VOLT_TRACE("Substituting parameters for expression \n%s ...", debug(true).c_str());
-        for (size_t i = 0; i < m_args.size(); i++) {
-            assert(m_args[i]);
-            VOLT_TRACE("Substituting parameters for arg at index %d...", static_cast<int>(i));
-            m_args[i]->substitute(params);
-        }
     }
 
     NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
@@ -252,6 +230,9 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             break;
         case FUNC_EXTRACT_DAY_OF_WEEK:
             ret = new UnaryFunctionExpression<FUNC_EXTRACT_DAY_OF_WEEK>((*arguments)[0]);
+            break;
+        case FUNC_EXTRACT_WEEKDAY:
+            ret = new UnaryFunctionExpression<FUNC_EXTRACT_WEEKDAY>((*arguments)[0]);
             break;
         case FUNC_EXTRACT_DAY_OF_YEAR:
             ret = new UnaryFunctionExpression<FUNC_EXTRACT_DAY_OF_YEAR>((*arguments)[0]);
@@ -401,6 +382,12 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             break;
         case FUNC_VOLT_SUBSTRING_CHAR_FROM:
             ret = new GeneralFunctionExpression<FUNC_VOLT_SUBSTRING_CHAR_FROM>(*arguments);
+            break;
+        case FUNC_VOLT_SET_FIELD:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_SET_FIELD>(*arguments);
+            break;
+        case FUNC_VOLT_FORMAT_CURRENCY:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_FORMAT_CURRENCY>(*arguments);
             break;
         default:
             return NULL;

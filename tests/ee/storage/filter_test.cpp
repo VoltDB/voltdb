@@ -353,12 +353,13 @@ TEST_F(FilterTest, SubstituteFilter) {
     //
     // ConjunctionExpression predicate(EXPRESSION_TYPE_CONJUNCTION_AND, equal1, equal2);
 
+    NValueArray params(1);
     AbstractExpression *tv1 = new TupleValueExpression(0, 0);
     AbstractExpression *cv1 = new ConstantValueExpression(ValueFactory::getBigIntValue(20));
     AbstractExpression *equal1 = ExpressionUtil::comparisonFactory(EXPRESSION_TYPE_COMPARE_LESSTHANOREQUALTO, tv1, cv1);
 
     AbstractExpression *tv2 = new TupleValueExpression(0, 4);
-    AbstractExpression *pv2 = new ParameterValueExpression(0);
+    AbstractExpression *pv2 = new ParameterValueExpression(0, &params[0]);
     AbstractExpression *equal2 = ExpressionUtil::comparisonFactory(EXPRESSION_TYPE_COMPARE_EQUAL, tv2, pv2);
 
     AbstractExpression *predicate = ExpressionUtil::conjunctionFactory(EXPRESSION_TYPE_CONJUNCTION_AND, equal1, equal2);
@@ -366,9 +367,7 @@ TEST_F(FilterTest, SubstituteFilter) {
     // ::printf("\nFilter:%s\n", predicate->debug().c_str());
 
     for (int64_t implantedValue = 1; implantedValue < 5; ++implantedValue) {
-        NValueArray params(1);
         params[0] = ValueFactory::getBigIntValue(implantedValue);
-        predicate->substitute(params);
         // ::printf("\nSubstituted Filter:%s\n", predicate->debug().c_str());
         // ::printf("\tLEFT:  %s\n", predicate->getLeft()->debug().c_str());
         // ::printf("\tRIGHT: %s\n", predicate->getRight()->debug().c_str());

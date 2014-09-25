@@ -424,7 +424,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     /*
                      * Enforce a limit on the maximum number of connections
                      */
-                    if (m_numConnections.get() == MAX_CONNECTIONS.get()) {
+                    if (m_numConnections.get() >= MAX_CONNECTIONS.get()) {
                         networkLog.warn("Rejected connection from " +
                                 socket.socket().getRemoteSocketAddress() +
                                 " because the connection limit of " + MAX_CONNECTIONS + " has been reached");
@@ -1240,9 +1240,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         registerPolicy(new ParameterDeserializationPolicy(true));
         registerPolicy(new ReplicaInvocationAcceptancePolicy(replicationRole == ReplicationRole.REPLICA));
 
+        // NOTE: These "policies" are really parameter correctness checks, not permissions
         registerPolicy("@AdHoc", new AdHocAcceptancePolicy(true));
         registerPolicy("@AdHocSpForTest", new AdHocAcceptancePolicy(true));
         registerPolicy("@UpdateApplicationCatalog", new UpdateCatalogAcceptancePolicy(true));
+        registerPolicy("@UpdateClasses", new UpdateClassesAcceptancePolicy(true));
     }
 
     private void registerPolicy(InvocationAcceptancePolicy policy) {
@@ -1340,7 +1342,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         VoltDB.crashLocalVoltDB("Failed to make SnapshotDaemon active", false, e);
                     }
                 }
-            }, MoreExecutors.sameThreadExecutor());
+            }, CoreUtils.SAMETHREADEXECUTOR);
         }
     }
 
@@ -1497,7 +1499,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 handler.isAdmin(), ccxn,
                 sql, stmtsArray, userParams, null, isExplain,
                 userPartitionKey == null, userPartitionKey,
-                task.type, task.originalTxnId, task.originalUniqueId,
+                task.procName, task.type, task.originalTxnId, task.originalUniqueId,
+                VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
+                VoltDB.instance().getCatalogContext().cluster.getUseadhocschema(),
                 m_adhocCompletionHandler);
         LocalObjectMessage work = new LocalObjectMessage( ahpw );
 
@@ -1533,7 +1537,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     m_siteId,
                     task.clientHandle, handler.connectionId(), ccxn.getHostnameAndIPAndPort(),
                     handler.isAdmin(), ccxn, catalogBytes, deploymentString,
-                    task.type, task.originalTxnId, task.originalUniqueId,
+                    task.procName, task.type, task.originalTxnId, task.originalUniqueId,
+                    VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
+                    VoltDB.instance().getCatalogContext().cluster.getUseadhocschema(),
                     m_adhocCompletionHandler));
 
         m_mailbox.send(m_plannerSiteId, work);
@@ -1764,6 +1770,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 dispatchSendSentinel(handler.connectionId(), nowNanos, buf.capacity(), task);
                 return null;
             }
+            else if (task.procName.equals("@UpdateClasses")) {
+                // Icky.  Map @UpdateClasses to @UpdateApplicationCatalog.  We want the
+                // permissions and replication policy for @UAC, and we'll deal with the
+                // parameter validation stuff separately (the different name will
+                // skip the @UAC-specific policy)
+                catProc =
+                    SystemProcedureCatalog.listing.get("@UpdateApplicationCatalog").asCatalogProcedure();
+            }
         }
 
         if (user == null) {
@@ -1848,6 +1862,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             // PRO SYSPROC SPECIAL HANDLING
 
             if (task.procName.equals("@UpdateApplicationCatalog")) {
+                return dispatchUpdateApplicationCatalog(task, handler, ccxn);
+            }
+            else if (task.procName.equals("@UpdateClasses")) {
                 return dispatchUpdateApplicationCatalog(task, handler, ccxn);
             }
             else if (task.procName.equals("@SnapshotSave")) {
@@ -2108,7 +2125,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // create the execution site task
         StoredProcedureInvocation task = new StoredProcedureInvocation();
         // DR stuff
-        task.type = plannedStmtBatch.work.type;
+        task.type = plannedStmtBatch.work.invocationType;
         task.originalTxnId = plannedStmtBatch.work.originalTxnId;
         task.originalUniqueId = plannedStmtBatch.work.originalUniqueId;
         // pick the sysproc based on the presence of partition info
@@ -2241,8 +2258,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             // create the execution site task
                             StoredProcedureInvocation task = new StoredProcedureInvocation();
                             task.procName = "@UpdateApplicationCatalog";
-                            task.setParams(changeResult.encodedDiffCommands, changeResult.catalogHash, changeResult.catalogBytes,
-                                           changeResult.expectedCatalogVersion, changeResult.deploymentString,
+                            task.setParams(changeResult.encodedDiffCommands,
+                                           changeResult.catalogHash,
+                                           changeResult.catalogBytes,
+                                           changeResult.expectedCatalogVersion,
+                                           changeResult.deploymentString,
+                                           changeResult.tablesThatMustBeEmpty,
+                                           changeResult.reasonsForEmptyTables,
                                            changeResult.requiresSnapshotIsolation ? 1 : 0,
                                            changeResult.worksWithElastic ? 1 : 0,
                                            changeResult.deploymentHash);
@@ -2330,7 +2352,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     c.writeStream().enqueue(buf);
                 }
             }
-        }, MoreExecutors.sameThreadExecutor());
+        }, CoreUtils.SAMETHREADEXECUTOR);
 
         //Return the future task for test code
         return ft;
@@ -2451,7 +2473,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     hostLog.error("Error checking for topology updates", Throwables.getRootCause(t));
                 }
             }
-        }, MoreExecutors.sameThreadExecutor());
+        }, CoreUtils.SAMETHREADEXECUTOR);
         final StoredProcedureInvocation spi = new StoredProcedureInvocation();
         spi.setProcName("@Statistics");
         spi.setParams("TOPO", 0);

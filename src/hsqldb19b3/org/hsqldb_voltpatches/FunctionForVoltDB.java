@@ -117,6 +117,12 @@ public class FunctionForVoltDB extends FunctionSQL {
 
         static final int FUNC_VOLT_FROM_UNIXTIME          = 20023;
 
+        static final int FUNC_VOLT_SET_FIELD              = 20024;
+
+        static final int FUNC_VOLT_FORMAT_CURRENCY        = 20025;
+
+        static final int FUNC_CONCAT                      = 124;
+
         private static final FunctionId[] instances = {
 
             new FunctionId("sql_error", null, FUNC_VOLT_SQL_ERROR, 0,
@@ -135,6 +141,14 @@ public class FunctionForVoltDB extends FunctionSQL {
                     new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
                                   Tokens.COMMA, Tokens.QUESTION,
                                   Tokens.CLOSEBRACKET}),
+
+// Disable SET_FIELD at the parser level until its exact semantics can be ironed out.
+//            new FunctionId("set_field", Type.SQL_VARCHAR, FUNC_VOLT_SET_FIELD, -1,
+//                    new Type[] { Type.SQL_VARCHAR, Type.SQL_VARCHAR, Type.SQL_VARCHAR },
+//                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
+//                                  Tokens.COMMA, Tokens.QUESTION,
+//                                  Tokens.COMMA, Tokens.QUESTION,
+//                                  Tokens.CLOSEBRACKET }),
 
             new FunctionId("array_element", Type.SQL_VARCHAR, FUNC_VOLT_ARRAY_ELEMENT, -1,
                     new Type[] { Type.SQL_VARCHAR, Type.SQL_INTEGER },
@@ -171,6 +185,18 @@ public class FunctionForVoltDB extends FunctionSQL {
             new FunctionId("from_unixtime", Type.SQL_TIMESTAMP, FUNC_VOLT_FROM_UNIXTIME, -1,
                     new Type[] { Type.SQL_BIGINT },
                     new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("format_currency", Type.SQL_VARCHAR, FUNC_VOLT_FORMAT_CURRENCY, -1,
+                    new Type[] { Type.SQL_DECIMAL, Type.SQL_INTEGER},
+                    new short[] {  Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA,
+            		Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+
+            new FunctionId("concat", Type.SQL_VARCHAR, FUNC_CONCAT, -1,
+                    new Type[] { Type.SQL_VARCHAR, Type.SQL_VARCHAR },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA, Tokens.QUESTION,
+                                  Tokens.X_REPEAT, 2, Tokens.COMMA, Tokens.QUESTION,
+                                  Tokens.CLOSEBRACKET }),
+
         };
 
         private static Map<String, FunctionId> by_LC_name = new HashMap<String, FunctionId>();
@@ -260,6 +286,13 @@ public class FunctionForVoltDB extends FunctionSQL {
         }
 
         switch(funcType) {
+        case FunctionId.FUNC_CONCAT:
+            for (int ii = 0; ii < nodes.length; ii++) {
+                if (nodes[ii].dataType == null && nodes[ii].isParam) {
+                    nodes[ii].dataType = Type.SQL_VARCHAR;
+                }
+            }
+            break;
         /*
          * The types to the FIELD functions parameters are VARCHAR
          */
@@ -459,6 +492,17 @@ public class FunctionForVoltDB extends FunctionSQL {
             case FunctionId.FUNC_VOLT_FROM_UNIXTIME: {
                 sb.append(name).append(Tokens.T_OPENBRACKET).append(nodes[0].getSQL());
                 sb.append(Tokens.T_CLOSEBRACKET);
+
+                return sb.toString();
+            }
+            case FunctionId.FUNC_VOLT_SET_FIELD: {
+                sb.append(name).append(Tokens.T_OPENBRACKET);
+                sb.append(nodes[0].getSQL());
+                sb.append(Tokens.T_COMMA).append(nodes[1].getSQL());
+                sb.append(Tokens.T_COMMA).append(nodes[2].getSQL());
+                sb.append(Tokens.T_CLOSEBRACKET);
+
+                return sb.toString();
             }
             default :
                 return super.getSQL();

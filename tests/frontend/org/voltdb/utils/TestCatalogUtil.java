@@ -26,6 +26,7 @@ package org.voltdb.utils;
 import java.io.File;
 import java.io.FileInputStream;
 import java.util.List;
+import java.util.SortedSet;
 
 import junit.framework.TestCase;
 
@@ -46,6 +47,7 @@ import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
+import org.voltdb.compilereport.ProcedureAnnotation;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.types.ConstraintType;
 
@@ -537,8 +539,8 @@ public class TestCatalogUtil extends TestCase {
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
-                + "    <export enabled='true' target='custom' exportconnectorclass=\"com.foo.export.ExportClient\" >"
-                + "        <configuration>"
+                + "    <export>"
+                + "        <configuration enabled='true' target='custom' exportconnectorclass=\"com.foo.export.ExportClient\" >"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -549,8 +551,8 @@ public class TestCatalogUtil extends TestCase {
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
-                + "    <export enabled='true' target='custom' exportconnectorclass=\"org.voltdb.exportclient.NoOpTestExportClient\" >"
-                + "        <configuration>"
+                + "    <export>"
+                + "        <configuration enabled='true' target='custom' exportconnectorclass=\"org.voltdb.exportclient.NoOpTestExportClient\" >"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -561,8 +563,8 @@ public class TestCatalogUtil extends TestCase {
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
-                + "    <export enabled='true' target='file'>"
-                + "        <configuration>"
+                + "    <export>"
+                + "        <configuration enabled='true' target='file'>"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -573,8 +575,20 @@ public class TestCatalogUtil extends TestCase {
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
-                + "    <export enabled='true' target='kafka'>"
-                + "        <configuration>"
+                + "    <export>"
+                + "        <configuration enabled='true' target='kafka'>"
+                + "            <property name=\"foo\">false</property>"
+                + "            <property name=\"type\">CSV</property>"
+                + "            <property name=\"with-schema\">false</property>"
+                + "        </configuration>"
+                + "    </export>"
+                + "</deployment>";
+        final String withBuiltinRabbitMQExport =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <export>"
+                + "        <configuration enabled='true' target='rabbitmq'>"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -602,7 +616,7 @@ public class TestCatalogUtil extends TestCase {
         org.voltdb.catalog.Connector catconn = db.getConnectors().get("0");
         assertNotNull(catconn);
 
-        assertFalse(bad_deployment.getExport().isEnabled());
+        assertFalse(bad_deployment.getExport().getConfiguration().get(0).isEnabled());
 
         //This is a good deployment with custom class that can be found
         final File tmpGood = VoltProjectBuilder.writeStringToTempFile(withGoodCustomExport);
@@ -616,9 +630,9 @@ public class TestCatalogUtil extends TestCase {
         catconn = db.getConnectors().get("0");
         assertNotNull(catconn);
 
-        assertTrue(good_deployment.getExport().isEnabled());
-        assertEquals(good_deployment.getExport().getTarget(), ServerExportEnum.CUSTOM);
-        assertEquals(good_deployment.getExport().getExportconnectorclass(),
+        assertTrue(good_deployment.getExport().getConfiguration().get(0).isEnabled());
+        assertEquals(good_deployment.getExport().getConfiguration().get(0).getTarget(), ServerExportEnum.CUSTOM);
+        assertEquals(good_deployment.getExport().getConfiguration().get(0).getExportconnectorclass(),
                 "org.voltdb.exportclient.NoOpTestExportClient");
         ConnectorProperty prop = catconn.getConfig().get(ExportDataProcessor.EXPORT_TO_TYPE);
         assertEquals(prop.getValue(), "org.voltdb.exportclient.NoOpTestExportClient");
@@ -635,8 +649,8 @@ public class TestCatalogUtil extends TestCase {
         catconn = db.getConnectors().get("0");
         assertNotNull(catconn);
 
-        assertTrue(builtin_deployment.getExport().isEnabled());
-        assertEquals(builtin_deployment.getExport().getTarget(), ServerExportEnum.FILE);
+        assertTrue(builtin_deployment.getExport().getConfiguration().get(0).isEnabled());
+        assertEquals(builtin_deployment.getExport().getConfiguration().get(0).getTarget(), ServerExportEnum.FILE);
         prop = catconn.getConfig().get(ExportDataProcessor.EXPORT_TO_TYPE);
         assertEquals(prop.getValue(), "org.voltdb.exportclient.ExportToFileClient");
 
@@ -652,11 +666,52 @@ public class TestCatalogUtil extends TestCase {
         catconn = db.getConnectors().get("0");
         assertNotNull(catconn);
 
-        assertTrue(builtin_kafkadeployment.getExport().isEnabled());
-        assertEquals(builtin_kafkadeployment.getExport().getTarget(), ServerExportEnum.KAFKA);
+        assertTrue(builtin_kafkadeployment.getExport().getConfiguration().get(0).isEnabled());
+        assertEquals(builtin_kafkadeployment.getExport().getConfiguration().get(0).getTarget(), ServerExportEnum.KAFKA);
         prop = catconn.getConfig().get(ExportDataProcessor.EXPORT_TO_TYPE);
         assertEquals(prop.getValue(), "org.voltdb.exportclient.KafkaExportClient");
 
+        // Check RabbitMQ option
+        final File tmpRabbitMQBuiltin = VoltProjectBuilder.writeStringToTempFile(withBuiltinRabbitMQExport);
+        DeploymentType builtin_rabbitmqdeployment = CatalogUtil.getDeployment(new FileInputStream(tmpRabbitMQBuiltin));
+        Catalog cat5 = compiler.compileCatalogFromDDL(x);
+        crc = CatalogUtil.compileDeployment(cat5, builtin_rabbitmqdeployment, true, false);
+        assertTrue("Deployment file failed to parse", crc != -1);
+        db = cat5.getClusters().get("cluster").getDatabases().get("database");
+        catconn = db.getConnectors().get("0");
+        assertNotNull(catconn);
+        assertTrue(builtin_rabbitmqdeployment.getExport().getConfiguration().get(0).isEnabled());
+        assertEquals(ServerExportEnum.RABBITMQ, builtin_rabbitmqdeployment.getExport().getConfiguration().get(0).getTarget());
+        prop = catconn.getConfig().get(ExportDataProcessor.EXPORT_TO_TYPE);
+        assertEquals("org.voltdb.exportclient.RabbitMQExportClient", prop.getValue());
+    }
+
+    public void testDeprecatedExportSyntax() throws Exception {
+        final String withGoodCustomExport =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <export enabled='true' target='custom' exportconnectorclass=\"org.voltdb.exportclient.NoOpTestExportClient\" >"
+                + "        <configuration>"
+                + "            <property name=\"foo\">false</property>"
+                + "            <property name=\"type\">CSV</property>"
+                + "            <property name=\"with-schema\">false</property>"
+                + "        </configuration>"
+                + "    </export>"
+                + "</deployment>";
+        final String ddl =
+                "CREATE TABLE export_data ( id BIGINT default 0 , value BIGINT DEFAULT 0 );\n"
+                + "EXPORT TABLE export_data;";
+
+        final File tmpDdl = VoltProjectBuilder.writeStringToTempFile(ddl);
+
+        final File tmpGood = VoltProjectBuilder.writeStringToTempFile(withGoodCustomExport);
+        DeploymentType good_deployment = CatalogUtil.getDeployment(new FileInputStream(tmpGood));
+
+        assertTrue(good_deployment.getExport().getConfiguration().get(0).isEnabled());
+        assertEquals(good_deployment.getExport().getConfiguration().get(0).getExportconnectorclass(),
+                "org.voltdb.exportclient.NoOpTestExportClient");
+        assertEquals(good_deployment.getExport().getConfiguration().get(0).getTarget(), ServerExportEnum.CUSTOM);
     }
 
     /**
@@ -677,4 +732,85 @@ public class TestCatalogUtil extends TestCase {
         assertEquals(crc1, crc2);
     }
 
+    public void testClusterSchemaSetting() throws Exception
+    {
+        final String defSchema =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+            "<deployment>" +
+            "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
+            "</deployment>";
+
+        final String catalogSchema =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+            "<deployment>" +
+            "   <cluster hostcount='3' kfactor='1' sitesperhost='2' schema='catalog'/>" +
+            "</deployment>";
+
+        final String adhocSchema =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+            "<deployment>" +
+            "   <cluster hostcount='3' kfactor='1' sitesperhost='2' schema='adhoc'/>" +
+            "</deployment>";
+
+        final File tmpDefSchema = VoltProjectBuilder.writeStringToTempFile(defSchema);
+        CatalogUtil.compileDeployment(catalog, tmpDefSchema.getPath(), true, false);
+        Cluster cluster =  catalog.getClusters().get("cluster");
+        assertFalse(cluster.getUseadhocschema());
+
+        setUp();
+        final File tmpCatalogSchema = VoltProjectBuilder.writeStringToTempFile(catalogSchema);
+        CatalogUtil.compileDeployment(catalog, tmpCatalogSchema.getPath(), true, false);
+        cluster =  catalog.getClusters().get("cluster");
+        assertFalse(cluster.getUseadhocschema());
+
+        setUp();
+        final File tmpAdhocSchema = VoltProjectBuilder.writeStringToTempFile(adhocSchema);
+        CatalogUtil.compileDeployment(catalog, tmpAdhocSchema.getPath(), true, false);
+        cluster =  catalog.getClusters().get("cluster");
+        assertTrue(cluster.getUseadhocschema());
+    }
+
+    public void testProcedureReadWriteAccess() {
+
+        assertFalse(checkTableInProcedure("InsertStock", "STOCK", true));
+        assertFalse(checkTableInProcedure("InsertStock", "NEW_ORDER", false));
+
+        assertTrue(checkTableInProcedure("SelectAll", "HISTORY", true));
+        assertTrue(checkTableInProcedure("SelectAll", "NEW_ORDER", true));
+        assertFalse(checkTableInProcedure("SelectAll", "HISTORY", false));
+
+        assertTrue(checkTableInProcedure("neworder", "WAREHOUSE", true));
+        assertFalse(checkTableInProcedure("neworder", "ORDERS", true));
+        assertFalse(checkTableInProcedure("neworder", "WAREHOUSE", false));
+
+        assertFalse(checkTableInProcedure("paymentByCustomerIdW", "WAREHOUSE", true));
+        assertFalse(checkTableInProcedure("paymentByCustomerIdW", "HISTORY", true));
+        assertTrue(checkTableInProcedure("paymentByCustomerIdW", "WAREHOUSE", false));
+        assertTrue(checkTableInProcedure("paymentByCustomerIdW", "HISTORY", false));
+
+        assertFalse(checkTableInProcedure("ResetWarehouse", "ORDER_LINE", true));
+        assertTrue(checkTableInProcedure("ResetWarehouse", "ORDER_LINE", false));
+    }
+
+    private boolean checkTableInProcedure(String procedureName, String tableName, boolean read){
+
+        ProcedureAnnotation annotation = (ProcedureAnnotation) catalog_db
+                .getProcedures().get(procedureName).getAnnotation();
+
+        SortedSet<Table> tables = null;
+        if(read){
+            tables = annotation.tablesRead;
+        } else {
+            tables = annotation.tablesUpdated;
+        }
+
+        boolean containsTable = false;
+        for(Table t: tables) {
+            if(t.getTypeName().equals(tableName)) {
+                containsTable = true;
+                break;
+            }
+        }
+        return containsTable;
+    }
 }

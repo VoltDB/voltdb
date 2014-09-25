@@ -1,7 +1,7 @@
 Key-Value application
 ===========================
 
-This example application demonstrates how to create a "Key-Value" store in VoltDB.
+This example application demonstrates how to create a "Key-Value" store using VoltDB and the automatic stored procedures created for each table.
 
 Many attributes of the application are customizable through arguments passed to the client, including:
 
@@ -46,6 +46,11 @@ For more on benchmarking and tips on application tuning, make sure you visit the
  - http://voltdb.com/search/node/benchmark
  - http://voltdb.com/search/node/tuning
 
+Calling stored procedures
+-------------------------
+
+This example makes use of the built-in stored procedures that are automatically created for each table. Client applications use stored procedures to make query calls to the database. However, they can use the builtin procedures to make basic query calls to the server instead of writing custom stored procedures. For example, a Get query uses the builtin STORE.select procedure call and a Put query (insert or update) uses the builtin STORE.upsert.
+
 run.sh actions described
 ---------------------
 
@@ -53,11 +58,11 @@ run.sh                 : compile all Java clients and stored procedures, build t
 
 run.sh server          : start the server
 
-run.sh client          : start the async client benchmark, [if needed, initialize the given number of key-value pairs (puts),] begin normal client processing (gets and puts)
+run.sh client          : start the async client benchmark, initialize the given number of key-value pairs (puts) if needed, and begin normal client processing (gets and puts)
 
 run.sh async-benchmark : same as run.sh client
 
-run.sh sync-benchmark  : start the multi-threaded sync client, [if needed, initialize the given number of key-value pairs (puts),] begin normal client processing (gets and puts)
+run.sh sync-benchmark  : start the multi-threaded sync client,  initialize the given number of key-value pairs (puts) if needed, and begin normal client processing (gets and puts)
 
 run.sh jdbc-benchmark  : start the JDBC client benchmark
 

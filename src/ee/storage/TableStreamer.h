@@ -23,6 +23,7 @@
 #include <list>
 #include <boost/shared_ptr.hpp>
 #include <boost/foreach.hpp>
+#include "common/declarations.h"
 #include "common/ids.h"
 #include "common/types.h"
 #include "common/TupleSerializer.h"
@@ -36,7 +37,6 @@ class CopyOnWriteTest;
 namespace voltdb
 {
 
-class ReferenceSerializeInput;
 class PersistentTable;
 class PersistentTableSurgeon;
 class TupleOutputStreamProcessor;

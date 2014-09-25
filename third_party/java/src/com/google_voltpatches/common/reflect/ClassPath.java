@@ -20,6 +20,8 @@ import static com.google_voltpatches.common.base.Preconditions.checkNotNull;
 
 import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.annotations.VisibleForTesting;
+import com.google_voltpatches.common.base.CharMatcher;
+import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.base.Splitter;
 import com.google_voltpatches.common.collect.FluentIterable;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -55,8 +57,13 @@ import javax.annotation_voltpatches.Nullable;
  */
 @Beta
 public final class ClassPath {
-
   private static final Logger logger = Logger.getLogger(ClassPath.class.getName());
+
+  private static final Predicate<ClassInfo> IS_TOP_LEVEL = new Predicate<ClassInfo>() {
+    @Override public boolean apply(ClassInfo info) {
+      return info.className.indexOf('$') == -1;
+    }
+  };
 
   /** Separator for the Class-Path manifest attribute value in jar files. */
   private static final Splitter CLASS_PATH_ATTRIBUTE_SEPARATOR =
@@ -95,9 +102,18 @@ public final class ClassPath {
     return resources;
   }
 
+  /**
+   * Returns all classes loadable from the current class path.
+   *
+   * @since 16.0
+   */
+  public ImmutableSet<ClassInfo> getAllClasses() {
+    return FluentIterable.from(resources).filter(ClassInfo.class).toSet();
+  }
+
   /** Returns all top level classes loadable from the current class path. */
   public ImmutableSet<ClassInfo> getTopLevelClasses() {
-    return FluentIterable.from(resources).filter(ClassInfo.class).toSet();
+    return FluentIterable.from(resources).filter(ClassInfo.class).filter(IS_TOP_LEVEL).toSet();
   }
 
   /** Returns all top level classes whose package name is {@code packageName}. */
@@ -140,7 +156,7 @@ public final class ClassPath {
     final ClassLoader loader;
 
     static ResourceInfo of(String resourceName, ClassLoader loader) {
-      if (resourceName.endsWith(CLASS_FILE_NAME_EXTENSION) && !resourceName.contains("$")) {
+      if (resourceName.endsWith(CLASS_FILE_NAME_EXTENSION)) {
         return new ClassInfo(resourceName, loader);
       } else {
         return new ResourceInfo(resourceName, loader);
@@ -196,22 +212,45 @@ public final class ClassPath {
       this.className = getClassName(resourceName);
     }
 
-    /** Returns the package name of the class, without attempting to load the class. */
+    /** 
+     * Returns the package name of the class, without attempting to load the class.
+     * 
+     * <p>Behaves identically to {@link Package#getName()} but does not require the class (or 
+     * package) to be loaded.
+     */
     public String getPackageName() {
       return Reflection.getPackageName(className);
     }
 
-    /** Returns the simple name of the underlying class as given in the source code. */
+    /** 
+     * Returns the simple name of the underlying class as given in the source code.
+     * 
+     * <p>Behaves identically to {@link Class#getSimpleName()} but does not require the class to be
+     * loaded.
+     */
     public String getSimpleName() {
+      int lastDollarSign = className.lastIndexOf('$');
+      if (lastDollarSign != -1) {
+        String innerClassName = className.substring(lastDollarSign + 1);
+        // local and anonymous classes are prefixed with number (1,2,3...), anonymous classes are 
+        // entirely numeric whereas local classes have the user supplied name as a suffix
+        return CharMatcher.DIGIT.trimLeadingFrom(innerClassName);
+      }
       String packageName = getPackageName();
       if (packageName.isEmpty()) {
         return className;
       }
+
       // Since this is a top level class, its simple name is always the part after package name.
       return className.substring(packageName.length() + 1);
     }
 
-    /** Returns the fully qualified name of the class. */
+    /** 
+     * Returns the fully qualified name of the class. 
+     * 
+     * <p>Behaves identically to {@link Class#getName()} but does not require the class to be
+     * loaded.
+     */
     public String getName() {
       return className;
     }

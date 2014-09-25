@@ -17,7 +17,7 @@
 
 #include "streamedtable.h"
 #include "StreamedTableUndoAction.hpp"
-#include "TupleStreamWrapper.h"
+#include "ExportTupleStream.h"
 #include "common/executorcontext.hpp"
 #include "tableiterator.h"
 
@@ -29,7 +29,7 @@ StreamedTable::StreamedTable(bool exportEnabled)
 {
     // In StreamedTable, a non-null m_wrapper implies export enabled.
     if (exportEnabled) {
-        m_wrapper = new TupleStreamWrapper(m_executorContext->m_partitionId,
+        m_wrapper = new ExportTupleStream(m_executorContext->m_partitionId,
                                            m_executorContext->m_siteId);
     }
 }
@@ -85,7 +85,7 @@ bool StreamedTable::insertTuple(TableTuple &source)
                                       m_executorContext->currentUniqueId(),
                                       m_executorContext->currentTxnTimestamp(),
                                       source,
-                                      TupleStreamWrapper::INSERT);
+                                      ExportTupleStream::INSERT);
         m_tupleCount++;
         UndoQuantum *uq = m_executorContext->getCurrentUndoQuantum();
         if (!uq) {
@@ -113,7 +113,7 @@ bool StreamedTable::deleteTuple(TableTuple &tuple, bool fallible)
                                       m_executorContext->currentUniqueId(),
                                       m_executorContext->currentTxnTimestamp(),
                                       tuple,
-                                      TupleStreamWrapper::DELETE);
+                                      ExportTupleStream::DELETE);
         m_tupleCount++;
         // Infallible delete (schema change with tuple migration & views) is not supported for export tables
         assert(fallible);
@@ -127,7 +127,7 @@ bool StreamedTable::deleteTuple(TableTuple &tuple, bool fallible)
     return true;
 }
 
-void StreamedTable::loadTuplesFrom(SerializeInput&, Pool*)
+void StreamedTable::loadTuplesFrom(SerializeInputBE&, Pool*)
 {
     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                   "May not update a streamed table.");
@@ -137,8 +137,7 @@ void StreamedTable::flushOldTuples(int64_t timeInMillis)
 {
     if (m_wrapper) {
         m_wrapper->periodicFlush(timeInMillis,
-                                 m_executorContext->m_lastCommittedSpHandle,
-                                 m_executorContext->currentSpHandle());
+                                 m_executorContext->m_lastCommittedSpHandle);
     }
 }
 

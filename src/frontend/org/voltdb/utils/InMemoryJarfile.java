@@ -212,6 +212,27 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
         return put(key, bytes);
     }
 
+    private String fileToClassName(String filename)
+    {
+        return filename.replace(File.separatorChar, '.').substring(0, filename.length() - ".class".length());
+    }
+
+    private String classToFileName(String classname)
+    {
+        return classname.replace('.', File.separatorChar) + ".class";
+    }
+
+    /**
+     * Remove the provided classname and all inner classes from the jarfile and the classloader
+     */
+    public void removeClassFromJar(String classname)
+    {
+        for (String innerclass : getLoader().getInnerClassesForClass(classname)) {
+            remove(classToFileName(innerclass));
+        }
+        remove(classToFileName(classname));
+    }
+
     ///////////////////////////////////////////////////////
     // CLASSLOADING
     ///////////////////////////////////////////////////////
@@ -223,18 +244,14 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
         void noteUpdated(String key) {
             if (!key.endsWith(".class"))
                 return;
-            String javaClassName = key.replace(File.separatorChar, '.');
-            javaClassName = javaClassName.substring(0, javaClassName.length() - 6);
-            m_classNames.add(javaClassName);
+            m_classNames.add(fileToClassName(key));
         }
 
         void noteRemoved(String key) {
             if (!key.endsWith(".class"))
                 return;
-            String javaClassName = key.replace(File.separatorChar, '.');
-            javaClassName = javaClassName.substring(0, javaClassName.length() - 6);
-            m_classNames.remove(javaClassName);
-            m_cache.remove(javaClassName);
+            m_classNames.remove(fileToClassName(key));
+            m_cache.remove(fileToClassName(key));
         }
 
         // prevent this from being publicly called
@@ -258,7 +275,7 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
 
             // now look through the list
             if (m_classNames.contains(className)) {
-                String classPath = className.replace('.', File.separatorChar) + ".class";
+                String classPath = classToFileName(className);
 
                 byte bytes[] = get(classPath);
                 if (bytes == null)
@@ -282,11 +299,15 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
         public String[] getInnerClassesForClass(String className) {
             List<String> matches = new ArrayList<>();
             for (String potential : m_classNames) {
-                if (potential.startsWith(className + ".")) {
+                if (potential.startsWith(className + "$")) {
                     matches.add(potential);
                 }
             }
             return matches.toArray(new String[0]);
+        }
+
+        public Set<String> getClassNames() {
+            return m_classNames;
         }
     }
 

@@ -84,6 +84,14 @@ class AbstractExecutor {
         }
     }
 
+    inline void cleanupInputTempTable(Table * input_table) {
+        TempTable* tmp_input_table = dynamic_cast<TempTable*>(input_table);
+        if (tmp_input_table) {
+            // No need of its input temp table
+            tmp_input_table->deleteAllTuplesNonVirtual(false);
+        }
+    }
+
   protected:
     AbstractExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode) {
         m_abstractNode = abstractNode;
@@ -123,11 +131,6 @@ inline bool AbstractExecutor::execute(const NValueArray& params)
 {
     assert(m_abstractNode);
     VOLT_TRACE("Starting execution of plannode(id=%d)...",  m_abstractNode->getPlanNodeId());
-
-    // substitute params for output schema
-    for (int i = 0; i < m_abstractNode->getOutputSchema().size(); i++) {
-        m_abstractNode->getOutputSchema()[i]->getExpression()->substitute(params);
-    }
 
     // run the executor
     return p_execute(params);

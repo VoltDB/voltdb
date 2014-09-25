@@ -16,7 +16,7 @@
 
 package com.google_voltpatches.common.collect;
 
-import static com.google_voltpatches.common.base.Preconditions.checkArgument;
+import static com.google_voltpatches.common.collect.CollectPreconditions.checkNonnegative;
 
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.base.Supplier;
@@ -86,7 +86,7 @@ public class HashBasedTable<R, C, V> extends StandardTable<R, C, V> {
    */
   public static <R, C, V> HashBasedTable<R, C, V> create(
       int expectedRows, int expectedCellsPerRow) {
-    checkArgument(expectedCellsPerRow >= 0);
+    checkNonnegative(expectedCellsPerRow, "expectedCellsPerRow");
     Map<R, Map<C, V>> backingMap =
         Maps.newHashMapWithExpectedSize(expectedRows);
     return new HashBasedTable<R, C, V>(

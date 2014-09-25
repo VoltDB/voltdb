@@ -24,6 +24,7 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -79,13 +80,13 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
         // Exercise basic syntax without runtime invocation.
         cr = client.callProcedure("@AdHoc", "select SQL_ERROR(123) from P1 where ID = 0");
-        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
 
         cr = client.callProcedure("@AdHoc", "select SQL_ERROR('abc') from P1 where ID = 0");
-        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
 
         cr = client.callProcedure("@AdHoc", "select SQL_ERROR(123, 'abc') from P1 where ID = 0");
-        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
 
         boolean caught = false;
 
@@ -572,390 +573,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertTrue(cr.getResults()[0].advanceRow());
         assertEquals(Integer.MIN_VALUE, cr.getResults()[0].getLong(0));
 
-        try {
-            cr = client.callProcedure("@AdHoc","select DECODE(tiny, 4, 5, NULL, 'tiny null', tiny) " +
-                    " from R3 where id = 2");
-            fail();
-        } catch (Exception ex) {
-            System.out.println(ex.getMessage());
-            assertTrue(ex.getMessage().contains("SQL ERROR"));
-            assertTrue(ex.getMessage().contains("value: 'tiny null'"));
-        }
-    }
-
-    /**
-     * @return
-     * @throws IOException
-     * @throws NoConnectionsException
-     * @throws ProcCallException
-     */
-    private void loadJS1(Client client) throws IOException, NoConnectionsException, ProcCallException
-    {
-
-        final String jstemplate = "{\n" +
-                "    \"id\": %d,\n" +
-                "    \"bool\": true,\n" +
-                "    \"inner\": {\n" +
-                "        \"veggies\": \"good for you\",\n" +
-                "        \"贾鑫Vo\": \"wakarimasen\"\n" +
-                "    },\n" +
-                "    \"arr\": [\n" +
-                "        0,\n" +
-                "        %d,\n" +
-                "        100\n" +
-                "    ],\n" +
-                "    \"tag\": \"%s\"\n" +
-                "}";
-
-        ClientResponse cr;
-        cr = client.callProcedure("JS1.insert",1,String.format(jstemplate, 1, 1, "one"));
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("JS1.insert",2,String.format(jstemplate, 2, 2, "two"));
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("JS1.insert",3,String.format(jstemplate, 3, 3, "three"));
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("JS1.insert",4,"{\"id\":4,\"bool\": false}");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("JS1.insert",5,"{}");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("JS1.insert",6,"[]");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("JS1.insert",7,"{\"id\":7,\"funky\": null}");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("JS1.insert",8, null);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("JS1.insert",9, "{\"id\":9, \"贾鑫Vo\":\"分かりません\"}");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-    }
-
-    public void testFIELDFunction() throws Exception {
-        ClientResponse cr;
-        VoltTable result;
-        Client client = getClient();
-        loadJS1(client);
-
-        cr = client.callProcedure("IdFieldProc", "id", "1");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals(1L,result.getLong(0));
-
-        try {
-            cr = client.callProcedure("IdFieldProc", "id", 1);
-            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        }
-        catch ( ProcCallException pcex) {
-            fail("parameter check failed");
-        }
-
-        try {
-            cr = client.callProcedure("IdFieldProc", 1, "1");
-            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        }
-        catch ( ProcCallException pcex) {
-            fail("parameter check failed");
-        }
-
-        cr = client.callProcedure("IdFieldProc", "tag", "three");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals(3L,result.getLong(0));
-
-        cr = client.callProcedure("IdFieldProc", "bool", "false");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals(4L,result.getLong(0));
-
-        cr = client.callProcedure("IdFieldProc", "贾鑫Vo", "分かりません");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals(9L,result.getLong(0));
-
-        cr = client.callProcedure("NullFieldProc", "funky");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(9, result.getRowCount());
-
-        cr = client.callProcedure("NullFieldProc", "id");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(3, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals(5L,result.getLong(0));
-        assertTrue(result.advanceRow());
-        assertEquals(6L,result.getLong(0));
-        assertTrue(result.advanceRow());
-        assertEquals(8L,result.getLong(0));
-
-        cr = client.callProcedure("InnerFieldProc", "贾鑫Vo" ,"wakarimasen");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(3, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals(1L,result.getLong(0));
-        assertTrue(result.advanceRow());
-        assertEquals(2L,result.getLong(0));
-        assertTrue(result.advanceRow());
-        assertEquals(3L,result.getLong(0));
-
-        cr = client.callProcedure("IdFieldProc", "arr" ,"[0,2,100]");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals(2L,result.getLong(0));
-
-        cr = client.callProcedure("@AdHoc", // test scalar not an object
-                                  "SELECT FIELD(FIELD(DOC, 'id'), 'value') FROM JS1 WHERE ID = 1");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        result.getString(0);
-        assertTrue(result.wasNull());
-
-        cr = client.callProcedure("@AdHoc", // test array not an object
-                                  "SELECT FIELD(FIELD(DOC, 'arr'), 'value') FROM JS1 WHERE ID = 1");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        result.getString(0);
-        assertTrue(result.wasNull());
-    }
-
-    public void testARRAY_ELEMENTFunction() throws Exception {
-        ClientResponse cr;
-        VoltTable result;
-        Client client = getClient();
-        loadJS1(client);
-
-        cr = client.callProcedure("IdArrayProc", "arr", 1, "1");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals(1L,result.getLong(0));
-
-        try {
-            cr = client.callProcedure("IdArrayProc", "arr", "NotNumeric", "1");
-            fail("parameter check failed");
-        }
-        catch ( ProcCallException pcex) {
-            assertTrue(pcex.getMessage().contains("TYPE ERROR FOR PARAMETER 1"));
-        }
-
-        try {
-            cr = client.callProcedure("IdArrayProc", 1, 1, "1");
-            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        }
-        catch ( ProcCallException pcex) {
-            fail("parameter check failed");
-        }
-
-        cr = client.callProcedure("NullArrayProc", "funky", 2);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(9, result.getRowCount());
-
-        cr = client.callProcedure("IdArrayProc", "id", 1, "1");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(0, result.getRowCount());
-
-        cr = client.callProcedure("@AdHoc", // test index out of bounds
-                                  "SELECT ARRAY_ELEMENT(FIELD(DOC, 'arr'), 99) FROM JS1 WHERE ID = 1");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        result.getString(0);
-        assertTrue(result.wasNull());
-
-        cr = client.callProcedure("@AdHoc", // test negative index
-                                  "SELECT ARRAY_ELEMENT(FIELD(DOC, 'arr'), -1) FROM JS1 WHERE ID = 1");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        result.getString(0);
-        assertTrue(result.wasNull());
-
-        cr = client.callProcedure("@AdHoc", // test scalar not an array
-                                  "SELECT ARRAY_ELEMENT(FIELD(DOC, 'id'), 1) FROM JS1 WHERE ID = 1");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        result.getString(0);
-        assertTrue(result.wasNull());
-
-        cr = client.callProcedure("@AdHoc", // test object not an array
-                                  "SELECT ARRAY_ELEMENT(FIELD(DOC, 'inner'), 1) FROM JS1 WHERE ID = 1");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        result.getString(0);
-        assertTrue(result.wasNull());
-
-        // Test top-level json array.
-        cr = client.callProcedure("JS1.insert", 10, "[0, 10, 100]");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("@AdHoc",
-                                  "SELECT ARRAY_ELEMENT(DOC, 1) FROM JS1 WHERE ID = 10");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals("10",result.getString(0));
-
-        // Test empty json array.
-        cr = client.callProcedure("JS1.insert", 11, "[]");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("@AdHoc",
-                                  "SELECT ARRAY_ELEMENT(DOC, 0) FROM JS1 WHERE ID = 11");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        result.getString(0);
-        assertTrue(result.wasNull());
-    }
-
-    public void testARRAY_LENGTHFunction() throws Exception {
-        ClientResponse cr;
-        VoltTable result;
-        Client client = getClient();
-        loadJS1(client);
-
-        cr = client.callProcedure("IdArrayLengthProc", "arr", 3);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(3, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals(1L,result.getLong(0));
-        assertTrue(result.advanceRow());
-        assertEquals(2L,result.getLong(0));
-        assertTrue(result.advanceRow());
-        assertEquals(3L,result.getLong(0));
-
-        try {
-            cr = client.callProcedure("IdArrayLengthProc", "arr", "NoNumber");
-            fail("parameter check failed");
-        }
-        catch ( ProcCallException pcex) {
-            assertTrue(pcex.getMessage().contains("TYPE ERROR FOR PARAMETER 1"));
-        }
-
-        try {
-            cr = client.callProcedure("IdArrayLengthProc", 1, 3);
-            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        }
-        catch ( ProcCallException pcex) {
-            fail("parameter check failed");
-        }
-
-        cr = client.callProcedure("NullFieldProc", "funky");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(9, result.getRowCount());
-
-        cr = client.callProcedure("NullArrayLengthProc", "arr");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(6, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals(4L,result.getLong(0));
-        assertTrue(result.advanceRow());
-        assertEquals(5L,result.getLong(0));
-        assertTrue(result.advanceRow());
-        assertEquals(6L,result.getLong(0));
-        assertTrue(result.advanceRow());
-        assertEquals(7L,result.getLong(0));
-        assertTrue(result.advanceRow());
-        assertEquals(8L,result.getLong(0));
-        assertTrue(result.advanceRow());
-        assertEquals(9L,result.getLong(0));
-
-        cr = client.callProcedure("LargeArrayLengthProc", "arr", 3);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(0, result.getRowCount());
-
-        cr = client.callProcedure("LargeArrayLengthProc", "arr", 2);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(3, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals(1L,result.getLong(0));
-        assertTrue(result.advanceRow());
-        assertEquals(2L,result.getLong(0));
-        assertTrue(result.advanceRow());
-        assertEquals(3L,result.getLong(0));
-
-        cr = client.callProcedure("SmallArrayLengthProc", "arr", 2);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(0, result.getRowCount());
-
-        cr = client.callProcedure("SmallArrayLengthProc", "arr", 3);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(3, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals(1L,result.getLong(0));
-        assertTrue(result.advanceRow());
-        assertEquals(2L,result.getLong(0));
-        assertTrue(result.advanceRow());
-        assertEquals(3L,result.getLong(0));
-
-        cr = client.callProcedure("@AdHoc", // test scalar not an array
-                                  "SELECT ARRAY_LENGTH(FIELD(DOC, 'id')) FROM JS1 WHERE ID = 1");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        result.getLong(0);
-        assertTrue(result.wasNull());
-
-        cr = client.callProcedure("@AdHoc", // test object not an array
-                                  "SELECT ARRAY_LENGTH(FIELD(DOC, 'inner')) FROM JS1 WHERE ID = 1");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        result.getLong(0);
-        assertTrue(result.wasNull());
-
-        // Test top-level json array.
-        cr = client.callProcedure("JS1.insert", 10, "[0, 10, 100]");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("@AdHoc", // test object not an array
-                                  "SELECT ARRAY_LENGTH(DOC) FROM JS1 WHERE ID = 10");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals(3L,result.getLong(0));
-
-        // Test empty json array.
-        cr = client.callProcedure("JS1.insert", 11, "[]");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("@AdHoc",
-                                  "SELECT ARRAY_LENGTH(DOC) FROM JS1 WHERE ID = 11");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals(0L,result.getLong(0));
+        verifyStmtFails(client, "select DECODE(tiny, 4, 5, NULL, 'tiny null', tiny)  from R3 where id = 2",
+                "Could not convert to number");
     }
 
     public void testSINCE_EPOCH() throws Exception {
@@ -1436,6 +1055,437 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
+    public void testFormatCurrency() throws Exception
+    {
+        System.out.println("STARTING testFormatCurrency");
+        Client client = getClient();
+        ClientResponse cr = null;
+        VoltTable result;
+        String str;
+
+        cr = client.callProcedure("@AdHoc", "Delete from D1;");
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        cr = client.callProcedure("@AdHoc", "Delete from R3;");
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+
+        String[] decimal_strs = {"123456.64565",     // id = 0
+                                 "-123456.64565",    // id = 1
+                                 "1123456785.555",   // id = 2
+                                 "-1123456785.555",  // id = 3
+                                 "0.0",              // id = 4
+                                 "-0.0",             // id = 5
+                                 "0",                // id = 6
+                                 "-0",               // id = 7
+                                 "99999999999999999999999999.999999999999", // id = 8
+                                 "-99999999999999999999999999.99999999999", // id = 9
+                                 "1500",             // id = 10
+                                 "2500",             // id = 11
+                                 "8223372036854775807.123456789125",        // id = 12
+                                 "8223372036854775807.123456789175"};       // id = 13
+        for(int i = 0; i < decimal_strs.length; i++) {
+            BigDecimal bd = new BigDecimal(decimal_strs[i]);
+            cr = client.callProcedure("D1.insert", i, bd);
+            assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        }
+        cr = client.callProcedure("R3.insert", 1, 1, 1, 1, 1, 1.1, "2013-07-18 02:00:00.123457", "IBM", 1);
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, 1), FORMAT_CURRENCY(DEC, 2),"
+                                                 + "FORMAT_CURRENCY(DEC, 3), FORMAT_CURRENCY(DEC, 4),"
+                                                 + "FORMAT_CURRENCY(DEC, 0), FORMAT_CURRENCY(DEC, -1),"
+                                                 + "FORMAT_CURRENCY(DEC, -2), FORMAT_CURRENCY(DEC, -3) from D1 where id = 0");
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        // rounding to positive places
+        str = result.getString(0);
+        assertEquals(str, "123,456.6");    // rounding down
+        str = result.getString(1);
+        assertEquals(str, "123,456.65");   // rounding up
+        str = result.getString(2);
+        assertEquals(str, "123,456.646");
+        str = result.getString(3);
+        assertEquals(str, "123,456.6456"); // banker's rounding: half to nearest even when previous digit is even
+        // rounding to none-positive places, or say the whole part
+        str = result.getString(4);
+        assertEquals(str, "123,457");      // rounding up
+        str = result.getString(5);
+        assertEquals(str, "123,460");
+        str = result.getString(6);
+        assertEquals(str, "123,500");
+        str = result.getString(7);
+        assertEquals(str, "123,000");      // rounding down
+
+
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, 1), FORMAT_CURRENCY(DEC, 2),"
+                                                 + "FORMAT_CURRENCY(DEC, 3), FORMAT_CURRENCY(DEC, 4),"
+                                                 + "FORMAT_CURRENCY(DEC, 0), FORMAT_CURRENCY(DEC, -1),"
+                                                 + "FORMAT_CURRENCY(DEC, -2), FORMAT_CURRENCY(DEC, -3) from D1 where id = 1");
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        // rounding to positive places
+        str = result.getString(0);
+        assertEquals(str, "-123,456.6");    // rounding down
+        str = result.getString(1);
+        assertEquals(str, "-123,456.65");   // rounding up
+        str = result.getString(2);
+        assertEquals(str, "-123,456.646");
+        str = result.getString(3);
+        assertEquals(str, "-123,456.6456"); //banker's rounding: half to nearest even when previous digit is even
+        // rounding to none-positive places, or say the whole part
+        str = result.getString(4);
+        assertEquals(str, "-123,457");      // rounding up
+        str = result.getString(5);
+        assertEquals(str, "-123,460");
+        str = result.getString(6);
+        assertEquals(str, "-123,500");
+        str = result.getString(7);
+        assertEquals(str, "-123,000");      // rounding down
+
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, 1), FORMAT_CURRENCY(DEC, 2),"
+                                                 + "FORMAT_CURRENCY(DEC, 3), FORMAT_CURRENCY(DEC, 4),"
+                                                 + "FORMAT_CURRENCY(DEC, 0), FORMAT_CURRENCY(DEC, -1),"
+                                                 + "FORMAT_CURRENCY(DEC, -2), FORMAT_CURRENCY(DEC, -3) from D1 where id = 2");
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        // rounding to positive places
+        str = result.getString(0);
+        assertEquals(str, "1,123,456,785.6");
+        str = result.getString(1);
+        assertEquals(str, "1,123,456,785.56"); // banker's rounding: half to nearest even when previous digit is odd
+        str = result.getString(2);
+        assertEquals(str, "1,123,456,785.555");
+        str = result.getString(3);
+        assertEquals(str, "1,123,456,785.5550"); // add trailing zero if rounding to a larger place
+        // rounding to none-positive places, or say the whole part
+        str = result.getString(4);
+        assertEquals(str, "1,123,456,786");
+        str = result.getString(5);
+        assertEquals(str, "1,123,456,790");
+        str = result.getString(6);
+        assertEquals(str, "1,123,456,800");
+        str = result.getString(7);
+        assertEquals(str, "1,123,457,000");
+
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, 1), FORMAT_CURRENCY(DEC, 2),"
+                                                 + "FORMAT_CURRENCY(DEC, 3), FORMAT_CURRENCY(DEC, 4),"
+                                                 + "FORMAT_CURRENCY(DEC, 0), FORMAT_CURRENCY(DEC, -1),"
+                                                 + "FORMAT_CURRENCY(DEC, -2), FORMAT_CURRENCY(DEC, -3) from D1 where id = 3");
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        // rounding to positive places
+        str = result.getString(0);
+        assertEquals(str, "-1,123,456,785.6");
+        str = result.getString(1);
+        assertEquals(str, "-1,123,456,785.56"); // banker's rounding: half to nearest even when previous digit is odd
+        str = result.getString(2);
+        assertEquals(str, "-1,123,456,785.555");
+        str = result.getString(3);
+        assertEquals(str, "-1,123,456,785.5550"); // add trailing zero if rounding to a larger place
+        // rounding to none-positive places, or say the whole part
+        str = result.getString(4);
+        assertEquals(str, "-1,123,456,786");
+        str = result.getString(5);
+        assertEquals(str, "-1,123,456,790");
+        str = result.getString(6);
+        assertEquals(str, "-1,123,456,800");
+        str = result.getString(7);
+        assertEquals(str, "-1,123,457,000");
+
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, -3) from D1 where id = 10");
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        str = result.getString(0);
+        // banker's rounding to a negative place: half to nearest even when previous digit is odd
+        assertEquals(str, "2,000");
+
+        cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, -3) from D1 where id = 11");
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        str = result.getString(0);
+        // banker's rounding to a negative place: half to nearest even when previous digit is even
+        assertEquals(str, "2,000");
+
+        // zeros with different init input
+        for (int i = 4; i < 8; i++) {
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, 2) from D1 where id = "+i);
+            assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            str = result.getString(0);
+            assertEquals(str, "0.00");
+        }
+
+        // out of int64_t range
+        try {
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(dec, 2) from D1 where id = 8");
+            fail("range validity check failed for FORMAT_CURRENCY");
+        }
+        catch (ProcCallException pcex) {
+            assertTrue(pcex.getMessage().contains("out of range"));
+        }
+        try {
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(dec, 2) from D1 where id = 9");
+            fail("range validity check failed for FORMAT_CURRENCY");
+        }
+        catch (ProcCallException pcex) {
+            assertTrue(pcex.getMessage().contains("out of range"));
+        }
+
+        // check invalid type
+        try {
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(id, 2) from R3 where id = 1");
+            fail("type validity check failed for FORMAT_CURRENCY");
+        } catch (ProcCallException pcex){
+            assertTrue(pcex.getMessage().contains("can't be cast as DECIMAL"));
+        }
+        try {
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(tiny, 2) from R3 where id = 1");
+            fail("type validity check failed for FORMAT_CURRENCY");
+        } catch (ProcCallException pcex){
+            assertTrue(pcex.getMessage().contains("can't be cast as DECIMAL"));
+        }
+        try {
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(small, 2) from R3 where id = 1");
+            fail("type validity check failed for FORMAT_CURRENCY");
+        } catch (ProcCallException pcex){
+            assertTrue(pcex.getMessage().contains("can't be cast as DECIMAL"));
+        }
+        try {
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(num, 2) from R3 where id = 1");
+            fail("type validity check failed for FORMAT_CURRENCY");
+        } catch (ProcCallException pcex){
+            assertTrue(pcex.getMessage().contains("can't be cast as DECIMAL"));
+        }
+        try {
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(big, 2) from R3 where id = 1");
+            fail("type validity check failed for FORMAT_CURRENCY");
+        } catch (ProcCallException pcex){
+            assertTrue(pcex.getMessage().contains("can't be cast as DECIMAL"));
+        }
+        try {
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio, 2) from R3 where id = 1");
+            fail("type validity check failed for FORMAT_CURRENCY");
+        } catch (ProcCallException pcex){
+            assertTrue(pcex.getMessage().contains("can't be cast as DECIMAL"));
+        }
+        try {
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(tm, 2) from R3 where id = 1");
+            fail("type validity check failed for FORMAT_CURRENCY");
+        } catch (ProcCallException pcex){
+            // TODO: I have no idea why the exception is different
+            assertTrue(pcex.getMessage().contains("incompatible data type in operation"));
+        }
+        try {
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(var, 2) from R3 where id = 1");
+            fail("type validity check failed for FORMAT_CURRENCY");
+        } catch (ProcCallException pcex){
+            assertTrue(pcex.getMessage().contains("incompatible data type in operation"));
+        }
+
+        String[] s = {"1,000,000.00", "100,000.00", "10,000.00", "1,000.00", "100.00", "10.00", "1.00", "0.10", "0.01", "0.00"};
+        for (int i = 0; i < 10; i++){
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(CAST("+ Math.pow(10, 6-i) +" as DECIMAL), 2) from D1 where id = 1");
+            assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            str = result.getString(0);
+            assertEquals(str, s[i]);
+        }
+        for (int i = 0; i < 10; i++){
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(CAST("+ -Math.pow(10, 6-i) +" as DECIMAL), 2) from D1 where id = 1");
+            assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            str = result.getString(0);
+            assertEquals(str, "-" + s[i]);
+        }
+
+        // TODO: The precision depends on the ability of TTInt, and there may exist some number whose rounding is wrong.
+        // test places from 11 to -25
+        String[] s2 = {"8,223,372,036,854,775,807.12345678912","8,223,372,036,854,775,807.1234567891","8,223,372,036,854,775,807.123456789",
+                  "8,223,372,036,854,775,807.12345679","8,223,372,036,854,775,807.1234568","8,223,372,036,854,775,807.123457",
+                  "8,223,372,036,854,775,807.12346","8,223,372,036,854,775,807.1235","8,223,372,036,854,775,807.123","8,223,372,036,854,775,807.12",
+                  "8,223,372,036,854,775,807.1","8,223,372,036,854,775,807","8,223,372,036,854,775,810","8,223,372,036,854,775,800",
+                  "8,223,372,036,854,776,000","8,223,372,036,854,780,000","8,223,372,036,854,800,000","8,223,372,036,855,000,000",
+                  "8,223,372,036,850,000,000","8,223,372,036,900,000,000","8,223,372,037,000,000,000","8,223,372,040,000,000,000","8,223,372,000,000,000,000",
+                  "8,223,372,000,000,000,000","8,223,370,000,000,000,000","8,223,400,000,000,000,000","8,223,000,000,000,000,000","8,220,000,000,000,000,000",
+                  "8,200,000,000,000,000,000","8,000,000,000,000,000,000","not used","0","0","0","0","0","0"};
+        for (int i=11; i > -19; i--){
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, "+i+") from D1 where id = 12");
+            assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            str = result.getString(0);
+            assertEquals(str, s2[11-i]);
+        }
+        // it will go out of the range of int64_t
+        try {
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, -19) from D1 where id = 12");
+            fail("type validity check failed for FORMAT_CURRENCY");
+        } catch (ProcCallException pcex){
+            assertTrue(pcex.getMessage().contains("out of range"));
+        }
+        // now it is zero
+        for (int i=-20; i >= -25; i--){
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, "+i+") from D1 where id = 12");
+            assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            str = result.getString(0);
+            assertEquals(str, s2[11-i]);
+        }
+        String s3[] ={"8,223,372,036,854,775,807.12345678918","8,223,372,036,854,775,807.1234567892","8,223,372,036,854,775,807.123456789",
+                "8,223,372,036,854,775,807.12345679","8,223,372,036,854,775,807.1234568","8,223,372,036,854,775,807.123457",
+                "8,223,372,036,854,775,807.12346","8,223,372,036,854,775,807.1235","8,223,372,036,854,775,807.123","8,223,372,036,854,775,807.12",
+                "8,223,372,036,854,775,807.1","8,223,372,036,854,775,807","8,223,372,036,854,775,810","8,223,372,036,854,775,800",
+                "8,223,372,036,854,776,000","8,223,372,036,854,780,000","8,223,372,036,854,800,000","8,223,372,036,855,000,000",
+                "8,223,372,036,850,000,000","8,223,372,036,900,000,000","8,223,372,037,000,000,000","8,223,372,040,000,000,000","8,223,372,000,000,000,000",
+                "8,223,372,000,000,000,000","8,223,370,000,000,000,000","8,223,400,000,000,000,000","8,223,000,000,000,000,000","8,220,000,000,000,000,000",
+                "8,200,000,000,000,000,000","8,000,000,000,000,000,000","not used","0","0","0","0","0","0"};
+        for (int i=11; i > -19; i--){
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, "+i+") from D1 where id = 13");
+            assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            str = result.getString(0);
+            assertEquals(str, s3[11-i]);
+        }
+        // it will go out of the range of int64_t
+        try {
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, -19) from D1 where id = 13");
+            fail("type validity check failed for FORMAT_CURRENCY");
+        } catch (ProcCallException pcex){
+            assertTrue(pcex.getMessage().contains("out of range"));
+        }
+        // now it is zero
+        for (int i=-20; i >= -25; i--){
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, "+i+") from D1 where id = 13");
+            assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            str = result.getString(0);
+            assertEquals(str, s3[11-i]);
+        }
+
+        // check the validity of the second parameter
+        try {
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, 15) from D1 where id = 0");
+            fail("type validity check failed for FORMAT_CURRENCY");
+        } catch (ProcCallException pcex){
+            assertTrue(pcex.getMessage().contains("the second parameter"));
+        }
+
+        try {
+            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, -26) from D1 where id = 0");
+            fail("type validity check failed for FORMAT_CURRENCY");
+        } catch (ProcCallException pcex){
+            assertTrue(pcex.getMessage().contains("the second parameter"));
+        }
+    }
+
+    public void testConcat() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING test Concat and its Operator");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P1.insert", 1, "Xin", 1, 1.0);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("CONCAT2", "", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("Xin", result.getString(1));
+
+        cr = client.callProcedure("CONCAT2", "@VoltDB", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("Xin@VoltDB", result.getString(1));
+
+        cr = client.callProcedure("ConcatOpt", "", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("Xin", result.getString(1));
+
+        cr = client.callProcedure("ConcatOpt", "@VoltDB", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("Xin@VoltDB", result.getString(1));
+    }
+
+    public void testConcatMoreThan2Param() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING test Concat with more than two parameters");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P1.insert", 1, "Yetian", 1, 1.0);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("CONCAT3", "@Volt", "DB", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, 1, new String[]{"Yetian@VoltDB"});
+
+        cr = client.callProcedure("CONCAT3", "", "@VoltDB", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, 1, new String[]{"Yetian@VoltDB"});
+
+        cr = client.callProcedure("CONCAT4", "@Volt", "", "DB", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, 1, new String[]{"Yetian@VoltDB"});
+
+        cr = client.callProcedure("CONCAT4", "", "@VoltDB", "", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, 1, new String[]{"Yetian@VoltDB"});
+
+        cr = client.callProcedure("CONCAT5", "@Volt", "D", "B", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, 1, new String[]{"Yetian@VoltDB1"});
+
+        cr = client.callProcedure("CONCAT5", "", "@VoltDB", "", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, 1, new String[]{"Yetian@VoltDB1"});
+
+        try {
+            cr = client.callProcedure("@AdHoc", "select CONCAT('a', 'b', id) from p1 where id = 1");
+        } catch (ProcCallException pcex){
+            assertTrue(pcex.getMessage().contains("can't be cast as VARCHAR"));
+        }
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -1492,6 +1542,12 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "  PRIMARY KEY(ID))\n" +
                 ";\n" +
 
+                "CREATE TABLE D1 (\n" +
+                "  ID INTEGER NOT NULL, \n" +
+                "  DEC DECIMAL, \n" +
+                "  PRIMARY KEY(ID))\n" +
+                ";\n" +
+
                 "CREATE PROCEDURE IdFieldProc AS\n" +
                 "   SELECT ID FROM JS1 WHERE FIELD(DOC, ?) = ? ORDER BY ID\n" +
                 ";\n" +
@@ -1534,6 +1590,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "CREATE PROCEDURE BadIdArrayLengthProc AS\n" +
                 "  SELECT ID FROM JSBAD WHERE ID = ? AND ARRAY_LENGTH(FIELD(DOC, ?)) = ?\n" +
                 ";\n" +
+
                 "";
         try {
             project.addLiteralSchema(literalSchema);
@@ -1601,6 +1658,12 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "DECODE(dec, ?, 'null dec', dec) from R3 where id = ?");
 
         project.addStmtProcedure("TestDecodeNullTimestamp", "select DECODE(tm, NULL, 'null tm', tm) from R3 where id = ?");
+
+        project.addStmtProcedure("CONCAT2", "select id, CONCAT(DESC,?) from P1 where id = ?");
+        project.addStmtProcedure("CONCAT3", "select id, CONCAT(DESC,?,?) from P1 where id = ?");
+        project.addStmtProcedure("CONCAT4", "select id, CONCAT(DESC,?,?,?) from P1 where id = ?");
+        project.addStmtProcedure("CONCAT5", "select id, CONCAT(DESC,?,?,?,cast(ID as VARCHAR)) from P1 where id = ?");
+        project.addStmtProcedure("ConcatOpt", "select id, DESC || ? from P1 where id = ?");
 
         // CONFIG #1: Local Site/Partition running on JNI backend
         config = new LocalCluster("fixedsql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);

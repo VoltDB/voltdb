@@ -89,12 +89,12 @@ import org.voltdb.compiler.deploymentfile.CommandLogType;
 import org.voltdb.compiler.deploymentfile.CommandLogType.Frequency;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
-import org.voltdb.compiler.deploymentfile.ExportGroupsType;
 import org.voltdb.compiler.deploymentfile.ExportType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.PathEntry;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PropertyType;
+import org.voltdb.compiler.deploymentfile.SchemaType;
 import org.voltdb.compiler.deploymentfile.SecurityProviderString;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
@@ -128,14 +128,13 @@ public abstract class CatalogUtil {
      * Load a catalog from the jar bytes.
      *
      * @param catalogBytes
-     * @param log
-     * @return Pair containing catalog serialized string and upgraded version (or null if it wasn't upgraded)
+     * @return Pair containing updated InMemoryJarFile and upgraded version (or null if it wasn't upgraded)
      * @throws IOException
      *             If the catalog cannot be loaded because it's incompatible, or
      *             if there is no version information in the catalog.
      */
-    public static Pair<String, String> loadAndUpgradeCatalogFromJar(byte[] catalogBytes, VoltLogger log)
-            throws IOException
+    public static Pair<InMemoryJarfile, String> loadAndUpgradeCatalogFromJar(byte[] catalogBytes)
+        throws IOException
     {
         // Throws IOException on load failure.
         InMemoryJarfile jarfile = loadInMemoryJarFile(catalogBytes);
@@ -143,9 +142,17 @@ public abstract class CatalogUtil {
         // I.e. jarfile may be modified.
         VoltCompiler compiler = new VoltCompiler();
         String upgradedFromVersion = compiler.upgradeCatalogAsNeeded(jarfile);
-        byte[] serializedCatalogBytes = jarfile.get(CATALOG_FILENAME);
+        return new Pair<InMemoryJarfile, String>(jarfile, upgradedFromVersion);
+    }
+
+    /**
+     * Convenience method to extract the catalog commands from an InMemoryJarfile as a string
+     */
+    public static String getSerializedCatalogStringFromJar(InMemoryJarfile jarfile)
+    {
+        byte[] serializedCatalogBytes = jarfile.get(CatalogUtil.CATALOG_FILENAME);
         String serializedCatalog = new String(serializedCatalogBytes, Constants.UTF8ENCODING);
-        return new Pair<String, String>(serializedCatalog, upgradedFromVersion);
+        return serializedCatalog;
     }
 
     /**
@@ -519,7 +526,7 @@ public abstract class CatalogUtil {
         setHTTPDInfo(catalog, deployment.getHttpd());
 
         if (!isPlaceHolderCatalog) {
-            setExportInfo(catalog, deployment.getExportgroups());
+            setExportInfo(catalog, deployment.getExport());
         }
 
         setCommandLogInfo( catalog, deployment.getCommandlog());
@@ -631,11 +638,12 @@ public abstract class CatalogUtil {
             DeploymentType deployment = result.getValue();
 
             // move any deprecated standalone export elements to the group
-            if ((deployment.getExport() != null) && deployment.getExport().isEnabled()) {
-                if (deployment.getExportgroups() == null) {
-                    deployment.setExportgroups(new ExportGroupsType());
-                }
-                deployment.getExportgroups().getExport().add(deployment.getExport());
+            ExportType export = deployment.getExport();
+            if ((export != null) && (export.isEnabled() != null)) {
+                ExportConfigurationType exportConfig = export.getConfiguration().get(0);
+                exportConfig.setEnabled(export.isEnabled());
+                exportConfig.setTarget(export.getTarget());
+                exportConfig.setExportconnectorclass(export.getExportconnectorclass());
             }
 
             return deployment;
@@ -764,6 +772,17 @@ public abstract class CatalogUtil {
                 // default to 10 seconds
                 catCluster.setHeartbeattimeout(10);
             }
+
+            // copy schema modification behavior from xml to catalog
+            if (cluster.getSchema() != null) {
+                catCluster.setUseadhocschema(cluster.getSchema() == SchemaType.ADHOC);
+            }
+            else {
+                // Don't think we can get here, deployment schema guarantees a default value
+                hostLog.warn("Schema modification setting not found. " +
+                        "Forcing default behavior of UpdateCatalog to modify database schema.");
+                catCluster.setUseadhocschema(false);
+            }
         }
     }
 
@@ -833,17 +852,17 @@ public abstract class CatalogUtil {
      * @param catalog The catalog to be updated.
      * @param exportsType A reference to the <exports> element of the deployment.xml file.
      */
-    private static void setExportInfo(Catalog catalog, ExportGroupsType exportGroupsType) {
-        if (exportGroupsType == null) {
+    private static void setExportInfo(Catalog catalog, ExportType exportType) {
+        if (exportType == null) {
             return;
         }
 
-        for (ExportType exportType : exportGroupsType.getExport()) {
+        for (ExportConfigurationType exportConfiguration : exportType.getConfiguration()) {
 
-            boolean connectorEnabled = exportType.isEnabled();
+            boolean connectorEnabled = exportConfiguration.isEnabled();
             // Get the group name from the xml attribute "group"
             // Should default to Constants.DEFAULT_EXPORT_CONNECTOR_NAME if not specified
-            String groupName = exportType.getGroup();
+            String groupName = exportConfiguration.getGroup();
             boolean defaultConnector = groupName.equals(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
 
             Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
@@ -875,22 +894,24 @@ public abstract class CatalogUtil {
 
             String exportClientClassName = null;
 
-            switch(exportType.getTarget()) {
+            switch(exportConfiguration.getTarget()) {
                 case FILE: exportClientClassName = "org.voltdb.exportclient.ExportToFileClient"; break;
                 case JDBC: exportClientClassName = "org.voltdb.exportclient.JDBCExportClient"; break;
                 case KAFKA: exportClientClassName = "org.voltdb.exportclient.KafkaExportClient"; break;
+                case RABBITMQ: exportClientClassName = "org.voltdb.exportclient.RabbitMQExportClient"; break;
+                case HTTP: exportClientClassName = "org.voltdb.exportclient.HttpExportClient"; break;
                 //Validate that we can load the class.
                 case CUSTOM:
                     try {
-                        CatalogUtil.class.getClassLoader().loadClass(exportType.getExportconnectorclass());
-                        exportClientClassName = exportType.getExportconnectorclass();
+                        CatalogUtil.class.getClassLoader().loadClass(exportConfiguration.getExportconnectorclass());
+                        exportClientClassName = exportConfiguration.getExportconnectorclass();
                     }
                     catch (ClassNotFoundException ex) {
                         hostLog.error(
                                 "Custom Export failed to configure, failed to load " +
-                                " export plugin class: " + exportType.getExportconnectorclass() +
+                                " export plugin class: " + exportConfiguration.getExportconnectorclass() +
                                 " Disabling export.");
-                    exportType.setEnabled(false);
+                        exportConfiguration.setEnabled(false);
                     return;
                 }
                 break;
@@ -906,17 +927,13 @@ public abstract class CatalogUtil {
                 prop.setValue(dexportClientClassName);
             }
 
-            ExportConfigurationType exportConfiguration = exportType.getConfiguration();
-            if (exportConfiguration != null) {
+            List<PropertyType> configProperties = exportConfiguration.getProperty();
+            if (configProperties != null && ! configProperties.isEmpty()) {
 
-                List<PropertyType> configProperties = exportConfiguration.getProperty();
-                if (configProperties != null && ! configProperties.isEmpty()) {
-
-                    for( PropertyType configProp: configProperties) {
-                        ConnectorProperty prop = catconn.getConfig().add(configProp.getName());
-                        prop.setName(configProp.getName());
-                        prop.setValue(configProp.getValue());
-                    }
+                for( PropertyType configProp: configProperties) {
+                    ConnectorProperty prop = catconn.getConfig().add(configProp.getName());
+                    prop.setName(configProp.getName());
+                    prop.setValue(configProp.getValue());
                 }
             }
 
@@ -931,12 +948,12 @@ public abstract class CatalogUtil {
                 }
             } else {
                 if (defaultConnector) {
-                    hostLog.info("Default export group is configured and enabled with type=" + exportType.getTarget());
+                    hostLog.info("Default export group is configured and enabled with type=" + exportConfiguration.getTarget());
                 }
                 else {
-                    hostLog.info("Export group " + groupName + " is configured and enabled with type=" + exportType.getTarget());
+                    hostLog.info("Export group " + groupName + " is configured and enabled with type=" + exportConfiguration.getTarget());
                 }
-                if (exportConfiguration != null && exportConfiguration.getProperty() != null) {
+                if (exportConfiguration.getProperty() != null) {
                     if (defaultConnector) {
                         hostLog.info("Default export group configuration properties are: ");
                     }
@@ -1197,8 +1214,10 @@ public abstract class CatalogUtil {
             return;
         }
 
-        // TODO: The database name is not available in deployment.xml (it is defined in project.xml). However, it must
-        // always be named "database", so I've temporarily hardcoded it here until a more robust solution is available.
+        // The database name is not available in deployment.xml (it is defined
+        // in project.xml). However, it must always be named "database", so
+        // I've temporarily hardcoded it here until a more robust solution is
+        // available.
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
 
         SecureRandom sr = new SecureRandom();
@@ -1315,12 +1334,15 @@ public abstract class CatalogUtil {
                 int catalogVersion,
                 long txnId,
                 long uniqueId,
-                byte[] catalogHash,
-                byte[] deploymentHash,
-                byte[] catalogBytes)
+                byte[] catalogBytes,
+                byte[] deploymentBytes)
     {
         ByteBuffer versionAndBytes =
-            ByteBuffer.allocate(catalogBytes.length +
+            ByteBuffer.allocate(
+                    4 +  // catalog bytes length
+                    catalogBytes.length +
+                    4 +  // deployment bytes length
+                    deploymentBytes.length +
                     4 +  // catalog version
                     8 +  // txnID
                     8 +  // unique ID
@@ -1330,36 +1352,48 @@ public abstract class CatalogUtil {
         versionAndBytes.putInt(catalogVersion);
         versionAndBytes.putLong(txnId);
         versionAndBytes.putLong(uniqueId);
-        versionAndBytes.put(catalogHash);
-        versionAndBytes.put(deploymentHash);
+        versionAndBytes.put(makeCatalogOrDeploymentHash(catalogBytes));
+        versionAndBytes.put(makeCatalogOrDeploymentHash(deploymentBytes));
+        versionAndBytes.putInt(catalogBytes.length);
         versionAndBytes.put(catalogBytes);
+        versionAndBytes.putInt(deploymentBytes.length);
+        versionAndBytes.put(deploymentBytes);
         return versionAndBytes;
     }
 
-    public static void uploadCatalogToZK(ZooKeeper zk,
+    /**
+     *  Attempt to create the ZK node and write the catalog/deployment bytes
+     *  to ZK.  Used during the initial cluster deployment discovery and
+     *  distribution.
+     */
+    public static void writeCatalogToZK(ZooKeeper zk,
                 int catalogVersion,
                 long txnId,
                 long uniqueId,
-                byte[] catalogHash,
-                byte[] deploymentHash,
-                byte[] catalogBytes) throws KeeperException, InterruptedException
+                byte[] catalogBytes,
+                byte[] deploymentBytes)
+        throws KeeperException, InterruptedException
     {
         ByteBuffer versionAndBytes = makeCatalogVersionAndBytes(catalogVersion,
-                txnId, uniqueId, catalogHash, catalogBytes, deploymentHash);
+                txnId, uniqueId, catalogBytes, deploymentBytes);
         zk.create(VoltZK.catalogbytes,
                 versionAndBytes.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
     }
 
-    public static void setCatalogToZK(ZooKeeper zk,
+    /**
+     * Update the catalog/deployment contained in ZK.  Someone somewhere must have
+     * called writeCatalogToZK earlier in order to create the ZK node.
+     */
+    public static void updateCatalogToZK(ZooKeeper zk,
             int catalogVersion,
             long txnId,
             long uniqueId,
-            byte[] catalogHash,
-            byte[] deploymentHash,
-            byte[] catalogBytes) throws KeeperException, InterruptedException
+            byte[] catalogBytes,
+            byte[] deploymentBytes)
+        throws KeeperException, InterruptedException
     {
         ByteBuffer versionAndBytes = makeCatalogVersionAndBytes(catalogVersion,
-                txnId, uniqueId, catalogHash, deploymentHash, catalogBytes);
+                txnId, uniqueId, catalogBytes, deploymentBytes);
         zk.setData(VoltZK.catalogbytes, versionAndBytes.array(), -1);
     }
 
@@ -1367,22 +1401,36 @@ public abstract class CatalogUtil {
         public final long txnId;
         public final long uniqueId;
         public final int version;
-        public final byte[] catalogHash;
-        public final byte[] deploymentHash;
-        public final byte[] bytes;
+        private final byte[] catalogHash;
+        private final byte[] deploymentHash;
+        public final byte[] catalogBytes;
+        public final byte[] deploymentBytes;
 
-        public CatalogAndIds(long txnId,
+        private CatalogAndIds(long txnId,
                 long uniqueId,
                 int catalogVersion,
                 byte[] catalogHash,
                 byte[] deploymentHash,
-                byte[] catalogBytes) {
+                byte[] catalogBytes,
+                byte[] deploymentBytes)
+        {
             this.txnId = txnId;
             this.uniqueId = uniqueId;
             this.version = catalogVersion;
             this.catalogHash = catalogHash;
             this.deploymentHash = deploymentHash;
-            this.bytes = catalogBytes;
+            this.catalogBytes = catalogBytes;
+            this.deploymentBytes = deploymentBytes;
+        }
+
+        public byte[] getCatalogHash()
+        {
+            return catalogHash.clone();
+        }
+
+        public byte[] getDeploymentHash()
+        {
+            return deploymentHash.clone();
         }
 
         @Override
@@ -1405,11 +1453,15 @@ public abstract class CatalogUtil {
         versionAndBytes.get(catalogHash);
         byte[] deploymentHash = new byte[20]; // sha-1 hash size
         versionAndBytes.get(deploymentHash);
-        byte[] catalogBytes = new byte[versionAndBytes.remaining()];
+        int catalogLength = versionAndBytes.getInt();
+        byte[] catalogBytes = new byte[catalogLength];
         versionAndBytes.get(catalogBytes);
+        int deploymentLength = versionAndBytes.getInt();
+        byte[] deploymentBytes = new byte[deploymentLength];
+        versionAndBytes.get(deploymentBytes);
         versionAndBytes = null;
         return new CatalogAndIds(catalogTxnId, catalogUniqueId, version, catalogHash,
-                deploymentHash, catalogBytes);
+                deploymentHash, catalogBytes, deploymentBytes);
     }
 
     /**
@@ -1454,14 +1506,14 @@ public abstract class CatalogUtil {
                 }
                 if (updated != null && updated.equals(table.getTypeName())) {
                     // make useage only in either read or updated, not both
-                    updateTableUsageAnnotation(table, stmt, true);
+                    updateTableUsageAnnotation(table, stmt, false);
                     updated = null;
                     continue;
                 }
-                updateTableUsageAnnotation(table, stmt, false);
+                updateTableUsageAnnotation(table, stmt, true);
             }
             else if (updated != null && updated.equals(table.getTypeName())) {
-                updateTableUsageAnnotation(table, stmt, true);
+                updateTableUsageAnnotation(table, stmt, false);
                 updated = null;
             }
         }
@@ -1597,7 +1649,6 @@ public abstract class CatalogUtil {
             try {
                 indexSize = AbstractExpression.fromJSONArrayString(jsonstring, null).size();
             } catch (JSONException e) {
-                // TODO Auto-generated catch block
                 e.printStackTrace();
             }
         }

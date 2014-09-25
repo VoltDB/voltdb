@@ -80,7 +80,7 @@ public class TestCatalogDiffs extends TestCase {
 
     protected Catalog catalogForJar(String pathToJar) throws IOException {
         byte[] bytes = MiscUtils.fileToBytes(new File(pathToJar));
-        String serializedCatalog = CatalogUtil.loadAndUpgradeCatalogFromJar(bytes, null).getFirst();
+        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes).getFirst());
         assertNotNull(serializedCatalog);
         Catalog c = new Catalog();
         c.execute(serializedCatalog);
@@ -1081,7 +1081,7 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiff(catOriginal, catUpdated);
     }
 
-    public void testChangeTableReplicationSettingRejected() throws IOException {
+    public void testChangeTableReplicationSetting() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
@@ -1093,6 +1093,22 @@ public class TestCatalogDiffs extends TestCase {
         builder.addPartitionInfo("A", "C1");
         builder.compile(testDir + File.separator + "addpart2.jar");
         Catalog catUpdated = catalogForJar(testDir + File.separator + "addpart2.jar");
+        verifyDiff(catOriginal, catUpdated);
+    }
+
+    public void testChangeTableReplicationSettingOfExportTable() throws IOException {
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
+        builder.addLiteralSchema("\nEXPORT TABLE A;");
+        builder.addStmtProcedure("the_requisite_procedure", "insert into A values (?, ?);");
+        builder.compile(testDir + File.separator + "elastic1a.jar");
+        Catalog catOriginal = catalogForJar(testDir +  File.separator + "elastic1a.jar");
+
+        builder.addPartitionInfo("A", "C1");
+        builder.compile(testDir + File.separator + "elastic2a.jar");
+        Catalog catUpdated = catalogForJar(testDir + File.separator + "elastic2a.jar");
         verifyDiffRejected(catOriginal, catUpdated);
     }
 

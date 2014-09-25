@@ -18,7 +18,6 @@
 package org.voltdb.jni;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.util.List;
 
@@ -221,10 +220,10 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      *  catalog.
      */
     @Override
-    public void loadCatalog(long timestamp, final String serializedCatalog) throws EEException {
+    protected void loadCatalog(long timestamp, final byte[] catalogBytes) throws EEException {
         LOG.trace("Loading Application Catalog...");
         int errorCode = 0;
-        errorCode = nativeLoadCatalog(pointer, timestamp, getStringBytes(serializedCatalog));
+        errorCode = nativeLoadCatalog(pointer, timestamp, catalogBytes);
         checkErrorCode(errorCode);
         //LOG.info("Loaded Catalog.");
     }
@@ -241,14 +240,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         checkErrorCode(errorCode);
     }
 
-    private static byte[] getStringBytes(String string) {
-        try {
-            return string.getBytes("UTF-8");
-        } catch (UnsupportedEncodingException e) {
-           throw new AssertionError(e);
-        }
-    }
-
     /**
      * @param undoToken Token identifying undo quantum for generated undo info
      */
@@ -258,6 +249,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final long[] planFragmentIds,
             final long[] inputDepIds,
             final Object[] parameterSets,
+            final long txnId,
             final long spHandle, final long lastCommittedSpHandle,
             long uniqueId, final long undoToken) throws EEException
     {
@@ -313,6 +305,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     numFragmentIds,
                     planFragmentIds,
                     inputDepIds,
+                    txnId,
                     spHandle,
                     lastCommittedSpHandle,
                     uniqueId,
@@ -373,8 +366,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public byte[] loadTable(final int tableId, final VoltTable table,
-        final long txnId, final long lastCommittedTxnId, boolean returnUniqueViolations,
+    public byte[] loadTable(final int tableId, final VoltTable table, final long txnId,
+        final long spHandle, final long lastCommittedSpHandle, boolean returnUniqueViolations, boolean shouldDRStream,
         long undoToken) throws EEException
     {
         if (HOST_TRACE_ENABLED) {
@@ -387,8 +380,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
         //Clear is destructive, do it before the native call
         deserializer.clear();
-        final int errorCode = nativeLoadTable(pointer, tableId, serialized_table,
-                                              txnId, lastCommittedTxnId, returnUniqueViolations, undoToken);
+        final int errorCode = nativeLoadTable(pointer, tableId, serialized_table, txnId,
+                                              spHandle, lastCommittedSpHandle, returnUniqueViolations, shouldDRStream,
+                                              undoToken);
         checkErrorCode(errorCode);
 
         try {
@@ -616,13 +610,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
-    public byte[] executeTask(TaskType taskType, byte[] task) {
-        clearPsetAndEnsureCapacity(8 + task.length);
+    public byte[] executeTask(TaskType taskType, ByteBuffer task) {
 
         byte retval[] = null;
         try {
-            psetBuffer.putLong(taskType.taskId);
-            psetBuffer.put(task);
+            psetBuffer.putLong(0, taskType.taskId);
 
             //Clear is destructive, do it before the native call
             deserializer.clear();
@@ -632,5 +624,12 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             Throwables.propagate(e);
         }
         return retval;
+    }
+
+    @Override
+    public ByteBuffer getParamBufferForExecuteTask(int requiredCapacity) {
+        clearPsetAndEnsureCapacity(8 + requiredCapacity);
+        psetBuffer.position(8);
+        return psetBuffer;
     }
 }

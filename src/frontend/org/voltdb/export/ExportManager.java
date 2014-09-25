@@ -192,7 +192,7 @@ public class ExportManager
                     newProcessor.setProcessorConfig(m_processorConfig);
                     newProcessor.readyForData();
 
-                    if (nextGeneration.isDiskBased()) {
+                    if (!nextGeneration.isContinueingGeneration()) {
                         /*
                          * Changes in partition count can make the load balancing strategy not capture
                          * all partitions for data that was from a previously larger cluster.
@@ -245,8 +245,8 @@ public class ExportManager
             CatalogContext catalogContext,
             boolean isRejoin,
             HostMessenger messenger,
-            List<Pair<Integer, Long>> partitions)
-    throws ExportManager.SetupException
+            List<Integer> partitions)
+            throws ExportManager.SetupException
     {
         ExportManager em = new ExportManager(myHostId, catalogContext, messenger, partitions);
         CatalogMap<Connector> connectors = getConnectors(catalogContext);
@@ -285,7 +285,7 @@ public class ExportManager
          * makes it safe to accept mastership.
          */
         ExportGeneration gen = m_generations.firstEntry().getValue();
-        if (gen != null && !gen.isDiskBased()) {
+        if (gen != null && gen.isContinueingGeneration()) {
             gen.acceptMastershipTask(partitionId);
         } else {
             exportLog.info("Failed to run accept mastership tasks for partition: " + partitionId);
@@ -323,7 +323,7 @@ public class ExportManager
             int myHostId,
             CatalogContext catalogContext,
             HostMessenger messenger,
-            List<Pair<Integer, Long>> partitions)
+            List<Integer> partitions)
     throws ExportManager.SetupException
     {
         m_hostId = myHostId;
@@ -351,7 +351,7 @@ public class ExportManager
             CatalogContext catalogContext,
             final CatalogMap<Connector> connectors,
             boolean startup,
-            List<Pair<Integer, Long>> partitions,
+            List<Integer> partitions,
             boolean isRejoin) {
         try {
             exportLog.info("Creating connector " + m_loaderClass);
@@ -379,17 +379,18 @@ public class ExportManager
              * So construct one here, otherwise use the one provided
              */
             if (startup) {
-                final ExportGeneration currentGeneration = new ExportGeneration(
+                if (!m_generations.containsKey(catalogContext.m_uniqueId)) {
+                    final ExportGeneration currentGeneration = new ExportGeneration(
                             catalogContext.m_uniqueId,
-                        exportOverflowDirectory, isRejoin);
-                currentGeneration.setGenerationDrainRunnable(new GenerationDrainRunnable(currentGeneration));
-                currentGeneration.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
-                if (!m_generations.isEmpty()) {
-                    if (m_generations.containsKey(catalogContext.m_uniqueId)) {
-                        exportLog.info("Persisted export generation with same timestamp from generation from catalog exists. Catalog generation will be used.");
-                    }
+                            exportOverflowDirectory, isRejoin);
+                    currentGeneration.setGenerationDrainRunnable(new GenerationDrainRunnable(currentGeneration));
+                    currentGeneration.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
+                    m_generations.put(catalogContext.m_uniqueId, currentGeneration);
+                } else {
+                    exportLog.info("Persisted export generation same as catalog exists. Persisted generation will be used and appended to");
+                    ExportGeneration currentGeneration = m_generations.get(catalogContext.m_uniqueId);
+                    currentGeneration.initializeMissingPartitionsFromCatalog(connectors, m_hostId, m_messenger, partitions);
                 }
-                m_generations.put( catalogContext.m_uniqueId, currentGeneration);
             }
             final ExportGeneration nextGeneration = m_generations.firstEntry().getValue();
             /*
@@ -404,7 +405,7 @@ public class ExportManager
                  * and we are using server side export we need to kick off a leader election
                  * to choose which server is going to export each partition
                  */
-                if (nextGeneration.isDiskBased()) {
+                if (!nextGeneration.isContinueingGeneration()) {
                     nextGeneration.kickOffLeaderElection();
                 }
             } else {
@@ -412,7 +413,7 @@ public class ExportManager
                  * When it isn't startup, it is necessary to kick things off with the mastership
                  * settings that already exist
                  */
-                if (nextGeneration.isDiskBased()) {
+                if (!nextGeneration.isContinueingGeneration()) {
                     /*
                      * Changes in partition count can make the load balancing strategy not capture
                      * all partitions for data that was from a previously larger cluster.
@@ -458,7 +459,7 @@ public class ExportManager
 
         //Only give the processor to the oldest generation
         for (File generationDirectory : generationDirectories) {
-            ExportGeneration generation = new ExportGeneration(generationDirectory);
+            ExportGeneration generation = new ExportGeneration(generationDirectory, catalogContext.m_uniqueId);
             generation.setGenerationDrainRunnable(new GenerationDrainRunnable(generation));
 
             if (generation.initializeGenerationFromDisk(connectors, m_messenger)) {
@@ -501,7 +502,7 @@ public class ExportManager
                 Iterator<ConnectorProperty> connPropIt = conn.getConfig().iterator();
                 while (connPropIt.hasNext()) {
                     ConnectorProperty prop = connPropIt.next();
-                    properties.put(prop.getName(), prop.getValue());
+                    properties.put(prop.getName(), prop.getValue().trim());
                 }
             }
 
@@ -512,7 +513,7 @@ public class ExportManager
         m_processorConfig = config;
     }
 
-    public synchronized void updateCatalog(CatalogContext catalogContext, List<Pair<Integer, Long>> partitions)
+    public synchronized void updateCatalog(CatalogContext catalogContext, List<Integer> partitions)
     {
         final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
         final Database db = cluster.getDatabases().get("database");
@@ -534,12 +535,11 @@ public class ExportManager
             newGeneration = new ExportGeneration(
                     catalogContext.m_uniqueId, exportOverflowDirectory, false);
             newGeneration.setGenerationDrainRunnable(new GenerationDrainRunnable(newGeneration));
+            newGeneration.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
+            m_generations.put(catalogContext.m_uniqueId, newGeneration);
         } catch (IOException e1) {
             VoltDB.crashLocalVoltDB("Error processing catalog update in export system", true, e1);
         }
-        newGeneration.initializeGenerationFromCatalog(connectors, m_hostId, m_messenger, partitions);
-
-        m_generations.put(catalogContext.m_uniqueId, newGeneration);
 
         /*
          * If there is no existing export processor, create an initial one.
@@ -551,12 +551,12 @@ public class ExportManager
     }
 
     public void shutdown() {
+        for (ExportGeneration generation : m_generations.values()) {
+            generation.close();
+        }
         ExportDataProcessor proc = m_processor.getAndSet(null);
         if (proc != null) {
             proc.shutdown();
-        }
-        for (ExportGeneration generation : m_generations.values()) {
-            generation.close();
         }
         m_generations.clear();
         m_loaderClass = null;

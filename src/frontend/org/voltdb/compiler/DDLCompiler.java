@@ -73,6 +73,7 @@ import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
+import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.VoltTypeUtil;
 
 
@@ -264,6 +265,22 @@ public class DDLCompiler {
             );
 
     /**
+     * DROP PROCEDURE  statement regex
+     */
+    static final Pattern procedureDropPattern = Pattern.compile(
+            "(?i)" +                                // ignore case
+            "\\A" +                                 // beginning of statement
+            "DROP" +                                // DROP token
+            "\\s+" +                                // one or more spaces
+            "PROCEDURE" +                           // PROCEDURE token
+            "\\s+" +                                // one or more spaces
+            "([\\w$.]+)" +                          // (1) class name or procedure name
+            "\\s*" +                                // zero or more spaces
+            ";" +                                   // semi-colon terminator
+            "\\z"                                   // end of statement
+            );
+
+    /**
      * IMPORT CLASS with pattern for matching classfiles in
      * the current classpath.
      */
@@ -306,6 +323,16 @@ public class DDLCompiler {
             "CREATE\\s+(TABLE|VIEW)\\s+" +      // (1) CREATE TABLE
             "([\\w.$]+)"                        // (2) <table name>
             );
+
+    /**
+     * Regex to match ALTER or DROP TABLE statements. Capture group (1) is operator, (2) is TABLE, but (3) is used.
+     */
+    static final Pattern alterOrDropTablePattern = Pattern.compile(
+            "(?i)" + // (ignore case)
+            "\\A" + // (start statement)
+            "(ALTER|DROP)\\s+(TABLE)\\s+" + // (1) ALTER or DROP TABLE
+            "([\\w.$]+)" // (3) <table name>
+    );
 
     /**
      * NB supports only unquoted table and column names
@@ -374,7 +401,8 @@ public class DDLCompiler {
      */
     static final Pattern voltdbStatementPrefixPattern = Pattern.compile(
             "(?i)((?<=\\ACREATE\\s{0,1024})" +
-            "(?:PROCEDURE|ROLE)|\\APARTITION|\\AREPLICATE|\\AEXPORT|\\AIMPORT)\\s"
+            "(?:PROCEDURE|ROLE)|" +
+            "\\ADROP|\\APARTITION|\\AREPLICATE|\\AEXPORT|\\AIMPORT)\\s"
             );
 
     static final String TABLE = "TABLE";
@@ -403,6 +431,9 @@ public class DDLCompiler {
     final VoltDDLElementTracker m_tracker;
 
     // used to match imported class with those in the classpath
+    // For internal cluster compilation, this will point to the
+    // InMemoryJarfile for the current catalog, so that we can
+    // find classes provided as part of the application.
     ClassMatcher m_classMatcher = new ClassMatcher();
 
     HashMap<String, Column> columnMap = new HashMap<String, Column>();
@@ -464,7 +495,7 @@ public class DDLCompiler {
             }
             if (!processed) {
                 try {
-                    // Check for CREATE TABLE or CREATE VIEW.
+                    // Check for CREATE TABLE, CREATE VIEW, ALTER or DROP TABLE.
                     // We sometimes choke at parsing statements with newlines, so
                     // check against a newline free version of the stmt.
                     String oneLinerStmt = stmt.statement.replace("\n", " ");
@@ -472,6 +503,22 @@ public class DDLCompiler {
                     if (tableMatcher.find()) {
                         String tableName = tableMatcher.group(2);
                         m_tableNameToDDL.put(tableName.toUpperCase(), stmt.statement);
+                    } else {
+                        Matcher atableMatcher = alterOrDropTablePattern.matcher(oneLinerStmt);
+                        if (atableMatcher.find()) {
+                            String op = atableMatcher.group(1);
+                            String tableName = atableMatcher.group(3);
+                            if (op.equalsIgnoreCase("DROP")) {
+                                m_tableNameToDDL.remove(tableName.toUpperCase());
+                            } else {
+                                //ALTER - Append the statement
+                                String prevStmt = m_tableNameToDDL.get(tableName.toUpperCase());
+                                if (prevStmt != null) {
+                                    //Append the SQL for report...else would blow up compilation.
+                                    m_tableNameToDDL.put(tableName.toUpperCase(), prevStmt + "\n" + stmt.statement);
+                                }
+                            }
+                        }
                     }
 
                     // kind of ugly.  We hex-encode each statement so we can
@@ -715,6 +762,15 @@ public class DDLCompiler {
             return true;
         }
 
+        // Matches if it is DROP PROCEDURE <proc-name or classname>
+        statementMatcher = procedureDropPattern.matcher(statement);
+        if (statementMatcher.matches()) {
+            String classOrProcName = checkIdentifierStart(statementMatcher.group(1), statement);
+            m_tracker.removeProcedure(classOrProcName);
+
+            return true;
+        }
+
         // matches if it is the beginning of a partition statement
         statementMatcher = prePartitionPattern.matcher(statement);
         if (statementMatcher.matches()) {
@@ -796,23 +852,35 @@ public class DDLCompiler {
         statementMatcher = importClassPattern.matcher(statement);
         if (statementMatcher.matches()) {
             if (whichProcs == DdlProceduresToLoad.ALL_DDL_PROCEDURES) {
-                // Only process the statement if this is not for the StatementPlanner
-                String classNameStr = statementMatcher.group(1);
+                // Semi-hacky way of determining if we're doing a cluster-internal compilation.
+                // Command-line compilation will never have an InMemoryJarfile.
+                if (!(m_classLoader instanceof InMemoryJarfile.JarLoader)) {
+                    // Only process the statement if this is not for the StatementPlanner
+                    String classNameStr = statementMatcher.group(1);
 
-                // check that the match pattern is a valid match pattern
-                checkIdentifierWithWildcard(classNameStr, statement);
+                    // check that the match pattern is a valid match pattern
+                    checkIdentifierWithWildcard(classNameStr, statement);
 
-                ClassNameMatchStatus matchStatus = m_classMatcher.addPattern(classNameStr);
-                if (matchStatus == ClassNameMatchStatus.NO_EXACT_MATCH) {
-                    throw m_compiler.new VoltCompilerException(String.format(
-                            "IMPORT CLASS not found: '%s'",
-                            classNameStr)); // remove trailing semicolon
+                    ClassNameMatchStatus matchStatus = m_classMatcher.addPattern(classNameStr);
+                    if (matchStatus == ClassNameMatchStatus.NO_EXACT_MATCH) {
+                        throw m_compiler.new VoltCompilerException(String.format(
+                                    "IMPORT CLASS not found: '%s'",
+                                    classNameStr)); // remove trailing semicolon
+                    }
+                    else if (matchStatus == ClassNameMatchStatus.NO_WILDCARD_MATCH) {
+                        m_compiler.addWarn(String.format(
+                                    "IMPORT CLASS no match for wildcarded class: '%s'",
+                                    classNameStr), ddlStatement.lineNo);
+                    }
                 }
-                else if (matchStatus == ClassNameMatchStatus.NO_WILDCARD_MATCH) {
-                    m_compiler.addWarn(String.format(
-                            "IMPORT CLASS no match for wildcarded class: '%s'",
-                            classNameStr), ddlStatement.lineNo);
+                else {
+                    m_compiler.addInfo("Internal cluster recompilation ignoring IMPORT CLASS line: " +
+                            statement);
                 }
+                // Need to track the IMPORT CLASS lines even on internal compiles so that
+                // we don't lose them from the DDL source.  When the @UAC path goes away,
+                // we could change this.
+                m_tracker.addImportLine(statement);
             }
 
             return true;
@@ -1353,7 +1421,11 @@ public class DDLCompiler {
         }
         // Temporarily assign the view Query to the annotation so we can use when we build
         // the DDL statement for the VIEW
-        annotation.ddl = query;
+        if (query != null) {
+            annotation.ddl = query;
+        } else {
+            annotation.ddl = m_tableNameToDDL.get(name.toUpperCase());
+        }
 
         if (maxRowSize > MAX_ROW_SIZE) {
             throw m_compiler.new VoltCompilerException("Table name " + name + " has a maximum row size of " + maxRowSize +

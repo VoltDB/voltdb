@@ -36,6 +36,7 @@ package voltkv;
 import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.Random;
@@ -55,6 +56,9 @@ public class JDBCBenchmark
     private static final AtomicLongArray GetCompressionResults = new AtomicLongArray(2);
     private static final AtomicLongArray PutStoreResults = new AtomicLongArray(2);
     private static final AtomicLongArray PutCompressionResults = new AtomicLongArray(2);
+
+    private static ClientStatsContext periodicStatsContext;
+    private static long benchmarkStartTS;
 
     // Reference to the database connection we will use in them main thread
     private static Connection Con;
@@ -146,8 +150,8 @@ public class JDBCBenchmark
             try
             {
                 con = DriverManager.getConnection(url, "", "");
-                final CallableStatement getCS = con.prepareCall("{call Get(?)}");
-                final CallableStatement putCS = con.prepareCall("{call Put(?,?)}");
+                final CallableStatement getCS = con.prepareCall("{call STORE.select(?)}");
+                final CallableStatement putCS = con.prepareCall("{call STORE.upsert(?,?)}");
                 long endTime = System.currentTimeMillis() + (1000l * this.duration);
                 Random rand = new Random();
                 while (endTime > System.currentTimeMillis())
@@ -179,7 +183,7 @@ public class JDBCBenchmark
                         final PayloadProcessor.Pair pair = processor.generateForStore();
                         try
                         {
-                            // Put a key/value pair, asynchronously
+                            // Put a key/value pair using inbuilt upsert procedure, asynchronously
                             putCS.setString(1, pair.Key);
                             putCS.setBytes(2, pair.getStoreValue());
                             putCS.executeUpdate();
@@ -207,6 +211,22 @@ public class JDBCBenchmark
                 try { con.close(); } catch (Exception x) {}
             }
         }
+    }
+
+    /**
+     * Prints a one line update on performance that can be printed
+     * periodically during a benchmark.
+     */
+    public static synchronized void printStatistics() {
+        ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
+        long time = Math.round((stats.getEndTimestamp() - benchmarkStartTS) / 1000.0);
+
+        System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
+        System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
+        System.out.printf("Aborts/Failures %d/%d, ",
+                stats.getInvocationAborts(), stats.getInvocationErrors());
+        System.out.printf("Avg/95%% Latency %.2f/%.2fms\n", stats.getAverageLatency(),
+                stats.kPercentileLatencyAsDouble(0.95));
     }
 
     // Application entry point
@@ -248,6 +268,7 @@ public class JDBCBenchmark
 
             // Statistics manager objects from the connection, used to generate latency histogram
             ClientStatsContext fullStatsContext = ((IVoltDBConnection) Con).createStatsContext();
+            periodicStatsContext = ((IVoltDBConnection) Con).createStatsContext();
 
             System.out.println("Connected.  Starting benchmark.");
 
@@ -257,36 +278,35 @@ public class JDBCBenchmark
                     config.entropy, config.poolsize, config.usecompression);
 
             // Initialize the store
-            if (config.preload)
-            {
+            if (config.preload) {
                 System.out.print("Initializing data store... ");
-                final CallableStatement initializeCS = Con.prepareCall("{call Initialize(?,?,?,?)}");
-                for(int i=0;i<config.poolsize;i+=1000)
-                {
-                    initializeCS.setInt(1, i);
-                    initializeCS.setInt(2, Math.min(i+1000,config.poolsize));
-                    initializeCS.setString(3, processor.KeyFormat);
-                    initializeCS.setBytes(4, processor.generateForStore().getStoreValue());
-                    initializeCS.executeUpdate();
+
+                final PreparedStatement removeCS = Con.prepareStatement("DELETE FROM store;");
+                final CallableStatement putCS = Con.prepareCall("{call STORE.upsert(?,?)}");
+                for(int i=0;i<config.poolsize ;i++) {
+                    if (i == 0) {
+                        removeCS.execute();
+                    }
+                    putCS.setString(1, String.format(processor.KeyFormat, i));
+                    putCS.setBytes(2,processor.generateForStore().getStoreValue());
+                    putCS.execute();
                 }
                 System.out.println(" Done.");
             }
-
             // start the stats
             fullStatsContext.fetchAndResetBaseline();
+            periodicStatsContext.fetchAndResetBaseline();
+            benchmarkStartTS = System.currentTimeMillis();
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 
             // Create a Timer task to display performance data on the operating procedures
             Timer timer = new Timer();
-            timer.scheduleAtFixedRate(new TimerTask()
-            {
+            TimerTask statsPrinting = new TimerTask() {
                 @Override
-                public void run()
-                {
-                    try { System.out.print(Con.unwrap(IVoltDBConnection.class).getStatistics("Get", "Put")); } catch(Exception x) {}
-                }
-            }
+                public void run() { printStatistics(); }
+            };
+            timer.scheduleAtFixedRate(statsPrinting
             , config.displayinterval*1000l
             , config.displayinterval*1000l
             );
@@ -351,20 +371,6 @@ public class JDBCBenchmark
             + ((double)PutCompressionResults.get(0) + (PutStoreResults.get(0)+PutStoreResults.get(1))*config.keysize)/(134217728d*config.duration)
             );
 
-            // 2. Overall performance statistics for GET/PUT operations
-            System.out.println(
-              "\n\n-------------------------------------------------------------------------------------\n"
-            + " System Statistics\n"
-            + "-------------------------------------------------------------------------------------\n\n");
-            System.out.print(Con.unwrap(IVoltDBConnection.class).getStatistics("Get", "Put").toString(false));
-
-            // 3. Per-procedure detailed performance statistics
-            System.out.println(
-              "\n\n-------------------------------------------------------------------------------------\n"
-            + " Detailed Statistics\n"
-            + "-------------------------------------------------------------------------------------\n\n");
-            System.out.print(Con.unwrap(IVoltDBConnection.class).getStatistics().toString(false));
-
             System.out.println(
                     "\n\n-------------------------------------------------------------------------------------\n"
                   + " Client Latency Statistics\n"
@@ -392,7 +398,7 @@ public class JDBCBenchmark
             System.out.println("\n\n" + stats.latencyHistoReport());
 
             // Dump statistics to a CSV file
-            Con.unwrap(IVoltDBConnection.class).saveStatistics(config.statsfile);
+            Con.unwrap(IVoltDBConnection.class).saveStatistics(stats, config.statsfile);
 
             Con.close();
 

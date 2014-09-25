@@ -477,6 +477,70 @@ public class TestDistributer extends TestCase {
     }
 
     /**
+     * Test premature connection timeouts.
+     */
+    @Test
+    public void testPrematureTimeout() throws Exception {
+        final AtomicBoolean failed = new AtomicBoolean(false);
+        class TimeoutMonitorCSL extends ClientStatusListenerExt {
+            @Override
+            public void connectionLost(String hostname, int port, int connectionsLeft,
+                                       ClientStatusListenerExt.DisconnectCause cause) {
+                if (cause.equals(DisconnectCause.TIMEOUT)) {
+                    failed.set(true);
+                }
+            }
+        }
+
+        // create a fake server and connect to it.
+        MockVolt volt = new MockVolt(20000);
+        volt.start();
+
+        // create distributer and connect it to the client
+        Distributer dist = new Distributer(false,
+                ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
+                2000 /* Two seconds connection timeout */,
+                false, null /* subject */);
+        dist.addClientStatusListener(new TimeoutMonitorCSL());
+        dist.createConnection("localhost", "", "", 20000);
+
+        // make sure it connected
+        assertTrue(volt.handler != null);
+
+        // run fine for long enough to send some pings
+        long start = System.currentTimeMillis();
+        while ((System.currentTimeMillis() - start) < 3000) {
+            Thread.yield();
+        }
+
+        start = System.currentTimeMillis();
+
+        // tell the mock voltdb to stop responding
+        volt.handler.sendResponses.set(false);
+
+        // Should not timeout unless 2 seconds has passed
+        while (!failed.get()) {
+            if ((System.currentTimeMillis() - start) > 2000) {
+                break;
+            } else {
+                Thread.yield();
+            }
+        }
+
+        // If the actual elapsed time is smaller than the timeout value,
+        // but the connection was closed due to a timeout, fail.
+        // Only check if the duration is within a range, because the timer may not be accurate.
+        if ((System.currentTimeMillis() - start) < 1900 &&
+            (System.currentTimeMillis() - start) > 2100) {
+            fail("Premature timeout occurred " + (System.currentTimeMillis() - start));
+        }
+
+        // clean up
+        dist.shutdown();
+        volt.shutdown();
+    }
+
+    /**
      * Test query timeouts. Create a fake voltdb that runs all happy for a while, but then can be told to shut up if it
      * knows what's good for it. Wait for the query timeout.
      */
