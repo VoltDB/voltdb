@@ -1410,6 +1410,7 @@ public class ProcedureRunner {
        final int batchSize = batch.size();
        Object[] params = new Object[batchSize];
        long[] fragmentIds = new long[batchSize];
+       String[] sqlTexts = new String[batchSize];
 
        int i = 0;
        for (final QueuedSQL qs : batch) {
@@ -1422,6 +1423,7 @@ public class ProcedureRunner {
            else {
                params[i] = qs.params;
            }
+           sqlTexts[i] = qs.stmt.getText();
            i++;
        }
        return m_site.executePlanFragments(
@@ -1429,6 +1431,7 @@ public class ProcedureRunner {
            fragmentIds,
            null,
            params,
+           sqlTexts,
            m_txnState.txnId,
            m_txnState.m_spHandle,
            m_txnState.uniqueId,
