@@ -1966,12 +1966,19 @@ public class VoltCompiler {
 
         if (tableName.equalsIgnoreCase("*")) {
             // star wildcard support
+            boolean containsReplicatedTables = false;
             for (Table table : db.getTables()) {
                 if (action.equalsIgnoreCase("DISABLE")) {
                     table.setIsdred(false);
-                } else {
+                } else if (!table.getIsreplicated()) {
                     table.setIsdred(true);
+                } else {
+                    containsReplicatedTables = true;
                 }
+            }
+            if (containsReplicatedTables) {
+                compilerLog.warn("DR is not supported for replicated tables, which are present in the catalog. " +
+                                 "These tables will not be included when replicating the database.");
             }
             return;
         }
@@ -1982,8 +1989,11 @@ public class VoltCompiler {
         }
         if (action.equalsIgnoreCase("DISABLE")) {
             tableref.setIsdred(false);
-        } else {
+        } else if (!tableref.getIsreplicated()) {
             tableref.setIsdred(true);
+        } else {
+            throw new VoltCompilerException("DR is not supported for replicated tables. " +
+                                            "Please remove this option from table '" + tableName + "'");
         }
     }
 

@@ -3326,6 +3326,20 @@ public class TestVoltCompiler extends TestCase {
                 );
     }
 
+    public void testDRReplicatedTable() throws Exception {
+        String moreSchema = "create table repl (key varchar(16), value varchar(128));";
+        badDDLAgainstSimpleSchema("DR is not supported for replicated tables.*",
+                moreSchema, "DR TABLE repl;");
+
+        Database db;
+        db = goodDDLAgainstSimpleSchema(moreSchema, "DR TABLE repl DISABLE;");
+        assertFalse(db.getTables().getIgnoreCase("repl").getIsdred());
+
+        db = goodDDLAgainstSimpleSchema(moreSchema, "DR TABLE *;");
+        assertTrue(db.getTables().getIgnoreCase("books").getIsdred());
+        assertFalse(db.getTables().getIgnoreCase("repl").getIsdred());
+    }
+
     public void testCompileFromDDL() throws IOException {
         final String simpleSchema1 =
             "create table table1r_el  (pkey integer, column2_integer integer, PRIMARY KEY(pkey));\n" +
