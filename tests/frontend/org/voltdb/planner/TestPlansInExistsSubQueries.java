@@ -252,26 +252,33 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
     }
 
     // HSQL failed to parse  these statement
-    // commented out for now
-//       public void testHSQLFailed() {
-//           {
-//                AbstractPlanNode pn = compile("select a from r1,r2 where exists (" +
-//                    "select 1 from r3 where r1.a = r3.a and r2.a = r3.a)");
+       public void testHSQLFailed() {
+           {    
+               failToCompile("select a from r1,r2 where exists (" +
+                           "select 1 from r3 where r1.a = r3.a and r2.a = r3.a)",
+                           "-1");
+            }
+            {
+                failToCompile("select a from r1 where exists (" +
+                    "select 1 from r2 having max(r1.a + r2.a) in (" +
+                    " select max(a) from r3))",
+                    "expression not in aggregate or GROUP BY columns");
+            }
+//            {
+//                failToCompile("select a from r1 group by a " +
+//                    " having exists (select c from r2 where r2.c = max(r1.a))",
+//                    "");
 //            }
 //            {
-//                AbstractPlanNode pn = compile("select a from r1 where exists (" +
-//                    "select 1 from r2 having max(r1.a + r2.a) in (" +
-//                    " select a from r3))");
+////                compile("select r2.a from r2 where exists " +
+////                        "( SELECT 1 from R2 WHERE r2.c = 4)");
+////                compile("select 1 from r2 where exists " +
+////                        "( SELECT 1 from R2 WHERE r2.c = ?)");
+//                failToCompile("select r2.a from r2 where exists " +
+//                        "( SELECT 1 from R2 WHERE r2.c = ?)",
+//                        "");
 //            }
-//            {
-//                AbstractPlanNode pn = compile("select a from r1 group by a " +
-//                    " having exists (select c from r2 where r2.c = max(r1.a))");
-//            }
-//            {
-//                AbstractPlanNode pn = compile("select a from r2 t1 where exists " +
-//                        "( SELECT 1 from R2 t2 WHERE t1.c = t2.c and t2.a = ?)");
-//            }
-//        }
+        }
 
     // Disabled for now
     //    public void testDeleteWhereIn() {
