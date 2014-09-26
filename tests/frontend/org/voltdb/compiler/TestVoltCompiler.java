@@ -3262,14 +3262,19 @@ public class TestVoltCompiler extends TestCase {
         Database db;
 
         db = goodDDLAgainstSimpleSchema(
-                "create table e1 (id integer, f1 varchar(16));",
+                "create table e1 (id integer not null, f1 varchar(16));",
+                "partition table e1 on column id;",
                 "dr table e1;"
                 );
         assertTrue(db.getTables().getIgnoreCase("e1").getIsdred());
 
+        String schema = "create table e1 (id integer not null, f1 varchar(16));\n" +
+                        "create table e2 (id integer not null, f1 varchar(16));\n" +
+                        "partition table e1 on column id;\n" +
+                        "partition table e2 on column id;";
+
         db = goodDDLAgainstSimpleSchema(
-                "create table e1 (id integer, f1 varchar(16));",
-                "create table e2 (id integer, f1 varchar(16));",
+                schema,
                 "dr table e1;",
                 "DR TABLE E2;"
                 );
@@ -3277,8 +3282,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(db.getTables().getIgnoreCase("e2").getIsdred());
 
         db = goodDDLAgainstSimpleSchema(
-                "create table e1 (id integer, f1 varchar(16));",
-                "create table e2 (id integer, f1 varchar(16));",
+                schema,
                 "dr table *;"
                 );
         assertTrue(db.getTables().getIgnoreCase("e1").getIsdred());
@@ -3286,8 +3290,7 @@ public class TestVoltCompiler extends TestCase {
 
         // DR statement is order sensitive
         db = goodDDLAgainstSimpleSchema(
-                "create table e1 (id integer, f1 varchar(16));",
-                "create table e2 (id integer, f1 varchar(16));",
+                schema,
                 "dr table *;",
                 "dr table e2 disable;"
                 );
@@ -3295,8 +3298,7 @@ public class TestVoltCompiler extends TestCase {
         assertFalse(db.getTables().getIgnoreCase("e2").getIsdred());
 
         db = goodDDLAgainstSimpleSchema(
-                "create table e1 (id integer, f1 varchar(16));",
-                "create table e2 (id integer, f1 varchar(16));",
+                schema,
                 "dr table e2 disable;",
                 "dr table *;"
                 );
