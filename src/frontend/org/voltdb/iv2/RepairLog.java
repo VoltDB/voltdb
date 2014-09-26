@@ -29,6 +29,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TheHashinator;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DumpMessage;
@@ -61,6 +62,12 @@ public class RepairLog
     private long m_maxSeenMpUniqueId = Long.MIN_VALUE;
     private long m_maxSeenSpUniqueId = Long.MIN_VALUE;
 
+    /*
+     * Track the last master-cluster unique ID associated with an
+     *  @ApplyBinaryLogSP invocation so it can be provided to the
+     *  ReplicaDRGateway on repair
+     */
+    private long m_maxSeenBinaryLogUniqueId = Long.MIN_VALUE;
 
     // is this a partition leader?
     boolean m_isLeader = false;
@@ -161,6 +168,11 @@ public class RepairLog
                 truncate(m.getTruncationHandle(), IS_SP);
                 m_logSP.add(new Item(IS_SP, m, m.getSpHandle(), m.getTxnId()));
                 m_maxSeenSpUniqueId = Math.max(m_maxSeenSpUniqueId, m.getSpUniqueId());
+                if ("@ApplyBinaryLogSP".equals(m.getStoredProcedureName())) {
+                    StoredProcedureInvocation spi = m.getStoredProcedureInvocation();
+                    // params[3] is the end sp unique id from the original cluster
+                    m_maxSeenBinaryLogUniqueId = Math.max(m_maxSeenBinaryLogUniqueId, (long)spi.getParams().getParam(3));
+                }
             }
         } else if (msg instanceof FragmentTaskMessage) {
             final TransactionInfoBaseMessage m = (TransactionInfoBaseMessage)msg;
@@ -277,7 +289,8 @@ public class RepairLog
                         m_lastSpHandle,
                         m_lastMpHandle,
                         TheHashinator.getCurrentVersionedConfigCooked(),
-                        maxSeenUniqueId);
+                        maxSeenUniqueId,
+                        m_maxSeenBinaryLogUniqueId);
         responses.add(hheader);
 
         int seq = responses.size();

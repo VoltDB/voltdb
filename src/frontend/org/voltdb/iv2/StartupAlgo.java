@@ -20,10 +20,10 @@ package org.voltdb.iv2;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
 
-import com.google_voltpatches.common.util.concurrent.SettableFuture;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
-import org.voltcore.utils.Pair;
+
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 public class StartupAlgo implements RepairAlgo
 {
@@ -35,7 +35,7 @@ public class StartupAlgo implements RepairAlgo
 
     // Each Term can process at most one promotion; if promotion fails, make
     // a new Term and try again (if that's your big plan...)
-    private final SettableFuture<Pair<Long, Long>> m_promotionResult = SettableFuture.create();
+    private final SettableFuture<RepairResult> m_promotionResult = SettableFuture.create();
 
     /**
      * Setup a new StartupAlgo but don't take any action to take responsibility.
@@ -53,7 +53,7 @@ public class StartupAlgo implements RepairAlgo
     }
 
     @Override
-    public Future<Pair<Long, Long>> start()
+    public Future<RepairResult> start()
     {
         try {
             prepareForStartup();
@@ -83,9 +83,10 @@ public class StartupAlgo implements RepairAlgo
         // then initialize the mailbox's replica set and proceed as leader.
         m_missingStartupSites.await();
         m_promotionResult.set(
-                Pair.of(
+                new RepairResult(
                     TxnEgo.makeZero(m_partitionId).getTxnId(),
-                    new UniqueIdGenerator(m_partitionId, 0).getNextUniqueId()));
+                    new UniqueIdGenerator(m_partitionId, 0).getNextUniqueId(),
+                    Long.MIN_VALUE));
     }
 
     /** Process a new repair log response */

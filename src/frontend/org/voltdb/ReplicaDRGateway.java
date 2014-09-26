@@ -33,7 +33,7 @@ public abstract class ReplicaDRGateway extends Thread implements Promotable {
 
     public abstract void shutdown();
 
-    public abstract void promotePartition(int partitionId);
+    public abstract void promotePartition(int partitionId, long maxUniqueId);
 
     public abstract void notifyOfLastAppliedSpUniqueId(int dataCenter, long spUniqueId);
 
@@ -55,7 +55,7 @@ public abstract class ReplicaDRGateway extends Thread implements Promotable {
         public void shutdown() {}
 
         @Override
-        public void promotePartition(int partitionId) {}
+        public void promotePartition(int partitionId, long maxUniqueId) {}
 
         @Override
         public void notifyOfLastAppliedSpUniqueId(int dataCenter, long spUniqueId) {};
