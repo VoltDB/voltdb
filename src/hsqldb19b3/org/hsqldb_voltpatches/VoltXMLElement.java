@@ -138,6 +138,11 @@ public class VoltXMLElement {
             m_name = name;
         }
 
+        public String getName()
+        {
+            return m_name;
+        }
+
         public List<VoltXMLElement> getAddedNodes()
         {
             return m_addedNodes;

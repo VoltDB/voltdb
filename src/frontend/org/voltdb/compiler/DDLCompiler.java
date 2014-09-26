@@ -516,7 +516,7 @@ public class DDLCompiler {
                     // with newline.
                     m_fullDDL += Encoder.hexEncode(stmt.statement) + "\n";
                     VoltXMLDiff thisStmtDiff = m_hsql.runDDLCommand(stmt.statement);
-                    m_schema.applyDiff(thisStmtDiff);
+                    applyDiff(thisStmtDiff);
                 } catch (HSQLParseException e) {
                     String msg = "DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
                     throw m_compiler.new VoltCompilerException(msg, stmt.lineNo);
@@ -535,6 +535,51 @@ public class DDLCompiler {
         m_tracker.addExtraClasses(m_classMatcher.getMatchedClassList());
         // possibly save some memory
         m_classMatcher.clear();
+    }
+
+    private void applyDiff(VoltXMLDiff stmtDiff)
+    {
+        m_schema.applyDiff(stmtDiff);
+        // now go back and clean up anything that wasn't resolvable just by applying the diff
+        // For now, this is:
+        // - ensuring that the partition columns on tables are correct.  The hard
+        // case is when the partition column is dropped from the table
+
+        // Each statement can affect at most one table.  Check to see if the table is listed in
+        // the changed nodes
+        if (stmtDiff.getChangedNodes().isEmpty()) {
+            return;
+        }
+        assert(stmtDiff.getChangedNodes().size() == 1);
+        Entry<String, VoltXMLDiff> tableEntry = stmtDiff.getChangedNodes().entrySet().iterator().next();
+        VoltXMLDiff tableDiff = tableEntry.getValue();
+        // need columns to be changed
+        if (tableDiff.getChangedNodes().isEmpty() ||
+            !tableDiff.getChangedNodes().containsKey("columnsdefault"))
+        {
+            return;
+        }
+        VoltXMLDiff columnsDiff = tableDiff.getChangedNodes().get("columnsdefault");
+        assert(columnsDiff != null);
+        // Need to have deleted columns
+        if (columnsDiff.getRemovedNodes().isEmpty()) {
+            return;
+        }
+        // Okay, get a list of deleted column names
+        Set<String> removedColumns = new HashSet<String>();
+        for (VoltXMLElement e : columnsDiff.getRemovedNodes()) {
+            removedColumns.add(e.name);
+        }
+        // go back and get our table name.  Use the uniquename ("table" + name) to get the element
+        // from the schema
+        VoltXMLElement tableElement = m_schema.findChild(tableEntry.getKey());
+        assert(tableElement != null);
+        String partitionCol = tableElement.attributes.get("partitioncolumn");
+        // if we removed the partition column, then remove the attribute from the schema
+        if (partitionCol != null && removedColumns.contains(partitionCol)) {
+            m_compiler.addWarn(String.format("Partition column %s was dropped from table %s.  Attempting to change table to replicated.", partitionCol, tableElement.attributes.get("name")));
+            tableElement.attributes.remove("partitioncolumn");
+        }
     }
 
     /**
@@ -780,10 +825,13 @@ public class DDLCompiler {
                             statement.substring(0,statement.length()-1))); // remove trailing semicolon
                 }
                 // group(1) -> table, group(2) -> column
-                m_tracker.put(
-                        checkIdentifierStart(statementMatcher.group(1),statement),
-                        checkIdentifierStart(statementMatcher.group(2),statement)
-                        );
+                String tableName = checkIdentifierStart(statementMatcher.group(1), statement);
+                String columnName = checkIdentifierStart(statementMatcher.group(2), statement);
+                m_tracker.put(tableName, columnName);
+                VoltXMLElement tableXML = m_schema.findChild("table" + tableName);
+                if (tableXML != null) {
+                    tableXML.attributes.put("partitioncolumn", columnName);
+                }
                 return true;
             }
             else if (PROCEDURE.equals(partitionee)) {
@@ -832,10 +880,15 @@ public class DDLCompiler {
         statementMatcher = replicatePattern.matcher(statement);
         if (statementMatcher.matches()) {
             // group(1) -> table
+            String tableName = statementMatcher.group(1);
             m_tracker.put(
-                    checkIdentifierStart(statementMatcher.group(1), statement),
+                    checkIdentifierStart(tableName, statement),
                     null
                     );
+            VoltXMLElement tableXML = m_schema.findChild("table" + tableName);
+            if (tableXML != null) {
+                tableXML.attributes.remove("partitioncolumn");
+            }
             return true;
         }
 
@@ -912,6 +965,10 @@ public class DDLCompiler {
             // check the table portion
             String tableName = checkIdentifierStart(statementMatcher.group(1), statement);
             m_tracker.addExportedTable(tableName);
+            VoltXMLElement tableXML = m_schema.findChild("table" + tableName);
+            if (tableXML != null) {
+                tableXML.attributes.put("export", "true");
+            }
 
             return true;
         }

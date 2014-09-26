@@ -69,8 +69,9 @@ public class VoltDDLElementTracker {
         }
 
         if (m_partitionMap.containsKey(tableName.toLowerCase())) {
-            throw m_compiler.new VoltCompilerException(String.format(
-                    "Partitioning already specified for table \"%s\"", tableName));
+            m_compiler.addInfo(String.format("Replacing partition column %s on table %s with column %s\n",
+                        m_partitionMap.get(tableName.toLowerCase()), tableName,
+                        colName));
         }
 
         m_partitionMap.put(tableName.toLowerCase(), colName);
