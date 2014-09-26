@@ -46,10 +46,15 @@ public class TestFunctionsForJSON extends RegressionSuite {
     private static final long[][] TABLE_ROW1 = new long[][]{{1}};
     private static final long[][] TABLE_ROW2 = new long[][]{{2}};
     private static final long[][] TABLE_ROW3 = new long[][]{{3}};
+    private static final long[][] TABLE_ROW4 = new long[][]{{4}};
+    private static final long[][] TABLE_ROW7 = new long[][]{{7}};
+    private static final long[][] TABLE_ROW10 = new long[][]{{10}};
     private static final long[][] TABLE_ROWS12  = new long[][]{{1},{2}};
     private static final long[][] TABLE_ROWS13  = new long[][]{{1},{3}};
     private static final long[][] TABLE_ROWS23  = new long[][]{{2},{3}};
+    private static final long[][] TABLE_ROWS47  = new long[][]{{4},{7}};
     private static final long[][] TABLE_ROWS123 = new long[][]{{1},{2},{3}};
+    private static final long[][] TABLE_ROWS234 = new long[][]{{2},{3},{4}};
     private static final long[][] FULL_TABLE = new long[][]{{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14},{15}};
     private static final int TOTAL_NUM_ROWS = FULL_TABLE.length;
     private static final boolean DEBUG = false;
@@ -95,7 +100,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
                 "    \"arr3d\": [\n" +
                 "        0,\n" +
                 "        [\n" +
-                "            \"one\",\n" +
+                "            \"One\",\n" +
                 "            [\n" +
                 "                2,\n" +
                 "                %d,\n" +
@@ -115,11 +120,11 @@ public class TestFunctionsForJSON extends RegressionSuite {
                 "}";
 
         ClientResponse cr;
-        cr = client.callProcedure("JS1.insert", 1, String.format(jstemplate, 1, 1, 1, 1, 1, 1, "one"));
+        cr = client.callProcedure("JS1.insert", 1, String.format(jstemplate, 1, 1, 1, 1, 1, 1, "One"));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("JS1.insert", 2, String.format(jstemplate, 2, 2, 2, 2, 2, 2, "two"));
+        cr = client.callProcedure("JS1.insert", 2, String.format(jstemplate, 2, 2, 2, 2, 2, 2, "Two"));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        cr = client.callProcedure("JS1.insert", 3, String.format(jstemplate, 3, 3, 3, 3, 3, 3, "three"));
+        cr = client.callProcedure("JS1.insert", 3, String.format(jstemplate, 3, 3, 3, 3, 3, 3, "Three"));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         cr = client.callProcedure("JS1.insert", 4, "{\"id\":4,\"bool\": false}");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -153,6 +158,16 @@ public class TestFunctionsForJSON extends RegressionSuite {
         VoltTable result = cr.getResults()[0];
         assertTrue(result.advanceRow());
         return result.getString(0);
+    }
+
+    private void debugPrintJsonDoc(String description, Client client, int... rowIds) throws Exception {
+        if (DEBUG) {
+            System.out.println();
+            for (int id : rowIds) {
+                System.out.println("JSON document (DOC column), for id=" + id + " ("
+                                   + description + "):\n" + getDocFromId(client, id));
+            }
+        }
     }
 
     private void testProcWithValidJSON(long[] expectedResult, Client client,
@@ -201,7 +216,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
         testProcWithValidJSON(new long[][]{{6}}, client, "DocEqualsProc", "[]");
 
         testProcWithValidJSON(new long[][]{{6}}, client, "ArrayLengthDocProc", "0");
-        testProcWithValidJSON(new long[][]{{10}}, client, "ArrayLengthDocProc", "3");
+        testProcWithValidJSON(TABLE_ROW10, client, "ArrayLengthDocProc", "3");
         testProcWithValidJSON(EMPTY_TABLE, client, "ArrayLengthDocProc", "1");
         testProcWithValidJSON(EMPTY_TABLE, client, "ArrayLengthDocProc", "2");
     }
@@ -214,10 +229,11 @@ public class TestFunctionsForJSON extends RegressionSuite {
 
         // Debug print, echoing the initial JSON documents, to stdout
         if (DEBUG) {
+            int[] ids = new int[TOTAL_NUM_ROWS];
             for (int id=1; id <= TOTAL_NUM_ROWS; id++) {
-                System.out.println("JSON document (DOC column), for id=" + id + ":\n"
-                                   + getDocFromId(client, id));
+                ids[id-1] = id;
             }
+            debugPrintJsonDoc("initial values", client, ids);
         }
 
         cr = client.callProcedure("IdFieldProc", "id", "1");
@@ -243,7 +259,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
             fail("parameter check failed");
         }
 
-        cr = client.callProcedure("IdFieldProc", "tag", "three");
+        cr = client.callProcedure("IdFieldProc", "tag", "Three");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
@@ -315,12 +331,17 @@ public class TestFunctionsForJSON extends RegressionSuite {
         result.getString(0);
         assertTrue(result.wasNull());
 
+        // Test that FIELD function is case-sensitive
+        testProcWithValidJSON(EMPTY_TABLE, client, "IdFieldProc", "tag", "one");
+        testProcWithValidJSON(EMPTY_TABLE, client, "IdFieldProc", "tag", "ONE");
+        testProcWithValidJSON(TABLE_ROW1,  client, "IdFieldProc", "tag", "One");
+
         // Test null values passed to FIELD function
         testProcWithValidJSON(FULL_TABLE, client, "NullFieldDocProc", null, null);
         testProcWithValidJSON(FULL_TABLE, client, "NullFieldDocProc", null, 0);
         testProcWithValidJSON(FULL_TABLE, client, "NullFieldDocProc", null, 1.2);
         testProcWithValidJSON(FULL_TABLE, client, "NullFieldDocProc", null, "true");
-        testProcWithValidJSON(FULL_TABLE, client, "NullFieldDocProc", null, "one");
+        testProcWithValidJSON(FULL_TABLE, client, "NullFieldDocProc", null, "One");
         testProcWithInvalidJSON("Invalid FIELD path argument (SQL null)", client, "NullFieldProc", (Object) null);
 
         testProcWithValidJSON(new long[][]{{11}}, client, "NotNullFieldProc", "null");
@@ -329,7 +350,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
         testProcWithValidJSON(new long[][]{{12}}, client, "IdFieldProc", "foo", "null");
     }
 
-    /** Used to test ENG-6620, part 1 (dotted path notation). */
+    /** Used to test ENG-6620, part 1 (dotted path notation) / ENG-6832. */
     public void testFIELDFunctionWithDotNotation() throws Exception {
         Client client = getClient();
         loadJS1(client);
@@ -363,7 +384,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
         testProcWithInvalidJSON("Syntax error: value, object or array expected", client, "NotNullField2Proc", "tag", "veggies");
     }
 
-    /** Used to test ENG-6620, part 2 (array index notation). */
+    /** Used to test ENG-6620, part 2 (array index notation) / ENG-6832. */
     public void testFIELDFunctionWithIndexNotation() throws Exception {
         Client client = getClient();
         loadJS1(client);
@@ -371,9 +392,15 @@ public class TestFunctionsForJSON extends RegressionSuite {
         testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "arr[0]", 0);
         testProcWithValidJSON(TABLE_ROW2,    client, "IdFieldProc", "arr[1]", 2);
         testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "arr[2]", 100);
-        testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "arr3d[1][0]", "one");
+        testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "arr[-1]", 100);
+        testProcWithValidJSON(TABLE_ROWS123, client, "NotNullFieldProc", "arr[-1]");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "arr[3]");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "arr[" + Integer.MAX_VALUE + "]");
+        testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "arr3d[1][0]", "One");
         testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "arr3d[1][1][0]", 2);
         testProcWithValidJSON(TABLE_ROW3,    client, "IdFieldProc", "arr3d[1][1][1]", 3);
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "arr3d[1][1][3]");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "arr3d[1][1][" + Integer.MAX_VALUE + "]");
 
         // Test \ escape for brackets in element name, not used for array index
         testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "bracket]\\[\\[] \\[ ] chars", "[foo]");
@@ -397,13 +424,18 @@ public class TestFunctionsForJSON extends RegressionSuite {
         testProcWithInvalidJSON("Syntax error: value, object or array expected", client, "NullArrayProc", "tag", 0);
 
         // Test index notation with no name specified (a weird case!)
-        testProcWithValidJSON(new long[][]{{10}}, client, "NotNullFieldProc", "[0]");
-        testProcWithValidJSON(new long[][]{{10}}, client, "IdFieldProc", "[0]", 1);
-        testProcWithValidJSON(new long[][]{{10}}, client, "IdFieldProc", "[1]", 2);
-        testProcWithValidJSON(new long[][]{{10}}, client, "IdFieldProc", "[2]", 3);
+        testProcWithValidJSON(TABLE_ROW10, client, "NotNullFieldProc", "[0]");
+        testProcWithValidJSON(TABLE_ROW10, client, "NotNullFieldProc", "[1]");
+        testProcWithValidJSON(TABLE_ROW10, client, "NotNullFieldProc", "[2]");
+        testProcWithValidJSON(TABLE_ROW10, client, "NotNullFieldProc", "[-1]");
+        testProcWithValidJSON(EMPTY_TABLE, client, "NotNullFieldProc", "[3]");
+        testProcWithValidJSON(TABLE_ROW10, client, "IdFieldProc", "[0]", 1);
+        testProcWithValidJSON(TABLE_ROW10, client, "IdFieldProc", "[1]", 2);
+        testProcWithValidJSON(TABLE_ROW10, client, "IdFieldProc", "[2]", 3);
+        testProcWithValidJSON(TABLE_ROW10, client, "IdFieldProc", "[-1]", 3);
     }
 
-    /** Used to test ENG-6620, part 3 (dotted path and array index notation, combined). */
+    /** Used to test ENG-6620, part 3 (dotted path and array index notation, combined) / ENG-6832. */
     public void testFIELDFunctionWithDotAndIndexNotation() throws Exception {
         Client client = getClient();
         loadJS1(client);
@@ -411,9 +443,12 @@ public class TestFunctionsForJSON extends RegressionSuite {
         testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "inner.arr[0]", 0);
         testProcWithValidJSON(TABLE_ROW2,    client, "IdFieldProc", "inner.arr[1]", 2);
         testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "arr3d[2].veggies", "good for you");
-        testProcWithValidJSON(TABLE_ROW3,    client, "IdFieldProc", "arr3d[2].dairy", "3");
+        testProcWithValidJSON(TABLE_ROW3,    client, "IdFieldProc", "arr3d[2].dairy", 3);
     }
 
+    /** Used to test ENG-6620 / ENG-6832, for numeric, floating-point data, which
+     *  needs to be handled slightly differently, due to the tendency to add a
+     *  trailing zero; including with dotted path and/or array index notation. */
     public void testFIELDFunctionWithNumericData() throws Exception {
         Client client = getClient();
         loadJS1(client);
@@ -421,6 +456,8 @@ public class TestFunctionsForJSON extends RegressionSuite {
         testProcWithValidJSON(TABLE_ROWS123, client, "NumericFieldProc", "numeric", "1.2", "1.20");
         testProcWithValidJSON(TABLE_ROWS123, client, "NumericFieldProc", "inner.second.third.numeric", "2.3", "2.30");
         testProcWithValidJSON(TABLE_ROWS123, client, "NumericFieldProc", "arr3d[1][1][2]", "4.5", "4.50");
+        testProcWithValidJSON(TABLE_ROWS123, client, "NotNullFieldProc", "arr3d[1][-1][-1]");
+        testProcWithValidJSON(TABLE_ROWS123, client, "NumericFieldProc", "arr3d[1][-1][-1]", "4.5", "4.50");
         testProcWithValidJSON(TABLE_ROWS123, client, "NumericFieldProc", "inner.arr[2]", "3.4", "3.40");
         testProcWithValidJSON(TABLE_ROWS123, client, "NumericFieldProc", "arr3d[2].numeric", "5.6", "5.60");
     }
@@ -439,11 +476,12 @@ public class TestFunctionsForJSON extends RegressionSuite {
                                 client, "IdFieldProc", "arr[",     0);
         testProcWithInvalidJSON("Invalid JSON path: Missing ']' after array index [position 6]",
                                 client, "IdFieldProc", "arr[123",  0);
-        testProcWithInvalidJSON("Invalid JSON path: Invalid array index greater than the maximum integer value [position 14]",
-                                client, "IdFieldProc", "arr[10000000000]", 0);
+        // 2147483648 is Integer.MAX_VALUE + 1
+        testProcWithInvalidJSON("Invalid JSON path: Invalid array index greater than the maximum integer value [position 13]",
+                                client, "IdFieldProc", "arr[2147483648]", 0);
     }
 
-    /** Used to test ENG-6832 (invalid array index notation, for SET_FIELD). */
+    /** Used to test ENG-6879 (invalid array index notation, for SET_FIELD). */
     public void testSET_FIELDFunctionWithInvalidIndexNotation() throws Exception {
         Client client = getClient();
         loadJS1(client);
@@ -457,150 +495,427 @@ public class TestFunctionsForJSON extends RegressionSuite {
                                 client, "UpdateSetFieldProc", "arr[",     "-1", 1);
         testProcWithInvalidJSON("Invalid JSON path: Missing ']' after array index [position 6]",
                                 client, "UpdateSetFieldProc", "arr[123",  "-1", 1);
-        testProcWithInvalidJSON("Invalid JSON path: Invalid array index greater than the maximum integer value [position 14]",
-                                client, "UpdateSetFieldProc", "arr[10000000000]", "-1", 1);
+        // 2147483648 is Integer.MAX_VALUE + 1
+        testProcWithInvalidJSON("Invalid JSON path: Invalid array index greater than the maximum integer value [position 13]",
+                                client, "UpdateSetFieldProc", "arr[2147483648]", "-1", 1);
         // 1568 is the minimum array index that will trigger this error
         testProcWithInvalidJSON("exceeds the size of the VARCHAR(8192) column",
                                 client, "UpdateSetFieldProc", "arr[1568]", "-1", 1);
+//        testProcWithInvalidJSON("exceeds the size of the VARCHAR(8192) column",
+//                                client, "UpdateSetFieldProc", "arr[" + Integer.MAX_VALUE + "]", "-1", 1);
     }
 
-    /** Used to test ENG-6621, part 1 (without dotted path or array index notation). */
+    /** Used to test ENG-6621, part 1 (without dotted path or array index notation) / ENG-6879. */
     public void testSET_FIELDFunction() throws Exception {
         Client client = getClient();
         loadJS1(client);
 
-        // Confirm expected results before calling the "UpdateSetFieldProc" Stored Proc
-        testProcWithValidJSON(TABLE_ROW3,  client, "IdFieldProc", "tag", "three");
-        testProcWithValidJSON(EMPTY_TABLE, client, "IdFieldProc", "tag", "four");
+        // Confirm expected results before calling the SET_FIELD function
+        testProcWithValidJSON(TABLE_ROW1,    client, "IdFieldProc", "id", 1);
+        testProcWithValidJSON(EMPTY_TABLE,   client, "IdFieldProc", "id", -1);
+        testProcWithValidJSON(TABLE_ROW2,    client, "IdFieldProc", "id", 2);
+        testProcWithValidJSON(EMPTY_TABLE,   client, "IdFieldProc", "id", -2);
+        testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "bool", "true");
+        testProcWithValidJSON(TABLE_ROW4,    client, "IdFieldProc", "bool", "false");
+        testProcWithValidJSON(TABLE_ROW3,    client, "IdFieldProc", "tag", "Three");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "IdFieldProc", "tag", "Four");
+        testProcWithValidJSON(TABLE_ROW1,    client, "IdFieldProc", "tag", "One");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "IdFieldProc", "tag", "Five");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newint");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newbool");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newstr");
 
         // Call the "UpdateSetFieldProc" Stored Proc, which uses the SET_FIELD function
-        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "tag", "\"four\"", 3);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "id",   "-1",       1);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "bool", "false",    2);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "tag",  "\"Four\"", 3);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "newint", "7",     4);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "newbool", "true",  4);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "newstr", "\"newvalue\"", 4);
 
-        // Confirm modified results after calling the "UpdateSetFieldProc" Stored Proc
-        testProcWithValidJSON(EMPTY_TABLE, client, "IdFieldProc", "tag", "three");
-        testProcWithValidJSON(TABLE_ROW3,  client, "IdFieldProc", "tag", "four");
+        // Call the SET_FIELD function directly, using ad-hoc queries
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'id', '-2') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'bool', 'false') WHERE ID = 3");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'tag', '\"Five\"') WHERE ID = 1");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newint', '7') WHERE ID = 7");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newbool', 'true') WHERE ID = 7");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newstr', '\"newvalue\"') WHERE ID = 7");
+
+        debugPrintJsonDoc("with new primitive values", client, 4, 7);
+
+        // Confirm modified results after calling the SET_FIELD function
+        testProcWithValidJSON(EMPTY_TABLE,   client, "IdFieldProc", "id", 1);
+        testProcWithValidJSON(TABLE_ROW1,    client, "IdFieldProc", "id", -1);
+        testProcWithValidJSON(EMPTY_TABLE,   client, "IdFieldProc", "id", 2);
+        testProcWithValidJSON(TABLE_ROW2,    client, "IdFieldProc", "id", -2);
+        testProcWithValidJSON(TABLE_ROW1,    client, "IdFieldProc", "bool", "true");
+        testProcWithValidJSON(TABLE_ROWS234, client, "IdFieldProc", "bool", "false");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "IdFieldProc", "tag", "Three");
+        testProcWithValidJSON(TABLE_ROW3,    client, "IdFieldProc", "tag", "Four");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "IdFieldProc", "tag", "One");
+        testProcWithValidJSON(TABLE_ROW1,    client, "IdFieldProc", "tag", "Five");
+        testProcWithValidJSON(TABLE_ROWS47,  client, "NotNullFieldProc", "newint");
+        testProcWithValidJSON(TABLE_ROWS47,  client, "NotNullFieldProc", "newbool");
+        testProcWithValidJSON(TABLE_ROWS47,  client, "NotNullFieldProc", "newstr");
+        testProcWithValidJSON(TABLE_ROWS47,  client, "IdFieldProc", "newint", 7);
+        testProcWithValidJSON(TABLE_ROWS47,  client, "IdFieldProc", "newbool", "true");
+        testProcWithValidJSON(TABLE_ROWS47,  client, "IdFieldProc", "newstr", "newvalue");
     }
 
-    /** Used to test ENG-6621, part 2 (dotted path notation). */
+    /** Used to test ENG-6621, part 2 (dotted path notation) / ENG-6879. */
     public void testSET_FIELDFunctionWithDotNotation() throws Exception {
         Client client = getClient();
         loadJS1(client);
 
-        // Confirm expected results before calling the "UpdateSetFieldProc" Stored Proc
+        // Confirm expected results before calling the SET_FIELD function
         testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "inner.veggies", "good for you");
         testProcWithValidJSON(EMPTY_TABLE,   client, "IdFieldProc", "inner.veggies", "bad for you");
         testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "inner.second.fruits", 1);
         testProcWithValidJSON(EMPTY_TABLE,   client, "IdFieldProc", "inner.second.fruits", -1);
         testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "inner.second.third.meats", "yum");
         testProcWithValidJSON(EMPTY_TABLE,   client, "IdFieldProc", "inner.second.third.meats", "yuck");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "inner.newint");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "inner.newstr");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "inner.newbool");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newobj.newint");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newobj.newstr");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newobj.newbool");
         testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "dot\\.char", "foo.bar");
         testProcWithValidJSON(EMPTY_TABLE,   client, "IdFieldProc", "dot\\.char", "bar.foo");
 
-        // Call the "UpdateSetFieldProc" Stored Proc (several times), to test the SET_FIELD function
+        // Call the "UpdateSetFieldProc" Stored Proc, which uses the SET_FIELD function
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "inner.veggies", "\"bad for you\"", 1);
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "inner.second.fruits", -1, 2);
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "inner.second.third.meats", "\"yuck\"", 3);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "inner.newint", 7, 1);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "inner.newstr", "\"newvalue\"", 2);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "newobj.newbool", "true", 4);
+
+        // Call the SET_FIELD function directly, using ad-hoc queries
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'inner.veggies', '\"bad for you\"') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'inner.second.fruits', '-1') WHERE ID = 3");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'inner.second.third.meats', '\"yuck\"') WHERE ID = 1");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'inner.newbool', 'true') WHERE ID = 3");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newobj.newint', '7') WHERE ID = 4");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newobj.newstr', '\"newvalue\"') WHERE ID = 4");
 
         // Test \ escape for dot in element name, not used for sub-path
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "dot\\.char", "\"bar.foo\"", 1);
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'dot\\.char', '\"bar.foo\"') WHERE ID = 2");
 
-        // Confirm modified results after calling the "UpdateSetFieldProc" Stored Proc
-        testProcWithValidJSON(TABLE_ROWS23, client, "IdFieldProc", "inner.veggies", "good for you");
-        testProcWithValidJSON(TABLE_ROW1,   client, "IdFieldProc", "inner.veggies", "bad for you");
-        testProcWithValidJSON(TABLE_ROWS13, client, "IdFieldProc", "inner.second.fruits", 1);
-        testProcWithValidJSON(TABLE_ROW2,   client, "IdFieldProc", "inner.second.fruits", -1);
-        testProcWithValidJSON(TABLE_ROWS12, client, "IdFieldProc", "inner.second.third.meats", "yum");
-        testProcWithValidJSON(TABLE_ROW3,   client, "IdFieldProc", "inner.second.third.meats", "yuck");
-        testProcWithValidJSON(TABLE_ROWS23, client, "IdFieldProc", "dot\\.char", "foo.bar");
-        testProcWithValidJSON(TABLE_ROW1,   client, "IdFieldProc", "dot\\.char", "bar.foo");
+        debugPrintJsonDoc("with new object values", client, 1, 2, 3, 4);
+
+        // Confirm modified results after calling the SET_FIELD function
+        testProcWithValidJSON(TABLE_ROW3,   client, "IdFieldProc", "inner.veggies", "good for you");
+        testProcWithValidJSON(TABLE_ROWS12, client, "IdFieldProc", "inner.veggies", "bad for you");
+        testProcWithValidJSON(TABLE_ROW1,   client, "IdFieldProc", "inner.second.fruits", 1);
+        testProcWithValidJSON(TABLE_ROWS23, client, "IdFieldProc", "inner.second.fruits", -1);
+        testProcWithValidJSON(TABLE_ROW2,   client, "IdFieldProc", "inner.second.third.meats", "yum");
+        testProcWithValidJSON(TABLE_ROWS13, client, "IdFieldProc", "inner.second.third.meats", "yuck");
+        testProcWithValidJSON(TABLE_ROW1,   client, "IdFieldProc", "inner.newint", 7);
+        testProcWithValidJSON(TABLE_ROW2,   client, "IdFieldProc", "inner.newstr", "newvalue");
+        testProcWithValidJSON(TABLE_ROW3,   client, "IdFieldProc", "inner.newbool", "true");
+        testProcWithValidJSON(TABLE_ROW4,   client, "IdFieldProc", "newobj.newint", 7);
+        testProcWithValidJSON(TABLE_ROW4,   client, "IdFieldProc", "newobj.newstr", "newvalue");
+        testProcWithValidJSON(TABLE_ROW4,   client, "IdFieldProc", "newobj.newbool", "true");
+        testProcWithValidJSON(TABLE_ROW3,   client, "IdFieldProc", "dot\\.char", "foo.bar");
+        testProcWithValidJSON(TABLE_ROWS12, client, "IdFieldProc", "dot\\.char", "bar.foo");
     }
 
-    /** Used to test ENG-6620, part 3 (array index notation). */
+    /** Used to test ENG-6620, part 3 (array index notation) / ENG-6879. */
     public void testSET_FIELDFunctionWithIndexNotation() throws Exception {
         Client client = getClient();
         loadJS1(client);
 
-        // Confirm expected results before calling the "UpdateSetFieldProc" Stored Proc
+        // Confirm expected results before calling the SET_FIELD function
+        testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "arr[0]", 0);
+        testProcWithValidJSON(EMPTY_TABLE,   client, "IdFieldProc", "arr[0]", -1);
+        testProcWithValidJSON(TABLE_ROW2,    client, "IdFieldProc", "arr[1]", 2);
+        testProcWithValidJSON(EMPTY_TABLE,   client, "IdFieldProc", "arr[1]", -2);
+        testProcWithValidJSON(TABLE_ROWS123, client, "NotNullFieldProc", "arr[2]");
+        testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "arr[2]", 100);
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "arr[3]");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "arr[4]");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "arr[5]");
         testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "arr3d[0]", 0);
         testProcWithValidJSON(EMPTY_TABLE,   client, "IdFieldProc", "arr3d[0]", -1);
-        testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "arr3d[1][0]", "one");
-        testProcWithValidJSON(EMPTY_TABLE,   client, "IdFieldProc", "arr3d[1][0]", "two");
+        testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "arr3d[1][0]", "One");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "IdFieldProc", "arr3d[1][0]", "Four");
         testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "arr3d[1][1][0]", 2);
         testProcWithValidJSON(EMPTY_TABLE,   client, "IdFieldProc", "arr3d[1][1][0]", -2);
+        testProcWithValidJSON(TABLE_ROW1,    client, "IdFieldProc", "arr3d[1][1][1]", 1);
         testProcWithValidJSON(TABLE_ROW3,    client, "IdFieldProc", "arr3d[1][1][1]", 3);
         testProcWithValidJSON(EMPTY_TABLE,   client, "IdFieldProc", "arr3d[1][1][1]", -3);
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "arr3d[1][1][3]");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "arr3d[1][1][4]");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "arr3d[1][1][5]");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newarr[0]");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newarr[1]");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newarr[2]");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newarr[3]");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newarr[4]");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newarr[5]");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newarr3d[0]");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newarr3d[1]");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newarr3d[2]");
         testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "bracket]\\[\\[] \\[ ] chars", "[foo]");
         testProcWithValidJSON(EMPTY_TABLE,   client, "IdFieldProc", "bracket]\\[\\[] \\[ ] chars", "[bar]");
-        testProcWithValidJSON(EMPTY_TABLE,   client, "IdFieldProc", "arr[3]", -4);
-        testProcWithValidJSON(EMPTY_TABLE,   client, "IdFieldProc", "arr3d[3]", -4);
 
-        // Call the "UpdateSetFieldProc" Stored Proc (several times), to test the SET_FIELD function
-        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "arr3d[0]", "-1", 1);
-        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "arr3d[1][0]", "\"two\"", 2);
+        // Call the "UpdateSetFieldProc" Stored Proc, which uses the SET_FIELD function
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "arr[0]", -1, 1);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "arr[3]", -4, 1);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "arr[-1]", -4, 2);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "arr[4]", -5, 3);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "arr3d[0]", -1, 1);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "arr3d[1][0]", "\"Four\"", 2);
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "arr3d[1][1][0]", -2, 2);
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "arr3d[1][1][1]", -3, 3);
-        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "arr[-1]", "-4", 1);
-        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "arr3d[-1]", "-4", 3);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "arr3d[1][1][-1]", -4, 3);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "arr3d[1][1][3]", -5, 1);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "newarr[2]", 7, 4);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "newarr[-1]", "true", 4);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "newarr[-1]", "\"newvalue\"", 4);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "newarr3d[1][1][1]", 7, 4);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "newarr3d[1][1][-1]", 8, 4);
+
+        // Call the SET_FIELD function directly, using ad-hoc queries
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr[1]', '-2') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr[4]', '-5') WHERE ID = 1");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr[-1]', '-5') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr[-1]', '-6') WHERE ID = 3");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr3d[0]', '-1') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr3d[1][0]', '\"Four\"') WHERE ID = 3");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr3d[1][1][0]', '-2') WHERE ID = 3");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr3d[1][1][1]', '-3') WHERE ID = 1");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr3d[1][1][-1]', '-6') WHERE ID = 1");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr3d[1][1][3]', '-5') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newarr[3]', 'true') WHERE ID = 7");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newarr[-1]', '\"newvalue\"') WHERE ID = 7");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newarr[2]', '7') WHERE ID = 7");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newarr3d[-1][-1][-1]', '9') WHERE ID = 7");
 
         // Test \ escape for brackets in element name, not used for array index
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "bracket]\\[\\[] \\[ ] chars", "\"[bar]\"", 1);
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'bracket]\\[\\[] \\[ ] chars', '\"[bar]\"') WHERE ID = 2");
 
-        // Confirm modified results after calling the "UpdateSetFieldProc" Stored Proc
-        testProcWithValidJSON(TABLE_ROWS23, client, "IdFieldProc", "arr3d[0]", 0);
-        testProcWithValidJSON(TABLE_ROW1,   client, "IdFieldProc", "arr3d[0]", -1);
-        testProcWithValidJSON(TABLE_ROWS13, client, "IdFieldProc", "arr3d[1][0]", "one");
-        testProcWithValidJSON(TABLE_ROW2,   client, "IdFieldProc", "arr3d[1][0]", "two");
-        testProcWithValidJSON(TABLE_ROWS13, client, "IdFieldProc", "arr3d[1][1][0]", 2);
-        testProcWithValidJSON(TABLE_ROW2,   client, "IdFieldProc", "arr3d[1][1][0]", -2);
-        testProcWithValidJSON(EMPTY_TABLE,  client, "IdFieldProc", "arr3d[1][1][1]", 3);
-        testProcWithValidJSON(TABLE_ROW3,   client, "IdFieldProc", "arr3d[1][1][1]", -3);
-        testProcWithValidJSON(TABLE_ROWS23, client, "IdFieldProc", "bracket]\\[\\[] \\[ ] chars", "[foo]");
-        testProcWithValidJSON(TABLE_ROW1,   client, "IdFieldProc", "bracket]\\[\\[] \\[ ] chars", "[bar]");
-        testProcWithValidJSON(TABLE_ROW1,   client, "IdFieldProc", "arr[3]", -4);
-        testProcWithValidJSON(TABLE_ROW3,   client, "IdFieldProc", "arr3d[3]", -4);
+        debugPrintJsonDoc("with new array values", client, 1, 2, 3, 4, 7);
+
+        // Confirm modified results after calling the SET_FIELD function
+        testProcWithValidJSON(TABLE_ROWS23,  client, "IdFieldProc", "arr[0]", 0);
+        testProcWithValidJSON(TABLE_ROW1,    client, "IdFieldProc", "arr[0]", -1);
+        testProcWithValidJSON(EMPTY_TABLE,   client, "IdFieldProc", "arr[1]", 2);
+        testProcWithValidJSON(TABLE_ROW2,    client, "IdFieldProc", "arr[1]", -2);
+        testProcWithValidJSON(TABLE_ROWS123, client, "NotNullFieldProc", "arr[2]");
+        testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "arr[2]", 100);
+        testProcWithValidJSON(TABLE_ROWS12,  client, "NotNullFieldProc", "arr[3]");
+        testProcWithValidJSON(TABLE_ROWS12,  client, "IdFieldProc", "arr[3]", -4);
+        testProcWithValidJSON(TABLE_ROWS123, client, "NotNullFieldProc", "arr[4]");
+        testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "arr[4]", -5);
+        testProcWithValidJSON(TABLE_ROW3,    client, "NotNullFieldProc", "arr[5]");
+        testProcWithValidJSON(TABLE_ROW3,    client, "IdFieldProc", "arr[5]", -6);
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "arr[6]");
+        testProcWithValidJSON(TABLE_ROW3,    client, "IdFieldProc", "arr3d[0]", 0);
+        testProcWithValidJSON(TABLE_ROWS12,  client, "IdFieldProc", "arr3d[0]", -1);
+        testProcWithValidJSON(TABLE_ROW1,    client, "IdFieldProc", "arr3d[1][0]", "One");
+        testProcWithValidJSON(TABLE_ROWS23,  client, "IdFieldProc", "arr3d[1][0]", "Four");
+        testProcWithValidJSON(TABLE_ROW1,    client, "IdFieldProc", "arr3d[1][1][0]", 2);
+        testProcWithValidJSON(TABLE_ROWS23,  client, "IdFieldProc", "arr3d[1][1][0]", -2);
+        testProcWithValidJSON(EMPTY_TABLE,   client, "IdFieldProc", "arr3d[1][1][1]", 1);
+        testProcWithValidJSON(EMPTY_TABLE,   client, "IdFieldProc", "arr3d[1][1][1]", 3);
+        testProcWithValidJSON(TABLE_ROWS13,  client, "IdFieldProc", "arr3d[1][1][1]", -3);
+        testProcWithValidJSON(TABLE_ROWS123, client, "NotNullFieldProc", "arr3d[1][1][2]");
+        testProcWithValidJSON(TABLE_ROWS123, client, "NumericFieldProc", "arr3d[1][1][2]", "4.5", "4.50");
+        testProcWithValidJSON(TABLE_ROWS123, client, "NotNullFieldProc", "arr3d[1][1][3]");
+        testProcWithValidJSON(TABLE_ROW3,    client, "IdFieldProc", "arr3d[1][1][3]", -4);
+        testProcWithValidJSON(TABLE_ROWS12,  client, "IdFieldProc", "arr3d[1][1][3]", -5);
+        testProcWithValidJSON(TABLE_ROW1,    client, "NotNullFieldProc", "arr3d[1][1][4]");
+        testProcWithValidJSON(TABLE_ROW1,    client, "IdFieldProc", "arr3d[1][1][4]", -6);
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "arr3d[1][1][5]");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newarr[0]");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newarr[1]");
+        testProcWithValidJSON(TABLE_ROWS47,  client, "NotNullFieldProc", "newarr[2]");
+        testProcWithValidJSON(TABLE_ROWS47,  client, "IdFieldProc", "newarr[2]", 7);
+        testProcWithValidJSON(TABLE_ROWS47,  client, "NotNullFieldProc", "newarr[3]");
+        testProcWithValidJSON(TABLE_ROWS47,  client, "IdFieldProc", "newarr[3]", "true");
+        testProcWithValidJSON(TABLE_ROWS47,  client, "NotNullFieldProc", "newarr[4]");
+        testProcWithValidJSON(TABLE_ROWS47,  client, "IdFieldProc", "newarr[4]", "newvalue");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newarr[5]");
+        testProcWithValidJSON(TABLE_ROW7,    client, "NotNullFieldProc", "newarr3d[0]");
+        testProcWithValidJSON(TABLE_ROW7,    client, "NotNullFieldProc", "newarr3d[0][0]");
+        testProcWithValidJSON(TABLE_ROW7,    client, "NotNullFieldProc", "newarr3d[0][0][0]");
+        testProcWithValidJSON(TABLE_ROW7,    client, "IdFieldProc", "newarr3d[0][0][0]", 9);
+        testProcWithValidJSON(TABLE_ROW4,    client, "NotNullFieldProc", "newarr3d[1]");
+        testProcWithValidJSON(TABLE_ROW4,    client, "NotNullFieldProc", "newarr3d[1][1]");
+        testProcWithValidJSON(TABLE_ROW4,    client, "NotNullFieldProc", "newarr3d[1][1][1]");
+        testProcWithValidJSON(TABLE_ROW4,    client, "IdFieldProc", "newarr3d[1][1][1]", 7);
+        testProcWithValidJSON(TABLE_ROW4,    client, "NotNullFieldProc", "newarr3d[1][1][2]");
+        testProcWithValidJSON(TABLE_ROW4,    client, "IdFieldProc", "newarr3d[1][1][2]", 8);
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newarr3d[2]");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newarr3d[1][2]");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newarr3d[1][1][3]");
+        testProcWithValidJSON(TABLE_ROW3,    client, "IdFieldProc", "bracket]\\[\\[] \\[ ] chars", "[foo]");
+        testProcWithValidJSON(TABLE_ROWS12,  client, "IdFieldProc", "bracket]\\[\\[] \\[ ] chars", "[bar]");
     }
 
-    /** Used to test ENG-6620, part 4 (dotted path and array index notation, combined). */
+    /** Used to test a weird part of ENG-6620 / ENG-6879: index notation, used
+     *  with no name specified. */
+    public void testSET_FIELDFunctionWithIndexNotationButNoName() throws Exception {
+        Client client = getClient();
+        loadJS1(client);
+
+        // Confirm expected results before calling the SET_FIELD function
+        testProcWithValidJSON(TABLE_ROW10, client, "IdFieldProc", "[0]", 1);
+        testProcWithValidJSON(EMPTY_TABLE, client, "IdFieldProc", "[0]", -1);
+        testProcWithValidJSON(TABLE_ROW10, client, "IdFieldProc", "[1]", 2);
+        testProcWithValidJSON(EMPTY_TABLE, client, "IdFieldProc", "[1]", -2);
+        testProcWithValidJSON(TABLE_ROW10, client, "NotNullFieldProc", "[2]");
+        testProcWithValidJSON(TABLE_ROW10, client, "IdFieldProc", "[2]", 3);
+        testProcWithValidJSON(EMPTY_TABLE, client, "NotNullFieldProc", "[3]");
+        testProcWithValidJSON(EMPTY_TABLE, client, "NotNullFieldProc", "[4]");
+        testProcWithValidJSON(EMPTY_TABLE, client, "NotNullFieldProc", "[5]");
+        testProcWithValidJSON(EMPTY_TABLE, client, "NotNullFieldProc", "[6]");
+        testProcWithValidJSON(EMPTY_TABLE, client, "NotNullFieldProc", "[7]");
+
+        // Call the "UpdateSetFieldProc" Stored Proc, which uses the SET_FIELD function
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "[0]", -1, 10);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "[3]", -4, 10);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "[-1]", -5, 10);
+
+        // Call the SET_FIELD function directly, using ad-hoc queries
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, '[1]', '-2') WHERE ID = 10");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, '[5]', '-6') WHERE ID = 10");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, '[-1]', '-7') WHERE ID = 10");
+
+        debugPrintJsonDoc("with new nameless array values", client, 10);
+
+        // Confirm modified results after calling the SET_FIELD function
+        testProcWithValidJSON(EMPTY_TABLE, client, "IdFieldProc", "[0]", 1);
+        testProcWithValidJSON(TABLE_ROW10, client, "IdFieldProc", "[0]", -1);
+        testProcWithValidJSON(EMPTY_TABLE, client, "IdFieldProc", "[1]", 2);
+        testProcWithValidJSON(TABLE_ROW10, client, "IdFieldProc", "[1]", -2);
+        testProcWithValidJSON(TABLE_ROW10, client, "NotNullFieldProc", "[2]");
+        testProcWithValidJSON(TABLE_ROW10, client, "IdFieldProc", "[2]", 3);
+        testProcWithValidJSON(TABLE_ROW10, client, "NotNullFieldProc", "[3]");
+        testProcWithValidJSON(TABLE_ROW10, client, "IdFieldProc", "[3]", -4);
+        testProcWithValidJSON(TABLE_ROW10, client, "NotNullFieldProc", "[4]");
+        testProcWithValidJSON(TABLE_ROW10, client, "IdFieldProc", "[4]", -5);
+        testProcWithValidJSON(TABLE_ROW10, client, "NotNullFieldProc", "[5]");
+        testProcWithValidJSON(TABLE_ROW10, client, "IdFieldProc", "[5]", -6);
+        testProcWithValidJSON(TABLE_ROW10, client, "NotNullFieldProc", "[6]");
+        testProcWithValidJSON(TABLE_ROW10, client, "IdFieldProc", "[6]", -7);
+        testProcWithValidJSON(EMPTY_TABLE, client, "NotNullFieldProc", "[7]");
+    }
+
+    /** Used to test ENG-6620, part 4 (dotted path and array index notation, combined) / ENG-6879. */
     public void testSET_FIELDFunctionWithDotAndIndexNotation() throws Exception {
         Client client = getClient();
         loadJS1(client);
 
-        // Confirm expected results before calling the "UpdateSetFieldProc" Stored Proc
+        // Confirm expected results before calling the SET_FIELD function
         testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "inner.arr[0]", 0);
         testProcWithValidJSON(EMPTY_TABLE,   client, "IdFieldProc", "inner.arr[0]", -1);
         testProcWithValidJSON(TABLE_ROW2,    client, "IdFieldProc", "inner.arr[1]", 2);
+        testProcWithValidJSON(TABLE_ROW3,    client, "IdFieldProc", "inner.arr[1]", 3);
         testProcWithValidJSON(EMPTY_TABLE,   client, "IdFieldProc", "inner.arr[1]", -2);
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "inner.newarr[0]");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "inner.newarr[1]");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "inner.newarr[2]");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "inner.newarr[3]");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newobj.newarr[0]");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newobj.newarr[1]");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newobj.newarr[2]");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newobj.newarr[3]");
+        testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "arr3d[0]", 0);
         testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "arr3d[2].veggies", "good for you");
         testProcWithValidJSON(EMPTY_TABLE,   client, "IdFieldProc", "arr3d[2].veggies", "bad for you");
+        testProcWithValidJSON(TABLE_ROW1,    client, "IdFieldProc", "arr3d[2].dairy", "1");
         testProcWithValidJSON(TABLE_ROW3,    client, "IdFieldProc", "arr3d[2].dairy", "3");
         testProcWithValidJSON(EMPTY_TABLE,   client, "IdFieldProc", "arr3d[2].dairy", "-3");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "arr3d[0].newint");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "arr3d[2].newint");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "arr3d[3].newint");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "arr3d[4]");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newarr[0].newint");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newarr[1].newint");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newarr[2].newint");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newarr[3]");
 
-        // Call the "UpdateSetFieldProc" Stored Proc (several times), to test the SET_FIELD function
+
+        // Call the "UpdateSetFieldProc" Stored Proc, which uses the SET_FIELD function
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "inner.arr[0]", "-1", 1);
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "inner.arr[1]", "-2", 2);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "inner.newarr[1]", "5", 1);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "newobj.newarr[1]", "7", 4);
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "arr3d[2].veggies", "\"bad for you\"", 2);
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "arr3d[2].dairy", "-3", 3);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "arr3d[2].newint", "5", 2);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "newarr[1].newint", "7", 4);
 
-        // Confirm modified results after calling the "UpdateSetFieldProc" Stored Proc
-        testProcWithValidJSON(TABLE_ROWS23, client, "IdFieldProc", "inner.arr[0]", 0);
-        testProcWithValidJSON(TABLE_ROW1,   client, "IdFieldProc", "inner.arr[0]", -1);
-        testProcWithValidJSON(EMPTY_TABLE,  client, "IdFieldProc", "inner.arr[1]", 2);
-        testProcWithValidJSON(TABLE_ROW2,   client, "IdFieldProc", "inner.arr[1]", -2);
-        testProcWithValidJSON(TABLE_ROWS13, client, "IdFieldProc", "arr3d[2].veggies", "good for you");
-        testProcWithValidJSON(TABLE_ROW2,   client, "IdFieldProc", "arr3d[2].veggies", "bad for you");
-        testProcWithValidJSON(EMPTY_TABLE,  client, "IdFieldProc", "arr3d[2].dairy", "3");
-        testProcWithValidJSON(TABLE_ROW3,   client, "IdFieldProc", "arr3d[2].dairy", "-3");
+        // Call the SET_FIELD function directly, using ad-hoc queries
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'inner.arr[0]', '-1') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'inner.arr[1]', '-2') WHERE ID = 3");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'inner.newarr[-1]', '6') WHERE ID = 1");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newobj.newarr[-1]', '8') WHERE ID = 4");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr3d[2].veggies', '\"bad for you\"') WHERE ID = 3");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr3d[2].dairy', '-3') WHERE ID = 1");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr3d[-1].newint', '6') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newarr[-1].newint', '8') WHERE ID = 4");
+
+        // Confirm that these lines have no effect, since arr3d[0] is not an object:
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "arr3d[0].newint", "-9", 1);
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr3d[0].newint', '-9') WHERE ID = 2");
+
+        debugPrintJsonDoc("with new object/array values", client, 1, 2, 3, 4);
+
+        // Confirm modified results after calling the SET_FIELD function
+        testProcWithValidJSON(TABLE_ROW3,    client, "IdFieldProc", "inner.arr[0]", 0);
+        testProcWithValidJSON(TABLE_ROWS12,  client, "IdFieldProc", "inner.arr[0]", -1);
+        testProcWithValidJSON(EMPTY_TABLE,   client, "IdFieldProc", "inner.arr[1]", 2);
+        testProcWithValidJSON(EMPTY_TABLE,   client, "IdFieldProc", "inner.arr[1]", 3);
+        testProcWithValidJSON(TABLE_ROWS23,  client, "IdFieldProc", "inner.arr[1]", -2);
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "inner.newarr[0]");
+        testProcWithValidJSON(TABLE_ROW1,    client, "NotNullFieldProc", "inner.newarr[1]");
+        testProcWithValidJSON(TABLE_ROW1,    client, "IdFieldProc", "inner.newarr[1]", 5);
+        testProcWithValidJSON(TABLE_ROW1,    client, "NotNullFieldProc", "inner.newarr[2]");
+        testProcWithValidJSON(TABLE_ROW1,    client, "IdFieldProc", "inner.newarr[2]", 6);
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "inner.newarr[3]");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newobj.newarr[0]");
+        testProcWithValidJSON(TABLE_ROW4,    client, "NotNullFieldProc", "newobj.newarr[1]");
+        testProcWithValidJSON(TABLE_ROW4,    client, "IdFieldProc", "newobj.newarr[1]", 7);
+        testProcWithValidJSON(TABLE_ROW4,    client, "NotNullFieldProc", "newobj.newarr[2]");
+        testProcWithValidJSON(TABLE_ROW4,    client, "IdFieldProc", "newobj.newarr[2]", 8);
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newobj.newarr[3]");
+        testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "arr3d[0]", 0);
+        testProcWithValidJSON(TABLE_ROW1,    client, "IdFieldProc", "arr3d[2].veggies", "good for you");
+        testProcWithValidJSON(TABLE_ROWS23,  client, "IdFieldProc", "arr3d[2].veggies", "bad for you");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "IdFieldProc", "arr3d[2].dairy", "1");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "IdFieldProc", "arr3d[2].dairy", "3");
+        testProcWithValidJSON(TABLE_ROWS13,  client, "IdFieldProc", "arr3d[2].dairy", "-3");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "arr3d[0].newint");
+        testProcWithValidJSON(TABLE_ROW2,    client, "NotNullFieldProc", "arr3d[2].newint");
+        testProcWithValidJSON(TABLE_ROW2,    client, "IdFieldProc", "arr3d[2].newint", 5);
+        testProcWithValidJSON(TABLE_ROW2,    client, "NotNullFieldProc", "arr3d[3].newint");
+        testProcWithValidJSON(TABLE_ROW2,    client, "IdFieldProc", "arr3d[3].newint", 6);
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "arr3d[4]");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newarr[0].newint");
+        testProcWithValidJSON(TABLE_ROW4,    client, "NotNullFieldProc", "newarr[1].newint");
+        testProcWithValidJSON(TABLE_ROW4,    client, "IdFieldProc", "newarr[1].newint", 7);
+        testProcWithValidJSON(TABLE_ROW4,    client, "NotNullFieldProc", "newarr[2].newint");
+        testProcWithValidJSON(TABLE_ROW4,    client, "IdFieldProc", "newarr[2].newint", 8);
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newarr[3]");
     }
 
-    // Test the SET_FIELD function with numeric, floating-point data, including
-    // with dotted path and/or array index notation
+    /** Used to test ENG-6620 / ENG-6879, for numeric, floating-point data, which
+     *  needs to be handled slightly differently, due to the tendency to add a
+     *  trailing zero; including with dotted path and/or array index notation. */
     public void testSET_FIELDFunctionWithNumericData() throws Exception {
         Client client = getClient();
         loadJS1(client);
 
-        // Confirm expected results before calling the "UpdateSetFieldProc" Stored Proc
+        // Confirm expected results before calling the SET_FIELD function
         testProcWithValidJSON(TABLE_ROWS123, client, "NumericFieldProc", "numeric", "1.2", "1.20");
         testProcWithValidJSON(EMPTY_TABLE,   client, "NumericFieldProc", "numeric", "-1.2", "-1.20");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NumericFieldProc", "numeric", "-2.3", "-2.30");
         testProcWithValidJSON(TABLE_ROWS123, client, "NumericFieldProc", "inner.second.third.numeric", "2.3", "2.30");
         testProcWithValidJSON(EMPTY_TABLE,   client, "NumericFieldProc", "inner.second.third.numeric", "-2.3", "-2.30");
         testProcWithValidJSON(TABLE_ROWS123, client, "NumericFieldProc", "arr3d[1][1][2]", "4.5", "4.50");
@@ -609,25 +924,54 @@ public class TestFunctionsForJSON extends RegressionSuite {
         testProcWithValidJSON(EMPTY_TABLE,   client, "NumericFieldProc", "inner.arr[2]", "-3.4", "-3.40");
         testProcWithValidJSON(TABLE_ROWS123, client, "NumericFieldProc", "arr3d[2].numeric", "5.6", "5.60");
         testProcWithValidJSON(EMPTY_TABLE,   client, "NumericFieldProc", "arr3d[2].numeric", "-5.6", "-5.60");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newnum");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newobj");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newarr");
 
-        // Call the "UpdateSetFieldProc" Stored Proc (several times), to test the SET_FIELD function
+        // Call the "UpdateSetFieldProc" Stored Proc, which uses the SET_FIELD function
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "numeric", "-1.2", 1);
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "inner.second.third.numeric", "-2.3", 2);
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "arr3d[1][1][2]", "-4.5", 3);
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "inner.arr[2]", "-3.4", 2);
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "arr3d[2].numeric", "-5.6", 3);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "newnum", "6.789", 4);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "newobj.newnum", "7.8", 4);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "newarr[1]", "8.9", 4);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "newarr[-1]", "9.1", 4);
 
-        // Confirm modified results after calling the "UpdateSetFieldProc" Stored Proc
-        testProcWithValidJSON(TABLE_ROWS23, client, "NumericFieldProc", "numeric", "1.2", "1.20");
+        // Test the SET_FIELD function directly, using an ad-hoc query
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'numeric', '-2.3') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'inner.second.third.numeric', '-2.3') WHERE ID = 3");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr3d[1][1][2]', '-4.5') WHERE ID = 1");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'inner.arr[2]', '-3.4') WHERE ID = 3");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr3d[2].numeric', '-5.6') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newnum', '6.789') WHERE ID = 7");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newobj.newnum', '7.8') WHERE ID = 7");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newarr[1]', '8.9') WHERE ID = 7");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'newarr[-1]', '9.1') WHERE ID = 7");
+
+        debugPrintJsonDoc("with new numeric values", client, 1, 2, 3, 4, 7);
+
+        // Confirm modified results after calling the SET_FIELD function
+        testProcWithValidJSON(TABLE_ROW3,   client, "NumericFieldProc", "numeric", "1.2", "1.20");
         testProcWithValidJSON(TABLE_ROW1,   client, "NumericFieldProc", "numeric", "-1.2", "-1.20");
-        testProcWithValidJSON(TABLE_ROWS13, client, "NumericFieldProc", "inner.second.third.numeric", "2.3", "2.30");
-        testProcWithValidJSON(TABLE_ROW2,   client, "NumericFieldProc", "inner.second.third.numeric", "-2.3", "-2.30");
-        testProcWithValidJSON(TABLE_ROWS12, client, "NumericFieldProc", "arr3d[1][1][2]", "4.5", "4.50");
-        testProcWithValidJSON(TABLE_ROW3,   client, "NumericFieldProc", "arr3d[1][1][2]", "-4.5", "-4.50");
-        testProcWithValidJSON(TABLE_ROWS13, client, "NumericFieldProc", "inner.arr[2]", "3.4", "3.40");
-        testProcWithValidJSON(TABLE_ROW2,   client, "NumericFieldProc", "inner.arr[2]", "-3.4", "-3.40");
-        testProcWithValidJSON(TABLE_ROWS12, client, "NumericFieldProc", "arr3d[2].numeric", "5.6", "5.60");
-        testProcWithValidJSON(TABLE_ROW3,   client, "NumericFieldProc", "arr3d[2].numeric", "-5.6", "-5.60");
+        testProcWithValidJSON(TABLE_ROW2,   client, "NumericFieldProc", "numeric", "-2.3", "-2.30");
+        testProcWithValidJSON(TABLE_ROW1,   client, "NumericFieldProc", "inner.second.third.numeric", "2.3", "2.30");
+        testProcWithValidJSON(TABLE_ROWS23, client, "NumericFieldProc", "inner.second.third.numeric", "-2.3", "-2.30");
+        testProcWithValidJSON(TABLE_ROW2,   client, "NumericFieldProc", "arr3d[1][1][2]", "4.5", "4.50");
+        testProcWithValidJSON(TABLE_ROWS13, client, "NumericFieldProc", "arr3d[1][1][2]", "-4.5", "-4.50");
+        testProcWithValidJSON(TABLE_ROW1,   client, "NumericFieldProc", "inner.arr[2]", "3.4", "3.40");
+        testProcWithValidJSON(TABLE_ROWS23, client, "NumericFieldProc", "inner.arr[2]", "-3.4", "-3.40");
+        testProcWithValidJSON(TABLE_ROW1,   client, "NumericFieldProc", "arr3d[2].numeric", "5.6", "5.60");
+        testProcWithValidJSON(TABLE_ROWS23, client, "NumericFieldProc", "arr3d[2].numeric", "-5.6", "-5.60");
+        testProcWithValidJSON(TABLE_ROWS47, client, "NotNullFieldProc", "newnum");
+        testProcWithValidJSON(TABLE_ROWS47, client, "NumericFieldProc", "newnum", "6.789", "6.7890");
+        testProcWithValidJSON(TABLE_ROWS47, client, "NotNullFieldProc", "newobj");
+        testProcWithValidJSON(TABLE_ROWS47, client, "NumericFieldProc", "newobj.newnum", "7.8", "7.80");
+        testProcWithValidJSON(TABLE_ROWS47, client, "NotNullFieldProc", "newarr");
+        testProcWithValidJSON(EMPTY_TABLE,  client, "NotNullFieldProc", "newarr[0]");
+        testProcWithValidJSON(TABLE_ROWS47, client, "NumericFieldProc", "newarr[1]", "8.9", "8.90");
+        testProcWithValidJSON(TABLE_ROWS47, client, "NumericFieldProc", "newarr[2]", "9.1", "9.10");
     }
 
     public void testARRAY_ELEMENTFunction() throws Exception {
