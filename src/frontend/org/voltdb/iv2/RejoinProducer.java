@@ -24,6 +24,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
@@ -310,19 +311,25 @@ public class RejoinProducer extends JoinProducerBase {
 
             @Override
             public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog rejoinTaskLog) throws IOException {
-                if (!m_schemaHasNoTables && !m_snapshotCompletionMonitor.isDone()) {
+                if (!m_snapshotCompletionMonitor.isDone()) {
                     m_taskQueue.offer(this);
                     return;
                 }
                 SnapshotCompletionEvent event = null;
                 Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers = null;
                 try {
+                    event = m_snapshotCompletionMonitor.get();
                     if (!m_schemaHasNoTables) {
                         REJOINLOG.debug(m_whoami + "waiting on snapshot completion monitor.");
-                        event = m_snapshotCompletionMonitor.get();
                         exportSequenceNumbers = event.exportSequenceNumbers;
                         m_completionAction.setSnapshotTxnId(event.multipartTxnId);
                     }
+
+                    for (Map.Entry<Integer, Long> e : event.remoteDCLastUniqueIds.get(0).entrySet()) {
+                        SnapshotSaveAPI.m_lastAppliedUniqueId.put(e.getKey(), new AtomicLong(e.getValue()));
+                        VoltDB.instance().getReplicaDRGateway().notifyOfLastAppliedSpUniqueId(0, e.getValue());
+                    }
+
                     REJOINLOG.debug(m_whoami + " monitor completed. Sending SNAPSHOT_FINISHED "
                             + "and handing off to site.");
                     RejoinMessage snap_complete = new RejoinMessage(

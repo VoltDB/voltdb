@@ -17,9 +17,12 @@
 
 package org.voltdb;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
+import org.voltdb.iv2.UniqueIdGenerator;
 
 
 // Interface through which the outside world can interact with the replica-side
@@ -37,7 +40,11 @@ public abstract class ReplicaDRGateway extends Thread implements Promotable {
 
     public abstract void notifyOfLastAppliedSpUniqueId(int dataCenter, long spUniqueId);
 
+    public abstract Map<Integer, Map<Integer, Long>> getLastReceivedUniqueIds();
+
     public static class DummyReplicaDRGateway extends ReplicaDRGateway {
+        Map<Integer, Map<Integer, Long>> ids = new HashMap<Integer, Map<Integer, Long>>();
+
         @Override
         public void run() {}
 
@@ -58,6 +65,15 @@ public abstract class ReplicaDRGateway extends Thread implements Promotable {
         public void promotePartition(int partitionId, long maxUniqueId) {}
 
         @Override
-        public void notifyOfLastAppliedSpUniqueId(int dataCenter, long spUniqueId) {};
+        public void notifyOfLastAppliedSpUniqueId(int dataCenter, long spUniqueId) {
+            if (!ids.containsKey(dataCenter)) {
+                ids.put(dataCenter, new HashMap<Integer, Long>());
+            }
+            ids.get(dataCenter).put(UniqueIdGenerator.getPartitionIdFromUniqueId(spUniqueId), spUniqueId);
+        };
+
+        @Override
+        public Map<Integer, Map<Integer, Long>> getLastReceivedUniqueIds() { return ids; }
+
     }
 }
