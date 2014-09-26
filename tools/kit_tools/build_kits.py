@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import os, sys, shutil, datetime
+import os, re, sys, shutil, datetime
 from fabric.api import run, cd, local, get, settings, lcd, put
 from fabric_ssh_config import getSSHInfoForHost
 
@@ -88,7 +88,7 @@ def copyCommunityFilesToReleaseDir(releaseDir, version, operatingsys):
     # add stripped symbols
     if operatingsys == "LINUX":
         os.makedirs(releaseDir + "/other")
-        get("%s/voltdb/obj/release/voltdb-%s.sym" % (builddir, version),
+        get("%s/voltdb/obj/release/voltdb-*.sym" % (builddir),
             "%s/other/%s-voltdb-voltkv-%s.sym" % (releaseDir, operatingsys, version))
 
 def copyEnterpriseFilesToReleaseDir(releaseDir, version, operatingsys):
@@ -177,8 +177,12 @@ if len(sys.argv) == 3:
 
 try:
     build_args = os.environ['VOLTDB_BUILD_ARGS']
+    if 'dist.version' in build_args:
+        distVersion = re.search('dist.version=(\S+)\s+', build_args).group(1)
+        print "Found dist.version in VOLTDB_BUILD_ARGS. Setting version to " + distVersion
 except:
     build_args=""
+    distVersion = None
 
 print "Building with pro: %s and voltdb: %s" % (proTreeish, voltdbTreeish)
 
@@ -194,6 +198,8 @@ volt12c = getSSHInfoForHost("volt12c")
 # build kits on 5f
 with settings(user=username,host_string=volt5f[1],disable_known_hosts=True,key_filename=volt5f[0]):
     versionVolt5f = checkoutCode(voltdbTreeish, proTreeish)
+    if distVersion:
+	versionVolt5f = distVersion
     if oneOff:
         releaseDir = "%s/releases/one-offs/%s-%s-%s" % \
             (os.getenv('HOME'), versionVolt5f, voltdbTreeish, proTreeish)
@@ -211,6 +217,8 @@ with settings(user=username,host_string=volt5f[1],disable_known_hosts=True,key_f
 # build kits on the mini
 with settings(user=username,host_string=voltmini[1],disable_known_hosts=True,key_filename=voltmini[0]):
     versionMac = checkoutCode(voltdbTreeish, proTreeish)
+    if distVersion:
+	versionMac = distVersion
     assert versionVolt5f == versionMac
     buildCommunity()
     copyCommunityFilesToReleaseDir(releaseDir, versionMac, "MAC")
