@@ -70,6 +70,8 @@ public class QueryPlanner {
     boolean m_wasParameterizedPlan = false;
     static boolean m_debuggingStaticModeToRetryOnError = true;
 
+    public static String UPSERT_TAG = "isUpsert";
+
     /**
      * Initialize planner with physical schema info and a reference to HSQLDB parser.
      *
@@ -165,7 +167,7 @@ public class QueryPlanner {
         if (m_isUpsert) {
             assert(m_xmlSQL.name.equalsIgnoreCase("INSERT"));
             // for AdHoc cache distinguish purpose which is based on the XML
-            m_xmlSQL.attributes.put("isUpsert","true");
+            m_xmlSQL.attributes.put(UPSERT_TAG, "true");
         }
 
         m_planSelector.outputCompiledStatement(m_xmlSQL);
@@ -320,7 +322,7 @@ public class QueryPlanner {
         // to keep track of the best plan
         PlanAssembler assembler = new PlanAssembler(m_cluster, m_db, m_partitioning, (PlanSelector) m_planSelector.clone());
         // find the plan with minimal cost
-        CompiledPlan bestPlan = assembler.getBestCostPlan(parsedStmt, true);
+        CompiledPlan bestPlan = assembler.getBestCostPlan(parsedStmt);
 
         // This processing of bestPlan outside/after getBestCostPlan
         // allows getBestCostPlan to be called both here and
@@ -329,7 +331,7 @@ public class QueryPlanner {
         // make sure we got a winner
         if (bestPlan == null) {
             if (m_debuggingStaticModeToRetryOnError) {
-                assembler.getBestCostPlan(parsedStmt, true);
+                assembler.getBestCostPlan(parsedStmt);
             }
             m_recentErrorMsg = assembler.getErrorMessage();
             if (m_recentErrorMsg == null) {
@@ -371,11 +373,6 @@ public class QueryPlanner {
         }
 
         if (receives.size() == 1) {
-        /*/ enable for debug ...
-        if (receives.size() > 1) {
-            System.out.println(plan.rootPlanGraph.toExplainPlanString());
-        }
-        // ... enable for debug */
             ReceivePlanNode recvNode = (ReceivePlanNode) receives.get(0);
             fragmentize(bestPlan, recvNode);
         }

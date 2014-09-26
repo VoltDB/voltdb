@@ -78,6 +78,8 @@ public abstract class AbstractParsedStmt {
     protected final String[] m_paramValues;
     public final Database m_db;
 
+    boolean m_isUpsert = false;
+
     static final String INSERT_NODE_NAME = "insert";
     static final String UPDATE_NODE_NAME = "update";
     static final String DELETE_NODE_NAME = "delete";
@@ -119,6 +121,9 @@ public abstract class AbstractParsedStmt {
        // create non-abstract instances
        if (stmtTypeElement.name.equalsIgnoreCase(INSERT_NODE_NAME)) {
            retval = new ParsedInsertStmt(paramValues, db);
+           if (stmtTypeElement.attributes.containsKey(QueryPlanner.UPSERT_TAG)) {
+               retval.m_isUpsert = true;
+           }
        }
        else if (stmtTypeElement.name.equalsIgnoreCase(UPDATE_NODE_NAME)) {
            retval = new ParsedUpdateStmt(paramValues, db);
