@@ -1966,19 +1966,25 @@ public class VoltCompiler {
 
         if (tableName.equalsIgnoreCase("*")) {
             // star wildcard support
-            boolean containsReplicatedTables = false;
+            StringBuilder replicatedWarning = null;
             for (Table table : db.getTables()) {
                 if (action.equalsIgnoreCase("DISABLE")) {
                     table.setIsdred(false);
                 } else if (!table.getIsreplicated()) {
                     table.setIsdred(true);
                 } else {
-                    containsReplicatedTables = true;
+                    if (replicatedWarning == null) {
+                        replicatedWarning = new StringBuilder(
+                                "DR is not supported for replicated tables, which are present in the catalog. " +
+                                "The following tables will not be included when replicating the database: ");
+                        replicatedWarning.append(table.getTypeName());
+                    } else {
+                        replicatedWarning.append(", ").append(table.getTypeName());
+                    }
                 }
             }
-            if (containsReplicatedTables) {
-                compilerLog.warn("DR is not supported for replicated tables, which are present in the catalog. " +
-                                 "These tables will not be included when replicating the database.");
+            if (replicatedWarning != null) {
+                compilerLog.warn(replicatedWarning.toString());
             }
             return;
         }
