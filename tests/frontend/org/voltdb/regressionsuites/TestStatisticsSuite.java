@@ -420,6 +420,35 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         validateRowSeenAtAllHosts(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), true);
     }
 
+    public void testCpuStatistics() throws Exception {
+        System.out.println("\n\nTESTING CPU STATS\n\n\n");
+        Client client  = getFullyConnectedClient();
+
+        ColumnInfo[] expectedSchema = new ColumnInfo[4];
+        expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
+        expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
+        expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
+        expectedSchema[3] = new ColumnInfo("PERCENT_USED", VoltType.FLOAT);
+        VoltTable expectedTable = new VoltTable(expectedSchema);
+
+        VoltTable[] results = null;
+
+        //
+        // cpu
+        //
+        // give time to seed the stats cache?
+        Thread.sleep(1000);
+        results = client.callProcedure("@Statistics", "cpu", 0).getResults();
+        System.out.println("Node cpu statistics table: " + results[0].toString());
+        // one aggregate table returned
+        assertEquals(1, results.length);
+        validateSchema(results[0], expectedTable);
+        results[0].advanceRow();
+        // Hacky, on a single local cluster make sure that all 'nodes' are present.
+        // CPU stats lacks a common string across nodes, but we can hijack the hostname in this case.
+        validateRowSeenAtAllHosts(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), true);
+    }
+
     public void testProcedureStatistics() throws Exception {
         System.out.println("\n\nTESTING PROCEDURE STATS\n\n\n");
         Client client  = getFullyConnectedClient();
@@ -977,9 +1006,9 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         // LIVECLIENTS
         //
         results = client.callProcedure("@Statistics", "MANAGEMENT", 0).getResults();
-        // six aggregate tables returned.  Assume that we have selected the right
+        // eight aggregate tables returned.  Assume that we have selected the right
         // subset of stats internally, just check that we get stuff.
-        assertEquals(7, results.length);
+        assertEquals(8, results.length);
     }
 
     class RebalanceStatsChecker
