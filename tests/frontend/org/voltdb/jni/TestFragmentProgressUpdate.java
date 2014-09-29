@@ -78,7 +78,8 @@ public class TestFragmentProgressUpdate extends TestCase {
         ActivePlanRepository.clear();
         ActivePlanRepository.addFragmentForTest(
                 CatalogUtil.getUniqueIdForFragment(selectBottomFrag),
-                Encoder.decodeBase64AndDecompressToBytes(selectBottomFrag.getPlannodetree()));
+                Encoder.decodeBase64AndDecompressToBytes(selectBottomFrag.getPlannodetree()),
+                selectStmt.getSqltext());
         ParameterSet params = ParameterSet.emptyParameterSet();
 
         m_ee.executePlanFragments(
@@ -129,7 +130,8 @@ public class TestFragmentProgressUpdate extends TestCase {
         ActivePlanRepository.clear();
         ActivePlanRepository.addFragmentForTest(
                 CatalogUtil.getUniqueIdForFragment(selectBottomFrag),
-                Encoder.decodeBase64AndDecompressToBytes(selectBottomFrag.getPlannodetree()));
+                Encoder.decodeBase64AndDecompressToBytes(selectBottomFrag.getPlannodetree()),
+                selectStmt.getSqltext());
         ParameterSet params = ParameterSet.emptyParameterSet();
 
         m_ee.executePlanFragments(
@@ -166,7 +168,8 @@ public class TestFragmentProgressUpdate extends TestCase {
         ActivePlanRepository.clear();
         ActivePlanRepository.addFragmentForTest(
                 CatalogUtil.getUniqueIdForFragment(deleteBottomFrag),
-                Encoder.decodeBase64AndDecompressToBytes(deleteBottomFrag.getPlannodetree()));
+                Encoder.decodeBase64AndDecompressToBytes(deleteBottomFrag.getPlannodetree()),
+                deleteStmt.getSqltext());
         params = ParameterSet.emptyParameterSet();
         m_ee.executePlanFragments(
                 1,
@@ -180,7 +183,8 @@ public class TestFragmentProgressUpdate extends TestCase {
         ActivePlanRepository.clear();
         ActivePlanRepository.addFragmentForTest(
                 CatalogUtil.getUniqueIdForFragment(selectBottomFrag),
-                Encoder.decodeBase64AndDecompressToBytes(selectBottomFrag.getPlannodetree()));
+                Encoder.decodeBase64AndDecompressToBytes(selectBottomFrag.getPlannodetree()),
+                selectStmt.getSqltext());
         params = ParameterSet.emptyParameterSet();
         m_ee.executePlanFragments(
                 1,
@@ -232,7 +236,8 @@ public class TestFragmentProgressUpdate extends TestCase {
         ActivePlanRepository.clear();
         ActivePlanRepository.addFragmentForTest(
                 CatalogUtil.getUniqueIdForFragment(selectBottomFrag),
-                Encoder.decodeBase64AndDecompressToBytes(selectBottomFrag.getPlannodetree()));
+                Encoder.decodeBase64AndDecompressToBytes(selectBottomFrag.getPlannodetree()),
+                selectStmt.getSqltext());
         ParameterSet params = ParameterSet.emptyParameterSet();
 
         m_ee.executePlanFragments(
@@ -274,7 +279,8 @@ public class TestFragmentProgressUpdate extends TestCase {
         ActivePlanRepository.clear();
         ActivePlanRepository.addFragmentForTest(
                 CatalogUtil.getUniqueIdForFragment(frag),
-                Encoder.decodeBase64AndDecompressToBytes(frag.getPlannodetree()));
+                Encoder.decodeBase64AndDecompressToBytes(frag.getPlannodetree()),
+                selectStmt.getSqltext());
         ParameterSet params = ParameterSet.emptyParameterSet();
 
         // Replace the normal logger with a mocked one, so we can verify the message

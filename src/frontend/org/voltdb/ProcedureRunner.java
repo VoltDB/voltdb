@@ -603,11 +603,11 @@ public class ProcedureRunner {
             AdHocPlannedStatement plannedStatement = batch.plannedStatements.get(0);
 
             long aggFragId = ActivePlanRepository.loadOrAddRefPlanFragment(
-                    plannedStatement.core.aggregatorHash, plannedStatement.core.aggregatorFragment);
+                    plannedStatement.core.aggregatorHash, plannedStatement.core.aggregatorFragment, sql);
             long collectorFragId = 0;
             if (plannedStatement.core.collectorFragment != null) {
                 collectorFragId = ActivePlanRepository.loadOrAddRefPlanFragment(
-                        plannedStatement.core.collectorHash, plannedStatement.core.collectorFragment);
+                        plannedStatement.core.collectorHash, plannedStatement.core.collectorFragment, sql);
             }
 
             queuedSQL.stmt = SQLStmtAdHocHelper.createWithPlan(
@@ -841,7 +841,7 @@ public class ProcedureRunner {
         for (PlanFragment frag : catStmt.getFragments()) {
             byte[] planHash = Encoder.hexDecode(frag.getPlanhash());
             byte[] plan = Encoder.decodeBase64AndDecompressToBytes(frag.getPlannodetree());
-            long id = ActivePlanRepository.loadOrAddRefPlanFragment(planHash, plan);
+            long id = ActivePlanRepository.loadOrAddRefPlanFragment(planHash, plan, catStmt.getSqltext());
             boolean transactional = frag.getNontransactional() == false;
 
             SQLStmt.Frag stmtFrag = new SQLStmt.Frag(id, planHash, transactional);

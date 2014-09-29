@@ -216,14 +216,17 @@ public class FragmentTask extends TransactionTask
             try {
                 VoltTable dependency;
                 fragmentPlan = m_fragmentMsg.getFragmentPlan(frag);
+                String stmtText = null;
 
                 // if custom fragment, load the plan and get local fragment id
                 if (fragmentPlan != null) {
-                    fragmentId = ActivePlanRepository.loadOrAddRefPlanFragment(planHash, fragmentPlan);
+                    // should really be pulling the statement text from the fragment message here.
+                    fragmentId = ActivePlanRepository.loadOrAddRefPlanFragment(planHash, fragmentPlan, null);
                 }
                 // otherwise ask the plan source for a local fragment id
                 else {
                     fragmentId = ActivePlanRepository.getFragmentIdForPlanHash(planHash);
+                    stmtText = ActivePlanRepository.getStmtTextForPlanHash(planHash);
                 }
 
                 // set up the batch context for the fragment set
@@ -234,7 +237,7 @@ public class FragmentTask extends TransactionTask
                         new long[] { fragmentId },
                         new long [] { inputDepId },
                         new ParameterSet[] { params },
-                        null, // SQL text for fragment, not relevant on this codepath?
+                        stmtText == null ? null : new String[] { stmtText },
                         m_txnState.txnId,
                         m_txnState.m_spHandle,
                         m_txnState.uniqueId,
