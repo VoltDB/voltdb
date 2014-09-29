@@ -47,12 +47,15 @@ public class TestFunctionsForJSON extends RegressionSuite {
     private static final long[][] TABLE_ROW2 = new long[][]{{2}};
     private static final long[][] TABLE_ROW3 = new long[][]{{3}};
     private static final long[][] TABLE_ROW4 = new long[][]{{4}};
+    private static final long[][] TABLE_ROW5 = new long[][]{{5}};
     private static final long[][] TABLE_ROW7 = new long[][]{{7}};
+    private static final long[][] TABLE_ROW9 = new long[][]{{9}};
     private static final long[][] TABLE_ROW10 = new long[][]{{10}};
     private static final long[][] TABLE_ROWS12  = new long[][]{{1},{2}};
     private static final long[][] TABLE_ROWS13  = new long[][]{{1},{3}};
     private static final long[][] TABLE_ROWS23  = new long[][]{{2},{3}};
     private static final long[][] TABLE_ROWS47  = new long[][]{{4},{7}};
+    private static final long[][] TABLE_ROWS59  = new long[][]{{5},{9}};
     private static final long[][] TABLE_ROWS123 = new long[][]{{1},{2},{3}};
     private static final long[][] TABLE_ROWS234 = new long[][]{{2},{3},{4}};
     private static final long[][] FULL_TABLE = new long[][]{{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12},{13},{14},{15}};
@@ -1033,6 +1036,141 @@ public class TestFunctionsForJSON extends RegressionSuite {
         testProcWithValidJSON(TABLE_ROW4,    client, "NotNullFieldProc", "newarr[2].newint");
         testProcWithValidJSON(TABLE_ROW4,    client, "IdFieldProc", "newarr[2].newint", 8);
         testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newarr[3]");
+    }
+
+    /** Used to test ENG-6879, part #2.b., with dot notation applied to an existing
+     *  primitive or array, and index notation applied to an existing primitive or
+     *  object; these have no effect (which is contrary to initial expectations,
+     *  but not unreasonable). */
+    public void testSET_FIELDFunctionWithMisplacedDotOrIndexNotation() throws Exception {
+        Client client = getClient();
+        loadJS1(client);
+
+        // Confirm expected results before calling the SET_FIELD function
+        testProcWithValidJSON(EMPTY_TABLE, client, "NotNullFieldProc", "id.veggies");
+        testProcWithValidJSON(EMPTY_TABLE, client, "NotNullFieldProc", "id2.veggies");
+        testProcWithValidJSON(EMPTY_TABLE, client, "NotNullFieldProc", "numeric.veggies");
+        testProcWithValidJSON(EMPTY_TABLE, client, "NotNullFieldProc", "bool.veggies");
+        testProcWithValidJSON(EMPTY_TABLE, client, "NotNullFieldProc", "boo2.veggies");
+        testProcWithValidJSON(EMPTY_TABLE, client, "NotNullFieldProc", "tag.veggies");
+        testProcWithValidJSON(EMPTY_TABLE, client, "NotNullFieldProc", "last.veggies");
+        testProcWithValidJSON(EMPTY_TABLE, client, "NotNullFieldProc", "arr.veggies");
+        testProcWithValidJSON(EMPTY_TABLE, client, "NotNullFieldProc", "arr.0");
+
+        testProcWithValidJSON(EMPTY_TABLE, client, "NotNullFieldProc", "id[0]");
+        testProcWithValidJSON(EMPTY_TABLE, client, "NotNullFieldProc", "id2[0]");
+        testProcWithValidJSON(EMPTY_TABLE, client, "NotNullFieldProc", "numeric[0]");
+        testProcWithValidJSON(EMPTY_TABLE, client, "NotNullFieldProc", "bool[0]");
+        testProcWithValidJSON(EMPTY_TABLE, client, "NotNullFieldProc", "bool2[0]");
+        testProcWithValidJSON(EMPTY_TABLE, client, "NotNullFieldProc", "tag[0]");
+        testProcWithValidJSON(EMPTY_TABLE, client, "NotNullFieldProc", "last[0]");
+        testProcWithValidJSON(EMPTY_TABLE, client, "NotNullFieldProc", "inner[0]");
+
+        // Call the "UpdateSetFieldProc" Stored Proc, which uses the SET_FIELD function:
+        // note that none of these have any effect
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "id.veggies", -9, 1);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "numeric.veggies", -9.1, 1);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "bool.veggies", "true", 1);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "tag.veggies", "\"newTagValue\"", 1);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "last.veggies", "\"newLastValue\"", 1);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "arr.veggies", -9, 1);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "arr.0", -9, 1);
+
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "id[0]", -9, 1);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "numeric[0]", -9.1, 1);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "bool[0]", "true", 1);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "tag[0]", "\"newTagValue\"", 1);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "last[0]", "\"newLastValue\"", 1);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "inner[0]", -9, 1);
+
+        // Similar calls on a row without those primitives, arrays or objects defined do have an effect
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "id.veggies", -9, 5);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "numeric.veggies", -9.1, 5);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "bool.veggies", "true", 5);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "tag.veggies", "\"newTagValue\"", 5);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "last.veggies", "\"newLastValue\"", 5);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "arr.veggies", -9, 5);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "arr.0", -9, 5);
+
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "id2[0]", -9, 4);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "numeric[0]", -9.1, 4);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "bool2[0]", "true", 4);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "tag[0]", "\"newTagValue\"", 4);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "last[0]", "\"newLastValue\"", 4);
+        testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "inner[0]", -9, 4);
+
+        // Call the SET_FIELD function directly, using ad-hoc queries:
+        // again, none of these have any effect
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'id.veggies', '-9') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'numeric.veggies', '-9.1') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'bool.veggies', 'true') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'tag.veggies', '\"newTagValue\"') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'last.veggies', '\"newLastValue\"') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr.veggies', '-9') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr.0', '-9') WHERE ID = 2");
+
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'id[0]', '-9') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'numeric[0]', '-9.1') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'bool[0]', 'true') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'tag[0]', '\"newTagValue\"') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'last[0]', '\"newLastValue\"') WHERE ID = 2");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'inner[0]', '-9') WHERE ID = 2");
+
+        // Similar calls on a row without those primitives, arrays or objects defined do have an effect
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'id2.veggies', '-9') WHERE ID = 9");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'numeric.veggies', '-9.1') WHERE ID = 9");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'bool2.veggies', 'true') WHERE ID = 9");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'tag.veggies', '\"newTagValue\"') WHERE ID = 9");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'last.veggies', '\"newLastValue\"') WHERE ID = 9");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr.veggies', '-9') WHERE ID = 9");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr.0', '-9') WHERE ID = 9");
+
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'id2[0]', '-9') WHERE ID = 7");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'numeric[0]', '-9.1') WHERE ID = 7");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'bool2[0]', 'true') WHERE ID = 7");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'tag[0]', '\"newTagValue\"') WHERE ID = 7");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'last[0]', '\"newLastValue\"') WHERE ID = 7");
+        testProcWithValidJSON(UPDATED_1ROW, client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'inner[0]', '-9') WHERE ID = 7");
+
+        debugPrintJsonDoc("with misplaced dot/index values", client, 4, 5, 7, 9);
+
+        // Confirm modified results after calling the SET_FIELD function
+        // (confirm that none of the above had any effect)
+        testProcWithValidJSON(TABLE_ROW5,   client, "NotNullFieldProc", "id.veggies");
+        testProcWithValidJSON(TABLE_ROW5,   client, "IdFieldProc", "id.veggies", -9);
+        testProcWithValidJSON(TABLE_ROW9,   client, "NotNullFieldProc", "id2.veggies");
+        testProcWithValidJSON(TABLE_ROW9,   client, "IdFieldProc", "id2.veggies", -9);
+        testProcWithValidJSON(TABLE_ROWS59, client, "NotNullFieldProc", "numeric.veggies");
+        testProcWithValidJSON(TABLE_ROWS59, client, "NumericFieldProc", "numeric.veggies", "-9.1", "-9.10");
+        testProcWithValidJSON(TABLE_ROW5,   client, "NotNullFieldProc", "bool.veggies");
+        testProcWithValidJSON(TABLE_ROW5,   client, "IdFieldProc", "bool.veggies", "true");
+        testProcWithValidJSON(TABLE_ROW9,   client, "NotNullFieldProc", "bool2.veggies");
+        testProcWithValidJSON(TABLE_ROW9,   client, "IdFieldProc", "bool2.veggies", "true");
+        testProcWithValidJSON(TABLE_ROWS59, client, "NotNullFieldProc", "tag.veggies");
+        testProcWithValidJSON(TABLE_ROWS59, client, "IdFieldProc", "tag.veggies", "newTagValue");
+        testProcWithValidJSON(TABLE_ROWS59, client, "NotNullFieldProc", "last.veggies");
+        testProcWithValidJSON(TABLE_ROWS59, client, "IdFieldProc", "last.veggies", "newLastValue");
+        testProcWithValidJSON(TABLE_ROWS59, client, "NotNullFieldProc", "arr.veggies");
+        testProcWithValidJSON(TABLE_ROWS59, client, "IdFieldProc", "arr.veggies", -9);
+        testProcWithValidJSON(TABLE_ROWS59, client, "NotNullFieldProc", "arr.0");
+        testProcWithValidJSON(TABLE_ROWS59, client, "IdFieldProc", "arr.0", -9);
+
+        testProcWithValidJSON(EMPTY_TABLE,  client, "NotNullFieldProc", "id[0]");
+        testProcWithValidJSON(EMPTY_TABLE,  client, "IdFieldProc", "id[0]", -9);
+        testProcWithValidJSON(TABLE_ROWS47, client, "NotNullFieldProc", "id2[0]");
+        testProcWithValidJSON(TABLE_ROWS47, client, "IdFieldProc", "id2[0]", -9);
+        testProcWithValidJSON(TABLE_ROWS47, client, "NotNullFieldProc", "numeric[0]");
+        testProcWithValidJSON(TABLE_ROWS47, client, "NumericFieldProc", "numeric[0]", "-9.1", "-9.10");
+        testProcWithValidJSON(EMPTY_TABLE,  client, "NotNullFieldProc", "bool[0]");
+        testProcWithValidJSON(EMPTY_TABLE,  client, "IdFieldProc", "bool[0]", "true");
+        testProcWithValidJSON(TABLE_ROWS47, client, "NotNullFieldProc", "bool2[0]");
+        testProcWithValidJSON(TABLE_ROWS47, client, "IdFieldProc", "bool2[0]", "true");
+        testProcWithValidJSON(TABLE_ROWS47, client, "NotNullFieldProc", "tag[0]");
+        testProcWithValidJSON(TABLE_ROWS47, client, "IdFieldProc", "tag[0]", "newTagValue");
+        testProcWithValidJSON(TABLE_ROWS47, client, "NotNullFieldProc", "last[0]");
+        testProcWithValidJSON(TABLE_ROWS47, client, "IdFieldProc", "last[0]", "newLastValue");
+        testProcWithValidJSON(TABLE_ROWS47, client, "NotNullFieldProc", "inner[0]");
+        testProcWithValidJSON(TABLE_ROWS47, client, "IdFieldProc", "inner[0]", -9);
     }
 
     /** Used to test ENG-6620 / ENG-6879, for numeric, floating-point data, which
