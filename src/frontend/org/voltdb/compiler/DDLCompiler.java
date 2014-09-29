@@ -474,6 +474,8 @@ public class DDLCompiler {
 
         DDLStatement stmt = getNextStatement(reader, m_compiler);
         while (stmt != null) {
+            //m_compiler.addInfo("DOOOD: STATEMENT: " + stmt.statement);
+            //m_compiler.addInfo("DOOOD: SCHEMA: " + m_schema);
             // Some statements are processed by VoltDB and the rest are handled by HSQL.
             boolean processed = false;
             try {
@@ -827,10 +829,15 @@ public class DDLCompiler {
                 // group(1) -> table, group(2) -> column
                 String tableName = checkIdentifierStart(statementMatcher.group(1), statement);
                 String columnName = checkIdentifierStart(statementMatcher.group(2), statement);
-                m_tracker.put(tableName, columnName);
-                VoltXMLElement tableXML = m_schema.findChild("table" + tableName);
+                //m_tracker.put(tableName, columnName);
+                VoltXMLElement tableXML = m_schema.findChild("table" + tableName.toUpperCase());
                 if (tableXML != null) {
-                    tableXML.attributes.put("partitioncolumn", columnName);
+                    tableXML.attributes.put("partitioncolumn", columnName.toUpperCase());
+                    // XXX IZZY need to check validity of column here and throw error
+                }
+                else {
+                    //throw m_compiler.new VoltCompilerException(String.format(
+                    //            "Invalid PARTITION statement: table %s does not exist", tableName));
                 }
                 return true;
             }
@@ -881,10 +888,10 @@ public class DDLCompiler {
         if (statementMatcher.matches()) {
             // group(1) -> table
             String tableName = statementMatcher.group(1);
-            m_tracker.put(
-                    checkIdentifierStart(tableName, statement),
-                    null
-                    );
+            //m_tracker.put(
+            //        checkIdentifierStart(tableName, statement),
+            //        null
+            //        );
             VoltXMLElement tableXML = m_schema.findChild("table" + tableName);
             if (tableXML != null) {
                 tableXML.attributes.remove("partitioncolumn");
@@ -964,10 +971,15 @@ public class DDLCompiler {
 
             // check the table portion
             String tableName = checkIdentifierStart(statementMatcher.group(1), statement);
-            m_tracker.addExportedTable(tableName);
-            VoltXMLElement tableXML = m_schema.findChild("table" + tableName);
+            //m_tracker.addExportedTable(tableName);
+            VoltXMLElement tableXML = m_schema.findChild("table" + tableName.toUpperCase());
             if (tableXML != null) {
                 tableXML.attributes.put("export", "true");
+            }
+            else {
+                throw m_compiler.new VoltCompilerException(String.format(
+                            "Invalid EXPORT statement: table %s was not present in the catalog.",
+                            tableName));
             }
 
             return true;
@@ -1026,27 +1038,37 @@ public class DDLCompiler {
         String binDDL = Encoder.compressAndBase64Encode(m_fullDDL);
         db.setSchema(binDDL);
 
-        VoltXMLElement xmlCatalog;
-        try
-        {
-            xmlCatalog = m_hsql.getXMLFromCatalog();
-            if (!xmlCatalog.toMinString().equals(m_schema.toMinString())) {
-                System.out.println("FULL CATALOG: " + xmlCatalog.toString());
-                System.out.println("DIFF BUILT  : " + m_schema.toString());
-            }
-            //assert(xmlCatalog.toMinString().equals(m_schema.toMinString()));
-        }
-        catch (HSQLParseException e)
-        {
-            String msg = "DDL Error: " + e.getMessage();
-            throw m_compiler.new VoltCompilerException(msg);
-        }
-
         // output the xml catalog to disk
         BuildDirectoryUtils.writeFile("schema-xml", "hsql-catalog-output.xml", m_schema.toString(), true);
 
         // build the local catalog from the xml catalog
         fillCatalogFromXML(db, m_schema);
+        fillTrackerFromXML();
+    }
+
+    // Fill the table stuff in VoltDDLElementTracker from the VoltXMLElement tree at the end when
+    // requested from the compiler
+    private void fillTrackerFromXML()
+    {
+        for (VoltXMLElement e : m_schema.children) {
+            if (e.name.equals("table")) {
+                String tableName = e.attributes.get("name");
+                String partitionCol = e.attributes.get("partitioncolumn");
+                String export = e.attributes.get("export");
+                if (partitionCol != null) {
+                    m_tracker.put(tableName, partitionCol);
+                }
+                else {
+                    m_tracker.m_partitionMap.remove(tableName);
+                }
+                if (export != null) {
+                    m_tracker.addExportedTable(tableName);
+                }
+                else {
+                    m_tracker.m_exports.remove(tableName);
+                }
+            }
+        }
     }
 
     /**
