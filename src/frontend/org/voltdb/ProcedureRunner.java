@@ -1289,7 +1289,11 @@ public class ProcedureRunner {
                }
                else {
                    byte[] planBytes = ActivePlanRepository.planForFragmentId(stmt.aggregator.id);
-                   m_localTask.addCustomFragment(stmt.aggregator.planHash, m_depsToResume[index], params, planBytes);
+                   m_localTask.addCustomFragment(stmt.aggregator.planHash,
+                           m_depsToResume[index],
+                           params,
+                           planBytes,
+                           stmt.getText());
                }
            }
            // two fragments
@@ -1304,9 +1308,9 @@ public class ProcedureRunner {
                }
                else {
                    byte[] planBytes = ActivePlanRepository.planForFragmentId(stmt.aggregator.id);
-                   m_localTask.addCustomFragment(stmt.aggregator.planHash, m_depsToResume[index], params, planBytes);
+                   m_localTask.addCustomFragment(stmt.aggregator.planHash, m_depsToResume[index], params, planBytes, stmt.getText());
                    planBytes = ActivePlanRepository.planForFragmentId(stmt.collector.id);
-                   m_distributedTask.addCustomFragment(stmt.collector.planHash, outputDepId, params, planBytes);
+                   m_distributedTask.addCustomFragment(stmt.collector.planHash, outputDepId, params, planBytes, stmt.getText());
                }
            }
        }

@@ -220,7 +220,10 @@ public class FragmentTask extends TransactionTask
 
                 // if custom fragment, load the plan and get local fragment id
                 if (fragmentPlan != null) {
-                    // should really be pulling the statement text from the fragment message here.
+                    // statement text for unplanned fragments are pulled from the message,
+                    // to ensure that we get the correct constants from the most recent
+                    // invocation.
+                    stmtText = m_fragmentMsg.getStmtText(frag);
                     fragmentId = ActivePlanRepository.loadOrAddRefPlanFragment(planHash, fragmentPlan, null);
                 }
                 // otherwise ask the plan source for a local fragment id
