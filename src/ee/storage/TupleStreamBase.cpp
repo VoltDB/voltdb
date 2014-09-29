@@ -270,9 +270,7 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
     StreamBlock *oldBlock = NULL;
     size_t uso = m_uso;
 
-    int64_t lastSpUniqueId = std::numeric_limits<int64_t>::max();
     if (m_currBlock) {
-        lastSpUniqueId = m_currBlock->lastSpUniqueId();
         if (m_currBlock->offset() > 0) {
             m_pendingBlocks.push_back(m_currBlock);
             oldBlock = m_currBlock;
@@ -296,8 +294,6 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
     if (blockSize > m_defaultCapacity) {
         m_currBlock->setType(LARGE_STREAM_BLOCK);
     }
-
-    m_currBlock->startSpUniqueId(lastSpUniqueId);
 
     if (blockSize == 0) {
         rollbackTo(uso);

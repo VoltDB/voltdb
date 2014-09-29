@@ -361,6 +361,12 @@ public class VoltProjectBuilder {
         }
     }
 
+    public void addDRTables(final String tableNames[]) {
+        for (final String drTable : tableNames) {
+            transformer.append("DR TABLE " + drTable + ";");
+        }
+    }
+
     public void addSchema(final URL schemaURL) {
         assert(schemaURL != null);
         addSchema(schemaURL.getPath());

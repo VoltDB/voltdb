@@ -34,8 +34,9 @@ message Subscribe {
 
 message EventAck {
     optional int32 partitionId = 1;
-    optional bool lookForEvent = 2;
-    optional fixed64 lastAckedUniqueId = 3;
+    optional int32 eventType = 2; 
+    optional bool lookForEvent = 3;
+    optional fixed64 lastAckedUniqueId = 4;
 }
 
 message Response {
