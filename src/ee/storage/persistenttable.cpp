@@ -56,6 +56,7 @@
 #include "common/FailureInjection.h"
 #include "common/tabletuple.h"
 #include "common/UndoQuantum.h"
+#include "common/DummyUndoQuantum.hpp"
 #include "common/executorcontext.hpp"
 #include "common/FatalException.hpp"
 #include "common/types.h"
@@ -271,7 +272,7 @@ void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
 }
 
 
-void PersistentTable::truncateTable(VoltDBEngine* engine) {
+void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
     TableCatalogDelegate * tcd = engine->getTableDelegate(m_name);
     assert(tcd);
 
@@ -307,16 +308,31 @@ void PersistentTable::truncateTable(VoltDBEngine* engine) {
     }
     engine->rebuildTableCollections();
 
+    ExecutorContext *ec = ExecutorContext::getExecutorContext();
+    DRTupleStream *drStream = ec->drStream();
+    size_t drMark = drStream->m_uso;
+    if (!m_isMaterialized && m_drEnabled) {
+        ExecutorContext *ec = ExecutorContext::getExecutorContext();
+        const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
+        const int64_t currentTxnId = ec->currentTxnId();
+        const int64_t currentSpHandle = ec->currentSpHandle();
+        const int64_t currentUniqueId = ec->currentUniqueId();
+        const int64_t currentSpUniqueId = ec->currentSpUniqueId();
+        drStream->truncateTable(lastCommittedSpHandle, m_signature, m_name, currentTxnId, currentSpHandle, currentUniqueId, currentSpUniqueId);
+    }
+
     UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
-    if (uq) {
+    if (uq && fallible) {
         emptyTable->m_tuplesPinnedByUndo = emptyTable->m_tupleCount;
         emptyTable->m_invisibleTuplesPendingDeleteCount = emptyTable->m_tupleCount;
         // Create and register an undo action.
-        uq->registerUndoAction(new (*uq) PersistentTableUndoTruncateTableAction(engine, tcd, this, emptyTable));
+        uq->registerUndoAction(new (*uq) PersistentTableUndoTruncateTableAction(engine, tcd, this, emptyTable, &m_surgeon, drMark));
         return;
+    } else {
+        //A very round about way to get the release stuff done when undo is disabled
+        DummyUndoQuantum quantum;
+        quantum.registerUndoAction(new (quantum) PersistentTableUndoTruncateTableAction(engine, tcd, this, emptyTable, &m_surgeon, drMark));
     }
-
-    this->decrementRefcount();
 }
 
 

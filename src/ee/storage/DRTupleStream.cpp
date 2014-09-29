@@ -55,6 +55,67 @@ void DRTupleStream::setSecondaryCapacity(size_t capacity) {
     m_secondaryCapacity = capacity;
 }
 
+size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
+                                    char *tableHandle,
+                                    std::string tableName,
+                                    int64_t txnId,
+                                    int64_t spHandle,
+                                    int64_t uniqueId,
+                                    int64_t spUniqueId) {
+    assert(UniqueId::pid(spUniqueId) == m_partitionId);
+    assert(UniqueId::pid(spHandle) == m_partitionId);
+    assert(UniqueId::pid(lastCommittedSpHandle) == m_partitionId);
+    //Drop the row, don't move the USO
+    if (!m_enabled) return m_uso;
+
+    size_t tupleMaxLength = 0;
+
+    // Transaction IDs for transactions applied to this tuple stream
+    // should always be moving forward in time.
+    if (spHandle < m_openSpHandle)
+    {
+        throwFatalException(
+                "Active transactions moving backwards: openSpHandle is %jd, while the append spHandle is %jd",
+                (intmax_t)m_openSpHandle, (intmax_t)spHandle
+                );
+    }
+
+    commit(lastCommittedSpHandle, spHandle, txnId, uniqueId, spUniqueId, false, false);
+
+    tupleMaxLength = 1 + 1 + 8 + 4 + tableName.size() + 4;//version, type, table handle, name length prefix, table name, checksum
+    if (!m_currBlock) {
+        extendBufferChain(m_defaultCapacity);
+    }
+
+    if (m_currBlock->remaining() < tupleMaxLength) {
+        extendBufferChain(tupleMaxLength);
+    }
+
+
+    ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
+                             m_currBlock->remaining());
+
+    io.writeByte(DR_VERSION);
+    io.writeByte(static_cast<int8_t>(DR_RECORD_TRUNCATE_TABLE));
+    io.writeLong(*reinterpret_cast<int64_t*>(tableHandle));
+    io.writeInt(static_cast<int32_t>(tableName.size()));
+    io.writeBytes(tableName.c_str(), tableName.size());
+
+    uint32_t crc = vdbcrc::crc32cInit();
+    crc = vdbcrc::crc32c( crc, m_currBlock->mutableDataPtr(), io.position());
+    crc = vdbcrc::crc32cFinish(crc);
+    io.writeInt(crc);
+
+    // update m_offset
+    m_currBlock->consumed(io.position());
+
+    // update uso.
+    const size_t startingUso = m_uso;
+    m_uso += io.position();
+
+    return startingUso;
+}
+
 /*
  * If SpHandle represents a new transaction, commit previous data.
  * Always serialize the supplied tuple in to the stream.
@@ -138,8 +199,8 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
 
     // update m_offset
     m_currBlock->consumed(io.position());
-//
-//    // update uso.
+
+    // update uso.
     const size_t startingUso = m_uso;
     m_uso += io.position();
 

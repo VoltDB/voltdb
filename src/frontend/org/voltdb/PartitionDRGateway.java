@@ -29,6 +29,7 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.licensetool.LicenseApi;
 
+import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
@@ -39,7 +40,7 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 public class PartitionDRGateway {
 
     public enum DRRecordType {
-        INSERT, DELETE, UPDATE, BEGIN_TXN, END_TXN;
+        INSERT, DELETE, UPDATE, BEGIN_TXN, END_TXN, TRUNCATE_TABLE;
 
         public static final ImmutableMap<Integer, DRRecordType> conversion;
         static {
@@ -223,12 +224,22 @@ public class PartitionDRGateway {
                     System.out.println("Version " + version + " type END_TXN " + " spHandle " + spHandle + " checksum " + checksum);
                     break;
                 }
+                case TRUNCATE_TABLE: {
+                    final long tableHandle = buf.getLong();
+                    final byte tableNameBytes[] = new byte[buf.getInt()];
+                    buf.get(tableNameBytes);
+                    final String tableName = new String(tableNameBytes, Charsets.UTF_8);
+                    checksum = buf.getInt();
+                    System.out.println("Version " + version + " type TRUNCATE_TABLE table handle " + tableHandle + " table name " + tableName);
+                    break;
+                }
                 }
                 int calculatedChecksum = DBBPool.getBufferCRC32C(buf, startPosition, buf.position() - startPosition - 4);
                 if (calculatedChecksum != checksum) {
                     System.out.println("Checksum " + calculatedChecksum + " didn't match " + checksum);
                     System.exit(-1);
                 }
+
             }
         }
 

@@ -1775,7 +1775,7 @@ void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
         break;
     case TASK_TYPE_APPLY_BINARY_LOG: {
         DRTupleStreamDisableGuard guard(&m_drStream);
-        m_binaryLogSink.apply(taskParams, m_tablesBySignatureHash, &m_stringPool);
+        m_binaryLogSink.apply(taskParams, m_tablesBySignatureHash, &m_stringPool, this);
         break;
     }
     default:
