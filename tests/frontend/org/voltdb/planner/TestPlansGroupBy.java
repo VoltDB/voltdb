@@ -751,6 +751,12 @@ public class TestPlansGroupBy extends PlannerTestCase {
         checkHasComplexAgg(pns);
     }
 
+    public void testGroupbyAlias() {
+        pns = compileToFragments("SELECT abs(PKEY) as sp FROM P1 GROUP BY sp");
+        checkHasComplexAgg(pns);
+
+    }
+
     private void checkMVNoFix_NoAgg(
             String sql,
             boolean distinctPushdown) {
