@@ -354,7 +354,11 @@ int32_t DRTupleStream::getTestDRBuffer(char *outBytes) {
 
     TupleSchema::freeTupleSchema(schema);
 
-    int64_t committedUID = UniqueId::makeIdFromComponents(99, 0, 42);
+    int64_t lastUID = UniqueId::makeIdFromComponents(99, 0, 42);
+    int64_t uid = UniqueId::makeIdFromComponents(100, 0, 42);
+    stream.truncateTable(lastUID, tableHandle, "foobar", uid, uid, uid, uid);
+
+    int64_t committedUID = UniqueId::makeIdFromComponents(100, 0, 42);
     stream.commit(committedUID, committedUID, committedUID, committedUID, committedUID, false, false);
 
     const int32_t adjustedLength = stream.m_currBlock->rawLength() - MAGIC_HEADER_SPACE_FOR_JAVA;
