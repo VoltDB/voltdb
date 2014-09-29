@@ -49,6 +49,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
     private static final long[][] TABLE_ROW4 = new long[][]{{4}};
     private static final long[][] TABLE_ROW5 = new long[][]{{5}};
     private static final long[][] TABLE_ROW7 = new long[][]{{7}};
+    private static final long[][] TABLE_ROW8 = new long[][]{{8}};
     private static final long[][] TABLE_ROW9 = new long[][]{{9}};
     private static final long[][] TABLE_ROW10 = new long[][]{{10}};
     private static final long[][] TABLE_ROWS12  = new long[][]{{1},{2}};
@@ -187,6 +188,15 @@ public class TestFunctionsForJSON extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         VoltTable result = cr.getResults()[0];
         validateTableOfLongs(result, expectedResult);
+    }
+
+    private void testProcWithValidJSON(String expectedResult, Client client,
+                                       String procName, Object... parameters) throws Exception {
+        ClientResponse cr = client.callProcedure(procName, parameters);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        VoltTable result = cr.getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals(expectedResult, result.getString(0));
     }
 
     private void testProcWithInvalidJSON(String expectedErrorMessage, Client client,
@@ -973,7 +983,6 @@ public class TestFunctionsForJSON extends RegressionSuite {
         testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newarr[2].newint");
         testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "newarr[3]");
 
-
         // Call the "UpdateSetFieldProc" Stored Proc, which uses the SET_FIELD function
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "inner.arr[0]", "-1", 1);
         testProcWithValidJSON(UPDATED_1ROW, client, "UpdateSetFieldProc", "inner.arr[1]", "-2", 2);
@@ -1134,8 +1143,8 @@ public class TestFunctionsForJSON extends RegressionSuite {
 
         debugPrintJsonDoc("with misplaced dot/index values", client, 4, 5, 7, 9);
 
-        // Confirm modified results after calling the SET_FIELD function
-        // (confirm that none of the above had any effect)
+        // Confirm modified results after calling the SET_FIELD function (confirm
+        // that much of the above had no effect, but the 'similar calls' did)
         testProcWithValidJSON(TABLE_ROW5,   client, "NotNullFieldProc", "id.veggies");
         testProcWithValidJSON(TABLE_ROW5,   client, "IdFieldProc", "id.veggies", -9);
         testProcWithValidJSON(TABLE_ROW9,   client, "NotNullFieldProc", "id2.veggies");
@@ -1240,6 +1249,67 @@ public class TestFunctionsForJSON extends RegressionSuite {
         testProcWithValidJSON(EMPTY_TABLE,  client, "NotNullFieldProc", "newarr[0]");
         testProcWithValidJSON(TABLE_ROWS47, client, "NumericFieldProc", "newarr[1]", "8.9", "8.90");
         testProcWithValidJSON(TABLE_ROWS47, client, "NumericFieldProc", "newarr[2]", "9.1", "9.10");
+    }
+
+    /** Used to test ENG-6879, for various null values (in various parameters,
+     *  with and without quotes), and related queries. */
+    public void testSET_FIELDFunctionWithNullValues() throws Exception {
+        Client client = getClient();
+        loadJS1(client);
+
+        // Call the SET_FIELD function with null first (JSON doc column) parameter
+        // (using both the "NullSetFieldDocProc" Stored Proc and ad-hoc queries)
+        testProcWithValidJSON(FULL_TABLE, client, "NullSetFieldDocProc", null, "id", -1);
+        testProcWithValidJSON(FULL_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE SET_FIELD(null, 'id', '-1') IS NULL ORDER BY ID");
+        testProcWithValidJSON((String) null, client, "@AdHoc", "SELECT SET_FIELD(null, 'id', '-1') FROM JS1 WHERE ID = 5");
+        // Or, similarly, where the DOC column has null value
+        testProcWithValidJSON(TABLE_ROW8, client, "NullSetFieldProc", "id", -1);
+        testProcWithValidJSON(TABLE_ROW8, client, "@AdHoc", "SELECT ID FROM JS1 WHERE SET_FIELD(DOC, 'id', '-1') IS NULL ORDER BY ID");
+        testProcWithValidJSON((String) null, client, "@AdHoc", "SELECT SET_FIELD(DOC, 'id', '-1') FROM JS1 WHERE ID = 8");
+
+        // Call the SET_FIELD function with null second ("path") parameter
+        // (using both the "NullSetFieldProc" Stored Proc and an ad-hoc query)
+        testProcWithInvalidJSON("Invalid SET_FIELD path argument (SQL null)", client, "NullSetFieldProc", null, -1);
+        testProcWithInvalidJSON("Invalid SET_FIELD path argument (SQL null)", client, "@AdHoc",
+                                "SELECT ID FROM JS1 WHERE SET_FIELD(DOC, null, '-1') IS NULL");
+
+        // Call the SET_FIELD function with null third ("value") parameter
+        // (using both the "NullSetFieldProc" Stored Proc and an ad-hoc query)
+        testProcWithInvalidJSON("Invalid SET_FIELD value argument (SQL null)", client, "NullSetFieldProc", "id", null);
+        testProcWithInvalidJSON("Invalid SET_FIELD value argument (SQL null)", client, "@AdHoc",
+                                "SELECT ID FROM JS1 WHERE SET_FIELD(DOC, 'id', null) IS NULL");
+
+        // Call the SET_FIELD function with quoted-null second ("path") parameter
+        // (using both the "SelectSetFieldProc" Stored Proc and an ad-hoc query)
+        testProcWithValidJSON("{\"null\":-1}", client, "SelectSetFieldProc", "null", -1, 5);
+        testProcWithValidJSON("{\"null\":-1}", client, "@AdHoc", "SELECT SET_FIELD(DOC, 'null', '-1') FROM JS1 WHERE ID = 5");
+        // Note: quotes for "null" are double-escaped, for Java and JSON; the
+        // resulting JSON document is actually: {"\"null\"":-1}
+        testProcWithValidJSON("{\"\\\"null\\\"\":-1}", client, "SelectSetFieldProc", "\"null\"", -1, 5);
+        testProcWithValidJSON("{\"\\\"null\\\"\":-1}", client, "@AdHoc", "SELECT SET_FIELD(DOC, '\"null\"', '-1') FROM JS1 WHERE ID = 5");
+        // Similar double-quotes, but without null:
+        testProcWithValidJSON("{\"\\\"foo\\\"\":-1}", client, "SelectSetFieldProc", "\"foo\"", -1, 5);
+        testProcWithValidJSON("{\"\\\"foo\\\"\":-1}", client, "@AdHoc", "SELECT SET_FIELD(DOC, '\"foo\"', '-1') FROM JS1 WHERE ID = 5");
+
+        // Call the SET_FIELD function with quoted-null third ("value") parameter
+        // (using both the "SelectSetFieldProc" Stored Proc and an ad-hoc query)
+        testProcWithValidJSON("{\"id\":null}", client, "SelectSetFieldProc", "id", "null", 5);
+        testProcWithValidJSON("{\"id\":null}", client, "@AdHoc", "SELECT SET_FIELD(DOC, 'id', 'null') FROM JS1 WHERE ID = 5");
+        // Note: quotes for "id" and "null" are escaped for Java; the resulting
+        // JSON document is actually: {"id":"null"}
+        testProcWithValidJSON("{\"id\":\"null\"}", client, "SelectSetFieldProc", "id", "\"null\"", 5);
+        testProcWithValidJSON("{\"id\":\"null\"}", client, "@AdHoc", "SELECT SET_FIELD(DOC, 'id', '\"null\"') FROM JS1 WHERE ID = 5");
+        // Similar double-quotes, but without null:
+        testProcWithValidJSON("{\"id\":\"foo\"}", client, "SelectSetFieldProc", "id", "\"foo\"", 5);
+        testProcWithValidJSON("{\"id\":\"foo\"}", client, "@AdHoc", "SELECT SET_FIELD(DOC, 'id', '\"foo\"') FROM JS1 WHERE ID = 5");
+        // Without quotes, for comparison:
+        testProcWithValidJSON("{\"id\":-1}", client, "SelectSetFieldProc", "id", -1, 5);
+        testProcWithValidJSON("{\"id\":-1}", client, "@AdHoc", "SELECT SET_FIELD(DOC, 'id', '-1') FROM JS1 WHERE ID = 5");
+
+        // Another edge case (not involving null), when the third ("value")
+        // parameter is a JSON object
+        testProcWithValidJSON("{\"id\":{\"foo\":-1}}", client, "SelectSetFieldProc", "id", "{\"foo\":-1}", 5);
+        testProcWithValidJSON("{\"id\":{\"foo\":-1}}", client, "@AdHoc", "SELECT SET_FIELD(DOC, 'id', '{\"foo\":-1}') FROM JS1 WHERE ID = 5");
     }
 
     public void testARRAY_ELEMENTFunction() throws Exception {
@@ -1597,6 +1667,15 @@ public class TestFunctionsForJSON extends RegressionSuite {
                 ";\n" +
                 "CREATE PROCEDURE UpdateSetFieldProc AS\n" +
                 "   UPDATE JS1 SET DOC = SET_FIELD(DOC, ?, ?) WHERE ID = ?\n" +
+                ";\n" +
+                "CREATE PROCEDURE NullSetFieldDocProc AS\n" +
+                "   SELECT ID FROM JS1 WHERE SET_FIELD(?, ?, ?) IS NULL ORDER BY ID\n" +
+                ";\n" +
+                "CREATE PROCEDURE NullSetFieldProc AS\n" +
+                "   SELECT ID FROM JS1 WHERE SET_FIELD(DOC, ?, ?) IS NULL ORDER BY ID\n" +
+                ";\n" +
+                "CREATE PROCEDURE SelectSetFieldProc AS\n" +
+                "   SELECT SET_FIELD(DOC, ?, ?) FROM JS1 WHERE ID = ?\n" +
                 ";\n" +
 
                 // Useful for debugging:
