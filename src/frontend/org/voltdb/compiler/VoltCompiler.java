@@ -128,6 +128,8 @@ public class VoltCompiler {
     // Environment variable used to verify that a catalog created from autogen-dll.sql is effectively
     // identical to the original catalog that was used to create the autogen-ddl.sql file.
     public static final boolean DEBUG_VERIFY_CATALOG = Boolean.valueOf(System.getenv().get("VERIFY_CATALOG_DEBUG"));
+    // Turn off warning about DRing replicated tables
+    public static final boolean DISABLE_DR_WARNING = Boolean.getBoolean("DISABLE_DR_WARNING");
 
     String m_projectFileURL = null;
     String m_currentFilename = null;
@@ -1085,8 +1087,15 @@ public class VoltCompiler {
         }
 
         // process DRed tables
+        List<String> drReplicated = new ArrayList<String>();
         for (Entry<String, String> drNode: voltDdlTracker.getDRedTables().entrySet()) {
-            compileDRTable(drNode, db);
+            compileDRTable(drNode, db, drReplicated);
+        }
+        if (!drReplicated.isEmpty()) {
+            throw new VoltCompilerException(
+                    "DR is not supported for replicated tables. " +
+                    "Please remove this option from the following tables: " +
+                    StringUtils.join(drReplicated, ','));
         }
 
         if (whichProcs != DdlProceduresToLoad.NO_DDL_PROCEDURES) {
@@ -1958,7 +1967,7 @@ public class VoltCompiler {
 
     }
 
-    void compileDRTable(final Entry<String, String> drNode, final Database db)
+    void compileDRTable(final Entry<String, String> drNode, final Database db, final List<String> drReplicated)
             throws VoltCompilerException
     {
         String tableName = drNode.getKey();
@@ -1966,12 +1975,25 @@ public class VoltCompiler {
 
         if (tableName.equalsIgnoreCase("*")) {
             // star wildcard support
+            StringBuilder replicatedWarning = null;
             for (Table table : db.getTables()) {
                 if (action.equalsIgnoreCase("DISABLE")) {
                     table.setIsdred(false);
-                } else {
+                } else if (!table.getIsreplicated()) {
                     table.setIsdred(true);
+                } else if (!DISABLE_DR_WARNING) {
+                    if (replicatedWarning == null) {
+                        replicatedWarning = new StringBuilder(
+                                "DR is not supported for replicated tables, which are present in the catalog. " +
+                                "The following tables will not be included when replicating the database: ");
+                        replicatedWarning.append(table.getTypeName());
+                    } else {
+                        replicatedWarning.append(", ").append(table.getTypeName());
+                    }
                 }
+            }
+            if (replicatedWarning != null) {
+                compilerLog.warn(replicatedWarning.toString());
             }
             return;
         }
@@ -1982,8 +2004,10 @@ public class VoltCompiler {
         }
         if (action.equalsIgnoreCase("DISABLE")) {
             tableref.setIsdred(false);
-        } else {
+        } else if (!tableref.getIsreplicated()) {
             tableref.setIsdred(true);
+        } else {
+            drReplicated.add(tableName);
         }
     }
 
