@@ -61,7 +61,7 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
 
             boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
             if (tableIter == tables.end()) {
-                throwFatalException("Where is my table at yo? %jd", (intmax_t)tableHandle);
+                throwFatalException("Unable to find table hash %jd while applying a binary log", (intmax_t)tableHandle);
             }
 
             PersistentTable *table = tableIter->second;
@@ -96,14 +96,14 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
         }
         case DR_RECORD_TRUNCATE_TABLE: {
             tableHandle = taskInfo.readLong();
-            taskInfo.readTextString();//table name
+            std::string tableName = taskInfo.readTextString();//table name
 
             checksum = taskInfo.readInt();
             validateChecksum(checksum, recordStart, taskInfo.getRawPointer());
 
             boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
             if (tableIter == tables.end()) {
-                throwFatalException("Where is my table at yo? %jd", (intmax_t)tableHandle);
+                throwFatalException("Unable to find table %s hash %jd while applying binary log", tableName.c_str(), (intmax_t)tableHandle);
             }
 
             PersistentTable *table = tableIter->second;
