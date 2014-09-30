@@ -23,7 +23,6 @@ import java.util.EmptyStackException;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.atomic.AtomicLong;
 import org.voltdb.ClientResponseImpl;
 
 import org.voltdb.ParameterConverter;
@@ -63,17 +62,14 @@ public class PerPartitionTable {
     final VoltTable.ColumnInfo m_columnInfo[];
     //Column types
     final VoltType[] m_columnTypes;
-    //The number of rows in m_partitionProcessorQueue.
-    final AtomicLong m_partitionQueuedRowCnt = new AtomicLong(0);
     //Size of the batches this table submits (minimum of all values provided by VoltBulkLoaders)
-    int m_minBatchTriggerSize;
+    volatile int m_minBatchTriggerSize;
     //Insert procedure name
     final String m_procName;
     //Name of table
     final String m_tableName;
     //List of callbacks for which we have not seen a response from the client.
     LinkedCallbackList m_activeCallbacks = new LinkedCallbackList();
-    boolean m_okToFlush = true;
 
     // Node wrapping each Client callback that is still outstanding.
     static class WrappedCallback {
@@ -223,67 +219,25 @@ public class PerPartitionTable {
         }
      }
 
-    // Synchronized to prevent insertRow from manipulating m_partitionProcessorQueue and m_partitionRowQueue
-    synchronized void abortFromLoader(VoltBulkLoader loader)
-    {
-        int abortedRows = 0;
-        // First we need to remove ourselves from the PartitionProcessor thread
-        while (m_partitionProcessorQueue.remove(this)) ;
-
-        // Now remove all rows from the partition row queue
-        List<VoltBulkLoaderRow> allPartitionRows = new ArrayList<VoltBulkLoaderRow>();
-        m_partitionRowQueue.drainTo(allPartitionRows);
-        // Remove all rows matching the requesting loader from the list
-        ListIterator<VoltBulkLoaderRow> it=allPartitionRows.listIterator();
-        while (it.hasNext()) {
-            VoltBulkLoaderRow currRow = it.next();
-            if (currRow.m_loader == loader && !currRow.isNotificationRow()) {
-                it.remove();
-                abortedRows++;
-            }
-        }
-        // Add back in whatever rows from other loaders are left over
-        try {
-            for (VoltBulkLoaderRow currRow : allPartitionRows) {
-                m_partitionRowQueue.put(currRow);
-            }
-        }
-        catch (InterruptedException e) {
-        }
-        m_partitionQueuedRowCnt.addAndGet(-1*abortedRows);
-        loader.m_loaderQueuedRowCnt.addAndGet(-1*abortedRows);
-        long batchCnt = m_partitionQueuedRowCnt.get() / m_minBatchTriggerSize;
-        for (long i=0; i<batchCnt; i++) {
-            m_partitionProcessorQueue.add(this);
-        }
-    }
-
     synchronized void insertRowInTable(VoltBulkLoaderRow nextRow) throws InterruptedException {
         if (!m_partitionRowQueue.offer(nextRow)) {
             m_partitionRowQueue.put(nextRow);
         }
-        if (m_partitionQueuedRowCnt.incrementAndGet() % m_minBatchTriggerSize == 0) {
+        if (m_partitionRowQueue.size() == m_minBatchTriggerSize) {
             // A sync row will typically cause the table to be split into 2 requests
-            m_okToFlush = false;
             m_partitionProcessorQueue.add(this);
         }
     }
 
-    synchronized void flushAllTableQueues(boolean force) {
-        if (m_partitionQueuedRowCnt.get() % m_minBatchTriggerSize != 0 && (m_okToFlush || force)) {
-            // A flush will typically cause the table to be split into 2 batches
-            m_partitionProcessorQueue.add(this);
-        }
-        if (!force) {
-            m_okToFlush = true;
-        }
+    synchronized void flushAllTableQueues() {
+        // A flush will typically cause the table to be split into 2 batches
+        m_partitionProcessorQueue.add(this);
     }
 
     synchronized void drainTableQueue(VoltBulkLoaderRow nextRow) throws InterruptedException {
         if (!m_partitionRowQueue.offer(nextRow)) {
             m_partitionRowQueue.put(nextRow);
         }
-        m_partitionQueuedRowCnt.incrementAndGet();
         m_partitionProcessorQueue.add(this);
     }
 
@@ -291,7 +245,6 @@ public class PerPartitionTable {
         PartitionProcedureCallback nextCallback;
         List<VoltBulkLoaderRow> batchList = new ArrayList<VoltBulkLoaderRow>();
         m_partitionRowQueue.drainTo(batchList, m_minBatchTriggerSize);
-        m_partitionQueuedRowCnt.addAndGet(-1*batchList.size());
         ArrayList<LoaderSpecificRowCnt> usedLoaderList = new
                 ArrayList<LoaderSpecificRowCnt>();
         ArrayList<VoltBulkLoaderRow> notificationList = new ArrayList<VoltBulkLoaderRow>();

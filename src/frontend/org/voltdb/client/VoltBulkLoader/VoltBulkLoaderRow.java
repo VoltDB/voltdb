@@ -96,7 +96,7 @@ class VoltBulkLoaderRow {
         @Override
         public void notifyOfClientResponse() {
             if (--batchCnt <= 0) {
-                if (m_tableForClosedBulkLoader.m_partitionQueuedRowCnt.get() >  0) {
+                if (m_tableForClosedBulkLoader.m_partitionRowQueue.size() >  0) {
                     // A row squeaked through so reinsert this row to repeat the close attempt
                     try {
                         m_tableForClosedBulkLoader.drainTableQueue(VoltBulkLoaderRow.this);

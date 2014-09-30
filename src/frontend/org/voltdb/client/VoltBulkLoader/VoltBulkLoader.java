@@ -421,7 +421,7 @@ public class VoltBulkLoader {
             m_flush = m_ses.scheduleAtFixedRate(new Runnable() {
                 @Override
                 public void run() {
-                    _flush(false);
+                    _flush();
                 }
             }, delay, seconds, TimeUnit.SECONDS);
         }
@@ -494,28 +494,12 @@ public class VoltBulkLoader {
      * instances working on the same table and using the same instance of Client.
      */
     public void flush() {
-        _flush(true);
+        _flush();
     }
 
-    private void _flush(boolean force) {
+    private void _flush() {
         for (int i = m_firstPartitionTable; i <= m_lastPartitionTable; i++) {
-            m_partitionTable[i].flushAllTableQueues(force);
-        }
-    }
-
-    /**
-     * Removes all rows not already batched and submitted to the client to be removed. No
-     * callback notifications will be provided for aborted rows. This method will only remove
-     * rows inserted by this instance of VoltBulkLoader. rowInsert()s submitted on other
-     * instances of VoltBulkLoader (even those operating on the same table) will be unaffected.
-     */
-    public synchronized void cancelQueued() {
-        for (int i=m_firstPartitionTable; i<=m_lastPartitionTable; i++)
-            m_partitionTable[i].abortFromLoader(this);
-        List<VoltBulkLoaderRow> allPartitionRows = new ArrayList<VoltBulkLoaderRow>();
-        if (m_failedQueue != null) {
-            m_failedQueue.drainTo(allPartitionRows);
-            m_failedBatchQueuedRowCnt.addAndGet(-1 * allPartitionRows.size());
+            m_partitionTable[i].flushAllTableQueues();
         }
     }
 
