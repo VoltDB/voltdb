@@ -220,9 +220,7 @@ public class PerPartitionTable {
      }
 
     synchronized void insertRowInTable(VoltBulkLoaderRow nextRow) throws InterruptedException {
-        if (!m_partitionRowQueue.offer(nextRow)) {
-            m_partitionRowQueue.put(nextRow);
-        }
+        m_partitionRowQueue.put(nextRow);
         if (m_partitionRowQueue.size() == m_minBatchTriggerSize) {
             // A sync row will typically cause the table to be split into 2 requests
             m_partitionProcessorQueue.add(this);
@@ -235,9 +233,7 @@ public class PerPartitionTable {
     }
 
     synchronized void drainTableQueue(VoltBulkLoaderRow nextRow) throws InterruptedException {
-        if (!m_partitionRowQueue.offer(nextRow)) {
-            m_partitionRowQueue.put(nextRow);
-        }
+        m_partitionRowQueue.put(nextRow);
         m_partitionProcessorQueue.add(this);
     }
 
