@@ -517,7 +517,7 @@ public class DDLCompiler {
                     // avoid embedded newlines so we can delimit statements
                     // with newline.
                     m_fullDDL += Encoder.hexEncode(stmt.statement) + "\n";
-                    VoltXMLDiff thisStmtDiff = m_hsql.runDDLCommand(stmt.statement);
+                    VoltXMLDiff thisStmtDiff = m_hsql.runDDLCommandAndDiff(stmt.statement);
                     applyDiff(thisStmtDiff);
                 } catch (HSQLParseException e) {
                     String msg = "DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
@@ -570,7 +570,8 @@ public class DDLCompiler {
         // Okay, get a list of deleted column names
         Set<String> removedColumns = new HashSet<String>();
         for (VoltXMLElement e : columnsDiff.getRemovedNodes()) {
-            removedColumns.add(e.name);
+            assert(e.attributes.get("name") != null);
+            removedColumns.add(e.attributes.get("name"));
         }
         // go back and get our table name.  Use the uniquename ("table" + name) to get the element
         // from the schema

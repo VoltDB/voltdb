@@ -60,4 +60,52 @@ public class TestLiveDDLCompiler extends TestCase {
         Table t = db.getTables().get("T");
         assertEquals("C2", t.getPartitioncolumn().getTypeName());
     }
+
+    public void testDropPartitionedTable() throws Exception
+    {
+        File jarOut = new File("partitionfun.jar");
+        jarOut.deleteOnExit();
+
+        String schema =
+            "CREATE TABLE T (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL, C3 INTEGER NOT NULL);\n" +
+            "PARTITION TABLE T ON COLUMN C1;\n" +
+            "DROP TABLE T;\n";
+        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
+        String schemaPath = schemaFile.getPath();
+
+        VoltCompiler compiler = new VoltCompiler();
+        boolean success = compiler.compileFromDDL(jarOut.getPath(), schemaPath);
+        assertTrue("Compilation failed unexpectedly", success);
+
+        Catalog catalog = new Catalog();
+        catalog.execute(CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(MiscUtils.fileToBytes(new File(jarOut.getPath()))).getFirst()));
+
+        Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
+        Table t = db.getTables().get("T");
+        assertEquals(null, t);
+    }
+
+    public void testDropExportTable() throws Exception
+    {
+        File jarOut = new File("partitionfun.jar");
+        jarOut.deleteOnExit();
+
+        String schema =
+            "CREATE TABLE T (C1 INTEGER NOT NULL, C2 INTEGER NOT NULL, C3 INTEGER NOT NULL);\n" +
+            "EXPORT TABLE T;\n" +
+            "DROP TABLE T;\n";
+        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
+        String schemaPath = schemaFile.getPath();
+
+        VoltCompiler compiler = new VoltCompiler();
+        boolean success = compiler.compileFromDDL(jarOut.getPath(), schemaPath);
+        assertTrue("Compilation failed unexpectedly", success);
+
+        Catalog catalog = new Catalog();
+        catalog.execute(CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(MiscUtils.fileToBytes(new File(jarOut.getPath()))).getFirst()));
+
+        Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
+        Table t = db.getTables().get("T");
+        assertEquals(null, t);
+    }
 }
