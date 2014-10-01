@@ -17,33 +17,22 @@
 
 package org.voltdb.client.VoltBulkLoader;
 
-import java.io.IOException;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Stack;
 import java.util.TreeMap;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 import org.voltcore.utils.CoreUtils;
 
 import org.voltdb.ClientResponseImpl;
-import org.voltdb.ParameterConverter;
-import org.voltdb.client.HashinatorLite;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTypeException;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcedureCallback;
-import org.voltdb.client.VoltBulkLoader.VoltBulkLoaderRow.BulkLoaderNotification;
 
 /**
  * VoltBulkLoader is meant to run for long periods of time. Multiple threads can
@@ -106,24 +95,14 @@ public class VoltBulkLoader {
     private final ScheduledThreadPoolExecutor m_ses = CoreUtils.getScheduledThreadPoolExecutor("Periodic-Flush", 1, CoreUtils.SMALL_STACK_SIZE);
     private ScheduledFuture<?> m_flush = null;
 
-    // Dedicated thread for processing all failed batch rows inserted by this VoltBulkLoader instance
-    FailedBatchProcessor m_failureProcessor = null;
-    //Queue of batch entries where some rows failed.
-    BlockingQueue<VoltBulkLoaderRow> m_failedQueue = null;
-
-    // The max number of failed rows that can be stored in m_failedQueue before blocking insertion
-    private final int FAILED_QUEUE_LIMIT = Integer.getInteger("FAILED_QUEUE_LIMIT", 50);
-
     //Number of rows inserted into the PerPartitionTable queues.
     final AtomicLong m_loaderQueuedRowCnt = new AtomicLong(0);
     //Number of rows removed from PerPartitionTable queue converted to VoltTable and submitted to Client
     final AtomicLong m_loaderBatchedRowCnt = new AtomicLong(0);
     //Number of rows for which we have received a definitive success or failure.
     final AtomicLong m_loaderCompletedCnt = new AtomicLong(0);
-    //Number of rows waiting to be sent by the BatchFailureProcessor
-    final AtomicLong m_failedBatchQueuedRowCnt = new AtomicLong(0);
-    //Number of rows sent by the BatchFailureProcessor
-    final AtomicLong m_failedBatchSentRowCnt = new AtomicLong(0);
+    //Number of rows failed to be inserted after retry
+    final AtomicLong m_loaderFailedRowCnt = new AtomicLong(0);
 
     // Permanent set of all outstanding batches organized by partitionId
     final ArrayList<LoaderSpecificRowCnt>[] m_outstandingRowCnts;
@@ -142,103 +121,6 @@ public class VoltBulkLoader {
             this.rowCnt = c;
         }
     }
-
-    //This is the thread that processes one insert at a time if the batch fails
-    private class FailedBatchProcessor extends Thread {
-        CountDownLatch m_failedBatchProcessor_cdl = null;
-
-        //Callback for single row procedure invoke called for rows in failed batch.
-        class PartitionFailureExecuteProcedureCallback implements ProcedureCallback {
-            final VoltBulkLoaderRow m_row;
-
-            public PartitionFailureExecuteProcedureCallback(VoltBulkLoaderRow row) {
-                m_row = row;
-            }
-
-            @Override
-            public void clientCallback(ClientResponse response) {
-                //one insert at a time callback
-                if (response.getStatus() != ClientResponse.SUCCESS) {
-                    m_notificationCallBack.failureCallback(m_row.m_rowHandle, m_row.m_rowData, response);
-                }
-                m_loaderCompletedCnt.incrementAndGet();
-                if (m_failedBatchSentRowCnt.decrementAndGet() == 0) {
-                    if (m_failedBatchProcessor_cdl != null) {
-                        m_failedBatchProcessor_cdl.countDown();
-                        m_failedBatchProcessor_cdl = null;
-                    }
-                }
-            }
-        }
-
-        @Override
-        public void run() {
-            while (true) {
-                try {
-                    VoltBulkLoaderRow currRow;
-                    currRow = m_failedQueue.take();
-                    //If we see a syncRow process the special condition.
-                    if (currRow.isNotificationRow()) {
-                        assert(m_failedBatchProcessor_cdl == null);
-                        BulkLoaderNotification notifier = ((BulkLoaderNotification)currRow.m_rowHandle);
-                        m_failedBatchProcessor_cdl = notifier.getLatch();
-                        if (m_failedBatchProcessor_cdl != null && m_failedBatchSentRowCnt.get() == 0) {
-                            m_failedBatchProcessor_cdl.countDown();
-                            m_failedBatchProcessor_cdl = null;
-                        }
-                        if (notifier instanceof VoltBulkLoaderRow.CloseNotificationCallBack) {
-                            break;
-                        }
-                        continue;
-                    }
-                    m_failedBatchQueuedRowCnt.decrementAndGet();
-                    m_failedBatchSentRowCnt.incrementAndGet();
-                    PartitionFailureExecuteProcedureCallback callback = null;
-                    try {
-                        VoltTable table = new VoltTable(m_colInfo);
-                        // No need to check error here if a correctedLine has come here it was
-                        // previously successful.
-                        try {
-                            Object row_args[] = new Object[currRow.m_rowData.length];
-                            for (int i = 0; i < row_args.length; i++) {
-                                final VoltType type = m_columnTypes[i];
-                                row_args[i] = ParameterConverter.tryToMakeCompatible(type.classFromType(),
-                                        currRow.m_rowData[i]);
-                            }
-                            table.addRow(row_args);
-                        } catch (VoltTypeException ex) {
-                            // Should never happened because the bulk conversion in PerPartitionProcessor
-                            // should have caught this
-                            continue;
-                        }
-
-                        callback = new PartitionFailureExecuteProcedureCallback(currRow);
-                        if (!m_isMP) {
-                            Object rpartitionParam =
-                                    HashinatorLite.valueToBytes(table.fetchRow(0).
-                                            get(m_partitionedColumnIndex,m_partitionColumnType));
-                            m_clientImpl.callProcedure(callback, m_procName, rpartitionParam,
-                                    m_tableName, table);
-                        }
-                        else
-                            m_clientImpl.callProcedure(callback, m_procName, m_tableName, table);
-                    } catch (IOException ioex) {
-                        //Send connection lost callback.
-                        m_failureProcessor = null;
-                        final ClientResponse r = new ClientResponseImpl(
-                                ClientResponse.CONNECTION_LOST, new VoltTable[0],
-                                "Connection to database was lost");
-                        callback.clientCallback(r);
-                        break;
-                    }
-                } catch (InterruptedException ex) {
-                    m_failureProcessor = null;
-                    break;
-                }
-            }
-        }
-    }
-
 
     // Constructor allocated through the Client to ensure consistency of VoltBulkLoaderGlobals
     public VoltBulkLoader(BulkLoaderState vblGlobals, String tableName, int maxBatchSize,
@@ -328,42 +210,16 @@ public class VoltBulkLoader {
         // Dedicate a PartitionProcessor to MP tables
         m_maxPartitionProcessors = ((hostcount * sitesPerHost) / (kfactor + 1)) + 1;
 
-        int queueDepthMultiplier;
         if (!m_isMP) {
             m_firstPartitionTable = 0;
             m_lastPartitionTable = m_maxPartitionProcessors-2;
-            queueDepthMultiplier = Math.max(5, 1000/(m_maxPartitionProcessors-1));
             m_procName = "@LoadSinglepartitionTable" ;
         }
         else {
-            queueDepthMultiplier = 1000;
             m_firstPartitionTable = m_maxPartitionProcessors-1;
             m_lastPartitionTable = m_maxPartitionProcessors-1;
             m_procName = "@LoadMultipartitionTable" ;
        }
-
-       // The constructor for VoltBulkLoader is called holding synchronized for m_vblGlobals.
-        if (m_vblGlobals.m_TableNameToLoader.isEmpty()) {
-            // Set up the PartitionProcessors
-            m_vblGlobals.m_spawnedPartitionProcessors = new ArrayList<Thread>(m_maxPartitionProcessors);
-            m_vblGlobals.m_partitionProcessors = new PartitionProcessor[m_maxPartitionProcessors];
-
-            m_vblGlobals.m_tableQueues = (ConcurrentLinkedQueue<PerPartitionTable>[])
-                    new ConcurrentLinkedQueue[m_maxPartitionProcessors];
-            m_vblGlobals.m_processor_cdl = new CountDownLatch(m_maxPartitionProcessors);
-            for (int i=0; i<m_maxPartitionProcessors; i++) {
-                ConcurrentLinkedQueue<PerPartitionTable> tableQueue =
-                        new ConcurrentLinkedQueue<PerPartitionTable>();
-                m_vblGlobals.m_tableQueues[i] = tableQueue;
-                PartitionProcessor processor = new PartitionProcessor(i, i==m_maxPartitionProcessors-1,
-                        m_vblGlobals);
-                m_vblGlobals.m_partitionProcessors[i] = processor;
-                Thread th = new Thread(processor);
-                th.setName(processor.m_processorName);
-                m_vblGlobals.m_spawnedPartitionProcessors.add(th);
-                th.start();
-            }
-        }
 
         // Set up LoaderPair tables for managing multi-loader statistics
         m_outstandingRowCnts = (ArrayList<LoaderSpecificRowCnt>[])
@@ -378,9 +234,10 @@ public class VoltBulkLoader {
             // Set up the BulkLoaderPerPartitionTables
             for(int i=m_firstPartitionTable; i<=m_lastPartitionTable; i++) {
                 m_partitionTable[i] = new PerPartitionTable(m_clientImpl, m_tableName,
-                        m_vblGlobals.m_partitionProcessors[i],
-                        this, maxBatchSize, maxBatchSize*queueDepthMultiplier);
+                        i, i == m_maxPartitionProcessors-1, this, maxBatchSize);
                 m_outstandingRowCnts[i] = new ArrayList<LoaderSpecificRowCnt>();
+
+                new Thread(m_partitionTable[i], m_tableName + "-" + i).start();
             }
             loaderList = new ArrayList<VoltBulkLoader>();
             loaderList.add(this);
@@ -398,12 +255,6 @@ public class VoltBulkLoader {
                 m_outstandingRowCnts[i] = new ArrayList<LoaderSpecificRowCnt>();
             }
         }
-
-        //Launch failureProcessor
-        m_failedQueue = new LinkedBlockingQueue<VoltBulkLoaderRow>();
-        m_failureProcessor = new FailedBatchProcessor();
-        m_failureProcessor.start();
-
     }
 
     /**
@@ -421,7 +272,11 @@ public class VoltBulkLoader {
             m_flush = m_ses.scheduleAtFixedRate(new Runnable() {
                 @Override
                 public void run() {
-                    _flush();
+                    try {
+                        flush();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
                 }
             }, delay, seconds, TimeUnit.SECONDS);
         }
@@ -444,10 +299,6 @@ public class VoltBulkLoader {
      * @throws java.lang.InterruptedException
      */
     public void insertRow(Object rowHandle, Object... fieldList)  throws InterruptedException {
-
-        if (timeToDrainFailedQueue())
-            drainFailQueue();
-
         int partitionId = 0;
         //Find partition to send this row to and put on correct PerPartitionTable.
         if (fieldList == null || fieldList.length <= 0) {
@@ -493,28 +344,9 @@ public class VoltBulkLoader {
      * use drain(). This method will also flush pending rows submitted by other VoltBulkLoader
      * instances working on the same table and using the same instance of Client.
      */
-    public void flush() {
-        _flush();
-    }
-
-    private void _flush() {
+    public void flush() throws ExecutionException, InterruptedException {
         for (int i = m_firstPartitionTable; i <= m_lastPartitionTable; i++) {
             m_partitionTable[i].flushAllTableQueues();
-        }
-    }
-
-    public boolean timeToDrainFailedQueue() {
-        return m_failedQueue.size() > FAILED_QUEUE_LIMIT;
-    }
-
-    public synchronized void drainFailQueue() throws InterruptedException {
-        if (m_failedQueue != null && m_failureProcessor != null) {
-            CountDownLatch batchFailureQueueLatch = new CountDownLatch(1);
-            VoltBulkLoaderRow drainRow = new VoltBulkLoaderRow(this);
-            drainRow.new DrainNotificationCallBack(batchFailureQueueLatch);
-            m_failedQueue.add(drainRow);
-            batchFailureQueueLatch.await();
-            assert (m_failedBatchQueuedRowCnt.get() == 0 && m_failedBatchSentRowCnt.get() == 0);
         }
     }
 
@@ -527,21 +359,16 @@ public class VoltBulkLoader {
      */
     public synchronized void drain() throws InterruptedException {
         // Wait for number of PerPartitionTables we are using and the Failure Processor
-        CountDownLatch waitLatch = new CountDownLatch(m_lastPartitionTable-m_firstPartitionTable+1);
         for (int i=m_firstPartitionTable; i<=m_lastPartitionTable; i++) {
-            VoltBulkLoaderRow drainRow = new VoltBulkLoaderRow(this);
-            drainRow.new DrainNotificationCallBack(waitLatch);
-            m_partitionTable[i].drainTableQueue(drainRow);
+            try {
+                m_partitionTable[i].flushAllTableQueues().get();
+            } catch (ExecutionException e) {
+                e.printStackTrace();
+            }
         }
-
-        waitLatch.await();
+        m_clientImpl.drain();
 
         assert(m_loaderBatchedRowCnt.get() == 0 && m_loaderQueuedRowCnt.get() == 0);
-
-        // Now we know all batches have been processed so wait for all failedQueue messages to complete unless failure
-        //processor is dead.
-
-        drainFailQueue();
     }
 
     /**
@@ -550,7 +377,7 @@ public class VoltBulkLoader {
      * an Exception. All other instances of VoltBulkLoader will continue to function.
      * @throws java.lang.InterruptedException
      */
-    public synchronized void close() throws InterruptedException {
+    public synchronized void close() throws Exception {
         //Stop the periodic flush as we will flush laster
         if (m_flush != null) {
             m_flush.cancel(false);
@@ -568,48 +395,16 @@ public class VoltBulkLoader {
                 loaderList.remove(this);
 
             // First flush the tables
-            CountDownLatch tableWaitLatch = new
-                    CountDownLatch(m_lastPartitionTable-m_firstPartitionTable+1);
             // keep one PerPartitionTable around so we can use it as the poisoned
             // table for the PartitionProcessors
-            tmpTable = m_partitionTable[m_firstPartitionTable];
-            for (int i=m_firstPartitionTable; i<=m_lastPartitionTable; i++) {
-                VoltBulkLoaderRow closeTableRow = new VoltBulkLoaderRow(this);
-                closeTableRow.new CloseNotificationCallBack(m_partitionTable[i], tableWaitLatch);
-                m_partitionTable[i].drainTableQueue(closeTableRow);
-                // After this point we can no longer see the PerPartitionTable through m_partitionTable
+            drain();
+            for (PerPartitionTable ppt : m_partitionTable) {
+                if (ppt != null) {
+                    ppt.shutdown();
+                }
             }
 
-            // Wait for all our entries to be flushed from all the tables
-            tableWaitLatch.await();
             assert(m_loaderBatchedRowCnt.get() == 0 && m_loaderQueuedRowCnt.get() == 0);
-
-            CountDownLatch failureThreadLatch = new CountDownLatch(1);
-
-            // At this point it is safe to assume that this BulkLoader has processed all
-            // non-failed Rows to completion unless failure processor is dead.
-            if (m_failedQueue != null && m_failureProcessor != null) {
-                VoltBulkLoaderRow closeFailureProcRow = new VoltBulkLoaderRow(this);
-                closeFailureProcRow.new CloseNotificationCallBack(tmpTable, failureThreadLatch);
-                m_failedQueue.add(closeFailureProcRow);
-                failureThreadLatch.await();
-                assert (m_failedBatchQueuedRowCnt.get() == 0 && m_failedBatchSentRowCnt.get() == 0);
-            }
-
-            // Remove all VoltBulkLoader-specific state in the client if there are no others
-            if (m_vblGlobals.getTableNameToLoaderCnt() == 0) {
-                m_vblGlobals.m_shutdownPartitionProcessors = true;
-                for (int i=0; i<m_maxPartitionProcessors; i++) {
-                    m_vblGlobals.m_partitionProcessors[i].m_PendingTables.add(tmpTable);
-                }
-                try {
-                    for (Thread th : m_vblGlobals.m_spawnedPartitionProcessors) {
-                        th.join();
-                    }
-                } catch (InterruptedException e) {
-                }
-                m_vblGlobals.cleanupBulkLoaderState();
-            }
         }
     }
 
@@ -628,8 +423,7 @@ public class VoltBulkLoader {
      *  but have not been processed by the Client
      */
     public long getOutstandingRowCount() {
-        return m_loaderQueuedRowCnt.get() + m_loaderBatchedRowCnt.get() +
-                m_failedBatchQueuedRowCnt.get() + m_failedBatchSentRowCnt.get();
+        return m_loaderQueuedRowCnt.get() + m_loaderBatchedRowCnt.get();
     }
 
     /**
