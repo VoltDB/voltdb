@@ -1756,6 +1756,16 @@ public class TestFixedSQLSuite extends RegressionSuite {
         validateTableOfScalarLongs(vt, new long[]{0});
     }
 
+    public void testInsertWithCast() throws Exception {
+        Client client = getClient();
+        client.callProcedure("@AdHoc", "delete from p1");
+
+        // in ENG-5929, this would cause a null pointer exception,
+        // because OperatorException.refineValueType was not robust to casts.
+        String stmt = "insert into p1 (id, num) values (1, cast(1 + ? as integer))";
+        VoltTable vt = client.callProcedure("@AdHoc", stmt, 100).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {1});
+    }
 
     //
     // JUnit / RegressionSuite boilerplate
