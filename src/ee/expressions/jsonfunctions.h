@@ -190,8 +190,13 @@ private:
                         throwInvalidPathError("Unexpected character in array index");
                     }
                     arrayIndex = 10 * arrayIndex + (c - '0');
-                    if (arrayIndex > static_cast<int64_t>(INT32_MAX)) {
-                        throwInvalidPathError("Invalid array index greater than the maximum integer value");
+                    // This 500000 is a mostly arbitrary maximum JSON array index enforced for practical
+                    // purposes. We enforce this up front to avoid excessive delays, ridiculous short-term
+                    // memory growth, and/or bad_alloc errors that the jsoncpp library could produce
+                    // essentially for nothing since our supported JSON document columns are typically not
+                    // wide enough to hold the string representations of arrays this large.
+                    if (arrayIndex > 500000) {
+                        throwInvalidPathError("Array index greater than the maximum allowed value of 500000");
                     }
                 }
                 if ( ! terminated ) {
@@ -462,10 +467,15 @@ template<> inline NValue NValue::call<FUNC_VOLT_SET_FIELD>(const std::vector<NVa
     const char* pathChars = reinterpret_cast<char*>(pathNVal.getObjectValue_withoutNull());
     int32_t lenValue = valueNVal.getObjectLength_withoutNull();
     const char* valueChars = reinterpret_cast<char*>(valueNVal.getObjectValue_withoutNull());
-    doc.set(pathChars, lenPath, valueChars, lenValue);
-
-    std::string value = doc.value();
-    return getTempStringValue(value.c_str(), value.length() - 1);
+    try {
+        doc.set(pathChars, lenPath, valueChars, lenValue);
+        std::string value = doc.value();
+        return getTempStringValue(value.c_str(), value.length() - 1);
+    } catch (std::bad_alloc& too_large) {
+        std::string pathForDiagnostic(pathChars, lenPath);
+        throwDynamicSQLException("Insufficient memory for SET_FIELD operation with path argument: %s",
+                                 pathForDiagnostic.c_str());
+    }
 }
 
 }
