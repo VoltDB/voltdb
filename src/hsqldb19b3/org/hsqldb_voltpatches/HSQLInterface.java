@@ -134,21 +134,33 @@ public class HSQLInterface {
     }
 
     /**
+     * Modify the current schema with a SQL DDL command and get the
+     * diff which represents the changes
+     *
+     * @param ddl The SQL DDL statement to be run.
+     * @throws HSQLParseException Throws exception if SQL parse error is
+     * encountered.
+     */
+    public VoltXMLDiff runDDLCommandAndDiff(String ddl) throws HSQLParseException {
+        runDDLCommand(ddl);
+        VoltXMLElement thisSchema = getXMLFromCatalog();
+        VoltXMLDiff diff = VoltXMLElement.computeDiff(lastSchema, thisSchema);
+        lastSchema = thisSchema;
+        return diff;
+    }
+
+    /**
      * Modify the current schema with a SQL DDL command.
      *
      * @param ddl The SQL DDL statement to be run.
      * @throws HSQLParseException Throws exception if SQL parse error is
      * encountered.
      */
-    public VoltXMLDiff runDDLCommand(String ddl) throws HSQLParseException {
+    public void runDDLCommand(String ddl) throws HSQLParseException {
         Result result = sessionProxy.executeDirectStatement(ddl);
         if (result.hasError()) {
             throw new HSQLParseException(result.getMainString());
         }
-        VoltXMLElement thisSchema = getXMLFromCatalog();
-        VoltXMLDiff diff = VoltXMLElement.computeDiff(lastSchema, thisSchema);
-        lastSchema = thisSchema;
-        return diff;
     }
 
     /**
