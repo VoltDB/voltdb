@@ -32,7 +32,7 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 /**
- * System tests for UPSERT
+ * Junit tests for UPSERT
  */
 
 public class TestSqlUpsertSuite extends RegressionSuite {
@@ -153,7 +153,7 @@ public class TestSqlUpsertSuite extends RegressionSuite {
 
         // Test AdHoc UPSER with SELECT
         vt = client.callProcedure("@AdHoc", String.format(
-                "Upsert into R1 (dept, id) SELECT dept, id+1 FROM R2 ")).getResults()[0];
+                "Upsert into R1 (dept, id) SELECT dept, id+1 FROM R2 order by 1, 2")).getResults()[0];
         vt = client.callProcedure("@AdHoc",
                 "select ID, wage, dept from R1 order by ID, dept").getResults()[0];
         validateTableOfLongs(vt, new long[][] {{1,1,1}, {2, 1, 1}, {3, 1, 1}});
@@ -164,16 +164,8 @@ public class TestSqlUpsertSuite extends RegressionSuite {
                 "Upsert into P1 (dept, id) SELECT id, dept FROM P2 order by 1, 2 ")).getResults()[0];
         vt = client.callProcedure("@AdHoc",
                 "select ID, wage, dept from P1 order by ID, dept").getResults()[0];
-        System.err.println(vt);
         validateTableOfLongs(vt, new long[][] {{1, 1, 2}, {2, 2, 1}});
 
-        // also validate the partition to partition UPSERT
-        try {
-            vt = client.callProcedure("@AdHoc", String.format(
-                    "Upsert into P1 (dept, id) SELECT dept, id  FROM P2 order by 1, 2 ")).getResults()[0];
-            fail();
-        } catch (Exception ex) {
-        }
     }
 
     public void testUpsertWithoutPrimaryKey() throws IOException, ProcCallException {
@@ -195,10 +187,40 @@ public class TestSqlUpsertSuite extends RegressionSuite {
                 client.callProcedure("@AdHoc", "Upsert into "+ tb + " values(1, 1, 2)").getResults();
                 fail();
             } catch(Exception ex) {
-                System.err.println("tablename: " + tb + "\n" +ex.getMessage());
-
                 assertTrue(ex.getMessage().contains(errorMsg));
             }
+        }
+
+        String errorMsg = "DML statement manipulates data in content non-deterministic way "
+                + "(this may happen on UPSERT INTO ... SELECT, for example).";
+        // validate the non-content deterministic result
+        try {
+            client.callProcedure("@AdHoc", String.format(
+                    "Upsert into P1 (dept, id) SELECT id, dept FROM P2"));
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains(errorMsg));
+        }
+
+        try {
+            client.callProcedure("@AdHoc", String.format(
+                    "Upsert into P1 (dept, id) SELECT id, dept FROM P2 order by 2"));
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains(errorMsg));
+        }
+
+        errorMsg = "Partitioning could not be determined for UPSERT INTO ... SELECT statement.  "
+                + "Please ensure that statement does not attempt to copy row data "
+                + "from one partition to another, which is unsupported.";
+
+        // also validate the partition to partition UPSERT
+        try {
+            client.callProcedure("@AdHoc", String.format(
+                    "Upsert into P1 (dept, id) SELECT dept, id  FROM P2 order by 1, 2 "));
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains(errorMsg));
         }
     }
 
