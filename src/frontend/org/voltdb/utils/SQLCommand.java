@@ -174,7 +174,7 @@ public class SQLCommand
             Pattern.compile(
                     "(" +                  // start capturing group
                     "\\s*" +               // leading whitespace
-                    "insert|upsert\\s+into" + followedBySpaceOrQuote + "\\s*" +
+                    "(insert|upsert)\\s+into" + followedBySpaceOrQuote + "\\s*" +
                     idPattern + "\\s*" +   // <tablename>
                     optionalColumnList +   // (column, "anotherColumn", ...)
                     "[(\\s]*" +            // 0 or more spaces or left parentheses
@@ -192,7 +192,7 @@ public class SQLCommand
             ")" +  // end group 1
             "\\s+" + // one or more spaces
             "(" + // start group 2
-              "select|insert|upsert|update|delete|truncate" + // SQL CRUD statement verb
+              "select|insert|update|upsert|delete|truncate" + // SQL CRUD statement verb
             ")" + // end group 2
             "\\s+", // one or more spaces
             Pattern.MULTILINE|Pattern.CASE_INSENSITIVE
