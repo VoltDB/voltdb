@@ -174,7 +174,7 @@ public class SQLCommand
             Pattern.compile(
                     "(" +                  // start capturing group
                     "\\s*" +               // leading whitespace
-                    "(insert|upsert)\\s+into" + followedBySpaceOrQuote + "\\s*" +
+                    "(?:insert|upsert)\\s+into" + followedBySpaceOrQuote + "\\s*" +
                     idPattern + "\\s*" +   // <tablename>
                     optionalColumnList +   // (column, "anotherColumn", ...)
                     "[(\\s]*" +            // 0 or more spaces or left parentheses
