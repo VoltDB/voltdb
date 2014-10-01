@@ -30,20 +30,22 @@ import groovy.json.*
 
 
 class StudioWebPage extends Page {
-
-    static url = 'file://localhost/' + new File('../../../src/frontend/org/voltdb/studio/index.htm').getCanonicalPath()
+    static url = StudioWebDiag.USE_NEW_UI ? 'http://admin:voltdb@stag.deerwalk.com/mockup/voltdb_monitor/studio/index.htm'
+                                          : 'file://localhost/' + new File('../../../src/frontend/org/voltdb/studio/index.htm').getCanonicalPath()
     static at = { title == 'VoltDB Web Studio' }
 }
 
 class StudioWebDiag extends GebReportingSpec {
+    static final boolean USE_NEW_UI = false;
 
     //STATUS MESSAGES
-    static String FAILURE = 'Query error'
-    static String SUCCESS = 'Query Duration:'
+    static String FAILURE = USE_NEW_UI ? 'Query Result' : 'Query error'
+    static String SUCCESS = USE_NEW_UI ? 'Query Result' : 'Query Duration:'
     static String ERROR = 'Error:' //all errors are handled server-side
 
     //FILES
-    @Shared def elementFile = new File('src/test/resources/elems.txt')
+    static String elemFileName = USE_NEW_UI ? 'elemsNewUI.txt' : 'elems.txt'
+    @Shared def elementFile = new File('src/test/resources/' + elemFileName)
     @Shared def procedureFile = new File('src/test/resources/storedProcs.txt')
     @Shared def sqlFile = new File('src/test/resources/sql.txt')
     @Shared def correctReadme = new File('src/test/resources/readme.htm')
@@ -99,6 +101,10 @@ class StudioWebDiag extends GebReportingSpec {
     }
 
     def 'Connect to server'(){
+        if (USE_NEW_UI) {
+            return
+        }
+
         when: 'connect button is clicked'
         $('span.connect').click()
 
@@ -124,12 +130,16 @@ class StudioWebDiag extends GebReportingSpec {
     }
 
     def 'System Stored Procedures'(){
+        if (USE_NEW_UI) {
+            return
+        }
+
         setup: 'make stored procedures visible'
         expandFolds()
-       
+
         and: 'obtain their locations and make list of their text'
         def procsToCheck = $('#localhost_8080__Admin_sp').find('ul', 0).children().children('span')*.text()
-        
+
         and: 'expect them to be the same (no extras, none missing)'
         if (correctProcedures.isEmpty()){
             correctProcedures = procsToCheck
@@ -145,22 +155,38 @@ class StudioWebDiag extends GebReportingSpec {
             response = resTmp
             $('#new-query').click()
             def inputField = $('#worktabs').find('div', 0).find('textarea')
+            if (USE_NEW_UI) {
+                inputField = $('#theQueryText')
+                response.result = [Contestant_name:[null, 'Lorem_Ipsum', 'Lorem_Dolor', 'Ipsum_Dolor', 'Sit_Amet', 'Lorem_Ipsum_Dolor', 'Ipsum_Dolor_Sit'],
+                                   Contestant_number:[null, 20, 21, 22, 23, 24, 25],
+                                   Total_votes:[null, 15002, 18002, 19003, 22809, 28402, 32456] ]
+            }
 
             and: 'execute SQL query'
             inputField.value(input)
-            $('#execute-query').click()
+            if (USE_NEW_UI) {
+                $('.btnStudio').click()
+            } else {
+                $('#execute-query').click()
+            }
 
             and: 'obtain response status and result'
             def statusField = $('#worktabs').find('span.status')
             def resultField = $('#worktabs').find('div.resultbar').children('div')
+            if (USE_NEW_UI) {
+                statusField = $('.icon-queryResult')
+                resultField = $('#resultHtml')
+            }
+            // TODO: may want to add a wait here, to make sure (new) values
+            // are visible in statusField & resultField, since this fails very
+            // occasionally, apparently do to a timing issue
 
         try{
-
             when: 'ensure appropriate status and result are displayed'
             assert checkResponse(statusField, resultField)
 
-        }finally{
-
+        } finally {
+            // TODO: update this section, to use new UI (when available)
             then: 'clear all tables'
             inputField.value('DELETE FROM partitioned_table')
             $('#execute-query').click()
@@ -182,6 +208,10 @@ class StudioWebDiag extends GebReportingSpec {
 
 
     def 'Disconnect from server'(){
+        if (USE_NEW_UI) {
+            return
+        }
+
         setup: 'Actions interface to enable right click'
         def actions = new Actions(this.getDriver())
 
@@ -226,13 +256,16 @@ class StudioWebDiag extends GebReportingSpec {
         if(resultField.children().is('table')){
             makeAndCheckTable(resultField.find('table').last())
         }else if(resultField.text() =~ /^$ERROR/) {return response.result == 'ERROR'
-            }else{return false} //result should only be a table or an error message
+        }else{return false} //result should only be a table or an error message
     }
 
     def makeAndCheckTable(def tableLoc){
 
         def table = [:]
         def columns = tableLoc.find('thead').find('th')*.text()
+        if (USE_NEW_UI) {
+            columns = tableLoc.find('tr').find('th')*.text()
+        }
         def rows = tableLoc.find('tbody').find('tr')
 
         //make table
@@ -256,8 +289,8 @@ class StudioWebDiag extends GebReportingSpec {
             def expected_column = response.result."$it"
             def table_column = table[it]
             if (expected_column == null) {
-                assert table_column.size() == 1
-                assert table_column[0] == ""
+                assert table_column.size() == (USE_NEW_UI ? 7 : 1)
+                assert table_column[0] == (USE_NEW_UI ? null : "")
             } else {
                 assert expected_column == table_column
             }

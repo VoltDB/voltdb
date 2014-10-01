@@ -137,7 +137,7 @@ public class PlannerTool {
                 }
             }
 
-            //Reset plan node id counter
+            // Reset plan node id counter
             AbstractPlanNode.resetPlanNodeIds();
 
             //////////////////////
@@ -174,13 +174,13 @@ public class PlannerTool {
                             }
                         }
                         if (matched != null) {
-                            CorePlan core = matched.core;
+                            CorePlan core = matched.m_core;
                             ParameterSet params = planner.extractedParamValues(core.parameterTypes);
                             AdHocPlannedStatement ahps = new AdHocPlannedStatement(sql.getBytes(Constants.UTF8ENCODING),
                                                                                    core,
                                                                                    params,
                                                                                    null);
-                            ahps.setBoundConstants(matched.constants);
+                            ahps.setBoundConstants(matched.m_constants);
                             m_cache.put(sql, parsedToken, ahps, extractedLiterals);
                             cacheUse = CacheUse.HIT2;
                             return ahps;

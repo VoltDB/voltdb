@@ -71,10 +71,11 @@ public:
         m_partitionColumnIsString(false),
         m_multiPartition(false),
         m_isStreamed(false),
+        m_isUpsert(false),
+        m_engine(engine),
         m_templateTuple(),
         m_memoryPool(),
-        m_nowFields(),
-        m_engine(engine)
+        m_nowFields()
     {
     }
 
@@ -90,9 +91,12 @@ public:
         bool m_partitionColumnIsString;
         bool m_multiPartition;
         bool m_isStreamed;
+        bool m_isUpsert;
+
+        /** reference to the engine/context to store the number of modified tuples */
+        VoltDBEngine* m_engine;
 
     private:
-
         /** A tuple with the target table's schema that is populated with default
          * values for each field. */
         StandAloneTupleStorage m_templateTuple;
@@ -104,10 +108,6 @@ public:
          * that has a DEFAULT of NOW, which must be set on each
          * execution of this plan. */
         std::vector<int> m_nowFields;
-
-    protected:
-        /** reference to the engine/context to store the number of modified tuples */
-        VoltDBEngine* m_engine;
 };
 
 }
