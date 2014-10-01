@@ -164,14 +164,18 @@ public class TestFunctionsForJSON extends RegressionSuite {
         return result.getString(0);
     }
 
-    private void debugPrintJsonDoc(String description, Client client, int... rowIds) throws Exception {
-        if (DEBUG) {
+    private void debugPrintJsonDoc(boolean print, String description, Client client, int... rowIds) throws Exception {
+        if (print) {
             System.out.println();
             for (int id : rowIds) {
                 System.out.println("JSON document (DOC column), for id=" + id + " ("
                                    + description + "):\n" + getDocFromId(client, id));
             }
         }
+    }
+
+    private void debugPrintJsonDoc(String description, Client client, int... rowIds) throws Exception {
+        debugPrintJsonDoc(DEBUG, description, client, rowIds);
     }
 
     private void testProcWithValidJSON(long[] expectedResult, Client client,
@@ -196,25 +200,32 @@ public class TestFunctionsForJSON extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         VoltTable result = cr.getResults()[0];
         assertTrue(result.advanceRow());
-        assertEquals(expectedResult, result.getString(0));
+        assertEquals(expectedResult, result.get(0, result.getColumnType(0)));
     }
 
-    private void testProcWithInvalidJSON(String expectedErrorMessage, Client client,
+    private void testProcWithInvalidJSON(String expectedErrorMessage, Client client, int rowId,
                                          String procName, Object... parameters) throws Exception {
         String procDescription = "'" + procName + "', with parameters:";
         for (int i=0; i < parameters.length; i++) {
             procDescription += "\n" + (parameters[i] == null ? "null" : parameters[i].toString());
         }
         try {
-            client.callProcedure(procName, parameters);
-            fail("document validity check failed for " + procDescription + "\nDid not get "
-                 + "error containing expected  message:\n'" + expectedErrorMessage + "'");
+            testProcWithValidJSON("FAILURE", client, procName, parameters);
         } catch (ProcCallException pcex) {
             String actualMessage = pcex.getMessage();
             assertTrue("For " + procDescription + "\nExpected error message containing:\n'"
                        + expectedErrorMessage + "'\nbut got:\n'" + actualMessage + "'",
                        actualMessage.contains(expectedErrorMessage));
+        } catch (AssertionError aex) {
+            debugPrintJsonDoc(true, "after call to " + procDescription, client, rowId);
+            fail("Failed document validity check for " + procDescription + "\nExpected error message containing:\n'"
+                    + expectedErrorMessage + "'\nbut got:\n'" + aex.getMessage() + "'");
         }
+    }
+
+    private void testProcWithInvalidJSON(String expectedErrorMessage, Client client,
+                                         String procName, Object... parameters) throws Exception {
+        testProcWithInvalidJSON(expectedErrorMessage, client, 1, procName, parameters);
     }
 
     /** Used to test cases involving minimal JSON documents. */
@@ -360,6 +371,7 @@ public class TestFunctionsForJSON extends RegressionSuite {
         testProcWithValidJSON(FULL_TABLE, client, "NullFieldDocProc", null, 1.2);
         testProcWithValidJSON(FULL_TABLE, client, "NullFieldDocProc", null, "true");
         testProcWithValidJSON(FULL_TABLE, client, "NullFieldDocProc", null, "One");
+        testProcWithValidJSON(FULL_TABLE, client, "NullFieldDocProc", null, "tag");
         testProcWithInvalidJSON("Invalid FIELD path argument (SQL null)", client, "NullFieldProc", (Object) null);
 
         testProcWithValidJSON(new long[][]{{11}}, client, "NotNullFieldProc", "null");
@@ -369,10 +381,11 @@ public class TestFunctionsForJSON extends RegressionSuite {
 
         // Same null-value tests, using ad-hoc queries
         testProcWithValidJSON(FULL_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(null, null) IS NULL ORDER BY ID");
-        testProcWithValidJSON(FULL_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(null, null) IS NULL ORDER BY ID");
-        testProcWithValidJSON(FULL_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(null, null) IS NULL ORDER BY ID");
-        testProcWithValidJSON(FULL_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(null, null) IS NULL ORDER BY ID");
-        testProcWithValidJSON(FULL_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(null, null) IS NULL ORDER BY ID");
+        testProcWithValidJSON(FULL_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(null, 0) IS NULL ORDER BY ID");
+        testProcWithValidJSON(FULL_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(null, 1.2) IS NULL ORDER BY ID");
+        testProcWithValidJSON(FULL_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(null, 'true') IS NULL ORDER BY ID");
+        testProcWithValidJSON(FULL_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(null, 'One') IS NULL ORDER BY ID");
+        testProcWithValidJSON(FULL_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(null, 'tag') IS NULL ORDER BY ID");
         testProcWithInvalidJSON("Invalid FIELD path argument (SQL null)", client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, null) IS NULL ORDER BY ID");
 
         testProcWithValidJSON(new long[][]{{11}}, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'null') IS NOT NULL ORDER BY ID");
@@ -474,6 +487,12 @@ public class TestFunctionsForJSON extends RegressionSuite {
         testProcWithValidJSON(EMPTY_TABLE,   client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr3d[1][1][3]') IS NOT NULL ORDER BY ID");
         testProcWithValidJSON(EMPTY_TABLE,   client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr3d[1][1][" + Integer.MAX_VALUE + "]') IS NOT NULL ORDER BY ID");
 
+        // Test using 2147483646, which is Integer.MAX_VALUE - 1
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "arr[2147483646]");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "NotNullFieldProc", "arr3d[1][1][2147483646]");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr[2147483646]') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(EMPTY_TABLE,   client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr3d[1][1][2147483646]') IS NOT NULL ORDER BY ID");
+
         // Test \ escape for brackets in element name, not used for array index
         testProcWithValidJSON(TABLE_ROWS123, client, "IdFieldProc", "bracket]\\[\\[] \\[ ] chars", "[foo]");
         testProcWithValidJSON(EMPTY_TABLE,   client, "IdFieldProc", "bracket]]  ] chars", "[foo]");
@@ -527,10 +546,10 @@ public class TestFunctionsForJSON extends RegressionSuite {
 
         // Same nameless array tests, using ad-hoc queries
         testProcWithValidJSON(TABLE_ROW10, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, '[0]') IS NOT NULL ORDER BY ID");
-        testProcWithValidJSON(TABLE_ROW10, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, '[0]') IS NOT NULL ORDER BY ID");
-        testProcWithValidJSON(TABLE_ROW10, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, '[0]') IS NOT NULL ORDER BY ID");
-        testProcWithValidJSON(TABLE_ROW10, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, '[0]') IS NOT NULL ORDER BY ID");
-        testProcWithValidJSON(TABLE_ROW10, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, '[0]') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROW10, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, '[1]') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROW10, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, '[2]') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(TABLE_ROW10, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, '[-1]') IS NOT NULL ORDER BY ID");
+        testProcWithValidJSON(EMPTY_TABLE, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, '[3]') IS NOT NULL ORDER BY ID");
         testProcWithValidJSON(TABLE_ROW10, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, '[0]') = '1' ORDER BY ID");
         testProcWithValidJSON(TABLE_ROW10, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, '[1]') = '2' ORDER BY ID");
         testProcWithValidJSON(TABLE_ROW10, client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, '[2]') = '3' ORDER BY ID");
@@ -599,9 +618,28 @@ public class TestFunctionsForJSON extends RegressionSuite {
                                 client, "IdFieldProc", "arr[",     0);
         testProcWithInvalidJSON("Invalid JSON path: Missing ']' after array index [position 6]",
                                 client, "IdFieldProc", "arr[123",  0);
-        // 2147483648 is Integer.MAX_VALUE + 1
+        testProcWithInvalidJSON("Invalid JSON path: Invalid array index greater than the maximum integer value [position 14]",
+                                client, "IdFieldProc", "arr[" + Integer.MIN_VALUE + "]",  0);
+
+        // Same invalid-query tests, using ad-hoc queries
+        testProcWithInvalidJSON("Invalid JSON path: Invalid array index less than -1 [position 6]",
+                                client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr[-2]') = '0' ORDER BY ID");
+        testProcWithInvalidJSON("Invalid JSON path: Unexpected character in array index [position 4]",
+                                client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr[]') = '0' ORDER BY ID");
+        testProcWithInvalidJSON("Invalid JSON path: Unexpected character in array index [position 4]",
+                                client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr[abc]') = '0' ORDER BY ID");
+        testProcWithInvalidJSON("Invalid JSON path: Unexpected termination (unterminated array access) [position 3]",
+                                client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr[') = '0' ORDER BY ID");
+        testProcWithInvalidJSON("Invalid JSON path: Missing ']' after array index [position 6]",
+                                client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr[123') = '0' ORDER BY ID");
+        testProcWithInvalidJSON("Invalid JSON path: Invalid array index greater than the maximum integer value [position 14]",
+                                client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr[" + Integer.MIN_VALUE + "]') = '0' ORDER BY ID");
+
+        // Test using 2147483648, which is Integer.MAX_VALUE + 1
         testProcWithInvalidJSON("Invalid JSON path: Invalid array index greater than the maximum integer value [position 13]",
                                 client, "IdFieldProc", "arr[2147483648]", 0);
+        testProcWithInvalidJSON("Invalid JSON path: Invalid array index greater than the maximum integer value [position 13]",
+                                client, "@AdHoc", "SELECT ID FROM JS1 WHERE FIELD(DOC, 'arr[2147483648]') = '0' ORDER BY ID");
 
         // Test the wrong number of parameters
         testProcWithInvalidJSON("PROCEDURE IdFieldProc EXPECTS 2 PARAMS, BUT RECEIVED 0",
@@ -629,13 +667,31 @@ public class TestFunctionsForJSON extends RegressionSuite {
         // 1568 is the minimum array index that will trigger this error
         testProcWithInvalidJSON("exceeds the size of the VARCHAR(8192) column",
                                 client, "UpdateSetFieldProc", "arr[1568]", "-1", 1);
-        // 2147483648 is Integer.MAX_VALUE + 1
-        testProcWithInvalidJSON("Invalid JSON path: Invalid array index greater than the maximum integer value [position 13]",
-                                client, "UpdateSetFieldProc", "arr[2147483648]", "-1", 1);
         testProcWithInvalidJSON("Invalid JSON path: Invalid array index greater than the maximum integer value [position 14]",
                                 client, "UpdateSetFieldProc", "arr[" + Integer.MIN_VALUE + "]", "-1", 1);
-//        testProcWithInvalidJSON("exceeds the size of the VARCHAR(8192) column",
-//                                client, "UpdateSetFieldProc", "arr[" + Integer.MAX_VALUE + "]", "-1", 1);
+
+        // Same invalid-query tests, using ad-hoc queries
+        testProcWithInvalidJSON("Invalid JSON path: Invalid array index less than -1 [position 6]",
+                                client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr[-2]', '-1') WHERE ID = 1");
+        testProcWithInvalidJSON("Invalid JSON path: Unexpected character in array index [position 4]",
+                                client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr[]', '-1') WHERE ID = 1");
+        testProcWithInvalidJSON("Invalid JSON path: Unexpected character in array index [position 4]",
+                                client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr[abc]', '-1') WHERE ID = 1");
+        testProcWithInvalidJSON("Invalid JSON path: Unexpected termination (unterminated array access) [position 3]",
+                                client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr[', '-1') WHERE ID = 1");
+        testProcWithInvalidJSON("Invalid JSON path: Missing ']' after array index [position 6]",
+                                client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr[123', '-1') WHERE ID = 1");
+        // 1568 is the minimum array index that will trigger this error
+        testProcWithInvalidJSON("exceeds the size of the VARCHAR(8192) column",
+                                client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr[1568]', '-1') WHERE ID = 1");
+        testProcWithInvalidJSON("Invalid JSON path: Invalid array index greater than the maximum integer value [position 14]",
+                                client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr[" + Integer.MIN_VALUE + "]', '-1') WHERE ID = 1");
+
+        // Test using 2147483648, which is Integer.MAX_VALUE + 1
+        testProcWithInvalidJSON("Invalid JSON path: Invalid array index greater than the maximum integer value [position 13]",
+                                client, "UpdateSetFieldProc", "arr[2147483648]", "-1", 1);
+        testProcWithInvalidJSON("Invalid JSON path: Invalid array index greater than the maximum integer value [position 13]",
+                                client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr[2147483648]', '-1') WHERE ID = 1");
 
         // Test the wrong number of parameters
         testProcWithInvalidJSON("PROCEDURE UpdateSetFieldProc EXPECTS 3 PARAMS, BUT RECEIVED 0",
@@ -646,6 +702,37 @@ public class TestFunctionsForJSON extends RegressionSuite {
                                 client, "UpdateSetFieldProc", "arr[0]", "-1");
         testProcWithInvalidJSON("PROCEDURE UpdateSetFieldProc EXPECTS 3 PARAMS, BUT RECEIVED 4",
                                 client, "UpdateSetFieldProc", "arr[0]", "-1", 1, 1);
+    }
+
+    /** Used to test bug ENG-6979: SET_FIELD(x,arr[largeIndex],z) causes memory error. */
+    public void testSET_FIELDFunctionWithVeryLargeIndexValue() throws Exception {
+        final boolean veryLargeIndexBugFixed = false;
+        if (veryLargeIndexBugFixed) {
+            // Test using 2147483646, which is Integer.MAX_VALUE - 1
+            int largeIndex = 2147483646;
+            Client client = getClient();
+            loadJS1(client);
+            testProcWithInvalidJSON("exceeds the size of the VARCHAR(8192) column",
+                    client, "UpdateSetFieldProc", "arr[" + largeIndex + "]", "-1", 1);
+            testProcWithInvalidJSON("exceeds the size of the VARCHAR(8192) column",
+                    client, "@AdHoc", "UPDATE JS1 SET DOC = SET_FIELD(DOC, 'arr[" + largeIndex + "]', '-1') WHERE ID = 1");
+        }
+    }
+
+    /** Used to test bug ENG-6978: SET_FIELD(x,arr[Integer.MAX_VALUE],z) sets value arr[]. */
+    public void testSET_FIELDFunctionWithIntegerMaxValueIndex() throws Exception {
+        final boolean intMaxValIndexBugFixed = false;
+        Client client = getClient();
+        loadJS1(client);
+        if (intMaxValIndexBugFixed) {
+            testProcWithInvalidJSON("exceeds the size of the VARCHAR(8192) column",
+                                    client, 5, "SelectSetFieldProc", "arr[" + Integer.MAX_VALUE + "]", "-1", 5);
+            testProcWithInvalidJSON("exceeds the size of the VARCHAR(8192) column",
+                                    client, 5, "@AdHoc", "SELECT SET_FIELD(DOC, 'arr[" + Integer.MAX_VALUE + "]', '-1') FROM JS1 WHERE ID = 5");
+        } else {
+            testProcWithValidJSON("{\"arr\":[]}", client, "SelectSetFieldProc", "arr[" + Integer.MAX_VALUE + "]", "-1", 5);
+            testProcWithValidJSON("{\"arr\":[]}", client, "@AdHoc", "SELECT SET_FIELD(DOC, 'arr[" + Integer.MAX_VALUE + "]', '-1') FROM JS1 WHERE ID = 5");
+        }
     }
 
     /** Used to test ENG-6621, part 1 (without dotted path or array index notation) / ENG-6879. */
