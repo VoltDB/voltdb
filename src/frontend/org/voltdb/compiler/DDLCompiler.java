@@ -828,7 +828,7 @@ public class DDLCompiler {
                 // group(1) -> table, group(2) -> column
                 String tableName = checkIdentifierStart(statementMatcher.group(1), statement);
                 String columnName = checkIdentifierStart(statementMatcher.group(2), statement);
-                VoltXMLElement tableXML = m_schema.findChild("table" + tableName.toUpperCase());
+                VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
                 if (tableXML != null) {
                     tableXML.attributes.put("partitioncolumn", columnName.toUpperCase());
                     // XXX IZZY need to check validity of column here and throw error
@@ -886,7 +886,7 @@ public class DDLCompiler {
         if (statementMatcher.matches()) {
             // group(1) -> table
             String tableName = checkIdentifierStart(statementMatcher.group(1), statement);
-            VoltXMLElement tableXML = m_schema.findChild("table" + tableName);
+            VoltXMLElement tableXML = m_schema.findChild("table", tableName);
             if (tableXML != null) {
                 tableXML.attributes.remove("partitioncolumn");
             }
@@ -965,7 +965,7 @@ public class DDLCompiler {
 
             // check the table portion
             String tableName = checkIdentifierStart(statementMatcher.group(1), statement);
-            VoltXMLElement tableXML = m_schema.findChild("table" + tableName.toUpperCase());
+            VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
             if (tableXML != null) {
                 tableXML.attributes.put("export", "true");
             }
