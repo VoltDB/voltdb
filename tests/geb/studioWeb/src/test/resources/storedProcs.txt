@@ -19,3 +19,4 @@
 @Promote(0)
 @ValidatePartitioning(2)
 @GetPartitionKeys(1)
+@ApplyBinaryLogSP(2)
