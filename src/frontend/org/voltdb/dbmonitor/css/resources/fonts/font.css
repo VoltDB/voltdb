@@ -1,0 +1,11 @@
+@font-face {
+	font-family: 'MYRIADPROREGULAR';
+	src: url('./MYRIADPROREGULAR.eot');
+	src: local('MYRIADPROREGULAR'), url('./MYRIADPROREGULAR.woff') format('woff'), url('./MYRIADPROREGULAR.ttf') format('truetype');
+}
+/* use this class to attach this font to any element i.e. <p class="fontsforweb_fontid_4410">Text with this font applied</p> */
+.fontsforweb_fontid_4410 {
+	font-family: 'MYRIADPROREGULAR' !important;
+}
+
+/* Font downloaded from FontsForWeb.com */

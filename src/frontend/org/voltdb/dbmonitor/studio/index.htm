@@ -1,0 +1,137 @@
+﻿<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!--DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"-->
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+	<head>
+		<title>VoltDB Web Studio</title>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+        <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1">
+	<!--	<link type="text/css" href="css/voltdb.css" rel="stylesheet" /> -->
+	    <link type="text/css" href="../css/resources/layout.css" rel="stylesheet" />
+        <link  href="css/tablesorter.css" rel="stylesheet" />
+        <link href="../css/resources/tooltipster.css" rel="stylesheet" />
+        <script type="application/javascript" src="../js/jquery-1.11.1.min.js"></script>
+        <script type="application/javascript" src="../js/jquery-ui.js"></script>
+        <script type="application/javascript" src="../js/jquery.slimscroll.js"></script>
+        <script type="text/javascript" src="../js/voltdb.render.js"></script>
+        <script type="text/javascript" src="../js/voltdb.service.js"></script>
+        <script type="text/javascript" src="../js/voltdb.core.js"></script>
+        <script type="text/javascript" src="../js/jquery.tooltipster.js"></script>
+		<script type="text/javascript" src="../js/voltdb.render.js"></script>
+        <script type="text/javascript" src="../js/voltdb.sqlquery.ui.js"></script>
+        <script type="text/javascript" src="../js/voltdb.queryrender.js"></script>
+        <script type="text/javascript" src="../js/sorttable.js"></script>
+        <script type="text/javascript"src="../js/shortcut.js"></script>
+	</head>
+<body class="body">
+<div class="page-wrap">
+<div class="header" id="headerMain">
+    <div class="headLeft">
+      <div class="logo"><img src="../css/resources/images/voltdb-logo.png" alt="VoltDB" /></div>
+      <div class="menu" id="toggle">
+         <div class="toggleMenu" id="toggleMenu">Menu</div>
+        <nav id="nav">
+              <ul>
+                  <li><a href="../index.htm" class="linkFirst">DB Monitor</a></li>
+                  <li><a href="../catalog.html">Schema</a></li>
+                  <li><a href="../studio/index.htm" class="active">SQL Query</a></li>
+              </ul>
+   		 </nav>
+      </div>
+      <div class="clear"></div>
+    </div>
+    <div class="headRight">
+       <ul class="topRightList" id="userSection">
+        <li class="userN">Username </li>
+        <li>
+          <div class="user"></div>
+        </li>
+        <li class="responsiveMenuPlaceHolder">&nbsp;</li>
+      </ul>
+    </div>
+    <div class="clear"></div>
+  </div> 
+<div class="containerStudio" id="sqlQuery">  
+
+<div class="blockWrapper" id="BlockContainer01">
+	<div class="objectExplorer">
+        <div class="explorer">
+        	<!--tab-->
+          <div class="tabContant" id="tabMain">
+            <ul class="tabs">
+              <li><a href="#tab1">Tables</a></li>
+              <li><a href="#tab2">Views</a></li>
+            </ul>
+            <div class="tab_container">
+            <div  id="tabScroller">
+              <div id="tab1" class="tab_content">
+                	<div id="accordionTable">
+                      
+				    </div>
+              </div>
+              <div id="tab2" class="tab_content">
+              		<div id="accordionViews" >
+                      
+                    </div>
+               </div>
+               </div>
+            </div>
+          </div>
+        </div>
+        <div class="clear"></div>
+    </div>
+    <div class="queryInput" id="inputQuery">
+
+    <ul class="btnList" id="queryBtnList">
+                <li><button class="btnStudio" id="runBTn">Run</button></li>
+                <li><button class="btnStudio" id="clearQuery">Clear</button></li>
+                </ul>
+    <h1 class="theHeading icon-query">Query</h1>
+    
+    <div class="query">
+    		<form name="" id="queryForm">
+            <textarea id="theQueryText"></textarea>               
+                
+       </form>         
+    </div>
+    
+    </div>
+    <div class="clear"></div>
+</div>
+<div class="blockWrapper" id="blockContainer02">
+<div class="exportType">
+<form name="" id="queryResult">
+	<select id="exportType" onchange="exportType()">
+    	<option selected="selected">HTML</option>
+        <option>CSV</option>
+        <option>Monospace</option>
+    </select>
+</form>    
+</div>
+<h1 class="theHeading icon-queryResult">Query Result</h1>
+	
+    <div class="queryResult">
+    	<div id="resultHtml" style="display:block;" class="resultHtml">
+        	 
+        </div>
+        <div id="resultCsv" style="display:none;" class="resultCsv">
+ 
+        </div>
+        <div id="resultMonospace" style="display:none;" class="resultMonospace">
+<pre>
+
+</pre>
+        </div>
+    </div>
+    <div id="queryResults" class="queryStatus">Query took 0.034 seconds.</div>
+    
+</div>
+</div>
+</div>
+<div class="footer" id="mainFooter">
+   <p>Copyright  &copy; 2014 VoltDB. All rights reserved. </p>
+   <span></span>
+   </div>
+</body>
+</html>

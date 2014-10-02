@@ -1,0 +1,33 @@
+table.tablesorter {
+	
+}
+table.tablesorter th {
+
+	padding-right: 45px;
+	background-image: url(bg.gif);
+	background-repeat: no-repeat;
+	background-position: center right;
+	cursor: pointer;
+}
+table.tablesorter td {
+	
+}
+table.tablesorter tbody tr.odd td {
+	background-color:#f9f9f9;
+}
+table.tablesorter .headerSortUp {
+	background-image: url(asc.gif);
+}
+table.tablesorter .headerSortDown {
+	background-image: url(desc.gif);
+}
+
+table.tablesorter .sorttable_sorted_reverse {
+	background-image: url(asc.gif);
+}
+table.tablesorter .sorttable_sorted {
+	background-image: url(desc.gif);
+}
+
+table.tablesorter .headerSortDown, table.tablesorter .headerSortUp, table.tablesorter .sorttable_sorted, table.tablesorter .sorttable_sorted_reverse {
+}
