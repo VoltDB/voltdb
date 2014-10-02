@@ -145,7 +145,7 @@ public class HSQLInterface {
         runDDLCommand(ddl);
         VoltXMLElement thisSchema = getXMLFromCatalog();
         VoltXMLDiff diff = VoltXMLElement.computeDiff(lastSchema, thisSchema);
-        lastSchema = thisSchema;
+        lastSchema = thisSchema.duplicate();
         return diff;
     }
 
