@@ -60,7 +60,7 @@ public class VoltDDLElementTracker {
      * @param tableName table name
      * @param colName column name
      */
-    void put(String tableName, String colName)
+    void addPartition(String tableName, String colName)
     {
         if (m_partitionMap.containsKey(tableName.toLowerCase())) {
             m_compiler.addInfo(String.format("Replacing partition column %s on table %s with column %s\n",
@@ -69,6 +69,11 @@ public class VoltDDLElementTracker {
         }
 
         m_partitionMap.put(tableName.toLowerCase(), colName.toLowerCase());
+    }
+
+    void removePartition(String tableName)
+    {
+        m_partitionMap.remove(tableName);
     }
 
     /**
@@ -181,11 +186,16 @@ public class VoltDDLElementTracker {
      * Track an exported table
      * @param tableName a table name
      */
-    void addExportedTable( String tableName)
+    void addExportedTable(String tableName)
     {
         assert tableName != null && ! tableName.trim().isEmpty();
 
         m_exports.add(tableName);
+    }
+
+    void removeExportedTable(String tableName)
+    {
+        m_exports.remove(tableName);
     }
 
     /**

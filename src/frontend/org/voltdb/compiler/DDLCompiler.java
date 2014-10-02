@@ -474,8 +474,6 @@ public class DDLCompiler {
 
         DDLStatement stmt = getNextStatement(reader, m_compiler);
         while (stmt != null) {
-            //m_compiler.addInfo("DOOOD: STATEMENT: " + stmt.statement);
-            //m_compiler.addInfo("DOOOD: SCHEMA: " + m_schema);
             // Some statements are processed by VoltDB and the rest are handled by HSQL.
             boolean processed = false;
             try {
@@ -830,7 +828,6 @@ public class DDLCompiler {
                 // group(1) -> table, group(2) -> column
                 String tableName = checkIdentifierStart(statementMatcher.group(1), statement);
                 String columnName = checkIdentifierStart(statementMatcher.group(2), statement);
-                //m_tracker.put(tableName, columnName);
                 VoltXMLElement tableXML = m_schema.findChild("table" + tableName.toUpperCase());
                 if (tableXML != null) {
                     tableXML.attributes.put("partitioncolumn", columnName.toUpperCase());
@@ -888,11 +885,7 @@ public class DDLCompiler {
         statementMatcher = replicatePattern.matcher(statement);
         if (statementMatcher.matches()) {
             // group(1) -> table
-            String tableName = statementMatcher.group(1);
-            //m_tracker.put(
-            //        checkIdentifierStart(tableName, statement),
-            //        null
-            //        );
+            String tableName = checkIdentifierStart(statementMatcher.group(1), statement);
             VoltXMLElement tableXML = m_schema.findChild("table" + tableName);
             if (tableXML != null) {
                 tableXML.attributes.remove("partitioncolumn");
@@ -972,7 +965,6 @@ public class DDLCompiler {
 
             // check the table portion
             String tableName = checkIdentifierStart(statementMatcher.group(1), statement);
-            //m_tracker.addExportedTable(tableName);
             VoltXMLElement tableXML = m_schema.findChild("table" + tableName.toUpperCase());
             if (tableXML != null) {
                 tableXML.attributes.put("export", "true");
@@ -1057,16 +1049,16 @@ public class DDLCompiler {
                 String partitionCol = e.attributes.get("partitioncolumn");
                 String export = e.attributes.get("export");
                 if (partitionCol != null) {
-                    m_tracker.put(tableName, partitionCol);
+                    m_tracker.addPartition(tableName, partitionCol);
                 }
                 else {
-                    m_tracker.m_partitionMap.remove(tableName);
+                    m_tracker.removePartition(tableName);
                 }
                 if (export != null) {
                     m_tracker.addExportedTable(tableName);
                 }
                 else {
-                    m_tracker.m_exports.remove(tableName);
+                    m_tracker.removeExportedTable(tableName);
                 }
             }
         }
