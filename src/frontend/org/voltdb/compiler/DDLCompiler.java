@@ -515,6 +515,8 @@ public class DDLCompiler {
                     // avoid embedded newlines so we can delimit statements
                     // with newline.
                     m_fullDDL += Encoder.hexEncode(stmt.statement) + "\n";
+                    // Get the diff that results from applying this statement and apply it
+                    // to our local tree (with Volt-specific additions)
                     VoltXMLDiff thisStmtDiff = m_hsql.runDDLCommandAndDiff(stmt.statement);
                     applyDiff(thisStmtDiff);
                 } catch (HSQLParseException e) {
@@ -831,11 +833,11 @@ public class DDLCompiler {
                 VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
                 if (tableXML != null) {
                     tableXML.attributes.put("partitioncolumn", columnName.toUpperCase());
-                    // XXX IZZY need to check validity of column here and throw error
+                    // Column validity check done by VoltCompiler in post-processing
                 }
                 else {
-                    //throw m_compiler.new VoltCompilerException(String.format(
-                    //            "Invalid PARTITION statement: table %s does not exist", tableName));
+                    throw m_compiler.new VoltCompilerException(String.format(
+                                "Invalid PARTITION statement: table %s does not exist", tableName));
                 }
                 return true;
             }
@@ -889,6 +891,10 @@ public class DDLCompiler {
             VoltXMLElement tableXML = m_schema.findChild("table", tableName);
             if (tableXML != null) {
                 tableXML.attributes.remove("partitioncolumn");
+            }
+            else {
+                throw m_compiler.new VoltCompilerException(String.format(
+                            "Invalid REPLICATE statement: table %s does not exist", tableName));
             }
             return true;
         }
@@ -1389,6 +1395,7 @@ public class DDLCompiler {
         // map of index replacements for later constraint fixup
         Map<String, String> indexReplacementMap = new TreeMap<String, String>();
 
+        // Need the columnTypes sorted by column index.
         TreeMap<Integer, VoltType> columnTypes = new TreeMap<Integer, VoltType>();
         for (VoltXMLElement subNode : node.children) {
 
