@@ -88,15 +88,15 @@ abstract public class ProcedureTask extends TransactionTask
                 ProcedureRunner runner = siteConnection.getProcedureRunner(m_procName);
                 if (runner == null) {
                     String error =
-                        "Procedure %s is not present in the catalog. "  +
+                        "Procedure " + m_procName + " is not present in the catalog. "  +
                         "This can happen if a catalog update removing the procedure occurred " +
                         "after the procedure was submitted " +
-                        "but before the procedure was executed. This log message is rate limited to once every 60 seconds.";
+                        "but before the procedure was executed. %s";
                     RateLimitedLogger.tryLogForMessage(
                             System.currentTimeMillis(),
                             60, TimeUnit.SECONDS,
                             hostLog,
-                            Level.WARN, error, m_procName);
+                            Level.WARN, error, "This log message is rate limited to once every 60 seconds.");
                     response.setResults(
                             new ClientResponseImpl(
                                 ClientResponse.UNEXPECTED_FAILURE,
