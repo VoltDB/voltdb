@@ -75,6 +75,7 @@
 <property name='src.hsqldb.test.dir'         location='tests/hsqldb' />
 <property name='src.ee.test.dir'             location='tests/ee' />
 <property name='src.studio.dir'              location='src/frontend/org/voltdb/studio' />
+<property name='src.dbmonitor.dir'           location='src/frontend/org/voltdb/dbmonitor' />
 <property name='build.testoutput.dir'        location='${build.dir}/testoutput' />
 <property name='build.testobjects.dir'       location='${build.dir}/testobjects' />
 <property name='lib.dir'                     location='lib' />
@@ -976,6 +977,12 @@ JAVA COMPILATION
 
     <copy todir='${build.prod.dir}/org/voltdb/studio'>
         <fileset dir="${src.gpl.dir}/org/voltdb/studio">
+            <include name="**"/>
+        </fileset>
+    </copy>
+    
+<copy todir='${build.prod.dir}/org/voltdb/dbmonitor'>
+        <fileset dir="${src.gpl.dir}/org/voltdb/dbmonitor">
             <include name="**"/>
         </fileset>
     </copy>
