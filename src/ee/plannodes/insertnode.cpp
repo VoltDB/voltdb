@@ -60,6 +60,10 @@ void InsertPlanNode::loadFromJSONObject(PlannerDomValue obj)
           m_fieldMap.push_back(fieldMap.valueAtIndex(i).asInt());
         }
     }
+    m_isUpsert = false;
+    if (obj.hasNonNullKey("UPSERT")) {
+        m_isUpsert = true;
+    }
 }
 
 void InsertPlanNode::initTupleWithDefaultValues(VoltDBEngine* engine,

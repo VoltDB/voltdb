@@ -115,6 +115,7 @@ import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListenableFutureTask;
+import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -423,7 +424,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     /*
                      * Enforce a limit on the maximum number of connections
                      */
-                    if (m_numConnections.get() == MAX_CONNECTIONS.get()) {
+                    if (m_numConnections.get() >= MAX_CONNECTIONS.get()) {
                         networkLog.warn("Rejected connection from " +
                                 socket.socket().getRemoteSocketAddress() +
                                 " because the connection limit of " + MAX_CONNECTIONS + " has been reached");
@@ -2257,8 +2258,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             // create the execution site task
                             StoredProcedureInvocation task = new StoredProcedureInvocation();
                             task.procName = "@UpdateApplicationCatalog";
-                            task.setParams(changeResult.encodedDiffCommands, changeResult.catalogHash, changeResult.catalogBytes,
-                                           changeResult.expectedCatalogVersion, changeResult.deploymentString,
+                            task.setParams(changeResult.encodedDiffCommands,
+                                           changeResult.catalogHash,
+                                           changeResult.catalogBytes,
+                                           changeResult.expectedCatalogVersion,
+                                           changeResult.deploymentString,
+                                           changeResult.tablesThatMustBeEmpty,
+                                           changeResult.reasonsForEmptyTables,
                                            changeResult.requiresSnapshotIsolation ? 1 : 0,
                                            changeResult.worksWithElastic ? 1 : 0,
                                            changeResult.deploymentHash);

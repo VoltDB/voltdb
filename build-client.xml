@@ -168,7 +168,12 @@ JAR BUILDING
         <fileset dir="${build.client.dir}" defaultexcludes="yes" >
             <include name="**" />
         </fileset>
-        <fileset dir="."><include name="buildstring.txt"/></fileset>
+        <fileset dir=".">
+            <include name="buildstring.txt"/>
+        </fileset>
+        <fileset dir="src/frontend">
+            <include name="META-INF/**"/>
+        </fileset>
         <manifest>
             <section name="Credits">
                 <attribute name="Author" value="VoltDB Inc." />
@@ -250,6 +255,10 @@ JAVA COMPILATION
                   org/voltdb/utils/Base64.java
                   org/voltdb/utils/Encoder.java
                   org/voltdb/utils/SerializationHelper.java
+                  org/voltdb/utils/RowWithMetaData.java
+                  org/voltdb/utils/CSVDataLoader.java
+                  org/voltdb/utils/CSVBulkDataLoader.java
+                  org/voltdb/utils/CSVTupleDataLoader.java
                   org/voltdb/VoltOverflowException.java
                   org/voltdb/VoltTable.java
                   org/voltdb/VoltTableRow.java

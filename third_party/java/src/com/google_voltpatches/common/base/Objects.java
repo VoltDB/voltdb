@@ -51,6 +51,9 @@ public final class Objects {
    *
    * <p>This assumes that any non-null objects passed to this function conform
    * to the {@code equals()} contract.
+   *
+   * <p><b>Note for Java 7 and later:</b> This method should be treated as
+   * deprecated; use {@link java.util.Objects#equals} instead.
    */
   @CheckReturnValue
   public static boolean equal(@Nullable Object a, @Nullable Object b) {
@@ -71,8 +74,11 @@ public final class Objects {
    *     return Objects.hashCode(getX(), getY(), getZ());
    *   }}</pre>
    *
-   * <p><b>Warning</b>: When a single object is supplied, the returned hash code
+   * <p><b>Warning:</b> When a single object is supplied, the returned hash code
    * does not equal the hash code of that object.
+   *
+   * <p><b>Note for Java 7 and later:</b> This method should be treated as
+   * deprecated; use {@link java.util.Objects#hash} instead.
    */
   public static int hashCode(@Nullable Object... objects) {
     return Arrays.hashCode(objects);
@@ -116,9 +122,12 @@ public final class Objects {
    * @param self the object to generate the string for (typically {@code this}),
    *        used only for its class name
    * @since 2.0
+   * @deprecated Use {@link MoreObjects#toStringHelper(Object)} instead. This
+   *     method is scheduled for removal in June 2016.
    */
+  @Deprecated
   public static ToStringHelper toStringHelper(Object self) {
-    return new ToStringHelper(simpleName(self.getClass()));
+    return new ToStringHelper(MoreObjects.simpleName(self.getClass()));
   }
 
   /**
@@ -130,9 +139,12 @@ public final class Objects {
    *
    * @param clazz the {@link Class} of the instance
    * @since 7.0 (source-compatible since 2.0)
+   * @deprecated Use {@link MoreObjects#toStringHelper(Class)} instead. This
+   *     method is scheduled for removal in June 2016.
    */
+  @Deprecated
   public static ToStringHelper toStringHelper(Class<?> clazz) {
-    return new ToStringHelper(simpleName(clazz));
+    return new ToStringHelper(MoreObjects.simpleName(clazz));
   }
 
   /**
@@ -142,31 +154,12 @@ public final class Objects {
    *
    * @param className the name of the instance type
    * @since 7.0 (source-compatible since 2.0)
+   * @deprecated Use {@link MoreObjects#toStringHelper(String)} instead. This
+   *     method is scheduled for removal in June 2016.
    */
+  @Deprecated
   public static ToStringHelper toStringHelper(String className) {
     return new ToStringHelper(className);
-  }
-
-  /**
-   * {@link Class#getSimpleName()} is not GWT compatible yet, so we
-   * provide our own implementation.
-   */
-  private static String simpleName(Class<?> clazz) {
-    String name = clazz.getName();
-
-    // the nth anonymous class has a class name ending in "Outer$n"
-    // and local inner classes have names ending in "Outer.$1Inner"
-    name = name.replaceAll("\\$[0-9]+", "\\$");
-
-    // we want the name of the inner class all by its lonesome
-    int start = name.lastIndexOf('$');
-
-    // if this isn't an inner class, just find the start of the
-    // top level class name.
-    if (start == -1) {
-      start = name.lastIndexOf('.');
-    }
-    return name.substring(start + 1);
   }
 
   /**
@@ -185,9 +178,12 @@ public final class Objects {
    * @throws NullPointerException if both {@code first} and {@code second} were
    *     {@code null}
    * @since 3.0
+   * @deprecated Use {@link MoreObjects#firstNonNull} instead. This method is
+   *      scheduled for removal in June 2016.
    */
+  @Deprecated
   public static <T> T firstNonNull(@Nullable T first, @Nullable T second) {
-    return first != null ? first : checkNotNull(second);
+    return MoreObjects.firstNonNull(first, second);
   }
 
   /**
@@ -195,7 +191,10 @@ public final class Objects {
    *
    * @author Jason Lee
    * @since 2.0
+   * @deprecated Use {@link MoreObjects.ToStringHelper} instead. This class is
+   *      scheduled for removal in June 2016.
    */
+  @Deprecated
   public static final class ToStringHelper {
     private final String className;
     private ValueHolder holderHead = new ValueHolder();

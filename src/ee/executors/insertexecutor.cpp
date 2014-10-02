@@ -78,6 +78,7 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
     assert(m_node->getInputTableCount() == 1);
 
     Table* targetTable = m_node->getTargetTable();
+    m_isUpsert = m_node->isUpsert();
 
     setDMLCountOutputTable(limits);
 
@@ -89,6 +90,19 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
     m_partitionColumn = -1;
     m_partitionColumnIsString = false;
     m_isStreamed = (persistentTarget == NULL);
+
+    if (m_isUpsert) {
+        VOLT_TRACE("init Upsert Executor actually");
+        if (m_isStreamed) {
+            VOLT_ERROR("UPSERT is not supported for Stream table %s", targetTable->name().c_str());
+        }
+        // look up the tuple whether it exists already
+        if (targetTable->primaryKeyIndex() == NULL) {
+            VOLT_ERROR("No primary keys were found in our target table '%s'",
+                    targetTable->name().c_str());
+        }
+    }
+
     if (persistentTarget) {
         m_partitionColumn = persistentTarget->partitionColumn();
         if (m_partitionColumn != -1) {
@@ -128,6 +142,13 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     assert(targetTable);
     assert((targetTable == dynamic_cast<PersistentTable*>(targetTable)) ||
             (targetTable == dynamic_cast<StreamedTable*>(targetTable)));
+
+    PersistentTable* upsertTable = NULL;
+    if (m_isUpsert) {
+        upsertTable = dynamic_cast<PersistentTable*>(targetTable);
+        assert(upsertTable != NULL);
+    }
+    TableTuple upsertTuple = TableTuple(targetTable->schema());
 
     VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug().c_str());
 
@@ -200,13 +221,43 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
             if (!isLocal) continue;
         }
 
-        // try to put the tuple into the target table
-        if (!targetTable->insertTuple(templateTuple)) {
-            VOLT_ERROR("Failed to insert tuple from input table '%s' into"
-                       " target table '%s'",
-                       m_inputTable->name().c_str(),
-                       targetTable->name().c_str());
-            return false;
+
+        if (! m_isUpsert) {
+            // try to put the tuple into the target table
+            if (!targetTable->insertTuple(templateTuple)) {
+                VOLT_ERROR("Failed to insert tuple from input table '%s' into"
+                        " target table '%s'",
+                        m_inputTable->name().c_str(),
+                        targetTable->name().c_str());
+                return false;
+            }
+
+        } else {
+            // upsert execution logic
+            assert(upsertTable->primaryKeyIndex() != NULL);
+            TableTuple existsTuple = upsertTable->lookupTuple(templateTuple);
+
+            if (existsTuple.isNullTuple()) {
+                // try to put the tuple into the target table
+                if (!upsertTable->insertTuple(templateTuple)) {
+                    VOLT_ERROR("Failed to insert tuple from input table '%s' into"
+                            " target table '%s'",
+                            m_inputTable->name().c_str(),
+                            upsertTable->name().c_str());
+                    return false;
+                }
+            } else {
+                // tuple exists already, try to update the tuple instead
+                upsertTuple.move(templateTuple.address());
+                TableTuple &tempTuple = upsertTable->getTempTupleInlined(upsertTuple);
+
+                if (!upsertTable->updateTupleWithSpecificIndexes(existsTuple, tempTuple,
+                        upsertTable->allIndexes())) {
+                    VOLT_INFO("Failed to update existsTuple from table '%s'",
+                            upsertTable->name().c_str());
+                    return false;
+                }
+            }
         }
 
         // successfully inserted

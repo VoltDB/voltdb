@@ -325,11 +325,9 @@ public class PlanAssembler {
      * Generate the best cost plan for the current SQL statement context.
      *
      * @param parsedStmt Current SQL statement to generate plan for
-     * @param coordinateResult include (as required) or exclude (unconditionally) the plan nodes that
-     * propagate the results of a select statement to a coordinator site, making a multi-fragment plan.
      * @return The best cost plan or null.
      */
-    public CompiledPlan getBestCostPlan(AbstractParsedStmt parsedStmt, boolean coordinateResult) {
+    public CompiledPlan getBestCostPlan(AbstractParsedStmt parsedStmt) {
         // parse any subqueries that the statement contains
         List<StmtSubqueryScan> subqueryNodes = parsedStmt.getSubqueries();
         ParsedResultAccumulator subQueryResult = null;
@@ -384,23 +382,21 @@ public class PlanAssembler {
             // the final best parent plan
             retval.rootPlanGraph = connectChildrenBestPlans(retval.rootPlanGraph);
         }
-        // Remove the coordinator send/receive pair from the plan for a subselect.
-        // It may be added later by the caller for the whole plan.
-        //TODO: refactor getNextPlan to prevent generating them in the first place.
-        // But be careful -- this could create (or close?) loopholes in how some
-        // micro-optimizations apply (to the partial plan vs. the coordinated plan),
-        // especially the determinism rewrites.
-        if ( ! coordinateResult) {
-            retval.rootPlanGraph = StmtSubqueryScan.removeCoordinatorSendReceivePair(retval.rootPlanGraph);
-        }
 
         // If we have content non-determinism on DML, then fail planning.
         // This can happen in case of an INSERT INTO ... SELECT ... where the select statement has a limit on unordered data.
         // This may also be a concern in the future if we allow subqueries in UPDATE and DELETE statements
         //   (e.g., WHERE c IN (SELECT ...))
-        if (retval != null && retval.hasLimitOrOffset() && !retval.isOrderDeterministic() && !retval.getReadOnly()) {
-            throw new PlanningErrorException("DML statement manipulates data in content non-deterministic way " +
+        if (retval != null && !retval.getReadOnly() && !retval.isOrderDeterministic()) {
+            String errorMsg = "DML statement manipulates data in content non-deterministic way ";
+            if (parsedStmt.m_isUpsert) {
+                throw new PlanningErrorException(errorMsg +
+                        "(this may happen on UPSERT INTO ... SELECT, for example).");
+            }
+            if (retval.hasLimitOrOffset()) {
+                throw new PlanningErrorException(errorMsg +
                         "(this may happen on INSERT INTO ... SELECT, for example).");
+            }
         }
 
         return retval;
@@ -427,7 +423,7 @@ public class PlanAssembler {
         for (StmtSubqueryScan subqueryScan : subqueryNodes) {
             ParsedResultAccumulator parsedResult = planForParsedSubquery(subqueryScan, nextPlanId);
             if (parsedResult == null) {
-                return null;
+                throw new PlanningErrorException(m_recentErrorMsg);
             }
             nextPlanId = parsedResult.m_planId;
             orderIsDeterministic &= parsedResult.m_orderIsDeterministic;
@@ -527,11 +523,12 @@ public class PlanAssembler {
             processor.m_planId = planId;
             PlanAssembler assembler = new PlanAssembler(
                     m_catalogCluster, m_catalogDb, partitioning, processor);
-            CompiledPlan bestChildPlan = assembler.getBestCostPlan(parsedChildStmt, true);
+            CompiledPlan bestChildPlan = assembler.getBestCostPlan(parsedChildStmt);
             partitioning = assembler.getPartition();
 
             // make sure we got a winner
             if (bestChildPlan == null) {
+                m_recentErrorMsg = assembler.getErrorMessage();
                 if (m_recentErrorMsg == null) {
                     m_recentErrorMsg = "Unable to plan for statement. Error unknown.";
                 }
@@ -623,11 +620,14 @@ public class PlanAssembler {
         StatementPartitioning currentPartitioning = (StatementPartitioning)m_partitioning.clone();
         PlanAssembler assembler = new PlanAssembler(
                 m_catalogCluster, m_catalogDb, currentPartitioning, selector);
-        CompiledPlan compiledPlan = assembler.getBestCostPlan(subQuery, true);
+        CompiledPlan compiledPlan = assembler.getBestCostPlan(subQuery);
         // make sure we got a winner
         if (compiledPlan == null) {
+            String tbAlias = subqueryScan.getTableAlias();
+            m_recentErrorMsg = "Subquery statement for table " + tbAlias
+                    + " has error: " + assembler.getErrorMessage();
             if (m_recentErrorMsg == null) {
-                m_recentErrorMsg = "Unable to plan for subquery statement. Error unknown.";
+                m_recentErrorMsg = "Unable to plan for subquery statement for table " + tbAlias;
             }
             return null;
         }

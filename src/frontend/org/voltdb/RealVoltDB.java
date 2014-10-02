@@ -169,9 +169,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    static final String m_defaultVersionString = "4.6";
+    static final String m_defaultVersionString = "4.8";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q4.6\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q4.8\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -185,6 +185,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private PartitionCountStats m_partitionCountStats = null;
     private IOStats m_ioStats = null;
     private MemoryStats m_memoryStats = null;
+    private CpuStats m_cpuStats = null;
     private StatsManager m_statsManager = null;
     private SnapshotCompletionMonitor m_snapshotCompletionMonitor;
     // These are unused locally, but they need to be registered with the StatsAgent so they're
@@ -683,6 +684,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             KSafetyStats kSafetyStats = new KSafetyStats();
             getStatsAgent().registerStatsSource(StatsSelector.KSAFETY, 0, kSafetyStats);
+            m_cpuStats = new CpuStats();
+            getStatsAgent().registerStatsSource(StatsSelector.CPU,
+                    0, m_cpuStats);
 
             /*
              * Initialize the command log on rejoin and join before configuring the IV2

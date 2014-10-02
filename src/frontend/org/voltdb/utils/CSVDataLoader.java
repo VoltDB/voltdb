@@ -37,7 +37,7 @@ public interface CSVDataLoader {
      * @param values   The values to insert.
      * @throws InterruptedException
      */
-    public void insertRow(CSVLineWithMetaData metaData, String[] values) throws InterruptedException;
+    public void insertRow(RowWithMetaData metaData, Object[] values) throws InterruptedException;
 
     /**
      * Close the loader.
@@ -57,4 +57,9 @@ public interface CSVDataLoader {
     public long getFailedRows();
 
     public void setFlushInterval(int delay, int seconds);
+
+    /**
+     * Flush use this only when you think you are done and want to push everything before close/quit.
+     */
+    public void flush();
 }

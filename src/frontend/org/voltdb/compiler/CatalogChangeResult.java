@@ -26,6 +26,8 @@ public class CatalogChangeResult extends AsyncCompilerResult {
     public byte[] catalogBytes;
     public String deploymentString;
     public String encodedDiffCommands;
+    public String[] tablesThatMustBeEmpty;
+    public String[] reasonsForEmptyTables;
     public boolean requiresSnapshotIsolation;
     public boolean worksWithElastic;
     public ProcedureInvocationType invocationType;
