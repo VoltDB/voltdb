@@ -112,7 +112,7 @@ public:
             throwJsonFormattingError();
         }
 
-        std::vector<JsonPathNode> path = resolveJsonPath(pathChars, lenPath);
+        std::vector<JsonPathNode> path = resolveJsonPath(pathChars, lenPath, true /*enforceArrayIndexLimitForSet*/);
         // the non-const version of the Json::Value [] operator creates a new, null node on attempted
         // access if none already exists
         Json::Value* node = &m_doc;
@@ -151,7 +151,8 @@ private:
     static const int32_t ARRAY_TAIL = -10;
 
     /** parse our path to its vector representation */
-    std::vector<JsonPathNode> resolveJsonPath(const char* pathChars, int32_t lenPath) {
+    std::vector<JsonPathNode> resolveJsonPath(const char* pathChars, int32_t lenPath,
+                                              bool enforceArrayIndexLimitForSet = false) {
         std::vector<JsonPathNode> path;
         // NULL path refers directly to the doc root
         if (pathChars == NULL) {
@@ -190,13 +191,27 @@ private:
                         throwInvalidPathError("Unexpected character in array index");
                     }
                     arrayIndex = 10 * arrayIndex + (c - '0');
-                    // This 500000 is a mostly arbitrary maximum JSON array index enforced for practical
-                    // purposes. We enforce this up front to avoid excessive delays, ridiculous short-term
-                    // memory growth, and/or bad_alloc errors that the jsoncpp library could produce
-                    // essentially for nothing since our supported JSON document columns are typically not
-                    // wide enough to hold the string representations of arrays this large.
-                    if (arrayIndex > 500000) {
-                        throwInvalidPathError("Array index greater than the maximum allowed value of 500000");
+                    if (enforceArrayIndexLimitForSet) {
+                        // This 500000 is a mostly arbitrary maximum JSON array index enforced for practical
+                        // purposes. We enforce this up front to avoid excessive delays, ridiculous short-term
+                        // memory growth, and/or bad_alloc errors that the jsoncpp library could produce
+                        // essentially for nothing since our supported JSON document columns are typically not
+                        // wide enough to hold the string representations of arrays this large.
+                        if (arrayIndex > 500000) {
+                            if (neg) {
+                                // other than the special '-1' case, negative indices aren't allowed
+                                throwInvalidPathError("Array index less than -1");
+                            }
+                            throwInvalidPathError("Array index greater than the maximum allowed value of 500000");
+                        }
+                    } else {
+                        if (arrayIndex > static_cast<int64_t>(INT32_MAX)) {
+                            if (neg) {
+                                // other than the special '-1' case, negative indices aren't allowed
+                                throwInvalidPathError("Array index less than -1");
+                            }
+                            throwInvalidPathError("Array index greater than the maximum integer value");
+                        }
                     }
                 }
                 if ( ! terminated ) {
@@ -205,7 +220,7 @@ private:
                 if (neg) {
                     // other than the special '-1' case, negative indices aren't allowed
                     if (arrayIndex != 1) {
-                        throwInvalidPathError("Invalid array index less than -1");
+                        throwInvalidPathError("Array index less than -1");
                     }
                     arrayIndex = ARRAY_TAIL;
                 }
