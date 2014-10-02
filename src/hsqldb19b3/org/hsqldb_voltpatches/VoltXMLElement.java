@@ -277,7 +277,8 @@ public class VoltXMLElement {
         Set<String> commonNames = new HashSet<String>();
         for (VoltXMLElement firstChild : first.children) {
             if (!secondChildren.contains(firstChild.getUniqueName())) {
-                result.m_removedNodes.add(firstChild.duplicate());
+                // Need to duplicate the
+                result.m_removedNodes.add(firstChild);
             }
             else {
                 commonNames.add(firstChild.getUniqueName());
@@ -285,7 +286,7 @@ public class VoltXMLElement {
         }
         for (VoltXMLElement secondChild : second.children) {
             if (!firstChildren.contains(secondChild.getUniqueName())) {
-                result.m_addedNodes.add(secondChild.duplicate());
+                result.m_addedNodes.add(secondChild);
             }
             else {
                 assert(commonNames.contains(secondChild.getUniqueName()));
