@@ -183,11 +183,34 @@ public class StatementPartitioning implements Cloneable{
     }
 
     /**
+     * Returns true if the expression can be used to restrict plan execution to a single partition.
+     * For now this is anything other than a constant or parameter.  (In the future, one could
+     * imagine evaluating expressions like sqrt(8 * 8) and the like during planning)
+     *
+     * @param expr  The expression to consider
+     * @return      true or false
+     */
+    private static boolean isUsefulPartitioningExpression(AbstractExpression expr) {
+        if (expr instanceof ParameterValueExpression) {
+            return true;
+        }
+        if (expr instanceof ConstantValueExpression) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * @param string table.column name of a(nother) equality-filtered partitioning column
      * @param constExpr -- a constant/parameter-based expression that equality-filters the partitioning column
      */
     public void addPartitioningExpression(String fullColumnName, AbstractExpression constExpr,
             VoltType valueType) {
+
+        if (! isUsefulPartitioningExpression(constExpr))
+            return;
+
         if (m_fullColumnName == null) {
             m_fullColumnName = fullColumnName;
         }
@@ -394,7 +417,7 @@ public class StatementPartitioning implements Cloneable{
             if (unfiltered) {
                 ++unfilteredPartitionKeyCount;
             }
-        }
+        } // end for each table StmtTableScan in the collection
 
         m_countOfIndependentlyPartitionedTables = eqSets.size() + unfilteredPartitionKeyCount;
         if (m_countOfIndependentlyPartitionedTables > 1) {

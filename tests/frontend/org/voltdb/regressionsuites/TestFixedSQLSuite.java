@@ -1765,6 +1765,17 @@ public class TestFixedSQLSuite extends RegressionSuite {
         String stmt = "insert into p1 (id, num) values (1, cast(1 + ? as integer))";
         VoltTable vt = client.callProcedure("@AdHoc", stmt, 100).getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {1});
+
+        // This should even work when assigning the expression to the partitioning column:
+        // Previously this would fail with a mispartitioned tuple error.
+        stmt = "insert into p1 (id, num) values (cast(1 + ? as integer), 1)";
+        vt = client.callProcedure("@AdHoc", stmt, 100).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {1});
+
+        stmt = "select id, num from p1 order by id";
+        vt = client.callProcedure("@AdHoc", stmt).getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{1, 101}, {101, 1}});
+
     }
 
     //
