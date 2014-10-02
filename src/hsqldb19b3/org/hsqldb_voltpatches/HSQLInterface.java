@@ -138,6 +138,7 @@ public class HSQLInterface {
      * diff which represents the changes
      *
      * @param ddl The SQL DDL statement to be run.
+     * @return the "diff" of the before and after trees
      * @throws HSQLParseException Throws exception if SQL parse error is
      * encountered.
      */
