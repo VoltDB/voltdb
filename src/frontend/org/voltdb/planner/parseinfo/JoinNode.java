@@ -181,7 +181,7 @@ public abstract class JoinNode implements Cloneable {
     /**
      * Collect all JOIN and WHERE expressions combined with AND for the entire tree.
      */
-    public AbstractExpression getAllInnerJoinFilters() {
+    public AbstractExpression getAllFilters() {
         ArrayDeque<JoinNode> joinNodes = new ArrayDeque<JoinNode>();
         ArrayDeque<AbstractExpression> in = new ArrayDeque<AbstractExpression>();
         ArrayDeque<AbstractExpression> out = new ArrayDeque<AbstractExpression>();

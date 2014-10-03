@@ -69,6 +69,10 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
         assert(m_tableList.isEmpty());
 
         String tableName = stmtNode.attributes.get("table");
+        // Need to add the table to the cache. It may be required to resolve the
+        // correlated TVE in case of WHERE clause contains IN subquery
+        addTableToStmtCache(tableName, tableName, null);
+
         Table table = getTableFromDB(tableName);
 
         m_tableList.add(table);

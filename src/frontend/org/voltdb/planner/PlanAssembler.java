@@ -41,6 +41,7 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
+import org.voltdb.expressions.SubqueryExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
@@ -67,6 +68,7 @@ import org.voltdb.plannodes.PartialAggregatePlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
+import org.voltdb.plannodes.SemiSeqScanPlanNode;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.UnionPlanNode;
@@ -93,8 +95,8 @@ public class PlanAssembler {
         public final boolean m_orderIsDeterministic;
         public final boolean m_hasLimitOrOffset;
         public final int m_planId;
-        public ParsedResultAccumulator(boolean orderIsDeterministic, boolean hasLimitOrOffset,
-                int planId)
+
+        public ParsedResultAccumulator(boolean orderIsDeterministic, boolean hasLimitOrOffset, int planId)
         {
             m_orderIsDeterministic = orderIsDeterministic;
             m_hasLimitOrOffset  = hasLimitOrOffset;
@@ -332,8 +334,32 @@ public class PlanAssembler {
         List<StmtSubqueryScan> subqueryNodes = parsedStmt.getSubqueries();
         ParsedResultAccumulator subQueryResult = null;
         if (! subqueryNodes.isEmpty()) {
-            subQueryResult = getBestCostPlanForSubQueries(subqueryNodes);
+            subQueryResult = getBestCostPlanForFromSubQueries(subqueryNodes);
+            if (subQueryResult == null) {
+                // There was at least one sub-query and we should have a compiled plan for it
+                return null;
+            }
         }
+
+        // Get the best plans for the expression subqueries ( IN/EXISTS (SELECT...) )
+        List<AbstractExpression> subqueryExprs = parsedStmt.findAllSubexpressionsOfType(
+                ExpressionType.EXISTS_SUBQUERY);
+        subqueryExprs.addAll(parsedStmt.findAllSubexpressionsOfType(ExpressionType.IN_SUBQUERY));
+        ParsedResultAccumulator exprSubqueryResult = null;
+        if ( ! subqueryExprs.isEmpty() ) {
+            if (parsedStmt instanceof ParsedSelectStmt == false) {
+                m_recentErrorMsg = "In/Exists are only supported in SELECT clause";
+                return null;
+            }
+
+            exprSubqueryResult = getBestCostPlanForExpressionSubQueries(subqueryExprs);
+            if (exprSubqueryResult == null) {
+                // There was at least one sub-query and we should have a compiled plan for it
+                return null;
+            }
+        }
+
+        boolean hasSubquery = subQueryResult != null || exprSubqueryResult != null;
 
         // set up the plan assembler for this statement
         setupForNewPlans(parsedStmt);
@@ -353,30 +379,45 @@ public class PlanAssembler {
         }
 
         CompiledPlan retval = m_planSelector.m_bestPlan;
-        if (subQueryResult != null && retval != null) {
-            boolean orderIsDeterministic;
-            if (subQueryResult.m_orderIsDeterministic) {
-                orderIsDeterministic = retval.isOrderDeterministic();
-            } else {
-                //TODO: this reliance on the vague isOrderDeterministicInSpiteOfUnorderedSubqueries test
-                // is subject to false negatives for determinism. It misses the subtlety of parent
-                // queries that surgically add orderings for specific "key" columns of a subquery result
-                // or a subquery-based join for an effectively deterministic result.
-                // The first step towards repairing this would involve detecting deterministic and
-                // non-deterministic subquery results IN CONTEXT where they are scanned in the parent
-                // query, so that the parent query can ensure that ALL the columns from a
-                // non-deterministic subquery are later sorted.
-                // The next step would be to extend the model for "subquery scans"
-                // to identify dependencies / uniqueness constraints in subquery results
-                // that can be exploited to impose determinism with fewer parent order by columns
-                // -- like just the keys.
-                orderIsDeterministic = retval.isOrderDeterministic() &&
-                        parsedStmt.isOrderDeterministicInSpiteOfUnorderedSubqueries();
-            }
-            boolean hasLimitOrOffset =
-                    subQueryResult.m_hasLimitOrOffset || retval.hasLimitOrOffset();
-            retval.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic);
+        if (retval == null) {
+            return null;
+        }
 
+        if (hasSubquery) {
+            boolean isDQLStmt = (parsedStmt instanceof ParsedSelectStmt)
+                             || (parsedStmt instanceof ParsedUnionStmt);
+            if (isDQLStmt) {
+                // Calculate the combined state of determinism for the parent and child statements
+                boolean orderIsDeterministic = (subQueryResult != null) ?
+                        subQueryResult.m_orderIsDeterministic : true;
+                if (exprSubqueryResult != null) {
+                    orderIsDeterministic &= exprSubqueryResult.m_orderIsDeterministic;
+                }
+                if (orderIsDeterministic == true) {
+                    orderIsDeterministic = retval.isOrderDeterministic();
+                } else {
+                    //TODO: this reliance on the vague isOrderDeterministicInSpiteOfUnorderedSubqueries test
+                    // is subject to false negatives for determinism. It misses the subtlety of parent
+                    // queries that surgically add orderings for specific "key" columns of a subquery result
+                    // or a subquery-based join for an effectively deterministic result.
+                    // The first step towards repairing this would involve detecting deterministic and
+                    // non-deterministic subquery results IN CONTEXT where they are scanned in the parent
+                    // query, so that the parent query can ensure that ALL the columns from a
+                    // non-deterministic subquery are later sorted.
+                    // The next step would be to extend the model for "subquery scans"
+                    // to identify dependencies / uniqueness constraints in subquery results
+                    // that can be exploited to impose determinism with fewer parent order by columns
+                    // -- like just the keys.
+                    orderIsDeterministic = retval.isOrderDeterministic() &&
+                            parsedStmt.isOrderDeterministicInSpiteOfUnorderedSubqueries();
+                }
+                boolean hasLimitOrOffset = (subQueryResult != null) ?
+                        subQueryResult.m_hasLimitOrOffset : false;
+                if (exprSubqueryResult != null) {
+                    hasLimitOrOffset &= exprSubqueryResult.m_hasLimitOrOffset;
+                }
+                retval.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic);
+            }
             // Need to re-attach the sub-queries plans to the best parent plan. The same best plan for each
             // sub-query is reused with all parent candidate plans and needs to be reconnected with
             // the final best parent plan
@@ -387,7 +428,7 @@ public class PlanAssembler {
         // This can happen in case of an INSERT INTO ... SELECT ... where the select statement has a limit on unordered data.
         // This may also be a concern in the future if we allow subqueries in UPDATE and DELETE statements
         //   (e.g., WHERE c IN (SELECT ...))
-        if (retval != null && !retval.getReadOnly() && !retval.isOrderDeterministic()) {
+        if (retval != null && !retval.isReadOnly() && !retval.isOrderDeterministic()) {
             String errorMsg = "DML statement manipulates data in content non-deterministic way ";
             if (parsedStmt.m_isUpsert) {
                 throw new PlanningErrorException(errorMsg +
@@ -397,6 +438,13 @@ public class PlanAssembler {
                 throw new PlanningErrorException(errorMsg +
                         "(this may happen on INSERT INTO ... SELECT, for example).");
             }
+        }
+
+        if ( ! subqueryExprs.isEmpty() ) {
+             if (! m_partitioning.isInferredSingle()) {
+                m_recentErrorMsg = "In/Exists are only supported in single partition procedure";
+                return null;
+             }
         }
 
         return retval;
@@ -411,12 +459,12 @@ public class PlanAssembler {
     }
 
     /**
-     * Generate the best cost plans for the immediate sub-queries of the
+     * Generate the best cost plans for the immediate FROM sub-queries of the
      * current SQL statement context.
      * @param parsedStmt - SQL context containing sub queries
      * @return ChildPlanResult
      */
-    private ParsedResultAccumulator getBestCostPlanForSubQueries(List<StmtSubqueryScan> subqueryNodes) {
+    private ParsedResultAccumulator getBestCostPlanForFromSubQueries(List<StmtSubqueryScan> subqueryNodes) {
         int nextPlanId = 0;
         boolean orderIsDeterministic = true;
         boolean hasSignificantOffsetOrLimit = false;
@@ -437,6 +485,81 @@ public class PlanAssembler {
         m_planSelector.m_planId = nextPlanId;
 
         return new ParsedResultAccumulator(orderIsDeterministic, hasSignificantOffsetOrLimit, nextPlanId);
+    }
+
+
+    /**
+     * Generate the best cost plans for the immediate EXISTS/IN (SELECT...) sub-queries
+     * of the current SQL statement context.
+     * @param parsedStmt - SQL context containing sub queries
+     * @return ChildPlanResult
+     */
+    private ParsedResultAccumulator getBestCostPlanForExpressionSubQueries(List<AbstractExpression> subqueryExprs) {
+        int nextPlanId = 0;
+        boolean orderIsDeterministic = true;
+        boolean hasSignificantOffsetOrLimit = false;
+
+        for (AbstractExpression expr : subqueryExprs) {
+            if (!(expr instanceof SubqueryExpression)) {
+                // it can be IN (values)
+                continue;
+            }
+            SubqueryExpression subqueryExpr = (SubqueryExpression) expr;
+            AbstractParsedStmt subquery = subqueryExpr.getSubquery();
+            assert(subquery != null);
+
+            ParsedResultAccumulator parsedResult = planForParsedSubquery(subqueryExpr.getTable(), nextPlanId);
+            if (parsedResult == null) {
+                return null;
+            }
+            nextPlanId = parsedResult.m_planId;
+            orderIsDeterministic &= parsedResult.m_orderIsDeterministic;
+            // Offsets or limits in subqueries are only significant (only effect content determinism)
+            // when they apply to un-ordered subquery contents.
+            hasSignificantOffsetOrLimit |=
+                    (( ! parsedResult.m_orderIsDeterministic) && parsedResult.m_hasLimitOrOffset);
+
+            CompiledPlan bestPlan = subqueryExpr.getTable().getBestCostPlan();
+            subqueryExpr.setSubqueryNode(bestPlan.rootPlanGraph);
+            // The subquery plan must not contain Receive/Send nodes because it will be executed
+            // multiple times during the parent statement execution.
+            if (bestPlan.rootPlanGraph.hasAnyNodeOfType(PlanNodeType.SEND)) {
+                // fail the whole plan
+                return null;
+            }
+            // For IN Expressions only
+            if (ExpressionType.IN_SUBQUERY  == expr.getExpressionType()) {
+                // Add an artificial SeqScan on top of the subquery plan
+                addScanToInSubquery(subqueryExpr);
+            }
+        }
+        // need to reset plan id for the entire SQL
+        m_planSelector.m_planId = nextPlanId;
+
+        return new ParsedResultAccumulator(orderIsDeterministic, hasSignificantOffsetOrLimit, nextPlanId);
+    }
+
+    /*
+     * Create a SemiSeqScan node to aid the EE to perform the scan of the
+     * subquery output table. The scan will have a predicate built from
+     * the IN expression:
+     * outer_expr IN (SELECT inner_expr FROM ... WHERE subq_where)
+     * The predicate: outer_expr=inner_expr
+     * The node's executor quits either after it encounters the first tuple
+     * satisfied the predicate or after the whole table is exhausted.
+     * @param subqueryExpr The subquery Expression
+     * @param inColumnsExpr - PVE for each column from the IN list combined by the AND expression
+     */
+    private void addScanToInSubquery(SubqueryExpression subqueryExpr) {
+        // Get the top node from the subquery best plan
+        AbstractPlanNode subqueryNode = subqueryExpr.getSubqueryNode();
+        assert(subqueryNode != null);
+        AbstractExpression inColumnsExpr = subqueryExpr.getLeft();
+        assert(inColumnsExpr != null);
+        SemiSeqScanPlanNode inScanNode = new SemiSeqScanPlanNode(subqueryExpr.getTable().getTableName(), inColumnsExpr);
+        // Add the new node to the top
+        inScanNode.addAndLinkChild(subqueryNode);
+        subqueryExpr.setSubqueryNode(inScanNode);
     }
 
     /**

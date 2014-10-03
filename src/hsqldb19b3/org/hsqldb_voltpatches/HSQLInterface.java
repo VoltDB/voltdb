@@ -219,12 +219,12 @@ public class HSQLInterface {
     /**
      * Recursively find all in-lists found in the XML and munge them into the
      * simpler thing we want to pass to the AbstractParsedStmt.
+     * @throws HSQLParseException 
      */
-    private void fixupInStatementExpressions(VoltXMLElement expr) {
+    private void fixupInStatementExpressions(VoltXMLElement expr) throws HSQLParseException {
         if (doesExpressionReallyMeanIn(expr)) {
             inFixup(expr);
-            // can return because in can't be nested
-            return;
+            // can't return because in with subquery can be nested
         }
 
         // recursive hunt
@@ -237,8 +237,9 @@ public class HSQLInterface {
      * Find in-expressions in fresh-off-the-hsql-boat Volt XML. Is this fake XML
      * representing an in-list in the weird table/row way that HSQL generates
      * in-list expressions. Used by {@link this#fixupInStatementExpressions(VoltXMLElement)}.
+     * @throws HSQLParseException 
      */
-    private boolean doesExpressionReallyMeanIn(VoltXMLElement expr) {
+    private boolean doesExpressionReallyMeanIn(VoltXMLElement expr) throws HSQLParseException {
         if (!expr.name.equals("operation")) {
             return false;
         }
@@ -247,9 +248,10 @@ public class HSQLInterface {
             return false;
         }
 
-        // see if the children are "row" and "table".
+        // see if the children are "row" and "table" or "tablesubquery".
         int rowCount = 0;
         int tableCount = 0;
+        int subqueryCount = 0;
         int valueCount = 0;
         for (VoltXMLElement child : expr.children) {
             if (child.name.equals("row")) {
@@ -258,13 +260,17 @@ public class HSQLInterface {
             else if (child.name.equals("table")) {
                 tableCount++;
             }
+            else if (child.name.equals("tablesubquery")) {
+                subqueryCount++;
+            }
             else if (child.name.equals("value")) {
                 valueCount++;
             }
         }
-        if ((tableCount + rowCount > 0) && (tableCount + valueCount > 0)) {
+        if ((tableCount + rowCount > 0) && (tableCount + valueCount > 0) ||
+                subqueryCount > 0) {
             assert rowCount == 1;
-            assert tableCount + valueCount == 1;
+            assert tableCount + subqueryCount + valueCount == 1;
             return true;
         }
 
@@ -283,6 +289,7 @@ public class HSQLInterface {
 
         VoltXMLElement rowElem = null;
         VoltXMLElement tableElem = null;
+        VoltXMLElement subqueryElem = null;
         VoltXMLElement valueElem = null;
         for (VoltXMLElement child : inElement.children) {
             if (child.name.equals("row")) {
@@ -291,11 +298,13 @@ public class HSQLInterface {
             else if (child.name.equals("table")) {
                 tableElem = child;
             }
+            else if (child.name.equals("tablesubquery")) {
+                subqueryElem = child;
+            }
             else if (child.name.equals("value")) {
                 valueElem = child;
             }
         }
-        assert(rowElem.children.size() == 1);
 
         VoltXMLElement inlist;
         if (tableElem != null) {
@@ -306,15 +315,18 @@ public class HSQLInterface {
                 assert(child.children.size() == 1);
                 inlist.children.addAll(child.children);
             }
-        }
-        else {
+        } else if (subqueryElem != null) {
+            inlist = subqueryElem;
+        } else {
             assert valueElem != null;
             inlist = valueElem;
         }
 
+        assert(rowElem != null);
+        assert(inlist != null);
         inElement.children.clear();
-        // short out the row expression
-        inElement.children.addAll(rowElem.children);
+        // add the row
+        inElement.children.add(rowElem);
         // add the inlist
         inElement.children.add(inlist);
     }

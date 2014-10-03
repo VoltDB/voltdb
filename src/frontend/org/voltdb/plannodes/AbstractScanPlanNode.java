@@ -119,6 +119,12 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         }
     }
 
+    @Override
+    public int overrideId(int newId) {
+        m_id = newId++;
+        return overrideSubqueryIds(newId, m_predicate);
+    }
+
     /**
      * @return the target_table_name
      */
@@ -317,8 +323,14 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             }
         }
 
+        // Generate the output schema for subqueries
+        generateSubqueryExpressionOutputSchema(m_predicate, db);
+
         AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(this);
         if (aggNode != null) {
+            // generate its subquery output schema
+            aggNode.generateOutputSchema(db);
+
             m_outputSchema = aggNode.getOutputSchema().copyAndReplaceWithTVE();
             m_hasSignificantOutputSchema = true;
         }
@@ -380,6 +392,8 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             limit.m_outputSchema = m_outputSchema.clone();
             limit.m_hasSignificantOutputSchema = false; // It's just another cheap knock-off
         }
+        // Resolve subquery expression indexes
+        resolveSubqueryExpressionColumnIndexes(m_predicate);
 
         AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(this);
 
@@ -402,7 +416,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         }
         stringer.key(Members.TARGET_TABLE_NAME.name()).value(m_targetTableName);
         stringer.key(Members.TARGET_TABLE_ALIAS.name()).value(m_targetTableAlias);
-        if (m_isSubQuery) {
+        if (m_isSubQuery || PlanNodeType.SEMISEQSCAN == getPlanNodeType()) {
             stringer.key(Members.SUBQUERY_INDICATOR.name()).value("TRUE");
         }
     }
@@ -431,8 +445,12 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
 
     protected String explainPredicate(String prefix) {
         if (m_predicate != null) {
-            return prefix + m_predicate.explain(m_targetTableName);
+            return prefix + m_predicate.explain(getTableNameForExplain());
         }
         return "";
+    }
+
+    protected String getTableNameForExplain() {
+        return (m_targetTableAlias != null) ? m_targetTableAlias : m_targetTableName;
     }
 }

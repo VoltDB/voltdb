@@ -56,7 +56,7 @@ public class PlannerTestCase extends TestCase {
             m_aide.compile(sql, paramCount, m_byDefaultInferPartitioning, m_byDefaultPlanForSinglePartition, null);
             fail();
         }
-        catch (PlanningErrorException ex) {
+        catch (Exception ex) {
             String result = ex.toString();
             for (String pattern : patterns) {
                 if ( ! result.contains(pattern)) {
