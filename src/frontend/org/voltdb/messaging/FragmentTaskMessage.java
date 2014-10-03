@@ -26,7 +26,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
-import com.google_voltpatches.common.collect.ImmutableSet;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Subject;
@@ -39,6 +38,7 @@ import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 
 import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.collect.ImmutableSet;
 
 /**
  * Message from a stored procedure coordinator to an execution site
@@ -74,6 +74,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         ArrayList<Integer> m_inputDepIds = null;
         // For unplanned item
         byte[] m_fragmentPlan = null;
+        byte[] m_stmtText = null;
 
         public FragmentData() {
         }
@@ -108,6 +109,11 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                 sb.append("\n");
                 sb.append("  FRAGMENT_PLAN ");
                 sb.append(m_fragmentPlan);
+            }
+            if ((m_stmtText != null) && (m_stmtText.length != 0)) {
+                sb.append("\n");
+                sb.append("  STATEMENT_TEXT ");
+                sb.append(m_stmtText);
             }
             return sb.toString();
         }
@@ -232,12 +238,13 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
      * @param parameterSet
      * @param fragmentPlan
      */
-    public void addCustomFragment(byte[] planHash, int outputDepId, ByteBuffer parameterSet, byte[] fragmentPlan) {
+    public void addCustomFragment(byte[] planHash, int outputDepId, ByteBuffer parameterSet, byte[] fragmentPlan, String stmtText) {
         FragmentData item = new FragmentData();
         item.m_planHash = planHash;
         item.m_outputDepId = outputDepId;
         item.m_parameterSet = parameterSet;
         item.m_fragmentPlan = fragmentPlan;
+        item.m_stmtText = stmtText.getBytes();
         m_items.add(item);
     }
 
@@ -466,6 +473,13 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         return item.m_fragmentPlan;
     }
 
+    public String getStmtText(int index) {
+        assert(index >= 0 && index < m_items.size());
+        FragmentData item = m_items.get(index);
+        assert(item != null);
+        return new String(item.m_stmtText, Constants.UTF8ENCODING);
+    }
+
     /*
      * Serialization Format [description: type: byte count]
      *
@@ -563,10 +577,17 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                 msgsize += 4 * item.m_inputDepIds.size();
             }
 
-            // Each unplanned item gets an index (2) and a size (4) and buffer for
-            // the fragment plan string.
+            // Each unplanned item gets:
+            //  - an index (2)
+            //  - a size (4)
+            //  - buffer for fragment plan string
+            //  - a size (4)
+            //  - a buffer for statement text
             if (item.m_fragmentPlan != null) {
                 msgsize += 2 + 4 + item.m_fragmentPlan.length;
+
+                assert(item.m_stmtText != null);
+                msgsize += 4 + item.m_stmtText.length;
             }
         }
 
@@ -680,13 +701,21 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
         // Unplanned item block
         for (short index = 0; index < m_items.size(); index++) {
-            // Each unplanned item gets an index (2) and a size (4) and buffer for
-            // the fragment plan string.
+            // Each unplanned item gets:
+            //  - an index (2)
+            //  - a size (4)
+            //  - buffer for the fragment plan string
+            //  - a size(4)
+            //  - buffer for the statement text
             FragmentData item = m_items.get(index);
             if (item.m_fragmentPlan != null) {
                 buf.putShort(index);
                 buf.putInt(item.m_fragmentPlan.length);
                 buf.put(item.m_fragmentPlan);
+
+                assert(item.m_stmtText != null);
+                buf.putInt(item.m_stmtText.length);
+                buf.put(item.m_stmtText);
             }
         }
     }
@@ -821,6 +850,10 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             if (fragmentPlanLength > 0) {
                 item.m_fragmentPlan = new byte[fragmentPlanLength];
                 buf.get(item.m_fragmentPlan);
+
+                int stmtTextLength = buf.getInt();
+                item.m_stmtText = new byte[stmtTextLength];
+                buf.get(item.m_stmtText);
             }
         }
     }
