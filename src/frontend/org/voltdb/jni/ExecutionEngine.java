@@ -91,13 +91,17 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     private int m_cacheMisses = 0;
     private int m_eeCacheSize = 0;
 
-    /** Context information of the current running procedure*/
+    /** Context information of the current running procedure,
+     * for logging "long running query" messages */
+    private static long INITIAL_LOG_DURATION = 1000; // in milliseconds,
+                                                     // not final to allow unit testing
     String m_currentProcedureName = null;
     int m_currentBatchIndex = 0;
     private boolean m_readOnly;
     private long m_startTime;
     private long m_lastMsgTime;
-    private long m_logDuration = 1000;
+    private long m_logDuration = INITIAL_LOG_DURATION;
+    private String[] m_sqlTexts = null;
 
     /** information about EE calls back to JAVA. For test.*/
     public int m_callsFromEE = 0;
@@ -377,7 +381,11 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                         CoreUtils.hsIdToString(m_siteId),
                         currMemoryInBytes,
                         peakMemoryInBytes);
+        if (m_sqlTexts != null) {
+            msg += "  Executing SQL statement is \"" + m_sqlTexts[m_currentBatchIndex] + "\".";
+        }
         log.info(msg);
+
         m_logDuration = (m_logDuration < 30000) ? (2 * m_logDuration) : 30000;
         m_lastMsgTime = currentTime;
         // Return 0 if we want to interrupt ee. Otherwise return the number of tuple operations to let
@@ -456,6 +464,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                             long[] planFragmentIds,
                                             long[] inputDepIds,
                                             Object[] parameterSets,
+                                            String[] sqlTexts,
                                             long txnId,
                                             long spHandle,
                                             long lastCommittedSpHandle,
@@ -468,7 +477,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
             // reset context for progress updates
             m_startTime = 0;
-            m_logDuration = 1000;
+            m_logDuration = INITIAL_LOG_DURATION;
+            m_sqlTexts = sqlTexts;
 
             VoltTable[] results = coreExecutePlanFragments(numFragmentIds, planFragmentIds, inputDepIds,
                     parameterSets, txnId, spHandle, lastCommittedSpHandle, uniqueId, undoQuantumToken);
@@ -481,6 +491,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             // will still be used to estimate the cache size, but it's hard to count cache hits
             // during an exception, so we don't count cache misses either to get the right ratio.
             m_cacheMisses = 0;
+
+            m_sqlTexts = null;
         }
     }
 
@@ -905,4 +917,25 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         }
     }
 
+    /**
+     * Useful in unit tests.  Allows one to supply a mocked logger
+     * to verify that something was logged.
+     *
+     * @param vl  The new logger to install
+     */
+    @Deprecated
+    public static void setVoltLoggerForTest(VoltLogger vl) {
+        log = vl;
+    }
+
+    /**
+     * Useful in unit tests.  Sets the starting frequency with which
+     * the long-running query info message will be logged.
+     *
+     * @param newDuration  The duration in milliseconds before the first message is logged
+     */
+    @Deprecated
+    public void setInitialLogDurationForTest(long newDuration) {
+        INITIAL_LOG_DURATION = newDuration;
+    }
 }

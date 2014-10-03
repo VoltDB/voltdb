@@ -291,21 +291,20 @@ public class FunctionExpression extends AbstractExpression {
 
     @Override
     public String explain(String impliedTableName) {
-        String result = m_name + "(";
-        String connector;
+        String result = m_name;
+        String connector = "(";
         // This is temporary and will be replaced once the Unit Attribute is in the XML
         if (FunctionForVoltDB.isUnitFunction(m_functionId)) {
-            result += m_alias.substring(m_name.length()+1);
+            result += connector + m_alias.substring(m_name.length()+1);
             connector = ", ";
         }
-        else {
-            connector = "";
+        if (m_args != null) {
+            for (AbstractExpression arg : m_args) {
+                result += connector + arg.explain(impliedTableName);
+                connector = ", ";
+            }
+            result += ")";
         }
-        for (AbstractExpression arg : m_args) {
-            result += connector + arg.explain(impliedTableName);
-            connector = ", ";
-        }
-        result += ")";
         return result;
     }
 

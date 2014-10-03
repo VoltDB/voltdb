@@ -1834,7 +1834,7 @@ void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
 
 static std::string dummy_last_accessed_plan_node_name("no plan node in progress");
 
-void VoltDBEngine::reportProgessToTopend() {
+void VoltDBEngine::reportProgressToTopend() {
     std::string tableName;
     int64_t tableSize;
 
