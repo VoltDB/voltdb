@@ -1151,62 +1151,6 @@ public class ProcedureRunner {
        throw new RuntimeException("Procedure didn't return acceptable type.");
    }
 
-   VoltTable[] executeQueriesInIndividualBatches(List<QueuedSQL> batch, boolean finalTask) {
-       assert(batch.size() > 0);
-
-       VoltTable[] retval = new VoltTable[batch.size()];
-
-       ArrayList<QueuedSQL> microBatch = new ArrayList<QueuedSQL>();
-
-       for (int i = 0; i < batch.size(); i++) {
-           QueuedSQL queuedSQL = batch.get(i);
-           assert(queuedSQL != null);
-
-           microBatch.add(queuedSQL);
-
-           boolean isThisLoopFinalTask = finalTask && (i == (batch.size() - 1));
-           assert(microBatch.size() == 1);
-           VoltTable[] results = executeQueriesInABatch(microBatch, isThisLoopFinalTask);
-           assert(results != null);
-           assert(results.length == 1);
-           retval[i] = results[0];
-
-           microBatch.clear();
-       }
-
-       return retval;
-   }
-
-   private VoltTable[] slowPath(List<QueuedSQL> batch, final boolean finalTask) {
-       /*
-        * Determine if reads and writes are mixed. Can't mix reads and writes
-        * because the order of execution is wrong when replicated tables are
-        * involved due to ENG-1232.
-        */
-       boolean hasRead = false;
-       boolean hasWrite = false;
-       for (int i = 0; i < batch.size(); ++i) {
-           final SQLStmt stmt = batch.get(i).stmt;
-           if (stmt.isReadOnly) {
-               hasRead = true;
-           }
-           else {
-               hasWrite = true;
-           }
-       }
-       /*
-        * If they are all reads or all writes then we can use the batching
-        * slow path Otherwise the order of execution will be interleaved
-        * incorrectly so we have to do each statement individually.
-        */
-       if (hasRead && hasWrite) {
-           return executeQueriesInIndividualBatches(batch, finalTask);
-       }
-       else {
-           return executeSlowHomogeneousBatch(batch, finalTask);
-       }
-   }
-
    /**
     * Used by executeSlowHomogeneousBatch() to build messages and keep track
     * of other information as the batch is processed.
@@ -1224,7 +1168,11 @@ public class ProcedureRunner {
        final int[] m_depsToResume;
 
        // these dependencies need to be received before the local stuff can run
-       final int[] m_depsForLocalTask;
+       // Since replicated reads are not handled in the local task,
+       // this list has variable length, so assemble it first in an ArrayList
+       // and later convert it to the array
+       private List<Integer> m_depsForLocalTaskList = new ArrayList<Integer>();
+       int[] m_depsForLocalTask = null;
 
        // check if all local fragment work is non-transactional
        boolean m_localFragsAreNonTransactional = false;
@@ -1234,6 +1182,8 @@ public class ProcedureRunner {
 
        // the data and message for all sites in the transaction
        final FragmentTaskMessage m_distributedTask;
+       // for each of m_distributedTask's fragments: which ones are replicated reads
+       boolean[] m_isReplicatedRead = null;
 
        // holds query results
        final VoltTable[] m_results;
@@ -1243,7 +1193,6 @@ public class ProcedureRunner {
            m_txnState = txnState;
 
            m_depsToResume = new int[batchSize];
-           m_depsForLocalTask = new int[batchSize];
            m_results = new VoltTable[batchSize];
 
            // the data and message for locally processed fragments
@@ -1257,6 +1206,7 @@ public class ProcedureRunner {
            m_localTask.setProcedureName(procedureName);
 
            // the data and message for all sites in the transaction
+           // except that the replicated reads are done on only one site
            m_distributedTask = new FragmentTaskMessage(m_txnState.initiatorHSId,
                                                        siteId,
                                                        m_txnState.txnId,
@@ -1265,6 +1215,8 @@ public class ProcedureRunner {
                                                        finalTask,
                                                        txnState.isForReplay());
            m_distributedTask.setProcedureName(procedureName);
+           // which fragments of m_distributedTask are replicated reads
+           m_isReplicatedRead = new boolean[batchSize];
        }
 
        /*
@@ -1280,26 +1232,30 @@ public class ProcedureRunner {
                m_localFragsAreNonTransactional = false;
            }
 
-           // single aggregator fragment
+           // single replicated read fragment
            if (stmt.collector == null) {
-               m_depsForLocalTask[index] = -1;
-               // Add the local fragment data.
+               // Replicated read: will be done only on one site in distributed work phase
+               //   in its proper place with respect to other reads and writes
+               //   Arrange to deliver its results directly to the stored procedure
+               m_isReplicatedRead[index] = true;  // mark position in m_distributedTask as replicated read
                if (stmt.inCatalog) {
-                   m_localTask.addFragment(stmt.aggregator.planHash, m_depsToResume[index], params);
+                   m_distributedTask.addFragment(stmt.aggregator.planHash, m_depsToResume[index], params);
                }
                else {
                    byte[] planBytes = ActivePlanRepository.planForFragmentId(stmt.aggregator.id);
-                   m_localTask.addCustomFragment(stmt.aggregator.planHash, m_depsToResume[index], params, planBytes);
+                   m_distributedTask.addCustomFragment(stmt.aggregator.planHash, m_depsToResume[index], params, planBytes);
                }
            }
            // two fragments
            else {
                int outputDepId =
                        m_txnState.getNextDependencyId() | DtxnConstants.MULTIPARTITION_DEPENDENCY;
-               m_depsForLocalTask[index] = outputDepId;
-               // Add local and distributed fragments.
+               m_depsForLocalTaskList.add(outputDepId);
+               m_isReplicatedRead[index] = false;  // mark position as not replicated read
+               // Add fragment to local and distributed fragments.
                if (stmt.inCatalog) {
                    m_localTask.addFragment(stmt.aggregator.planHash, m_depsToResume[index], params);
+                   // add distributed fragment to work for all sites, special or not
                    m_distributedTask.addFragment(stmt.collector.planHash, outputDepId, params);
                }
                else {
@@ -1309,13 +1265,27 @@ public class ProcedureRunner {
                    m_distributedTask.addCustomFragment(stmt.collector.planHash, outputDepId, params, planBytes);
                }
            }
+           if (index == m_batchSize - 1) {
+               // end of adding statements, now convert list to array
+               m_depsForLocalTask = new int[m_depsForLocalTaskList.size()];
+               for (int i=0; i< m_depsForLocalTaskList.size(); i++)
+                   m_depsForLocalTask[i] = m_depsForLocalTaskList.get(i);
+           }
        }
    }
 
    /*
-    * Execute a batch of homogeneous queries, i.e. all reads or all writes.
+    * Execute a batch of queries, possibly a mix of reads and writes.
+    * Execution of reads vs. writes in the correct order is ensured by
+    * executing the original sequence on one site, the buddy site.
+    * The rest of the sites execute a batch with the replicated read
+    * fragments deleted. The buddy site has two special fragment batches
+    * to execute, first the original read/write sequence and then the
+    * "localTask" data-accumulation work.
+    * This is a faster approach than that of ENG-1232, which chopped
+    * up the full batch into smaller batches of homogeneous reads or writes.
     */
-   VoltTable[] executeSlowHomogeneousBatch(final List<QueuedSQL> batch, final boolean finalTask) {
+   VoltTable[] slowPath(final List<QueuedSQL> batch, final boolean finalTask) {
 
        BatchState state = new BatchState(batch.size(),
                                          m_txnState,
@@ -1352,17 +1322,6 @@ public class ProcedureRunner {
            assert(paramBuf != null);
            paramBuf.flip();
 
-            /*
-             * This numfrags == 1 code is for routing multi-partition reads of a
-             * replicated table to the local site. This was a broken performance
-             * optimization. see https://issues.voltdb.com/browse/ENG-1232.
-             *
-             * The problem is that the fragments for the replicated read are not correctly
-             * interleaved with the distributed writes to the replicated table that might
-             * be in the same batch of SQL statements. We do end up doing the replicated
-             * read locally but we break up the batches in the face of mixed reads and
-             * writes
-             */
            state.addStatement(i, queuedSQL.stmt, paramBuf, m_site);
        }
 
@@ -1380,12 +1339,11 @@ public class ProcedureRunner {
        // note: non-transactional work only helps us if it's final work
        m_txnState.createLocalFragmentWork(state.m_localTask,
                                           state.m_localFragsAreNonTransactional && finalTask);
-
-       if (!state.m_distributedTask.isEmpty()) {
+       if(!state.m_distributedTask.isEmpty()){
            state.m_distributedTask.setBatch(m_batchIndex);
-           m_txnState.createAllParticipatingFragmentWork(state.m_distributedTask);
+           m_txnState.createAllParticipatingFragmentWork
+                           (state.m_distributedTask, state.m_isReplicatedRead);
        }
-
        // recursively call recursableRun and don't allow it to shutdown
        Map<Integer,List<VoltTable>> mapResults =
            m_site.recursableRun(m_txnState);
@@ -1393,7 +1351,6 @@ public class ProcedureRunner {
        assert(mapResults != null);
        assert(state.m_depsToResume != null);
        assert(state.m_depsToResume.length == batch.size());
-
        // build an array of answers, assuming one result per expected id
        for (int i = 0; i < batch.size(); i++) {
            List<VoltTable> matchingTablesForId = mapResults.get(state.m_depsToResume[i]);
