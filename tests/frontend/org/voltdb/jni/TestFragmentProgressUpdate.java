@@ -23,8 +23,13 @@
 
 package org.voltdb.jni;
 
+import static org.mockito.Matchers.contains;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.verify;
 import junit.framework.TestCase;
 
+import org.mockito.Mockito;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.LegacyHashinator;
 import org.voltdb.ParameterSet;
 import org.voltdb.TheHashinator.HashinatorConfig;
@@ -44,71 +49,8 @@ import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 
 public class TestFragmentProgressUpdate extends TestCase {
-    public void testJNIFragmentProgressUpdate() throws Exception {
-        m_ee = new ExecutionEngineJNI(
-                CLUSTER_ID,
-                NODE_ID,
-                0,
-                0,
-                "",
-                100,
-                new HashinatorConfig(HashinatorType.LEGACY,
-                                     LegacyHashinator.getConfigureBytes(1),
-                                     0,
-                                     0));
-        testFragmentProgressUpdate(m_ee);
-    }
 
-    // test we reset the statistic when start a new fragment
-    public void testJNIFragmentProgressUpdate2() throws Exception {
-        m_ee = new ExecutionEngineJNI(
-                CLUSTER_ID,
-                NODE_ID,
-                0,
-                0,
-                "",
-                100,
-                new HashinatorConfig(HashinatorType.LEGACY,
-                                     LegacyHashinator.getConfigureBytes(1),
-                                     0,
-                                     0));
-        testTwoUpdates(m_ee);
-    }
-
-    // test sometimes the peak is larger than the current
-    public void testJNIFragmentProgressUpdate3() throws Exception {
-        m_ee = new ExecutionEngineJNI(
-                CLUSTER_ID,
-                NODE_ID,
-                0,
-                0,
-                "",
-                100,
-                new HashinatorConfig(HashinatorType.LEGACY,
-                                     LegacyHashinator.getConfigureBytes(1),
-                                     0,
-                                     0));
-        testPeakLargerThanCurr(m_ee);
-    }
-
-    /*public void testIPCFragmentProgressUpdate() throws Exception {
-        m_ee = new ExecutionEngineIPC(
-                CLUSTER_ID,
-                NODE_ID,
-                0,
-                0,
-                "",
-                100,
-                BackendTarget.NATIVE_EE_IPC,
-                10000,
-                new HashinatorConfig(HashinatorType.LEGACY,
-                        LegacyHashinator.getConfigureBytes(1),
-                        0,
-                        0));
-        testFragmentProgressUpdate(m_ee);
-    }*/
-
-    void testFragmentProgressUpdate(ExecutionEngine ee) throws Exception {
+    public void testFragmentProgressUpdate() throws Exception {
         m_ee.loadCatalog( 0, m_catalog.serialize());
 
         m_tableSize = 5001;
@@ -136,7 +78,8 @@ public class TestFragmentProgressUpdate extends TestCase {
         ActivePlanRepository.clear();
         ActivePlanRepository.addFragmentForTest(
                 CatalogUtil.getUniqueIdForFragment(selectBottomFrag),
-                Encoder.decodeBase64AndDecompressToBytes(selectBottomFrag.getPlannodetree()));
+                Encoder.decodeBase64AndDecompressToBytes(selectBottomFrag.getPlannodetree()),
+                selectStmt.getSqltext());
         ParameterSet params = ParameterSet.emptyParameterSet();
 
         m_ee.executePlanFragments(
@@ -144,6 +87,7 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
                 null,
                 new ParameterSet[] { params },
+                new String[] { selectStmt.getSqltext() },
                 3, 3, 2, 42, Long.MAX_VALUE);
         // Like many fully successful operations, a single row fetch counts as 2 logical row operations,
         // one for locating the row and one for retrieving it.
@@ -156,7 +100,7 @@ public class TestFragmentProgressUpdate extends TestCase {
         assertTrue(m_ee.m_peakMemoryInBytes >= m_ee.m_currMemoryInBytes);
     }
 
-    void testTwoUpdates(ExecutionEngine ee) throws Exception {
+    public void testTwoUpdates() throws Exception {
         m_ee.loadCatalog( 0, m_catalog.serialize());
 
         m_tableSize = 10000;
@@ -186,7 +130,8 @@ public class TestFragmentProgressUpdate extends TestCase {
         ActivePlanRepository.clear();
         ActivePlanRepository.addFragmentForTest(
                 CatalogUtil.getUniqueIdForFragment(selectBottomFrag),
-                Encoder.decodeBase64AndDecompressToBytes(selectBottomFrag.getPlannodetree()));
+                Encoder.decodeBase64AndDecompressToBytes(selectBottomFrag.getPlannodetree()),
+                selectStmt.getSqltext());
         ParameterSet params = ParameterSet.emptyParameterSet();
 
         m_ee.executePlanFragments(
@@ -194,6 +139,7 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
                 null,
                 new ParameterSet[] { params },
+                new String[] { selectStmt.getSqltext() },
                 3, 3, 2, 42, Long.MAX_VALUE);
 
         // Like many fully successful operations, a single row fetch counts as 2 logical row operations,
@@ -222,26 +168,30 @@ public class TestFragmentProgressUpdate extends TestCase {
         ActivePlanRepository.clear();
         ActivePlanRepository.addFragmentForTest(
                 CatalogUtil.getUniqueIdForFragment(deleteBottomFrag),
-                Encoder.decodeBase64AndDecompressToBytes(deleteBottomFrag.getPlannodetree()));
+                Encoder.decodeBase64AndDecompressToBytes(deleteBottomFrag.getPlannodetree()),
+                deleteStmt.getSqltext());
         params = ParameterSet.emptyParameterSet();
         m_ee.executePlanFragments(
                 1,
                 new long[] { CatalogUtil.getUniqueIdForFragment(deleteBottomFrag) },
                 null,
                 new ParameterSet[] { params },
+                new String[] { deleteStmt.getSqltext() },
                 3, 3, 2, 42, Long.MAX_VALUE);
 
         // populate plan cache
         ActivePlanRepository.clear();
         ActivePlanRepository.addFragmentForTest(
                 CatalogUtil.getUniqueIdForFragment(selectBottomFrag),
-                Encoder.decodeBase64AndDecompressToBytes(selectBottomFrag.getPlannodetree()));
+                Encoder.decodeBase64AndDecompressToBytes(selectBottomFrag.getPlannodetree()),
+                selectStmt.getSqltext());
         params = ParameterSet.emptyParameterSet();
         m_ee.executePlanFragments(
                 1,
                 new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
                 null,
                 new ParameterSet[] { params },
+                new String[] { selectStmt.getSqltext() },
                 3, 3, 2, 42, Long.MAX_VALUE);
         assertTrue(m_ee.m_callsFromEE > 2);
         // here the m_lastTuplesAccessed is just the same as threshold, since we start a new fragment
@@ -256,7 +206,7 @@ public class TestFragmentProgressUpdate extends TestCase {
         assertTrue(m_ee.m_peakMemoryInBytes < previousPeakMemory);
     }
 
-    void testPeakLargerThanCurr(ExecutionEngine ee) throws Exception {
+    public void testPeakLargerThanCurr() throws Exception {
         m_ee.loadCatalog( 0, m_catalog.serialize());
 
         m_tableSize = 20000;
@@ -286,7 +236,8 @@ public class TestFragmentProgressUpdate extends TestCase {
         ActivePlanRepository.clear();
         ActivePlanRepository.addFragmentForTest(
                 CatalogUtil.getUniqueIdForFragment(selectBottomFrag),
-                Encoder.decodeBase64AndDecompressToBytes(selectBottomFrag.getPlannodetree()));
+                Encoder.decodeBase64AndDecompressToBytes(selectBottomFrag.getPlannodetree()),
+                selectStmt.getSqltext());
         ParameterSet params = ParameterSet.emptyParameterSet();
 
         m_ee.executePlanFragments(
@@ -294,6 +245,7 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
                 null,
                 new ParameterSet[] { params },
+                new String[] { selectStmt.getSqltext() },
                 3, 3, 2, 42, Long.MAX_VALUE);
 
         // If want to see the stats, please uncomment the following line.
@@ -303,14 +255,62 @@ public class TestFragmentProgressUpdate extends TestCase {
         assertTrue(m_ee.m_peakMemoryInBytes > m_ee.m_currMemoryInBytes);
     }
 
+    @SuppressWarnings("deprecation")
+    public void testProgressUpdateLogSqlStmt() throws Exception {
+        m_ee.loadCatalog( 0, m_catalog.serialize());
+
+        m_tableSize = 50;
+        m_itemData.clearRowData();
+
+        for (int i = 0; i < m_tableSize; ++i) {
+            m_itemData.addRow(i, i + 50, "item" + i, (double)i / 2, "data" + i);
+        }
+
+        m_ee.loadTable(ITEM_TABLEID, m_itemData, 0, 0, 0, false, false, Long.MAX_VALUE);
+        assertEquals(m_tableSize, m_ee.serializeTable(ITEM_TABLEID).getRowCount());
+        System.out.println("Rows loaded to table "+m_ee.serializeTable(ITEM_TABLEID).getRowCount());
+
+        Statement selectStmt = m_testProc.getStatements().getIgnoreCase("item_crazy_join");
+
+        assertEquals(1, selectStmt.getFragments().size());
+        PlanFragment frag = selectStmt.getFragments().iterator().next();
+
+        // populate plan cache
+        ActivePlanRepository.clear();
+        ActivePlanRepository.addFragmentForTest(
+                CatalogUtil.getUniqueIdForFragment(frag),
+                Encoder.decodeBase64AndDecompressToBytes(frag.getPlannodetree()),
+                selectStmt.getSqltext());
+        ParameterSet params = ParameterSet.emptyParameterSet();
+
+        // Replace the normal logger with a mocked one, so we can verify the message
+        VoltLogger mockedLogger = Mockito.mock(VoltLogger.class);
+        ExecutionEngine.setVoltLoggerForTest(mockedLogger);
+
+        // Set the log duration to be very short, to ensure that a message will be logged.
+        m_ee.setInitialLogDurationForTest(1);
+
+        m_ee.executePlanFragments(
+                1,
+                new long[] { CatalogUtil.getUniqueIdForFragment(frag) },
+                null,
+                new ParameterSet[] { params },
+                new String[] { selectStmt.getSqltext() },
+                3, 3, 2, 42, Long.MAX_VALUE);
+        verify(mockedLogger, atLeastOnce()).info(
+                contains("Executing SQL statement is \"SELECT COUNT(*) FROM ITEM i1, ITEM i2, ITEM i3;\"."));
+    }
+
     private ExecutionEngine m_ee;
     private static final int CLUSTER_ID = 2;
     private static final long NODE_ID = 1;
     private int m_tableSize;
     private int m_longOpthreshold;
     private VoltTable m_warehousedata;
+    private VoltTable m_itemData;
     private Catalog m_catalog;
     private int WAREHOUSE_TABLEID;
+    private int ITEM_TABLEID;
     private Procedure m_testProc;
 
     @Override
@@ -328,13 +328,33 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new VoltTable.ColumnInfo("W_TAX", VoltType.FLOAT),
                 new VoltTable.ColumnInfo("W_YTD", VoltType.FLOAT)
                 );
+        m_itemData = new VoltTable(
+                new VoltTable.ColumnInfo("I_ID", VoltType.INTEGER),
+                new VoltTable.ColumnInfo("I_IM_ID", VoltType.INTEGER),
+                new VoltTable.ColumnInfo("I_NAME", VoltType.STRING),
+                new VoltTable.ColumnInfo("I_PRICE", VoltType.FLOAT),
+                new VoltTable.ColumnInfo("I_DATA", VoltType.STRING)
+                );
         TPCCProjectBuilder builder = new TPCCProjectBuilder();
         m_catalog = builder.createTPCCSchemaCatalog();
         Cluster cluster = m_catalog.getClusters().get("cluster");
         WAREHOUSE_TABLEID = m_catalog.getClusters().get("cluster").getDatabases().
                 get("database").getTables().get("WAREHOUSE").getRelativeIndex();
+        ITEM_TABLEID = m_catalog.getClusters().get("cluster").getDatabases().
+                get("database").getTables().get("ITEM").getRelativeIndex();
         CatalogMap<Procedure> procedures = cluster.getDatabases().get("database").getProcedures();
         m_testProc = procedures.getIgnoreCase("FragmentUpdateTestProcedure");
+        m_ee = new ExecutionEngineJNI(
+                CLUSTER_ID,
+                NODE_ID,
+                0,
+                0,
+                "",
+                100,
+                new HashinatorConfig(HashinatorType.LEGACY,
+                                     LegacyHashinator.getConfigureBytes(1),
+                                     0,
+                                     0));
     }
 
     @Override

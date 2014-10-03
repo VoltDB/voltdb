@@ -64,6 +64,10 @@ public class FragmentUpdateTestProcedure extends VoltProcedure {
     public final SQLStmt warehouse_join = new SQLStmt("SELECT W1.W_TAX + W1.W_YTD FROM WAREHOUSE W1, WAREHOUSE W2"
             + " WHERE W1.W_ID = W2.W_ID AND W1.W_ID > -1 AND W1.W_TAX > W2.W_TAX ORDER BY W2.W_ID;");
 
+    // This query doesn't produce a very meaningful result,
+    // but should take a decent amount of time to run with just a few rows in ITEM.
+    public final SQLStmt item_crazy_join = new SQLStmt("SELECT COUNT(*) FROM ITEM i1, ITEM i2, ITEM i3");
+
     public VoltTable[] run() {
         voltQueueSQL(warehouse_select);
         voltQueueSQL(warehouse_del_half);

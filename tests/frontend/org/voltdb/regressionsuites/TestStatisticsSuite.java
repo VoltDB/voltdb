@@ -428,7 +428,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
         expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
-        expectedSchema[3] = new ColumnInfo("PERCENT_USED", VoltType.FLOAT);
+        expectedSchema[3] = new ColumnInfo("PERCENT_USED", VoltType.BIGINT);
         VoltTable expectedTable = new VoltTable(expectedSchema);
 
         VoltTable[] results = null;
