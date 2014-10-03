@@ -39,16 +39,13 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
+import org.voltdb_testprocs.regressionsuites.fixedsql.GotBadParamCountsInJava;
 
 /**
  * Tests for SQL that was recently (early 2012) unsupported.
  */
 
 public class TestFunctionsForVoltDBSuite extends RegressionSuite {
-
-    /** Procedures used by this suite */
-    static final Class<?>[] PROCEDURES = { Insert.class };
 
     public void testExplicitErrorUDF() throws Exception
     {
@@ -703,6 +700,67 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
+    public void testENG6861() throws Exception {
+        System.out.println("STARTING testENG6861");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        // Test user-found anomaly around complex filter using functions
+        try {
+            cr = client.callProcedure("@Explain",
+                    "SELECT TOP ? * FROM PAULTEST WHERE NAME IS NOT NULL AND " +
+                    "    ( LOCK_TIME IS NULL OR " +
+                    "      SINCE_EPOCH(MILLIS,CURRENT_TIMESTAMP)-? < SINCE_EPOCH(MILLIS,LOCK_TIME) );");
+            //* enable for debug */ System.out.println(cr.getResults()[0]);
+        } catch (Exception ex) {
+            fail();
+        }
+
+        try {
+            cr = client.callProcedure("@AdHoc",
+                    "SELECT TOP ? * FROM PAULTEST WHERE NAME IS NOT NULL AND " +
+                    "    ( LOCK_TIME IS NULL OR " +
+                    "      SINCE_EPOCH(MILLIS,CURRENT_TIMESTAMP)-? < SINCE_EPOCH(MILLIS,LOCK_TIME) );",
+                    10, 10000);
+            result = cr.getResults()[0];
+            assertEquals(0, result.getRowCount());
+            //* enable for debug */ System.out.println(result);
+        } catch (Exception ex) {
+            fail();
+        }
+
+        try {
+            cr = client.callProcedure("GOT_BAD_PARAM_COUNTS_INLINE", 10, 10000);
+            result = cr.getResults()[0];
+            assertEquals(0, result.getRowCount());
+            //* enable for debug */ System.out.println(result);
+        } catch (Exception ex) {
+            fail();
+        }
+
+        try {
+            cr = client.callProcedure("GotBadParamCountsInJava", 10, 10000);
+            result = cr.getResults()[0];
+            assertEquals(0, result.getRowCount());
+            //* enable for debug */ System.out.println(result);
+        } catch (Exception ex) {
+            fail();
+        }
+
+        try {
+            // Purposely neglecting to list an select columns or '*'.
+            cr = client.callProcedure("@Explain", "SELECT TOP ? FROM PAULTEST WHERE NAME IS NOT NULL AND (LOCK_TIME IS NULL OR SINCE_EPOCH(MILLIS,CURRENT_TIMESTAMP)-? < SINCE_EPOCH(MILLIS,LOCK_TIME));");
+            //* enable for debug */ System.out.println(cr.getResults()[0]);
+            fail("Expected to detect missing SELECT columns");
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("PlanningErrorException"));
+            assertTrue(ex.getMessage().contains("unexpected token: FROM"));
+            return;
+        }
+        //* enable for debug */ System.out.println(cr.getResults()[0]);
+    }
+
     public void testTO_TIMESTAMP() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING TO_TIMESTAMP");
         Client client = getClient();
@@ -835,8 +893,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             ex = e;
         } finally {
             assertNotNull(ex);
-            assertTrue((ex.getMessage().contains("Error compiling query")));
             assertTrue((ex.getMessage().contains("PlanningErrorException")));
+            assertTrue((ex.getMessage().contains("TRUNCATE")));
         }
 
         // Test date before Gregorian calendar beginning.
@@ -1591,6 +1649,15 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "  SELECT ID FROM JSBAD WHERE ID = ? AND ARRAY_LENGTH(FIELD(DOC, ?)) = ?\n" +
                 ";\n" +
 
+                "CREATE TABLE PAULTEST (ID INTEGER, NAME VARCHAR(12), LOCK_TIME TIMESTAMP, PRIMARY KEY(ID));" +
+                "\n" +
+                "CREATE PROCEDURE GOT_BAD_PARAM_COUNTS_INLINE AS \n" +
+                "    SELECT TOP ? * FROM PAULTEST WHERE NAME IS NOT NULL AND " +
+                "                                       (LOCK_TIME IS NULL OR " +
+                "                                        SINCE_EPOCH(MILLIS,CURRENT_TIMESTAMP)-? < " +
+                "                                        SINCE_EPOCH(MILLIS,LOCK_TIME))\n" +
+                ";\n" +
+
                 "";
         try {
             project.addLiteralSchema(literalSchema);
@@ -1665,6 +1732,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         project.addStmtProcedure("CONCAT5", "select id, CONCAT(DESC,?,?,?,cast(ID as VARCHAR)) from P1 where id = ?");
         project.addStmtProcedure("ConcatOpt", "select id, DESC || ? from P1 where id = ?");
 
+        project.addProcedures(GotBadParamCountsInJava.class);
         // CONFIG #1: Local Site/Partition running on JNI backend
         config = new LocalCluster("fixedsql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);

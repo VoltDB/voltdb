@@ -442,4 +442,31 @@ public class TestSqlCommandParserInteractive extends TestCase {
         // assertEquals(1, result.get().size());
         // assertEquals(insert, result.get().get(0));
     }
+
+    /**
+     * This test basically copies from INSERT INTO...SELECT test above.
+     * @throws Exception
+     */
+    public void testUpsertIntoSelect() throws Exception
+    {
+        CommandStuff cmd = new CommandStuff();
+        Future<List<String>> result = cmd.openQuery();
+        String upsert = "upsert into hats (foo, bar) select goat, chicken from hats";
+        cmd.submitText(upsert + ";\n");
+        cmd.waitOnResult();
+        System.out.println("RESULT: " + result.get());
+        assertEquals(1, result.get().size());
+        assertEquals(upsert, result.get().get(0));
+
+        // Test double-quoted identifiers with embedded parentheses
+        // and escaped double quotes.
+        result = cmd.openQuery();
+        upsert = "upsert into\"hats\" (\"foo\", \"b\"\"ar\") " +
+                "( ( ( (((( (select goat, chicken from hats))))))))";
+        cmd.submitText(upsert + ";\n");
+        cmd.waitOnResult();
+        System.out.println("RESULT: " + result.get());
+        assertEquals(1, result.get().size());
+        assertEquals(upsert, result.get().get(0));
+    }
 }
