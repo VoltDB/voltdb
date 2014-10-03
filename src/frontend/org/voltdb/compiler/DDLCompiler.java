@@ -888,7 +888,7 @@ public class DDLCompiler {
         if (statementMatcher.matches()) {
             // group(1) -> table
             String tableName = checkIdentifierStart(statementMatcher.group(1), statement);
-            VoltXMLElement tableXML = m_schema.findChild("table", tableName);
+            VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
             if (tableXML != null) {
                 tableXML.attributes.remove("partitioncolumn");
             }
