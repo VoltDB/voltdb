@@ -260,7 +260,7 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         }
         {
             failToCompile("select a from r1 where exists (" +
-                    "select 1 from r2 having max(r1.a + r2.a) in (" +
+                    "select 1 from r2 group by r2.a having max(r1.a + r2.a) in (" +
                     " select max(a) from r3))",
                     "expression not in aggregate or GROUP BY columns");
         }
