@@ -603,11 +603,11 @@ public class ProcedureRunner {
             AdHocPlannedStatement plannedStatement = batch.plannedStatements.get(0);
 
             long aggFragId = ActivePlanRepository.loadOrAddRefPlanFragment(
-                    plannedStatement.core.aggregatorHash, plannedStatement.core.aggregatorFragment);
+                    plannedStatement.core.aggregatorHash, plannedStatement.core.aggregatorFragment, sql);
             long collectorFragId = 0;
             if (plannedStatement.core.collectorFragment != null) {
                 collectorFragId = ActivePlanRepository.loadOrAddRefPlanFragment(
-                        plannedStatement.core.collectorHash, plannedStatement.core.collectorFragment);
+                        plannedStatement.core.collectorHash, plannedStatement.core.collectorFragment, sql);
             }
 
             queuedSQL.stmt = SQLStmtAdHocHelper.createWithPlan(
@@ -841,7 +841,7 @@ public class ProcedureRunner {
         for (PlanFragment frag : catStmt.getFragments()) {
             byte[] planHash = Encoder.hexDecode(frag.getPlanhash());
             byte[] plan = Encoder.decodeBase64AndDecompressToBytes(frag.getPlannodetree());
-            long id = ActivePlanRepository.loadOrAddRefPlanFragment(planHash, plan);
+            long id = ActivePlanRepository.loadOrAddRefPlanFragment(planHash, plan, catStmt.getSqltext());
             boolean transactional = frag.getNontransactional() == false;
 
             SQLStmt.Frag stmtFrag = new SQLStmt.Frag(id, planHash, transactional);
@@ -1289,7 +1289,11 @@ public class ProcedureRunner {
                }
                else {
                    byte[] planBytes = ActivePlanRepository.planForFragmentId(stmt.aggregator.id);
-                   m_localTask.addCustomFragment(stmt.aggregator.planHash, m_depsToResume[index], params, planBytes);
+                   m_localTask.addCustomFragment(stmt.aggregator.planHash,
+                           m_depsToResume[index],
+                           params,
+                           planBytes,
+                           stmt.getText());
                }
            }
            // two fragments
@@ -1304,9 +1308,9 @@ public class ProcedureRunner {
                }
                else {
                    byte[] planBytes = ActivePlanRepository.planForFragmentId(stmt.aggregator.id);
-                   m_localTask.addCustomFragment(stmt.aggregator.planHash, m_depsToResume[index], params, planBytes);
+                   m_localTask.addCustomFragment(stmt.aggregator.planHash, m_depsToResume[index], params, planBytes, stmt.getText());
                    planBytes = ActivePlanRepository.planForFragmentId(stmt.collector.id);
-                   m_distributedTask.addCustomFragment(stmt.collector.planHash, outputDepId, params, planBytes);
+                   m_distributedTask.addCustomFragment(stmt.collector.planHash, outputDepId, params, planBytes, stmt.getText());
                }
            }
        }
@@ -1410,6 +1414,7 @@ public class ProcedureRunner {
        final int batchSize = batch.size();
        Object[] params = new Object[batchSize];
        long[] fragmentIds = new long[batchSize];
+       String[] sqlTexts = new String[batchSize];
 
        int i = 0;
        for (final QueuedSQL qs : batch) {
@@ -1422,6 +1427,7 @@ public class ProcedureRunner {
            else {
                params[i] = qs.params;
            }
+           sqlTexts[i] = qs.stmt.getText();
            i++;
        }
        return m_site.executePlanFragments(
@@ -1429,6 +1435,7 @@ public class ProcedureRunner {
            fragmentIds,
            null,
            params,
+           sqlTexts,
            m_txnState.txnId,
            m_txnState.m_spHandle,
            m_txnState.uniqueId,

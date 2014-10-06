@@ -1790,12 +1790,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         if (catProc == null) {
             String errorMessage = "Procedure " + task.procName + " was not found";
-            RateLimitedLogger.tryLogForMessage(
-                            errorMessage + ". This message is rate limited to once every 60 seconds.",
-                            System.currentTimeMillis(),
+            RateLimitedLogger.tryLogForMessage(System.currentTimeMillis(),
                             60, TimeUnit.SECONDS,
                             authLog,
-                            Level.WARN);
+                            Level.WARN, errorMessage + ". This message is rate limited to once every 60 seconds.");
             return new ClientResponseImpl(
                     ClientResponseImpl.UNEXPECTED_FAILURE,
                     new VoltTable[0], errorMessage, task.clientHandle);
