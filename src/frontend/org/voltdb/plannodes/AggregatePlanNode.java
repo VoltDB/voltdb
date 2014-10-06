@@ -407,7 +407,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
             m_aggregateDistinct.add( tempObj.getInt( Members.AGGREGATE_DISTINCT.name() ) );
             m_aggregateOutputColumns.add( tempObj.getInt( Members.AGGREGATE_OUTPUT_COLUMN.name() ));
 
-            if (jobj.isNull(Members.AGGREGATE_EXPRESSION.name())) {
+            if (tempObj.isNull(Members.AGGREGATE_EXPRESSION.name())) {
                 m_aggregateExpressions.add(null);
             }
             else {
