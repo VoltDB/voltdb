@@ -56,22 +56,30 @@ public class TestAdhocExportTable extends AdhocDDLTestBase {
             assertFalse(findTableInSystemCatalogResults("FOO"));
             try {
                 m_client.callProcedure("@AdHoc",
-                        "create table FOO (ID int default 0, VAL varchar(64 bytes)); export table foo;");
+                        "create table FOO (ID int default 0, VAL varchar(64 bytes));");
             }
             catch (ProcCallException pce) {
                 pce.printStackTrace();
                 fail("create table should have succeeded");
             }
             assertTrue(findTableInSystemCatalogResults("FOO"));
-
-            boolean threw = false;
             try {
-                m_client.callProcedure("@AdHoc", "drop table FOO;");
+                m_client.callProcedure("@AdHoc", "export table foo;");
             }
             catch (ProcCallException pce) {
                 pce.printStackTrace();
                 fail("Should be able to export a table");
             }
+            assertTrue(findTableInSystemCatalogResults("FOO"));
+            assertEquals("EXPORT", getTableType("FOO"));
+            try {
+                m_client.callProcedure("@AdHoc", "drop table FOO;");
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Should be able to drop an exported table");
+            }
+            assertFalse(findTableInSystemCatalogResults("FOO"));
         }
         finally {
             teardownSystem();
@@ -107,27 +115,40 @@ public class TestAdhocExportTable extends AdhocDDLTestBase {
                         "create table FOO (\n" +
                         "ID int default 0 not null,\n" +
                         "VAL varchar(32 bytes)\n" +
-                        ");\n" +
-                        "partition table FOO on column ID;\n"
+                        ");\n"
                         );
             }
             catch (ProcCallException pce) {
                 pce.printStackTrace();
                 fail("create table should have succeeded");
             }
-            resp = m_client.callProcedure("@SystemCatalog", "TABLES");
-            System.out.println(resp.getResults()[0]);
+
+            try {
+                m_client.callProcedure("@AdHoc", "partition table FOO on column id;");
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Should be able to partition a table");
+            }
             assertTrue(findTableInSystemCatalogResults("FOO"));
             assertTrue(isColumnPartitionColumn("FOO", "ID"));
-
-            boolean threw = false;
             try {
-                m_client.callProcedure("@AdHoc", "export table FOO;");
+                m_client.callProcedure("@AdHoc", "export table foo;");
             }
             catch (ProcCallException pce) {
                 pce.printStackTrace();
                 fail("Should be able to export a table");
             }
+            assertTrue(findTableInSystemCatalogResults("FOO"));
+            assertEquals("EXPORT", getTableType("FOO"));
+            try {
+                m_client.callProcedure("@AdHoc", "drop table FOO;");
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Should be able to drop an exported table");
+            }
+            assertFalse(findTableInSystemCatalogResults("FOO"));
         }
         finally {
             teardownSystem();
