@@ -241,6 +241,10 @@ public class VoltXMLElement {
         }
 
         VoltXMLDiff result = new VoltXMLDiff(first.getUniqueName());
+        // Short-circuit check for any differences first.  Can return early if there are no changes
+        if (first.toMinString().equals(second.toMinString())) {
+            return result;
+        }
         // first, check the attributes
         Set<String> firstKeys = first.attributes.keySet();
         Set<String> secondKeys = new HashSet<String>();
