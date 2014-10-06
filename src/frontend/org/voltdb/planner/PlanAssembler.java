@@ -2118,35 +2118,35 @@ public class PlanAssembler {
      */
     AbstractPlanNode handleDistinct(AbstractPlanNode root) {
         if (m_parsedSelect.hasDistinct()) {
+            //TODO: The long-term goal to fix all the ills of Distinct is to implement distinct as
+            // a final GROUP BY all columns and eliminate Distinct as separately implemented
+            // PlanNode and Executor class types.
+            // The riskiest edge case in this approach to Distinct is when the distinct is applied
+            // on top of a GROUP BY -- either explicit in the query or implied by a materialized view --
+            // AND not all the GROUP BY expressions are in the result columns.
+            // If all the GROUP BY expressions are in the result columns, the result is already Distinct.
             // We currently can't handle DISTINCT of multiple columns.
             // Throw a planner error if this is attempted.
-            //if (m_parsedSelect.displayColumns.size() > 1)
-            //{
-            //    throw new PlanningErrorException("Multiple DISTINCT columns currently unsupported");
-            //}
+            if (m_parsedSelect.m_displayColumns.size() > 1) {
+                throw new PlanningErrorException("Multiple DISTINCT columns currently unsupported");
+            }
             AbstractExpression distinctExpr = null;
-            AbstractExpression nextExpr = null;
             for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.m_displayColumns) {
                 // Distinct can in theory handle any expression now, but it's
                 // untested so we'll balk on anything other than a TVE here
                 // --izzy
                 if (col.expression instanceof TupleValueExpression)
                 {
-                    // Add distinct node(s) to the plan
-                    if (distinctExpr == null) {
-                        distinctExpr = col.expression;
-                        nextExpr = distinctExpr;
-                    } else {
-                        nextExpr.setRight(col.expression);
-                        nextExpr = nextExpr.getRight();
-                    }
+                    assert(distinctExpr == null);
+                    distinctExpr = col.expression;
                 }
                 else
                 {
                     throw new PlanningErrorException("DISTINCT of an expression currently unsupported");
                 }
             }
-            // Add distinct node(s) to the plan
+            // Add a distinct node to the plan.
+            assert(distinctExpr != null);
             root = addDistinctNodes(root, distinctExpr);
             // aggregate handlers are expected to produce the required projection.
             // the other aggregates do this inherently but distinct may need a
