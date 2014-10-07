@@ -37,6 +37,10 @@ class StudioWebPage extends Page {
 
 class StudioWebDiag extends GebReportingSpec {
     static final boolean USE_NEW_UI = false;
+    static final boolean DEBUG_PRINT = false;
+    // Set these > 0 only for debugging, so you can see results go by slowly:
+    static final int WAIT_SECS_AFTER_EACH_TEST = 0;
+    static final int WAIT_SECS_AFTER_DELETE = 0;
 
     //STATUS MESSAGES
     static String FAILURE = USE_NEW_UI ? 'Query Result' : 'Query error'
@@ -150,11 +154,16 @@ class StudioWebDiag extends GebReportingSpec {
     //TEST SQL Queries
     @Unroll //performs this method for each item in testName
     def '#testName'(){
-
+            boolean testFailed = true
+            def statusField = null
+            def resultField = null
+            def inputField = null
+            
+        try{
             setup: 'open new query'
             response = resTmp
             $('#new-query').click()
-            def inputField = $('#worktabs').find('div', 0).find('textarea')
+            inputField = $('#worktabs').find('div', 0).find('textarea')
             if (USE_NEW_UI) {
                 inputField = $('#theQueryText')
                 response.result = [Contestant_name:[null, 'Lorem_Ipsum', 'Lorem_Dolor', 'Ipsum_Dolor', 'Sit_Amet', 'Lorem_Ipsum_Dolor', 'Ipsum_Dolor_Sit'],
@@ -171,8 +180,8 @@ class StudioWebDiag extends GebReportingSpec {
             }
 
             and: 'obtain response status and result'
-            def statusField = $('#worktabs').find('span.status')
-            def resultField = $('#worktabs').find('div.resultbar').children('div')
+            statusField = $('#worktabs').find('span.status')
+            resultField = $('#worktabs').find('div.resultbar').children('div')
             if (USE_NEW_UI) {
                 statusField = $('.icon-queryResult')
                 resultField = $('#resultHtml')
@@ -181,15 +190,28 @@ class StudioWebDiag extends GebReportingSpec {
             // are visible in statusField & resultField, since this fails very
             // occasionally, apparently do to a timing issue
 
-        try{
             when: 'ensure appropriate status and result are displayed'
             assert checkResponse(statusField, resultField)
+            testFailed = false
 
         } finally {
+            if (testFailed || DEBUG_PRINT) {
+                println "\n\n" + testName + (testFailed ? " FAILED:\n" : " passed:\n") + inputField?.value()
+                println "Status field: " + statusField?.text()
+                println "Result field:\n" + resultField?.text()
+            }
+            if (WAIT_SECS_AFTER_EACH_TEST > 0) {
+                Thread.sleep(WAIT_SECS_AFTER_EACH_TEST * 1000);
+            }
             // TODO: update this section, to use new UI (when available)
             then: 'clear all tables'
-            inputField.value('DELETE FROM partitioned_table')
-            $('#execute-query').click()
+            if (inputField) {
+                inputField.value('DELETE FROM partitioned_table;\nDELETE FROM replicated_table;')
+                $('#execute-query').click()
+            }
+            if (WAIT_SECS_AFTER_DELETE > 0) {
+                Thread.sleep(WAIT_SECS_AFTER_DELETE * 1000);
+            }
 
             and: 'close query'
             $('#worktabs').find('ul').find('li', 0).find('span').click()
@@ -253,9 +275,10 @@ class StudioWebDiag extends GebReportingSpec {
         }else{return false}
 
         //check result
-        if(resultField.children().is('table')){
+        if(resultField.text() =~ /$ERROR/){
+            return response.result == 'ERROR'
+        }else if(resultField.children().is('table')) {
             makeAndCheckTable(resultField.find('table').last())
-        }else if(resultField.text() =~ /^$ERROR/) {return response.result == 'ERROR'
         }else{return false} //result should only be a table or an error message
     }
 
