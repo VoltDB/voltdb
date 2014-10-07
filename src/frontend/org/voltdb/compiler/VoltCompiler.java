@@ -492,6 +492,7 @@ public class VoltCompiler {
         FilteredCatalogDiffEngine diffEng = new FilteredCatalogDiffEngine(origCatalog, autoGenCatalog);
         String diffCmds = diffEng.commands();
         if (diffCmds != null && !diffCmds.equals("")) {
+            System.out.println(diffCmds.toString());
             VoltDB.crashLocalVoltDB("Catalog Verification from Generated DDL failed!");
         }
         else {
@@ -919,6 +920,7 @@ public class VoltCompiler {
                 catGroup.setAdhoc(group.isAdhoc());
                 catGroup.setSysproc(group.isSysproc());
                 catGroup.setDefaultproc(group.isDefaultproc());
+                catGroup.setDefaultprocread(group.isDefaultprocread());
             }
         }
 
@@ -929,6 +931,7 @@ public class VoltCompiler {
                 catGroup.setAdhoc(role.isAdhoc());
                 catGroup.setSysproc(role.isSysproc());
                 catGroup.setDefaultproc(role.isDefaultproc());
+                catGroup.setDefaultprocread(role.isDefaultprocread());
             }
         }
 
