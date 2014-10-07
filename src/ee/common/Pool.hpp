@@ -67,6 +67,8 @@ inline T nexthigher(T k) {
         return k+1;
 }
 
+static const size_t TEMP_POOL_CHUNK_SIZE = 262144;
+
 /**
  * A memory pool that provides fast allocation and deallocation. The
  * only way to release memory is to free all memory in the pool by
@@ -74,21 +76,9 @@ inline T nexthigher(T k) {
  */
 class Pool {
 public:
-
     Pool() :
-        m_allocationSize(262144), m_maxChunkCount(1), m_currentChunkIndex(0)
+        m_allocationSize(TEMP_POOL_CHUNK_SIZE), m_maxChunkCount(0), m_currentChunkIndex(0)
     {
-#ifdef USE_MMAP
-        char *storage =
-                static_cast<char*>(::mmap( 0, m_allocationSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 ));
-        if (storage == MAP_FAILED) {
-            std::cout << strerror( errno ) << std::endl;
-            throwFatalException("Failed mmap");
-        }
-#else
-        char *storage = new char[m_allocationSize];
-#endif
-        m_chunks.push_back(Chunk(m_allocationSize, storage));
     }
 
     Pool(uint64_t allocationSize, uint64_t maxChunkCount) :
@@ -100,17 +90,6 @@ public:
         m_maxChunkCount(static_cast<std::size_t>(maxChunkCount)),
         m_currentChunkIndex(0)
     {
-#ifdef USE_MMAP
-        char *storage =
-                static_cast<char*>(::mmap( 0, m_allocationSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 ));
-        if (storage == MAP_FAILED) {
-            std::cout << strerror( errno ) << std::endl;
-            throwFatalException("Failed mmap");
-        }
-#else
-        char *storage = new char[m_allocationSize];
-#endif
-        m_chunks.push_back(Chunk(allocationSize, storage));
     }
 
     ~Pool() {
@@ -140,6 +119,20 @@ public:
      * Allocate a continous block of memory of the specified size.
      */
     inline void* allocate(std::size_t size) {
+        if (m_chunks.empty()) {
+#ifdef USE_MMAP
+            char *storage =
+                    static_cast<char*>(::mmap( 0, m_allocationSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 ));
+            if (storage == MAP_FAILED) {
+                std::cout << strerror( errno ) << std::endl;
+                throwFatalException("Failed mmap");
+            }
+#else
+            char *storage = new char[m_allocationSize];
+#endif
+            m_chunks.push_back(Chunk(m_allocationSize, storage));
+        }
+
         /*
          * See if there is space in the current chunk
          */
