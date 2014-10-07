@@ -64,12 +64,12 @@ public class CpuStats extends StatsSource {
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
         super.populateColumnSchema(columns);
-        columns.add(new VoltTable.ColumnInfo("PERCENT_USED", VoltType.FLOAT));
+        columns.add(new VoltTable.ColumnInfo("PERCENT_USED", VoltType.BIGINT));
     }
 
     @Override
     protected synchronized void updateStatsRow(Object rowKey, Object[] rowValues) {
-        rowValues[columnNameToIndex.get("PERCENT_USED")] = m_osBean.getProcessCpuLoad() * 100;
+        rowValues[columnNameToIndex.get("PERCENT_USED")] = Math.round(m_osBean.getProcessCpuLoad() * 100);
         super.updateStatsRow(rowKey, rowValues);
     }
 

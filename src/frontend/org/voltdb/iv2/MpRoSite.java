@@ -454,10 +454,16 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public VoltTable[] executePlanFragments(int numFragmentIds,
-            long[] planFragmentIds, long[] inputDepIds,
-            Object[] parameterSets, long txnId, long spHandle, long uniqueId, boolean readOnly)
-            throws EEException
+    public VoltTable[] executePlanFragments(
+            int numFragmentIds,
+            long[] planFragmentIds,
+            long[] inputDepIds,
+            Object[] parameterSets,
+            String[] sqlTexts,
+            long txnId,
+            long spHandle,
+            long uniqueId,
+            boolean readOnly) throws EEException
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }

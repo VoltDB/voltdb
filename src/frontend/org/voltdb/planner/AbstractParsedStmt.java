@@ -285,7 +285,7 @@ public abstract class AbstractParsedStmt {
         else {
             throw new PlanningErrorException("Unsupported expression node '" + elementName + "'");
         }
-
+        assert(retval != null);
         return retval;
     }
 
@@ -348,6 +348,7 @@ public abstract class AbstractParsedStmt {
         if (needParameter) {
             long id = Long.parseLong(exprNode.attributes.get("id"));
             ParameterValueExpression expr = m_paramsById.get(id);
+            assert(expr != null);
             if (needConstant) {
                 expr.setOriginalValue(cve);
                 cve.setValue(m_paramValues[expr.getParameterIndex()]);

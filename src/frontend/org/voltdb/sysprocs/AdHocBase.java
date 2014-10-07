@@ -100,12 +100,14 @@ public abstract class AdHocBase extends VoltSystemProcedure {
                 throw new VoltAbortException(msg);
             }
 
+            // Don't cache the statement text, since ad hoc statements
+            // that differ only by constants reuse the same plan, statement text may change.
             long aggFragId = ActivePlanRepository.loadOrAddRefPlanFragment(
-                    statement.core.aggregatorHash, statement.core.aggregatorFragment);
+                    statement.core.aggregatorHash, statement.core.aggregatorFragment, null);
             long collectorFragId = 0;
             if (statement.core.collectorFragment != null) {
                 collectorFragId = ActivePlanRepository.loadOrAddRefPlanFragment(
-                        statement.core.collectorHash, statement.core.collectorFragment);
+                        statement.core.collectorHash, statement.core.collectorFragment, null);
             }
             SQLStmt stmt = SQLStmtAdHocHelper.createWithPlan(
                     statement.sql,

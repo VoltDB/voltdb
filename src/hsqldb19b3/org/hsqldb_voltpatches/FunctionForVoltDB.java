@@ -142,13 +142,12 @@ public class FunctionForVoltDB extends FunctionSQL {
                                   Tokens.COMMA, Tokens.QUESTION,
                                   Tokens.CLOSEBRACKET}),
 
-// Disable SET_FIELD at the parser level until its exact semantics can be ironed out.
-//            new FunctionId("set_field", Type.SQL_VARCHAR, FUNC_VOLT_SET_FIELD, -1,
-//                    new Type[] { Type.SQL_VARCHAR, Type.SQL_VARCHAR, Type.SQL_VARCHAR },
-//                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
-//                                  Tokens.COMMA, Tokens.QUESTION,
-//                                  Tokens.COMMA, Tokens.QUESTION,
-//                                  Tokens.CLOSEBRACKET }),
+            new FunctionId("set_field", Type.SQL_VARCHAR, FUNC_VOLT_SET_FIELD, -1,
+                    new Type[] { Type.SQL_VARCHAR, Type.SQL_VARCHAR, Type.SQL_VARCHAR },
+                    new short[] { Tokens.OPENBRACKET, Tokens.QUESTION,
+                                  Tokens.COMMA, Tokens.QUESTION,
+                                  Tokens.COMMA, Tokens.QUESTION,
+                                  Tokens.CLOSEBRACKET }),
 
             new FunctionId("array_element", Type.SQL_VARCHAR, FUNC_VOLT_ARRAY_ELEMENT, -1,
                     new Type[] { Type.SQL_VARCHAR, Type.SQL_INTEGER },

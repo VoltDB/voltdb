@@ -93,11 +93,10 @@ abstract public class ProcedureTask extends TransactionTask
                         "after the procedure was submitted " +
                         "but before the procedure was executed.";
                     RateLimitedLogger.tryLogForMessage(
-                            error + " This log message is rate limited to once every 60 seconds.",
                             System.currentTimeMillis(),
                             60, TimeUnit.SECONDS,
                             hostLog,
-                            Level.WARN);
+                            Level.WARN, error + " %s", "This log message is rate limited to once every 60 seconds.");
                     response.setResults(
                             new ClientResponseImpl(
                                 ClientResponse.UNEXPECTED_FAILURE,
