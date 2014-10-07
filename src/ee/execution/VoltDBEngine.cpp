@@ -493,7 +493,7 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
                 VOLT_TRACE("The Executor's execution at position '%d'"
                            " failed for PlanFragment '%jd'",
                            ctr, (intmax_t)planfragmentId);
-                cleanupExecutors(execsForFrag);
+                cleanupExecutors(execsForFrag, true);
 
                 return ENGINE_ERRORCODE_ERROR;
             }
@@ -501,7 +501,7 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
             VOLT_TRACE("The Executor's execution at position '%d'"
                        " failed for PlanFragment '%jd'",
                        ctr, (intmax_t)planfragmentId);
-            cleanupExecutors(execsForFrag);
+            cleanupExecutors(execsForFrag, true);
             resetReusedResultOutputBuffer();
             e.serialize(getExceptionOutputSerializer());
 
@@ -543,12 +543,23 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
 /**
  * Function that clean up the temp table the executors used and reset other metadata.
  */
-void VoltDBEngine::cleanupExecutors(ExecutorVector * execsForFrag) {
+void VoltDBEngine::cleanupExecutors(ExecutorVector * execsForFrag, bool hasException) {
     // Clean up all the tempTable when each plan finishes
     BOOST_FOREACH (AbstractExecutor *executor, execsForFrag->list) {
         assert (executor);
         executor->cleanupTempOutputTable();
+
+        if (hasException) {
+            AbstractPlanNode * node = executor->getPlanNode();
+            std::map<PlanNodeType, AbstractPlanNode*>::iterator it;
+            std::map<PlanNodeType, AbstractPlanNode*> inlineNodes = node->getInlinePlanNodes();
+            for (it = inlineNodes.begin(); it != inlineNodes.end(); it++ ) {
+                AbstractPlanNode *inlineNode = it->second;
+                inlineNode->getExecutor()->cleanupMemoryPool();
+            }
+        }
     }
+
     // set this back to -1 for error handling
     m_currentInputDepId = -1;
     m_currExecutorVec = NULL;

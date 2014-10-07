@@ -92,6 +92,10 @@ class AbstractExecutor {
         }
     }
 
+    virtual void cleanupMemoryPool() {
+        // LEAVE as blank on purpose
+    }
+
   protected:
     AbstractExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode) {
         m_abstractNode = abstractNode;
