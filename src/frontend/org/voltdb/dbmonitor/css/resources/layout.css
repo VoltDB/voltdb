@@ -431,6 +431,7 @@ ul.catalogNav li.active a, ul.catalogNav li.active a:hover{background:#76bd1d; d
 .rightCont { width:98%; padding:0 ; margin:0 auto;}
 .dataBlock { margin:0 0 20px 0; padding:0; background:#fff; }
 .dataBlock h1{font-weight:bold;}
+.dataBlock table td:nth-child(1) { width: 30%; }
 #rendersCatalogUrl h3, #rendersCatalogUrl h4 {font:14px 'MYRIADPROREGULAR'; font-weight:bold;}
 #catalogContainer h3 { font-weight: bold;}
 #rendersCatalogUrl h4{ background:#fbfbfb; padding:20px;}

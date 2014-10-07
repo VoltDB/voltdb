@@ -13,9 +13,12 @@
     var iVoltDbService = (function () {
         var _connection = connection;
 
-        this.TestConnection = function (lUsername, lPassword, lAdmin, onConnectionAdded) {
+        this.TestConnection = function (lServerName, lPort, lUsername, lPassword, lAdmin, onConnectionAdded) {
             try {
-                VoltDBCore.TestConnection(server, port, lAdmin, lUsername, lPassword, isHashedPassword, "DATABASE_LOGIN", function (result) {
+                var serverName = lServerName != null ? lServerName : server;
+                var portId = lPort != null ? lPort : port;
+
+                VoltDBCore.TestConnection(serverName, portId, lAdmin, lUsername, lPassword, isHashedPassword, "DATABASE_LOGIN", function (result) {
                     onConnectionAdded(result);
                 });
 
@@ -31,23 +34,27 @@
         };
         
         this.ChangeServerConfiguration = function(serverName,portId,userName,pw,isHashPw,isAdmin) {
-            server = serverName;
-            port = portId;
-            user = userName;
-            password = pw;
+            server = serverName != null ? serverName : server;
+            port = portId != null ? portId : port;
+            user = userName != undefined ? userName : "";
+            password = pw != undefined ? pw : "";
             isHashedPassword = isHashPw;
-            admin = isAdmin;
+            admin = isAdmin != undefined ? isAdmin : true;
         };
 
         this.GetSystemInformation = function (onConnectionAdded) {
             try {
-                _connection = VoltDBCore.HasConnection(server, port, admin, user, "SYSTEM_INFORMATION");
+                var processName = "SYSTEM_INFORMATION";
+                var procedureNames = ['@SystemInformation', '@Statistics'];
+                var parameters = ["OVERVIEW", "MEMORY"];
+                var values = [undefined, '0'];
+                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
                 if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, "SYSTEM_INFORMATION", function (result) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
                         if (result == true) {
                             updateTips("Connection successful.");
                                                        
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, ['@SystemInformation', '@Statistics'], ["OVERVIEW", "MEMORY"], [undefined, '0'],"SYSTEM_INFORMATION", function (connection, status) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
                                 onConnectionAdded(connection, status);
                             });
                         } else updateTips("Unable to connect.");
@@ -55,13 +62,14 @@
                     });
                     
                 } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, _connection, function (connection, status) {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
                         onConnectionAdded(connection, status);
                         
                     });
                     
                 }
             } catch (e) {
+                debugger;
                 console.log(e.message);
             }
 
@@ -79,13 +87,17 @@
         
         this.GetSystemInformationDeployment = function (onConnectionAdded) {
             try {
-                _connection = VoltDBCore.HasConnection(server, port, false, user, "SYSTEM_INFORMATION_DEPLOYMENT");
+                var processName = "SYSTEM_INFORMATION_DEPLOYMENT";
+                var procedureNames = ['@SystemInformation'];
+                var parameters = ["DEPLOYMENT"];
+                var values = [];
+                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
                 if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, "SYSTEM_INFORMATION_DEPLOYMENT", function (result) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
                         if (result == true) {
                             updateTips("Connection successful.");
 
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, ['@SystemInformation'], ["DEPLOYMENT"], [], "SYSTEM_INFORMATION_DEPLOYMENT", function (connection, status) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
                                 onConnectionAdded(connection);
                             });
                         } else updateTips("Unable to connect.");
@@ -93,7 +105,7 @@
                     });
 
                 } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, _connection, function (connection, status) {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
                         onConnectionAdded(connection);
 
                     });
@@ -117,11 +129,15 @@
 
         this.GetDataTablesInformation = function(onConnectionAdded) {
             try {
-                _connection = VoltDBCore.HasConnection(server, port, false, user, "DATABASE_INFORMATION");
+                var processName = "DATABASE_INFORMATION";
+                var procedureNames = ['@Statistics', '@SystemCatalog'];
+                var parameters = ["TABLE", "TABLES"];
+                var values = ['0', undefined];
+                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
                 if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword,"DATABASE_INFORMATION", function (result) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
                         if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, ['@Statistics', '@SystemCatalog'], ["TABLE", "TABLES"], ['0', undefined], "DATABASE_INFORMATION", function (connection, status) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
                                 onConnectionAdded(connection, status);
                             });
                         } 
@@ -129,7 +145,7 @@
                     });
 
                 } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, _connection, function (connection, status) {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
                         onConnectionAdded(connection, status);
 
                     });
@@ -144,11 +160,15 @@
         
         this.GetProceduresInformation = function (onConnectionAdded) {
             try {
-                _connection = VoltDBCore.HasConnection(server, port, false, user, "DATABASE_INFORMATION");
+                var processName = "DATABASE_INFORMATION";
+                var procedureNames = ['@Statistics'];
+                var parameters = ["PROCEDUREPROFILE"];
+                var values = ['0'];
+                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
                 if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword,"DATABASE_INFORMATION", function (result) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
                         if (result == true) {                            
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, ['@Statistics'], ["PROCEDUREPROFILE"], ['0'], "DATABASE_INFORMATION", function (connection, status) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
                                 onConnectionAdded(connection, status);
                             });
                         } 
@@ -156,7 +176,7 @@
                     });
 
                 } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, _connection, function (connection, status) {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
                         onConnectionAdded(connection, status);
 
                     });
@@ -171,11 +191,15 @@
         
         this.GetMemoryInformation = function (onConnectionAdded) {
             try {
-                _connection = VoltDBCore.HasConnection(server, port, false, user, "GRAPH_MEMORY");
+                var processName = "GRAPH_MEMORY";
+                var procedureNames = ['@Statistics'];
+                var parameters = ["MEMORY"];
+                var values = ['0'];
+                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
                 if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, "GRAPH_MEMORY", function (result) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
                         if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, ['@Statistics'], ["MEMORY"], ['0'], "GRAPH_MEMORY", function (connection, status) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
                                 onConnectionAdded(connection, status);
                             });
                         }
@@ -183,7 +207,7 @@
                     });
 
                 } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, _connection, function (connection, status) {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
                         onConnectionAdded(connection, status);
 
                     });
@@ -198,11 +222,15 @@
         
         this.GetGraphLatencyInformation = function (onConnectionAdded) {
             try {
-                _connection = VoltDBCore.HasConnection(server, port, false, user, "GRAPH_LATENCY");
+                var processName = "GRAPH_LATENCY";
+                var procedureNames = ['@Statistics'];
+                var parameters = ["LATENCY_HISTOGRAM"];
+                var values = ['0'];
+                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
                 if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, "GRAPH_LATENCY", function (result) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
                         if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, ['@Statistics'], ["LATENCY_HISTOGRAM"], ['0'], "GRAPH_LATENCY", function (connection, status) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
                                 onConnectionAdded(connection, status);
                             });
                         }
@@ -210,7 +238,7 @@
                     });
 
                 } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, _connection, function (connection, status) {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
                         onConnectionAdded(connection, status);
 
                     });
@@ -223,15 +251,18 @@
 
         };
         
-        //TODO: Render CPU Graph
         this.GetCPUInformation = function (onConnectionAdded) {
             try {
                 //GRAPH_CPU
-                _connection = VoltDBCore.HasConnection(server, port, false, user, "GRAPH_CPU");
+                var processName = "GRAPH_CPU";
+                var procedureNames = ['@Statistics'];
+                var parameters = ["CPU"];
+                var values = ['0'];
+                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
                 if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, "GRAPH_CPU", function (result) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
                         if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, ['@Statistics'], ["CPU"], ['0'], "GRAPH_CPU", function (connection, status) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
                                 onConnectionAdded(connection, status);
                             });
                         }
@@ -239,7 +270,7 @@
                     });
 
                 } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, _connection, function (connection, status) {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
                         onConnectionAdded(connection, status);
 
                     });
@@ -255,11 +286,15 @@
         //Render Cluster Transaction Graph
         this.GetTransactionInformation = function (onConnectionAdded) {
             try {
-                _connection = VoltDBCore.HasConnection(server, port, false, user, "GRAPH_TRANSACTION");
+                var processName = "GRAPH_TRANSACTION";
+                var procedureNames = ['@Statistics'];
+                var parameters = ["PROCEDUREPROFILE"];
+                var values = ['0'];
+                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
                 if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, "GRAPH_TRANSACTION", function (result) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
                         if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, ['@Statistics'], ["PROCEDUREPROFILE"], ['0'], "GRAPH_TRANSACTION", function (connection, status) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
                                 onConnectionAdded(connection, status);
                             });
                         }
@@ -267,7 +302,7 @@
                     });
 
                 } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, _connection, function (connection, status) {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
                         onConnectionAdded(connection, status);
 
                     });
@@ -282,11 +317,15 @@
     
         this.GetTableInformation = function (onConnectionAdded) {
             try {
-                _connection = VoltDBCore.HasConnection(server, port, false, user, "TABLE_INFORMATION");
+                var processName = "TABLE_INFORMATION";
+                var procedureNames = ['@Statistics', '@Statistics', '@SystemCatalog'];
+                var parameters = ["TABLE", "INDEX", "COLUMNS"];
+                var values = ['0', '0', undefined];
+                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
                 if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, "TABLE_INFORMATION", function (result) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
                         if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, ['@Statistics', '@Statistics', '@SystemCatalog'], ["TABLE", "INDEX", "COLUMNS"], ['0', '0', undefined], "TABLE_INFORMATION", function (connection, status) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
                                 onConnectionAdded(connection, status);
                             });
                         }
@@ -294,7 +333,7 @@
                     });
 
                 } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, _connection, function (connection, status) {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
                         onConnectionAdded(connection, status);
 
                     });

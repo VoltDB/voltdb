@@ -1,6 +1,5 @@
 ﻿$(document).ready(function () {
-    var queryString ='';
-
+    
     //Default Action
     $(".tab_content").hide(); //Hide all content
     $("ul.tabs li:first").addClass("active").show(); //Activate first tab
@@ -85,6 +84,43 @@
         disableFadeOut: true,
         height: '225px'
     });
+    
+    //Attach the login popup to the page.
+    $("body").append(voltDbRenderer.GetLoginPopup());
+
+    var serverName = window.location.hostname == "localhost" ? null : window.location.hostname;
+    var portid = window.location.hostname == "localhost" ? null : window.location.port;
+    
+    //If security is enabled, then it displays login popup. After user is verified, it calls loadPage().
+    //If security is not enabled, then it simply calls loadPage().
+    voltDbRenderer.HandleLogin(serverName, portid, function() { loadPage(serverName, portid); });
+});
+
+var saveCookie = function (name, value) {
+    $.cookie(name, value, { expires: 365 });
+};
+
+function loadPage(serverName, portid) {
+    
+    var userName = $.cookie('username') != undefined ? $.cookie('username') : "";
+    var password = $.cookie('password') != undefined ? $.cookie('password') : "";
+    var admin = $.cookie('admin') != undefined ? $.cookie('admin') : true;
+    voltDbRenderer.ChangeServerConfiguration(serverName, portid, userName, password, false, admin);
+    voltDbRenderer.ShowUsername(userName);
+
+    function saveConnectionKey() {
+        var server = serverName == null ? '184_73_30_156' : $.trim(serverName);
+        var port = portid == null ? '8080' : $.trim(portid);
+        var user = userName == '' ? null : userName;
+        var processName = 'TABLE_INFORMATION';
+        var key = (server + '_' + port + '_' + (user == '' ? '' : user) + '_' +
+            (admin == true ? 'Admin' : '') + "_" + processName).replace(/[^_a-zA-Z0-9]/g, "_");
+        saveCookie('connectionkey', key);
+    }
+
+    saveConnectionKey();
+
+    var queryString = '';
 
     // Export Type Change	 
     $('#exportType').change(function () {
@@ -106,7 +142,7 @@
         var query = new QueryUI(queryString).execute();
     });
     // Clears Query
-    $('#clearQuery').click(function() {
+    $('#clearQuery').click(function () {
         $('#theQueryText').val('');
     });
 
@@ -114,7 +150,7 @@
 
     $('.tooltip').tooltipster();
 
-    var populateTableData = function(tables) {
+    var populateTableData = function (tables) {
         var count = 0;
         var src = "";
         for (var k in tables) {
@@ -140,7 +176,7 @@
         }
     };
 
-    var populateViewData = function(views) {
+    var populateViewData = function (views) {
         var count = 0;
         var src = "";
         for (var k in views) {
@@ -166,7 +202,7 @@
         }
     };
 
-    var populateTablesAndViews = function() {
+    var populateTablesAndViews = function () {
         voltDbRenderer.GetTableInformation(function (tablesData, viewsData) {
             var tables = tablesData['tables'];
             populateTableData(tables);
@@ -179,12 +215,11 @@
     $('#runBTn').click(function () {
         queryString = $('#theQueryText').val();
         new QueryUI(queryString).execute();
-        
+
     });
-    $('#clearQuery').click(function() {
+    $('#clearQuery').click(function () {
         $('#theQueryText').val('');
     });
-    
-    shortcut.add("F5", function () { $("#runBTn").button().click(); });
-});
 
+    shortcut.add("F5", function () { $("#runBTn").button().click(); });
+}

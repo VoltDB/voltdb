@@ -2,7 +2,7 @@
     "use strict";
     var CommandParser,
         queryToRun=queryString,
-        DataSource = '184_73_30_156_8080_null_Admin_TABLE_INFORMATION';
+        DataSource = $.cookie('connectionkey') == undefined ? '' : $.cookie('connectionkey');
 
     function ICommandParser() {
         var MatchEndOfLineComments = /^\s*(?:\/\/|--).*$/gm,

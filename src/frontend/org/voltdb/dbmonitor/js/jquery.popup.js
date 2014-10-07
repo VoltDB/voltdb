@@ -102,6 +102,7 @@
 						.animate({opacity : 1}, plugin.o.speed, function(){
 						    $('body').css("height", $(window).height()); $('body').css("overflow", "hidden");
 						    $('body').css("position", "fixed");
+						    $('body').css("width", "100%");
 							//$('body').bind('touchmove', function(e){e.preventDefault()});//mobile
 							// Call the open callback
 							plugin.o.afterOpen.call(plugin);
@@ -123,6 +124,7 @@
 						$popup.animate({opacity : 0}, this.o.speed);
 						$('body').css("height", $(window).height()); $('body').css("overflow", "auto");
 						$('body').css("position", "static");
+						$('body').css("width", "auto");
 					 //$('body').unbind('touchmove');//mobile
 					}
 

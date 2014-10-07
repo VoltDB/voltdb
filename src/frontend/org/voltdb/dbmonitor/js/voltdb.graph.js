@@ -23,7 +23,7 @@
         
         var dataCpu = [{
             "key": "CPU",
-            "values": getDataCPU(),
+            "values": getEmptyData(),
             "color": "rgb(164, 136, 5)",
         }];
 
@@ -57,7 +57,7 @@
             MonitorGraphUI.ChartCpu.xAxis.rotateLabels(-20);
 
             MonitorGraphUI.ChartCpu.yAxis
-                .tickFormat(d3.format(',1%'));
+                .tickFormat(d3.format(',.2f'));
 
             MonitorGraphUI.ChartCpu.yAxis
                 .axisLabel('(%)')
@@ -101,7 +101,7 @@
             
             MonitorGraphUI.ChartRam.tooltipContent(function (key, y, e, graph) {
                 return '<h3> RAM </h3>'
-                    + '<p>' + e + 'GB at ' + y + '</p>';
+                    + '<p>' + e + ' GB at ' + y + '</p>';
             });
             
             d3.select('#visualisationRam')
@@ -134,7 +134,7 @@
             
             MonitorGraphUI.ChartLatency.tooltipContent(function (key, y, e, graph) {
                 return '<h3> Latency </h3>'
-                    + '<p>' + e + 'ms at ' + y + '</p>';
+                    + '<p>' + e + ' ms at ' + y + '</p>';
             });
 
             d3.select('#visualisationLatency')
@@ -167,7 +167,7 @@
 
             MonitorGraphUI.ChartTransactions.tooltipContent(function (key, y, e, graph) {
                 return '<h3> Transactions </h3>'
-                    + '<p>' + e + 'tps at ' + y + '</p>';
+                    + '<p>' + e + ' tps at ' + y + '</p>';
             });
 
             d3.select('#visualisationTransaction')
@@ -633,13 +633,15 @@
 
         };
 
-        this.RefreshCpu = function(cpuDetails) {
+        this.RefreshCpu = function(cpuDetails,currentServer) {
             var monitor = MonitorGraphUI.Monitors;
             var cpuData = monitor.cpuData;
 
             var cpuDetail = cpuDetails;
+            var percentageUsage = parseFloat(cpuDetail[currentServer].PERCENT_USED).toFixed(1) * 1;
+            var timeStamp = cpuDetail[currentServer].TIMESTAMP;
             cpuData = cpuData.slice(1);
-            cpuData.push({ "x": new Date(new Date().getTime()), "y": 0 });
+            cpuData.push({ "x": new Date(timeStamp), "y": percentageUsage });
             dataCpu[0]["values"] = cpuData;
             MonitorGraphUI.Monitors.cpuData = cpuData;
 

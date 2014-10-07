@@ -88,19 +88,19 @@
                     params += ']';
                     s[s.length] = encodeURIComponent('Parameters') + '=' + encodeURIComponent(params);
                 }
-                if (this.User != null)
-                    s[s.length] = encodeURIComponent('User') + '=' + encodeURIComponent(this.User);
-                if (this.Password != null)
-                    s[s.length] = encodeURIComponent('Password') + '=' + encodeURIComponent(this.Password);
-                if (this.HashedPassword != null)
-                    s[s.length] = encodeURIComponent('Hashedpassword') + '=' + encodeURIComponent(this.HashedPassword);
-                if (this.Admin)
+                if (this.user != null)
+                    s[s.length] = encodeURIComponent('User') + '=' + encodeURIComponent(this.user);
+                if (this.password != null)
+                    s[s.length] = encodeURIComponent('Password') + '=' + encodeURIComponent(this.password);
+                if (this.isHashedPassword != null)
+                    s[s.length] = encodeURIComponent('Hashedpassword') + '=' + encodeURIComponent(this.isHashedPassword);
+                if (this.admin)
                     s[s.length] = 'admin=true';
                 var paramSet = s.join('&') + '&jsonp=?';
                 return paramSet;
             };
             
-            this.CallExecute = function(procedure, parameters, callback) {
+            this.CallExecute = function (procedure, parameters, callback) {
                 var uri = 'http://' + this.server + ':' + this.port + '/api/1.0/';
                 var params = this.BuildParamSet(procedure, parameters);
                 if (uri.trim())
@@ -163,7 +163,7 @@
                                         if (item[2] != null)
                                             item[2](response);
                                         queue.EndExecute();
-                                    } catch(x) {
+                                    } catch (x) {
                                         success = false;
                                         queue.EndExecute();
                                     }
@@ -291,12 +291,13 @@
             return paramSet;
         };
 
-        
-
-        this.TestConnection = function(server, port, admin, user, password, isHashedPassword,processName, onConnectionTested) {
+        this.TestConnection = function (server, port, admin, user, password, isHashedPassword, processName, onConnectionTested) {
             var conn = new DbConnection(server, port, admin, user, password, isHashedPassword, processName);
-            var timeout = setTimeout(function() { onConnectionTested(false); }, 5000);
-            conn.BeginExecute('@Statistics', ['TABLE', 0], function(response) {
+            var timeout = setTimeout(function() {
+                onConnectionTested(false);
+            }, 5000);
+            
+            conn.BeginExecute('@Statistics', ['TABLE', 0], function (response) {
                 try {
                     if (response.status == 1) {
                         clearTimeout(timeout);
@@ -311,15 +312,15 @@
         
         this.AddConnection = function (server, port, admin, user, password, isHashedPassword,procedureNames,parameters,values,processName,onConnectionAdded) {
             var conn =new DbConnection(server, port, admin, user, password, isHashedPassword,processName);
-            compileProcedureCommands(conn,procedureNames, parameters, values);
+            compileProcedureCommands(conn, procedureNames, parameters, values);
             this.connections[conn.key] = conn;
             loadConnectionMetadata(this.connections[conn.key], onConnectionAdded, processName);
             
         };
-        
-        this.updateConnection = function (server, port, admin, user, password, isHashedPassword,connection, onConnectionAdded) {
-            loadConnectionMetadata(connection, onConnectionAdded);
 
+        this.updateConnection = function (server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, connection, onConnectionAdded) {
+            compileProcedureCommands(connection, procedureNames, parameters, values);
+            loadConnectionMetadata(connection, onConnectionAdded, processName);
         };
 
         this.HasConnection = function(server, port, admin, user,processName) {

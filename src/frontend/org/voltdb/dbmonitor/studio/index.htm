@@ -13,7 +13,8 @@
         <link href="../css/resources/tooltipster.css" rel="stylesheet" />
         <script type="application/javascript" src="../js/jquery-1.11.1.min.js"></script>
         <script type="application/javascript" src="../js/jquery-ui.js"></script>
-        <script type="application/javascript" src="../js/jquery.slimscroll.js"></script>
+	    <script type="application/javascript" src="../js/jquery.slimscroll.js"></script>
+        <script type="application/javascript" src="../js/jquery.popup.js"></script>
         <script type="text/javascript" src="../js/voltdb.render.js"></script>
         <script type="text/javascript" src="../js/voltdb.service.js"></script>
         <script type="text/javascript" src="../js/voltdb.core.js"></script>
@@ -23,6 +24,7 @@
         <script type="text/javascript" src="../js/voltdb.queryrender.js"></script>
         <script type="text/javascript" src="../js/sorttable.js"></script>
         <script type="text/javascript"src="../js/shortcut.js"></script>
+        <script type="text/javascript" src="../js/jquery.cookie.js"></script>
 	</head>
 <body class="body">
 <div class="page-wrap">
@@ -43,7 +45,7 @@
     </div>
     <div class="headRight">
        <ul class="topRightList" id="userSection">
-        <li class="userN">Username </li>
+        <li class="userN"></li>
         <li>
           <div class="user"></div>
         </li>
@@ -102,7 +104,7 @@
 <div class="blockWrapper" id="blockContainer02">
 <div class="exportType">
 <form name="" id="queryResult">
-	<select id="exportType" onchange="exportType()">
+	<select id="exportType">
     	<option selected="selected">HTML</option>
         <option>CSV</option>
         <option>Monospace</option>
@@ -133,5 +135,10 @@
    <p>Copyright  &copy; 2014 VoltDB. All rights reserved. </p>
    <span></span>
    </div>
+ <!-- Loading -->
+    <div id="overlay" style="display: none;">
+        <div class="loading"></div>
+    </div>
+    <!-- Loading -->
 </body>
 </html>
