@@ -30,7 +30,7 @@ import groovy.json.*
 
 
 class StudioWebPage extends Page {
-    static url = StudioWebDiag.USE_NEW_UI ? 'http://admin:voltdb@stag.deerwalk.com/mockup/voltdb_monitor/studio/index.htm'
+    static url = StudioWebDiag.USE_NEW_UI ? 'http://184.73.30.156:8080/dbmonitor/studio/index.htm'
                                           : 'file://localhost/' + new File('../../../src/frontend/org/voltdb/studio/index.htm').getCanonicalPath()
     static at = { title == 'VoltDB Web Studio' }
 }
@@ -43,9 +43,11 @@ class StudioWebDiag extends GebReportingSpec {
     static final int WAIT_SECS_AFTER_DELETE = 0;
 
     //STATUS MESSAGES
-    static String FAILURE = USE_NEW_UI ? 'Query Result' : 'Query error'
-    static String SUCCESS = USE_NEW_UI ? 'Query Result' : 'Query Duration:'
+    //static String FAILURE = 'Query error'
+    static String FAILURE = USE_NEW_UI ? 'Query took' : 'Query error'
+    static String SUCCESS = USE_NEW_UI ? 'Query took' : 'Query Duration:'
     static String ERROR = 'Error:' //all errors are handled server-side
+    static String CONNECT_FIRST = 'Connect to a datasource first'
 
     //FILES
     static String elemFileName = USE_NEW_UI ? 'elemsNewUI.txt' : 'elems.txt'
@@ -89,6 +91,22 @@ class StudioWebDiag extends GebReportingSpec {
 
         expect: 'to be on studio web page'
         at StudioWebPage
+
+        if (!USE_NEW_UI) {
+            return
+        }
+
+        and: 'Wait to finish loading'
+        waitFor(30) {$('.loading').displayed == false}
+
+        and: 'Login'
+        waitFor(30) {$('#loginBox').text().contains('Username:')}
+        $('#username').value('voltdb')
+        $('#password').value('voltdb')
+        $('#LoginBtn').click()
+
+        and: 'Wait to finish loading again'
+        waitFor(30) {$('.loading').displayed == false}
     }
 
     def 'Contains important elements'(){
@@ -155,40 +173,42 @@ class StudioWebDiag extends GebReportingSpec {
     @Unroll //performs this method for each item in testName
     def '#testName'(){
             boolean testFailed = true
+            def newQuery = $('#clearQuery')
+            def executeQuery = $('#runBTn')
+            def inputField = $('#theQueryText')
             def statusField = null
             def resultField = null
-            def inputField = null
-            
+            if (!USE_NEW_UI) {
+                newQuery = $('#new-query')
+                executeQuery = $('#execute-query')
+            }
+
         try{
             setup: 'open new query'
             response = resTmp
-            $('#new-query').click()
-            inputField = $('#worktabs').find('div', 0).find('textarea')
-            if (USE_NEW_UI) {
-                inputField = $('#theQueryText')
-                response.result = [Contestant_name:[null, 'Lorem_Ipsum', 'Lorem_Dolor', 'Ipsum_Dolor', 'Sit_Amet', 'Lorem_Ipsum_Dolor', 'Ipsum_Dolor_Sit'],
-                                   Contestant_number:[null, 20, 21, 22, 23, 24, 25],
-                                   Total_votes:[null, 15002, 18002, 19003, 22809, 28402, 32456] ]
+            newQuery.click()
+            if (!USE_NEW_UI) {
+                inputField = $('#worktabs').find('div', 0).find('textarea')
             }
 
             and: 'execute SQL query'
             inputField.value(input)
-            if (USE_NEW_UI) {
-                $('.btnStudio').click()
-            } else {
-                $('#execute-query').click()
-            }
+            executeQuery.click()
 
-            and: 'obtain response status and result'
-            statusField = $('#worktabs').find('span.status')
-            resultField = $('#worktabs').find('div.resultbar').children('div')
-            if (USE_NEW_UI) {
-                statusField = $('.icon-queryResult')
-                resultField = $('#resultHtml')
-            }
             // TODO: may want to add a wait here, to make sure (new) values
             // are visible in statusField & resultField, since this fails very
             // occasionally, apparently do to a timing issue
+
+            and: 'obtain response status and result'
+            statusField = $('#queryResults')
+            resultField = $('#resultHtml')
+            if (USE_NEW_UI) {
+                // TODO: remove this kludge, once the new UI really works
+                response.result = 'CONNECT_FIRST'
+            } else {
+                statusField = $('#worktabs').find('span.status')
+                resultField = $('#worktabs').find('div.resultbar').children('div')
+            }
 
             when: 'ensure appropriate status and result are displayed'
             assert checkResponse(statusField, resultField)
@@ -277,6 +297,8 @@ class StudioWebDiag extends GebReportingSpec {
         //check result
         if(resultField.text() =~ /$ERROR/){
             return response.result == 'ERROR'
+        }else if(resultField.text() =~ /^$CONNECT_FIRST/) {
+            return response.result == 'CONNECT_FIRST'
         }else if(resultField.children().is('table')) {
             makeAndCheckTable(resultField.find('table').last())
         }else{return false} //result should only be a table or an error message
