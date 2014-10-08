@@ -519,6 +519,15 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "( select WAGE, DEPT from R2 );").getResults()[0];
         validateTableOfLongs(vt, new long[][] {});
 
+        // The NULL from R2 is eliminated by the offset
+        // HSQL gets it wrong
+        if (!isHSQL()) {
+            vt = client.callProcedure("@AdHoc",
+                "select ID from R1 where R1.WAGE NOT IN " +
+                "(select WAGE from R2 where ID < 104 order by WAGE desc limit 1 offset 1);").getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{100}});
+        }
+
     }
 
     /**
