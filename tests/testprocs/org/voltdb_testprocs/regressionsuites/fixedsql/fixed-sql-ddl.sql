@@ -220,10 +220,3 @@ CREATE TABLE ENG6926_HITS (
    PRIMARY KEY (WEEK, IP)
 );
 PARTITION TABLE HITS ON COLUMN WEEK;
-
-CREATE PROCEDURE ENG6926_Buggy AS
-	select count(ip.ip), ip.province as state
-        from eng6926_hits as h, eng6926_ipuser as ip
-        where ip.ip=h.ip and ip.countrycode='US'
-        group by ip.province
-        order by count(ip.ip) desc;
