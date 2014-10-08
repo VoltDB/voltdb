@@ -44,6 +44,7 @@ import org.hsqldb_voltpatches.lib.HashSet;
 import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.lib.HsqlList;
 import org.hsqldb_voltpatches.lib.IntValueHashMap;
+import org.hsqldb_voltpatches.lib.Iterator;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.lib.OrderedIntHashSet;
 import org.hsqldb_voltpatches.lib.Set;
@@ -246,8 +247,72 @@ public class QuerySpecification extends QueryExpression {
                                                rangeVariables.length, false);
         }
 
+    /************************* Volt DB Extensions *************************/
+        resolveColumnRefernecesInGroupBy();
+    /**********************************************************************/
+
         resolveColumnRefernecesInOrderBy(sortAndSlice);
     }
+
+    /************************* Volt DB Extensions *************************/
+    void resolveColumnRefernecesInGroupBy() {
+        if (! isAggregated) {
+            return;
+        }
+
+        if (unresolvedExpressions == null || unresolvedExpressions.isEmpty()) {
+            return;
+        }
+        HashSet uniqueSet = new HashSet();
+        for (int i = 0; i < unresolvedExpressions.size(); i++) {
+            Object element = unresolvedExpressions.get(i);
+            uniqueSet.add(element);
+        }
+
+        // resolve GROUP BY and HAVING columns/expressions
+        HsqlList newUnresolvedExpressions = new ArrayListIdentity();
+        Iterator iter = uniqueSet.iterator();
+        while(iter.hasNext()) {
+            Expression element = (Expression)iter.next();
+            // find the unsolved expression in the groupBy/Having list
+            int k = indexLimitVisible;
+            for (; k < indexStartOrderBy; k++) {
+                if (element.equals(exprColumns[k])) {
+                    break;
+                }
+            }
+
+            if (exprColumns[k].opType != OpTypes.COLUMN) {
+                continue;
+            }
+            ExpressionColumn exprCol = (ExpressionColumn) exprColumns[k];
+            String alias = exprCol.getColumnName();
+
+            boolean hasFound = false;
+            // find it in the SELECT list
+            for (int j = 0; j < indexLimitVisible; j++) {
+                Expression selectCol = exprColumns[j];
+                if (selectCol.isAggregate) {
+                    // Group by can not support aggregate expression
+                    continue;
+                }
+                if (alias.equals(selectCol.alias.name)) {
+                    hasFound = true;
+
+                    exprColumns[k] = selectCol;
+                    exprColumnList.set(k, selectCol);
+                    // found it and get the next one
+                    break;
+                }
+            }
+            if (! hasFound) {
+                newUnresolvedExpressions.add(element);
+            }
+        }
+
+        unresolvedExpressions = newUnresolvedExpressions;
+    }
+    /**********************************************************************/
 
     void resolveColumnRefernecesInOrderBy(SortAndSlice sortAndSlice) {
 
@@ -978,7 +1043,7 @@ public class QuerySpecification extends QueryExpression {
                 (Integer) sortAndSlice.limitCondition.getRightNode().getValue(
                     session);
 
-            // A VoltDB extension to support LIMIT 0 
+            // A VoltDB extension to support LIMIT 0
             if (limit == null || limit.intValue() < 0) {
             /* disable 1 line ...
             if (limit == null || limit.intValue() <= 0) {
@@ -1011,7 +1076,7 @@ public class QuerySpecification extends QueryExpression {
                 rowCount = limitCount;
             }
 
-            // A VoltDB extension to support LIMIT 0 
+            // A VoltDB extension to support LIMIT 0
             if (rowCount > Integer.MAX_VALUE - limitStart) {
             /* disable 1 line ...
             if (rowCount == 0 || rowCount > Integer.MAX_VALUE - limitStart) {
@@ -1023,7 +1088,7 @@ public class QuerySpecification extends QueryExpression {
             }
         } else {
             rowCount = Integer.MAX_VALUE;
-            // A VoltDB extension to support LIMIT 0 
+            // A VoltDB extension to support LIMIT 0
             // limitCount == 0 can be enforced/optimized as rowCount == 0 regardless of offset
             // even in non-simpleLimit cases (SELECT DISTINCT, GROUP BY, and/or ORDER BY).
             // This is an optimal handling of a hard-coded LIMIT 0, but it really shouldn't be the ONLY
@@ -1086,7 +1151,7 @@ public class QuerySpecification extends QueryExpression {
 
         result.setDataResultConcurrency(isUpdatable);
 
-        // A VoltDB extension to support LIMIT 0 
+        // A VoltDB extension to support LIMIT 0
         // Test for early return case added by VoltDB to support LIMIT 0 in "HSQL backend".
         if (limitcount == 0) {
             return result;

@@ -47,8 +47,6 @@ public class TestPlansGroupBy extends PlannerTestCase {
     protected void setUp() throws Exception {
         setupSchema(TestPlansGroupBy.class.getResource("testplans-groupby-ddl.sql"),
                 "testplansgroupby", false);
-        AbstractPlanNode.enableVerboseExplainForDebugging();
-        AbstractExpression.enableVerboseExplainForDebugging();
     }
 
     @Override
@@ -499,17 +497,11 @@ public class TestPlansGroupBy extends PlannerTestCase {
         */
         String expectedStr = "  inline Serial AGGREGATION ops\n" +
                              "   inline LIMIT 5";
-        AbstractPlanNode.disableVerboseExplainForDebugging();
-        AbstractExpression.disableVerboseExplainForDebugging();
-
         String explainPlan = "";
         for (AbstractPlanNode apn: pns) {
             explainPlan += apn.toExplainPlanString();
         }
         assertTrue(explainPlan.contains(expectedStr));
-
-        AbstractPlanNode.enableVerboseExplainForDebugging();
-        AbstractExpression.enableVerboseExplainForDebugging();
 
         pns = compileToFragments("SELECT A3, COUNT(*) FROM T3 GROUP BY A3 LIMIT 5");
         checkGroupByOnlyPlanWithLimit(true, false, true, true);
@@ -752,9 +744,15 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     public void testGroupbyAlias() {
-        pns = compileToFragments("SELECT abs(PKEY) as sp FROM P1 GROUP BY sp");
-        checkHasComplexAgg(pns);
+        pns = compileToFragments(
+                "SELECT abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY sp");
 
+        String explainStr1 = printExplainPlan(pns);
+        pns = compileToFragments(
+                "SELECT abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY abs(PKEY)");
+        String explainStr2 = printExplainPlan(pns);
+
+        assertEquals(explainStr1, explainStr2);
     }
 
     private void checkMVNoFix_NoAgg(
