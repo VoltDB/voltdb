@@ -103,7 +103,7 @@ ENABLE_BOOST_FOREACH_ON_CONST_MAP(Index);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(MaterializedViewInfo);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Table);
 
-static const size_t PLAN_CACHE_SIZE = 1024 * 10;
+static const size_t PLAN_CACHE_SIZE = 1000;
 // how many initial tuples to scan before calling into java
 const int64_t LONG_OP_THRESHOLD = 10000;
 
@@ -404,9 +404,9 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
         m_tuplesProcessedInBatch += m_tuplesProcessedInFragment;
         m_tuplesProcessedInFragment = 0;
         m_tuplesProcessedSinceReport = 0;
-    }
 
-    m_stringPool.purge();
+        m_stringPool.purge();
+    }
 
     return failures;
 }
@@ -493,7 +493,7 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
                 VOLT_TRACE("The Executor's execution at position '%d'"
                            " failed for PlanFragment '%jd'",
                            ctr, (intmax_t)planfragmentId);
-                cleanupExecutors(execsForFrag);
+                cleanupExecutors(execsForFrag, true);
 
                 return ENGINE_ERRORCODE_ERROR;
             }
@@ -501,7 +501,7 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
             VOLT_TRACE("The Executor's execution at position '%d'"
                        " failed for PlanFragment '%jd'",
                        ctr, (intmax_t)planfragmentId);
-            cleanupExecutors(execsForFrag);
+            cleanupExecutors(execsForFrag, true);
             resetReusedResultOutputBuffer();
             e.serialize(getExceptionOutputSerializer());
 
@@ -543,12 +543,23 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
 /**
  * Function that clean up the temp table the executors used and reset other metadata.
  */
-void VoltDBEngine::cleanupExecutors(ExecutorVector * execsForFrag) {
+void VoltDBEngine::cleanupExecutors(ExecutorVector * execsForFrag, bool hasException) {
     // Clean up all the tempTable when each plan finishes
     BOOST_FOREACH (AbstractExecutor *executor, execsForFrag->list) {
         assert (executor);
         executor->cleanupTempOutputTable();
+
+        if (hasException) {
+            AbstractPlanNode * node = executor->getPlanNode();
+            std::map<PlanNodeType, AbstractPlanNode*>::iterator it;
+            std::map<PlanNodeType, AbstractPlanNode*> inlineNodes = node->getInlinePlanNodes();
+            for (it = inlineNodes.begin(); it != inlineNodes.end(); it++ ) {
+                AbstractPlanNode *inlineNode = it->second;
+                inlineNode->getExecutor()->cleanupMemoryPool();
+            }
+        }
     }
+
     // set this back to -1 for error handling
     m_currentInputDepId = -1;
     m_currExecutorVec = NULL;
@@ -1786,7 +1797,7 @@ void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
 
 static std::string dummy_last_accessed_plan_node_name("no plan node in progress");
 
-void VoltDBEngine::reportProgessToTopend() {
+void VoltDBEngine::reportProgressToTopend() {
     std::string tableName;
     int64_t tableSize;
 
