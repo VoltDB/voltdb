@@ -761,6 +761,37 @@ public class CoreUtils {
         return ReverseDNSCache.hostnameOrAddress(addr);
     }
 
+    /**
+     * Return the local [hostname]/ip string, attempting a cached lookup
+     * to resolve the local hostname
+     * @return The [hostname]/ip string representation for some valid local
+     *         interface, if we can find one; the empty string otherwise
+     */
+    public static String getHostnameAndAddress() {
+        return addressToString(m_localAddressSupplier.get());
+    }
+
+    /**
+     * Return [hostname]/ip string for the given {@link InetAddress}. This
+     * simulates the value of {@link InetAddress#toString()}, except that it
+     * does a cached lookup of the hostname
+     * @param addr
+     * @return If the provided address is not null, its [hostname]/ip
+     *         string representation; the empty string otherwise
+     */
+    public static String addressToString(InetAddress addr) {
+        if (addr == null) return "";
+
+        StringBuilder hostnameAndAddress = new StringBuilder();
+        String address = addr.getHostAddress();
+        String hostnameOrAddress = ReverseDNSCache.hostnameOrAddress(addr);
+        if (!hostnameOrAddress.equals(address)) {
+            hostnameAndAddress.append(hostnameOrAddress);
+        }
+        hostnameAndAddress.append('/').append(address);
+        return hostnameAndAddress.toString();
+    }
+
     private static final Supplier<InetAddress> m_localAddressSupplier =
             Suppliers.memoizeWithExpiration(new Supplier<InetAddress>() {
                 @Override
