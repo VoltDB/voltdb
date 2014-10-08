@@ -62,7 +62,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     final long m_targetId;
 
     // shortened when in test mode
-    final static long WRITE_TIMEOUT_MS = m_rejoinDeathTestMode ? 10000 : 60000;
+    final static long WRITE_TIMEOUT_MS = m_rejoinDeathTestMode ? 10000 : Long.getLong("REJOIN_WRITE_TIMEOUT_MS", 600000);
     final static long WATCHDOG_PERIOS_S = 5;
 
     // schemas for all the tables on this partition
