@@ -122,7 +122,13 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     @Override
     public int overrideId(int newId) {
         m_id = newId++;
-        return overrideSubqueryIds(newId, m_predicate);
+        newId = overrideSubqueryIds(newId, m_predicate);
+        if (m_outputSchema != null) {
+            for (SchemaColumn col : m_outputSchema.getColumns()) {
+                newId = overrideSubqueryIds(newId, col.getExpression());
+            }
+        }
+        return newId;
     }
 
     /**

@@ -187,6 +187,12 @@ public class PlanNodeTree implements JSONString {
      * Scan node, join node can have predicate, so does the Aggregate node (Having clause).
      */
     private void findPlanNodeWithPredicate(AbstractPlanNode node) {
+        NodeSchema outputSchema = node.getOutputSchema();
+        if (outputSchema != null) {
+            for(SchemaColumn col : outputSchema.getColumns()) {
+                connectPredicateStmt(col.getExpression());
+            }
+        }
         if (node instanceof AbstractScanPlanNode) {
             AbstractScanPlanNode scanNode = (AbstractScanPlanNode)node;
             connectPredicateStmt(scanNode.getPredicate());
@@ -330,6 +336,14 @@ public class PlanNodeTree implements JSONString {
         // also check the inlined plan nodes
         for (AbstractPlanNode inlineNode: node.getInlinePlanNodes().values()) {
             extractSubqueries(inlineNode);
+        }
+
+        // and the output column expressions
+        NodeSchema schema = node.getOutputSchema();
+        if (schema != null) {
+            for (SchemaColumn col : schema.getColumns()) {
+                extractSubqueriesFromExpression(col.getExpression());
+            }
         }
     }
 

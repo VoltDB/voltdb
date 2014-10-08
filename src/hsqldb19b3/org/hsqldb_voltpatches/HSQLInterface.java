@@ -268,7 +268,7 @@ public class HSQLInterface {
             }
         }
         if ((tableCount + rowCount > 0) && (tableCount + valueCount > 0) ||
-                subqueryCount > 0) {
+                (subqueryCount + rowCount) > 1) {
             assert rowCount == 1;
             assert tableCount + subqueryCount + valueCount == 1;
             return true;

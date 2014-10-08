@@ -344,9 +344,11 @@ public class PlanAssembler {
         }
 
         // Get the best plans for the expression subqueries ( IN/EXISTS (SELECT...) )
-        List<AbstractExpression> subqueryExprs = parsedStmt.findAllSubexpressionsOfType(
-                ExpressionType.EXISTS_SUBQUERY);
-        subqueryExprs.addAll(parsedStmt.findAllSubexpressionsOfType(ExpressionType.IN_SUBQUERY));
+//        List<AbstractExpression> subqueryExprs = parsedStmt.findAllSubexpressionsOfType(
+//                ExpressionType.EXISTS_SUBQUERY);
+//        subqueryExprs.addAll(parsedStmt.findAllSubexpressionsOfType(ExpressionType.IN_SUBQUERY));
+        List<AbstractExpression> subqueryExprs = parsedStmt.findAllSubexpressionsOfClass(
+                SubqueryExpression.class);
         ParsedResultAccumulator exprSubqueryResult = null;
         if ( ! subqueryExprs.isEmpty() ) {
             if (parsedStmt instanceof ParsedSelectStmt == false) {

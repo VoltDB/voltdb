@@ -444,4 +444,8 @@ public class StmtSubqueryScan extends StmtTableScan {
             return root;
         }
     }
+
+    public List<SchemaColumn> getOutputSchema() {
+        return m_outputColumnList;
+    }
 }

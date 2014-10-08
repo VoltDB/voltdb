@@ -31,6 +31,7 @@ import org.voltdb.VoltType;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AbstractScanPlanNode.Members;
 import org.voltdb.types.ExpressionType;
 
 /**
@@ -68,18 +69,26 @@ public class SubqueryExpression extends AbstractExpression {
 
     public SubqueryExpression(ExpressionType subqueryType, StmtSubqueryScan subquery) {
         super(subqueryType);
-        assert(subquery != null);
-        m_subquery = subquery;
-        assert(m_subquery.getSubqueryStmt() != null);
-        m_subqueryId = m_subquery.getSubqueryStmt().m_stmtId;
-        if (m_subquery.getBestCostPlan() != null && m_subquery.getBestCostPlan().rootPlanGraph != null) {
-            m_subqueryNode = m_subquery.getBestCostPlan().rootPlanGraph;
-            m_subqueryNodeId = m_subqueryNode.getPlanNodeId();
+        // subquery is null if loaded from JSON
+        if (subquery != null) {
+            m_subquery = subquery;
+            assert(m_subquery.getSubqueryStmt() != null);
+            m_subqueryId = m_subquery.getSubqueryStmt().m_stmtId;
+            // Scalar subquery can have only a single output column
+            if (subquery.getOutputSchema().size() == 1) {
+                m_valueType = subquery.getOutputSchema().get(0).getType();
+                m_valueSize = subquery.getOutputSchema().get(0).getSize();
+            } else {
+                m_valueType = VoltType.BIGINT;
+                m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
+            }
+            if (m_subquery.getBestCostPlan() != null && m_subquery.getBestCostPlan().rootPlanGraph != null) {
+                m_subqueryNode = m_subquery.getBestCostPlan().rootPlanGraph;
+                m_subqueryNodeId = m_subqueryNode.getPlanNodeId();
+            }
+            m_args = new ArrayList<AbstractExpression>();
+            moveUpTVE();
         }
-        m_valueType = VoltType.BIGINT;
-        m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
-        m_args = new ArrayList<AbstractExpression>();
-        moveUpTVE();
     }
 
     /**
@@ -130,12 +139,18 @@ public class SubqueryExpression extends AbstractExpression {
     @Override
     public Object clone() {
         SubqueryExpression clone = new SubqueryExpression(m_subquery);
+        clone.m_subqueryId = m_subqueryId;
+        clone.m_subqueryNodeId = m_subqueryNodeId;
         clone.setExpressionType(m_type);
+        clone.m_valueType = m_valueType;
+        clone.m_valueSize = m_valueSize;
         // The parameter TVE map must be cloned explicitly because the original TVEs
         // from the statement are already replaced with the corresponding PVEs
-        clone.m_args = new ArrayList<AbstractExpression>();
-        for (AbstractExpression arg: m_args) {
-            clone.m_args.add((AbstractExpression)arg.clone());
+        if (m_args != null) {
+            clone.m_args = new ArrayList<AbstractExpression>();
+            for (AbstractExpression arg: m_args) {
+                clone.m_args.add((AbstractExpression)arg.clone());
+            }
         }
         clone.m_parameterIdxList = new ArrayList<Integer>();
         clone.m_parameterIdxList.addAll(m_parameterIdxList);
@@ -206,6 +221,10 @@ public class SubqueryExpression extends AbstractExpression {
     protected void loadFromJSONObject(JSONObject obj) throws JSONException {
         m_subqueryId = obj.getInt(Members.SUBQUERY_ID.name());
         m_subqueryNodeId = obj.getInt(Members.SUBQUERY_ROOT_NODE_ID.name());
+        if (obj.has(AbstractExpression.Members.VALUE_TYPE.name())) {
+            m_valueType = VoltType.get((byte) obj.getInt(AbstractExpression.Members.VALUE_TYPE.name()));
+            m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
+        }
         if (obj.has(Members.PARAM_IDX.name())) {
             JSONArray paramIdxArray = obj.getJSONArray(Members.PARAM_IDX.name());
             int paramSize = paramIdxArray.length();

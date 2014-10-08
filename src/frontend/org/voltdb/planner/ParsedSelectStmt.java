@@ -46,6 +46,7 @@ import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
+import org.voltdb.expressions.SubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.VectorValueExpression;
 import org.voltdb.planner.parseinfo.BranchNode;
@@ -652,9 +653,16 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 if (col.tableAlias == null) {
                     col.tableAlias = col.tableName;
                 }
-            }
-            else
-            {
+            } else if (child.name.equals("tablesubquery")) {
+                // Scalar subquery like 'select c, (select count(*) from t1), from t2;'
+                col.columnName = child.attributes.get("alias");
+                assert(col.expression instanceof SubqueryExpression);
+                SubqueryExpression scalarSubqueryExpr = (SubqueryExpression) col.expression;
+                col.tableName = scalarSubqueryExpr.getTable().getTableName();
+                col.tableAlias = scalarSubqueryExpr.getTable().getTableAlias();
+                // Subquery can be only a scalar subquery here
+                col.expression.setExpressionType(ExpressionType.SCALAR_SUBQUERY);
+            } else {
                 // XXX hacky, assume all non-column refs come from a temp table
                 col.tableName = "VOLT_TEMP_TABLE";
                 col.tableAlias = "VOLT_TEMP_TABLE";
@@ -1915,6 +1923,37 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         List<AbstractExpression> exprs = super.findAllSubexpressionsOfType(exprType);
         if (m_having != null) {
             exprs.addAll(m_having.findAllSubexpressionsOfType(exprType));
+        }
+        if (m_groupByExpressions != null) {
+            for (AbstractExpression groupByExpr : m_groupByExpressions.values()) {
+                exprs.addAll(groupByExpr.findAllSubexpressionsOfType(exprType));
+            }
+        }
+        for(ParsedColInfo col : m_displayColumns) {
+            if (col.expression != null) {
+                exprs.addAll(col.expression.findAllSubexpressionsOfType(exprType));
+            }
+        }
+        return exprs;
+    }
+
+    @Override
+    public List<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        List<AbstractExpression> exprs = super.findAllSubexpressionsOfClass(aeClass);
+        if (m_having != null) {
+            exprs.addAll(m_having.findAllSubexpressionsOfClass(aeClass));
+        }
+        if (m_groupByExpressions != null) {
+            for (AbstractExpression groupByExpr : m_groupByExpressions.values()) {
+                exprs.addAll(groupByExpr.findAllSubexpressionsOfClass(aeClass));
+            }
+        }
+        if (m_projectSchema != null) {
+            for(SchemaColumn col : m_projectSchema.getColumns()) {
+                if (col.getExpression() != null) {
+                    exprs.addAll(col.getExpression().findAllSubexpressionsOfClass(aeClass));
+                }
+            }
         }
         return exprs;
     }

@@ -166,6 +166,15 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         return exprs;
     }
 
+    @Override
+    public List<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
+        for (AbstractParsedStmt childStmt : m_children) {
+            exprs.addAll(childStmt.findAllSubexpressionsOfClass(aeClass));
+        }
+        return exprs;
+    }
+
     /**
      * Break up UNION/INTERSECT (ALL) set ops into individual selects that are part
      * of the IN/EXISTS subquery into multiple expressions for each set op child

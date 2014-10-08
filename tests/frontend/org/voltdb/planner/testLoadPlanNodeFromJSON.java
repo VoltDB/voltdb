@@ -54,6 +54,8 @@ public class testLoadPlanNodeFromJSON extends PlannerTestCase {
         testLoadQueryPlanTree("select a from l group by a having max(id) in (select b from t )");
         testLoadQueryPlanTree("select a from l group by a having max(id) in (select b from t )");
 
+        testLoadQueryPlanTree("select a, (select b from t limit 1) b from l ");
+
     }
 
     public void testLoadQueryPlanTree(String sql) throws JSONException {
