@@ -8,16 +8,7 @@ HOUR=`date +%H`
 DAY=`date +%u`
 
 if [ $USER = "test" ]; then
-    case `hostname` in
-        volt10?|volt12?|volt13?)
-            SUDO=sudo
-            ;;
-        *)
-            if [ $DAY -ge 6 ] || [ $HOUR -ge 20 ] || [ $HOUR -le 9 ]; then
-                SUDO=sudo
-            fi
-            ;;
-    esac
+    SUDO=sudo
 fi
 for P in `$SUDO netstat -tnlp | egrep 'LISTEN.*/java' | tr -s \  | cut -d\  -f7 | cut -d\/ -f1 | sort | uniq`
 do
