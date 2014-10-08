@@ -185,7 +185,8 @@ releaseDir = "unknown"
 # get ssh config
 volt5f = getSSHInfoForHost("volt5f")
 voltmini = getSSHInfoForHost("voltmini")
-volt12c = getSSHInfoForHost("volt12c")
+#yes, I just set volt12c = volt12d.  volt12c doesn't run ubuntu any more.
+volt12c = getSSHInfoForHost("volt12d")
 
 # build kits on 5f
 with settings(user=username,host_string=volt5f[1],disable_known_hosts=True,key_filename=volt5f[0]):
