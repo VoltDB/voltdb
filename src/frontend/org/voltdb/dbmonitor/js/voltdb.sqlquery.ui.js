@@ -100,6 +100,10 @@ var saveCookie = function (name, value) {
     $.cookie(name, value, { expires: 365 });
 };
 
+var saveSessionCookie = function (name, value) {
+    $.cookie(name, value, { path: '/', domain: window.location.hostname });
+};
+
 function loadPage(serverName, portid) {
     
     var userName = $.cookie('username') != undefined ? $.cookie('username') : "";

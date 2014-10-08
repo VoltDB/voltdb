@@ -13,7 +13,6 @@ function alertNodeClicked(obj) {
         $("#serversList").find("li a:contains(" + clickedServer + ")").filter(function () {
             return $(this).html() == clickedServer;
         }).parent().addClass("monitoring");
-        //saveCurrentServer(clickedServer);
 
         var serverIp = voltDbRenderer.getServerIP($(obj).attr('data-ip'));
         var currentUrl = window.location.href.split('?')[0];
@@ -133,9 +132,9 @@ function alertNodeClicked(obj) {
                         if (result) {
 
                             //Save user details to cookie.
-                            saveCookie("username", usernameVal);
-                            saveCookie("password", passwordVal);
-                            saveCookie("admin", chkAdmin);
+                            saveSessionCookie("username", usernameVal);
+                            saveSessionCookie("password", passwordVal);
+                            saveSessionCookie("admin", chkAdmin);
                             popupDisplayed = true;
 
                             pageLoadCallback();
@@ -201,7 +200,6 @@ function alertNodeClicked(obj) {
             }
         };
         
-
         this.GetSystemInformation = function (onInformationLoaded) {
             VoltDBService.GetSystemInformation(function (connection) {
                 populateSystemInformation(connection);

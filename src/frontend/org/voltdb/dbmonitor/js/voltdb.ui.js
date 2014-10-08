@@ -5,7 +5,7 @@ $(document).ready(function () {
         var savedData = getParameterByName("data");
 
         if (savedData != undefined && savedData != "") {
-            var json = jQuery.parseJSON(savedData);
+            var json = jQuery.parseJSON(decodeURIComponent(savedData));
 
             if (json["DisplayPreferences"] != undefined && json["DisplayPreferences"] != "")
                 saveCookie("user-preferences", json["DisplayPreferences"]);
@@ -17,13 +17,13 @@ $(document).ready(function () {
                 saveCurrentServer(json["CurrentServer"]);
 
             if (json["username"] != undefined && json["username"] != "")
-                saveCookie("username", json["username"]);
+                saveSessionCookie("username", json["username"]);
 
             if (json["password"] != undefined && json["password"] != "")
-                saveCookie("password", json["password"]);
+                saveSessionCookie("password", json["password"]);
             
             if (json["admin"] != undefined && json["admin"] != "")
-                saveCookie("admin", json["admin"]);
+                saveSessionCookie("admin", json["admin"]);
 
             if (json["AlertThreshold"] != undefined && json["AlertThreshold"] != "")
                 saveCookie("alert-threshold", json["AlertThreshold"]);
@@ -46,8 +46,8 @@ $(document).ready(function () {
 var loadPage = function (serverName, portid) {
     var userName = $.cookie('username');
     var password = $.cookie('password');
-
     var admin = $.cookie('admin');
+    
     voltDbRenderer.ChangeServerConfiguration(serverName, portid, userName, password, false, admin);
     voltDbRenderer.ShowUsername(userName);
       
@@ -60,7 +60,6 @@ var loadPage = function (serverName, portid) {
     var priorTableAction = VoltDbUi.ACTION_STATES.NONE;
 
     
-    //this.traverse = undefined;
     RefreshServerUI();
 
     var refreshClusterHealth = function () {
@@ -92,7 +91,6 @@ var loadPage = function (serverName, portid) {
             $('#serversList > li.active > a').click(function () {
                 var clickedServer = $(this).html();
                 $('.activeServerName').html(clickedServer).attr('title', clickedServer);
-                //saveCurrentServer(clickedServer);
 
                 if ($('#popServerList').css('display') == 'none') {
                     $('#btnPopServerList').removeClass('showServers');
@@ -128,7 +126,7 @@ var loadPage = function (serverName, portid) {
                     admin: $.cookie("admin")
                 };
 
-                var win = window.open(newUrl + '?data=' + JSON.stringify(data), '_parent');
+                var win = window.open(newUrl + '?data=' + encodeURIComponent(JSON.stringify(data)), '_parent');
                 win.focus();
 
             });
@@ -825,6 +823,10 @@ if (!(window.console && console.log)) {
 
 var saveCookie = function (name, value) {
     $.cookie(name, value, { expires: 365 });
+};
+
+var saveSessionCookie = function (name, value) {
+    $.cookie(name, value, { path: '/', domain: window.location.hostname });
 };
 
 var saveUserPreferences = function (preferences) {
