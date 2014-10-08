@@ -1,5 +1,13 @@
 ﻿$(document).ready(function () {
-    
+    if (navigator.userAgent.indexOf('Safari') != -1 && navigator.userAgent.indexOf('Chrome') == -1) {
+        shortcut.add("f6", function () {
+            $("#runBTn").button().click();
+        });
+    } else {
+        shortcut.add("f5", function () {
+            $("#runBTn").button().click();
+        });
+    }
     //Default Action
     $(".tab_content").hide(); //Hide all content
     $("ul.tabs li:first").addClass("active").show(); //Activate first tab
@@ -224,6 +232,4 @@ function loadPage(serverName, portid) {
     $('#clearQuery').click(function () {
         $('#theQueryText').val('');
     });
-
-    shortcut.add("F5", function () { $("#runBTn").button().click(); });
 }
