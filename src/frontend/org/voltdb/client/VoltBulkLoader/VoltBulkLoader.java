@@ -236,8 +236,6 @@ public class VoltBulkLoader {
                 m_partitionTable[i] = new PerPartitionTable(m_clientImpl, m_tableName,
                         i, i == m_maxPartitionProcessors-1, this, maxBatchSize);
                 m_outstandingRowCnts[i] = new ArrayList<LoaderSpecificRowCnt>();
-
-                new Thread(m_partitionTable[i], m_tableName + "-" + i).start();
             }
             loaderList = new ArrayList<VoltBulkLoader>();
             loaderList.add(this);

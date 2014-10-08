@@ -22,12 +22,9 @@ import java.util.ArrayList;
 import java.util.EmptyStackException;
 import java.util.List;
 import java.util.ListIterator;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.*;
 
-import com.google_voltpatches.common.collect.ImmutableList;
-import com.google_voltpatches.common.util.concurrent.SettableFuture;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
 
 import org.voltdb.ParameterConverter;
@@ -44,16 +41,16 @@ import org.voltdb.client.VoltBulkLoader.VoltBulkLoader.LoaderSpecificRowCnt;
  * Partition specific table potentially shared by multiple VoltBulkLoader instances,
  * provided that they are all inserting to the same table.
  */
-public class PerPartitionTable implements Runnable {
+public class PerPartitionTable {
     // Client we are tied to
     final ClientImpl m_clientImpl;
     //The index in loader tables and the PartitionProcessor number
     final int m_partitionId;
     final boolean m_isMP;
     //Queue for processing pending rows for this table
-    List<VoltBulkLoaderRow> m_partitionRowQueue;
+    LinkedBlockingQueue<VoltBulkLoaderRow> m_partitionRowQueue;
 
-    final LinkedBlockingQueue<Runnable> m_tasks;
+    final ExecutorService m_es;
 
     //Zero based index of the partitioned column in the table
     final int m_partitionedColumnIndex;
@@ -72,23 +69,6 @@ public class PerPartitionTable implements Runnable {
     //Name of table
     final String m_tableName;
 
-    // Sigil used to terminate the thread
-    class TerminateException extends RuntimeException {}
-
-    @Override
-    public void run() {
-        while (true) {
-            try {
-                final Runnable task = m_tasks.take();
-                task.run();
-            } catch (TerminateException ignore) {
-                break;
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-    }
-
     // Callback for batch submissions to the Client. A failed request submits the entire
     // batch of rows to m_failedQueue for row by row processing on m_failureProcessor.
     class PartitionProcedureCallback implements ProcedureCallback {
@@ -105,7 +85,7 @@ public class PerPartitionTable implements Runnable {
         public void clientCallback(ClientResponse response) throws InterruptedException {
             if (response.getStatus() != ClientResponse.SUCCESS) {
                 // Queue up all rows for individual processing by originating BulkLoader's FailureProcessor.
-                m_tasks.put(new Runnable() {
+                m_es.execute(new Runnable() {
                     @Override
                     public void run() {
                         try {
@@ -133,7 +113,7 @@ public class PerPartitionTable implements Runnable {
         m_partitionId = partitionId;
         m_isMP = isMP;
         m_procName = firstLoader.m_procName;
-        m_partitionRowQueue = new ArrayList<VoltBulkLoaderRow>(minBatchTriggerSize);
+        m_partitionRowQueue = new LinkedBlockingQueue<VoltBulkLoaderRow>(minBatchTriggerSize*5);
         m_minBatchTriggerSize = minBatchTriggerSize;
         m_columnInfo = firstLoader.m_colInfo;
         m_partitionedColumnIndex = firstLoader.m_partitionedColumnIndex;
@@ -143,7 +123,7 @@ public class PerPartitionTable implements Runnable {
 
         table = new VoltTable(m_columnInfo);
 
-        m_tasks = new LinkedBlockingQueue<Runnable>(minBatchTriggerSize);
+        m_es = CoreUtils.getSingleThreadExecutor(tableName + "-" + partitionId);
     }
 
     boolean updateMinBatchTriggerSize(int minBatchTriggerSize) {
@@ -157,36 +137,32 @@ public class PerPartitionTable implements Runnable {
         }
      }
 
-    void insertRowInTable(final VoltBulkLoaderRow nextRow) throws InterruptedException {
-        m_tasks.put(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    m_partitionRowQueue.add(nextRow);
-                    if (m_partitionRowQueue.size() == m_minBatchTriggerSize) {
-                        loadTable(buildTable(), table);
+    synchronized void insertRowInTable(final VoltBulkLoaderRow nextRow) throws InterruptedException {
+        m_partitionRowQueue.put(nextRow);
+        if (m_partitionRowQueue.size() == m_minBatchTriggerSize) {
+            m_es.execute(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        while (m_partitionRowQueue.size() >= m_minBatchTriggerSize) {
+                            loadTable(buildTable(), table);
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
                     }
-                } catch (Exception e) {
-                    e.printStackTrace();
                 }
-            }
-        });
+            });
+        }
     }
 
     Future<?> flushAllTableQueues() throws InterruptedException {
-        final SettableFuture<Object> future = SettableFuture.create();
-        m_tasks.put(new Runnable() {
+        return m_es.submit(new Callable<Boolean>() {
             @Override
-            public void run() {
-                try {
-                    loadTable(buildTable(), table);
-                    future.set(null);
-                } catch (Exception e) {
-                    future.setException(e);
-                }
+            public Boolean call() throws Exception {
+                loadTable(buildTable(), table);
+                return true;
             }
         });
-        return future;
     }
 
     void shutdown() throws Exception {
@@ -195,12 +171,8 @@ public class PerPartitionTable implements Runnable {
         } catch (ExecutionException e) {
             throw (Exception) e.getCause();
         }
-        m_tasks.put(new Runnable() {
-            @Override
-            public void run() {
-                throw new TerminateException();
-            }
-        });
+        m_es.shutdown();
+        m_es.awaitTermination(365, TimeUnit.DAYS);
     }
 
     private void reinsertFailed(List<VoltBulkLoaderRow> rows) throws Exception {
@@ -244,7 +216,9 @@ public class PerPartitionTable implements Runnable {
     private PartitionProcedureCallback buildTable() {
         ArrayList<LoaderSpecificRowCnt> usedLoaderList = new
                 ArrayList<LoaderSpecificRowCnt>();
-        ListIterator<VoltBulkLoaderRow> it = m_partitionRowQueue.listIterator();
+        ArrayList<VoltBulkLoaderRow> buf = new ArrayList<VoltBulkLoaderRow>(m_minBatchTriggerSize);
+        m_partitionRowQueue.drainTo(buf, m_minBatchTriggerSize);
+        ListIterator<VoltBulkLoaderRow> it = buf.listIterator();
         while (it.hasNext()) {
             VoltBulkLoaderRow currRow = it.next();
             VoltBulkLoader loader = currRow.m_loader;
@@ -285,10 +259,7 @@ public class PerPartitionTable implements Runnable {
             currPair.loader.m_loaderQueuedRowCnt.addAndGet(-1*currPair.rowCnt);
         }
 
-        final PartitionProcedureCallback callback =
-                new PartitionProcedureCallback(ImmutableList.copyOf(m_partitionRowQueue), usedLoaderList);
-        m_partitionRowQueue.clear();
-        return callback;
+        return new PartitionProcedureCallback(buf, usedLoaderList);
     }
 
     private void loadTable(ProcedureCallback callback, VoltTable toSend) throws Exception {
