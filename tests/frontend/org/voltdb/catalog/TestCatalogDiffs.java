@@ -177,7 +177,7 @@ public class TestCatalogDiffs extends TestCase {
         Catalog catOriginal = catalogForJar(original);
 
         GroupInfo gi[] = new GroupInfo[1];
-        gi[0] = new GroupInfo("group1", true, true, true, false);
+        gi[0] = new GroupInfo("group1", true, true, true, true);
         String updated = compileWithGroups(false, null, gi, null, "base", BASEPROCS);
         Catalog catUpdated = catalogForJar(updated);
 
@@ -189,7 +189,7 @@ public class TestCatalogDiffs extends TestCase {
         Catalog catOriginal = catalogForJar(original);
 
         GroupInfo gi[] = new GroupInfo[1];
-        gi[0] = new GroupInfo("group1", true, true, true, false);
+        gi[0] = new GroupInfo("group1", true, true, true, true);
 
         UserInfo ui[] = new UserInfo[1];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
@@ -210,9 +210,11 @@ public class TestCatalogDiffs extends TestCase {
         String original = compileWithGroups(false, null, gi, ui, "base", BASEPROCS);
         Catalog catOriginal = catalogForJar(original);
 
+        GroupInfo gi2[] = new GroupInfo[1];
+        gi2[0] = new GroupInfo("group2", true, true, true, true);
         // change a user.
-        ui[0] = new UserInfo("user1", "drowssap", new String[] {"group1"});
-        String updated = compileWithGroups(false, null, gi, ui, "base", BASEPROCS);
+        ui[0] = new UserInfo("user1", "drowssap", new String[] {"group2"});
+        String updated = compileWithGroups(false, null, gi2, ui, "base", BASEPROCS);
         Catalog catUpdated = catalogForJar(updated);
 
         verifyDiff(catOriginal, catUpdated);

@@ -176,7 +176,7 @@ public class CatalogBuilder {
     public void addGroups(final GroupInfo groups[]) {
         for (final GroupInfo info : groups) {
             transformer.append("CREATE ROLE " + info.name);
-            if(info.adhoc || info.defaultproc || info.sysproc) {
+            if(info.adhoc || info.defaultproc || info.sysproc || info.defaultprocread) {
                 transformer.append(" WITH ");
                 if(info.adhoc) {
                     transformer.append("adhoc,");
