@@ -241,33 +241,27 @@ function alertNodeClicked(obj) {
 
         this.getMemoryGraphInformation = function (onInformationLoaded) {
             var memoryDetails = {};
-            VoltDbUi.CurrentGraphProgess = VoltDbUi.DASHBOARD_PROGRESS_STATES.REFRESHMEMORY;
 
             VoltDBService.GetMemoryInformation(function (connection) {
                 getMemoryDetails(connection, memoryDetails, "GRAPH_MEMORY");
-                VoltDbUi.CurrentGraphProgess = VoltDbUi.DASHBOARD_PROGRESS_STATES.REFRESHMEMORY_NONE;
                 onInformationLoaded(memoryDetails);
             });
         };
 
         this.getLatencyGraphInformation = function (onInformationLoaded) {
             var latencyDetails = {};
-            VoltDbUi.CurrentGraphProgess = VoltDbUi.DASHBOARD_PROGRESS_STATES.REFRESHLATENCY;
 
             VoltDBService.GetGraphLatencyInformation(function (connection) {
-                getLatencyDetails(connection, latencyDetails);
-                VoltDbUi.CurrentGraphProgess = VoltDbUi.DASHBOARD_PROGRESS_STATES.REFRESHLATENCY_NONE;
+                getLatencyDetails(connection, latencyDetails);                
                 onInformationLoaded(latencyDetails);
             });
         };
 
         this.getCpuGraphInformation = function (onInformationLoaded) {
             var cpuDetails = {};
-            VoltDbUi.CurrentGraphProgess = VoltDbUi.DASHBOARD_PROGRESS_STATES.REFRESHCPU;
 
             VoltDBService.GetCPUInformation(function (connection) {
-                getCpuDetails(connection, cpuDetails);
-                VoltDbUi.CurrentGraphProgess = VoltDbUi.DASHBOARD_PROGRESS_STATES.REFRESHCPU_NONE;
+                getCpuDetails(connection, cpuDetails);               
                 onInformationLoaded(cpuDetails);
             });
 
@@ -276,11 +270,9 @@ function alertNodeClicked(obj) {
         //Render Cluster Transaction Graph
         this.GetTransactionInformation = function (onInformationLoaded) {
             var transactionDetails = {};
-            VoltDbUi.CurrentGraphProgess = VoltDbUi.DASHBOARD_PROGRESS_STATES.REFRESHTRANSACTION;
 
             VoltDBService.GetTransactionInformation(function (connection) {
-                getTransactionDetails(connection, transactionDetails);
-                VoltDbUi.CurrentGraphProgess = VoltDbUi.DASHBOARD_PROGRESS_STATES.REFRESHMEMORY_NONE;
+                getTransactionDetails(connection, transactionDetails);                
                 onInformationLoaded(transactionDetails);
             });
         };
@@ -654,7 +646,6 @@ function alertNodeClicked(obj) {
 
                 htmlMarkup = "";
                 htmlMarkups.SystemInformation = [];
-                VoltDbUi.CurrentProcedureDataProgress = VoltDbUi.DASHBOARD_PROGRESS_STATES.REFRESH_PROCEDUREDATA;
 
                 if (procedureData == null || procedureData == undefined) {
                     alert("Error: Unable to extract Procedure Data");
@@ -782,8 +773,7 @@ function alertNodeClicked(obj) {
                     }
 
 
-                }
-                VoltDbUi.CurrentProcedureDataProgress = VoltDbUi.DASHBOARD_PROGRESS_STATES.REFRESH_PROCEDUREDATA_NONE;
+                }                
             };
 
             this.mapTableInformation = function (currentAction, priorAction, isSearch, callback) {
@@ -793,8 +783,7 @@ function alertNodeClicked(obj) {
                 var tupleCountPartitions = [];
                 var partitionKeyPairData = [];
                 var table_type = "";
-
-                VoltDbUi.CurrentTableDataProgress = VoltDbUi.DASHBOARD_PROGRESS_STATES.REFRESH_TABLEDATA;
+                
                 var formatTableTupleData = function (key, tupleData) {
                     var tableName = "";
                     var counter = 0;
