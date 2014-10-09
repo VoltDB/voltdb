@@ -40,7 +40,7 @@
             
             voltDbRenderer.ShowUsername($.cookie('username'));
             var templateUrl = window.location.protocol + '//' + window.location.host;
-            var templateJavascript = "http://stag.deerwalk.com/mockup/volt_test/resources/template.js";
+            var templateJavascript = "js/template.js";
             
             $.get(templateUrl, function (result) {
 		    var body = $(result).filter("#wrapper").html();
