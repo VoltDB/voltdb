@@ -584,7 +584,6 @@ public abstract class AbstractParsedStmt {
             }
             assert(subqueryExpr != null);
 
-            // weed of IN (values) expression
             // Break up UNION/INTERSECT (ALL) set ops into individual selects connected by
             // AND/OR operator
             // col IN ( queryA UNION queryB ) - > col IN (queryA) OR col IN (queryB)

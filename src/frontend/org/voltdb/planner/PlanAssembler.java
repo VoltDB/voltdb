@@ -505,9 +505,6 @@ public class PlanAssembler {
                 continue;
             }
             SubqueryExpression subqueryExpr = (SubqueryExpression) expr;
-            AbstractParsedStmt subquery = subqueryExpr.getSubquery();
-            assert(subquery != null);
-
             ParsedResultAccumulator parsedResult = planForParsedSubquery(subqueryExpr.getTable(), nextPlanId);
             if (parsedResult == null) {
                 return null;
