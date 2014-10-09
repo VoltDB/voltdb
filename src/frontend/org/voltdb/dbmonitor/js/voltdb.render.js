@@ -20,7 +20,7 @@ function alertNodeClicked(obj) {
         var newUrl = '';
         if (urlArray != null && urlArray.length > 0) {
             var urlArray2 = urlArray[2].split(':');
-            urlArray2[0] = privateToPublicIP[serverIp];
+            urlArray2[0] = serverIp;
             urlArray[2] = urlArray2.join(':');
             newUrl = urlArray.join('/');
         }
