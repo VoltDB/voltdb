@@ -34,8 +34,15 @@ message Subscribe {
 
 message EventAck {
     optional int32 partitionId = 1;
+    // poison pill, cluster restart, rejoin
     optional int32 eventType = 2; 
+    // if true, the recipient should expect to have
+    // a corresponding event to discard
+    // if false, this is just a query for the next
+    // unique id available for this partition
     optional bool lookForEvent = 3;
+    // unique id of the last thing the receiver has
+    // acked for this partition
     optional fixed64 lastAckedUniqueId = 4;
 }
 
