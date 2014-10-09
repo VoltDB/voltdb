@@ -744,11 +744,20 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     private void checkGroupbyAliasFeature(String sql1, String sql2) {
+        checkGroupbyAliasFeature(sql1, sql2, true);
+    }
+
+    private void checkGroupbyAliasFeature(String sql1, String sql2, boolean exact) {
         String explainStr1, explainStr2;
         pns = compileToFragments(sql1);
         explainStr1 = printExplainPlan(pns, false);
         pns = compileToFragments(sql2);
         explainStr2 = printExplainPlan(pns, false);
+        if (! exact) {
+            explainStr1 = explainStr1.replaceAll("TEMP_TABLE\\.column#[\\d]", "TEMP_TABLE.column#[Index]");
+            explainStr2 = explainStr2.replaceAll("TEMP_TABLE\\.column#[\\d]", "TEMP_TABLE.column#[Index]");
+            assertEquals(explainStr1, explainStr2);
+        }
         assertEquals(explainStr1, explainStr2);
     }
 
@@ -777,8 +786,21 @@ public class TestPlansGroupBy extends PlannerTestCase {
             fail();
         } catch (Exception ex) {
             // not sure about the hsql parser error message
-            assertTrue(ex.getMessage().contains("3"));
         }
+
+        try {
+            pns = compileToFragments(
+                    "SELECT abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY P1.sp");
+            fail();
+        } catch (Exception ex) {
+            // not sure about the hsql parser error message
+        }
+
+        //
+        // ambiguous group by query because of A1 is a column name and a select alias
+        //
+        pns = compileToFragments(
+                "SELECT A1 as B1, B1 as A1, count(*) as ct FROM P1 GROUP BY A1");
     }
 
     public void testGroupbyAlias() {
@@ -796,6 +818,27 @@ public class TestPlansGroupBy extends PlannerTestCase {
         sql2 = "SELECT A1 as A, abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY A1, sp";
         checkGroupbyAliasFeature(sql1, sql2);
         sql2 = "SELECT A1 as A, abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY A1, abs(PKEY)";
+        checkGroupbyAliasFeature(sql1, sql2);
+
+        // group by and select in different orders
+        sql2 = "SELECT abs(PKEY) as sp, A1 as A, count(*) as ct FROM P1 GROUP BY A, abs(PKEY)";
+        checkGroupbyAliasFeature(sql1, sql2, false);
+
+        sql2 = "SELECT abs(PKEY) as sp, count(*) as ct, A1 as A FROM P1 GROUP BY A, abs(PKEY)";
+        checkGroupbyAliasFeature(sql1, sql2, false);
+
+        sql2 = "SELECT count(*) as ct, abs(PKEY) as sp, A1 as A FROM P1 GROUP BY A, abs(PKEY)";
+        checkGroupbyAliasFeature(sql1, sql2, false);
+
+        sql2 = "SELECT A1 as A, count(*) as ct, abs(PKEY) as sp FROM P1 GROUP BY A, abs(PKEY)";
+        checkGroupbyAliasFeature(sql1, sql2, false);
+
+        sql2 = "SELECT A1 as A, count(*) as ct, abs(PKEY) as sp FROM P1 GROUP BY abs(PKEY), A";
+        checkGroupbyAliasFeature(sql1, sql2, false);
+
+        // group by alias with selected constants
+        sql1 = "SELECT 1, abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY sp";
+        sql2 = "SELECT 1, abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY abs(PKEY)";
         checkGroupbyAliasFeature(sql1, sql2);
 
         // group by alias on joined results

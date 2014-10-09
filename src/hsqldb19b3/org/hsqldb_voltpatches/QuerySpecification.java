@@ -44,7 +44,6 @@ import org.hsqldb_voltpatches.lib.HashSet;
 import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.lib.HsqlList;
 import org.hsqldb_voltpatches.lib.IntValueHashMap;
-import org.hsqldb_voltpatches.lib.Iterator;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.lib.OrderedIntHashSet;
 import org.hsqldb_voltpatches.lib.Set;
@@ -288,10 +287,14 @@ public class QuerySpecification extends QueryExpression {
                 // skip the repeated expression
                 i += 1;
             }
-            if (obj instanceof Expression == false) {
+            if (obj instanceof ExpressionColumn == false) {
                 continue;
             }
-            Expression element = (Expression) obj;
+            ExpressionColumn element = (ExpressionColumn) obj;
+            if (element.tableName != null) {
+                // this alias does not belong to any table
+                continue;
+            }
 
             // find the unsolved expression in the groupBy/Having list
             int k = indexLimitVisible;
@@ -300,12 +303,20 @@ public class QuerySpecification extends QueryExpression {
                     break;
                 }
             }
+            if (k == indexStartOrderBy) {
+                // not found in selected list
+                continue;
+            }
 
-            if (exprColumns[k].opType != OpTypes.COLUMN) {
+            if (exprColumns[k].getType() != OpTypes.COLUMN) {
                 continue;
             }
             ExpressionColumn exprCol = (ExpressionColumn) exprColumns[k];
             String alias = exprCol.getColumnName();
+            if (alias == null) {
+                // we should not handle this case (group by constants)
+                continue;
+            }
 
             boolean hasFound = false;
             // find it in the SELECT list
@@ -313,6 +324,10 @@ public class QuerySpecification extends QueryExpression {
                 Expression selectCol = exprColumns[j];
                 if (selectCol.isAggregate) {
                     // Group by can not support aggregate expression
+                    continue;
+                }
+                if (selectCol.alias == null) {
+                    // constants selected columns do not have alias
                     continue;
                 }
                 if (alias.equals(selectCol.alias.name)) {
