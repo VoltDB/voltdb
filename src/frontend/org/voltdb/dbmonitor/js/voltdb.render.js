@@ -65,6 +65,7 @@ function alertNodeClicked(obj) {
         var procedureData = {};
         var tableData = {};
         var schemaCatalogTableTypes = {};
+        var schemaCatalogColumnTypes = {};
         var systemOverview = {};
         var systemMemory = {};
         var htmlMarkups = { "SystemInformation": [] };
@@ -77,7 +78,7 @@ function alertNodeClicked(obj) {
         };
 
 
-        var testConnection = function(serverName, portId, username, password, admin, onInformationLoaded) {
+        var testConnection = function (serverName, portId, username, password, admin, onInformationLoaded) {
             VoltDBService.TestConnection(serverName, portId, username, password, admin, function (result) {
 
                 onInformationLoaded(result);
@@ -199,7 +200,7 @@ function alertNodeClicked(obj) {
                 $(".userN").html("");
             }
         };
-        
+
         this.GetSystemInformation = function (onInformationLoaded) {
             VoltDBService.GetSystemInformation(function (connection) {
                 populateSystemInformation(connection);
@@ -215,13 +216,14 @@ function alertNodeClicked(obj) {
 
             VoltDBService.GetSystemInformationDeployment(function (connection) {
                 setKFactor(connection);
-                VoltDBService.GetProceduresInformation(function(nestConnection) {
+                VoltDBService.GetProceduresInformation(function (nestConnection) {
                     populateProceduresInformation(nestConnection);
                     procedureMetadata = nestConnection.Metadata['@Statistics_PROCEDUREPROFILE'].data;
 
-                    VoltDBService.GetDataTablesInformation(function(inestConnection) {
+                    VoltDBService.GetDataTablesInformation(function (inestConnection) {
                         populateTablesInformation(inestConnection);
                         populateTableTypes(inestConnection);
+                        populatePartitionColumnTypes(inestConnection);
                         onInformationLoaded(procedureMetadata, inestConnection.Metadata['@Statistics_TABLE'].data);
                     });
                 });
@@ -252,7 +254,7 @@ function alertNodeClicked(obj) {
             var latencyDetails = {};
 
             VoltDBService.GetGraphLatencyInformation(function (connection) {
-                getLatencyDetails(connection, latencyDetails);                
+                getLatencyDetails(connection, latencyDetails);
                 onInformationLoaded(latencyDetails);
             });
         };
@@ -261,7 +263,7 @@ function alertNodeClicked(obj) {
             var cpuDetails = {};
 
             VoltDBService.GetCPUInformation(function (connection) {
-                getCpuDetails(connection, cpuDetails);               
+                getCpuDetails(connection, cpuDetails);
                 onInformationLoaded(cpuDetails);
             });
 
@@ -272,7 +274,7 @@ function alertNodeClicked(obj) {
             var transactionDetails = {};
 
             VoltDBService.GetTransactionInformation(function (connection) {
-                getTransactionDetails(connection, transactionDetails);                
+                getTransactionDetails(connection, transactionDetails);
                 onInformationLoaded(transactionDetails);
             });
         };
@@ -429,7 +431,7 @@ function alertNodeClicked(obj) {
             counter = 0;
             var tableName = "";
 
-            if(connection.Metadata['@Statistics_TABLE'].data!=undefined){
+            if (connection.Metadata['@Statistics_TABLE'].data != undefined) {
                 connection.Metadata['@Statistics_TABLE'].data.forEach(function (entry) {
                     tableName = entry[tableNameIndex];
 
@@ -485,7 +487,7 @@ function alertNodeClicked(obj) {
 
             counter = 0;
             if (connection.Metadata['@Statistics_PROCEDUREPROFILE'].data != undefined) {
-                connection.Metadata['@Statistics_PROCEDUREPROFILE'].data.forEach(function(entry) {
+                connection.Metadata['@Statistics_PROCEDUREPROFILE'].data.forEach(function (entry) {
                     var name = entry[procedureNameIndex];
 
                     if (!procedureData.hasOwnProperty(name)) {
@@ -504,889 +506,950 @@ function alertNodeClicked(obj) {
                 voltDbRenderer.procedureDataSize = connection.Metadata['@Statistics_PROCEDUREPROFILE'].data.length;
 
             }
-            
+
         };
 
-            var populateTableTypes = function (connection) {
-                var counter = 0;
-                var tableName;
-                var tableNameIndex = 0;
-                var tableTypeIndex = 0;
-                var remarksIndex = 0;
+        var populateTableTypes = function (connection) {
+            var counter = 0;
+            var tableName;
+            var tableNameIndex = 0;
+            var tableTypeIndex = 0;
+            var remarksIndex = 0;
 
-                connection.Metadata['@SystemCatalog_TABLES'].schema.forEach(function (columnInfo) {
-                    if (columnInfo["name"] == "TABLE_NAME")
-                        tableNameIndex = counter;
+            connection.Metadata['@SystemCatalog_TABLES'].schema.forEach(function (columnInfo) {
+                if (columnInfo["name"] == "TABLE_NAME")
+                    tableNameIndex = counter;
 
-                    if (columnInfo["name"] == "TABLE_TYPE")
-                        tableTypeIndex = counter;
+                if (columnInfo["name"] == "TABLE_TYPE")
+                    tableTypeIndex = counter;
 
-                    if (columnInfo["name"] == "REMARKS")
-                        remarksIndex = counter;
+                if (columnInfo["name"] == "REMARKS")
+                    remarksIndex = counter;
 
-                    counter++;
-                });
+                counter++;
+            });
 
-                connection.Metadata['@SystemCatalog_TABLES'].data.forEach(function (entry) {
-                    tableName = entry[tableNameIndex];
-                    if (!schemaCatalogTableTypes.hasOwnProperty(tableName)) {
-                        schemaCatalogTableTypes[tableName] = {};
-                        schemaCatalogTableTypes[tableName]['TABLE_NAME'] = entry[tableNameIndex];
-                        schemaCatalogTableTypes[tableName]['TABLE_TYPE'] = entry[tableTypeIndex];
-                        schemaCatalogTableTypes[tableName]['REMARKS'] = entry[remarksIndex];
+            connection.Metadata['@SystemCatalog_TABLES'].data.forEach(function (entry) {
+                tableName = entry[tableNameIndex];
+                if (!schemaCatalogTableTypes.hasOwnProperty(tableName)) {
+                    schemaCatalogTableTypes[tableName] = {};
+                    schemaCatalogTableTypes[tableName]['TABLE_NAME'] = entry[tableNameIndex];
+                    schemaCatalogTableTypes[tableName]['TABLE_TYPE'] = entry[tableTypeIndex];
+                    schemaCatalogTableTypes[tableName]['REMARKS'] = entry[remarksIndex];
 
-                    }
-                });
-
-            };
-
-            this.mapNodeInformationByStatus = function (callback) {
-                var counter = 0;
-                var memoryThreshold = $.cookie("alert-threshold") != '' ? $.cookie("alert-threshold") : -1;
-                var htmlMarkups = { "ServerInformation": [] };
-                var htmlMarkup;
-                var currentServerHtml;
-
-                if (systemOverview == null || systemOverview == undefined) {
-                    alert("Error: Unable to extract Node Status");
-                    return;
                 }
+            });
 
-                var currentServer = getCurrentServer();
-                if (currentServer != null) {
-                    currentServerHtml = currentServer;
-                } else {
-                    currentServerHtml = "";
-                }
+        };
 
-                jQuery.each(systemOverview, function (id, val) {
-                    var hostName;
-                    hostName = val["HOSTNAME"];
+        var populatePartitionColumnTypes = function (connection) {
+            var counterColumns = 0;
+            var columnName;
+            var columnNameIndex = 0;
+            var tableNameColumnsIndex = 0;
+            var remarksColumnsIndex = 0;
 
-                    if (counter == 0) {
-                        /*************************************************************************
-                        //CLUSTERSTATE implies if server is running or joining
-                        **************************************************************************/
-                        if (val["HOSTNAME"] != null && val["CLUSTERSTATE"] == "RUNNING" && (currentServerHtml == "" || currentServer == hostName)) {
-                            if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
-                                htmlMarkup = "<li class=\"active monitoring\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\"  href=\"#\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
-                                currentServerHtml = hostName;
-                                //if (!serverIPs.hasOwnProperty(hostName)) {
-                                //    serverIPs["hostName"] = {};
-                                //    serverIPs["hostName"]= 
+            connection.Metadata['@SystemCatalog_COLUMNS'].schema.forEach(function (columnInfo) {
+                if (columnInfo["name"] == "COLUMN_NAME")
+                    columnNameIndex = counterColumns;
 
-                                //}
+                if (columnInfo["name"] == "TABLE_NAME")
+                    tableNameColumnsIndex = counterColumns;
 
-                            } else {
-                                htmlMarkup = "<li class=\"active monitoring\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"#\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
-                                currentServerHtml = hostName;
-                            }
+                if (columnInfo["name"] == "REMARKS")
+                    remarksColumnsIndex = counterColumns;
 
-                        } else if (val["HOSTNAME"] != null && val["CLUSTERSTATE"] == "RUNNING" && currentServer != hostName) {
-                            if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
-                                htmlMarkup = "<li class=\"active\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"#\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span><span class=\"hostIdHidden\" style=\"display:none\">" + systemMemory[hostName]["HOST_ID"] + "</span></li>";
-                            } else {
-                                htmlMarkup = "<li class=\"active\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"#\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
-                            }
+                counterColumns++;
+            });
 
-                        } else if (val["HOSTNAME"] != null && val["CLUSTERSTATE"] == "JOINING") {
-                            if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
-                                htmlMarkup = htmlMarkup + "<li class=\"joining\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"#\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span><span class=\"hostIdHidden\" style=\"display:none\">" + systemMemory[hostName]["HOST_ID"] + "</span></li>";
+            connection.Metadata['@SystemCatalog_COLUMNS'].data.forEach(function (entry) {
+                columnName = entry[columnNameIndex];
 
-                            } else {
-                                htmlMarkup = htmlMarkup + "<li class=\"joining\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"#\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
-                            }
-                        }
+                if (entry[remarksColumnsIndex] == "PARTITION_COLUMN") {
+                    if (!schemaCatalogColumnTypes.hasOwnProperty(columnName)) {
+                        schemaCatalogColumnTypes[columnName] = {};
+                        schemaCatalogColumnTypes[columnName]['COLUMN_NAME'] = entry[columnNameIndex];
+                        schemaCatalogColumnTypes[columnName]['TABLE_NAME'] = entry[tableNameColumnsIndex];
+                        schemaCatalogColumnTypes[columnName]['REMARKS'] = entry[remarksColumnsIndex];
 
-
-                    } else {
-                        /********************************************************************************************
-                        "currentServerHtml" is validated to verify if current server to be monitored is already set
-                        *********************************************************************************************/
-                        if (val["HOSTNAME"] != null && val["CLUSTERSTATE"] == "RUNNING" && currentServerHtml != "" && currentServerHtml == val["HOSTNAME"]) {
-                            if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
-                                htmlMarkup = htmlMarkup + "<li class=\"active monitoring\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"#\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
-
-                            } else {
-                                htmlMarkup = htmlMarkup + "<li class=\"active monitoring\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"#\">" + hostName + "</a> <span data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\"class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
-                            }
-                        }
-
-                        if (val["HOSTNAME"] != null && val["CLUSTERSTATE"] == "RUNNING" && currentServerHtml != val["HOSTNAME"]) {
-                            if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
-                                htmlMarkup = htmlMarkup + "<li class=\"active\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"#\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
-
-                            } else {
-                                htmlMarkup = htmlMarkup + "<li class=\"active\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"#\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
-                            }
-
-                        }
-
-                        if (val["HOSTNAME"] != null && val["CLUSTERSTATE"] == "JOINING") {
-                            if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
-                                htmlMarkup = htmlMarkup + "<li class=\"joining\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"#\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
-
-                            } else {
-                                htmlMarkup = htmlMarkup + "<li class=\"joining\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"#\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
-                            }
-
-                        }
-                    }
-                    counter++;
-                });
-                htmlMarkups.ServerInformation.push({ "ServersList": htmlMarkup });
-                htmlMarkups.ServerInformation.push({ "CurrentServer": currentServerHtml });
-                callback(htmlMarkups);
-            };
-
-            this.mapProcedureInformation = function (currentAction, priorAction, isSearch, callback) {
-                var counter = 0;
-                var pageStartIndex = 0;
-                var traverse = false;
-
-                htmlMarkup = "";
-                htmlMarkups.SystemInformation = [];
-
-                if (procedureData == null || procedureData == undefined) {
-                    alert("Error: Unable to extract Procedure Data");
-                    return;
-                }
-
-                if ((((voltDbRenderer.procedureTableIndex + 1) * this.maxVisibleRows < voltDbRenderer.procedureDataSize) && currentAction == VoltDbUI.ACTION_STATES.NEXT) || (currentAction == VoltDbUI.ACTION_STATES.PREVIOUS && voltDbRenderer.procedureTableIndex > 0) || currentAction == VoltDbUi.ACTION_STATES.REFRESH || currentAction == VoltDbUi.ACTION_STATES.SEARCH || currentAction == VoltDbUi.ACTION_STATES.NONE) {
-                    if (currentAction == VoltDbUi.ACTION_STATES.NEXT) {
-                        // alert('next');
-                        pageStartIndex = (voltDbRenderer.procedureTableIndex + 1) * voltDbRenderer.maxVisibleRows;
-
-                    }
-
-                    if (currentAction == VoltDbUi.ACTION_STATES.PREVIOUS) { // pageStartIndex need not be initialized if isNext is undefined(when page loads intially or during reload operation)
-                        //alert('previous');
-                        pageStartIndex = (voltDbRenderer.procedureTableIndex - 1) * voltDbRenderer.maxVisibleRows;
-                    }
-                    if ((currentAction == VoltDbUi.ACTION_STATES.REFRESH && priorAction == VoltDbUi.ACTION_STATES.NEXT)) {
-                        pageStartIndex = (voltDbRenderer.procedureTableIndex) * voltDbRenderer.maxVisibleRows;
-
-                    }
-                    if ((currentAction == VoltDbUi.ACTION_STATES.REFRESH && priorAction == VoltDbUi.ACTION_STATES.PREVIOUS)) {
-                        pageStartIndex = (voltDbRenderer.procedureTableIndex) * voltDbRenderer.maxVisibleRows;
-                    }
-                    if (currentAction == VoltDbUi.ACTION_STATES.SEARCH || currentAction == VoltDbUi.ACTION_STATES.NONE) {
-                        pageStartIndex = 0;
-                        voltDbRenderer.procedureTableIndex = 0;
-                    }
-
-                    var lProcedureData = voltDbRenderer.isProcedureSearch ? this.searchData.procedures : procedureData;
-
-                    jQuery.each(lProcedureData, function (id, val) {
-                        if (currentAction == VoltDbUi.ACTION_STATES.NEXT && (voltDbRenderer.isProcedureSearch == false || voltDbRenderer.isProcedureSearch == undefined)) {
-                            if (counter >= pageStartIndex && counter <= (voltDbRenderer.procedureTableIndex + 2) * voltDbRenderer.maxVisibleRows - 1) {
-                                setProcedureTupleHtml(val);
-                                if (counter == (voltDbRenderer.procedureTableIndex + 2) * voltDbRenderer.maxVisibleRows - 1 || counter == voltDbRenderer.procedureDataSize - 1) {
-                                    voltDbRenderer.procedureTableIndex++;
-                                    return false;
-                                    //counter = 0;
-                                }
-
-                            } else if (counter == pageStartIndex * 2) {
-                                voltDbRenderer.procedureTableIndex++;
-                                return false;
-                                //counter = 0;
-                            }
-
-                        } else if (currentAction == VoltDbUi.ACTION_STATES.PREVIOUS && (voltDbRenderer.isProcedureSearch == false || voltDbRenderer.isProcedureSearch == undefined)) {
-                            if (pageStartIndex >= 0 && counter >= pageStartIndex && counter < (voltDbRenderer.procedureTableIndex * voltDbRenderer.maxVisibleRows)) {
-                                setProcedureTupleHtml(val);
-                            }
-                            if (pageStartIndex >= 0 && counter == (voltDbRenderer.procedureTableIndex * voltDbRenderer.maxVisibleRows - 1)) {
-                                voltDbRenderer.procedureTableIndex--;
-                            }
-                        } else if (currentAction == VoltDbUi.ACTION_STATES.PREVIOUS && priorAction == VoltDbUi.ACTION_STATES.PREVIOUS) {
-                            if (counter >= 0 && counter >= pageStartIndex && counter < voltDbRenderer.procedureTableIndex * voltDbRenderer.maxVisibleRows) {
-                                setProcedureTupleHtml(val);
-                            }
-
-                            if (pageStartIndex >= 0 && counter == (voltDbRenderer.procedureTableIndex * voltDbRenderer.maxVisibleRows - 1)) {
-                                voltDbRenderer.procedureTableIndex--;
-                            }
-                        } else if (currentAction == VoltDbUi.ACTION_STATES.PREVIOUS && priorAction == VoltDbUi.ACTION_STATES.NEXT) {
-                            if (counter >= 0 && counter >= pageStartIndex && counter < voltDbRenderer.procedureTableIndex * voltDbRenderer.maxVisibleRows) {
-                                setProcedureTupleHtml(val);
-                            }
-
-                            if (pageStartIndex >= 0 && counter == (voltDbRenderer.procedureTableIndex * voltDbRenderer.maxVisibleRows - 1)) {
-                                voltDbRenderer.procedureTableIndex--;
-                            }
-                        } else if (currentAction == VoltDbUi.ACTION_STATES.REFRESH && priorAction == VoltDbUi.ACTION_STATES.NEXT) {
-                            if (counter >= pageStartIndex && counter <= (voltDbRenderer.procedureTableIndex + 1) * voltDbRenderer.maxVisibleRows - 1) {
-                                setProcedureTupleHtml(val);
-                            }
-                        } else if ((currentAction == VoltDbUi.ACTION_STATES.REFRESH && priorAction == VoltDbUi.ACTION_STATES.PREVIOUS)) {
-                            if (pageStartIndex >= 0 && counter >= pageStartIndex && counter < ((voltDbRenderer.procedureTableIndex + 1) * voltDbRenderer.maxVisibleRows)) {
-                                setProcedureTupleHtml(val);
-
-                            }
-                        } else if ((currentAction == VoltDbUi.ACTION_STATES.SEARCH && priorAction == VoltDbUi.ACTION_STATES.NONE)) {
-                            if (pageStartIndex >= 0 && counter >= pageStartIndex && counter < ((voltDbRenderer.procedureTableIndex + 1) * voltDbRenderer.maxVisibleRows)) {
-                                setProcedureTupleHtml(val);
-                            }
-                        } else if ((currentAction == VoltDbUi.ACTION_STATES.NEXT && priorAction == VoltDbUi.ACTION_STATES.SEARCH) || (currentAction == VoltDbUi.ACTION_STATES.NEXT && priorAction == VoltDbUi.ACTION_STATES.NEXT)) {
-                            if (counter >= pageStartIndex && counter <= (voltDbRenderer.procedureTableIndex + 2) * voltDbRenderer.maxVisibleRows - 1) {
-                                setProcedureTupleHtml(val);
-                            }
-
-                            if ((counter == (voltDbRenderer.procedureTableIndex + 2) * voltDbRenderer.maxVisibleRows - 1 || counter == voltDbRenderer.procedureSearchDataSize - 1) && htmlMarkup != "") {
-                                voltDbRenderer.procedureTableIndex++;
-                                return false;
-                                //counter = 0;
-                            }
-                        } else if ((currentAction == VoltDbUi.ACTION_STATES.NEXT && priorAction == VoltDbUi.ACTION_STATES.PREVIOUS)) {
-                            if (counter >= pageStartIndex && counter <= (voltDbRenderer.procedureTableIndex + 2) * voltDbRenderer.maxVisibleRows - 1) {
-                                setProcedureTupleHtml(val);
-                            }
-
-                            if ((counter == (voltDbRenderer.procedureTableIndex + 1) * voltDbRenderer.maxVisibleRows - 1 || counter == voltDbRenderer.procedureSearchDataSize - 1) && htmlMarkup != "") {
-                                voltDbRenderer.procedureTableIndex++;
-                                return false;
-                                //counter = 0;
-                            }
-                        } else {
-                            if (counter < voltDbRenderer.maxVisibleRows) {
-                                setProcedureTupleHtml(val);
-                            }
-                        }
-                        counter++;
-                    });
-
-
-                    if (voltDbRenderer.isProcedureSearch) {
-                        if (htmlMarkup != "")
-                            callback(currentAction, htmlMarkup);
-
-                        priorAction = currentAction;
-
-                    } else {
-                        htmlMarkups.SystemInformation.push(htmlMarkup);
-                        htmlMarkup = undefined;
-
-                        if (htmlMarkups.SystemInformation[0] != "")
-                            callback(currentAction, htmlMarkups);
-                    }
-
-
-                }                
-            };
-
-            this.mapTableInformation = function (currentAction, priorAction, isSearch, callback) {
-                var counter = 0;
-                var tablePageStartIndex = 0;
-                var replicationCount = 0;
-                var tupleCountPartitions = [];
-                var partitionKeyPairData = [];
-                var table_type = "";
-                
-                var formatTableTupleData = function (key, tupleData) {
-                    var tableName = "";
-                    var counter = 0;
-                    var partitionId = "";
-                    var totalTupleCount = 0;
-                    var partitionEntryCount = 0;
-
-
-                    var maxTupleValue;
-                    var minTupleValue;
-                    var avgTupleValue;
-
-                    var newPartition = false;
-
-                    $.each(tupleData, function (nestKey, partitionData) {
-                        if (partitionData != undefined) {
-                            if (counter == 0) {
-                                partitionKeyPairData.push(partitionData['PARTITION_ID']);
-                                totalTupleCount += parseInt(partitionData['TUPLE_COUNT']);
-                                tupleCountPartitions[counter] = partitionData['TUPLE_COUNT'];
-                                counter++;
-                            } else {
-                                partitionEntryCount = 0;
-                                partitionKeyPairData.forEach(function (partitionId) {
-                                    if (partitionId == partitionData['PARTITION_ID']) {
-                                        newPartition = false;
-                                        partitionEntryCount++;
-                                        return false;
-
-                                    } else if (partitionEntryCount == partitionKeyPairData.length - 1) {
-                                        newPartition = true;
-                                        partitionEntryCount++;
-                                        return true;
-
-                                    }
-
-                                });
-
-                            }
-
-
-                            if (newPartition) {
-                                partitionKeyPairData.push(partitionData['PARTITION_ID']); //added new partition id under the table name
-                                totalTupleCount += parseInt(partitionData['TUPLE_COUNT']);
-                                tupleCountPartitions[counter] = partitionData['TUPLE_COUNT'];
-                                counter++;
-
-                            } else if (!newPartition && counter > 0) { //not if it is the just the first partition
-                                replicationCount++;
-
-                            }
-
-
-                        }
-                    });
-
-                    if (replicationCount > 0 && table_type != "VIEW" && table_type != "PARTITION")
-                        table_type = "REPLICATED";
-
-
-                    maxTupleValue = Math.max.apply(null, tupleCountPartitions);
-                    minTupleValue = Math.max.apply(null, tupleCountPartitions);
-                    avgTupleValue = tupleCountPartitions.reduce(function (a) {
-
-                        return a;
-                    });
-
-                    setTableTupleDataHtml(key, totalTupleCount, maxTupleValue, minTupleValue, totalTupleCount / (parseInt(kFactor) + 1) * 1, table_type);
-
-                };
-
-                var setTableTypes = function (id) {
-                    if (counter < voltDbRenderer.maxVisibleRows) {
-                        var tableName = id;
-
-                        //before formatting individual table data validate table type with reference to SystemCatalog data
-                        $.each(schemaCatalogTableTypes, function (key, typeVal) {
-                            if (tableName == typeVal['TABLE_NAME']) {
-                                if (typeVal['REMARKS'] == 'PARTITION_COLUMN') {
-                                    table_type = "PARTITION";
-                                }
-
-                                if (typeVal['TABLE_TYPE'] == 'VIEW') {
-                                    table_type = "VIEW";
-                                } else {
-                                    table_type = "";
-                                }
-
-
-                            }
-
-                        });
-
-                    }
-                };
-
-
-                if (tableData == null || tableData == undefined) {
-                    alert("Error: Unable to extract Table Data");
-                    return;
-                }
-
-                htmlTableMarkup = "";
-                htmlTableMarkups.SystemInformation = [];
-
-                if ((((voltDbRenderer.tableIndex + 1) * this.maxVisibleRows < voltDbRenderer.tableDataSize) && currentAction == VoltDbUI.ACTION_STATES.NEXT) ||
-                    (currentAction == VoltDbUI.ACTION_STATES.PREVIOUS && voltDbRenderer.tableIndex > 0) ||
-                    currentAction == VoltDbUi.ACTION_STATES.REFRESH || currentAction == VoltDbUi.ACTION_STATES.SEARCH || currentAction == VoltDbUi.ACTION_STATES.NONE) {
-                    if (currentAction == VoltDbUi.ACTION_STATES.NEXT) {
-                        // alert('next');
-                        tablePageStartIndex = (voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows;
-
-                    }
-
-                    if (currentAction == VoltDbUi.ACTION_STATES.PREVIOUS) { // pageStartIndex need not be initialized if isNext is undefined(when page loads intially or during reload operation)
-                        //alert('previous');
-                        tablePageStartIndex = (voltDbRenderer.tableIndex - 1) * voltDbRenderer.maxVisibleRows;
-
-                    }
-
-                    if ((currentAction == VoltDbUi.ACTION_STATES.REFRESH && priorAction == VoltDbUi.ACTION_STATES.NEXT) ||
-                        (currentAction == VoltDbUi.ACTION_STATES.REFRESH && priorAction == VoltDbUi.ACTION_STATES.PREVIOUS)) {
-                        tablePageStartIndex = (voltDbRenderer.tableIndex) * voltDbRenderer.maxVisibleRows;
-
-                    }
-
-                    if (currentAction == VoltDbUi.ACTION_STATES.SEARCH || currentAction == VoltDbUi.ACTION_STATES.NONE) {
-                        tablePageStartIndex = 0;
-                        voltDbRenderer.tableIndex = 0;
-
-                    }
-
-                    var lTableData = this.isTableSearch ? this.searchData.tables : tableData;
-                    if (this.isTableSearch == false) voltDbRenderer.tableDataSize = Object.keys(tableData).length;
-
-
-                    $.each(lTableData, function (id, val) {
-                        if (currentAction == VoltDbUi.ACTION_STATES.NEXT && (voltDbRenderer.isTableSearch == false || voltDbRenderer.isTableSearch == undefined)) {
-                            if (counter >= tablePageStartIndex && counter <= (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1) {
-                                formatTableTupleData(id, val);
-                                if (counter == (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1 || counter == voltDbRenderer.tableDataSize - 1) {
-                                    voltDbRenderer.tableIndex++;
-                                    return false;
-                                    //counter = 0;
-                                }
-
-                            } else if (counter == tablePageStartIndex * 2) {
-                                voltDbRenderer.tableIndex++;
-                                return false;
-                                //counter = 0;
-                            }
-
-                        } else if (currentAction == VoltDbUi.ACTION_STATES.PREVIOUS && (voltDbRenderer.isTableSearch == false || voltDbRenderer.isTableSearch == undefined)) {
-                            if (tablePageStartIndex >= 0 && counter >= tablePageStartIndex && counter < (voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows)) {
-                                setTableTypes(id);
-                                formatTableTupleData(id, val);
-                            }
-                            if (tablePageStartIndex >= 0 && counter == (voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows - 1)) {
-                                voltDbRenderer.tableIndex--;
-                            }
-                        } else if (currentAction == VoltDbUi.ACTION_STATES.PREVIOUS && priorAction == VoltDbUi.ACTION_STATES.PREVIOUS) {
-                            if (counter >= 0 && counter >= tablePageStartIndex && counter < voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows) {
-                                setTableTypes(id);
-                                formatTableTupleData(id, val);
-                            }
-
-                            if (tablePageStartIndex >= 0 && counter == (voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows - 1)) {
-                                voltDbRenderer.tableIndex--;
-                            }
-                        } else if (currentAction == VoltDbUi.ACTION_STATES.PREVIOUS && priorAction == VoltDbUi.ACTION_STATES.NEXT) {
-                            if (counter >= 0 && counter >= tablePageStartIndex && counter < voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows) {
-                                setTableTypes(id);
-                                formatTableTupleData(id, val);
-                            }
-
-                            if (tablePageStartIndex >= 0 && counter == (voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows - 1)) {
-                                voltDbRenderer.tableIndex--;
-                            }
-                        } else if (currentAction == VoltDbUi.ACTION_STATES.REFRESH && priorAction == VoltDbUi.ACTION_STATES.NEXT) {
-                            if (counter >= tablePageStartIndex && counter <= (voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows - 1) {
-                                setTableTypes(id);
-                                formatTableTupleData(id, val);
-                            }
-
-                        } else if ((currentAction == VoltDbUi.ACTION_STATES.REFRESH && priorAction == VoltDbUi.ACTION_STATES.PREVIOUS)) {
-                            if (tablePageStartIndex >= 0 && counter >= tablePageStartIndex && counter < ((voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows)) {
-                                setTableTypes(id);
-                                formatTableTupleData(id, val);
-
-                            }
-
-                        } else if ((currentAction == VoltDbUi.ACTION_STATES.SEARCH && priorAction == VoltDbUi.ACTION_STATES.NONE) || (currentAction == VoltDbUi.ACTION_STATES.SEARCH && priorAction == VoltDbUi.ACTION_STATES.SEARCH) ||
-                        (currentAction == VoltDbUi.ACTION_STATES.SEARCH && priorAction == VoltDbUi.ACTION_STATES.REFRESH)) {
-                            if (tablePageStartIndex >= 0 && counter >= tablePageStartIndex && counter < ((voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows)) {
-                                setTableTypes(id);
-                                formatTableTupleData(id, val);
-                            }
-
-                        } else if ((currentAction == VoltDbUi.ACTION_STATES.NEXT && priorAction == VoltDbUi.ACTION_STATES.SEARCH) || (currentAction == VoltDbUi.ACTION_STATES.NEXT && priorAction == VoltDbUi.ACTION_STATES.NEXT)) {
-                            if (counter >= tablePageStartIndex && counter <= (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1) {
-                                setTableTypes(id);
-                                formatTableTupleData(id, val);
-                            }
-
-                            if ((counter == (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1 || counter == voltDbRenderer.tableSearchDataSize - 1) && htmlTableMarkup != "") {
-                                voltDbRenderer.tableIndex++;
-                                return false;
-                                //counter = 0;
-                            }
-
-                        } else if ((currentAction == VoltDbUi.ACTION_STATES.NEXT && priorAction == VoltDbUi.ACTION_STATES.PREVIOUS)) {
-                            if (counter >= tablePageStartIndex && counter <= (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1) {
-                                setTableTypes(id);
-                                formatTableTupleData(id, val);
-                            }
-
-                            if ((counter == (voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows - 1 || counter == voltDbRenderer.tableSearchDataSize - 1) && htmlTableMarkup != "") {
-                                voltDbRenderer.tableIndex++;
-                                return false;
-                                //counter = 0;
-                            }
-
-                        } else {
-                            if (counter < voltDbRenderer.maxVisibleRows) {
-                                setTableTypes(id);
-                                formatTableTupleData(id, val);
-                            }
-                        }
-                        counter++;
-
-                    });
-
-
-                    if (this.isTableSearch)
-                        callback(htmlTableMarkup);
-
-                    else {
-                        htmlTableMarkups.SystemInformation.push(htmlTableMarkup);
-                        htmlTableMarkup = undefined;
-                        callback(htmlTableMarkups);
                     }
                 }
+            });
 
-            };
+        };
 
+        this.mapNodeInformationByStatus = function (callback) {
+            var counter = 0;
+            var memoryThreshold = $.cookie("alert-threshold") != '' ? $.cookie("alert-threshold") : -1;
+            var htmlMarkups = { "ServerInformation": [] };
+            var htmlMarkup;
+            var currentServerHtml;
 
-            this.getServerIP = function (hostId) {
-                var serverAddress;
-                $.each(systemOverview, function (key, val) {
-                    if (key == hostId) {
-                        serverAddress = val["IPADDRESS"];
-                    }
-
-                });
-                return serverAddress;
-            };
-
-
-            var getLatencyDetails = function (connection, latency) {
-
-                var colIndex = {};
-                var counter = 0;
-
-                connection.Metadata['@Statistics_LATENCY_HISTOGRAM'].schema.forEach(function (columnInfo) {
-                    if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "UNCOMPRESSED_HISTOGRAM" || columnInfo["name"] == "TIMESTAMP")
-                        colIndex[columnInfo["name"]] = counter;
-                    counter++;
-                });
-
-                connection.Metadata['@Statistics_LATENCY_HISTOGRAM'].data.forEach(function (info) {
-                    var hostName = info[colIndex["HOSTNAME"]];
-                    if (!latency.hasOwnProperty(hostName)) {
-                        latency[hostName] = {};
-                    }
-                    latency[hostName]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
-                    latency[hostName]["UNCOMPRESSED_HISTOGRAM"] = info[colIndex["UNCOMPRESSED_HISTOGRAM"]];
-                });
-            };
-
-            var getMemoryDetails = function (connection, sysMemory, processName) {
-
-                var counter = 0;
-                var hostNameIndex = 0;
-                var tupledDataIndex = 0;
-                var tupleCountIndex = 0;
-                var rssIndex = 0;
-                var totalMemoryIndex = -1;
-                var suffix = "";
-                var timeStampIndex = 0;
-                var idIndex = 0;
-                var hostNameList = {};
-
-                if (processName == "GRAPH_MEMORY") {
-                    suffix = "_" + processName;
-                    hostNameList = { "1": { "HOSTNAME": getCurrentServer() } };
-                } else {
-                    hostNameList = systemOverview;
-                }
-
-                getCurrentServer();
-
-                connection.Metadata['@Statistics_MEMORY' + suffix].schema.forEach(function (columnInfo) {
-
-                    if (columnInfo["name"] == "HOSTNAME")
-                        hostNameIndex = counter;
-                    else if (columnInfo["name"] == "TUPLEDATA")
-                        tupledDataIndex = counter;
-                    else if (columnInfo["name"] == "TUPLECOUNT")
-                        tupleCountIndex = counter;
-                    else if (columnInfo["name"] == "RSS")
-                        rssIndex = counter;
-                    else if (columnInfo["name"] == "TOTALMEMORY")
-                        totalMemoryIndex = counter;
-                    else if (columnInfo["name"] == "TIMESTAMP")
-                        timeStampIndex = counter;
-                    else if (columnInfo["name"] == "HOST_ID")
-                        idIndex = counter;
-                    counter++;
-                });
-
-                connection.Metadata['@Statistics_MEMORY' + suffix].data.forEach(function (memoryInfo) {
-                    jQuery.each(hostNameList, function (id, val) {
-                        if (val["HOSTNAME"] == memoryInfo[hostNameIndex]) {
-
-                            var hostName = memoryInfo[hostNameIndex];
-
-                            if (!sysMemory.hasOwnProperty(hostName)) {
-                                sysMemory[hostName] = {};
-                            }
-
-                            sysMemory[hostName]["TIMESTAMP"] = memoryInfo[timeStampIndex];
-                            sysMemory[hostName]["HOSTNAME"] = hostName;
-                            sysMemory[hostName]["TUPLEDATA"] = memoryInfo[tupledDataIndex];
-                            sysMemory[hostName]["TUPLECOUNT"] = memoryInfo[tupleCountIndex];
-                            sysMemory[hostName]["RSS"] = memoryInfo[rssIndex];
-                            sysMemory[hostName]["HOST_ID"] = memoryInfo[idIndex];
-
-                            //If the value of TotalMemory is passed, then totalMemoryIndex will be greater than -1.
-                            //TODO: Remove the condition "totalMemoryIndex > -1" and just set it to "memoryInfo[totalMemoryIndex]" after it has been implemented in the API.
-                            sysMemory[hostName]["TOTALMEMORY"] = totalMemoryIndex > -1 ? memoryInfo[totalMemoryIndex] : 0;
-
-                            //TODO: Use TotalMemory after it has been implemented in the API.
-                            //sysMemory[hostName]["MEMORYUSAGE"] = (sysMemory[hostName]["RSS"] / sysMemory[hostName]["TOTALMEMORY"]) * 100;
-                            var memoryUsage = (sysMemory[hostName]["TUPLEDATA"] / sysMemory[hostName]["RSS"]) * 100;
-                            sysMemory[hostName]["MEMORYUSAGE"] = Math.round(memoryUsage * 100) / 100;
-                        }
-
-                    });
-                });
-            };
-
-            var getCpuDetails = function (connection, sysMemory) {
-                var colIndex = {};
-                var counter = 0;
-
-                connection.Metadata['@Statistics_CPU'].schema.forEach(function (columnInfo) {
-                    if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "PERCENT_USED" || columnInfo["name"] == "TIMESTAMP")
-                        colIndex[columnInfo["name"]] = counter;
-                    counter++;
-                });
-
-                connection.Metadata['@Statistics_CPU'].data.forEach(function (info) {
-                    var hostName = info[colIndex["HOSTNAME"]];
-                    if (!sysMemory.hasOwnProperty(hostName)) {
-                        sysMemory[hostName] = {};
-                    }
-                    sysMemory[hostName]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
-                    sysMemory[hostName]["PERCENT_USED"] = info[colIndex["PERCENT_USED"]];
-                });
-            };
-
-            var getTransactionDetails = function (connection, sysTransaction) {
-                var colIndex = {};
-                var counter = 0;
-                var currentTimerTick = 0;
-                var procStats = {};
-
-                //connection.Metadata['@Statistics_PROCEDUREPROFILE_GRAPH_TRANSACTION'] = GetTestProcedureData(connection);
-                connection.Metadata['@Statistics_PROCEDUREPROFILE_GRAPH_TRANSACTION'].schema.forEach(function (columnInfo) {
-                    colIndex[columnInfo["name"]] = counter;
-                    counter++;
-                });
-
-                var dataCount = 0;
-                connection.Metadata['@Statistics_PROCEDUREPROFILE_GRAPH_TRANSACTION'].data.forEach(function (table) {
-                    var srcData = table;
-                    var data = null;
-                    currentTimerTick = srcData[colIndex["TIMESTAMP"]];
-                    if (srcData[colIndex["PROCEDURE"]] in procStats) {
-                        data = procStats[srcData[colIndex["PROCEDURE"]]];
-                        data[1] = srcData[colIndex["INVOCATIONS"]];
-                        data[2] = srcData[colIndex["WEIGHTED_PERC"]];
-                        data[3] = srcData[colIndex["MIN"]];
-                        data[4] = srcData[colIndex["AVG"]];
-                        data[5] = srcData[colIndex["MAX"]];
-                    } else {
-                        data = [srcData[colIndex["PROCEDURE"]], srcData[colIndex["INVOCATIONS"]], srcData[colIndex["WEIGHTED_PERC"]], srcData[colIndex["MIN"]], srcData[colIndex["AVG"]], srcData[colIndex["MAX"]]];
-                    }
-                    procStats[srcData[colIndex["PROCEDURE"]]] = data;
-                    if (dataCount == connection.Metadata['@Statistics_PROCEDUREPROFILE_GRAPH_TRANSACTION'].data.length - 1) {
-                        sysTransaction["TimeStamp"] = srcData[colIndex["TIMESTAMP"]];
-                    }
-                    dataCount++;
-                });
-                var currentTimedTransactionCount = 0.0;
-                for (var proc in procStats) {
-                    currentTimedTransactionCount += procStats[proc][1];
-                }
-                sysTransaction["CurrentTimedTransactionCount"] = currentTimedTransactionCount;
-                sysTransaction["currentTimerTick"] = currentTimerTick;
-
-            };
-
-            function getTableData(connection, tablesData, viewsData, processName) {
-                var suffix = "";
-                if (processName == "TABLE_INFORMATION") {
-                    suffix = "_" + processName;
-                }
-
-                var rawTables = connection.Metadata['@Statistics_TABLE' + suffix].data;
-                var rawIndexes = connection.Metadata['@Statistics_INDEX' + suffix].data;
-                var rawColumns = connection.Metadata['@SystemCatalog_COLUMNS' + suffix].data;
-
-                var tables = [];
-                var exports = [];
-                var views = [];
-
-                for (var k = 0; k < rawTables.length; k++) {
-                    var tableName = rawTables[k][5];
-                    if (rawTables[k][6] == 'StreamedTable')
-                        exports[tableName] = { name: tableName };
-                    else {
-                        var isView = false;
-                        var item = { name: tableName, key: null, indexes: null, columns: null };
-                        for (var j = 0; j < rawIndexes.length; j++) {
-                            if (rawIndexes[j][6].toUpperCase() == tableName.toUpperCase()) {
-                                var indexName = rawIndexes[j][5];
-                                if (item.indexes == null)
-                                    item.indexes = [];
-                                item.indexes[indexName] = indexName + ' (' + ((rawIndexes[j][7].toLowerCase().indexOf('hash') > -1) ? 'Hash' : 'Tree') + (rawIndexes[j][8] == "1" ? ', Unique' : '') + ')';
-                                if (indexName.toUpperCase().indexOf("MATVIEW") > -1)
-                                    isView = true;
-                                if (indexName.toUpperCase().indexOf("PK_") > -1)
-                                    item.key = indexName;
-                            }
-                        }
-                        if (isView)
-                            views[tableName] = item;
-                        else
-                            tables[tableName] = item;
-                    }
-                }
-
-                connection.Metadata['tables'] = tables;
-                connection.Metadata['views'] = views;
-
-                for (var i = 0; i < rawColumns.length; i++) {
-                    var Type = 'tables';
-                    var TableName = rawColumns[i][2].toUpperCase();
-                    if (connection.Metadata['tables'][TableName] != null) {
-                        if (connection.Metadata['tables'][TableName].columns == null) {
-                            connection.Metadata['tables'][TableName].columns = [];
-                        }
-                        connection.Metadata['tables'][TableName].columns[rawColumns[i][16]] =
-                            rawColumns[i][3].toUpperCase() +
-                            ' (' + rawColumns[i][5].toLowerCase() + ')';
-                    }
-                    else if (connection.Metadata['views'][TableName] != null) {
-                        if (connection.Metadata['views'][TableName].columns == null) {
-                            connection.Metadata['views'][TableName].columns = [];
-                        }
-                        connection.Metadata['views'][TableName].columns[rawColumns[i][3].toUpperCase()] =
-                            rawColumns[i][3].toUpperCase() +
-                            ' (' + rawColumns[i][5].toLowerCase() + ')';
-                    }
-                }
-                if (!tablesData.hasOwnProperty('tables')) {
-                    tablesData['tables'] = {};
-                }
-                if (!viewsData.hasOwnProperty('views')) {
-                    viewsData['views'] = {};
-                }
-                tablesData['tables'] = connection.Metadata['tables'];
-                viewsData['views'] = connection.Metadata['views'];
+            if (systemOverview == null || systemOverview == undefined) {
+                alert("Error: Unable to extract Node Status");
+                return;
             }
 
+            var currentServer = getCurrentServer();
+            if (currentServer != null) {
+                currentServerHtml = currentServer;
+            } else {
+                currentServerHtml = "";
+            }
 
-            //common methods
-            var setProcedureTupleHtml = function (val) {
-                if (htmlMarkup == undefined || htmlMarkup == "") {
-                    //alert("if null");
-                    htmlMarkup = "<tr><td>" + val['PROCEDURE'] + "</td>" +
-                        "<td class=\"txt-center\">" + val['INVOCATIONS'] + "</td>" +
-                        "<td class=\"txt-center\">" + val['MIN_LATENCY'] + "</td>" +
-                        "<td class=\"txt-center\">" + val['MAX_LATENCY'] + "</td>" +
-                        "<td class=\"txt-center\">" + val['AVG_LATENCY'] + "</td>" +
-                        "<td class=\"txt-center\">" + val['PERC_EXECUTION'] + "</td></tr>";
+            jQuery.each(systemOverview, function (id, val) {
+                var hostName;
+                hostName = val["HOSTNAME"];
+
+                if (counter == 0) {
+                    /*************************************************************************
+                    //CLUSTERSTATE implies if server is running or joining
+                    **************************************************************************/
+                    if (val["HOSTNAME"] != null && val["CLUSTERSTATE"] == "RUNNING" && (currentServerHtml == "" || currentServer == hostName)) {
+                        if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
+                            htmlMarkup = "<li class=\"active monitoring\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\"  href=\"#\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
+                            currentServerHtml = hostName;
+                            //if (!serverIPs.hasOwnProperty(hostName)) {
+                            //    serverIPs["hostName"] = {};
+                            //    serverIPs["hostName"]= 
+
+                            //}
+
+                        } else {
+                            htmlMarkup = "<li class=\"active monitoring\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"#\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
+                            currentServerHtml = hostName;
+                        }
+
+                    } else if (val["HOSTNAME"] != null && val["CLUSTERSTATE"] == "RUNNING" && currentServer != hostName) {
+                        if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
+                            htmlMarkup = "<li class=\"active\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"#\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span><span class=\"hostIdHidden\" style=\"display:none\">" + systemMemory[hostName]["HOST_ID"] + "</span></li>";
+                        } else {
+                            htmlMarkup = "<li class=\"active\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"#\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
+                        }
+
+                    } else if (val["HOSTNAME"] != null && val["CLUSTERSTATE"] == "JOINING") {
+                        if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
+                            htmlMarkup = htmlMarkup + "<li class=\"joining\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"#\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span><span class=\"hostIdHidden\" style=\"display:none\">" + systemMemory[hostName]["HOST_ID"] + "</span></li>";
+
+                        } else {
+                            htmlMarkup = htmlMarkup + "<li class=\"joining\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"#\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
+                        }
+                    }
+
 
                 } else {
+                    /********************************************************************************************
+                    "currentServerHtml" is validated to verify if current server to be monitored is already set
+                    *********************************************************************************************/
+                    if (val["HOSTNAME"] != null && val["CLUSTERSTATE"] == "RUNNING" && currentServerHtml != "" && currentServerHtml == val["HOSTNAME"]) {
+                        if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
+                            htmlMarkup = htmlMarkup + "<li class=\"active monitoring\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"#\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
 
-                    htmlMarkup += "<tr><td>" + val['PROCEDURE'] + "</td>" +
-                        "<td class=\"txt-center\">" + val['INVOCATIONS'] + "</td>" +
-                        "<td class=\"txt-center\">" + val['MIN_LATENCY'] + "</td>" +
-                        "<td class=\"txt-center\">" + val['MAX_LATENCY'] + "</td>" +
-                        "<td class=\"txt-center\">" + val['AVG_LATENCY'] + "</td>" +
-                        "<td class=\"txt-center\">" + val['PERC_EXECUTION'] + "</td></tr>";
+                        } else {
+                            htmlMarkup = htmlMarkup + "<li class=\"active monitoring\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"#\">" + hostName + "</a> <span data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\"class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
+                        }
+                    }
+
+                    if (val["HOSTNAME"] != null && val["CLUSTERSTATE"] == "RUNNING" && currentServerHtml != val["HOSTNAME"]) {
+                        if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
+                            htmlMarkup = htmlMarkup + "<li class=\"active\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"#\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
+
+                        } else {
+                            htmlMarkup = htmlMarkup + "<li class=\"active\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"#\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
+                        }
+
+                    }
+
+                    if (val["HOSTNAME"] != null && val["CLUSTERSTATE"] == "JOINING") {
+                        if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
+                            htmlMarkup = htmlMarkup + "<li class=\"joining\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"#\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
+
+                        } else {
+                            htmlMarkup = htmlMarkup + "<li class=\"joining\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"#\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
+                        }
+
+                    }
                 }
-            };
+                counter++;
+            });
+            htmlMarkups.ServerInformation.push({ "ServersList": htmlMarkup });
+            htmlMarkups.ServerInformation.push({ "CurrentServer": currentServerHtml });
+            callback(htmlMarkups);
+        };
 
-            var setTableTupleDataHtml = function (tableName, totalTupleCount, maxTupleCountPartition, minTupleCountPartition, avgTupleCountPartition, tableType) {
-                if (htmlTableMarkup == undefined || htmlTableMarkup == "") {
-                    htmlTableMarkup = "<tr><td>" + tableName + "</td>" +
-                        "<td class=\"txt-center\">" + totalTupleCount + "</td>" +
-                        "<td class=\"txt-center\">" + maxTupleCountPartition + "</td>" +
-                        "<td class=\"txt-center\">" + minTupleCountPartition + "</td>" +
-                        "<td class=\"txt-center\">" + avgTupleCountPartition + "</td>" +
-                        "<td class=\"txt-center\">" + tableType + "</td></tr>";
-                } else {
-                    htmlTableMarkup += "<tr><td>" + tableName + "</td>" +
-                        "<td class=\"txt-center\">" + totalTupleCount + "</td>" +
-                        "<td class=\"txt-center\">" + maxTupleCountPartition + "</td>" +
-                       "<td class=\"txt-center\">" + minTupleCountPartition + "</td>" +
-                       "<td class=\"txt-center\">" + avgTupleCountPartition + "</td>" +
-                       "<td class=\"txt-center\">" + tableType + "</td></tr>";
-                }
-            };
+        this.mapProcedureInformation = function (currentAction, priorAction, isSearch, callback) {
+            var counter = 0;
+            var pageStartIndex = 0;
+            var traverse = false;
 
-            //Search methods
-            var lSearchData = this.searchData;
-            this.searchProcedures = function (searchType, searchKey, onProcedureSearched) {
-                var searchDataCount = 0;
+            htmlMarkup = "";
+            htmlMarkups.SystemInformation = [];
 
-                if (procedureData == null || procedureData == undefined) {
-                    return;
+            if (procedureData == null || procedureData == undefined) {
+                alert("Error: Unable to extract Procedure Data");
+                return;
+            }
+
+            if ((((voltDbRenderer.procedureTableIndex + 1) * this.maxVisibleRows < voltDbRenderer.procedureDataSize) && currentAction == VoltDbUI.ACTION_STATES.NEXT) || (currentAction == VoltDbUI.ACTION_STATES.PREVIOUS && voltDbRenderer.procedureTableIndex > 0) || currentAction == VoltDbUi.ACTION_STATES.REFRESH || currentAction == VoltDbUi.ACTION_STATES.SEARCH || currentAction == VoltDbUi.ACTION_STATES.NONE) {
+                if (currentAction == VoltDbUi.ACTION_STATES.NEXT) {
+                    // alert('next');
+                    pageStartIndex = (voltDbRenderer.procedureTableIndex + 1) * voltDbRenderer.maxVisibleRows;
+
                 }
 
-                lSearchData['procedures'] = [];
-                $.each(procedureData, function (nestKey, tupleData) {
-                    if (tupleData != undefined) {
-                        if (tupleData.PROCEDURE.toLowerCase().indexOf(searchKey.toLowerCase()) >= 0) {
-                            lSearchData['procedures'][searchDataCount] = tupleData;
-                            searchDataCount++;
+                if (currentAction == VoltDbUi.ACTION_STATES.PREVIOUS) { // pageStartIndex need not be initialized if isNext is undefined(when page loads intially or during reload operation)
+                    //alert('previous');
+                    pageStartIndex = (voltDbRenderer.procedureTableIndex - 1) * voltDbRenderer.maxVisibleRows;
+                }
+                if ((currentAction == VoltDbUi.ACTION_STATES.REFRESH && priorAction == VoltDbUi.ACTION_STATES.NEXT)) {
+                    pageStartIndex = (voltDbRenderer.procedureTableIndex) * voltDbRenderer.maxVisibleRows;
+
+                }
+                if ((currentAction == VoltDbUi.ACTION_STATES.REFRESH && priorAction == VoltDbUi.ACTION_STATES.PREVIOUS)) {
+                    pageStartIndex = (voltDbRenderer.procedureTableIndex) * voltDbRenderer.maxVisibleRows;
+                }
+                if (currentAction == VoltDbUi.ACTION_STATES.SEARCH || currentAction == VoltDbUi.ACTION_STATES.NONE) {
+                    pageStartIndex = 0;
+                    voltDbRenderer.procedureTableIndex = 0;
+                }
+
+                var lProcedureData = voltDbRenderer.isProcedureSearch ? this.searchData.procedures : procedureData;
+
+                jQuery.each(lProcedureData, function (id, val) {
+                    if (currentAction == VoltDbUi.ACTION_STATES.NEXT && (voltDbRenderer.isProcedureSearch == false || voltDbRenderer.isProcedureSearch == undefined)) {
+                        if (counter >= pageStartIndex && counter <= (voltDbRenderer.procedureTableIndex + 2) * voltDbRenderer.maxVisibleRows - 1) {
+                            setProcedureTupleHtml(val);
+                            if (counter == (voltDbRenderer.procedureTableIndex + 2) * voltDbRenderer.maxVisibleRows - 1 || counter == voltDbRenderer.procedureDataSize - 1) {
+                                voltDbRenderer.procedureTableIndex++;
+                                return false;
+                                //counter = 0;
+                            }
+
+                        } else if (counter == pageStartIndex * 2) {
+                            voltDbRenderer.procedureTableIndex++;
+                            return false;
+                            //counter = 0;
+                        }
+
+                    } else if (currentAction == VoltDbUi.ACTION_STATES.PREVIOUS && (voltDbRenderer.isProcedureSearch == false || voltDbRenderer.isProcedureSearch == undefined)) {
+                        if (pageStartIndex >= 0 && counter >= pageStartIndex && counter < (voltDbRenderer.procedureTableIndex * voltDbRenderer.maxVisibleRows)) {
+                            setProcedureTupleHtml(val);
+                        }
+                        if (pageStartIndex >= 0 && counter == (voltDbRenderer.procedureTableIndex * voltDbRenderer.maxVisibleRows - 1)) {
+                            voltDbRenderer.procedureTableIndex--;
+                        }
+                    } else if (currentAction == VoltDbUi.ACTION_STATES.PREVIOUS && priorAction == VoltDbUi.ACTION_STATES.PREVIOUS) {
+                        if (counter >= 0 && counter >= pageStartIndex && counter < voltDbRenderer.procedureTableIndex * voltDbRenderer.maxVisibleRows) {
+                            setProcedureTupleHtml(val);
+                        }
+
+                        if (pageStartIndex >= 0 && counter == (voltDbRenderer.procedureTableIndex * voltDbRenderer.maxVisibleRows - 1)) {
+                            voltDbRenderer.procedureTableIndex--;
+                        }
+                    } else if (currentAction == VoltDbUi.ACTION_STATES.PREVIOUS && priorAction == VoltDbUi.ACTION_STATES.NEXT) {
+                        if (counter >= 0 && counter >= pageStartIndex && counter < voltDbRenderer.procedureTableIndex * voltDbRenderer.maxVisibleRows) {
+                            setProcedureTupleHtml(val);
+                        }
+
+                        if (pageStartIndex >= 0 && counter == (voltDbRenderer.procedureTableIndex * voltDbRenderer.maxVisibleRows - 1)) {
+                            voltDbRenderer.procedureTableIndex--;
+                        }
+                    } else if (currentAction == VoltDbUi.ACTION_STATES.REFRESH && priorAction == VoltDbUi.ACTION_STATES.NEXT) {
+                        if (counter >= pageStartIndex && counter <= (voltDbRenderer.procedureTableIndex + 1) * voltDbRenderer.maxVisibleRows - 1) {
+                            setProcedureTupleHtml(val);
+                        }
+                    } else if ((currentAction == VoltDbUi.ACTION_STATES.REFRESH && priorAction == VoltDbUi.ACTION_STATES.PREVIOUS)) {
+                        if (pageStartIndex >= 0 && counter >= pageStartIndex && counter < ((voltDbRenderer.procedureTableIndex + 1) * voltDbRenderer.maxVisibleRows)) {
+                            setProcedureTupleHtml(val);
 
                         }
+                    } else if ((currentAction == VoltDbUi.ACTION_STATES.SEARCH && priorAction == VoltDbUi.ACTION_STATES.NONE)) {
+                        if (pageStartIndex >= 0 && counter >= pageStartIndex && counter < ((voltDbRenderer.procedureTableIndex + 1) * voltDbRenderer.maxVisibleRows)) {
+                            setProcedureTupleHtml(val);
+                        }
+                    } else if ((currentAction == VoltDbUi.ACTION_STATES.NEXT && priorAction == VoltDbUi.ACTION_STATES.SEARCH) || (currentAction == VoltDbUi.ACTION_STATES.NEXT && priorAction == VoltDbUi.ACTION_STATES.NEXT)) {
+                        if (counter >= pageStartIndex && counter <= (voltDbRenderer.procedureTableIndex + 2) * voltDbRenderer.maxVisibleRows - 1) {
+                            setProcedureTupleHtml(val);
+                        }
+
+                        if ((counter == (voltDbRenderer.procedureTableIndex + 2) * voltDbRenderer.maxVisibleRows - 1 || counter == voltDbRenderer.procedureSearchDataSize - 1) && htmlMarkup != "") {
+                            voltDbRenderer.procedureTableIndex++;
+                            return false;
+                            //counter = 0;
+                        }
+                    } else if ((currentAction == VoltDbUi.ACTION_STATES.NEXT && priorAction == VoltDbUi.ACTION_STATES.PREVIOUS)) {
+                        if (counter >= pageStartIndex && counter <= (voltDbRenderer.procedureTableIndex + 2) * voltDbRenderer.maxVisibleRows - 1) {
+                            setProcedureTupleHtml(val);
+                        }
+
+                        if ((counter == (voltDbRenderer.procedureTableIndex + 1) * voltDbRenderer.maxVisibleRows - 1 || counter == voltDbRenderer.procedureSearchDataSize - 1) && htmlMarkup != "") {
+                            voltDbRenderer.procedureTableIndex++;
+                            return false;
+                            //counter = 0;
+                        }
+                    } else {
+                        if (counter < voltDbRenderer.maxVisibleRows) {
+                            setProcedureTupleHtml(val);
+                        }
+                    }
+                    counter++;
+                });
+
+
+                if (voltDbRenderer.isProcedureSearch) {
+                    if (htmlMarkup != "")
+                        callback(currentAction, htmlMarkup);
+
+                    priorAction = currentAction;
+
+                } else {
+                    htmlMarkups.SystemInformation.push(htmlMarkup);
+                    htmlMarkup = undefined;
+
+                    if (htmlMarkups.SystemInformation[0] != "")
+                        callback(currentAction, htmlMarkups);
+                }
+
+
+            }
+        };
+
+        this.mapTableInformation = function (currentAction, priorAction, isSearch, callback) {
+            var counter = 0;
+            var tablePageStartIndex = 0;
+            var replicationCount = 0;
+            var tupleCountPartitions = [];
+            var partitionKeyPairData = [];
+            var table_type = "";
+
+            var formatTableTupleData = function (key, tupleData) {
+                var tableName = "";
+                var counter = 0;
+                var partitionId = "";
+                var totalTupleCount = 0;
+                var partitionEntryCount = 0;
+
+
+                var maxTupleValue;
+                var minTupleValue;
+                var avgTupleValue;
+
+                var newPartition = false;
+
+                $.each(tupleData, function (nestKey, partitionData) {
+                    if (partitionData != undefined) {
+                        if (counter == 0) {
+                            partitionKeyPairData.push(partitionData['PARTITION_ID']);
+                            totalTupleCount += parseInt(partitionData['TUPLE_COUNT']);
+                            tupleCountPartitions[counter] = partitionData['TUPLE_COUNT'];
+                            counter++;
+                        } else {
+                            partitionEntryCount = 0;
+                            partitionKeyPairData.forEach(function (partitionId) {
+                                if (partitionId == partitionData['PARTITION_ID']) {
+                                    newPartition = false;
+                                    partitionEntryCount++;
+                                    return false;
+
+                                } else if (partitionEntryCount == partitionKeyPairData.length - 1) {
+                                    newPartition = true;
+                                    partitionEntryCount++;
+                                    return true;
+
+                                }
+
+                            });
+
+                        }
+
+
+                        if (newPartition) {
+                            partitionKeyPairData.push(partitionData['PARTITION_ID']); //added new partition id under the table name
+                            totalTupleCount += parseInt(partitionData['TUPLE_COUNT']);
+                            tupleCountPartitions[counter] = partitionData['TUPLE_COUNT'];
+                            counter++;
+
+                        } else if (!newPartition && counter > 0) { //not if it is the just the first partition
+                            replicationCount++;
+
+                        }
+
 
                     }
                 });
 
-                this.procedureSearchDataSize = searchDataCount;
-                onProcedureSearched(searchDataCount > 0);
+                if (replicationCount > 0 && table_type != "VIEW" && table_type != "PARTITION")
+                    table_type = "REPLICATED";
 
-            };
 
-            this.searchTables = function (searchType, searchKey, onTablesSearched) {
-                var searchDataCount = 0;
-                var jsonTupleData = {};
+                maxTupleValue = Math.max.apply(null, tupleCountPartitions);
+                minTupleValue = Math.max.apply(null, tupleCountPartitions);
+                avgTupleValue = tupleCountPartitions.reduce(function (a) {
 
-                if (tableData == null || tableData == undefined) {
-                    return;
-                }
-
-                lSearchData['tables'] = {};
-                $.each(tableData, function (nestKey, tupleData) {
-                    if (tupleData != undefined) {
-                        if (nestKey.toLowerCase().indexOf(searchKey.toLowerCase()) >= 0) {
-                            lSearchData['tables'][nestKey] = tupleData;
-                            searchDataCount++;
-
-                        }
-                    }
+                    return a;
                 });
 
-                if (searchDataCount == 0)
-                    lSearchData['tables'] = "";
+                setTableTupleDataHtml(key, totalTupleCount, maxTupleValue, minTupleValue, totalTupleCount / (parseInt(kFactor) + 1) * 1, table_type);
 
-                this.tableSearchDataSize = searchDataCount;
-                onTablesSearched(searchDataCount > 0);
             };
 
+            var setTableTypes = function (id) {
+                if (counter < voltDbRenderer.maxVisibleRows) {
+                    var tableName = id;
 
-        });
-        window.voltDbRenderer = voltDbRenderer = new iVoltDbRenderer();
+                    //before formatting individual table data validate table type with reference to SystemCatalog data
+                    $.each(schemaCatalogTableTypes, function (key, typeVal) {
+                        if (tableName == typeVal['TABLE_NAME']) {
+                            if (typeVal['TABLE_TYPE'] == 'VIEW') {
+                                table_type = "VIEW";
+                            } 
 
-    })(window);
+                            else if (typeVal['REMARKS'] == null) {
+                                var columnType = getColumnTypes(tableName);
+
+                                if (columnType == "PARTITION")
+                                    table_type = columnType;
+                                
+                                else {
+                                    table_type = "";
+                                }
+                                
+                            }
+                            else {
+                                table_type = "";
+                            }
+                            
+                        }
+
+                    });
+
+                }
+            };
+
+            var getColumnTypes = function (tableName) {
+                var columnType;
+                $.each(schemaCatalogColumnTypes, function(key, typeVal) {
+                    if (tableName == typeVal['TABLE_NAME']) {
+                        columnType = typeVal['REMARKS'];
+                        return false;
+                    }                    
+                });
+
+                if (columnType == "PARTITION_COLUMN") {
+                    return "PARTITION";
+                } else {
+                    return columnType;
+                }
+                    
+                
+            };
+            
+            if (tableData == null || tableData == undefined) {
+                alert("Error: Unable to extract Table Data");
+                return;
+            }
+
+            htmlTableMarkup = "";
+            htmlTableMarkups.SystemInformation = [];
+
+            if ((((voltDbRenderer.tableIndex + 1) * this.maxVisibleRows < voltDbRenderer.tableDataSize) && currentAction == VoltDbUI.ACTION_STATES.NEXT) ||
+                (currentAction == VoltDbUI.ACTION_STATES.PREVIOUS && voltDbRenderer.tableIndex > 0) ||
+                currentAction == VoltDbUi.ACTION_STATES.REFRESH || currentAction == VoltDbUi.ACTION_STATES.SEARCH || currentAction == VoltDbUi.ACTION_STATES.NONE) {
+                if (currentAction == VoltDbUi.ACTION_STATES.NEXT) {
+                    // alert('next');
+                    tablePageStartIndex = (voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows;
+
+                }
+
+                if (currentAction == VoltDbUi.ACTION_STATES.PREVIOUS) { // pageStartIndex need not be initialized if isNext is undefined(when page loads intially or during reload operation)
+                    //alert('previous');
+                    tablePageStartIndex = (voltDbRenderer.tableIndex - 1) * voltDbRenderer.maxVisibleRows;
+
+                }
+
+                if ((currentAction == VoltDbUi.ACTION_STATES.REFRESH && priorAction == VoltDbUi.ACTION_STATES.NEXT) ||
+                    (currentAction == VoltDbUi.ACTION_STATES.REFRESH && priorAction == VoltDbUi.ACTION_STATES.PREVIOUS)) {
+                    tablePageStartIndex = (voltDbRenderer.tableIndex) * voltDbRenderer.maxVisibleRows;
+
+                }
+
+                if (currentAction == VoltDbUi.ACTION_STATES.SEARCH || currentAction == VoltDbUi.ACTION_STATES.NONE) {
+                    tablePageStartIndex = 0;
+                    voltDbRenderer.tableIndex = 0;
+
+                }
+
+                var lTableData = this.isTableSearch ? this.searchData.tables : tableData;
+                if (this.isTableSearch == false) voltDbRenderer.tableDataSize = Object.keys(tableData).length;
 
 
-    //Navigation responsive	
-    $(function () {
-        $('#toggleMenu').click(function () {
-            $("#nav").slideToggle('slow');
-        });
-    });
+                $.each(lTableData, function (id, val) {
+                    if (currentAction == VoltDbUi.ACTION_STATES.NEXT && (voltDbRenderer.isTableSearch == false || voltDbRenderer.isTableSearch == undefined)) {
+                        if (counter >= tablePageStartIndex && counter <= (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1) {
+                            formatTableTupleData(id, val);
+                            if (counter == (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1 || counter == voltDbRenderer.tableDataSize - 1) {
+                                voltDbRenderer.tableIndex++;
+                                return false;
+                                //counter = 0;
+                            }
 
-    $(window).resize(function () {
-        //alert("resized");
-        var windowWidth = $(window).width();
-        if (windowWidth > 699) {
-            //alert(windowWidth);
-            $("#nav").css('display', 'block');
-        } else if (windowWidth < 699) {
-            $("#nav").css('display', 'none');
+                        } else if (counter == tablePageStartIndex * 2) {
+                            voltDbRenderer.tableIndex++;
+                            return false;
+                            //counter = 0;
+                        }
+
+                    } else if (currentAction == VoltDbUi.ACTION_STATES.PREVIOUS && (voltDbRenderer.isTableSearch == false || voltDbRenderer.isTableSearch == undefined)) {
+                        if (tablePageStartIndex >= 0 && counter >= tablePageStartIndex && counter < (voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows)) {
+                            setTableTypes(id);
+                            formatTableTupleData(id, val);
+                        }
+                        if (tablePageStartIndex >= 0 && counter == (voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows - 1)) {
+                            voltDbRenderer.tableIndex--;
+                        }
+                    } else if (currentAction == VoltDbUi.ACTION_STATES.PREVIOUS && priorAction == VoltDbUi.ACTION_STATES.PREVIOUS) {
+                        if (counter >= 0 && counter >= tablePageStartIndex && counter < voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows) {
+                            setTableTypes(id);
+                            formatTableTupleData(id, val);
+                        }
+
+                        if (tablePageStartIndex >= 0 && counter == (voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows - 1)) {
+                            voltDbRenderer.tableIndex--;
+                        }
+                    } else if (currentAction == VoltDbUi.ACTION_STATES.PREVIOUS && priorAction == VoltDbUi.ACTION_STATES.NEXT) {
+                        if (counter >= 0 && counter >= tablePageStartIndex && counter < voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows) {
+                            setTableTypes(id);
+                            formatTableTupleData(id, val);
+                        }
+
+                        if (tablePageStartIndex >= 0 && counter == (voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows - 1)) {
+                            voltDbRenderer.tableIndex--;
+                        }
+                    } else if (currentAction == VoltDbUi.ACTION_STATES.REFRESH && priorAction == VoltDbUi.ACTION_STATES.NEXT) {
+                        if (counter >= tablePageStartIndex && counter <= (voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows - 1) {
+                            setTableTypes(id);
+                            formatTableTupleData(id, val);
+                        }
+
+                    } else if ((currentAction == VoltDbUi.ACTION_STATES.REFRESH && priorAction == VoltDbUi.ACTION_STATES.PREVIOUS)) {
+                        if (tablePageStartIndex >= 0 && counter >= tablePageStartIndex && counter < ((voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows)) {
+                            setTableTypes(id);
+                            formatTableTupleData(id, val);
+
+                        }
+
+                    } else if ((currentAction == VoltDbUi.ACTION_STATES.SEARCH && priorAction == VoltDbUi.ACTION_STATES.NONE) || (currentAction == VoltDbUi.ACTION_STATES.SEARCH && priorAction == VoltDbUi.ACTION_STATES.SEARCH) ||
+                    (currentAction == VoltDbUi.ACTION_STATES.SEARCH && priorAction == VoltDbUi.ACTION_STATES.REFRESH)) {
+                        if (tablePageStartIndex >= 0 && counter >= tablePageStartIndex && counter < ((voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows)) {
+                            setTableTypes(id);
+                            formatTableTupleData(id, val);
+                        }
+
+                    } else if ((currentAction == VoltDbUi.ACTION_STATES.NEXT && priorAction == VoltDbUi.ACTION_STATES.SEARCH) || (currentAction == VoltDbUi.ACTION_STATES.NEXT && priorAction == VoltDbUi.ACTION_STATES.NEXT)) {
+                        if (counter >= tablePageStartIndex && counter <= (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1) {
+                            setTableTypes(id);
+                            formatTableTupleData(id, val);
+                        }
+
+                        if ((counter == (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1 || counter == voltDbRenderer.tableSearchDataSize - 1) && htmlTableMarkup != "") {
+                            voltDbRenderer.tableIndex++;
+                            return false;
+                            //counter = 0;
+                        }
+
+                    } else if ((currentAction == VoltDbUi.ACTION_STATES.NEXT && priorAction == VoltDbUi.ACTION_STATES.PREVIOUS)) {
+                        if (counter >= tablePageStartIndex && counter <= (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1) {
+                            setTableTypes(id);
+                            formatTableTupleData(id, val);
+                        }
+
+                        if ((counter == (voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows - 1 || counter == voltDbRenderer.tableSearchDataSize - 1) && htmlTableMarkup != "") {
+                            voltDbRenderer.tableIndex++;
+                            return false;
+                            //counter = 0;
+                        }
+
+                    } else {
+                        if (counter < voltDbRenderer.maxVisibleRows) {
+                            setTableTypes(id);
+                            formatTableTupleData(id, val);
+                        }
+                    }
+                    counter++;
+
+                });
+
+
+                if (this.isTableSearch)
+                    callback(htmlTableMarkup);
+
+                else {
+                    htmlTableMarkups.SystemInformation.push(htmlTableMarkup);
+                    htmlTableMarkup = undefined;
+                    callback(htmlTableMarkups);
+                }
+            }
+
+        };
+
+
+        this.getServerIP = function (hostId) {
+            var serverAddress;
+            $.each(systemOverview, function (key, val) {
+                if (key == hostId) {
+                    serverAddress = val["IPADDRESS"];
+                }
+
+            });
+            return serverAddress;
+        };
+
+
+        var getLatencyDetails = function (connection, latency) {
+
+            var colIndex = {};
+            var counter = 0;
+
+            connection.Metadata['@Statistics_LATENCY_HISTOGRAM'].schema.forEach(function (columnInfo) {
+                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "UNCOMPRESSED_HISTOGRAM" || columnInfo["name"] == "TIMESTAMP")
+                    colIndex[columnInfo["name"]] = counter;
+                counter++;
+            });
+
+            connection.Metadata['@Statistics_LATENCY_HISTOGRAM'].data.forEach(function (info) {
+                var hostName = info[colIndex["HOSTNAME"]];
+                if (!latency.hasOwnProperty(hostName)) {
+                    latency[hostName] = {};
+                }
+                latency[hostName]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
+                latency[hostName]["UNCOMPRESSED_HISTOGRAM"] = info[colIndex["UNCOMPRESSED_HISTOGRAM"]];
+            });
+        };
+
+        var getMemoryDetails = function (connection, sysMemory, processName) {
+
+            var counter = 0;
+            var hostNameIndex = 0;
+            var tupledDataIndex = 0;
+            var tupleCountIndex = 0;
+            var rssIndex = 0;
+            var totalMemoryIndex = -1;
+            var suffix = "";
+            var timeStampIndex = 0;
+            var idIndex = 0;
+            var hostNameList = {};
+
+            if (processName == "GRAPH_MEMORY") {
+                suffix = "_" + processName;
+                hostNameList = { "1": { "HOSTNAME": getCurrentServer() } };
+            } else {
+                hostNameList = systemOverview;
+            }
+
+            getCurrentServer();
+
+            connection.Metadata['@Statistics_MEMORY' + suffix].schema.forEach(function (columnInfo) {
+
+                if (columnInfo["name"] == "HOSTNAME")
+                    hostNameIndex = counter;
+                else if (columnInfo["name"] == "TUPLEDATA")
+                    tupledDataIndex = counter;
+                else if (columnInfo["name"] == "TUPLECOUNT")
+                    tupleCountIndex = counter;
+                else if (columnInfo["name"] == "RSS")
+                    rssIndex = counter;
+                else if (columnInfo["name"] == "TOTALMEMORY")
+                    totalMemoryIndex = counter;
+                else if (columnInfo["name"] == "TIMESTAMP")
+                    timeStampIndex = counter;
+                else if (columnInfo["name"] == "HOST_ID")
+                    idIndex = counter;
+                counter++;
+            });
+
+            connection.Metadata['@Statistics_MEMORY' + suffix].data.forEach(function (memoryInfo) {
+                jQuery.each(hostNameList, function (id, val) {
+                    if (val["HOSTNAME"] == memoryInfo[hostNameIndex]) {
+
+                        var hostName = memoryInfo[hostNameIndex];
+
+                        if (!sysMemory.hasOwnProperty(hostName)) {
+                            sysMemory[hostName] = {};
+                        }
+
+                        sysMemory[hostName]["TIMESTAMP"] = memoryInfo[timeStampIndex];
+                        sysMemory[hostName]["HOSTNAME"] = hostName;
+                        sysMemory[hostName]["TUPLEDATA"] = memoryInfo[tupledDataIndex];
+                        sysMemory[hostName]["TUPLECOUNT"] = memoryInfo[tupleCountIndex];
+                        sysMemory[hostName]["RSS"] = memoryInfo[rssIndex];
+                        sysMemory[hostName]["HOST_ID"] = memoryInfo[idIndex];
+
+                        //If the value of TotalMemory is passed, then totalMemoryIndex will be greater than -1.
+                        //TODO: Remove the condition "totalMemoryIndex > -1" and just set it to "memoryInfo[totalMemoryIndex]" after it has been implemented in the API.
+                        sysMemory[hostName]["TOTALMEMORY"] = totalMemoryIndex > -1 ? memoryInfo[totalMemoryIndex] : 0;
+
+                        //TODO: Use TotalMemory after it has been implemented in the API.
+                        //sysMemory[hostName]["MEMORYUSAGE"] = (sysMemory[hostName]["RSS"] / sysMemory[hostName]["TOTALMEMORY"]) * 100;
+                        var memoryUsage = (sysMemory[hostName]["TUPLEDATA"] / sysMemory[hostName]["RSS"]) * 100;
+                        sysMemory[hostName]["MEMORYUSAGE"] = Math.round(memoryUsage * 100) / 100;
+                    }
+
+                });
+            });
+        };
+
+        var getCpuDetails = function (connection, sysMemory) {
+            var colIndex = {};
+            var counter = 0;
+
+            connection.Metadata['@Statistics_CPU'].schema.forEach(function (columnInfo) {
+                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "PERCENT_USED" || columnInfo["name"] == "TIMESTAMP")
+                    colIndex[columnInfo["name"]] = counter;
+                counter++;
+            });
+
+            connection.Metadata['@Statistics_CPU'].data.forEach(function (info) {
+                var hostName = info[colIndex["HOSTNAME"]];
+                if (!sysMemory.hasOwnProperty(hostName)) {
+                    sysMemory[hostName] = {};
+                }
+                sysMemory[hostName]["TIMESTAMP"] = info[colIndex["TIMESTAMP"]];
+                sysMemory[hostName]["PERCENT_USED"] = info[colIndex["PERCENT_USED"]];
+            });
+        };
+
+        var getTransactionDetails = function (connection, sysTransaction) {
+            var colIndex = {};
+            var counter = 0;
+            var currentTimerTick = 0;
+            var procStats = {};
+
+            //connection.Metadata['@Statistics_PROCEDUREPROFILE_GRAPH_TRANSACTION'] = GetTestProcedureData(connection);
+            connection.Metadata['@Statistics_PROCEDUREPROFILE_GRAPH_TRANSACTION'].schema.forEach(function (columnInfo) {
+                colIndex[columnInfo["name"]] = counter;
+                counter++;
+            });
+
+            var dataCount = 0;
+            connection.Metadata['@Statistics_PROCEDUREPROFILE_GRAPH_TRANSACTION'].data.forEach(function (table) {
+                var srcData = table;
+                var data = null;
+                currentTimerTick = srcData[colIndex["TIMESTAMP"]];
+                if (srcData[colIndex["PROCEDURE"]] in procStats) {
+                    data = procStats[srcData[colIndex["PROCEDURE"]]];
+                    data[1] = srcData[colIndex["INVOCATIONS"]];
+                    data[2] = srcData[colIndex["WEIGHTED_PERC"]];
+                    data[3] = srcData[colIndex["MIN"]];
+                    data[4] = srcData[colIndex["AVG"]];
+                    data[5] = srcData[colIndex["MAX"]];
+                } else {
+                    data = [srcData[colIndex["PROCEDURE"]], srcData[colIndex["INVOCATIONS"]], srcData[colIndex["WEIGHTED_PERC"]], srcData[colIndex["MIN"]], srcData[colIndex["AVG"]], srcData[colIndex["MAX"]]];
+                }
+                procStats[srcData[colIndex["PROCEDURE"]]] = data;
+                if (dataCount == connection.Metadata['@Statistics_PROCEDUREPROFILE_GRAPH_TRANSACTION'].data.length - 1) {
+                    sysTransaction["TimeStamp"] = srcData[colIndex["TIMESTAMP"]];
+                }
+                dataCount++;
+            });
+            var currentTimedTransactionCount = 0.0;
+            for (var proc in procStats) {
+                currentTimedTransactionCount += procStats[proc][1];
+            }
+            sysTransaction["CurrentTimedTransactionCount"] = currentTimedTransactionCount;
+            sysTransaction["currentTimerTick"] = currentTimerTick;
+
+        };
+
+        function getTableData(connection, tablesData, viewsData, processName) {
+            var suffix = "";
+            if (processName == "TABLE_INFORMATION") {
+                suffix = "_" + processName;
+            }
+
+            var rawTables = connection.Metadata['@Statistics_TABLE' + suffix].data;
+            var rawIndexes = connection.Metadata['@Statistics_INDEX' + suffix].data;
+            var rawColumns = connection.Metadata['@SystemCatalog_COLUMNS' + suffix].data;
+
+            var tables = [];
+            var exports = [];
+            var views = [];
+
+            for (var k = 0; k < rawTables.length; k++) {
+                var tableName = rawTables[k][5];
+                if (rawTables[k][6] == 'StreamedTable')
+                    exports[tableName] = { name: tableName };
+                else {
+                    var isView = false;
+                    var item = { name: tableName, key: null, indexes: null, columns: null };
+                    for (var j = 0; j < rawIndexes.length; j++) {
+                        if (rawIndexes[j][6].toUpperCase() == tableName.toUpperCase()) {
+                            var indexName = rawIndexes[j][5];
+                            if (item.indexes == null)
+                                item.indexes = [];
+                            item.indexes[indexName] = indexName + ' (' + ((rawIndexes[j][7].toLowerCase().indexOf('hash') > -1) ? 'Hash' : 'Tree') + (rawIndexes[j][8] == "1" ? ', Unique' : '') + ')';
+                            if (indexName.toUpperCase().indexOf("MATVIEW") > -1)
+                                isView = true;
+                            if (indexName.toUpperCase().indexOf("PK_") > -1)
+                                item.key = indexName;
+                        }
+                    }
+                    if (isView)
+                        views[tableName] = item;
+                    else
+                        tables[tableName] = item;
+                }
+            }
+
+            connection.Metadata['tables'] = tables;
+            connection.Metadata['views'] = views;
+
+            for (var i = 0; i < rawColumns.length; i++) {
+                var Type = 'tables';
+                var TableName = rawColumns[i][2].toUpperCase();
+                if (connection.Metadata['tables'][TableName] != null) {
+                    if (connection.Metadata['tables'][TableName].columns == null) {
+                        connection.Metadata['tables'][TableName].columns = [];
+                    }
+                    connection.Metadata['tables'][TableName].columns[rawColumns[i][16]] =
+                        rawColumns[i][3].toUpperCase() +
+                        ' (' + rawColumns[i][5].toLowerCase() + ')';
+                }
+                else if (connection.Metadata['views'][TableName] != null) {
+                    if (connection.Metadata['views'][TableName].columns == null) {
+                        connection.Metadata['views'][TableName].columns = [];
+                    }
+                    connection.Metadata['views'][TableName].columns[rawColumns[i][3].toUpperCase()] =
+                        rawColumns[i][3].toUpperCase() +
+                        ' (' + rawColumns[i][5].toLowerCase() + ')';
+                }
+            }
+            if (!tablesData.hasOwnProperty('tables')) {
+                tablesData['tables'] = {};
+            }
+            if (!viewsData.hasOwnProperty('views')) {
+                viewsData['views'] = {};
+            }
+            tablesData['tables'] = connection.Metadata['tables'];
+            viewsData['views'] = connection.Metadata['views'];
         }
 
+
+        //common methods
+        var setProcedureTupleHtml = function (val) {
+            if (htmlMarkup == undefined || htmlMarkup == "") {
+                //alert("if null");
+                htmlMarkup = "<tr><td>" + val['PROCEDURE'] + "</td>" +
+                    "<td class=\"txt-center\">" + val['INVOCATIONS'] + "</td>" +
+                    "<td class=\"txt-center\">" + val['MIN_LATENCY'] + "</td>" +
+                    "<td class=\"txt-center\">" + val['MAX_LATENCY'] + "</td>" +
+                    "<td class=\"txt-center\">" + val['AVG_LATENCY'] + "</td>" +
+                    "<td class=\"txt-center\">" + val['PERC_EXECUTION'] + "</td></tr>";
+
+            } else {
+
+                htmlMarkup += "<tr><td>" + val['PROCEDURE'] + "</td>" +
+                    "<td class=\"txt-center\">" + val['INVOCATIONS'] + "</td>" +
+                    "<td class=\"txt-center\">" + val['MIN_LATENCY'] + "</td>" +
+                    "<td class=\"txt-center\">" + val['MAX_LATENCY'] + "</td>" +
+                    "<td class=\"txt-center\">" + val['AVG_LATENCY'] + "</td>" +
+                    "<td class=\"txt-center\">" + val['PERC_EXECUTION'] + "</td></tr>";
+            }
+        };
+
+        var setTableTupleDataHtml = function (tableName, totalTupleCount, maxTupleCountPartition, minTupleCountPartition, avgTupleCountPartition, tableType) {
+            if (htmlTableMarkup == undefined || htmlTableMarkup == "") {
+                htmlTableMarkup = "<tr><td>" + tableName + "</td>" +
+                    "<td class=\"txt-center\">" + totalTupleCount + "</td>" +
+                    "<td class=\"txt-center\">" + maxTupleCountPartition + "</td>" +
+                    "<td class=\"txt-center\">" + minTupleCountPartition + "</td>" +
+                    "<td class=\"txt-center\">" + avgTupleCountPartition + "</td>" +
+                    "<td class=\"txt-center\">" + tableType + "</td></tr>";
+            } else {
+                htmlTableMarkup += "<tr><td>" + tableName + "</td>" +
+                    "<td class=\"txt-center\">" + totalTupleCount + "</td>" +
+                    "<td class=\"txt-center\">" + maxTupleCountPartition + "</td>" +
+                   "<td class=\"txt-center\">" + minTupleCountPartition + "</td>" +
+                   "<td class=\"txt-center\">" + avgTupleCountPartition + "</td>" +
+                   "<td class=\"txt-center\">" + tableType + "</td></tr>";
+            }
+        };
+
+        //Search methods
+        var lSearchData = this.searchData;
+        this.searchProcedures = function (searchType, searchKey, onProcedureSearched) {
+            var searchDataCount = 0;
+
+            if (procedureData == null || procedureData == undefined) {
+                return;
+            }
+
+            lSearchData['procedures'] = [];
+            $.each(procedureData, function (nestKey, tupleData) {
+                if (tupleData != undefined) {
+                    if (tupleData.PROCEDURE.toLowerCase().indexOf(searchKey.toLowerCase()) >= 0) {
+                        lSearchData['procedures'][searchDataCount] = tupleData;
+                        searchDataCount++;
+
+                    }
+
+                }
+            });
+
+            this.procedureSearchDataSize = searchDataCount;
+            onProcedureSearched(searchDataCount > 0);
+
+        };
+
+        this.searchTables = function (searchType, searchKey, onTablesSearched) {
+            var searchDataCount = 0;
+            var jsonTupleData = {};
+
+            if (tableData == null || tableData == undefined) {
+                return;
+            }
+
+            lSearchData['tables'] = {};
+            $.each(tableData, function (nestKey, tupleData) {
+                if (tupleData != undefined) {
+                    if (nestKey.toLowerCase().indexOf(searchKey.toLowerCase()) >= 0) {
+                        lSearchData['tables'][nestKey] = tupleData;
+                        searchDataCount++;
+
+                    }
+                }
+            });
+
+            if (searchDataCount == 0)
+                lSearchData['tables'] = "";
+
+            this.tableSearchDataSize = searchDataCount;
+            onTablesSearched(searchDataCount > 0);
+        };
+
+
     });
+    window.voltDbRenderer = voltDbRenderer = new iVoltDbRenderer();
+
+})(window);
+
+
+//Navigation responsive	
+$(function () {
+    $('#toggleMenu').click(function () {
+        $("#nav").slideToggle('slow');
+    });
+});
+
+$(window).resize(function () {
+    //alert("resized");
+    var windowWidth = $(window).width();
+    if (windowWidth > 699) {
+        //alert(windowWidth);
+        $("#nav").css('display', 'block');
+    } else if (windowWidth < 699) {
+        $("#nav").css('display', 'none');
+    }
+
+});
 
 

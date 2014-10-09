@@ -130,9 +130,9 @@
         this.GetDataTablesInformation = function(onConnectionAdded) {
             try {
                 var processName = "DATABASE_INFORMATION";
-                var procedureNames = ['@Statistics', '@SystemCatalog'];
-                var parameters = ["TABLE", "TABLES"];
-                var values = ['0', undefined];
+                var procedureNames = ['@Statistics', '@SystemCatalog', '@SystemCatalog'];
+                var parameters = ["TABLE", "TABLES","COLUMNS"];
+                var values = ['0', undefined, undefined];
                 _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
                 if (_connection == null) {
                     VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
