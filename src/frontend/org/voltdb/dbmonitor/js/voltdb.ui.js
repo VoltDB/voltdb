@@ -48,7 +48,7 @@ var loadPage = function (serverName, portid) {
     var password = $.cookie('password');
     var admin = $.cookie('admin');
     
-    voltDbRenderer.ChangeServerConfiguration(serverName, portid, userName, password, false, admin);
+    voltDbRenderer.ChangeServerConfiguration(serverName, portid, userName, password, true, admin);
     voltDbRenderer.ShowUsername(userName);
       
     var defaultSearchTextProcedure = 'Search Stored Procedures';

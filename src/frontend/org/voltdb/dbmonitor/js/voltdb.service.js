@@ -8,7 +8,7 @@
     var user = "";
     var password = "";
     var admin = true;
-    var isHashedPassword = false;
+    var isHashedPassword = true;
     this.connection = null;
     var iVoltDbService = (function () {
         var _connection = connection;

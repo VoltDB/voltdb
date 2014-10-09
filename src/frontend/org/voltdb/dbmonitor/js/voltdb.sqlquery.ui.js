@@ -117,7 +117,7 @@ function loadPage(serverName, portid) {
     var userName = $.cookie('username') != undefined ? $.cookie('username') : "";
     var password = $.cookie('password') != undefined ? $.cookie('password') : "";
     var admin = $.cookie('admin') != undefined ? $.cookie('admin') : true;
-    voltDbRenderer.ChangeServerConfiguration(serverName, portid, userName, password, false, admin);
+    voltDbRenderer.ChangeServerConfiguration(serverName, portid, userName, password, true, admin);
     voltDbRenderer.ShowUsername(userName);
 
     function saveConnectionKey() {

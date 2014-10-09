@@ -125,7 +125,7 @@ function alertNodeClicked(obj) {
                     $("#overlay").show();
                     $("#UnableToLoginMsg").hide();
                     var usernameVal = $("#username").val();
-                    var passwordVal = $("#password").val();
+                    var passwordVal = $().crypt({ method: "sha1", source: $("#password").val() });
                     var chkAdmin = $("#chkAdmin").is(':checked');
 
                     testConnection($("#username").data("servername"), $("#username").data("portid"), usernameVal, passwordVal, chkAdmin, function (result) {
