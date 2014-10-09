@@ -263,17 +263,36 @@ public class QuerySpecification extends QueryExpression {
         if (unresolvedExpressions == null || unresolvedExpressions.isEmpty()) {
             return;
         }
-        HashSet uniqueSet = new HashSet();
-        for (int i = 0; i < unresolvedExpressions.size(); i++) {
-            Object element = unresolvedExpressions.get(i);
-            uniqueSet.add(element);
-        }
+
+        /**
+         * Hsql HashSet does not work properly to remove duplicates, I doubt the hash
+         * function or equal function on expression work properly or something else
+         * is wrong. So use list
+         *
+         */
+//        HashSet uniqueSet = new HashSet();
+//        for (int i = 0; i < unresolvedExpressions.size(); i++) {
+//            Object element = unresolvedExpressions.get(i);
+//            uniqueSet.add((Expression)element);
+//        }
+
 
         // resolve GROUP BY and HAVING columns/expressions
         HsqlList newUnresolvedExpressions = new ArrayListIdentity();
-        Iterator iter = uniqueSet.iterator();
-        while(iter.hasNext()) {
-            Expression element = (Expression)iter.next();
+
+        int size = unresolvedExpressions.size();
+        for (int i = 0; i < size; i++) {
+            Object obj = unresolvedExpressions.get(i);
+            if (i + 1 < size && obj == unresolvedExpressions.get(i+1)) {
+                // hsql adds the unresolved expression twice
+                // skip the repeated expression
+                i += 1;
+            }
+            if (obj instanceof Expression == false) {
+                continue;
+            }
+            Expression element = (Expression) obj;
+
             // find the unsolved expression in the groupBy/Having list
             int k = indexLimitVisible;
             for (; k < indexStartOrderBy; k++) {
@@ -308,8 +327,8 @@ public class QuerySpecification extends QueryExpression {
             if (! hasFound) {
                 newUnresolvedExpressions.add(element);
             }
-        }
 
+        }
         unresolvedExpressions = newUnresolvedExpressions;
     }
     /**********************************************************************/

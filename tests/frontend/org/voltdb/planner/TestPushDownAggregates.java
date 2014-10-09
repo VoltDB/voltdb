@@ -242,7 +242,6 @@ public class TestPushDownAggregates extends PlannerTestCase {
 
         // order by does not cover all group by columns
         pns = compileToFragments("select B3, C3, count(*) as tag from T3 group by B3, C3 order by B3 limit 1");
-        printExplainPlan(pns);
         checkLimitPushedDown(pns, false);
 
 

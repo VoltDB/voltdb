@@ -743,16 +743,70 @@ public class TestPlansGroupBy extends PlannerTestCase {
         checkHasComplexAgg(pns);
     }
 
-    public void testGroupbyAlias() {
-        pns = compileToFragments(
-                "SELECT abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY sp");
-
-        String explainStr1 = printExplainPlan(pns);
-        pns = compileToFragments(
-                "SELECT abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY abs(PKEY)");
-        String explainStr2 = printExplainPlan(pns);
-
+    private void checkGroupbyAliasFeature(String sql1, String sql2) {
+        String explainStr1, explainStr2;
+        pns = compileToFragments(sql1);
+        explainStr1 = printExplainPlan(pns, false);
+        pns = compileToFragments(sql2);
+        explainStr2 = printExplainPlan(pns, false);
         assertEquals(explainStr1, explainStr2);
+    }
+
+    public void testGroupbyAliasNegativeCases() {
+        // Group by aggregate expression
+        try {
+            pns = compileToFragments(
+                    "SELECT abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY count(*)");
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("invalid GROUP BY expression"));
+        }
+
+        try {
+            pns = compileToFragments(
+                    "SELECT abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY ct");
+            fail();
+        } catch (Exception ex) {
+            assertEquals("user lacks privilege or object not found: CT", ex.getMessage());
+        }
+
+        // Group by alias and expression
+        try {
+            pns = compileToFragments(
+                    "SELECT abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY sp + 1");
+            fail();
+        } catch (Exception ex) {
+            // not sure about the hsql parser error message
+            assertTrue(ex.getMessage().contains("3"));
+        }
+    }
+
+    public void testGroupbyAlias() {
+        String sql1, sql2;
+
+        // group by alias for expression
+        sql1 = "SELECT abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY sp";
+        sql2 = "SELECT abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY abs(PKEY)";
+        checkGroupbyAliasFeature(sql1, sql2);
+
+        // group by multiple alias (expression or column)
+        sql1 = "SELECT A1 as A, abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY A, sp";
+        sql2 = "SELECT A1 as A, abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY A, abs(PKEY)";
+        checkGroupbyAliasFeature(sql1, sql2);
+        sql2 = "SELECT A1 as A, abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY A1, sp";
+        checkGroupbyAliasFeature(sql1, sql2);
+        sql2 = "SELECT A1 as A, abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY A1, abs(PKEY)";
+        checkGroupbyAliasFeature(sql1, sql2);
+
+        // group by alias on joined results
+        sql1 = "SELECT abs(PKEY) as sp, count(*) as ct FROM P1, R1 WHERE P1.A1 = R1.A1 GROUP BY sp";
+        sql2 = "SELECT abs(PKEY) as sp, count(*) as ct FROM P1, R1 WHERE P1.A1 = R1.A1 GROUP BY abs(PKEY)";
+        checkGroupbyAliasFeature(sql1, sql2);
+
+        // group by expression with constants parameter
+        sql1 = "SELECT abs(PKEY + 1) as sp, count(*) as ct FROM P1 GROUP BY sp";
+        sql2 = "SELECT abs(PKEY + 1) as sp, count(*) as ct FROM P1 GROUP BY abs(PKEY + 1)";
+        checkGroupbyAliasFeature(sql1, sql2);
     }
 
     private void checkMVNoFix_NoAgg(
