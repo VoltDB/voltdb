@@ -878,14 +878,13 @@ function alertNodeClicked(obj) {
                     }
                 });
 
-                if (replicationCount > 0 && table_type != "VIEW" && table_type != "PARTITION")
+                if (replicationCount > 0 && table_type != "VIEW" && table_type != "PARTITIONED")
                     table_type = "REPLICATED";
 
 
                 maxTupleValue = Math.max.apply(null, tupleCountPartitions);
                 minTupleValue = Math.max.apply(null, tupleCountPartitions);
                 avgTupleValue = tupleCountPartitions.reduce(function (a) {
-
                     return a;
                 });
 
@@ -907,7 +906,7 @@ function alertNodeClicked(obj) {
                             else if (typeVal['REMARKS'] == null) {
                                 var columnType = getColumnTypes(tableName);
 
-                                if (columnType == "PARTITION")
+                                if (columnType == "PARTITIONED")
                                     table_type = columnType;
                                 
                                 else {
@@ -936,7 +935,7 @@ function alertNodeClicked(obj) {
                 });
 
                 if (columnType == "PARTITION_COLUMN") {
-                    return "PARTITION";
+                    return "PARTITIONED";
                 } else {
                     return columnType;
                 }
