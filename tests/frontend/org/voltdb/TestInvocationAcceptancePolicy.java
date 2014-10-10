@@ -23,26 +23,27 @@
 
 package org.voltdb;
 
+import static junit.framework.Assert.assertEquals;
 import org.junit.Test;
 import org.voltdb.catalog.Procedure;
 
-import static junit.framework.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import org.voltdb.InvocationPermissionPolicy.PolicyResult;
 
 public class TestInvocationAcceptancePolicy {
     private AuthSystem.AuthUser createUser(boolean adhoc, boolean crud, boolean sysproc,
                                            Procedure userProc, boolean readonly)
     {
+
         AuthSystem.AuthUser user = mock(AuthSystem.AuthUser.class);
+        when(user.hasSystemProcPermission()).thenReturn(sysproc);
         when(user.hasAdhocPermission()).thenReturn(adhoc);
         when(user.hasDefaultProcPermission()).thenReturn(crud);
         when(user.hasDefaultProcReadPermission()).thenReturn(readonly);
         if (userProc != null) {
-            when(user.hasPermission(userProc)).thenReturn(true);
+            when(user.hasUserDefinedProcedurePermission(userProc)).thenReturn(true);
         }
-        when(user.hasSystemProcPermission()).thenReturn(sysproc);
         return user;
     }
 
@@ -56,12 +57,12 @@ public class TestInvocationAcceptancePolicy {
 
         Procedure proc = SystemProcedureCatalog.listing.get("@Pause").asCatalogProcedure();
 
-        InvocationPermissionPolicy policy = new InvocationPermissionPolicy(true);
-        assertNull(policy.shouldAccept(user, invocation, proc));
+        InvocationPermissionPolicy policy = new InvocationSysprocPermissionPolicy();
+        assertEquals(policy.shouldAccept(user, invocation, proc), PolicyResult.ALLOW);
 
         // A user that doesn't have sysproc permission
         user = createUser(false, false, false, null, true);
-        assertNotNull(policy.shouldAccept(user, invocation, proc));
+        assertEquals(policy.shouldAccept(user, invocation, proc), PolicyResult.DENY);
     }
 
     @Test
@@ -75,12 +76,12 @@ public class TestInvocationAcceptancePolicy {
 
         Procedure proc = SystemProcedureCatalog.listing.get("@AdHoc_RW_MP").asCatalogProcedure();
 
-        InvocationPermissionPolicy policy = new InvocationPermissionPolicy(true);
-        assertNull(policy.shouldAccept(user, invocation, proc));
+        InvocationPermissionPolicy policy = new InvocationAdHocPermissionPolicy();
+        assertEquals(policy.shouldAccept(user, invocation, proc), PolicyResult.ALLOW);
 
         // A user that doesn't have adhoc permission
         user = createUser(false, false, false, null, true);
-        assertNotNull(policy.shouldAccept(user, invocation, proc));
+        assertEquals(policy.shouldAccept(user, invocation, proc), PolicyResult.DENY);
     }
 
     @Test
@@ -94,12 +95,12 @@ public class TestInvocationAcceptancePolicy {
         invocation.setProcName("A.insert");
         invocation.setParams("test");
 
-        InvocationPermissionPolicy policy = new InvocationPermissionPolicy(true);
-        assertNull(policy.shouldAccept(user, invocation, proc));
+        InvocationPermissionPolicy policy = new InvocationUserDefinedProcedurePermissionPolicy();
+        assertEquals(policy.shouldAccept(user, invocation, proc), PolicyResult.ALLOW);
 
         // A user that doesn't have crud permission
         user = createUser(false, false, false, null, true);
-        assertNotNull(policy.shouldAccept(user, invocation, proc));
+        assertEquals(policy.shouldAccept(user, invocation, proc), PolicyResult.DENY);
     }
 
     @Test
@@ -114,15 +115,15 @@ public class TestInvocationAcceptancePolicy {
         invocation.setProcName("X.select");
         invocation.setParams("test");
 
-        InvocationPermissionPolicy policy = new InvocationPermissionPolicy(true);
-        assertNull(policy.shouldAccept(user, invocation, proc));
+        InvocationPermissionPolicy policy = new InvocationDefaultProcPermissionPolicy();
+        assertEquals(policy.shouldAccept(user, invocation, proc), PolicyResult.ALLOW);
 
         // A user that doesn't have crud permission
         Procedure procw = new Procedure();
         procw.setDefaultproc(true);
         procw.setReadonly(false);
         user = createUser(false, false, false, null, false);
-        assertNotNull(policy.shouldAccept(user, invocation, procw));
+        assertEquals(policy.shouldAccept(user, invocation, proc), PolicyResult.DENY);
     }
 
 }

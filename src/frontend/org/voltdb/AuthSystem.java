@@ -286,15 +286,9 @@ public class AuthSystem {
          * @param proc Catalog entry for the stored procedure to check
          * @return true if the user has permission and false otherwise
          */
-        public boolean hasPermission(Procedure proc) {
+        public boolean hasUserDefinedProcedurePermission(Procedure proc) {
             if (proc == null) {
                 return false;
-            }
-            if (proc.getDefaultproc()) {
-                if (!proc.getReadonly()) {
-                    return hasDefaultProcPermission();
-                }
-                return (hasDefaultProcReadPermission() || hasDefaultProcPermission());
             }
             return m_authorizedProcedures.contains(proc);
         }
@@ -635,7 +629,7 @@ public class AuthSystem {
 
     private final AuthUser m_authDisabledUser = new AuthUser(null, null, null, false, false, false, false) {
         @Override
-        public boolean hasPermission(Procedure proc) {
+        public boolean hasUserDefinedProcedurePermission(Procedure proc) {
             return true;
         }
 
