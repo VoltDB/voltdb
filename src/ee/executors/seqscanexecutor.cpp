@@ -215,10 +215,11 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                 NValue retval = predicate->eval(&tuple, NULL);
                 if (retval.isTrue()) {
                     hasMatchingTuple = true;
-                } else if (m_isSemiScan && retval.isNull()) {
-                    hasNullTuple = true;
                 } else {
                     hasMatchingTuple = false;
+                    if (m_isSemiScan && retval.isNull()) {
+                        hasNullTuple = true;
+                    }
                 }
             }
             if (predicate == NULL || hasMatchingTuple == true)

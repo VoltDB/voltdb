@@ -47,7 +47,7 @@ import org.voltdb.types.PlanNodeType;
 public class TestPlansInExistsSubQueries extends PlannerTestCase {
 
     public void testInExistsGuard() {
-        String errorMsg = "In/Exists are only supported in single partition procedure";
+        String errorMsg = "IN/EXISTS subquery clauses are only supported in single partition procedures";
 
         String sql;
         sql = "select p2.c from p2 where p2.c > ? and exists (select c from r1 where r1.c = p2.c)";
@@ -57,28 +57,117 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         failToCompile(sql, errorMsg);
 
 
-        errorMsg = "Unable to plan for statement. Error unknown";
+        errorMsg = "IN/EXISTS subquery clauses are only supported in single partition procedures";
         sql = "select r2.c from r2 where r2.c > ? and exists (select c from p1 where p1.c = r2.c)";
         failToCompile(sql, errorMsg);
     }
 
     public void testExistsWithUserParams() {
-        AbstractPlanNode pn = compile("select r2.c from r2 where r2.c > ? and exists (select c from r1 where r1.c = r2.c)");
-        pn = pn.getChild(0);
-        assertTrue(pn instanceof AbstractScanPlanNode);
-        AbstractScanPlanNode nps = (AbstractScanPlanNode) pn;
-        // Check param indexes
-        AbstractExpression e = nps.getPredicate();
-        AbstractExpression le = e.getLeft();
-        assertEquals(ExpressionType.COMPARE_GREATERTHAN, le.getExpressionType());
-        AbstractExpression pve = le.getRight();
-        assertEquals(ExpressionType.VALUE_PARAMETER, pve.getExpressionType());
-        assertEquals(new Integer(0), ((ParameterValueExpression)pve).getParameterIndex());
-        AbstractExpression re = e.getRight();
-        assertEquals(ExpressionType.EXISTS_SUBQUERY, re.getExpressionType());
-        assertEquals(1, re.getArgs().size());
-        assertEquals(1, ((SubqueryExpression) re).getParameterIdxList().size());
-        assertEquals(Integer.valueOf(1), ((SubqueryExpression) re).getParameterIdxList().get(0));
+        {
+            // Parent query with user's param and subquery with parent TVE
+            AbstractPlanNode pn = compile("select r2.c from r2 where r2.c > ? and exists (select c from r1 where r1.c = r2.c)");
+            pn = pn.getChild(0);
+            assertTrue(pn instanceof AbstractScanPlanNode);
+            AbstractScanPlanNode nps = (AbstractScanPlanNode) pn;
+            // Check param indexes
+            AbstractExpression e = nps.getPredicate();
+            AbstractExpression le = e.getLeft();
+            assertEquals(ExpressionType.COMPARE_GREATERTHAN, le.getExpressionType());
+            AbstractExpression pve = le.getRight();
+            assertEquals(ExpressionType.VALUE_PARAMETER, pve.getExpressionType());
+            assertEquals(new Integer(0), ((ParameterValueExpression)pve).getParameterIndex());
+            AbstractExpression re = e.getRight();
+            assertEquals(ExpressionType.EXISTS_SUBQUERY, re.getExpressionType());
+            assertEquals(1, re.getArgs().size());
+            assertEquals(1, ((SubqueryExpression) re).getParameterIdxList().size());
+            assertEquals(Integer.valueOf(1), ((SubqueryExpression) re).getParameterIdxList().get(0));
+        }
+        {
+            // Subqueries  with  grand-parent TVE
+            AbstractPlanNode pn = compile("select r1.c from r1 where  " +
+                    "exists ( select 1 from r2 where exists" +
+                    "(select 1 from r3 where r3.a = r1.c))");
+            pn = pn.getChild(0);
+            assertTrue(pn instanceof AbstractScanPlanNode);
+            AbstractScanPlanNode spn = (AbstractScanPlanNode) pn;
+            // Check param indexes
+            AbstractExpression e = spn.getPredicate();
+            assertEquals(ExpressionType.EXISTS_SUBQUERY, e.getExpressionType());
+            SubqueryExpression se = (SubqueryExpression) e;
+            List<AbstractExpression> args = se.getArgs();
+            assertEquals(1, args.size());
+            assertEquals(ExpressionType.VALUE_TUPLE, args.get(0).getExpressionType());
+            TupleValueExpression tve = (TupleValueExpression) args.get(0);
+            assertEquals("R1", tve.getTableName());
+            assertEquals("C", tve.getColumnName());
+            List<Integer> params = se.getParameterIdxList();
+            assertEquals(1, params.size());
+            assertEquals(new Integer(0), params.get(0));
+            // Child subquery
+            pn = se.getSubqueryNode();
+            assertTrue(pn instanceof AbstractScanPlanNode);
+            spn = (AbstractScanPlanNode) pn;
+            e = spn.getPredicate();
+            assertEquals(ExpressionType.EXISTS_SUBQUERY, e.getExpressionType());
+            se = (SubqueryExpression) e;
+            // Grand parent subquery
+            pn = se.getSubqueryNode();
+            assertTrue(pn instanceof AbstractScanPlanNode);
+            spn = (AbstractScanPlanNode) pn;
+            e = spn.getPredicate();
+            assertEquals(ExpressionType.COMPARE_EQUAL, e.getExpressionType());
+            e = e.getRight();
+            assertEquals(ExpressionType.VALUE_PARAMETER, e.getExpressionType());
+            assertEquals(new Integer(0), ((ParameterValueExpression) e).getParameterIndex());
+        }
+        {
+            // Subqueries  with  parent & grand-parent TVE
+            AbstractPlanNode pn = compile("select r1.c from r1 where  " +
+                    "exists ( select 1 from r2 where r1.d = r2.c and exists" +
+                    "(select 1 from r3 where r3.a = r1.c))");
+            pn = pn.getChild(0);
+            assertTrue(pn instanceof AbstractScanPlanNode);
+            AbstractScanPlanNode spn = (AbstractScanPlanNode) pn;
+            // Check param indexes
+            AbstractExpression e = spn.getPredicate();
+            assertEquals(ExpressionType.EXISTS_SUBQUERY, e.getExpressionType());
+            SubqueryExpression se = (SubqueryExpression) e;
+            List<AbstractExpression> args = se.getArgs();
+            assertEquals(2, args.size());
+            assertEquals(ExpressionType.VALUE_TUPLE, args.get(0).getExpressionType());
+            TupleValueExpression tve = (TupleValueExpression) args.get(0);
+            assertEquals("R1", tve.getTableName());
+            assertEquals("C", tve.getColumnName());
+            tve = (TupleValueExpression) args.get(1);
+            assertEquals("R1", tve.getTableName());
+            assertEquals("D", tve.getColumnName());
+            List<Integer> params = se.getParameterIdxList();
+            assertEquals(2, params.size());
+            assertEquals(new Integer(0), params.get(0));
+            assertEquals(new Integer(1), params.get(1));
+            // Child subquery
+            pn = se.getSubqueryNode();
+            assertTrue(pn instanceof AbstractScanPlanNode);
+            spn = (AbstractScanPlanNode) pn;
+            e = spn.getPredicate();
+            assertEquals(ExpressionType.COMPARE_EQUAL, e.getRight().getExpressionType());
+            AbstractExpression ce = e.getRight().getRight();
+            assertEquals(ExpressionType.VALUE_PARAMETER, ce.getExpressionType());
+            assertEquals(new Integer(1), ((ParameterValueExpression) ce).getParameterIndex());
+            // Grand parent subquery
+            AbstractExpression gce = e.getLeft();
+            assertEquals(ExpressionType.EXISTS_SUBQUERY, gce.getExpressionType());
+            se = (SubqueryExpression) gce;
+            pn = se.getSubqueryNode();
+            assertTrue(pn instanceof AbstractScanPlanNode);
+            spn = (AbstractScanPlanNode) pn;
+            e = spn.getPredicate();
+            assertEquals(ExpressionType.COMPARE_EQUAL, e.getExpressionType());
+            e = e.getRight();
+            assertEquals(ExpressionType.VALUE_PARAMETER, e.getExpressionType());
+            assertEquals(new Integer(0), ((ParameterValueExpression) e).getParameterIndex());
+        }
+
     }
 
     public void testParamTveInOutputSchema() {
