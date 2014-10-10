@@ -27,6 +27,8 @@
 #include "common/FatalException.hpp"
 
 namespace voltdb {
+static const size_t TEMP_POOL_CHUNK_SIZE = 262144;
+
 #ifndef MEMCHECK
 /**
  * Description of a chunk of memory allocated on the heap
@@ -66,8 +68,6 @@ inline T nexthigher(T k) {
                 k = k | k >> i;
         return k+1;
 }
-
-static const size_t TEMP_POOL_CHUNK_SIZE = 262144;
 
 /**
  * A memory pool that provides fast allocation and deallocation. The
