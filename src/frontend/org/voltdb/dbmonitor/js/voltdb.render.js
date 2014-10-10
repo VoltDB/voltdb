@@ -182,6 +182,10 @@ function alertNodeClicked(obj) {
                 if (!popupDisplayed) {
                     //If security is enabled, then display popup to get username and password.
                     if (!result) {
+                        saveSessionCookie("username", null);
+                        saveSessionCookie("password", null);
+                        saveSessionCookie("admin", null);
+                        
                         $("#loginLink").trigger("click");
                     } else {
                         popupDisplayed = true;
