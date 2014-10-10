@@ -12,15 +12,12 @@
             this.user = aUser == '' ? null : aUser;
             this.password = aPassword == '' ? null : (aIsHashPassword == false ? aPassword : null);
             this.isHashedPassword = aPassword == '' ? null : (aIsHashPassword == true ? aPassword : null);
-            //this.key = (this.server + '_' + this.port + '_' + (this.user == '' ? '' : this.user) + '_' + (this.admin == true ? 'Admin' : '')).replace(/[^_a-zA-Z0-9]/g, "_");             
             this.process = aProcess;
             this.key = (this.server + '_' + this.port + '_' + (this.user == '' ? '' : this.user) + '_' + (this.admin == true ? 'Admin' : '') + "_" + this.process).replace(/[^_a-zA-Z0-9]/g, "_");
             this.display = this.server + ':' + this.port + (this.user == '' ? '' : ' (' + this.user + ')') + (this.admin == true ? ' - Admin' : '');
             this.Metadata = {};
             this.ready = false;
             this.procedureCommands = {};
-            
-            //this.connection = null;
             
             this.getQueue = function() {
                 return (new iQueue(this));
@@ -347,14 +344,7 @@
            
                 jQuery.each(connection.procedureCommands.procedures, function(id, procedure) {
                     connectionQueue.BeginExecute(procedure['procedure'], (procedure['value'] === undefined ? procedure['parameter'] : [procedure['parameter'], procedure['value']]), function (data) {
-                        //if (procedure['procedure'] + "_" + procedure['parameter'] != '@Statistics_TABLE')
-                        //    connection.Metadata[procedure['procedure'] + "_" + procedure['parameter']] = data.results[0];
-                        //else
-                        //{
-                        //    connection.Metadata[procedure['procedure'] + "_" + procedure['parameter']] = data.results[0];
-                        //    connection.Metadata[procedure['procedure'] + "_" + procedure['parameter']].data = [];
 
-                        //}
                         var suffix = (processName == "GRAPH_MEMORY" || processName == "GRAPH_TRANSACTION") || processName == "TABLE_INFORMATION" ? "_" + processName : "";
                         connection.Metadata[procedure['procedure'] + "_" + procedure['parameter'] + suffix] = data.results[0];
                     });
