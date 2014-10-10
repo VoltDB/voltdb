@@ -185,9 +185,6 @@ function alertNodeClicked(obj) {
                         saveSessionCookie("username", null);
                         saveSessionCookie("password", null);
                         saveSessionCookie("admin", null);
-                        saveCookie("username", null);
-                        saveCookie("password", null);
-                        saveCookie("admin", null);
                         
                         $("#loginLink").trigger("click");
                     } else {
