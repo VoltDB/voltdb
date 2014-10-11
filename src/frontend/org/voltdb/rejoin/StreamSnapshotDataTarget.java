@@ -245,17 +245,22 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                 return;
             }
 
-            long bytesWritten = m_sender.m_bytesSent.get(m_targetId).get();
-            rejoinLog.info(String.format("While sending rejoin data to site %s, %d bytes have been sent in the past %s seconds.",
-                    CoreUtils.hsIdToString(m_destHSId), bytesWritten - m_bytesWrittenSinceConstruction, WATCHDOG_PERIOS_S));
+            long bytesWritten = 0;
+            try {
+                bytesWritten = m_sender.m_bytesSent.get(m_targetId).get();
+                rejoinLog.info(String.format("While sending rejoin data to site %s, %d bytes have been sent in the past %s seconds.",
+                        CoreUtils.hsIdToString(m_destHSId), bytesWritten - m_bytesWrittenSinceConstruction, WATCHDOG_PERIOS_S));
 
-            checkTimeout(WRITE_TIMEOUT_MS);
-            if (m_writeFailed.get()) {
-                clearOutstanding(); // idempotent
+                checkTimeout(WRITE_TIMEOUT_MS);
+                if (m_writeFailed.get()) {
+                    clearOutstanding(); // idempotent
+                }
+            } catch (Throwable t) {
+                rejoinLog.error("Stream snapshot watchdog thread threw an exception", t);
+            } finally {
+                // schedule to run again
+                VoltDB.instance().scheduleWork(new Watchdog(bytesWritten), WATCHDOG_PERIOS_S, -1, TimeUnit.SECONDS);
             }
-
-            // schedule to run again
-            VoltDB.instance().scheduleWork(new Watchdog(bytesWritten), WATCHDOG_PERIOS_S, -1, TimeUnit.SECONDS);
         }
     }
 
