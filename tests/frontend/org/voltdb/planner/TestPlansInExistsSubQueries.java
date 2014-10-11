@@ -257,16 +257,111 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
     }
 
     public void testExistsJoin() {
-        AbstractPlanNode pn = compile("select a from r1,r2 where r1.a = r2.a and " +
-                "exists ( select 1 from r3 where r1.a = r3.a)");
+        {
+            AbstractPlanNode pn = compile("select a from r1,r2 where r1.a = r2.a and " +
+                    "exists ( select 1 from r3 where r1.a = r3.a)");
 
-        pn = pn.getChild(0).getChild(0);
-        assertTrue(pn instanceof NestLoopIndexPlanNode);
-        pn = pn.getChild(0);
-        assertTrue(pn instanceof SeqScanPlanNode);
-        AbstractExpression pred = ((SeqScanPlanNode) pn).getPredicate();
-        assertTrue(pred != null);
-        assertEquals(ExpressionType.EXISTS_SUBQUERY, pred.getExpressionType());
+            pn = pn.getChild(0).getChild(0);
+            assertTrue(pn instanceof NestLoopIndexPlanNode);
+            pn = pn.getChild(0);
+            assertTrue(pn instanceof SeqScanPlanNode);
+            AbstractExpression pred = ((SeqScanPlanNode) pn).getPredicate();
+            assertTrue(pred != null);
+            assertEquals(ExpressionType.EXISTS_SUBQUERY, pred.getExpressionType());
+        }
+        {
+            AbstractPlanNode pn = compile("select a from r1,r2 where " +
+                    "exists ( select 1 from r3 where r1.a = r3.a and r2.c = r3.c)");
+
+            pn = pn.getChild(0).getChild(0);
+            assertTrue(pn instanceof NestLoopPlanNode);
+            AbstractExpression pred = ((NestLoopPlanNode) pn).getJoinPredicate();
+            assertTrue(pred != null);
+            assertEquals(ExpressionType.EXISTS_SUBQUERY, pred.getExpressionType());
+            SubqueryExpression se = (SubqueryExpression) pred;
+            List<AbstractExpression> args = se.getArgs();
+            assertEquals(2, args.size());
+            TupleValueExpression tve = (TupleValueExpression)args.get(0);
+            assertEquals("R2", tve.getTableName());
+            assertEquals("C", tve.getColumnName());
+            tve = (TupleValueExpression)args.get(1);
+            assertEquals("R1", tve.getTableName());
+            assertEquals("A", tve.getColumnName());
+            assertEquals(2, se.getParameterIdxList().size());
+            // Child query
+            pn = se.getSubqueryNode();
+            pred = ((AbstractScanPlanNode)pn).getPredicate();
+            AbstractExpression le = pred.getLeft();
+            assertEquals(ExpressionType.VALUE_PARAMETER, le.getRight().getExpressionType());
+            AbstractExpression re = pred.getRight();
+            assertEquals(ExpressionType.VALUE_PARAMETER, le.getRight().getExpressionType());
+        }
+    }
+
+    public void testInJoin() {
+        {
+            // IN gets converted to EXISTS
+            AbstractPlanNode pn = compile("select r1.d from r1, r2 where r1.a IN " +
+                    "(select a from r3 where r3.c = r2.d);");
+            pn = pn.getChild(0).getChild(0);
+            assertTrue(pn instanceof NestLoopPlanNode);
+            AbstractExpression pred = ((NestLoopPlanNode) pn).getJoinPredicate();
+            assertTrue(pred != null);
+            assertEquals(ExpressionType.EXISTS_SUBQUERY, pred.getExpressionType());
+            SubqueryExpression se = (SubqueryExpression) pred;
+            List<AbstractExpression> args = se.getArgs();
+            assertEquals(2, args.size());
+            TupleValueExpression tve = (TupleValueExpression)args.get(0);
+            assertEquals("R2", tve.getTableName());
+            assertEquals("D", tve.getColumnName());
+            tve = (TupleValueExpression)args.get(1);
+            assertEquals("R1", tve.getTableName());
+            assertEquals("A", tve.getColumnName());
+            assertEquals(2, se.getParameterIdxList().size());
+            // Child query
+            pn = se.getSubqueryNode();
+            pred = ((AbstractScanPlanNode)pn).getPredicate();
+            AbstractExpression le = pred.getLeft();
+            assertEquals(ExpressionType.VALUE_PARAMETER, le.getRight().getExpressionType());
+            AbstractExpression re = pred.getRight();
+            assertEquals(ExpressionType.VALUE_PARAMETER, le.getRight().getExpressionType());
+        }
+        {
+            // OFFSET prevents In-to-EXISTS transformation
+            AbstractPlanNode pn = compile("select r1.d from r1, r2 where r1.a IN " +
+                    "(select a from r3 where r3.c = r2.d limit 1 offset 2);");
+            pn = pn.getChild(0).getChild(0);
+            assertTrue(pn instanceof NestLoopPlanNode);
+            AbstractExpression pred = ((NestLoopPlanNode) pn).getJoinPredicate();
+            assertTrue(pred != null);
+            assertEquals(ExpressionType.IN_SUBQUERY, pred.getExpressionType());
+            SubqueryExpression se = (SubqueryExpression) pred;
+            List<AbstractExpression> args = se.getArgs();
+            assertEquals(2, args.size());
+            TupleValueExpression tve = (TupleValueExpression)args.get(0);
+            assertEquals("R2", tve.getTableName());
+            assertEquals("D", tve.getColumnName());
+            tve = (TupleValueExpression)args.get(1);
+            assertEquals("R1", tve.getTableName());
+            assertEquals("A", tve.getColumnName());
+            assertEquals(2, se.getParameterIdxList().size());
+            // Child query
+            pn = se.getSubqueryNode();
+            assertEquals(PlanNodeType.SEMISEQSCAN, pn.getPlanNodeType());
+            pred = ((AbstractScanPlanNode)pn).getPredicate();
+            tve = (TupleValueExpression) pred.getRight();
+            assertEquals("R3", tve.getTableName());
+            assertEquals("A", tve.getColumnName());
+            ParameterValueExpression pve = (ParameterValueExpression) pred.getLeft();
+            assertEquals(new Integer(1), pve.getParameterIndex());
+            pn = pn.getChild(0);
+            pred = ((AbstractScanPlanNode)pn).getPredicate();
+            tve = (TupleValueExpression) pred.getLeft();
+            assertEquals("R3", tve.getTableName());
+            assertEquals("C", tve.getColumnName());
+            pve = (ParameterValueExpression) pred.getRight();
+            assertEquals(new Integer(0), pve.getParameterIndex());
+        }
     }
 
     public void testInAggeregated() {
