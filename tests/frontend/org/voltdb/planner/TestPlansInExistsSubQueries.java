@@ -364,7 +364,7 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         }
     }
 
-    public void testInAggeregated() {
+    public void testInAggregated() {
         AbstractPlanNode pn = compile("select a, sum(c) as sc1 from r1 where (a, c) in " +
                 "( SELECT a, count(c) as sc2 " +
                 "from  r1  GROUP BY a ORDER BY a DESC) GROUP BY A;");
