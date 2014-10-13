@@ -8,7 +8,7 @@
         DbConnection = function(aServer, aPort, aAdmin, aUser, aPassword, aIsHashPassword,aProcess) {
             this.server = aServer == null ? 'localhost' : $.trim(aServer);
             this.port = aPort == null ? '8080' : $.trim(aPort);
-            this.admin = aAdmin == true;
+            this.admin = (aAdmin == true || aAdmin == "true");
             this.user = aUser == '' ? null : aUser;
             this.password = aPassword == '' ? null : (aIsHashPassword == false ? aPassword : null);
             this.isHashedPassword = aPassword == '' ? null : (aIsHashPassword == true ? aPassword : null);
