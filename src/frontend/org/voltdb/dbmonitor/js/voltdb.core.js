@@ -9,9 +9,9 @@
             this.server = aServer == null ? 'localhost' : $.trim(aServer);
             this.port = aPort == null ? '8080' : $.trim(aPort);
             this.admin = (aAdmin == true || aAdmin == "true");
-            this.user = aUser == '' ? null : aUser;
-            this.password = aPassword == '' ? null : (aIsHashPassword == false ? aPassword : null);
-            this.isHashedPassword = aPassword == '' ? null : (aIsHashPassword == true ? aPassword : null);
+            this.user = (aUser == '' || aUser == 'null') ? null : aUser;
+            this.password = (aPassword == '' || aPassword == 'null' ) ? null : (aIsHashPassword == false ? aPassword : null);
+            this.isHashedPassword = (aPassword == '' || aPassword == 'null') ? null : (aIsHashPassword == true ? aPassword : null);
             this.process = aProcess;
             this.key = (this.server + '_' + this.port + '_' + (this.user == '' ? '' : this.user) + '_' + (this.admin == true ? 'Admin' : '') + "_" + this.process).replace(/[^_a-zA-Z0-9]/g, "_");
             this.display = this.server + ':' + this.port + (this.user == '' ? '' : ' (' + this.user + ')') + (this.admin == true ? ' - Admin' : '');
