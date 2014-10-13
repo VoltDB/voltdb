@@ -100,10 +100,11 @@
             this.CallExecute = function (procedure, parameters, callback) {
                 var uri = 'http://' + this.server + ':' + this.port + '/api/1.0/';
                 var params = this.BuildParamSet(procedure, parameters);
-                if (uri.trim())
+                
+                if (typeof (params) == 'string')
                     jQuery.postJSON(uri, params, callback);
                 else if (callback != null)
-                    callback({ "status": -1, "statusstring": "PrepareStatement error: " + uri[0], "results": [] });
+                        callback({ "status": -1, "statusstring": "PrepareStatement error: " + params[0], "results": [] });
             };
             
             var callbackWrapper = function(userCallback) {
