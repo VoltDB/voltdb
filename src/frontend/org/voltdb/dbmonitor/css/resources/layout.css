@@ -183,16 +183,16 @@ font-size: 14px;
 
 
 
-.header { height:65px; background:#FFFFFF;
+.header { height:70px; background:#FFFFFF;
 	 -webkit-box-shadow: 0px 6px 7px -5px #ccc;  /* Safari 3-4, iOS 4.0.2 - 4.2, Android 2.3+ */
 		  -moz-box-shadow:    0px 6px 7px -5px #ccc;  /* Firefox 3.5 - 3.6 */
 		  box-shadow:         0px 6px 7px -5px #ccc;  /* Opera 10.5, IE 9, Firefox 4+, Chrome 6+, iOS 5 */
 		padding:0 20px; margin-bottom:20px;}
 .headLeft { float:left;}
-.headLeft .logo { float:left; width:140px;}
+.headLeft .logo { float:left; width:140px; padding:8px 0 0 0}
 .headLeft .menu { float:left;}
 			ul.nav { margin:0 0 0 50px; padding:0;}
-			ul.nav li { margin:0; padding:0; float:left; font:16px/10px Arial, Helvetica, sans-serif; height:42px;  }
+			ul.nav li { margin:0; padding:0; float:left; font:16px/10px Arial, Helvetica, sans-serif; height:40px;  }
 			ul.nav li a {display:block; margin:0; padding:23px 20px 0 20px; color:#000000; border-right:1px solid #CCCCCC; height:42px;}
 			ul.nav li a:hover, ul.nav li a.active { background:#76bd1d;color:#FFFFFF;}
 .headRight { float:right;}
@@ -347,7 +347,7 @@ html ul.tabs li.active, html ul.tabs li.active a:hover  {
 }
 
 .storeTbl, .dbTbl { margin:5px 0 0 0; padding:0; border:1px solid #CCCCCC;}
-.storeTbl th, .dbTbl th { maring:0; padding:0; background:#3f5364; color:#FFFFFF;}
+.storeTbl th, .dbTbl th { margin:0; padding:0; background:#3f5364; color:#FFFFFF;}
 .storeTbl th, td, .dbTbl th,td { padding:10px 10px; border-right:1px solid #CCCCCC;border-bottom:1px solid #CCCCCC;}
 td.txt-center{text-align:center;}
 
@@ -588,7 +588,7 @@ display:block;
  margin:0; padding:0; float:left; font:16px/10px Arial, Helvetica, sans-serif; height:42px;
 }
 #nav ul li a {
-  display:block; margin:0; padding:23px 20px 0 20px; color:#000000; border-right:1px solid #CCCCCC; height:42px;
+  display:block; margin:0; padding:28px 20px 0 20px; color:#000000; border-right:1px solid #CCCCCC; height:42px;
 }
 #nav ul li a:hover {background:#AA1F2F; color:#FFFFFF;}
 #nav ul li a.active { background:#76bd1d;color:#FFFFFF;}
