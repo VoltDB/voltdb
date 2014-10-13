@@ -231,8 +231,7 @@ inline void TempTable::deleteAllTuplesNonVirtual(bool freeAllocatedStrings) {
     }
 
     m_tupleCount = 0;
-    // clean up all blocks
-    while (m_data.size() > 0) {
+    while (m_data.size() > 1) {
         // This block of temp table may have been clean up already
         // because of delete as we go feature.
         TBPtr blockPtr = m_data.back();
@@ -240,6 +239,11 @@ inline void TempTable::deleteAllTuplesNonVirtual(bool freeAllocatedStrings) {
         if (m_limits && blockPtr) {
             m_limits->reduceAllocated(m_tableAllocationSize);
         }
+    }
+
+    // cheap clear of the preserved first block
+    if (!m_data.empty()) {
+        m_data[0]->reset();
     }
 }
 
@@ -255,6 +259,7 @@ inline TBPtr TempTable::allocateNextBlock() {
 }
 
 inline void TempTable::nextFreeTuple(TableTuple *tuple) {
+
     if (m_data.empty()) {
         allocateNextBlock();
     }
