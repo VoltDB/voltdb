@@ -370,7 +370,7 @@ td.txt-center{text-align:center;}
 .icon-procedures{ background-position:left -986px;}
 .icon-tables{ background-position:left -1043px;}
 input.search-box{ border:1px solid #dbdbdb; padding:0 5px 0 5px; height:40px; width:200px; color:#a3a3a3; font-weight:bold;}
-a.icon-search{ background-position:right -684px; border:1px solid #dbdbdb;line-height: 40px;display: inline-block;padding: 0 4px; width:35px; text-indent:-999em;}
+a.icon-search{ background-position:right -684px; border:1px solid #dbdbdb;line-height: 40px;display: inline-block;padding: 0 4px; width:35px; text-indent:-999em; cursor:default;}
 
 /* Server Popups */
 input.icon-search{ background-position:right -684px; border:1px solid #dbdbdb; padding:0 45px 0 5px; height:40px; width:200px; color:#a3a3a3; font-weight:bold;}
