@@ -276,9 +276,11 @@ ul.rightShowhideList li > a.btn {top:5px; position:relative}
 
 .collapsed{background: #fbfbfb url(images/voltdb-icon-sprite.png) 20px -535px no-repeat;}
 .expanded{background: #fbfbfb url(images/voltdb-icon-sprite.png) 20px -490px no-repeat;}
-.leftShowhide .expanded{ background:#fbfbfb url(images/voltdb-icon-sprite.png) 0px -502px no-repeat;}
-.leftShowhide  .collapsed{background:#fbfbfb url(images/voltdb-icon-sprite.png) 0px -547px no-repeat;}
-
+.leftShowhide .expanded{ background:#fbfbfb url(images/voltdb-icon-sprite.png) 0px -506px no-repeat;}
+.leftShowhide  .collapsed{background:#fbfbfb url(images/voltdb-icon-sprite.png) 0px -550px no-repeat;}
+.arrowAdjust {padding: 0px 0 0 26px;
+position: relative;
+top: 4px;}
   
   
 /* Tab */
