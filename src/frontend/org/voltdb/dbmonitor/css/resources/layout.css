@@ -609,7 +609,8 @@ ul.topRightList li.responsiveMenuPlaceHolder{border-left:1px solid #ccc; height:
 .blockWrapper{background:; margin-bottom:20px;}
 .objectExplorer{float:left; width:28%; padding:15px 1%; background:#fff;}
 .queryInput{float:right; width:68%;}
-.queryInput .query textarea{width:98%; padding:1%; height:215px;resize: none; line-height:20px;  border:none;}
+.queryInput .query textarea{width:98%; padding:1%; height:215px; resize: none; line-height:25px;  border:none; 
+font-size:18px;}
 .queryInput .query textarea:focus{outline:none;}
 .btnList { margin:10px 0 0 0; padding:0; float:right;}
 .btnList li { margin:0; padding:0 10px 0 0 ; float:left;}
