@@ -215,19 +215,18 @@ public class PlannerTestCase extends TestCase {
         return m_aide.getDatabase();
     }
 
-    protected String printExplainPlan(List<AbstractPlanNode> planNodes) {
-        return printExplainPlan(planNodes, true);
+    protected void printExplainPlan(List<AbstractPlanNode> planNodes) {
+        for (AbstractPlanNode apn: planNodes) {
+            System.out.println(apn.toExplainPlanString());
+        }
     }
 
-    protected String printExplainPlan(List<AbstractPlanNode> planNodes, boolean toConsole) {
-        String explainStr = "";
+    protected String buildExplainPlan(List<AbstractPlanNode> planNodes) {
+        String explain = "";
         for (AbstractPlanNode apn: planNodes) {
-            if (toConsole) {
-                System.out.println(apn.toExplainPlanString());
-            }
-            explainStr += apn.toExplainPlanString() + "\n";
+            explain += apn.toExplainPlanString() + '\n';
         }
-        return explainStr;
+        return explain;
     }
 
 }

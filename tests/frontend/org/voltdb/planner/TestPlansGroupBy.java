@@ -40,6 +40,7 @@ import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
+import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
 
 public class TestPlansGroupBy extends PlannerTestCase {
@@ -750,9 +751,9 @@ public class TestPlansGroupBy extends PlannerTestCase {
     private void checkGroupbyAliasFeature(String sql1, String sql2, boolean exact) {
         String explainStr1, explainStr2;
         pns = compileToFragments(sql1);
-        explainStr1 = printExplainPlan(pns, false);
+        explainStr1 = buildExplainPlan(pns);
         pns = compileToFragments(sql2);
-        explainStr2 = printExplainPlan(pns, false);
+        explainStr2 = buildExplainPlan(pns);
         if (! exact) {
             explainStr1 = explainStr1.replaceAll("TEMP_TABLE\\.column#[\\d]", "TEMP_TABLE.column#[Index]");
             explainStr2 = explainStr2.replaceAll("TEMP_TABLE\\.column#[\\d]", "TEMP_TABLE.column#[Index]");
@@ -779,28 +780,63 @@ public class TestPlansGroupBy extends PlannerTestCase {
             assertEquals("user lacks privilege or object not found: CT", ex.getMessage());
         }
 
+        try {
+            pns = compileToFragments(
+                    "SELECT abs(PKEY) as sp, (count(*) +1 ) as ct FROM P1 GROUP BY ct");
+            fail();
+        } catch (Exception ex) {
+            assertEquals("user lacks privilege or object not found: CT", ex.getMessage());
+        }
+
         // Group by alias and expression
         try {
             pns = compileToFragments(
                     "SELECT abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY sp + 1");
             fail();
         } catch (Exception ex) {
-            // not sure about the hsql parser error message
+            assertEquals("data type cast needed for parameter or null literal", ex.getMessage());
         }
 
+        // Having
+        try {
+            pns = compileToFragments(
+                    "SELECT ABS(A1) AS tag, count(*) as ct FROM P1 GROUP BY tag having ct > 3");
+            fail();
+        } catch (Exception ex) {
+            assertEquals("data type cast needed for parameter or null literal", ex.getMessage());
+        }
+
+        // Group by column.alias
         try {
             pns = compileToFragments(
                     "SELECT abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY P1.sp");
             fail();
         } catch (Exception ex) {
-            // not sure about the hsql parser error message
+            assertEquals(null, ex.getMessage());
+        }
+
+        // group by constants with alias
+        try {
+            pns = compileToFragments(
+                    "SELECT 1 as tag, abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY tag");
+            fail();
+        } catch (Exception ex) {
+            assertEquals("expression not in aggregate or GROUP BY columns: ABS(PUBLIC.P1.PKEY)",
+                    ex.getMessage());
         }
 
         //
         // ambiguous group by query because of A1 is a column name and a select alias
         //
         pns = compileToFragments(
-                "SELECT A1 as B1, B1 as A1, count(*) as ct FROM P1 GROUP BY A1");
+                "SELECT ABS(A1) AS A1, count(*) as ct FROM P1 GROUP BY A1");
+        printExplainPlan(pns);
+        AbstractPlanNode p = pns.get(1).getChild(0);
+        assertTrue(p instanceof AbstractScanPlanNode);
+        AggregatePlanNode agg = AggregatePlanNode.getInlineAggregationNode(p);
+        assertNotNull(agg);
+        // group by column, instead of the ABS(A1) expression
+        assertEquals(agg.getGroupByExpressions().get(0).getExpressionType(), ExpressionType.VALUE_TUPLE);
     }
 
     public void testGroupbyAlias() {

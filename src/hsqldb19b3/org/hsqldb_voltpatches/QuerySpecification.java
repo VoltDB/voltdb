@@ -269,22 +269,18 @@ public class QuerySpecification extends QueryExpression {
          * is wrong. So use list
          *
          */
-//        HashSet uniqueSet = new HashSet();
-//        for (int i = 0; i < unresolvedExpressions.size(); i++) {
-//            Object element = unresolvedExpressions.get(i);
-//            uniqueSet.add((Expression)element);
-//        }
-
-
-        // resolve GROUP BY and HAVING columns/expressions
+        // resolve GROUP BY columns/expressions
         HsqlList newUnresolvedExpressions = new ArrayListIdentity();
 
         int size = unresolvedExpressions.size();
         for (int i = 0; i < size; i++) {
             Object obj = unresolvedExpressions.get(i);
             if (i + 1 < size && obj == unresolvedExpressions.get(i+1)) {
-                // hsql adds the unresolved expression twice
-                // skip the repeated expression
+                // unresolvedExpressions is a public member that can be accessed from anywhere and
+                // I (xin) am 90% percent sure about the hsql adds the unresolved expression twice
+                // together for our targeted GROUP BY alias case.
+                // so we want to skip the repeated expression also.
+                // For other unresolved expression, it may differs.
                 i += 1;
             }
             if (obj instanceof ExpressionColumn == false) {
@@ -296,21 +292,25 @@ public class QuerySpecification extends QueryExpression {
                 continue;
             }
 
-            // find the unsolved expression in the groupBy/Having list
-            int k = indexLimitVisible;
-            for (; k < indexStartOrderBy; k++) {
-                if (element.equals(exprColumns[k])) {
-                    break;
-                }
-            }
-            if (k == indexStartOrderBy) {
-                // not found in selected list
+            // group by alias which is thought as an column
+            if (element.getType() != OpTypes.COLUMN) {
                 continue;
             }
 
-            if (exprColumns[k].getType() != OpTypes.COLUMN) {
+            // find the unsolved expression in the groupBy list
+            int k = indexLimitVisible;
+            int endGroupbyIndex = indexLimitVisible + groupByColumnCount;
+            for (; k < endGroupbyIndex; k++) {
+                if (element == exprColumns[k]) {
+                    break;
+                }
+            }
+            if (k == endGroupbyIndex) {
+                // not found in selected list
                 continue;
             }
+            assert(exprColumns[k].getType() == OpTypes.COLUMN);
+
             ExpressionColumn exprCol = (ExpressionColumn) exprColumns[k];
             String alias = exprCol.getColumnName();
             if (alias == null) {
@@ -327,7 +327,7 @@ public class QuerySpecification extends QueryExpression {
                     continue;
                 }
                 if (selectCol.alias == null) {
-                    // constants selected columns do not have alias
+                    // columns referenced by their alias must have an alias
                     continue;
                 }
                 if (alias.equals(selectCol.alias.name)) {
