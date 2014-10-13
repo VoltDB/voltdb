@@ -600,6 +600,7 @@ ul.topRightList li.responsiveMenuPlaceHolder{border-left:1px solid #ccc; height:
 
 
 /* Web Studio CSS */
+
 .containerStudio { margin:0 auto; width:98%; margin-bottom:20px; font-family:Arial, Helvetica, sans-serif; font-size:14px;}
 .btnStudio { background:#AA1F2F; padding:5px 10px; border:1px solid #AA1F2F; color:#FFFFFF; cursor:pointer;}
 .btnStudio:hover { background:#76BD1D; border:1px solid #76BD1D; color:#FFFFFF;}
@@ -609,8 +610,11 @@ ul.topRightList li.responsiveMenuPlaceHolder{border-left:1px solid #ccc; height:
 .blockWrapper{background:; margin-bottom:20px;}
 .objectExplorer{float:left; width:28%; padding:15px 1%; background:#fff;}
 .queryInput{float:right; width:68%;}
-.queryInput .query textarea{width:98%; padding:1%; height:215px;resize: none; line-height:20px;  border:none;}
+#queryForm{ background:#FFFFFF;}
+.queryInput .query textarea{width:98%; padding:1%; height:186px;border: 1px solid #CCCCCC;/* resize: none;*/ line-height:25px;   font-size:18px;}
+
 .queryInput .query textarea:focus{outline:none;}
+.textWritingArea { padding:13px;}
 .btnList { margin:10px 0 0 0; padding:0; float:right;}
 .btnList li { margin:0; padding:0 10px 0 0 ; float:left;}
 
