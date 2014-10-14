@@ -345,7 +345,15 @@ function loadPage(serverName, portid) {
     populateTablesAndViews();
 
     $('#runBTn').click(function () {
-        queryString = $('#theQueryText').val();
+        queryString = $('#theQueryText').getSelectedText();
+        if (queryString != null) {
+            queryString = queryString.replace(/^\s+|\s+$/g, '');
+            if (queryString == '')
+                queryString = $('#theQueryText').val();
+        }
+        else
+            queryString = $('#theQueryText').val();
+
         new QueryUI(queryString).execute();
 
     });

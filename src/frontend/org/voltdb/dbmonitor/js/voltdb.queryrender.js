@@ -223,14 +223,6 @@
         var connection = VoltDBCore.connections[DataSource];
         var source = '';
         source = queryToRun;
-        if (source != null) {
-            source = source.replace(/^\s+|\s+$/g, '');
-            if (source == '')
-                source = queryToRun;
-        }
-        else
-            source = queryToRun;
-
         source = source.replace(/^\s+|\s+$/g, '');
         if (source == '')
             return;
@@ -284,7 +276,7 @@
             for (var j = 0; j < tables.length; j++)
                 printResult(format, target, id + '_' + j, tables[j]);
         } else {
-            $(target).html("Error: " + response.statusstring + "\r\n");
+            $(target).append("Error: " + response.statusstring + "\r\n");
         }
     }
 
