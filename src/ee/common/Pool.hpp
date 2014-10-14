@@ -111,7 +111,7 @@ public:
             return storage;
     }
 
-    void realDeallocation(bool isForOversizeChunks = false) {
+    void realDeallocation(bool isForOversizeChunks) {
         if (isForOversizeChunks) {
             for (std::size_t ii = 0; ii < m_oversizeChunks.size(); ii++) {
 #ifdef USE_MMAP
@@ -212,7 +212,6 @@ public:
         /*
          * Erase any oversize chunks that were allocated
          */
-        const std::size_t numOversizeChunks = m_oversizeChunks.size();
         realDeallocation(true);
         m_oversizeChunks.clear();
 
