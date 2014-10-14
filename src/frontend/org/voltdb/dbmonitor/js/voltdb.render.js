@@ -286,8 +286,11 @@ function alertNodeClicked(obj) {
             VoltDBService.GetTableInformation(function (connection) {
                 var tablesData = {};
                 var viewsData = {};
-                getTableData(connection, tablesData, viewsData, 'TABLE_INFORMATION');
-                onInformationLoaded(tablesData, viewsData);
+                var proceduresData = {};
+                var procedureColumnsData = {};
+                var sysProceduresData = {};
+                getTableData(connection, tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData, 'TABLE_INFORMATION');
+                onInformationLoaded(tablesData, viewsData,proceduresData,procedureColumnsData,sysProceduresData);
             });
         };
 
@@ -1262,7 +1265,7 @@ function alertNodeClicked(obj) {
 
         };
 
-        function getTableData(connection, tablesData, viewsData, processName) {
+        function getTableData(connection, tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData, processName) {
             var suffix = "";
             if (processName == "TABLE_INFORMATION") {
                 suffix = "_" + processName;
@@ -1271,6 +1274,8 @@ function alertNodeClicked(obj) {
             var rawTables = connection.Metadata['@Statistics_TABLE' + suffix].data;
             var rawIndexes = connection.Metadata['@Statistics_INDEX' + suffix].data;
             var rawColumns = connection.Metadata['@SystemCatalog_COLUMNS' + suffix].data;
+            var procedures = connection.Metadata['@SystemCatalog_PROCEDURES' + suffix].data;
+            var procedureColumns = connection.Metadata['@SystemCatalog_PROCEDURECOLUMNS' + suffix].data;
 
             var tables = [];
             var exports = [];
@@ -1325,14 +1330,51 @@ function alertNodeClicked(obj) {
                         ' (' + rawColumns[i][5].toLowerCase() + ')';
                 }
             }
+            
+            // User Procedures
+            for (var i = 0; i < procedures.length; ++i) {
+                var connTypeParams = [];
+                var procParams = [];
+                var procName = procedures[i][2];
+                for (var p = 0; p < procedureColumns.length; ++p) {
+                    if (procedureColumns[p][2] == procName) {
+                        paramType = procedureColumns[p][6];
+                        paramName = procedureColumns[p][3];
+                        paramOrder = procedureColumns[p][17] - 1;
+                        procParams[paramOrder] = { 'name': paramName, 'type': paramType.toLowerCase() };
+                    }
+                }
+
+                for (var p = 0; p < procParams.length; ++p) {
+                    connTypeParams[connTypeParams.length] = procParams[p].type;
+                }
+
+                // make the procedure callable.
+                connection.procedures[procName] = {};
+                connection.procedures[procName]['' + connTypeParams.length] = connTypeParams;
+            }
+
             if (!tablesData.hasOwnProperty('tables')) {
                 tablesData['tables'] = {};
             }
             if (!viewsData.hasOwnProperty('views')) {
                 viewsData['views'] = {};
             }
+            if (!procedureData.hasOwnProperty('procedures')) {
+                procedureData['procedures'] = {};
+            }
+            if (!procedureColumnsData.hasOwnProperty('procedureColumns')) {
+                procedureColumnsData['procedureColumns'] = {};
+            }
+            if (!sysProceduresData.hasOwnProperty('sysProcedures')) {
+                sysProceduresData['sysProcedures'] = {};
+            }
+
             tablesData['tables'] = connection.Metadata['tables'];
             viewsData['views'] = connection.Metadata['views'];
+            proceduresData['procedures'] = procedures;
+            procedureColumnsData['procedureColumns'] = procedureColumns;
+            sysProceduresData['sysProcedures'] = connection.Metadata['sysprocs'];
         }
 
 

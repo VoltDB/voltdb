@@ -87,6 +87,37 @@
         }
     });
 
+    // Procedures Accordion
+    $('#accordionProcedures').accordion({
+        collapsible: true,
+        active: false,
+        beforeActivate: function (event, ui) {
+            // The accordion believes a panel is being opened
+            if (ui.newHeader[0]) {
+                var currHeader = ui.newHeader;
+                var currContent = currHeader.next('.ui-accordion-content');
+                // The accordion believes a panel is being closed
+            } else {
+                var currHeader = ui.oldHeader;
+                var currContent = currHeader.next('.ui-accordion-content');
+            }
+            // Since we've changed the default behavior, this detects the actual status
+            var isPanelSelected = currHeader.attr('aria-selected') == 'true';
+
+            // Toggle the panel's header
+            currHeader.toggleClass('ui-corner-all', isPanelSelected).toggleClass('accordion-header-active ui-state-active ui-corner-top', !isPanelSelected).attr('aria-selected', ((!isPanelSelected).toString()));
+
+            // Toggle the panel's icon
+            currHeader.children('.ui-icon').toggleClass('ui-icon-triangle-1-e', isPanelSelected).toggleClass('ui-icon-triangle-1-s', !isPanelSelected);
+
+            // Toggle the panel's content
+            currContent.toggleClass('accordion-content-active', !isPanelSelected)
+            if (isPanelSelected) { currContent.slideUp(50); } else { currContent.slideDown(50); }
+
+            return false; // Cancels the default action
+        }
+    });
+
     // Implements Scroll in Server List div
     $('#tabScroller').slimscroll({
         disableFadeOut: true,
@@ -216,41 +247,34 @@ function loadPage(serverName, portid) {
 
     var populateStoredProcedure = function(proceduresData, procedureColumnData,sysProcedure) {
         // Stored Procedures
-        var count = 0;
         var src = "";
-        src += '<h3>Stored Procedures</h3>';
-        src += '<ul id="' + connection.Key + '_sp">';
-        src += '<li class="folder closed"><span>System Stored Procedures</span>';
-        src += '<ul>';
-        for (var k in connection.Metadata['sysprocs']) {
-            for (var paramCount in connection.Metadata['sysprocs'][k]) {
-                src += '<li class="procedure closed"><span>' + k + '(' + paramCount + ')</span>';
-                src += '<ul>'
-                src += '<li class="folder closed"><span>Parameters</span>';
-                src += '<ul>'
-                for (var i = 0; i < connection.Metadata['sysprocs'][k][paramCount].length - 1; i++)
-                    src += '<li class="paramin"><span>' + connection.Metadata['sysprocs'][k][paramCount][i] + '</span></li>';
-                src += '<li class="paramreturn"><span>' + connection.Metadata['sysprocs'][k][paramCount][i] + '</span></li>';
+        src += '<h3 class="systemHeader">System Stored Procedures</h3>';
+        src += '<div id="systemProcedure" class="listView">';
+        for (var k in sysProcedure) {
+            for (var paramCount in sysProcedure[k]) {
+                src += '<h3>' + k + '(' + paramCount + ')</h3>';
+                src += '<div class="listView">';
+                src += '<ul>';
+                for (var i = 0; i < sysProcedure[k][paramCount].length - 1; i++) {
+                    src += '<li class="parameterValue">' + sysProcedure[k][paramCount][i] + '</li>';
+                }
+                src += '<li class="returnValue">' + sysProcedure[k][paramCount][i] + '</li>';
                 src += '</ul>';
-                src += '</li>';
-                src += '</ul>';
-                src += '</li>';
+                src += '</div>';
             }
         }
-        src += '</ul>';
-        src += '</li>'; // System Stored Procedures
-
-        // User Procedures
-        for (var i = 0; i < connection.Metadata['procedures'].data.length; ++i) {
+        
+        src += '</div>';
+        for (var i = 0; i < proceduresData.length; ++i) {
             var connTypeParams = [];
             var procParams = [];
-            var procName = connection.Metadata['procedures'].data[i][2];
-            for (var p = 0; p < connection.Metadata['procedurecolumns'].data.length; ++p) {
-                if (connection.Metadata['procedurecolumns'].data[p][2] == procName) {
-                    paramType = connection.Metadata['procedurecolumns'].data[p][6];
-                    paramName = connection.Metadata['procedurecolumns'].data[p][3];
-                    paramOrder = connection.Metadata['procedurecolumns'].data[p][17] - 1;
-                    if (connection.Metadata['procedurecolumns'].data[p][12] == "ARRAY_PARAMETER") {
+            var procName = proceduresData[i][2];
+            for (var p = 0; p < procedureColumnData.length; ++p) {
+                if (procedureColumnData[p][2] == procName) {
+                    paramType = procedureColumnData[p][6];
+                    paramName = procedureColumnData[p][3];
+                    paramOrder = procedureColumnData[p][17] - 1;
+                    if (procedureColumnData[p][12] == "ARRAY_PARAMETER") {
                         if (paramType.toLowerCase() == "tinyint") // ENG-2040 and ENG-3101, identify it as an array (byte[])
                             paramType = "byte[]";
                         else
@@ -259,23 +283,50 @@ function loadPage(serverName, portid) {
                     procParams[paramOrder] = { 'name': paramName, 'type': paramType.toLowerCase() };
                 }
             }
-
-            src += '<li class="procedure closed"><span>' + procName + '</span>';
-            src += '<ul>'
-            src += '<li class="folder closed"><span>Parameters</span>';
-            src += '<ul>'
+            src += '<h3>' + procName + '</h3>';
+            src += '<div class="listView">';
+            src += '<ul>';
             for (var p = 0; p < procParams.length; ++p) {
-                src += '<li class="paramin"><span>Param' + (p) + ' (' + procParams[p].type + ')</span></li>';
+                src += '<li class="parameterValue">Param' + (p) + ' (' + procParams[p].type + ')</li>';
             }
-            src += '<li class="paramreturn"><span>Return Table[]</span></li>';
-            src += '</ul>'
-            src += '</li>'
-            src += '</ul>'
-            src += '</li>'
-        }
+            src += '<li class="returnValue">Return Table[]</li>';
+            src += '</ul>';
+            src += '</div>';
 
-        src += '</ul>'; // connection.Key_sp
-        src += '</li>'; // Stored Procedures
+
+
+        }
+        $('#accordionProcedures').html(src);
+        $('#accordionProcedures').accordion("refresh");
+        $('#systemProcedure').accordion({
+            collapsible: true,
+            active: false,
+            beforeActivate: function (event, ui) {
+                // The accordion believes a panel is being opened
+                if (ui.newHeader[0]) {
+                    var currHeader = ui.newHeader;
+                    var currContent = currHeader.next('.ui-accordion-content');
+                    // The accordion believes a panel is being closed
+                } else {
+                    var currHeader = ui.oldHeader;
+                    var currContent = currHeader.next('.ui-accordion-content');
+                }
+                // Since we've changed the default behavior, this detects the actual status
+                var isPanelSelected = currHeader.attr('aria-selected') == 'true';
+
+                // Toggle the panel's header
+                currHeader.toggleClass('ui-corner-all', isPanelSelected).toggleClass('accordion-header-active ui-state-active ui-corner-top', !isPanelSelected).attr('aria-selected', ((!isPanelSelected).toString()));
+
+                // Toggle the panel's icon
+                currHeader.children('.ui-icon').toggleClass('ui-icon-triangle-1-e', isPanelSelected).toggleClass('ui-icon-triangle-1-s', !isPanelSelected);
+
+                // Toggle the panel's content
+                currContent.toggleClass('accordion-content-active', !isPanelSelected)
+                if (isPanelSelected) { currContent.slideUp(50); } else { currContent.slideDown(50); }
+
+                return false; // Cancels the default action
+            }
+        });
 
     };
 
@@ -286,8 +337,8 @@ function loadPage(serverName, portid) {
             var views = viewsData['views'];
             populateViewData(views);
             var procedures = proceduresData['procedures'];
-            var procedureColumns = procedureColumnsData['procedureColumn'];
-            var sysProcedure = sysProcedureData['sysProcedure'];
+            var procedureColumns = procedureColumnsData['procedureColumns'];
+            var sysProcedure = sysProcedureData['sysProcedures'];
             populateStoredProcedure(procedures, procedureColumns,sysProcedure);
         });
     };
