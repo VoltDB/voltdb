@@ -57,6 +57,8 @@ import org.voltdb.sysprocs.saverestore.SnapshotWritePlan;
 import org.voltdb.sysprocs.saverestore.StreamSnapshotWritePlan;
 
 import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.base.Function;
+import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 
@@ -154,11 +156,15 @@ public class SnapshotSaveAPI
                      * Copy last seen unique ids from remote data centers from @ApplyBinaryLogSP
                      */
                     Map<Integer, Map<Integer, Long>> remoteDCLastUniqueIds = new HashMap<Integer, Map<Integer, Long>>();
-                    Map<Integer, Long> dc0UniqueIds = new HashMap<Integer, Long>();
+                    Map<Integer, Long> dc0UniqueIds = new HashMap<Integer, Long>(
+                        Maps.transformValues(m_lastAppliedUniqueId, new Function<AtomicLong, Long>() {
+                           @Override
+                           public Long apply(AtomicLong input) {
+                               return input.get();
+                           }
+                        }
+                    ));
                     remoteDCLastUniqueIds.put(0, dc0UniqueIds);
-                    for (Map.Entry<Integer, AtomicLong> e : m_lastAppliedUniqueId.entrySet()) {
-                        dc0UniqueIds.put(e.getKey(), e.getValue().get());
-                    }
 
                     SNAP_LOG.debug("Last seen partition transaction ids " + partitionTransactionIds + " and unique ids " + partitionUniqueIds);
                     m_partitionLastSeenTransactionIds = new HashMap<Integer, Long>();

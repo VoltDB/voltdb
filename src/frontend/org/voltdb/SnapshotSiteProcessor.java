@@ -896,6 +896,7 @@ public class SnapshotSiteProcessor {
      */
     private static void mergeDRLastUniqueIds(JSONObject jsonObj,
             Map<Integer, Map<Integer, Long>> remoteDCLastUniqueId) throws JSONException {
+        //Unique ids for remote partitions indexed by remote datacenter id, each DC has a full partition set
         JSONObject dcUniqueIdMap;
         if (jsonObj.has("remoteDCUniqueIds")) {
             dcUniqueIdMap = jsonObj.getJSONObject("remoteDCUniqueIds");
@@ -905,6 +906,7 @@ public class SnapshotSiteProcessor {
         }
 
         for (Map.Entry<Integer, Map<Integer, Long>> dcEntry : remoteDCLastUniqueId.entrySet()) {
+            //Last seen unique ids for a specific data center
             JSONObject lastSeenUniqueIds;
             final String dcKeyString = dcEntry.getKey().toString();
             if (dcUniqueIdMap.has(dcKeyString)) {
@@ -919,10 +921,6 @@ public class SnapshotSiteProcessor {
                 final String partitionIdString = partitionId.toString();
                 final Long lastSeenUniqueIdLong = partitionEntry.getValue();
 
-                /*
-                 * Check that the sequence number is the same everywhere and log if it isn't.
-                 * Not going to crash because we are worried about poison pill transactions.
-                 */
                 if (lastSeenUniqueIds.has(partitionIdString)) {
                     long existingEntry = lastSeenUniqueIds.getLong(partitionIdString);
                     lastSeenUniqueIds.put(partitionIdString, Math.max(existingEntry, lastSeenUniqueIdLong));
