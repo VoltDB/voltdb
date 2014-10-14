@@ -214,12 +214,81 @@ function loadPage(serverName, portid) {
         }
     };
 
+    var populateStoredProcedure = function(proceduresData, procedureColumnData,sysProcedure) {
+        // Stored Procedures
+        var count = 0;
+        var src = "";
+        src += '<h3>Stored Procedures</h3>';
+        src += '<ul id="' + connection.Key + '_sp">';
+        src += '<li class="folder closed"><span>System Stored Procedures</span>';
+        src += '<ul>';
+        for (var k in connection.Metadata['sysprocs']) {
+            for (var paramCount in connection.Metadata['sysprocs'][k]) {
+                src += '<li class="procedure closed"><span>' + k + '(' + paramCount + ')</span>';
+                src += '<ul>'
+                src += '<li class="folder closed"><span>Parameters</span>';
+                src += '<ul>'
+                for (var i = 0; i < connection.Metadata['sysprocs'][k][paramCount].length - 1; i++)
+                    src += '<li class="paramin"><span>' + connection.Metadata['sysprocs'][k][paramCount][i] + '</span></li>';
+                src += '<li class="paramreturn"><span>' + connection.Metadata['sysprocs'][k][paramCount][i] + '</span></li>';
+                src += '</ul>';
+                src += '</li>';
+                src += '</ul>';
+                src += '</li>';
+            }
+        }
+        src += '</ul>';
+        src += '</li>'; // System Stored Procedures
+
+        // User Procedures
+        for (var i = 0; i < connection.Metadata['procedures'].data.length; ++i) {
+            var connTypeParams = [];
+            var procParams = [];
+            var procName = connection.Metadata['procedures'].data[i][2];
+            for (var p = 0; p < connection.Metadata['procedurecolumns'].data.length; ++p) {
+                if (connection.Metadata['procedurecolumns'].data[p][2] == procName) {
+                    paramType = connection.Metadata['procedurecolumns'].data[p][6];
+                    paramName = connection.Metadata['procedurecolumns'].data[p][3];
+                    paramOrder = connection.Metadata['procedurecolumns'].data[p][17] - 1;
+                    if (connection.Metadata['procedurecolumns'].data[p][12] == "ARRAY_PARAMETER") {
+                        if (paramType.toLowerCase() == "tinyint") // ENG-2040 and ENG-3101, identify it as an array (byte[])
+                            paramType = "byte[]";
+                        else
+                            paramType += "_array";
+                    }
+                    procParams[paramOrder] = { 'name': paramName, 'type': paramType.toLowerCase() };
+                }
+            }
+
+            src += '<li class="procedure closed"><span>' + procName + '</span>';
+            src += '<ul>'
+            src += '<li class="folder closed"><span>Parameters</span>';
+            src += '<ul>'
+            for (var p = 0; p < procParams.length; ++p) {
+                src += '<li class="paramin"><span>Param' + (p) + ' (' + procParams[p].type + ')</span></li>';
+            }
+            src += '<li class="paramreturn"><span>Return Table[]</span></li>';
+            src += '</ul>'
+            src += '</li>'
+            src += '</ul>'
+            src += '</li>'
+        }
+
+        src += '</ul>'; // connection.Key_sp
+        src += '</li>'; // Stored Procedures
+
+    };
+
     var populateTablesAndViews = function () {
-        voltDbRenderer.GetTableInformation(function (tablesData, viewsData) {
+        voltDbRenderer.GetTableInformation(function (tablesData, viewsData, proceduresData, procedureColumnsData,sysProcedureData) {
             var tables = tablesData['tables'];
             populateTableData(tables);
             var views = viewsData['views'];
             populateViewData(views);
+            var procedures = proceduresData['procedures'];
+            var procedureColumns = procedureColumnsData['procedureColumn'];
+            var sysProcedure = sysProcedureData['sysProcedure'];
+            populateStoredProcedure(procedures, procedureColumns,sysProcedure);
         });
     };
     populateTablesAndViews();
