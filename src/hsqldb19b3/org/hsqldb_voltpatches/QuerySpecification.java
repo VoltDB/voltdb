@@ -978,7 +978,7 @@ public class QuerySpecification extends QueryExpression {
                 (Integer) sortAndSlice.limitCondition.getRightNode().getValue(
                     session);
 
-            // A VoltDB extension to support LIMIT 0 
+            // A VoltDB extension to support LIMIT 0
             if (limit == null || limit.intValue() < 0) {
             /* disable 1 line ...
             if (limit == null || limit.intValue() <= 0) {
@@ -1011,7 +1011,7 @@ public class QuerySpecification extends QueryExpression {
                 rowCount = limitCount;
             }
 
-            // A VoltDB extension to support LIMIT 0 
+            // A VoltDB extension to support LIMIT 0
             if (rowCount > Integer.MAX_VALUE - limitStart) {
             /* disable 1 line ...
             if (rowCount == 0 || rowCount > Integer.MAX_VALUE - limitStart) {
@@ -1023,7 +1023,7 @@ public class QuerySpecification extends QueryExpression {
             }
         } else {
             rowCount = Integer.MAX_VALUE;
-            // A VoltDB extension to support LIMIT 0 
+            // A VoltDB extension to support LIMIT 0
             // limitCount == 0 can be enforced/optimized as rowCount == 0 regardless of offset
             // even in non-simpleLimit cases (SELECT DISTINCT, GROUP BY, and/or ORDER BY).
             // This is an optimal handling of a hard-coded LIMIT 0, but it really shouldn't be the ONLY
@@ -1086,7 +1086,7 @@ public class QuerySpecification extends QueryExpression {
 
         result.setDataResultConcurrency(isUpdatable);
 
-        // A VoltDB extension to support LIMIT 0 
+        // A VoltDB extension to support LIMIT 0
         // Test for early return case added by VoltDB to support LIMIT 0 in "HSQL backend".
         if (limitcount == 0) {
             return result;
@@ -1848,5 +1848,39 @@ public class QuerySpecification extends QueryExpression {
 
     /************************* Volt DB Extensions *************************/
     Expression getHavingCondition() { return havingCondition; }
+
+    /**
+     * Dumps the exprColumns list for this query specification.
+     * Writes to stdout.
+     *
+     * This method is useful to understand how the HSQL parser
+     * transforms its data structures during parsing.  For example,
+     * place call to this method at the beginning and end of
+     * resolveGroups() to see what it does.
+     *
+     * @param header    A string to be prepended to output
+     */
+    private void dumpExprColumns(String header){
+        System.out.println("\n\n*********************************************");
+        System.out.println(header);
+        try {
+            System.out.println(getSQL());
+        } catch (Exception e) {
+        }
+        for (int i = 0; i < exprColumns.length; ++i) {
+            if (i == 0)
+                System.out.println("Visible columns:");
+            if (i == indexStartOrderBy)
+                System.out.println("start order by:");
+            if (i == indexStartAggregates)
+                System.out.println("start aggregates:");
+            if (i == indexLimitVisible)
+                System.out.println("After limit of visible columns:");
+
+            System.out.println(i + ": " + exprColumns[i]);
+        }
+
+        System.out.println("\n\n");
+    }
     /**********************************************************************/
 }
