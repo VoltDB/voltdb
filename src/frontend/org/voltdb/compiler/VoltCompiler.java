@@ -492,7 +492,6 @@ public class VoltCompiler {
         FilteredCatalogDiffEngine diffEng = new FilteredCatalogDiffEngine(origCatalog, autoGenCatalog);
         String diffCmds = diffEng.commands();
         if (diffCmds != null && !diffCmds.equals("")) {
-            System.out.println(diffCmds.toString());
             VoltDB.crashLocalVoltDB("Catalog Verification from Generated DDL failed!");
         }
         else {
