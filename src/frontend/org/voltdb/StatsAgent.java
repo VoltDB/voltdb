@@ -25,6 +25,7 @@ import org.voltcore.network.Connection;
 import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
+
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -400,6 +401,15 @@ public class StatsAgent extends OpsAgent
         case KSAFETY:
             stats = collectKSafetyStats(interval);
             break;
+        case DRREPLICA:
+            stats = collectDRReplicaStats();
+            break;
+        case DRREPLICASTATUS:
+            stats = collectDRReplicaStatusStats();
+            break;
+        case DRREPLICAPERFORMANCE:
+            stats = collectDRReplicaPerformanceStats();
+            break;
         default:
             // Should have been successfully groomed in collectStatsImpl().  Log something
             // for our information but let the null check below return harmlessly
@@ -448,6 +458,45 @@ public class StatsAgent extends OpsAgent
             stats = new VoltTable[1];
             stats[0] = partitionStats;
         }
+        return stats;
+    }
+
+    private VoltTable[] collectDRReplicaStats() {
+        VoltTable[] stats = null;
+
+        VoltTable[] statusStats = collectDRReplicaStatusStats();
+        VoltTable[] perfStats = collectDRReplicaPerformanceStats();
+        if (statusStats != null && perfStats != null) {
+            stats = new VoltTable[2];
+            stats[0] = statusStats[0];
+            stats[1] = perfStats[0];
+        }
+        return stats;
+    }
+
+    private VoltTable[] collectDRReplicaStatusStats() {
+        Long now = System.currentTimeMillis();
+        VoltTable[] stats = null;
+
+        VoltTable replicaStats = getStatsAggregate(StatsSelector.DRREPLICASTATUS, false, now);
+        if (replicaStats != null) {
+            stats = new VoltTable[1];
+            stats[0] = replicaStats;
+        }
+
+        return stats;
+    }
+
+    private VoltTable[] collectDRReplicaPerformanceStats() {
+        Long now = System.currentTimeMillis();
+        VoltTable[] stats = null;
+
+        VoltTable replicaStats = getStatsAggregate(StatsSelector.DRREPLICAPERFORMANCE, false, now);
+        if (replicaStats != null) {
+            stats = new VoltTable[1];
+            stats[0] = replicaStats;
+        }
+
         return stats;
     }
 
