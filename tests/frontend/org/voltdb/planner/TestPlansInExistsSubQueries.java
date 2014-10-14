@@ -258,6 +258,31 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
 
     public void testExistsJoin() {
         {
+            AbstractPlanNode pn = compile("select a from r1,r2 where exists (" +
+                    "select 1 from r3 where r1.d = r3.c and r2.a = r3.c)");
+            pn = pn.getChild(0).getChild(0);
+            assertEquals(PlanNodeType.NESTLOOP, pn.getPlanNodeType());
+            AbstractExpression e = ((NestLoopPlanNode) pn).getJoinPredicate();
+            assertEquals(ExpressionType.EXISTS_SUBQUERY, e.getExpressionType());
+            SubqueryExpression se = (SubqueryExpression) e;
+            List<AbstractExpression> args = se.getArgs();
+            assertEquals(2, args.size());
+            TupleValueExpression tve = (TupleValueExpression)args.get(0);
+            assertEquals("R2", tve.getTableName());
+            assertEquals("A", tve.getColumnName());
+            tve = (TupleValueExpression)args.get(1);
+            assertEquals("R1", tve.getTableName());
+            assertEquals("D", tve.getColumnName());
+            assertEquals(2, se.getParameterIdxList().size());
+            // Child query
+            pn = se.getSubqueryNode();
+            e = ((AbstractScanPlanNode)pn).getPredicate();
+            AbstractExpression le = e.getLeft();
+            assertEquals(ExpressionType.VALUE_PARAMETER, le.getRight().getExpressionType());
+            AbstractExpression re = e.getRight();
+            assertEquals(ExpressionType.VALUE_PARAMETER, le.getRight().getExpressionType());
+        }
+        {
             AbstractPlanNode pn = compile("select a from r1,r2 where r1.a = r2.a and " +
                     "exists ( select 1 from r3 where r1.a = r3.a)");
 
@@ -528,11 +553,6 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
 
     // HSQL failed to parse  these statement
     public void testHSQLFailed() {
-        {
-            failToCompile("select a from r1,r2 where exists (" +
-                    "select 1 from r3 where r1.a = r3.a and r2.a = r3.a)",
-                    "-1");
-        }
         {
             failToCompile("select a from r1 where exists (" +
                     "select 1 from r2 group by r2.a having max(r1.a + r2.a) in (" +
