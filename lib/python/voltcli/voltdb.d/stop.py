@@ -34,6 +34,8 @@ from voltcli import utility
         VOLT.StringOption('-H', '--host', 'host',
             'HOST[:PORT] (default HOST=localhost, PORT=3021)',
             default='localhost:3021'),
+        VOLT.IntegerOption('-I', '--instance', 'instance',
+            'specify an instance number for multiple servers on the same host'),
     ]
 )
 def stop(runner):

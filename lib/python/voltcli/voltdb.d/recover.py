@@ -32,7 +32,8 @@
                                 supports_live=False,
                                 default_host=True,
                                 safemode_available=True,
-                                supports_daemon=True),
+                                supports_daemon=True,
+                                supports_multiple_daemons=True),
     description = 'Start the database and recover the previous state.'
 )
 def recover(runner):
