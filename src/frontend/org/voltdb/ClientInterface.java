@@ -189,9 +189,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     //This validator will check permissions in AUTH system.
     private final PermissionValidator m_permissionValidator = new PermissionValidator();
     //This validator will verify params or per procedure invocation vaidation.
-    private final InvocationValidator m_invocationValidator = new InvocationValidator();
-    //Single invocation acceptance policy for replication.
-    private ReplicaInvocationAcceptancePolicy m_replicationpolicy = null;
+    private final InvocationValidator m_invocationValidator;
 
     /*
      * Allow the async compiler thread to immediately process completed planning tasks
@@ -1135,7 +1133,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_acceptor = new ClientAcceptor(clientIntf, clientPort, messenger.getNetwork(), false);
         m_adminAcceptor = null;
         m_adminAcceptor = new ClientAcceptor(adminIntf, adminPort, messenger.getNetwork(), true);
-        m_replicationpolicy = new ReplicaInvocationAcceptancePolicy(replicationRole == ReplicationRole.REPLICA);
+        m_invocationValidator = new InvocationValidator(replicationRole);
 
         m_mailbox = new LocalMailbox(messenger,  messenger.getHSIdForLocalSite(HostMessenger.CLIENT_INTERFACE_SITE_ID)) {
             LinkedBlockingQueue<VoltMessage> m_d = new LinkedBlockingQueue<VoltMessage>();
@@ -1237,39 +1235,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     }
 
     /**
-     * Check the procedure invocation against a set of policies to see if it
-     * should be rejected.
-     *
-     * @param name The procedure name, null for generic policies.
-     * @return ClientResponseImpl on error or null if okay.
-     */
-    private ClientResponseImpl checkPolicies(String name, AuthSystem.AuthUser user,
-                                  final StoredProcedureInvocation task,
-                                  final Procedure catProc) {
-        ClientResponseImpl error = null;
-        if ((error = m_permissionValidator.shouldAccept(name, user, task, catProc)) != null) {
-            return error;
-        }
-
-        //Check replication policy
-        if ((error = m_replicationpolicy.shouldAccept(user, task, catProc)) != null) {
-            return error;
-        }
-
-        //Check param deserialization policy for sysprocs
-        if ((error = m_invocationValidator.shouldAccept(name, user, task, catProc)) != null) {
-            return error;
-        }
-
-        return null;
-    }
-
-    /**
      * Called when the replication role of the cluster changes.
      * @param role
      */
     public void setReplicationRole(ReplicationRole role) {
-        m_replicationpolicy.setMode(role == ReplicationRole.REPLICA);
+        m_invocationValidator.setReplicationRole(role);
     }
 
     /**
@@ -1771,8 +1741,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         final ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)catProc.getAttachment();
 
-        error = checkPolicies(task.procName, user, task, catProc);
-        if (error != null) {
+        //Check permissions
+        if ((error = m_permissionValidator.shouldAccept(task.procName, user, task, catProc)) != null) {
+            return error;
+        }
+
+        //Check param deserialization policy for sysprocs
+        if ((error = m_invocationValidator.shouldAccept(task.procName, user, task, catProc)) != null) {
             return error;
         }
 

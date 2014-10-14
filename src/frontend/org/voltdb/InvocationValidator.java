@@ -31,11 +31,14 @@ public class InvocationValidator {
     /**
      * Policies used to determine if we can accept an invocation.
      */
-    private final Map<String, List<InvocationValidationPolicy>> m_validationpolicies =
-            new HashMap<String, List<InvocationValidationPolicy>>();
-    private ParameterDeserializationPolicy m_paramdeserializationpolicy = new ParameterDeserializationPolicy(true);
+    private final Map<String, List<InvocationValidationPolicy>> m_validationpolicies = new HashMap<>();
+    //Single param deserialization policy for sysprocs only.
+    private final ParameterDeserializationPolicy m_paramdeserializationpolicy = new ParameterDeserializationPolicy(true);
+    //Single invocation acceptance policy for replication.
+    private final ReplicaInvocationAcceptancePolicy m_replicationpolicy;
 
-    public InvocationValidator() {
+    public InvocationValidator(ReplicationRole role) {
+        m_replicationpolicy = new ReplicaInvocationAcceptancePolicy(role == ReplicationRole.REPLICA);
         // NOTE: These "policies" are really parameter correctness checks, not permissions
         registerValidationPolicy("@AdHoc", new AdHocAcceptancePolicy(true));
         registerValidationPolicy("@AdHocSpForTest", new AdHocAcceptancePolicy(true));
@@ -46,16 +49,26 @@ public class InvocationValidator {
     private void registerValidationPolicy(String procName, InvocationValidationPolicy policy) {
         List<InvocationValidationPolicy> policies = m_validationpolicies.get(procName);
         if (policies == null) {
-            policies = new ArrayList<InvocationValidationPolicy>();
+            policies = new ArrayList<>();
             m_validationpolicies.put(procName, policies);
         }
         policies.add(policy);
+    }
+
+    public void setReplicationRole(ReplicationRole role) {
+        m_replicationpolicy.setMode(role == ReplicationRole.REPLICA);
     }
 
     public ClientResponseImpl shouldAccept(String name, AuthSystem.AuthUser user,
                                   final StoredProcedureInvocation task,
                                   final Procedure catProc) {
         ClientResponseImpl error = null;
+
+        //Check replication policy
+        if ((error = m_replicationpolicy.shouldAccept(user, task, catProc)) != null) {
+            return error;
+        }
+
         //Check param deserialization policy only applies to sysprocs
         if ((error = m_paramdeserializationpolicy.shouldAccept(user, task, catProc)) != null) {
             return error;
