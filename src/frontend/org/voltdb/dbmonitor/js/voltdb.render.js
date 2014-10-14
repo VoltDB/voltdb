@@ -493,6 +493,13 @@ function alertNodeClicked(obj) {
             if (connection.Metadata['@Statistics_PROCEDUREPROFILE'].data != undefined) {
                 connection.Metadata['@Statistics_PROCEDUREPROFILE'].data.forEach(function (entry) {
                     var name = entry[procedureNameIndex];
+                    var minLatency = entry[minLatencyIndex] / 1000000;
+                    var maxLatency = entry[maxLatencyIndex] / 1000000;
+                    var avgLatency = entry[avgLatencyIndex] / 1000000;
+
+                    minLatency = minLatency.toFixed(2);
+                    maxLatency = maxLatency.toFixed(2);
+                    avgLatency = avgLatency.toFixed(2);
 
                     if (!procedureData.hasOwnProperty(name)) {
                         procedureData[name] = {};
@@ -500,9 +507,9 @@ function alertNodeClicked(obj) {
 
                     procedureData[name]['PROCEDURE'] = entry[procedureNameIndex];
                     procedureData[name]['INVOCATIONS'] = entry[invocationsIndex];
-                    procedureData[name]['MIN_LATENCY'] = entry[minLatencyIndex];
-                    procedureData[name]['MAX_LATENCY'] = entry[maxLatencyIndex];
-                    procedureData[name]['AVG_LATENCY'] = entry[avgLatencyIndex];
+                    procedureData[name]['MIN_LATENCY'] = minLatency;
+                    procedureData[name]['MAX_LATENCY'] = maxLatency;
+                    procedureData[name]['AVG_LATENCY'] = avgLatency;
                     procedureData[name]['PERC_EXECUTION'] = entry[perExecutionIndex];
                     counter++;
 
