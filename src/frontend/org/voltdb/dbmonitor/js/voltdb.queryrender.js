@@ -223,14 +223,6 @@
         var connection = VoltDBCore.connections[DataSource];
         var source = '';
         source = queryToRun;
-        if (source != null) {
-            source = source.replace(/^\s+|\s+$/g, '');
-            if (source == '')
-                source = queryToRun;
-        }
-        else
-            source = queryToRun;
-
         source = source.replace(/^\s+|\s+$/g, '');
         if (source == '')
             return;
@@ -266,10 +258,11 @@
         }
         function atEnd(state, success) {
             var totalDuration = (new Date()).getTime() - state;
-            if (success)
+            if (success) {
+                $('#queryResults').removeClass('errorValue');
                 $('#queryResults').html('Query Duration: ' + (totalDuration / 1000.0) + 's');
-            else {
-                $('.queryStatus').addClass('error');
+            } else {
+                $('#queryResults').addClass('errorValue');
                 $('#queryResults').html('Query error | Query Duration: ' + (totalDuration / 1000.0) + 's');
             }
             $("#runBTn").removeAttr('disabled');
@@ -284,7 +277,7 @@
             for (var j = 0; j < tables.length; j++)
                 printResult(format, target, id + '_' + j, tables[j]);
         } else {
-            $(target).html("Error: " + response.statusstring + "\r\n");
+            target.append('<span class="errorValue">Error: ' + response.statusstring + '\r\n</span>');
         }
     }
 

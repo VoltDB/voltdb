@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="iso-8859-1"?>
+﻿<?xml version="1.0" encoding="iso-8859-1"?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <!--DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"-->
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
@@ -26,6 +26,7 @@
 <script type="text/javascript" src="../js/sorttable.js"></script>
 <script type="text/javascript"src="../js/shortcut.js"></script>
 <script type="text/javascript" src="../js/jquery.cookie.js"></script>
+<script type="text/javascript" src="../js/jquery.getSelectedText.min.js"></script>
 </head>
 <body class="body">
 <div class="page-wrap">
@@ -67,16 +68,26 @@
             <ul class="tabs">
               <li><a href="#tab1">Tables</a></li>
               <li><a href="#tab2">Views</a></li>
+              <li><a href="#tab3">Stored Procedures</a></li>
             </ul>
             <div class="tab_container">
-              <div  id="tabScroller">
+            <div  id="tabScroller">
                 <div id="tab1" class="tab_content">
-                  <div id="accordionTable"> </div>
+                	<div id="accordionTable">
+                      
+				    </div>
                 </div>
                 <div id="tab2" class="tab_content">
-                  <div id="accordionViews" > </div>
+                    <div id="accordionViews" >
+                      
+                    </div>
                 </div>
-              </div>
+                <div id="tab3" class="tab_content">
+              		<div id="accordionProcedures" >
+                      
+                    </div>
+               </div>
+               </div>
             </div>
           </div>
         </div>
@@ -95,8 +106,7 @@
         <div class="query">
           <form name="" id="queryForm">
             <div class="textWritingArea">
-              <textarea id="theQueryText">   
-            </textarea>
+              <textarea id="theQueryText"></textarea>
             </div>
           </form>
         </div>

@@ -185,7 +185,7 @@ function alertNodeClicked(obj) {
                         saveSessionCookie("username", null);
                         saveSessionCookie("password", null);
                         saveSessionCookie("admin", null);
-                        
+
                         $("#loginLink").trigger("click");
                     } else {
                         popupDisplayed = true;
@@ -286,8 +286,11 @@ function alertNodeClicked(obj) {
             VoltDBService.GetTableInformation(function (connection) {
                 var tablesData = {};
                 var viewsData = {};
-                getTableData(connection, tablesData, viewsData, 'TABLE_INFORMATION');
-                onInformationLoaded(tablesData, viewsData);
+                var proceduresData = {};
+                var procedureColumnsData = {};
+                var sysProceduresData = {};
+                getTableData(connection, tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData, 'TABLE_INFORMATION');
+                onInformationLoaded(tablesData, viewsData,proceduresData,procedureColumnsData,sysProceduresData);
             });
         };
 
@@ -492,6 +495,13 @@ function alertNodeClicked(obj) {
             if (connection.Metadata['@Statistics_PROCEDUREPROFILE'].data != undefined) {
                 connection.Metadata['@Statistics_PROCEDUREPROFILE'].data.forEach(function (entry) {
                     var name = entry[procedureNameIndex];
+                    var minLatency = entry[minLatencyIndex] * Math.pow(10, -6);
+                    var maxLatency = entry[maxLatencyIndex] * Math.pow(10, -6);
+                    var avgLatency = entry[avgLatencyIndex] * Math.pow(10, -6);
+
+                    minLatency = minLatency.toFixed(2);
+                    maxLatency = maxLatency.toFixed(2);
+                    avgLatency = avgLatency.toFixed(2);
 
                     if (!procedureData.hasOwnProperty(name)) {
                         procedureData[name] = {};
@@ -499,9 +509,9 @@ function alertNodeClicked(obj) {
 
                     procedureData[name]['PROCEDURE'] = entry[procedureNameIndex];
                     procedureData[name]['INVOCATIONS'] = entry[invocationsIndex];
-                    procedureData[name]['MIN_LATENCY'] = entry[minLatencyIndex];
-                    procedureData[name]['MAX_LATENCY'] = entry[maxLatencyIndex];
-                    procedureData[name]['AVG_LATENCY'] = entry[avgLatencyIndex];
+                    procedureData[name]['MIN_LATENCY'] = minLatency;
+                    procedureData[name]['MAX_LATENCY'] = maxLatency;
+                    procedureData[name]['AVG_LATENCY'] = avgLatency;
                     procedureData[name]['PERC_EXECUTION'] = entry[perExecutionIndex];
                     counter++;
 
@@ -904,23 +914,23 @@ function alertNodeClicked(obj) {
                         if (tableName == typeVal['TABLE_NAME']) {
                             if (typeVal['TABLE_TYPE'] == 'VIEW') {
                                 table_type = "VIEW";
-                            } 
+                            }
 
                             else if (typeVal['REMARKS'] == null) {
                                 var columnType = getColumnTypes(tableName);
 
                                 if (columnType == "PARTITIONED")
                                     table_type = columnType;
-                                
+
                                 else {
                                     table_type = "";
                                 }
-                                
+
                             }
                             else {
                                 table_type = "";
                             }
-                            
+
                         }
 
                     });
@@ -930,11 +940,11 @@ function alertNodeClicked(obj) {
 
             var getColumnTypes = function (tableName) {
                 var columnType;
-                $.each(schemaCatalogColumnTypes, function(key, typeVal) {
+                $.each(schemaCatalogColumnTypes, function (key, typeVal) {
                     if (tableName == typeVal['TABLE_NAME']) {
                         columnType = typeVal['REMARKS'];
                         return false;
-                    }                    
+                    }
                 });
 
                 if (columnType == "PARTITION_COLUMN") {
@@ -942,10 +952,10 @@ function alertNodeClicked(obj) {
                 } else {
                     return columnType;
                 }
-                    
-                
+
+
             };
-            
+
             if (tableData == null || tableData == undefined) {
                 alert("Error: Unable to extract Table Data");
                 return;
@@ -1262,7 +1272,7 @@ function alertNodeClicked(obj) {
 
         };
 
-        function getTableData(connection, tablesData, viewsData, processName) {
+        function getTableData(connection, tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData, processName) {
             var suffix = "";
             if (processName == "TABLE_INFORMATION") {
                 suffix = "_" + processName;
@@ -1271,6 +1281,8 @@ function alertNodeClicked(obj) {
             var rawTables = connection.Metadata['@Statistics_TABLE' + suffix].data;
             var rawIndexes = connection.Metadata['@Statistics_INDEX' + suffix].data;
             var rawColumns = connection.Metadata['@SystemCatalog_COLUMNS' + suffix].data;
+            var procedures = connection.Metadata['@SystemCatalog_PROCEDURES' + suffix].data;
+            var procedureColumns = connection.Metadata['@SystemCatalog_PROCEDURECOLUMNS' + suffix].data;
 
             var tables = [];
             var exports = [];
@@ -1325,14 +1337,51 @@ function alertNodeClicked(obj) {
                         ' (' + rawColumns[i][5].toLowerCase() + ')';
                 }
             }
+            
+            // User Procedures
+            for (var i = 0; i < procedures.length; ++i) {
+                var connTypeParams = [];
+                var procParams = [];
+                var procName = procedures[i][2];
+                for (var p = 0; p < procedureColumns.length; ++p) {
+                    if (procedureColumns[p][2] == procName) {
+                        paramType = procedureColumns[p][6];
+                        paramName = procedureColumns[p][3];
+                        paramOrder = procedureColumns[p][17] - 1;
+                        procParams[paramOrder] = { 'name': paramName, 'type': paramType.toLowerCase() };
+                    }
+                }
+
+                for (var p = 0; p < procParams.length; ++p) {
+                    connTypeParams[connTypeParams.length] = procParams[p].type;
+                }
+
+                // make the procedure callable.
+                connection.procedures[procName] = {};
+                connection.procedures[procName]['' + connTypeParams.length] = connTypeParams;
+            }
+
             if (!tablesData.hasOwnProperty('tables')) {
                 tablesData['tables'] = {};
             }
             if (!viewsData.hasOwnProperty('views')) {
                 viewsData['views'] = {};
             }
+            if (!procedureData.hasOwnProperty('procedures')) {
+                procedureData['procedures'] = {};
+            }
+            if (!procedureColumnsData.hasOwnProperty('procedureColumns')) {
+                procedureColumnsData['procedureColumns'] = {};
+            }
+            if (!sysProceduresData.hasOwnProperty('sysProcedures')) {
+                sysProceduresData['sysProcedures'] = {};
+            }
+
             tablesData['tables'] = connection.Metadata['tables'];
             viewsData['views'] = connection.Metadata['views'];
+            proceduresData['procedures'] = procedures;
+            procedureColumnsData['procedureColumns'] = procedureColumns;
+            sysProceduresData['sysProcedures'] = connection.Metadata['sysprocs'];
         }
 
 
