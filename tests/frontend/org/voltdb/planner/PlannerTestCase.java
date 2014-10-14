@@ -221,4 +221,12 @@ public class PlannerTestCase extends TestCase {
         }
     }
 
+    protected String buildExplainPlan(List<AbstractPlanNode> planNodes) {
+        String explain = "";
+        for (AbstractPlanNode apn: planNodes) {
+            explain += apn.toExplainPlanString() + '\n';
+        }
+        return explain;
+    }
+
 }

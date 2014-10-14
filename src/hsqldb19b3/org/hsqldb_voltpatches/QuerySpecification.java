@@ -246,8 +246,103 @@ public class QuerySpecification extends QueryExpression {
                                                rangeVariables.length, false);
         }
 
+    /************************* Volt DB Extensions *************************/
+        resolveColumnReferencesInGroupBy();
+    /**********************************************************************/
+
         resolveColumnRefernecesInOrderBy(sortAndSlice);
     }
+
+    /************************* Volt DB Extensions *************************/
+    void resolveColumnReferencesInGroupBy() {
+        if (! isAggregated) {
+            return;
+        }
+
+        if (unresolvedExpressions == null || unresolvedExpressions.isEmpty()) {
+            return;
+        }
+
+        /**
+         * Hsql HashSet does not work properly to remove duplicates, I doubt the hash
+         * function or equal function on expression work properly or something else
+         * is wrong. So use list
+         *
+         */
+        // resolve GROUP BY columns/expressions
+        HsqlList newUnresolvedExpressions = new ArrayListIdentity();
+
+        int size = unresolvedExpressions.size();
+        for (int i = 0; i < size; i++) {
+            Object obj = unresolvedExpressions.get(i);
+            newUnresolvedExpressions.add(obj);
+            if (i + 1 < size && obj == unresolvedExpressions.get(i+1)) {
+                // unresolvedExpressions is a public member that can be accessed from anywhere and
+                // I (xin) am 90% percent sure about the hsql adds the unresolved expression twice
+                // together for our targeted GROUP BY alias case.
+                // so we want to skip the repeated expression also.
+                // For other unresolved expression, it may differs.
+                i += 1;
+            }
+            if (obj instanceof ExpressionColumn == false) {
+                continue;
+            }
+            ExpressionColumn element = (ExpressionColumn) obj;
+            if (element.tableName != null) {
+                // this alias does not belong to any table
+                continue;
+            }
+
+            // group by alias which is thought as an column
+            if (element.getType() != OpTypes.COLUMN) {
+                continue;
+            }
+
+            // find the unsolved expression in the groupBy list
+            int k = indexLimitVisible;
+            int endGroupbyIndex = indexLimitVisible + groupByColumnCount;
+            for (; k < endGroupbyIndex; k++) {
+                if (element == exprColumns[k]) {
+                    break;
+                }
+            }
+            if (k == endGroupbyIndex) {
+                // not found in selected list
+                continue;
+            }
+            assert(exprColumns[k].getType() == OpTypes.COLUMN);
+
+            ExpressionColumn exprCol = (ExpressionColumn) exprColumns[k];
+            String alias = exprCol.getColumnName();
+            if (alias == null) {
+                // we should not handle this case (group by constants)
+                continue;
+            }
+
+            // find it in the SELECT list
+            for (int j = 0; j < indexLimitVisible; j++) {
+                Expression selectCol = exprColumns[j];
+                if (selectCol.isAggregate) {
+                    // Group by can not support aggregate expression
+                    continue;
+                }
+                if (selectCol.alias == null) {
+                    // columns referenced by their alias must have an alias
+                    continue;
+                }
+                if (alias.equals(selectCol.alias.name)) {
+                    exprColumns[k] = selectCol;
+                    exprColumnList.set(k, selectCol);
+                    // found it and get the next one
+
+                    newUnresolvedExpressions.remove(element);
+                    break;
+                }
+            }
+        }
+        unresolvedExpressions = newUnresolvedExpressions;
+    }
+    /**********************************************************************/
 
     void resolveColumnRefernecesInOrderBy(SortAndSlice sortAndSlice) {
 

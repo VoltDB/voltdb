@@ -44,7 +44,7 @@ import org.voltdb.planner.TestPlansGroupBy;
  * org.voltdb.planner.TestPlansGroupBy.
  */
 
-public class TestPlansGroupBySuite extends RegressionSuite {
+public class TestGroupBySuite extends RegressionSuite {
 
     static final Class<?>[] PROCEDURES = {
         org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.CountT1A1.class,
@@ -749,14 +749,14 @@ public class TestPlansGroupBySuite extends RegressionSuite {
     // Suite builder boilerplate
     //
 
-    public TestPlansGroupBySuite(String name) {
+    public TestGroupBySuite(String name) {
         super(name);
     }
 
     static public junit.framework.Test suite() {
         VoltServerConfig config = null;
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(
-                TestPlansGroupBySuite.class);
+                TestGroupBySuite.class);
         VoltProjectBuilder project = new VoltProjectBuilder();
 
         project.addSchema(TestPlansGroupBy.class

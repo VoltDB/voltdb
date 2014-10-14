@@ -40,6 +40,7 @@ import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
+import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
 
 public class TestPlansGroupBy extends PlannerTestCase {
@@ -47,8 +48,6 @@ public class TestPlansGroupBy extends PlannerTestCase {
     protected void setUp() throws Exception {
         setupSchema(TestPlansGroupBy.class.getResource("testplans-groupby-ddl.sql"),
                 "testplansgroupby", false);
-        AbstractPlanNode.enableVerboseExplainForDebugging();
-        AbstractExpression.enableVerboseExplainForDebugging();
     }
 
     @Override
@@ -499,17 +498,11 @@ public class TestPlansGroupBy extends PlannerTestCase {
         */
         String expectedStr = "  inline Serial AGGREGATION ops\n" +
                              "   inline LIMIT 5";
-        AbstractPlanNode.disableVerboseExplainForDebugging();
-        AbstractExpression.disableVerboseExplainForDebugging();
-
         String explainPlan = "";
         for (AbstractPlanNode apn: pns) {
             explainPlan += apn.toExplainPlanString();
         }
         assertTrue(explainPlan.contains(expectedStr));
-
-        AbstractPlanNode.enableVerboseExplainForDebugging();
-        AbstractExpression.enableVerboseExplainForDebugging();
 
         pns = compileToFragments("SELECT A3, COUNT(*) FROM T3 GROUP BY A3 LIMIT 5");
         checkGroupByOnlyPlanWithLimit(true, false, true, true);
@@ -749,6 +742,145 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         pns = compileToFragments("SELECT sum(PKEY), sum(PKEY) FROM P1 GROUP BY A1");
         checkHasComplexAgg(pns);
+    }
+
+    private void checkGroupbyAliasFeature(String sql1, String sql2) {
+        checkGroupbyAliasFeature(sql1, sql2, true);
+    }
+
+    private void checkGroupbyAliasFeature(String sql1, String sql2, boolean exact) {
+        String explainStr1, explainStr2;
+        pns = compileToFragments(sql1);
+        explainStr1 = buildExplainPlan(pns);
+        pns = compileToFragments(sql2);
+        explainStr2 = buildExplainPlan(pns);
+        if (! exact) {
+            explainStr1 = explainStr1.replaceAll("TEMP_TABLE\\.column#[\\d]", "TEMP_TABLE.column#[Index]");
+            explainStr2 = explainStr2.replaceAll("TEMP_TABLE\\.column#[\\d]", "TEMP_TABLE.column#[Index]");
+            assertEquals(explainStr1, explainStr2);
+        }
+        assertEquals(explainStr1, explainStr2);
+    }
+
+    public void testGroupbyAliasNegativeCases() {
+        // Group by aggregate expression
+        try {
+            pns = compileToFragments(
+                    "SELECT abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY count(*)");
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("invalid GROUP BY expression"));
+        }
+
+        try {
+            pns = compileToFragments(
+                    "SELECT abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY ct");
+            fail();
+        } catch (Exception ex) {
+            assertEquals("user lacks privilege or object not found: CT", ex.getMessage());
+        }
+
+        try {
+            pns = compileToFragments(
+                    "SELECT abs(PKEY) as sp, (count(*) +1 ) as ct FROM P1 GROUP BY ct");
+            fail();
+        } catch (Exception ex) {
+            assertEquals("user lacks privilege or object not found: CT", ex.getMessage());
+        }
+
+        // Group by alias and expression
+        try {
+            pns = compileToFragments(
+                    "SELECT abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY sp + 1");
+            fail();
+        } catch (Exception ex) {
+            assertEquals("user lacks privilege or object not found: SP", ex.getMessage());
+        }
+
+        // Having
+        try {
+            pns = compileToFragments(
+                    "SELECT ABS(A1), count(*) as ct FROM P1 GROUP BY ABS(A1) having ct > 3");
+            fail();
+        } catch (Exception ex) {
+            assertEquals("user lacks privilege or object not found: CT", ex.getMessage());
+        }
+
+        // Group by column.alias
+        try {
+            pns = compileToFragments(
+                    "SELECT abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY P1.sp");
+            fail();
+        } catch (Exception ex) {
+            assertEquals("user lacks privilege or object not found: P1.SP", ex.getMessage());
+        }
+
+        //
+        // ambiguous group by query because of A1 is a column name and a select alias
+        //
+        pns = compileToFragments(
+                "SELECT ABS(A1) AS A1, count(*) as ct FROM P1 GROUP BY A1");
+        printExplainPlan(pns);
+        AbstractPlanNode p = pns.get(1).getChild(0);
+        assertTrue(p instanceof AbstractScanPlanNode);
+        AggregatePlanNode agg = AggregatePlanNode.getInlineAggregationNode(p);
+        assertNotNull(agg);
+        // group by column, instead of the ABS(A1) expression
+        assertEquals(agg.getGroupByExpressions().get(0).getExpressionType(), ExpressionType.VALUE_TUPLE);
+    }
+
+    public void testGroupbyAlias() {
+        String sql1, sql2;
+
+        // group by alias for expression
+        sql1 = "SELECT abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY sp";
+        sql2 = "SELECT abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY abs(PKEY)";
+        checkGroupbyAliasFeature(sql1, sql2);
+
+        // group by multiple alias (expression or column)
+        sql1 = "SELECT A1 as A, abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY A, sp";
+        sql2 = "SELECT A1 as A, abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY A, abs(PKEY)";
+        checkGroupbyAliasFeature(sql1, sql2);
+        sql2 = "SELECT A1 as A, abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY A1, sp";
+        checkGroupbyAliasFeature(sql1, sql2);
+        sql2 = "SELECT A1 as A, abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY A1, abs(PKEY)";
+        checkGroupbyAliasFeature(sql1, sql2);
+
+        // group by and select in different orders
+        sql2 = "SELECT abs(PKEY) as sp, A1 as A, count(*) as ct FROM P1 GROUP BY A, abs(PKEY)";
+        checkGroupbyAliasFeature(sql1, sql2, false);
+
+        sql2 = "SELECT abs(PKEY) as sp, count(*) as ct, A1 as A FROM P1 GROUP BY A, abs(PKEY)";
+        checkGroupbyAliasFeature(sql1, sql2, false);
+
+        sql2 = "SELECT count(*) as ct, abs(PKEY) as sp, A1 as A FROM P1 GROUP BY A, abs(PKEY)";
+        checkGroupbyAliasFeature(sql1, sql2, false);
+
+        sql2 = "SELECT A1 as A, count(*) as ct, abs(PKEY) as sp FROM P1 GROUP BY A, abs(PKEY)";
+        checkGroupbyAliasFeature(sql1, sql2, false);
+
+        sql2 = "SELECT A1 as A, count(*) as ct, abs(PKEY) as sp FROM P1 GROUP BY abs(PKEY), A";
+        checkGroupbyAliasFeature(sql1, sql2, false);
+
+        // group by alias with selected constants
+        sql1 = "SELECT 1, abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY sp";
+        sql2 = "SELECT 1, abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY abs(PKEY)";
+        checkGroupbyAliasFeature(sql1, sql2);
+
+        // group by alias on joined results
+        sql1 = "SELECT abs(PKEY) as sp, count(*) as ct FROM P1, R1 WHERE P1.A1 = R1.A1 GROUP BY sp";
+        sql2 = "SELECT abs(PKEY) as sp, count(*) as ct FROM P1, R1 WHERE P1.A1 = R1.A1 GROUP BY abs(PKEY)";
+        checkGroupbyAliasFeature(sql1, sql2);
+
+        // group by expression with constants parameter
+        sql1 = "SELECT abs(PKEY + 1) as sp, count(*) as ct FROM P1 GROUP BY sp";
+        sql2 = "SELECT abs(PKEY + 1) as sp, count(*) as ct FROM P1 GROUP BY abs(PKEY + 1)";
+        checkGroupbyAliasFeature(sql1, sql2);
+
+        // group by constants with alias
+        sql1 = "SELECT 5 as tag, count(*) as ct FROM P1 GROUP BY tag";
+        sql2 = "SELECT 5 as tag, count(*) as ct FROM P1 GROUP BY 5";
+        checkGroupbyAliasFeature(sql1, sql2);
     }
 
     private void checkMVNoFix_NoAgg(
