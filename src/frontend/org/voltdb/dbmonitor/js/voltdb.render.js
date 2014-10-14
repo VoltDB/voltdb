@@ -185,7 +185,7 @@ function alertNodeClicked(obj) {
                         saveSessionCookie("username", null);
                         saveSessionCookie("password", null);
                         saveSessionCookie("admin", null);
-                        
+
                         $("#loginLink").trigger("click");
                     } else {
                         popupDisplayed = true;
@@ -492,9 +492,9 @@ function alertNodeClicked(obj) {
             if (connection.Metadata['@Statistics_PROCEDUREPROFILE'].data != undefined) {
                 connection.Metadata['@Statistics_PROCEDUREPROFILE'].data.forEach(function (entry) {
                     var name = entry[procedureNameIndex];
-                    var minLatency = entry[minLatencyIndex] / 1000000;
-                    var maxLatency = entry[maxLatencyIndex] / 1000000;
-                    var avgLatency = entry[avgLatencyIndex] / 1000000;
+                    var minLatency = entry[minLatencyIndex] * Math.pow(10, -6);
+                    var maxLatency = entry[maxLatencyIndex] * Math.pow(10, -6);
+                    var avgLatency = entry[avgLatencyIndex] * Math.pow(10, -6);
 
                     minLatency = minLatency.toFixed(2);
                     maxLatency = maxLatency.toFixed(2);
@@ -911,23 +911,23 @@ function alertNodeClicked(obj) {
                         if (tableName == typeVal['TABLE_NAME']) {
                             if (typeVal['TABLE_TYPE'] == 'VIEW') {
                                 table_type = "VIEW";
-                            } 
+                            }
 
                             else if (typeVal['REMARKS'] == null) {
                                 var columnType = getColumnTypes(tableName);
 
                                 if (columnType == "PARTITIONED")
                                     table_type = columnType;
-                                
+
                                 else {
                                     table_type = "";
                                 }
-                                
+
                             }
                             else {
                                 table_type = "";
                             }
-                            
+
                         }
 
                     });
@@ -937,11 +937,11 @@ function alertNodeClicked(obj) {
 
             var getColumnTypes = function (tableName) {
                 var columnType;
-                $.each(schemaCatalogColumnTypes, function(key, typeVal) {
+                $.each(schemaCatalogColumnTypes, function (key, typeVal) {
                     if (tableName == typeVal['TABLE_NAME']) {
                         columnType = typeVal['REMARKS'];
                         return false;
-                    }                    
+                    }
                 });
 
                 if (columnType == "PARTITION_COLUMN") {
@@ -949,10 +949,10 @@ function alertNodeClicked(obj) {
                 } else {
                     return columnType;
                 }
-                    
-                
+
+
             };
-            
+
             if (tableData == null || tableData == undefined) {
                 alert("Error: Unable to extract Table Data");
                 return;
