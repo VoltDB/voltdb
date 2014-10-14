@@ -794,16 +794,16 @@ public class TestPlansGroupBy extends PlannerTestCase {
                     "SELECT abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY sp + 1");
             fail();
         } catch (Exception ex) {
-            assertEquals("data type cast needed for parameter or null literal", ex.getMessage());
+            assertEquals("user lacks privilege or object not found: SP", ex.getMessage());
         }
 
         // Having
         try {
             pns = compileToFragments(
-                    "SELECT ABS(A1) AS tag, count(*) as ct FROM P1 GROUP BY tag having ct > 3");
+                    "SELECT ABS(A1), count(*) as ct FROM P1 GROUP BY ABS(A1) having ct > 3");
             fail();
         } catch (Exception ex) {
-            assertEquals("data type cast needed for parameter or null literal", ex.getMessage());
+            assertEquals("user lacks privilege or object not found: CT", ex.getMessage());
         }
 
         // Group by column.alias
@@ -812,17 +812,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
                     "SELECT abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY P1.sp");
             fail();
         } catch (Exception ex) {
-            assertEquals(null, ex.getMessage());
-        }
-
-        // group by constants with alias
-        try {
-            pns = compileToFragments(
-                    "SELECT 1 as tag, abs(PKEY) as sp, count(*) as ct FROM P1 GROUP BY tag");
-            fail();
-        } catch (Exception ex) {
-            assertEquals("expression not in aggregate or GROUP BY columns: ABS(PUBLIC.P1.PKEY)",
-                    ex.getMessage());
+            assertEquals("user lacks privilege or object not found: P1.SP", ex.getMessage());
         }
 
         //
@@ -885,6 +875,11 @@ public class TestPlansGroupBy extends PlannerTestCase {
         // group by expression with constants parameter
         sql1 = "SELECT abs(PKEY + 1) as sp, count(*) as ct FROM P1 GROUP BY sp";
         sql2 = "SELECT abs(PKEY + 1) as sp, count(*) as ct FROM P1 GROUP BY abs(PKEY + 1)";
+        checkGroupbyAliasFeature(sql1, sql2);
+
+        // group by constants with alias
+        sql1 = "SELECT 5 as tag, count(*) as ct FROM P1 GROUP BY tag";
+        sql2 = "SELECT 5 as tag, count(*) as ct FROM P1 GROUP BY 5";
         checkGroupbyAliasFeature(sql1, sql2);
     }
 

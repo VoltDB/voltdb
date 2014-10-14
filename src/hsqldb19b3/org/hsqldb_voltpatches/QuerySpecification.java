@@ -247,14 +247,14 @@ public class QuerySpecification extends QueryExpression {
         }
 
     /************************* Volt DB Extensions *************************/
-        resolveColumnRefernecesInGroupBy();
+        resolveColumnReferencesInGroupBy();
     /**********************************************************************/
 
         resolveColumnRefernecesInOrderBy(sortAndSlice);
     }
 
     /************************* Volt DB Extensions *************************/
-    void resolveColumnRefernecesInGroupBy() {
+    void resolveColumnReferencesInGroupBy() {
         if (! isAggregated) {
             return;
         }
@@ -275,6 +275,7 @@ public class QuerySpecification extends QueryExpression {
         int size = unresolvedExpressions.size();
         for (int i = 0; i < size; i++) {
             Object obj = unresolvedExpressions.get(i);
+            newUnresolvedExpressions.add(obj);
             if (i + 1 < size && obj == unresolvedExpressions.get(i+1)) {
                 // unresolvedExpressions is a public member that can be accessed from anywhere and
                 // I (xin) am 90% percent sure about the hsql adds the unresolved expression twice
@@ -318,7 +319,6 @@ public class QuerySpecification extends QueryExpression {
                 continue;
             }
 
-            boolean hasFound = false;
             // find it in the SELECT list
             for (int j = 0; j < indexLimitVisible; j++) {
                 Expression selectCol = exprColumns[j];
@@ -331,18 +331,14 @@ public class QuerySpecification extends QueryExpression {
                     continue;
                 }
                 if (alias.equals(selectCol.alias.name)) {
-                    hasFound = true;
-
                     exprColumns[k] = selectCol;
                     exprColumnList.set(k, selectCol);
                     // found it and get the next one
+
+                    newUnresolvedExpressions.remove(element);
                     break;
                 }
             }
-            if (! hasFound) {
-                newUnresolvedExpressions.add(element);
-            }
-
         }
         unresolvedExpressions = newUnresolvedExpressions;
     }
