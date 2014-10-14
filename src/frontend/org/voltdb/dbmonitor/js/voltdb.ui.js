@@ -139,21 +139,22 @@ var loadPage = function (serverName, portid) {
 
     };
 
-    var refreshGraphAndData = function () {        
+    var refreshGraphAndData = function (graphView) {
+
             voltDbRenderer.getMemoryGraphInformation(function (memoryDetails) {
-                MonitorGraphUI.RefreshMemory(memoryDetails, getCurrentServer());
+                MonitorGraphUI.RefreshMemory(memoryDetails, getCurrentServer(), graphView);
             });
            
             voltDbRenderer.getLatencyGraphInformation(function (latencyDetails) {
-                MonitorGraphUI.RefreshLatency(latencyDetails);
+                MonitorGraphUI.RefreshLatency(latencyDetails, graphView);
             });
                
             voltDbRenderer.GetTransactionInformation(function (transactionDetails) {
-                MonitorGraphUI.RefreshTransaction(transactionDetails);
+                MonitorGraphUI.RefreshTransaction(transactionDetails, graphView);
             });
                
             voltDbRenderer.getCpuGraphInformation(function (cpuDetails) {
-                MonitorGraphUI.RefreshCpu(cpuDetails, getCurrentServer());
+                MonitorGraphUI.RefreshCpu(cpuDetails, getCurrentServer(), graphView);
             });
 
 
@@ -681,14 +682,16 @@ var loadPage = function (serverName, portid) {
         saveCookie("graph-view", $("#graphView").val());
 
     $("#graphView").val($.cookie("graph-view"));
+    MonitorGraphUI.AddGraph($.cookie("graph-view"));
 
     var graphInterval = null;
     var refreshTime = 5000; //In milli seconds (i.e, 5 sec)
-    var refreshGraphAndDataInLoop = function (seconds) {
+    var refreshGraphAndDataInLoop = function (seconds, graphView) {
         if (graphInterval != null)
             window.clearInterval(graphInterval);
-
-        graphInterval = window.setInterval(refreshGraphAndData, seconds);
+        
+        refreshGraphAndData(graphView);
+        graphInterval = window.setInterval(function () { refreshGraphAndData(graphView); }, seconds);
     };
 
     var getRefreshTime = function () {
@@ -705,8 +708,15 @@ var loadPage = function (serverName, portid) {
     };
 
     $("#graphView").on("change", function () {
-        saveCookie("graph-view", $("#graphView").val());
-        refreshGraphAndDataInLoop(getRefreshTime());
+        var graphView = $("#graphView").val();
+        saveCookie("graph-view", graphView);
+        MonitorGraphUI.AddGraph(graphView);
+        MonitorGraphUI.ChartRam.update();
+        MonitorGraphUI.ChartCpu.update();
+        MonitorGraphUI.ChartLatency.update();
+        MonitorGraphUI.ChartTransactions.update();
+        
+        refreshGraphAndDataInLoop(getRefreshTime(), graphView);
     });
 
     //slides the element with class "menu_body" when paragraph with class "menu_head" is clicked 
@@ -740,10 +750,9 @@ var loadPage = function (serverName, portid) {
     });
 
     refreshClusterHealth();
-    refreshGraphAndData();
 
     setInterval(refreshClusterHealth, 5000);
-    refreshGraphAndDataInLoop(getRefreshTime());
+    refreshGraphAndDataInLoop(getRefreshTime(), $.cookie("graph-view"));
     configureUserPreferences();
     adjustGraphSpacing();
     saveThreshold();
