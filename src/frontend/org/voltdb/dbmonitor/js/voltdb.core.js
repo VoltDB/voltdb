@@ -8,7 +8,7 @@
         DbConnection = function(aServer, aPort, aAdmin, aUser, aPassword, aIsHashPassword,aProcess) {
             this.server = aServer == null ? 'localhost' : $.trim(aServer);
             this.port = aPort == null ? '8080' : $.trim(aPort);
-            this.admin = (aAdmin == true || aAdmin == "true");
+            this.admin = (aAdmin == true || aAdmin == "true") && !(aUser == '' || aUser == 'null');
             this.user = (aUser == '' || aUser == 'null') ? null : aUser;
             this.password = (aPassword == '' || aPassword == 'null' ) ? null : (aIsHashPassword == false ? aPassword : null);
             this.isHashedPassword = (aPassword == '' || aPassword == 'null') ? null : (aIsHashPassword == true ? aPassword : null);
@@ -100,10 +100,11 @@
             this.CallExecute = function (procedure, parameters, callback) {
                 var uri = 'http://' + this.server + ':' + this.port + '/api/1.0/';
                 var params = this.BuildParamSet(procedure, parameters);
-                if (uri.trim())
+                
+                if (typeof (params) == 'string')
                     jQuery.postJSON(uri, params, callback);
                 else if (callback != null)
-                    callback({ "status": -1, "statusstring": "PrepareStatement error: " + uri[0], "results": [] });
+                        callback({ "status": -1, "statusstring": "PrepareStatement error: " + params[0], "results": [] });
             };
             
             var callbackWrapper = function(userCallback) {

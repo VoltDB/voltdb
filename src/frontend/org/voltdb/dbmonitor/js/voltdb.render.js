@@ -196,9 +196,8 @@ function alertNodeClicked(obj) {
             });
         };
 
-
         this.ShowUsername = function (userName) {
-            if (userName != undefined) {
+            if (userName != undefined && userName != 'null') {
                 $(".userN").html(userName);
             } else {
                 $(".userN").html("");

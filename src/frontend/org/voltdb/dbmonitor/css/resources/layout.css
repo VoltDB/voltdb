@@ -26,7 +26,7 @@ h1 {font:16px 'MYRIADPROREGULAR'}
 
 /*****Global Ends******/
 /******sprite*************/
-.user,
+.user, .help,
 .logout,
 .clusterIcon,
 li.activeIcon,
@@ -44,6 +44,7 @@ ul.servers-list li.joining, a.showServers, a.hideServers, .popup_close, .icon-do
 { background-image:url(images/voltdb-icon-sprite.png); background-repeat:no-repeat;}
 
 .user {background-position:left -209px; width:25px; height:25px;}
+.help {background-position:left -1354px; width:25px; height:25px;}
 .logout {background-position: left  -260px; width:25px; height:25px;}
 .clusterIcon {background-position: left top; height:25px; line-height:25px;}
 .activeIcon {background-position: left -307px; height:27px; line-height:30px;}
@@ -197,7 +198,7 @@ font-size: 14px;
 			ul.nav li a:hover, ul.nav li a.active { background:#76bd1d;color:#FFFFFF;}
 .headRight { float:right;}
 	ul.topRightList {  margin:0; padding:0;}
-	ul.topRightList li {  margin:0 0 0 10px; padding:20px 0 0 0; float:left;}
+	ul.topRightList li {  margin:0 0 0 5px; padding:20px 0 0 0; float:left;}
 
 .userN { position:relative; top:6px; font-size:12px;}
 .container { margin:0 20px;}
@@ -275,9 +276,11 @@ ul.rightShowhideList li > a.btn {top:5px; position:relative}
 
 .collapsed{background: #fbfbfb url(images/voltdb-icon-sprite.png) 20px -535px no-repeat;}
 .expanded{background: #fbfbfb url(images/voltdb-icon-sprite.png) 20px -490px no-repeat;}
-.leftShowhide .expanded{ background:#fbfbfb url(images/voltdb-icon-sprite.png) 0px -502px no-repeat;}
-.leftShowhide  .collapsed{background:#fbfbfb url(images/voltdb-icon-sprite.png) 0px -547px no-repeat;}
-
+.leftShowhide .expanded{ background:#fbfbfb url(images/voltdb-icon-sprite.png) 0px -506px no-repeat;}
+.leftShowhide  .collapsed{background:#fbfbfb url(images/voltdb-icon-sprite.png) 0px -550px no-repeat;}
+.arrowAdjust {padding: 0px 0 0 26px;
+position: relative;
+top: 4px;}
   
   
 /* Tab */
@@ -599,6 +602,7 @@ ul.topRightList li.responsiveMenuPlaceHolder{border-left:1px solid #ccc; height:
 
 
 /* Web Studio CSS */
+
 .containerStudio { margin:0 auto; width:98%; margin-bottom:20px; font-family:Arial, Helvetica, sans-serif; font-size:14px;}
 .btnStudio { background:#AA1F2F; padding:5px 10px; border:1px solid #AA1F2F; color:#FFFFFF; cursor:pointer;}
 .btnStudio:hover { background:#76BD1D; border:1px solid #76BD1D; color:#FFFFFF;}
@@ -608,8 +612,11 @@ ul.topRightList li.responsiveMenuPlaceHolder{border-left:1px solid #ccc; height:
 .blockWrapper{background:; margin-bottom:20px;}
 .objectExplorer{float:left; width:28%; padding:15px 1%; background:#fff;}
 .queryInput{float:right; width:68%;}
-.queryInput .query textarea{width:98%; padding:1%; height:215px;resize: none; line-height:20px;  border:none;}
+#queryForm{ background:#FFFFFF;}
+.queryInput .query textarea{width:98%; padding:1%; height:186px;border: 1px solid #CCCCCC;/* resize: none;*/ line-height:25px;   font-size:18px;}
+
 .queryInput .query textarea:focus{outline:none;}
+.textWritingArea { padding:13px;}
 .btnList { margin:10px 0 0 0; padding:0; float:right;}
 .btnList li { margin:0; padding:0 10px 0 0 ; float:left;}
 
