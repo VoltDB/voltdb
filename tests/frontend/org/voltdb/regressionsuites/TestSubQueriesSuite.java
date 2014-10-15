@@ -309,12 +309,12 @@ public class TestSubQueriesSuite extends RegressionSuite {
 
         }
 
-//        // Subquery with a user parameter - HSQL fails to parse
-//        vt = client.callProcedure("@AdHoc",
-//                "select ID from R1 T1 where exists " +
-//                        "(SELECT 1 FROM R2 T2 where T1.ID * T2.ID  = ?) "
-//                        , 9).getResults()[0];
-//        validateTableOfLongs(vt, new long[][] {{3}});
+        // Subquery with a user parameter - HSQL fails to parse
+        vt = client.callProcedure("@AdHoc",
+                "select ID from R1 T1 where exists " +
+                        "(SELECT 1 FROM R2 T2 where T1.ID * T2.ID  = ?) "
+                        , 9).getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{3}});
 
       // Subquery with a parent parameter TVE
       vt = client.callProcedure("@AdHoc",

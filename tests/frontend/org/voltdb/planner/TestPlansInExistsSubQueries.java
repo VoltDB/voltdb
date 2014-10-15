@@ -167,7 +167,24 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
             assertEquals(ExpressionType.VALUE_PARAMETER, e.getExpressionType());
             assertEquals(new Integer(0), ((ParameterValueExpression) e).getParameterIndex());
         }
-
+        {
+            AbstractPlanNode pn = compile("select r2.a from r2 where exists " +
+                    "( SELECT 1 from R2 WHERE r2.c = ?)");
+            pn = pn.getChild(0);
+            assertEquals(PlanNodeType.SEQSCAN, pn.getPlanNodeType());
+            SeqScanPlanNode spl = (SeqScanPlanNode) pn;
+            AbstractExpression e = spl.getPredicate();
+            assertEquals(ExpressionType.EXISTS_SUBQUERY, e.getExpressionType());
+            SubqueryExpression subExpr = (SubqueryExpression) e;
+            assertEquals(0, subExpr.getParameterIdxList().size());
+            // Subquery
+            pn = subExpr.getSubqueryNode();
+            assertEquals(PlanNodeType.SEQSCAN, pn.getPlanNodeType());
+            spl = (SeqScanPlanNode) pn;
+            e = spl.getPredicate();
+            assertEquals(ExpressionType.COMPARE_EQUAL, e.getExpressionType());
+            assertEquals(ExpressionType.VALUE_PARAMETER, e.getRight().getExpressionType());
+        }
     }
 
     public void testParamTveInOutputSchema() {
@@ -562,11 +579,6 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         {
             failToCompile("select a from r1 group by a " +
                     " having exists (select c from r2 where r2.c = max(r1.a))", "");
-        }
-        {
-            failToCompile("select r2.a from r2 where exists " +
-                    "( SELECT 1 from R2 WHERE r2.c = ?)",
-                    "");
         }
     }
 
