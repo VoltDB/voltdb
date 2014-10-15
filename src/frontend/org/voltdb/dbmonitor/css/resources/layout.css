@@ -613,8 +613,7 @@ ul.topRightList li.responsiveMenuPlaceHolder{border-left:1px solid #ccc; height:
 .objectExplorer{float:left; width:28%; padding:15px 1%; background:#fff;}
 .queryInput{float:right; width:68%;}
 #queryForm{ background:#FFFFFF;}
-.queryInput .query textarea{width:98%; padding:1%; height:186px;border: 1px solid #CCCCCC;/* resize: none;*/ line-height:25px;   font-size:18px;}
-
+.queryInput .query textarea{width:98%; padding:1%; resize:none!important; height:186px;border: 1px solid #CCCCCC;line-height:25px; font-size:18px;}
 .queryInput .query textarea:focus{outline:none;}
 .textWritingArea { padding:13px;}
 .btnList { margin:10px 0 0 0; padding:0; float:right;}
