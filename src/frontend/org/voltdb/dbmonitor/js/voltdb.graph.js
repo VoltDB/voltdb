@@ -331,11 +331,7 @@
                 'memData': getEmptyDataForView(view),
                 'cpuData': getEmptyDataForView(view),
                 'lastTimedTransactionCount': -1,
-                'lastTimerTick': -1,
-                'latIgnoredCount': 0,
-                'tpsIgnoredCount': 0,
-                'memIgnoredCount': 0,
-                'cpuIgnoredCount': 0,
+                'lastTimerTick': -1
             };
             
             dataCpu[0]["values"] = getEmptyDataForView(view);
@@ -365,17 +361,16 @@
 
         this.RefreshLatency = function (latency, graphView) {
 
+            //Do not plot the point if the passed view is not for the currently chosen view.
+            //It might be of remaining the previous AJAX call.
+            if (graphView != undefined && currentView.toLowerCase() != graphView.toLowerCase()) {
+                return;
+            }
+            
             var monitor = MonitorGraphUI.Monitors;
             var dataLat = monitor.latData;
             var strLatStats = "";
             var timeStamp;
-            
-            //Do not plot the point if the passed view is not for the currently chosen view.
-            //It might be of remaining the previous AJAX call. Only ignore 2 upto points.
-            if (monitor.latIgnoredCount <=2 && graphView != undefined && currentView.toLowerCase() != graphView.toLowerCase()) {
-                monitor.latIgnoredCount++;
-                return;
-            }
 
             // Compute latency statistics
             jQuery.each(latency, function (id, val) {
@@ -407,16 +402,15 @@
         };
 
         this.RefreshMemory = function (memoryDetails, currentServer, graphView) {
-            var monitor = MonitorGraphUI.Monitors;
-            var dataMem = monitor.memData;
             
             //Do not plot the point if the passed view is not for the currently chosen view.
-            //It might be of remaining the previous AJAX call. Only ignore upto 2 points.
-            if (monitor.memIgnoredCount <= 2 && graphView != undefined && currentView.toLowerCase() != graphView.toLowerCase()) {
-                monitor.memIgnoredCount++;
+            //It might be of remaining the previous AJAX call.
+            if (graphView != undefined && currentView.toLowerCase() != graphView.toLowerCase()) {
                 return;
             }
 
+            var monitor = MonitorGraphUI.Monitors;
+            var dataMem = monitor.memData;
             var memDetails = memoryDetails;
             var memRss = parseFloat(memDetails[currentServer].RSS * 1.0 / 1048576.0).toFixed(3) * 1;
             var memTimeStamp = new Date(memDetails[currentServer].TIMESTAMP);
@@ -434,16 +428,15 @@
         };
 
         this.RefreshTransaction = function (transactionDetails, graphView) {
-            var monitor = MonitorGraphUI.Monitors;
-            var datatrans = monitor.tpsData;
             
             //Do not plot the point if the passed view is not for the currently chosen view.
-            //It might be of remaining the previous AJAX call. Only ignore upto 2 points.
-            if (monitor.tpsIgnoredCount <= 2 && graphView != undefined && currentView.toLowerCase() != graphView.toLowerCase()) {
-                monitor.tpsIgnoredCount++;
+            //It might be of remaining the previous AJAX call.
+            if (graphView != undefined && currentView.toLowerCase() != graphView.toLowerCase()) {
                 return;
             }
 
+            var monitor = MonitorGraphUI.Monitors;
+            var datatrans = monitor.tpsData;
             var transacDetail = transactionDetails;
             var currentTimedTransactionCount = transacDetail["CurrentTimedTransactionCount"];
             var currentTimerTick = transacDetail["currentTimerTick"];
@@ -469,16 +462,15 @@
         };
 
         this.RefreshCpu = function (cpuDetails, currentServer, graphView) {
-            var monitor = MonitorGraphUI.Monitors;
-            var cpuData = monitor.cpuData;
             
             //Do not plot the point if the passed view is not for the currently chosen view.
-            //It might be of remaining the previous AJAX call. Only ignore upto 2 points.
-            if (monitor.cpuIgnoredCount <= 2 && graphView != undefined && currentView.toLowerCase() != graphView.toLowerCase()) {
-                monitor.cpuIgnoredCount++;
+            //It might be of remaining the previous AJAX call.
+            if (graphView != undefined && currentView.toLowerCase() != graphView.toLowerCase()) {
                 return;
             }
 
+            var monitor = MonitorGraphUI.Monitors;
+            var cpuData = monitor.cpuData;
             var cpuDetail = cpuDetails;
             var percentageUsage = parseFloat(cpuDetail[currentServer].PERCENT_USED).toFixed(1) * 1;
             var timeStamp = cpuDetail[currentServer].TIMESTAMP;
