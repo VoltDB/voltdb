@@ -35,7 +35,8 @@ public interface SiteSnapshotConnection
             SnapshotFormat format,
             Deque<SnapshotTableTask> tasks,
             long txnId,
-            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers);
+            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+            Map<Integer, Map<Integer, Long>> remoteDCUniqueIds);
 
     public void startSnapshotWithTargets(Collection<SnapshotDataTarget> targets);
     public HashSet<Exception> completeSnapshotWork() throws InterruptedException;

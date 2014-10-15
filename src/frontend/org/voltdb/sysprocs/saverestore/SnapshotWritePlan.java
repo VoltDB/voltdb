@@ -136,6 +136,7 @@ public abstract class SnapshotWritePlan
             String file_path, String file_nonce,
             long txnId, Map<Integer, Long> partitionTransactionIds,
             Map<Integer, Long> partitionUniqueIds,
+            Map<Integer, Map<Integer, Long>> remoteDCLastUniqueIds,
             JSONObject jsData, SystemProcedureExecutionContext context,
             final VoltTable result,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,

@@ -648,7 +648,7 @@ public class JSONObject {
      *
      * @return An iterator of the keys.
      */
-    public Iterator keys() {
+    public Iterator<String> keys() {
         return this.map.keySet().iterator();
     }
 

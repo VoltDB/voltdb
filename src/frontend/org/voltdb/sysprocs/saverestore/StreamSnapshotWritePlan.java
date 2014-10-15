@@ -70,6 +70,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
             String file_path, String file_nonce,
             long txnId, Map<Integer, Long> partitionTransactionIds,
             Map<Integer, Long> partitionUniqueIds,
+            Map<Integer, Map<Integer, Long>> remoteDCLastUniqueIds,
             JSONObject jsData, SystemProcedureExecutionContext context,
             final VoltTable result,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
@@ -108,6 +109,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         if (config.shouldTruncate) {
             deferredSetup = coalesceTruncationSnapshotPlan(file_path, file_nonce, txnId, partitionTransactionIds,
                                            partitionUniqueIds,
+                                           remoteDCLastUniqueIds,
                                            jsData, context, result,
                                            exportSequenceNumbers, tracker,
                                            hashinatorData,
@@ -228,6 +230,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
     private Callable<Boolean> coalesceTruncationSnapshotPlan(String file_path, String file_nonce, long txnId,
                                                              Map<Integer, Long> partitionTransactionIds,
                                                              Map<Integer, Long> partitionUniqueIds,
+                                                             Map<Integer, Map<Integer, Long>> remoteDCLastUniqueIds,
                                                              JSONObject jsData,
                                                              SystemProcedureExecutionContext context,
                                                              VoltTable result,
@@ -239,7 +242,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
     {
         final NativeSnapshotWritePlan plan = new NativeSnapshotWritePlan();
         final Callable<Boolean> deferredTruncationSetup =
-                plan.createSetupInternal(file_path, file_nonce, txnId, partitionTransactionIds, partitionUniqueIds,
+                plan.createSetupInternal(file_path, file_nonce, txnId, partitionTransactionIds, partitionUniqueIds, remoteDCLastUniqueIds,
                         jsData, context, result, exportSequenceNumbers,
                         tracker, hashinatorData, timestamp, newPartitionCount);
         m_taskListsForHSIds.putAll(plan.m_taskListsForHSIds);
