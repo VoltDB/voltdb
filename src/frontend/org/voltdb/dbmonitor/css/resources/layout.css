@@ -369,7 +369,7 @@ td.txt-center{text-align:center;}
 
 .storedProcWrapper{ margin-bottom:20px;}
 .dataTablesWrapper{}
-.tableTitle{float:left; padding:15px 15px 15px 28px; font-size:13px; font-weight:bold; width:140px;}
+.tableTitle{float:left; padding:15px 15px 15px 28px; font-size:13px; font-weight:bold; width:200px;}
 .icon-procedures{ background-position:left -986px;}
 .icon-tables{ background-position:left -1043px;}
 input.search-box{ border:1px solid #dbdbdb; padding:0 5px 0 5px; height:40px; width:200px; color:#a3a3a3; font-weight:bold;}
