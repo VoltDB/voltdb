@@ -919,6 +919,7 @@ public class VoltCompiler {
                 catGroup.setAdhoc(group.isAdhoc());
                 catGroup.setSysproc(group.isSysproc());
                 catGroup.setDefaultproc(group.isDefaultproc());
+                catGroup.setDefaultprocread(group.isDefaultprocread());
             }
         }
 
@@ -929,6 +930,7 @@ public class VoltCompiler {
                 catGroup.setAdhoc(role.isAdhoc());
                 catGroup.setSysproc(role.isSysproc());
                 catGroup.setDefaultproc(role.isDefaultproc());
+                catGroup.setDefaultprocread(role.isDefaultprocread());
             }
         }
 
