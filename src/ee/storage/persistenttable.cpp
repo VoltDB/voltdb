@@ -56,7 +56,6 @@
 #include "common/FailureInjection.h"
 #include "common/tabletuple.h"
 #include "common/UndoQuantum.h"
-#include "common/DummyUndoQuantum.hpp"
 #include "common/executorcontext.hpp"
 #include "common/FatalException.hpp"
 #include "common/types.h"
