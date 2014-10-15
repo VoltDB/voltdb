@@ -50,6 +50,11 @@ private:
      * tuple in the original table.
      */
     virtual void release() {
+        //It's very important not to add anything else to this release method
+        //Put all the implementation in truncateTableRelease
+        //The reason is that truncateTableRelease is called directly when a binary log
+        //truncate record is being applied and it must do all the work and not leave
+        //something undone because it didn't go through this undo action
         m_emptyTable->truncateTableRelease(m_originalTable);
     }
 

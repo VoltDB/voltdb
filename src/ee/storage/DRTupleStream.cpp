@@ -68,12 +68,9 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
     //Drop the row, don't move the USO
     if (!m_enabled) return m_uso;
 
-    size_t tupleMaxLength = 0;
-
     // Transaction IDs for transactions applied to this tuple stream
     // should always be moving forward in time.
-    if (spHandle < m_openSpHandle)
-    {
+    if (spHandle < m_openSpHandle) {
         throwFatalException(
                 "Active transactions moving backwards: openSpHandle is %jd, while the append spHandle is %jd",
                 (intmax_t)m_openSpHandle, (intmax_t)spHandle
@@ -82,11 +79,11 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
 
     commit(lastCommittedSpHandle, spHandle, txnId, uniqueId, spUniqueId, false, false);
 
-    tupleMaxLength = 1 + 1 + 8 + 4 + tableName.size() + 4;//version, type, table handle, name length prefix, table name, checksum
     if (!m_currBlock) {
         extendBufferChain(m_defaultCapacity);
     }
 
+    const size_t tupleMaxLength = 1 + 1 + 8 + 4 + tableName.size() + 4;//version, type, table handle, name length prefix, table name, checksum
     if (m_currBlock->remaining() < tupleMaxLength) {
         extendBufferChain(tupleMaxLength);
     }
@@ -146,7 +143,7 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     if (spHandle < m_openSpHandle)
     {
         throwFatalException(
-                "Active transactions moving backwards: openSpHandle is %jd, while the append spHandle is %jd",
+                "Active transactions moving backwards: openSpHandle is %jd, while the truncate spHandle is %jd",
                 (intmax_t)m_openSpHandle, (intmax_t)spHandle
                 );
     }

@@ -312,7 +312,6 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
     DRTupleStream *drStream = ec->drStream();
     size_t drMark = drStream->m_uso;
     if (!m_isMaterialized && m_drEnabled) {
-        ExecutorContext *ec = ExecutorContext::getExecutorContext();
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
@@ -322,16 +321,25 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
     }
 
     UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
-    if (uq && fallible) {
+    if (uq) {
+        if (!fallible) {
+            throwFatalException("Attempted to truncate table %s when there was an "
+                                "active undo quantum, and presumably an active transaction that should be there",
+                                m_name.c_str());
+        }
         emptyTable->m_tuplesPinnedByUndo = emptyTable->m_tupleCount;
         emptyTable->m_invisibleTuplesPendingDeleteCount = emptyTable->m_tupleCount;
         // Create and register an undo action.
         uq->registerUndoAction(new (*uq) PersistentTableUndoTruncateTableAction(engine, tcd, this, emptyTable, &m_surgeon, drMark));
-        return;
     } else {
-        //A very round about way to get the release stuff done when undo is disabled
-        DummyUndoQuantum quantum;
-        quantum.registerUndoAction(new (quantum) PersistentTableUndoTruncateTableAction(engine, tcd, this, emptyTable, &m_surgeon, drMark));
+        if (fallible) {
+            throwFatalException("Attempted to truncate table %s when there was no "
+                                "active undo quantum even though one was expected", m_name.c_str());
+        }
+
+        //Skip the undo log and "commit" immediately by asking the new emptyTable to perform
+        //the truncate table release work rather then having it invoked by PersistentTableUndoTruncateTableAction
+        emptyTable->truncateTableRelease(this);
     }
 }
 

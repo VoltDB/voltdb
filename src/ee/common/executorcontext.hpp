@@ -95,7 +95,11 @@ class ExecutorContext {
         m_spHandle = std::max(lastCommittedSpHandle, m_spHandle);
     }
 
-    // for test (VoltDBEngine::getExecutorContext())
+    // Used originally for test. Now also used to NULL
+    // out the UndoQuantum when it is released to make it possible
+    // to check if there currently exists an active undo quantum
+    // so that things that should only execute after the currently running
+    // transaction has committed can assert on that.
     void setupForPlanFragments(UndoQuantum *undoQuantum) {
         m_undoQuantum = undoQuantum;
     }
