@@ -76,6 +76,7 @@ inline T nexthigher(T k) {
  */
 class Pool {
 public:
+
     Pool() :
         m_allocationSize(TEMP_POOL_CHUNK_SIZE), m_maxChunkCount(0), m_currentChunkIndex(0)
     {
@@ -93,40 +94,6 @@ public:
     }
 
     ~Pool() {
-        realDeallocation(false);
-        realDeallocation(true);
-    }
-
-    char* realAllocation(const uint64_t size) {
-#ifdef USE_MMAP
-            char *storage =
-                    static_cast<char*>(::mmap( 0, m_allocationSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 ));
-            if (storage == MAP_FAILED) {
-                std::cout << strerror( errno ) << std::endl;
-                throwFatalException("Failed mmap");
-            }
-#else
-            char *storage = new char[size];
-#endif
-            return storage;
-    }
-
-    void realDeallocation(bool isForOversizeChunks) {
-        if (isForOversizeChunks) {
-            for (std::size_t ii = 0; ii < m_oversizeChunks.size(); ii++) {
-#ifdef USE_MMAP
-                if (::munmap( m_oversizeChunks[ii].m_chunkData, m_oversizeChunks[ii].m_size) != 0) {
-                    std::cout << strerror( errno ) << std::endl;
-                    throwFatalException("Failed munmap");
-                }
-#else
-                delete [] m_oversizeChunks[ii].m_chunkData;
-#endif
-            }
-            return;
-        }
-
-        // normal size chuncks clean up
         for (std::size_t ii = 0; ii < m_chunks.size(); ii++) {
 #ifdef USE_MMAP
             if (::munmap( m_chunks[ii].m_chunkData, m_chunks[ii].m_size) != 0) {
@@ -137,6 +104,16 @@ public:
             delete [] m_chunks[ii].m_chunkData;
 #endif
         }
+        for (std::size_t ii = 0; ii < m_oversizeChunks.size(); ii++) {
+#ifdef USE_MMAP
+            if (::munmap( m_oversizeChunks[ii].m_chunkData, m_oversizeChunks[ii].m_size) != 0) {
+                std::cout << strerror( errno ) << std::endl;
+                throwFatalException("Failed munmap");
+            }
+#else
+            delete [] m_oversizeChunks[ii].m_chunkData;
+#endif
+        }
     }
 
     /*
@@ -144,10 +121,18 @@ public:
      */
     inline void* allocate(std::size_t size) {
         if (m_chunks.empty()) {
-            char *storage = realAllocation(m_allocationSize);
+#ifdef USE_MMAP
+            char *storage =
+                    static_cast<char*>(::mmap( 0, m_allocationSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 ));
+            if (storage == MAP_FAILED) {
+                std::cout << strerror( errno ) << std::endl;
+                throwFatalException("Failed mmap");
+            }
+#else
+            char *storage = new char[m_allocationSize];
+#endif
             m_chunks.push_back(Chunk(m_allocationSize, storage));
         }
-
         /*
          * See if there is space in the current chunk
          */
@@ -160,7 +145,16 @@ public:
                 /*
                  * Allocate an oversize chunk that will not be reused.
                  */
-                char *storage = realAllocation(size);
+#ifdef USE_MMAP
+                char *storage =
+                        static_cast<char*>(::mmap( 0, nexthigher(size), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 ));
+                if (storage == MAP_FAILED) {
+                    std::cout << strerror( errno ) << std::endl;
+                    throwFatalException("Failed mmap");
+                }
+#else
+                char *storage = new char[size];
+#endif
                 m_oversizeChunks.push_back(Chunk(nexthigher(size), storage));
                 Chunk &newChunk = m_oversizeChunks.back();
                 newChunk.m_offset = size;
@@ -179,7 +173,20 @@ public:
                 /*
                  * Need to allocate a new chunk
                  */
-                char *storage = realAllocation(size);
+//                std::cout << "Pool had to allocate a new chunk. Not a good thing "
+//                  "from a performance perspective. If you see this we need to look "
+//                  "into structuring our pool sizes and allocations so the this doesn't "
+//                  "happen frequently" << std::endl;
+#ifdef USE_MMAP
+                char *storage =
+                        static_cast<char*>(::mmap( 0, m_allocationSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 ));
+                if (storage == MAP_FAILED) {
+                    std::cout << strerror( errno ) << std::endl;
+                    throwFatalException("Failed mmap");
+                }
+#else
+                char *storage = new char[m_allocationSize];
+#endif
                 m_chunks.push_back(Chunk(m_allocationSize, storage));
                 Chunk &newChunk = m_chunks.back();
                 newChunk.m_offset = size;
@@ -212,7 +219,17 @@ public:
         /*
          * Erase any oversize chunks that were allocated
          */
-        realDeallocation(true);
+        const std::size_t numOversizeChunks = m_oversizeChunks.size();
+        for (std::size_t ii = 0; ii < numOversizeChunks; ii++) {
+#ifdef USE_MMAP
+            if (::munmap( m_oversizeChunks[ii].m_chunkData, m_oversizeChunks[ii].m_size) != 0) {
+                std::cout << strerror( errno ) << std::endl;
+                throwFatalException("Failed munmap");
+            }
+#else
+            delete [] m_oversizeChunks[ii].m_chunkData;
+#endif
+        }
         m_oversizeChunks.clear();
 
         /*
@@ -225,7 +242,16 @@ public:
          * If more then maxChunkCount chunks are allocated erase all extra chunks
          */
         if (numChunks > m_maxChunkCount) {
-            realDeallocation(false);
+            for (std::size_t ii = m_maxChunkCount; ii < numChunks; ii++) {
+#ifdef USE_MMAP
+                if (::munmap( m_chunks[ii].m_chunkData, m_chunks[ii].m_size) != 0) {
+                    std::cout << strerror( errno ) << std::endl;
+                    throwFatalException("Failed munmap");
+                }
+#else
+                delete []m_chunks[ii].m_chunkData;
+#endif
+            }
             m_chunks.resize(m_maxChunkCount);
         }
 
