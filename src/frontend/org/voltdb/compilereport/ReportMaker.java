@@ -17,6 +17,8 @@
 
 package org.voltdb.compilereport;
 
+import static org.apache.commons.lang3.StringEscapeUtils.escapeHtml4;
+
 import java.io.IOException;
 import java.net.URL;
 import java.text.DateFormat;
@@ -327,7 +329,7 @@ public class ReportMaker {
 
         // sql column
         sb.append("<td><tt>");
-        sb.append(statement.getSqltext());
+        sb.append(escapeHtml4(statement.getSqltext()));
         sb.append("</td></tt>");
 
         // params column
