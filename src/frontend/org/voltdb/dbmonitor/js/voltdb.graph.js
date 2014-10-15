@@ -2,7 +2,8 @@
 (function(window) {
 
     var IMonitorGraphUI = (function () {
-        
+
+        var currentView = "seconds";
         this.Monitors = {};
         this.ChartCpu = nv.models.lineChart();
         this.ChartRam = nv.models.lineChart();
@@ -16,6 +17,30 @@
             for (var i = 121; i >= 0; i--) {
                 arr[i] = { x: new Date(theDate.getTime()), y:null };
                 theDate.setSeconds(theDate.getSeconds() - 5);
+            }
+
+            return arr;
+        }
+        
+        function getEmptyDataForMinutes() {
+            var arr = [];
+            var theDate = new Date();
+
+            for (var i = 121; i >= 0; i--) {
+                arr[i] = { x: new Date(theDate.getTime()), y: null };
+                theDate.setMinutes(theDate.getMinutes() - 1);
+            }
+
+            return arr;
+        }
+        
+        function getEmptyDataForDays() {
+            var arr = [];
+            var theDate = new Date();
+
+            for (var i = 121; i >= 0; i--) {
+                arr[i] = { x: new Date(theDate.getTime()), y: null };
+                theDate.setDate(theDate.getDate() - 1);
             }
 
             return arr;
@@ -180,258 +205,6 @@
             return MonitorGraphUI.ChartTransactions;
         });
 
-        function getDataCPU() {
-
-            //Format for date: Date(year, month, day, hours, minutes, seconds, milliseconds)
-
-            var lineData = [
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 6, 0),
-                    'y': 0.5
-                },
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 7, 0),
-                    'y': 1
-                },
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 8, 0),
-                    'y': 1.3
-                },
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 8, 100),
-                    'y': 2.3
-                },
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 9, 0),
-                    'y': 1.2
-                },
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 10, 0),
-                    'y': 0.8
-                },
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 11, 0),
-                    'y': 0.9
-                },
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 12, 0),
-                    'y': 2.0
-                },
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 13, 0),
-                    'y': 2.3
-                },
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 14, 0),
-                    'y': 1.6
-                },
-
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 16, 0),
-                    'y': 1.5
-                },
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 17, 0),
-                    'y': 1.8
-                },
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 18, 0),
-                    'y': 1.9
-                },
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 19, 0),
-                    'y': 3.5
-                },
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 21, 0),
-                    'y': 8.5
-                },
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 22, 0),
-                    'y': 4.5
-                },
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 23, 0),
-                    'y': 2.5
-                },
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 24, 0),
-                    'y': 1.8
-                },
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 25, 0),
-                    'y': 3.7
-                },
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 26, 0),
-                    'y': 3.8
-                },
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 27, 0),
-                    'y': 2.5
-                },
-
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 28, 0),
-                    'y': 1.8
-                },
-
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 29, 0),
-                    'y': 1.0
-                },
-
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 30, 0),
-                    'y': 2.5
-                },
-
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 31, 0),
-                    'y': 1.5
-                },
-
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 32, 0),
-                    'y': 3.5
-                },
-
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 33, 0),
-                    'y': 8.0
-                },
-
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 34, 0),
-                    'y': 2.8
-                },
-
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 35, 0),
-                    'y': 2.9
-                },
-
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 36, 0),
-                    'y': 4.0
-                },
-
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 37, 0),
-                    'y': 4.8
-                },
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 38, 0),
-                    'y': 2.9
-                },
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 39, 0),
-                    'y': 3.3
-                },
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 40, 0),
-                    'y': 4.9
-                },
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 41, 0),
-                    'y': 5.8
-                },
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 42, 0),
-                    'y': 2.6
-                },
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 43, 0),
-                    'y': 3.6
-                },
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 44, 0),
-                    'y': 2.8
-                },
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 45, 0),
-                    'y': 3.8
-                },
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 46, 0),
-                    'y': 3.6
-                },
-
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 47, 0),
-                    'y': 3.5
-                },
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 48, 0),
-                    'y': 2.0
-                },
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 49, 0),
-                    'y': 2.8
-                },
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 50, 0),
-                    'y': 4.1
-                },
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 51, 0),
-                    'y': 3.5
-                },
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 52, 0),
-                    'y': 4.0
-                },
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 53, 0),
-                    'y': 4.5
-                },
-
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 54, 0),
-                    'y': 2.5
-                },
-
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 55, 0),
-                    'y': 2.5
-                },
-
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 56, 0),
-                    'y': 3.5
-                },
-
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 57, 0),
-                    'y': 5.8
-                },
-
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 58, 0),
-                    'y': 5.0
-                },
-
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 59, 0),
-                    'y': 3.0
-                },
-
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 60, 0),
-                    'y': 3.8
-                },
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 61, 0),
-                    'y': 2.5
-                },
-                {
-                    'x': new Date(2012, 01, 01, 10, 5, 62, 0),
-                    'y': 5
-                }];
-
-            return lineData;
-        }
-
         function Histogram(lowestTrackableValue, highestTrackableValue, nSVD, totalCount) {
             this.lowestTrackableValue = lowestTrackableValue;
             this.highestTrackableValue = highestTrackableValue;
@@ -537,25 +310,68 @@
             return histogram;
         }
 
-        this.AddGraph = function () {
+        var getEmptyDataForView = function (view) {
+            view = view != undefined ? view.toLowerCase() : "seconds";
+
+            if (view == "minutes")
+                return getEmptyDataForMinutes();
+            else if (view == "days")
+                return getEmptyDataForDays();
+
+            return getEmptyData();
+        };
+
+        this.AddGraph = function (view) {
+            currentView = view;
             MonitorGraphUI.Monitors = {
                 
                 'latHistogram': null,
-                'latData': getEmptyData(),
-                'tpsData': getEmptyData(),
-                'memData': getEmptyData(),
-                'cpuData': getEmptyData(),
+                'latData': getEmptyDataForView(view),
+                'tpsData': getEmptyDataForView(view),
+                'memData': getEmptyDataForView(view),
+                'cpuData': getEmptyDataForView(view),
                 'lastTimedTransactionCount': -1,
                 'lastTimerTick': -1
             };
+            
+            dataCpu[0]["values"] = getEmptyDataForView(view);
+            dataRam[0]["values"] = getEmptyDataForView(view);
+            dataLatency[0]["values"] = getEmptyDataForView(view);
+            dataTransactions[0]["values"] = getEmptyDataForView(view);
+            var dateFormat = (view != undefined && view.toLowerCase() == "days") ? "%x" : "%X";
+            
+            //%b %d : Feb 01, %x : 02/01/2012, %X: HH:MM:ss
+            MonitorGraphUI.ChartCpu.xAxis
+                .tickFormat(function (d) {
+                    return d3.time.format(dateFormat)(new Date(d));
+                });
+            MonitorGraphUI.ChartRam.xAxis
+                .tickFormat(function (d) {
+                    return d3.time.format(dateFormat)(new Date(d));
+                });
+            MonitorGraphUI.ChartLatency.xAxis
+                .tickFormat(function (d) {
+                    return d3.time.format(dateFormat)(new Date(d));
+                });
+            MonitorGraphUI.ChartTransactions.xAxis
+                .tickFormat(function(d) {
+                    return d3.time.format(dateFormat)(new Date(d));
+                });
         };
 
-        this.RefreshLatency = function(latency) {
+        this.RefreshLatency = function (latency, graphView) {
 
+            //Do not plot the point if the passed view is not for the currently chosen view.
+            //It might be of remaining the previous AJAX call.
+            if (graphView != undefined && currentView.toLowerCase() != graphView.toLowerCase()) {
+                return;
+            }
+            
             var monitor = MonitorGraphUI.Monitors;
             var dataLat = monitor.latData;
             var strLatStats = "";
             var timeStamp;
+
             // Compute latency statistics
             jQuery.each(latency, function (id, val) {
                 strLatStats += val["UNCOMPRESSED_HISTOGRAM"];
@@ -585,10 +401,16 @@
             
         };
 
-        this.RefreshMemory = function (memoryDetails, currentServer) {
+        this.RefreshMemory = function (memoryDetails, currentServer, graphView) {
+            
+            //Do not plot the point if the passed view is not for the currently chosen view.
+            //It might be of remaining the previous AJAX call.
+            if (graphView != undefined && currentView.toLowerCase() != graphView.toLowerCase()) {
+                return;
+            }
+
             var monitor = MonitorGraphUI.Monitors;
             var dataMem = monitor.memData;
-
             var memDetails = memoryDetails;
             var memRss = parseFloat(memDetails[currentServer].RSS * 1.0 / 1048576.0).toFixed(3) * 1;
             var memTimeStamp = new Date(memDetails[currentServer].TIMESTAMP);
@@ -605,10 +427,16 @@
 
         };
 
-        this.RefreshTransaction = function(transactionDetails) {
+        this.RefreshTransaction = function (transactionDetails, graphView) {
+            
+            //Do not plot the point if the passed view is not for the currently chosen view.
+            //It might be of remaining the previous AJAX call.
+            if (graphView != undefined && currentView.toLowerCase() != graphView.toLowerCase()) {
+                return;
+            }
+
             var monitor = MonitorGraphUI.Monitors;
             var datatrans = monitor.tpsData;
-
             var transacDetail = transactionDetails;
             var currentTimedTransactionCount = transacDetail["CurrentTimedTransactionCount"];
             var currentTimerTick = transacDetail["currentTimerTick"];
@@ -633,10 +461,16 @@
 
         };
 
-        this.RefreshCpu = function(cpuDetails,currentServer) {
+        this.RefreshCpu = function (cpuDetails, currentServer, graphView) {
+            
+            //Do not plot the point if the passed view is not for the currently chosen view.
+            //It might be of remaining the previous AJAX call.
+            if (graphView != undefined && currentView.toLowerCase() != graphView.toLowerCase()) {
+                return;
+            }
+
             var monitor = MonitorGraphUI.Monitors;
             var cpuData = monitor.cpuData;
-
             var cpuDetail = cpuDetails;
             var percentageUsage = parseFloat(cpuDetail[currentServer].PERCENT_USED).toFixed(1) * 1;
             var timeStamp = cpuDetail[currentServer].TIMESTAMP;
@@ -654,10 +488,5 @@
     
     window.MonitorGraphUI = MonitorGraphUI = new IMonitorGraphUI();
 })(window);
-
-$(document).ready(function () {
-  
-    MonitorGraphUI.AddGraph();
-});
 
 

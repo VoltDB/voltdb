@@ -725,6 +725,7 @@ ul.catalogNav li.active a, ul.catalogNav li.active a:hover{background:#76bd1d; d
 
 .parameterValue{ }
 .returnValue{ color:#0079bb;}
+.errorValue{color:red}
 
 h3.systemHeader{}
 
