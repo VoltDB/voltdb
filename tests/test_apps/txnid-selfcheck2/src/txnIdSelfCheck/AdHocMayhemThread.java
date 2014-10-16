@@ -173,7 +173,7 @@ public class AdHocMayhemThread extends Thread {
                 client.callProcedure(new AdHocCallback(), "@AdHoc", sql);
             }
             catch (NoConnectionsException e) {
-                log.error("AdHocMayhemThread got NoConnectionsException on proc call. Will sleep.");
+                log.warn("AdHocMayhemThread got NoConnectionsException on proc call. Will sleep.");
                 m_needsBlock.set(true);
             }
             catch (Exception e) {

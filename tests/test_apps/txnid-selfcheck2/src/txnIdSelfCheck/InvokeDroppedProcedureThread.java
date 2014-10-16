@@ -103,7 +103,7 @@ public class InvokeDroppedProcedureThread extends Thread {
                 }
             }
             catch (NoConnectionsException e) {
-                log.error("InvokeDroppedProcedureThread got NoConnectionsException on proc call. Will sleep.");
+                log.warn("InvokeDroppedProcedureThread got NoConnectionsException on proc call. Will sleep.");
                 m_needsBlock.set(true);
             }
             catch (Exception e) {

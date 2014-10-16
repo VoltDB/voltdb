@@ -109,8 +109,8 @@ public class BigTableLoader extends Thread {
             }
             if (status != ClientResponse.SUCCESS) {
                 // log what happened
-                log.error("BigTableLoader ungracefully failed to insert into table " + tableName);
-                log.error(((ClientResponseImpl) clientResponse).toJSONString());
+                log.warn("BigTableLoader ungracefully failed to insert into table " + tableName);
+                log.warn(((ClientResponseImpl) clientResponse).toJSONString());
             }
             else {
                 rowsLoaded++;
@@ -140,7 +140,7 @@ public class BigTableLoader extends Thread {
                             if (!m_shouldContinue.get()) {
                                 return;
                             }
-                            log.error("BigTableLoader thread interrupted while waiting for permit.", e);
+                            log.warn("BigTableLoader thread interrupted while waiting for permit.", e);
                         }
                         insertsTried++;
                         client.callProcedure(new InsertCallback(latch), tableName.toUpperCase() + "TableInsert", p, data);
@@ -151,7 +151,7 @@ public class BigTableLoader extends Thread {
                         if (!m_shouldContinue.get()) {
                             return;
                         }
-                        log.error("BigTableLoader thread interrupted while waiting.", e);
+                        log.warn("BigTableLoader thread interrupted while waiting.", e);
                     }
                     long nextRowCount = getRowCount();
                     // if no progress, throttle a bit
@@ -167,7 +167,7 @@ public class BigTableLoader extends Thread {
                     continue;
                 }
                 // on exception, log and end the thread, but don't kill the process
-                log.error("BigTableLoader failed a TableInsert procedure call for table " + tableName, e);
+                log.warn("BigTableLoader failed a TableInsert procedure call for table " + tableName, e);
                 try { Thread.sleep(3000); } catch (Exception e2) {}
             }
         }

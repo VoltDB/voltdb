@@ -252,7 +252,7 @@ public class ClientThread extends Thread {
                 runOne();
             }
             catch (NoConnectionsException e) {
-                log.error("ClientThread got NoConnectionsException on proc call. Will sleep.");
+                log.warn("ClientThread got NoConnectionsException on proc call. Will sleep.");
                 // take a breather to avoid slamming the log (stay paused if no connections)
                 do {
                     try { Thread.sleep(3000); } catch (Exception e2) {} // sleep for 3s

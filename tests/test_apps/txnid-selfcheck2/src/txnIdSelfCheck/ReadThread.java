@@ -77,8 +77,8 @@ public class ReadThread extends Thread {
         public void clientCallback(ClientResponse clientResponse) throws Exception {
             txnsOutstanding.release();
             if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-                log.error("Non success in ProcCallback for ReadThread");
-                log.error(((ClientResponseImpl)clientResponse).toJSONString());
+                log.warn("Non success in ProcCallback for ReadThread");
+                log.warn(((ClientResponseImpl)clientResponse).toJSONString());
                 m_needsBlock.set(true);
                 return;
             }
@@ -136,7 +136,7 @@ public class ReadThread extends Thread {
                 client.callProcedure(new ReadCallback(), procName, cid);
             }
             catch (NoConnectionsException e) {
-                log.error("ReadThread got NoConnectionsException on proc call. Will sleep.");
+                log.warn("ReadThread got NoConnectionsException on proc call. Will sleep.");
                 m_needsBlock.set(true);
             }
             catch (Exception e) {
