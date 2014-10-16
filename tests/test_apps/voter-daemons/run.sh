@@ -41,13 +41,31 @@ LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
 HOST="localhost"
 
+function _copy() {
+    # Prefer to use rsync so that modifications are not overridden.
+    if command -v rsync > /dev/null 2>&1; then
+        rsync -ur ../../../examples/voter/ddl.sql .
+        rsync -ur ../../../examples/voter/src .
+    else
+        cp -afv ../../../examples/voter/ddl.sql .
+        cp -afv ../../../examples/voter/src .
+    fi
+}
+
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar voltdbroot voltdbroot
+    rm -rf obj debugoutput $APPNAME.jar s[12]_[12] d[12]_[12].xml statement-plans catalog-report.html log
+}
+
+# remove build artifacts and copied source
+function clean-all() {
+    clean
+    rm -rf src ddl.sql
 }
 
 # compile the source code for procedures and the client
 function srccompile() {
+    _copy
     mkdir -p obj
     javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH -d obj \
         src/voter/*.java \
@@ -136,6 +154,7 @@ function create2() {
     _deployment 1 2
     _deployment 2 2
     _server 1 2
+    sleep 5
     _server 2 2
     echo ">>>>> Tailing logs (Ctrl-C stops tail, not server)..."
     watch2
@@ -143,11 +162,13 @@ function create2() {
 
 # Single server
 function watch1() {
+    echo "Command: tail -F ~/.voltdb_server/localhost_$(_port 1 1).out"
     tail -F ~/.voltdb_server/localhost_$(_port 1 1).out
 }
 
 # Dual server
 function watch2() {
+    echo "Command: tail -F ~/.voltdb_server/localhost_$(_port 1 1)_1.out ~/.voltdb_server/localhost_$(_port 1 1)_2.out"
     tail -F ~/.voltdb_server/localhost_$(_port 1 1)_1.out ~/.voltdb_server/localhost_$(_port 1 1)_2.out
 }
 
@@ -157,7 +178,7 @@ function _client() {
         voter.AsyncBenchmark \
         --displayinterval=5 \
         --warmup=5 \
-        --duration=20 \
+        --duration=10 \
         --servers=localhost:$(_port $1 6) \
         --contestants=6 \
         --maxvotes=2
@@ -176,8 +197,10 @@ function client2() {
 
 function _stop() {
     if [ $2 -eq 1 ]; then
+        echo "Command: $VOLTDB stop -H localhost:$(_port 1 1)"
         $VOLTDB stop -H localhost:$(_port 1 1)
     else
+        echo "Command: $VOLTDB stop -H localhost:$(_port 1 1) -I $1"
         $VOLTDB stop -H localhost:$(_port 1 1) -I $1
     fi
 }
@@ -194,7 +217,7 @@ function stop2() {
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|catalog|create1|create2|watch1|watch2|stop1|stop2}"
+    echo "Usage: ./run.sh {clean|clean-all|catalog|create1|create2|client1|client2|watch1|watch2|stop1|stop2}"
 }
 
 # Run the target passed as the first arg on the command line
