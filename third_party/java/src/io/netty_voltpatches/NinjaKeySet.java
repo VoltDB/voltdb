@@ -136,6 +136,6 @@ public final class NinjaKeySet extends AbstractSet<SelectionKey> {
                 s.close();
             }
         } catch (Throwable t){}
-        supported = false;
+        supported = supportedTemp;
     }
 }
