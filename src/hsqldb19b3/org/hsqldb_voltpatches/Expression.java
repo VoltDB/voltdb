@@ -577,9 +577,12 @@ public class Expression {
     boolean isComposedOf(OrderedHashSet expressions,
                          OrderedIntHashSet excludeSet) {
 
-        if (opType == OpTypes.VALUE) {
+        /************************* Volt DB Extensions *************************/
+        if (opType == OpTypes.VALUE || opType == OpTypes.DYNAMIC_PARAM
+                || opType == OpTypes.PARAMETER || opType == OpTypes.VARIABLE) {
             return true;
         }
+        /**********************************************************************/
 
         if (excludeSet.contains(opType)) {
             return true;

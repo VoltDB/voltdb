@@ -520,26 +520,33 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         }
         {
             // filter on agg of expression involving user parameter ('?')
-            failToCompile("select a from r1 where c in " +
-                  " (select max(c) from r2 group by c having min(a) > ?) ");
-//            AbstractPlanNode pn = compile("select a from r1 where c in " +
-//                    " (select max(c) from r2 group by c having min(a) > ?) ");
-//
-//            pn = pn.getChild(0);
-//            assertTrue(pn instanceof SeqScanPlanNode);
-//            AbstractExpression p = ((SeqScanPlanNode)pn).getPredicate();
-//            assertEquals(ExpressionType.EXISTS_SUBQUERY, p.getExpressionType());
-//            AbstractExpression subquery = p;
-//            pn = ((SubqueryExpression)subquery).getSubqueryNode();
-//            pn = pn.getChild(0);
-//            assertTrue(pn instanceof LimitPlanNode);
-//            pn = pn.getChild(0);
-//            assertTrue(pn instanceof SeqScanPlanNode);
-//            AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(pn);
-//            assertNotNull(aggNode);
-//            assertEquals(3, aggNode.getOutputSchema().size());
-//            AbstractExpression aggrExpr = aggNode.getPostPredicate();
-//            assertEquals(ExpressionType.CONJUNCTION_AND, aggrExpr.getExpressionType());
+            AbstractPlanNode pn = compile("select a from r1 where c in " +
+                    " (select max(c) from r2 group by c having min(a) > ?) ");
+
+            pn = pn.getChild(0);
+            assertTrue(pn instanceof SeqScanPlanNode);
+            AbstractExpression p = ((SeqScanPlanNode)pn).getPredicate();
+            assertEquals(ExpressionType.EXISTS_SUBQUERY, p.getExpressionType());
+            SubqueryExpression se = (SubqueryExpression)p;
+            assertEquals(1, se.getParameterIdxList().size());
+            assertEquals(new Integer(1), se.getParameterIdxList().get(0));
+            pn = ((SubqueryExpression)p).getSubqueryNode();
+            pn = pn.getChild(0).getChild(0);
+            assertEquals(PlanNodeType.SEQSCAN, pn.getPlanNodeType());
+            AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(pn);
+            assertNotNull(aggNode);
+            AbstractExpression aggrExpr = aggNode.getPostPredicate();
+            assertEquals(ExpressionType.CONJUNCTION_AND, aggrExpr.getExpressionType());
+            // User PVE
+            AbstractExpression le = aggrExpr.getLeft();
+            assertEquals(ExpressionType.COMPARE_GREATERTHAN, le.getExpressionType());
+            assertEquals(ExpressionType.VALUE_PARAMETER, le.getRight().getExpressionType());
+            assertEquals(new Integer(0), ((ParameterValueExpression)le.getRight()).getParameterIndex());
+            // Parent PVE
+            AbstractExpression re = aggrExpr.getRight();
+            assertEquals(ExpressionType.COMPARE_EQUAL, re.getExpressionType());
+            assertEquals(ExpressionType.VALUE_PARAMETER, re.getLeft().getExpressionType());
+            assertEquals(new Integer(1), ((ParameterValueExpression)re.getLeft()).getParameterIndex());
         }
         {
             // filter on agg of local tve
