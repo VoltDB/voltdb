@@ -369,7 +369,7 @@ td.txt-center{text-align:center;}
 
 .storedProcWrapper{ margin-bottom:20px;}
 .dataTablesWrapper{}
-.tableTitle{float:left; padding:15px 15px 15px 28px; font-size:13px; font-weight:bold; width:140px;}
+.tableTitle{float:left; padding:15px 15px 15px 28px; font-size:13px; font-weight:bold; width:200px;}
 .icon-procedures{ background-position:left -986px;}
 .icon-tables{ background-position:left -1043px;}
 input.search-box{ border:1px solid #dbdbdb; padding:0 5px 0 5px; height:40px; width:200px; color:#a3a3a3; font-weight:bold;}
@@ -613,8 +613,7 @@ ul.topRightList li.responsiveMenuPlaceHolder{border-left:1px solid #ccc; height:
 .objectExplorer{float:left; width:28%; padding:15px 1%; background:#fff;}
 .queryInput{float:right; width:68%;}
 #queryForm{ background:#FFFFFF;}
-.queryInput .query textarea{width:98%; padding:1%; height:186px;border: 1px solid #CCCCCC;/* resize: none;*/ line-height:25px;   font-size:18px;}
-
+.queryInput .query textarea{width:98%; padding:1%; resize:none!important; height:186px;border: 1px solid #CCCCCC;line-height:25px; font-size:18px;}
 .queryInput .query textarea:focus{outline:none;}
 .textWritingArea { padding:13px;}
 .btnList { margin:10px 0 0 0; padding:0; float:right;}
@@ -723,6 +722,11 @@ ul.catalogNav li.active a, ul.catalogNav li.active a:hover{background:#76bd1d; d
 
 }
 
+.parameterValue{ }
+.returnValue{ color:#0079bb;}
+.errorValue{color:red}
+
+h3.systemHeader{}
 
 
 @media (width: 640px) {

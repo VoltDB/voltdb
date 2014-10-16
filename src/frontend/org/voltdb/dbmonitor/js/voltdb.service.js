@@ -318,8 +318,8 @@
         this.GetTableInformation = function (onConnectionAdded) {
             try {
                 var processName = "TABLE_INFORMATION";
-                var procedureNames = ['@Statistics', '@Statistics', '@SystemCatalog'];
-                var parameters = ["TABLE", "INDEX", "COLUMNS"];
+                var procedureNames = ['@Statistics', '@Statistics', '@SystemCatalog', '@SystemCatalog', '@SystemCatalog'];
+                var parameters = ["TABLE", "INDEX", "COLUMNS", "PROCEDURES", "PROCEDURECOLUMNS"];
                 var values = ['0', '0', undefined];
                 _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
                 if (_connection == null) {
