@@ -411,7 +411,8 @@ public class DDLCompiler {
     enum Permission {
         adhoc,
         sysproc,
-        defaultproc;
+        defaultproc,
+        defaultprocread;
 
         static String toListString() {
             return Arrays.asList(values()).toString();
@@ -918,6 +919,9 @@ public class DDLCompiler {
                         break;
                     case defaultproc:
                         catGroup.setDefaultproc(true);
+                        break;
+                    case defaultprocread:
+                        catGroup.setDefaultprocread(true);
                         break;
                     }
                 }

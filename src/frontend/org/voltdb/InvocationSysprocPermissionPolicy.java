@@ -19,35 +19,52 @@ package org.voltdb;
 
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.catalog.Procedure;
+import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
+import org.voltdb.utils.LogKeys;
 
 /**
  * Checks if a user has permission to call a procedure.
  */
-public class InvocationPermissionPolicy {
+public class InvocationSysprocPermissionPolicy extends InvocationPermissionPolicy {
+    private static final VoltLogger authLog = new VoltLogger("AUTH");
 
-    enum PolicyResult {
-        ALLOW,
-        DENY,
-        NOT_APPLICABLE,
-    };
-
-    public InvocationPermissionPolicy() {
+    public InvocationSysprocPermissionPolicy() {
     }
 
     /**
      *
-     * shouldAccept will return ALLOW, DENY or NOT_APPLICABLE based on what is being evaluated with predicates.
-     * @return ClientResponse or null if accepted.
+     * @param user whose permission needs to be checked.
+     * @param invocation invocation associated with this request
+     * @param proc procedure associated.
+     * @return PolicyResult ALLOW, DENY or NOT_APPLICABLE
      * @see org.voltdb.InvocationAcceptancePolicy#shouldAccept(org.voltdb.AuthSystem.AuthUser,
      *      org.voltdb.StoredProcedureInvocation, org.voltdb.catalog.Procedure,
      *      org.voltcore.network.WriteStream)
      */
+    @Override
     public PolicyResult shouldAccept(AuthUser user, StoredProcedureInvocation invocation, Procedure proc) {
-        return null;
+
+        //Since AdHoc perms are diff we only check sysprocs other than AdHoc
+        if (proc.getSystemproc() && !invocation.procName.startsWith("@AdHoc")) {
+            if (!user.hasSystemProcPermission()) {
+                return PolicyResult.DENY;
+            }
+            return PolicyResult.ALLOW;
+        }
+        return PolicyResult.NOT_APPLICABLE;
     }
 
+    @Override
     public ClientResponseImpl getErrorResponse(AuthUser user, StoredProcedureInvocation invocation, Procedure procedure) {
-        return null;
+        authLog.l7dlog(Level.INFO,
+                LogKeys.auth_ClientInterface_LackingPermissionForSysproc.name(),
+                new String[] { user.m_name, invocation.procName },
+                null);
+        return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                new VoltTable[0],
+                "User " + user.m_name + " does not have sysproc permission",
+                invocation.clientHandle);
     }
 
 }
