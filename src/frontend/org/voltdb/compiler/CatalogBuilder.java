@@ -116,12 +116,14 @@ public class CatalogBuilder {
         private final boolean adhoc;
         private final boolean sysproc;
         private final boolean defaultproc;
+        private final boolean defaultprocread;
 
-        public GroupInfo(final String name, final boolean adhoc, final boolean sysproc, final boolean defaultproc){
+        public GroupInfo(final String name, final boolean adhoc, final boolean sysproc, final boolean defaultproc, final boolean defaultprocread){
             this.name = name;
             this.adhoc = adhoc;
             this.sysproc = sysproc;
             this.defaultproc = defaultproc;
+            this.defaultprocread = defaultprocread;
         }
 
         @Override
@@ -174,7 +176,7 @@ public class CatalogBuilder {
     public void addGroups(final GroupInfo groups[]) {
         for (final GroupInfo info : groups) {
             transformer.append("CREATE ROLE " + info.name);
-            if(info.adhoc || info.defaultproc || info.sysproc) {
+            if(info.adhoc || info.defaultproc || info.sysproc || info.defaultprocread) {
                 transformer.append(" WITH ");
                 if(info.adhoc) {
                     transformer.append("adhoc,");
@@ -184,6 +186,9 @@ public class CatalogBuilder {
                 }
                 if(info.sysproc) {
                     transformer.append("sysproc,");
+                }
+                if(info.defaultprocread) {
+                    transformer.append("defaultprocread,");
                 }
                 transformer.replace(transformer.length() - 1, transformer.length(), ";");
             }

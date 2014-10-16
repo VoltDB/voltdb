@@ -336,10 +336,10 @@ public abstract class CatalogSchemaTools {
      * @param Group
      */
     public static void toSchema(StringBuilder sb, Group grp) {
-        if (grp.getAdhoc() || grp.getDefaultproc() || grp.getSysproc()) {
+        if (grp.getAdhoc() || grp.getDefaultproc() || grp.getSysproc() || grp.getDefaultprocread()) {
             sb.append("CREATE ROLE " + grp.getTypeName() + " WITH ");
             if (grp.getAdhoc()) {
-                if (grp.getDefaultproc() || grp.getSysproc()) {
+                if (grp.getDefaultproc() || grp.getSysproc() || grp.getDefaultprocread()) {
                     sb.append("ADHOC, ");
                 }
                 else {
@@ -348,7 +348,7 @@ public abstract class CatalogSchemaTools {
                 }
             }
             if (grp.getDefaultproc()) {
-                if (grp.getSysproc()) {
+                if (grp.getSysproc() || grp.getDefaultprocread()) {
                     sb.append("DEFAULTPROC, ");
                 }
                 else {
@@ -357,7 +357,16 @@ public abstract class CatalogSchemaTools {
                 }
             }
             if (grp.getSysproc()) {
-                sb.append("SYSPROC;\n");
+                if (grp.getDefaultprocread()) {
+                    sb.append("SYSPROC, ");
+                }
+                else {
+                    sb.append("SYSPROC;\n");
+                    return;
+                }
+            }
+            if (grp.getDefaultprocread()) {
+                sb.append("DEFAULTPROCREAD;\n");
             }
         }
         else {

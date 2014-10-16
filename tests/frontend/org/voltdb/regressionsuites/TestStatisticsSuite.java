@@ -87,6 +87,21 @@ public class TestStatisticsSuite extends SaveRestoreBase {
                 hostsSeen.add(thisHostId);
             }
         }
+        // Before failing the assert, report details of the non-conforming result.
+        if (HOSTS != hostsSeen.size()) {
+            System.out.println("Something in the following results will fail the assert.");
+            result.resetRowPosition();
+            while (result.advanceRow()) {
+                String procName = result.getString(columnName);
+                Long thisHostId = result.getLong("HOST_ID");
+                if (procName.equalsIgnoreCase(rowId)) {
+                    System.out.println("Found the match at host " + thisHostId + " for proc " + procName +
+                                       (hostsSeen.add(thisHostId) ? " added" : " duplicated"));
+                } else {
+                    System.out.println("Found non-match at host " + thisHostId + " for proc " + procName);
+                }
+            }
+        }
         assertEquals(HOSTS, hostsSeen.size());
     }
 

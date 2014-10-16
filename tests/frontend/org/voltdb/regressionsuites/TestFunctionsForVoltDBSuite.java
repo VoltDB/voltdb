@@ -403,7 +403,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         VoltTable result;
 
         cr = client.callProcedure("@AdHoc", "Delete from P3_INLINE_DESC;");
-        cr = client.callProcedure("P3_INLINE_DESC.insert", 1, "zheng", 10, 1.1);
+        cr = client.callProcedure("P3_INLINE_DESC.insert", 1, "zheng", "zheng2", 10, 1.1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
         // null case
@@ -415,6 +415,40 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             assertEquals(1, result.getRowCount());
             assertTrue(result.advanceRow());
             assertEquals("zheng",result.getString(0));
+
+            cr = client.callProcedure("@AdHoc",
+                                      "select DECODE(id, 1, desc, 'INVALID') from P3_INLINE_DESC where id > 0");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            assertEquals("zheng",result.getString(0));
+
+            cr = client.callProcedure("@AdHoc",
+                    "update P3_INLINE_DESC set desc = DECODE(id, 1, desc2, 'INVALID'), desc2 = DECODE(id, 1, desc, 'INVALID') where id > 0");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            assertEquals(1, result.getLong(0));
+
+            cr = client.callProcedure("@AdHoc",
+                    "select DECODE(id, 1, desc, 'INVALID') from P3_INLINE_DESC where id > 0");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            assertEquals("zheng2",result.getString(0));
+
+            cr = client.callProcedure("@AdHoc",
+                    "select DECODE(id, 1, desc2, 'INVALID') from P3_INLINE_DESC where id > 0");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            assertEquals("zheng",result.getString(0));
+
+
         } catch (ProcCallException pce) {
             System.out.println(pce);
             fail("Looks like a regression of ENG-5078 inline varchar column pass-through by decode");
@@ -1576,7 +1610,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
                 "CREATE TABLE P3_INLINE_DESC ( " +
                 "ID INTEGER DEFAULT '0' NOT NULL, " +
-                "DESC VARCHAR(30), " +
+                "DESC VARCHAR(15), " +
+                "DESC2 VARCHAR(15), " +
                 "NUM INTEGER, " +
                 "RATIO FLOAT, " +
                 "PRIMARY KEY (ID) ); " +
