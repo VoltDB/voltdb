@@ -275,14 +275,16 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         {
             if (m_currentUndoQuantum != NULL && m_currentUndoQuantum->getUndoToken() == undoToken) {
                 m_currentUndoQuantum = NULL;
+                m_executorContext->setupForPlanFragments(NULL);
             }
             m_undoLog.release(undoToken);
         }
 
         void undoUndoToken(int64_t undoToken)
         {
-            m_undoLog.undo(undoToken);
             m_currentUndoQuantum = NULL;
+            m_executorContext->setupForPlanFragments(NULL);
+            m_undoLog.undo(undoToken);
         }
 
         voltdb::UndoQuantum* getCurrentUndoQuantum() { return m_currentUndoQuantum; }

@@ -355,7 +355,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     *reinterpret_cast<int32_t*>(&data.get()[4]) = htonl(static_cast<int32_t>(sb->offset()));
     drStream.m_enabled = false;
     districtTable->setDR(false);
-    sink.apply(&data[4], tables, &pool);
+    sink.apply(&data[4], tables, &pool, NULL);
     drStream.m_enabled = true;
     districtTable->setDR(true);
 
@@ -396,7 +396,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     *reinterpret_cast<int32_t*>(&data.get()[4]) = htonl(static_cast<int32_t>(sb->offset()));
     drStream.m_enabled = false;
     districtTable->setDR(false);
-    sink.apply(&data[4], tables, &pool);
+    sink.apply(&data[4], tables, &pool, NULL);
     drStream.m_enabled = true;
     districtTable->setDR(true);
 
@@ -427,7 +427,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     *reinterpret_cast<int32_t*>(&data.get()[4]) = htonl(static_cast<int32_t>(sb->offset()));
     drStream.m_enabled = false;
     districtTable->setDR(false);
-    sink.apply(&data[4], tables, &pool);
+    sink.apply(&data[4], tables, &pool, NULL);
     drStream.m_enabled = true;
     districtTable->setDR(true);
 

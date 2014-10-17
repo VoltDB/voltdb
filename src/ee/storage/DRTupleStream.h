@@ -64,6 +64,14 @@ public:
                        TableTuple &tuple,
                        DRRecordType type);
 
+    virtual size_t truncateTable(int64_t lastCommittedSpHandle,
+                       char *tableHandle,
+                       std::string tableName,
+                       int64_t txnId,
+                       int64_t spHandle,
+                       int64_t uniqueId,
+                       int64_t spUniqueId);
+
     size_t computeOffsets(TableTuple &tuple,size_t *rowHeaderSz);
 
     void beginTransaction(int64_t uniqueId, int64_t spUniqueId);
@@ -96,6 +104,16 @@ public:
     void pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) {}
 
     void rollbackTo(size_t mark) {}
+
+    size_t truncateTable(int64_t lastCommittedSpHandle,
+                       char *tableHandle,
+                       std::string tableName,
+                       int64_t txnId,
+                       int64_t spHandle,
+                       int64_t uniqueId,
+                       int64_t spUniqueId) {
+        return 0;
+    }
 };
 
 class DRTupleStreamDisableGuard {
