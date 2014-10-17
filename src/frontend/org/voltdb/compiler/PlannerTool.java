@@ -116,8 +116,6 @@ public class PlannerTool {
             // remove any spaces or newlines
             String sql = sqlIn.trim();
 
-            hostLog.debug("received sql stmt: " + sql);
-
             // No caching for forced single partition or forced multi partition SQL,
             // since these options potentially get different plans that may be invalid
             // or sub-optimal in other contexts. Likewise, plans cached from other contexts

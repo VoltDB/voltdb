@@ -382,6 +382,18 @@ public class AuthSystem {
             return false;
         }
 
+        /**
+         * Get group names.
+         * @return group name array
+         */
+        public final String[] getGroupNames() {
+            String[] groupNames = new String[m_groups.size()];
+            for (int i = 0; i < m_groups.size(); ++i) {
+                groupNames[i] = m_groups.get(i).m_name;
+            }
+            return groupNames;
+        }
+
         public boolean authorizeConnector(String connectorClass) {
             if (connectorClass == null) {
                 return false;
@@ -664,6 +676,17 @@ public class AuthSystem {
             return m_authDisabledUser;
         }
         return m_users.get(name);
+    }
+
+    public String[] getGroupNamesForUser(String userName) {
+        if (userName == null) {
+            return new String[] {};
+        }
+        AuthUser user = getUser(userName);
+        if (user == null) {
+            return new String[] {};
+        }
+        return user.getGroupNames();
     }
 
     public class HashAuthenticationRequest extends AuthenticationRequest {
