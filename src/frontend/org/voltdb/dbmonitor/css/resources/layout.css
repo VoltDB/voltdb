@@ -195,7 +195,7 @@ font-size: 14px;
 			ul.nav { margin:0 0 0 50px; padding:0;}
 			ul.nav li { margin:0; padding:0; float:left; font:16px/10px Arial, Helvetica, sans-serif; height:40px;  }
 			ul.nav li a {display:block; margin:0; padding:23px 20px 0 20px; color:#000000; border-right:1px solid #CCCCCC; height:42px;}
-			ul.nav li a:hover, ul.nav li a.active { background:#76bd1d;color:#FFFFFF;}
+			ul.nav li a:hover, ul.nav li a.active, #nav li.active a  { background:#76bd1d;color:#FFFFFF;}
 .headRight { float:right;}
 	ul.topRightList {  margin:0; padding:0;}
 	ul.topRightList li {  margin:0 0 0 5px; padding:20px 0 0 0; float:left;}
@@ -313,7 +313,7 @@ ul.tabs li a {
 	color: #000;
 	display: block;
 	font-size: 1.2em;
-	padding: 0 20px;
+	padding: 0 10px;
 	border: 1px solid #fff;
 	outline: none;
 }
@@ -468,6 +468,7 @@ table.z-table ul li{ list-style-type:disc; list-style-position:outside; margin-l
 .documentation span{float:right; position:relative; top:10px;}
 a.icon-document{background-position: left -942px; padding-left:20px; font-weight:bold; height:30px; line-height:32px; display:inline-block; width:auto;}
 a.icon-document:hover{color:#76bd1d;}
+#schema, #sqlQuery{ display:none;}
 
 /*  Overrides bootstrap */
 .dataBlock .btn{background:#aa1f2f;}

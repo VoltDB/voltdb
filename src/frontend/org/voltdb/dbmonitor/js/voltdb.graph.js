@@ -359,7 +359,7 @@
                 });
         };
 
-        this.RefreshLatency = function (latency, graphView) {
+        this.RefreshLatency = function (latency, graphView, currentTab) {
 
             //Do not plot the point if the passed view is not for the currently chosen view.
             //It might be of remaining the previous AJAX call.
@@ -393,15 +393,17 @@
             dataLat.push({ 'x': new Date(timeStamp), 'y': lat });
             dataLatency[0]["values"] = dataLat;
             MonitorGraphUI.Monitors.latData = dataLat;
-            
-            d3.select("#visualisationLatency")
-               .datum(dataLatency)
-               .transition().duration(500)
-               .call(MonitorGraphUI.ChartLatency);
-            
+
+            if (currentTab == NavigationTabs.DBMonitor) {
+                d3.select("#visualisationLatency")
+                    .datum(dataLatency)
+                    .transition().duration(500)
+                    .call(MonitorGraphUI.ChartLatency);
+            }
+
         };
 
-        this.RefreshMemory = function (memoryDetails, currentServer, graphView) {
+        this.RefreshMemory = function (memoryDetails, currentServer, graphView, currentTab) {
             
             //Do not plot the point if the passed view is not for the currently chosen view.
             //It might be of remaining the previous AJAX call.
@@ -419,15 +421,17 @@
             dataMem.push({ 'x': new Date(memTimeStamp), 'y' : memRss });
             dataRam[0]["values"] = dataMem;
             MonitorGraphUI.Monitors.memData = dataMem;
-            
-            d3.select('#visualisationRam')
-                .datum(dataRam)
-                .transition().duration(500)
-                .call(MonitorGraphUI.ChartRam);
+
+            if (currentTab == NavigationTabs.DBMonitor) {
+                d3.select('#visualisationRam')
+                    .datum(dataRam)
+                    .transition().duration(500)
+                    .call(MonitorGraphUI.ChartRam);
+            }
 
         };
 
-        this.RefreshTransaction = function (transactionDetails, graphView) {
+        this.RefreshTransaction = function (transactionDetails, graphView, currentTab) {
             
             //Do not plot the point if the passed view is not for the currently chosen view.
             //It might be of remaining the previous AJAX call.
@@ -454,14 +458,16 @@
             monitor.lastTimedTransactionCount = currentTimedTransactionCount;
             monitor.lastTimerTick = currentTimerTick;
 
-            d3.select('#visualisationTransaction')
-                .datum(dataTransactions)
-                .transition().duration(500)
-                .call(MonitorGraphUI.ChartTransactions);
+            if (currentTab == NavigationTabs.DBMonitor) {
+                d3.select('#visualisationTransaction')
+                    .datum(dataTransactions)
+                    .transition().duration(500)
+                    .call(MonitorGraphUI.ChartTransactions);
+            }
 
         };
 
-        this.RefreshCpu = function (cpuDetails, currentServer, graphView) {
+        this.RefreshCpu = function (cpuDetails, currentServer, graphView, currentTab) {
             
             //Do not plot the point if the passed view is not for the currently chosen view.
             //It might be of remaining the previous AJAX call.
@@ -479,10 +485,12 @@
             dataCpu[0]["values"] = cpuData;
             MonitorGraphUI.Monitors.cpuData = cpuData;
 
-            d3.select('#visualisationCpu')
-                .datum(dataCpu)
-                .transition().duration(500)
-                .call(MonitorGraphUI.ChartCpu);
+            if (currentTab == NavigationTabs.DBMonitor) {
+                d3.select('#visualisationCpu')
+                    .datum(dataCpu)
+                    .transition().duration(500)
+                    .call(MonitorGraphUI.ChartCpu);
+            }
         };
     });
     
