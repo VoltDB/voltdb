@@ -445,9 +445,11 @@ class ServerBundle(JavaBundle):
                 cli.BooleanOption('-B', '--background', 'daemon',
                                   'run the VoltDB server in the background (as a daemon process)'))
             if self.supports_multiple_daemons:
+                # Keep the -I/--instance option hidden for now.
                 verb.add_options(
                     cli.IntegerOption('-I', '--instance', 'instance',
-                                  'specify an instance number for multiple servers on the same host'))
+                                  #'specify an instance number for multiple servers on the same host'))
+                                  None))
 
     def go(self, verb, runner):
         if self.subcommand == 'create':

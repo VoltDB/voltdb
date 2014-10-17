@@ -41,7 +41,16 @@ LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
 HOST="localhost"
 
-function _copy() {
+function _run() {
+    if [ "$DRYRUN" = "true" ]; then
+        echo "$@"
+    else
+        echo "Command: $@"
+        "$@"
+    fi
+}
+
+function populate() {
     # Prefer to use rsync so that modifications are not overridden.
     if command -v rsync > /dev/null 2>&1; then
         rsync -ur ../../../examples/voter/ddl.sql .
@@ -52,9 +61,28 @@ function _copy() {
     fi
 }
 
+function _info() {
+    if [ "$DRYRUN" != "true" ]; then
+        echo ">>> $@"
+    fi
+}
+
+# Port #:  instance 1: 20000+offset  instance 2: 20010+offset
+function _port() {
+    echo $(($1*10+19990+$2))
+}
+
+function _checkarg() {
+    if [ "$2" != "1" -a "$2" != "2" ]; then
+        echo "Usage: $@ N  (N=1|2)"
+        exit 1
+    fi
+}
+
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar s[12]_[12] d[12]_[12].xml statement-plans catalog-report.html log
+    rm -rf obj debugoutput $APPNAME.jar s[12] d[12].xml statement-plans catalog-report.html log voltdb_crash*.txt
+    rm -f ~/.voltdb_server/*
 }
 
 # remove build artifacts and copied source
@@ -65,69 +93,54 @@ function clean-all() {
 
 # compile the source code for procedures and the client
 function srccompile() {
-    _copy
+    populate
     mkdir -p obj
     javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH -d obj \
         src/voter/*.java \
-        src/voter/procedures/*.java
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
+        src/voter/procedures/*.java || exit 1
 }
 
 # build an application catalog
 function catalog() {
     srccompile
-    echo "Compiling the voter application catalog."
-    echo "To perform this action manually, use the command line: "
-    echo
-    echo "voltdb compile --classpath obj -o $APPNAME.jar ddl.sql"
-    echo
-    $VOLTDB compile --classpath obj -o $APPNAME.jar ddl.sql
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
+    if ! ($VOLTDB compile --classpath obj -o $APPNAME.jar ddl.sql > /dev/null); then
+        echo "Catalog compilation failed"
+        exit 1
+    fi
 }
 
-# Usate: _deployment INSTANCE HOST_COUNT
-function _deployment() {
-    echo "Generating deployment d$1_$2.xml..."
+# Usage: deployment INSTANCE
+function deployment() {
+    _info "Generating deployment d$1.xml..."
     echo "\
 <?xml version=\"1.0\"?>
 <deployment>
-    <cluster hostcount=\"$2\" kfactor=\"0\" />
+    <cluster hostcount=\"1\" kfactor=\"0\" />
     <httpd enabled=\"true\">
         <jsonapi enabled=\"true\" />
     </httpd>
     <paths>
-        <voltdbroot path=\"s$1_$2/voltdbroot\" />
+        <voltdbroot path=\"s$1/voltdbroot\" />
         <snapshots path=\"snapshots\" />
         <commandlog path=\"commandlog\" />
         <commandlogsnapshot path=\"commandlog/snapshots\" />
     </paths>
 </deployment>
-" > d$1_$2.xml
+" > d$1.xml
 }
 
-# Port #:  instance 1: 20000+offset  instance 2: 20010+offset
-function _port() {
-    echo $(($1*10+19990+$2))
-}
-
-# Usage: _server INSTANCE HOST_COUNT
-function _server() {
+# Usage: server INSTANCE
+function server() {
+    _checkarg server "$@"
+    deployment $1
     test -f $APPNAME.jar || catalog
-    test -d s$1_$2/voltdbroot/snapshots || mkdir -p s$1_$2/voltdbroot/snapshots
-    local CMD
-    if [ $2 -eq 1 ]; then
-        CMD="$VOLTDB create -B"
-    else
-        CMD="$VOLTDB create -B -I $1"
-    fi
+    test -d s$1/voltdbroot || mkdir -p s$1/voltdbroot
     # Replication port needs to be the last assigned port #, including
     # the RMI port, because it consumes more than one port number.
-    CMD="$CMD \
--d d$1_$2.xml \
+    local CMD="$VOLTDB create -B \
+-d d$1.xml \
 -l $LICENSE \
--H localhost:$(_port 1 1) \
+-H localhost:$(_port $1 1) \
 --internal=$(_port $1 2) \
 --zookeeper=$(_port $1 3) \
 --http=$(_port $1 4) \
@@ -136,45 +149,19 @@ function _server() {
 --replication=$(_port $1 8) \
 $APPNAME.jar"
     local VOLTDB_OPTS=-Dvolt.rmi.agent.port=$(_port $1 7)
-    echo "Starting VoltDB daemon $1 (host count: $2)..."
-    echo "Command: VOLTDB_OPTS=$VOLTDB_OPTS $CMD"
-    VOLTDB_OPTS=$VOLTDB_OPTS $CMD
+    _info "Starting VoltDB daemon $1 (VOLTDB_OPTS=$VOLTDB_OPTS)..."
+    VOLTDB_OPTS=$VOLTDB_OPTS _run $CMD
 }
 
-# Single server
-function create1() {
-    _deployment 1 1
-    _server 1 1
-    echo ">>>>> Tailing log (Ctrl-C stops tail, not server)..."
-    watch1
+function watch() {
+    _run tail -F ~/.voltdb_server/localhost_200[01]1*.out
 }
 
-# Dual server
-function create2() {
-    _deployment 1 2
-    _deployment 2 2
-    _server 1 2
-    sleep 5
-    _server 2 2
-    echo ">>>>> Tailing logs (Ctrl-C stops tail, not server)..."
-    watch2
-}
-
-# Single server
-function watch1() {
-    echo "Command: tail -F ~/.voltdb_server/localhost_$(_port 1 1).out"
-    tail -F ~/.voltdb_server/localhost_$(_port 1 1).out
-}
-
-# Dual server
-function watch2() {
-    echo "Command: tail -F ~/.voltdb_server/localhost_$(_port 1 1)_1.out ~/.voltdb_server/localhost_$(_port 1 1)_2.out"
-    tail -F ~/.voltdb_server/localhost_$(_port 1 1)_1.out ~/.voltdb_server/localhost_$(_port 1 1)_2.out
-}
-
-function _client() {
+# Usage: client INSTANCE
+function client() {
+    _checkarg client "$@"
     test -d obj || srccompile
-    java -classpath obj:$CLIENTCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    _run java -classpath obj:$CLIENTCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voter.AsyncBenchmark \
         --displayinterval=5 \
         --warmup=5 \
@@ -184,41 +171,22 @@ function _client() {
         --maxvotes=2
 }
 
-# Single server
-function client1() {
-    _client 1 1
-}
-
-# Dual server
-function client2() {
-    _client 1 2
-    _client 2 2
-}
-
-function _stop() {
-    if [ $2 -eq 1 ]; then
-        echo "Command: $VOLTDB stop -H localhost:$(_port 1 1)"
-        $VOLTDB stop -H localhost:$(_port 1 1)
-    else
-        echo "Command: $VOLTDB stop -H localhost:$(_port 1 1) -I $1"
-        $VOLTDB stop -H localhost:$(_port 1 1) -I $1
-    fi
-}
-
-# Single server
-function stop1() {
-    _stop 1 1
-}
-
-# Dual server
-function stop2() {
-    _stop 1 2
-    _stop 2 2
+# Usage: stop INSTANCE
+function stop() {
+    _checkarg stop "$@"
+    _run $VOLTDB stop -H localhost:$(_port $1 1)
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|clean-all|catalog|create1|create2|client1|client2|watch1|watch2|stop1|stop2}"
+    echo "Usage: ./run.sh {clean|clean-all|catalog|server N|client N|stop N|watch}"
 }
+
+if [ "$1" = "-n" -o "$1" = "--dry-run" ]; then
+    export DRYRUN=true
+    shift
+else
+    export DRYRUN=false
+fi
 
 # Run the target passed as the first arg on the command line
 # If no first arg, run server
