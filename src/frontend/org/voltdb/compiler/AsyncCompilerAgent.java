@@ -41,7 +41,6 @@ import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 public class AsyncCompilerAgent {
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
-    static final VoltLogger ahpLog = new VoltLogger("ADHOCPLANNERTHREAD");
     private static final VoltLogger adhocLog = new VoltLogger("ADHOC");
 
     // if more than this amount of work is queued, reject new work

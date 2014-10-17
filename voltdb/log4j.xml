@@ -56,10 +56,6 @@
         <level value="INFO"/>
     </logger -->
 
-    <!-- logger name="ADHOCPLANNERTHREAD">
-        <level value="INFO"/>
-    </logger -->
-
     <!-- logger name="ADHOC">
         <level value="INFO"/>
     </logger -->
