@@ -167,6 +167,11 @@ public class PerPartitionTable {
         }
     }
 
+    /**
+     * Flush all queued rows even if they are smaller than the batch size. This does not
+     * guarantee that they will be reinserted if any of them fail. To make sure all rows
+     * are either inserted or failed definitively, call shutdown().
+     */
     Future<?> flushAllTableQueues() throws InterruptedException {
         return m_es.submit(new Callable<Boolean>() {
             @Override

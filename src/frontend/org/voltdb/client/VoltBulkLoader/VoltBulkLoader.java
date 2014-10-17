@@ -369,7 +369,13 @@ public class VoltBulkLoader {
                 loaderLog.error("Failed to drain all buffers, some tuples may not be inserted yet.", e);
             }
         }
-        m_clientImpl.drain();
+
+        // Draining the client doesn't guarantee that all failed rows are re-inserted, need to
+        // loop until the outstanding row count reaches 0.
+        while (m_loaderBatchedRowCnt.get() != 0) {
+            m_clientImpl.drain();
+            Thread.yield();
+        }
 
         assert(m_loaderBatchedRowCnt.get() == 0 && m_loaderQueuedRowCnt.get() == 0);
     }
