@@ -60,7 +60,7 @@
         <level value="INFO"/>
     </logger -->
 
-    <!-- logger name="ADHO">
+    <!-- logger name="ADHOC">
         <level value="INFO"/>
     </logger -->
 

@@ -355,9 +355,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             m_socket.socket().setKeepAlive(true);
 
                             if (handler instanceof ClientInputHandler) {
-                                @SuppressWarnings("unused")
-                                final Connection c
-                                        = m_network.registerChannel(
+                                m_network.registerChannel(
                                                 m_socket,
                                                 handler,
                                                 0,
@@ -962,10 +960,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     return false;
                 }
 
-                @SuppressWarnings("unused")
-                int partitionParamIndex = catProc.getPartitionparameter();
-                @SuppressWarnings("unused")
-                int partitionParamType = catProc.getPartitioncolumn().getType();
                 boolean isReadonly = catProc.getReadonly();
 
                 try {
@@ -2002,9 +1996,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     }
 
     private ClientResponseImpl dispatchStopNode(StoredProcedureInvocation task) {
-        @SuppressWarnings("unused")
-        VoltTable table = new VoltTable(
-                new ColumnInfo("RESULT", VoltType.STRING));
         Object params[] = task.getParams().toArray();
         if (params.length != 1 || params[0] == null) {
             return new ClientResponseImpl(
