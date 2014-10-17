@@ -17,11 +17,9 @@
 
 package org.voltdb.client.VoltBulkLoader;
 
-import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Stack;
 import java.util.TreeMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
@@ -102,32 +100,10 @@ public class VoltBulkLoader {
     private final ScheduledThreadPoolExecutor m_ses = CoreUtils.getScheduledThreadPoolExecutor("Periodic-Flush", 1, CoreUtils.SMALL_STACK_SIZE);
     private ScheduledFuture<?> m_flush = null;
 
-    //Number of rows inserted into the PerPartitionTable queues.
-    final AtomicLong m_loaderQueuedRowCnt = new AtomicLong(0);
-    //Number of rows removed from PerPartitionTable queue converted to VoltTable and submitted to Client
-    final AtomicLong m_loaderBatchedRowCnt = new AtomicLong(0);
+    // Number of rows currently being processed.
+    final AtomicLong m_outstandingRowCount = new AtomicLong(0);
     //Number of rows for which we have received a definitive success or failure.
     final AtomicLong m_loaderCompletedCnt = new AtomicLong(0);
-    //Number of rows failed to be inserted after retry
-    final AtomicLong m_loaderFailedRowCnt = new AtomicLong(0);
-
-    // Permanent set of all outstanding batches organized by partitionId
-    final ArrayList<LoaderSpecificRowCnt>[] m_outstandingRowCnts;
-    // Stack of entries in outstandingRowCnts that are not being used organized by partitionId
-    final Stack m_availLoaderPairs;
-    // LoaderPair currently being built by a PerPartitionTable organized by partitionId
-    final LoaderSpecificRowCnt[] m_currBatchPair;
-
-
-    // Object maintains the running row count for each VoltBulkLoader in a given batch
-    static class LoaderSpecificRowCnt {
-        VoltBulkLoader loader;
-        int rowCnt;
-        public LoaderSpecificRowCnt(VoltBulkLoader l, int c){
-            this.loader = l;
-            this.rowCnt = c;
-        }
-    }
 
     // Constructor allocated through the Client to ensure consistency of VoltBulkLoaderGlobals
     public VoltBulkLoader(BulkLoaderState vblGlobals, String tableName, int maxBatchSize,
@@ -224,13 +200,7 @@ public class VoltBulkLoader {
             m_firstPartitionTable = m_maxPartitionProcessors-1;
             m_lastPartitionTable = m_maxPartitionProcessors-1;
             m_procName = "@LoadMultipartitionTable" ;
-       }
-
-        // Set up LoaderPair tables for managing multi-loader statistics
-        m_outstandingRowCnts = (ArrayList<LoaderSpecificRowCnt>[])
-                Array.newInstance(ArrayList.class, m_maxPartitionProcessors);
-        m_availLoaderPairs = new Stack();
-        m_currBatchPair = new LoaderSpecificRowCnt[m_maxPartitionProcessors];
+        }
 
         List<VoltBulkLoader> loaderList = m_vblGlobals.m_TableNameToLoader.get(m_tableName);
         if (loaderList == null) {
@@ -240,7 +210,6 @@ public class VoltBulkLoader {
             for(int i=m_firstPartitionTable; i<=m_lastPartitionTable; i++) {
                 m_partitionTable[i] = new PerPartitionTable(m_clientImpl, m_tableName,
                         i, i == m_maxPartitionProcessors-1, this, maxBatchSize);
-                m_outstandingRowCnts[i] = new ArrayList<LoaderSpecificRowCnt>();
             }
             loaderList = new ArrayList<VoltBulkLoader>();
             loaderList.add(this);
@@ -255,7 +224,6 @@ public class VoltBulkLoader {
                 if (primary.m_maxBatchSize != maxBatchSize) {
                     m_partitionTable[i].updateMinBatchTriggerSize(maxBatchSize);
                 }
-                m_outstandingRowCnts[i] = new ArrayList<LoaderSpecificRowCnt>();
             }
         }
     }
@@ -338,7 +306,7 @@ public class VoltBulkLoader {
                 return;
             }
         }
-        m_loaderQueuedRowCnt.incrementAndGet();
+        m_outstandingRowCount.incrementAndGet();
     }
 
     /**
@@ -372,12 +340,10 @@ public class VoltBulkLoader {
 
         // Draining the client doesn't guarantee that all failed rows are re-inserted, need to
         // loop until the outstanding row count reaches 0.
-        while (m_loaderBatchedRowCnt.get() != 0) {
+        while (m_outstandingRowCount.get() != 0) {
             m_clientImpl.drain();
             Thread.yield();
         }
-
-        assert(m_loaderBatchedRowCnt.get() == 0 && m_loaderQueuedRowCnt.get() == 0);
     }
 
     /**
@@ -415,9 +381,9 @@ public class VoltBulkLoader {
                     }
                 }
             }
-
-            assert(m_loaderBatchedRowCnt.get() == 0 && m_loaderQueuedRowCnt.get() == 0);
         }
+
+        assert m_outstandingRowCount.get() == 0;
     }
 
     /**
@@ -435,7 +401,7 @@ public class VoltBulkLoader {
      *  but have not been processed by the Client
      */
     public long getOutstandingRowCount() {
-        return m_loaderQueuedRowCnt.get() + m_loaderBatchedRowCnt.get();
+        return m_outstandingRowCount.get();
     }
 
     /**

@@ -19,7 +19,6 @@ package org.voltdb.client.VoltBulkLoader;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.EmptyStackException;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.concurrent.Callable;
@@ -28,6 +27,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
@@ -41,7 +41,6 @@ import org.voltdb.VoltTypeException;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
-import org.voltdb.client.VoltBulkLoader.VoltBulkLoader.LoaderSpecificRowCnt;
 
 /**
  * Partition specific table potentially shared by multiple VoltBulkLoader instances,
@@ -81,11 +80,9 @@ public class PerPartitionTable {
     // batch of rows to m_failedQueue for row by row processing on m_failureProcessor.
     class PartitionProcedureCallback implements ProcedureCallback {
         final List<VoltBulkLoaderRow> m_batchRowList;
-        final private List<LoaderSpecificRowCnt> m_waitingLoaders;
 
-        PartitionProcedureCallback(List<VoltBulkLoaderRow> batchRowList, List<LoaderSpecificRowCnt> waitingLoaders) {
+        PartitionProcedureCallback(List<VoltBulkLoaderRow> batchRowList) {
             m_batchRowList = batchRowList;
-            m_waitingLoaders = waitingLoaders;
         }
 
         // Called by Client to inform us of the status of the bulk insert.
@@ -105,12 +102,8 @@ public class PerPartitionTable {
                 });
             }
             else {
-                // Update statistics for all BulkLoaders
-                for (LoaderSpecificRowCnt currPair : m_waitingLoaders) {
-                    currPair.loader.m_loaderBatchedRowCnt.addAndGet(-1*currPair.rowCnt);
-                    currPair.loader.m_loaderCompletedCnt.addAndGet(currPair.rowCnt);
-                    currPair.loader.m_availLoaderPairs.push(currPair);
-                }
+                m_batchRowList.get(0).m_loader.m_outstandingRowCount.addAndGet(-1 * m_batchRowList.size());
+                m_batchRowList.get(0).m_loader.m_loaderCompletedCnt.addAndGet(m_batchRowList.size());
             }
         }
     }
@@ -214,13 +207,11 @@ public class PerPartitionTable {
             ProcedureCallback callback = new ProcedureCallback() {
                 @Override
                 public void clientCallback(ClientResponse response) throws Exception {
-                    row.m_loader.m_loaderBatchedRowCnt.decrementAndGet();
+                    row.m_loader.m_outstandingRowCount.decrementAndGet();
                     row.m_loader.m_loaderCompletedCnt.incrementAndGet();
 
                     //one insert at a time callback
                     if (response.getStatus() != ClientResponse.SUCCESS) {
-                        // Insert failed (update per BulkLoader statistics)
-                        row.m_loader.m_loaderFailedRowCnt.incrementAndGet();
                         row.m_loader.m_notificationCallBack.failureCallback(row.m_rowHandle, row.m_rowData, response);
                     }
                 }
@@ -231,8 +222,6 @@ public class PerPartitionTable {
     }
 
     private PartitionProcedureCallback buildTable() {
-        ArrayList<LoaderSpecificRowCnt> usedLoaderList = new
-                ArrayList<LoaderSpecificRowCnt>();
         ArrayList<VoltBulkLoaderRow> buf = new ArrayList<VoltBulkLoaderRow>(m_minBatchTriggerSize);
         m_partitionRowQueue.drainTo(buf, m_minBatchTriggerSize);
         ListIterator<VoltBulkLoaderRow> it = buf.listIterator();
@@ -249,34 +238,14 @@ public class PerPartitionTable {
                 }
             } catch (VoltTypeException e) {
                 loader.generateError(currRow.m_rowHandle, currRow.m_rowData, e.getMessage());
-                loader.m_loaderQueuedRowCnt.decrementAndGet();
+                loader.m_outstandingRowCount.decrementAndGet();
                 it.remove();
                 continue;
             }
             table.addRow(row_args);
-
-            // Maintain per loader state
-            LoaderSpecificRowCnt currLoaderPair = loader.m_currBatchPair[m_partitionId];
-            if (currLoaderPair == null) {
-                try {
-                    currLoaderPair = (LoaderSpecificRowCnt)loader.m_availLoaderPairs.pop();
-                } catch (EmptyStackException e) {
-                    currLoaderPair = new LoaderSpecificRowCnt(loader, 0);
-                    loader.m_outstandingRowCnts[m_partitionId].add(currLoaderPair);
-                }
-                currLoaderPair.rowCnt = 0;
-                usedLoaderList.add(currLoaderPair);
-                loader.m_currBatchPair[m_partitionId] = currLoaderPair;
-            }
-            currLoaderPair.rowCnt++;
-        }
-        for (LoaderSpecificRowCnt currPair : usedLoaderList) {
-            currPair.loader.m_currBatchPair[m_partitionId] = null;
-            currPair.loader.m_loaderBatchedRowCnt.addAndGet(currPair.rowCnt);
-            currPair.loader.m_loaderQueuedRowCnt.addAndGet(-1*currPair.rowCnt);
         }
 
-        return new PartitionProcedureCallback(buf, usedLoaderList);
+        return new PartitionProcedureCallback(buf);
     }
 
     private void loadTable(ProcedureCallback callback, VoltTable toSend) throws Exception {
