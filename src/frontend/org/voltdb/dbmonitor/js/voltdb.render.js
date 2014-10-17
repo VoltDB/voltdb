@@ -1305,7 +1305,6 @@ function alertNodeClicked(obj) {
             connection.Metadata['views'] = views;
 
             for (var i = 0; i < rawColumns.length; i++) {
-                var Type = 'tables';
                 var TableName = rawColumns[i][2].toUpperCase();
                 if (connection.Metadata['tables'][TableName] != null) {
                     if (connection.Metadata['tables'][TableName].columns == null) {
@@ -1343,7 +1342,7 @@ function alertNodeClicked(obj) {
                     connTypeParams[connTypeParams.length] = procParams[p].type;
                 }
 
-                // make the procedure callable.
+                //// make the procedure callable.
                 connection.procedures[procName] = {};
                 connection.procedures[procName]['' + connTypeParams.length] = connTypeParams;
             }
@@ -1354,8 +1353,8 @@ function alertNodeClicked(obj) {
             if (!viewsData.hasOwnProperty('views')) {
                 viewsData['views'] = {};
             }
-            if (!procedureData.hasOwnProperty('procedures')) {
-                procedureData['procedures'] = {};
+            if (!proceduresData.hasOwnProperty('procedures')) {
+                proceduresData['procedures'] = {};
             }
             if (!procedureColumnsData.hasOwnProperty('procedureColumns')) {
                 procedureColumnsData['procedureColumns'] = {};

@@ -9,6 +9,12 @@
     <meta name="author" content="">
     <link href="css/resources/layout.css" rel="stylesheet" />
     <link href="css/resources/nv.d3.css" rel="stylesheet" />
+    <link  href="css/resources/tablesorter.css" rel="stylesheet" />
+
+    <link href="http://assets.voltdb.com/b/css/bootstrap.min.css" id="styleBootstrapMin" disabled="disabled" rel="stylesheet">
+    <link href="http://assets.voltdb.com/b/css/bootstrap-responsive.css" id="styleBootstrapResponsive" disabled="disabled" rel="stylesheet">
+    <link href="http://assets.voltdb.com/t/css/theme.bootstrap.css" id="styleThemeBootstrap" disabled="disabled"  rel="stylesheet">
+
     <script type="text/javascript" src="js/jquery-1.11.1.min.js"></script>
     <script type="text/javascript" src="js/d3/d3.v3.js"></script>
     <script type="text/javascript" src="js/d3/nv.d3.min.js"></script>
@@ -17,13 +23,21 @@
     <script type="text/javascript" src="js/jquery.cookie.js"></script>
     <script type="text/javascript" src="js/voltdb-js.js"></script>
     <script type="application/javascript" src="js/jquery.crypt.js"></script>
-    
+    <script type="application/javascript" src="js/jquery-ui.js"></script>
+
     <script type="text/javascript" src="js/voltdb.core.js"></script>
     <script type="text/javascript" src="js/voltdb.service.js"></script>
     <script type="text/javascript" src="js/voltdb.render.js"></script>
     <script type="text/javascript" src="js/voltdb.ui.js"></script>
     <script type="text/javascript" src="js/voltdb.graph.js"></script>
     <script type="text/javascript" src="js/volddb.config.js"></script>
+
+    <script type="text/javascript" src="js/jquery.tooltipster.js"></script>
+    <script type="text/javascript" src="js/voltdb.sqlquery.ui.js"></script>
+    <script type="text/javascript" src="js/voltdb.queryrender.js"></script>
+    <script type="text/javascript" src="js/sorttable.js"></script>
+    <script type="text/javascript" src="js/shortcut.js"></script>
+    <script type="text/javascript" src="js/jquery.getSelectedText.min.js"></script>
 </head>
 
 <body>
@@ -36,9 +50,12 @@
          <div class="toggleMenu" id="toggleMenu">Menu</div>
         <nav id="nav">
               <ul>
-                  <li><a href="index.htm" class="active">DB Monitor</a></li>
+                  <!--<li><a href="index.htm" class="active">DB Monitor</a></li>
                   <li><a href="catalog.html">Schema</a></li>
-                  <li><a href="studio/index.htm">SQL Query</a></li>
+                  <li><a href="studio/index.htm">SQL Query</a></li>-->
+                  <li id="navDbmonitor" class="active"><a href="#" class="linkFirst">DB Monitor</a></li>
+                  <li id="navSchema"><a href="#">Schema</a></li>
+                  <li id="navSqlQuery"><a href="#">SQL Query</a></li>
               </ul>
    		 </nav>
       </div>
@@ -56,125 +73,125 @@
     </div>
     <div class="clear"></div>
   </div>
-  <div class="container" id="containerMain">
-    <div class="clusterDetailsWrapper" id="clusterDetails">
-    <div class="clusterDetailsContLeft" id="clusterDetailsLeft">
+    <div class="contents">
+        <div class="container" id="containerMain">
+            <div class="clusterDetailsWrapper" id="clusterDetails">
+                <div class="clusterDetailsContLeft" id="clusterDetailsLeft">
     
-    <h1 class="headText clusterIcon">Cluster</h1>
-    <ul class="clusterStat" id="clusterHealth">
-    <li class="activeIcon">Active <span>()</span></li>
-    <li class="joiningIcon">Joining <span>()</span></li>
-    <li class="missingIcon">Missing <span>()</span></li>
-    <li style="display: none;" class="alertIcon" ><a href="#memoryAlerts" id="showMemoryAlerts">Alert <span>()</span></a></li>
-    </ul>
-    <div class="clear"></div>
+                    <h1 class="headText clusterIcon">Cluster</h1>
+                    <ul class="clusterStat" id="clusterHealth">
+                        <li class="activeIcon">Active <span>()</span></li>
+                        <li class="joiningIcon">Joining <span>()</span></li>
+                        <li class="missingIcon">Missing <span>()</span></li>
+                        <li style="display: none;" class="alertIcon" ><a href="#memoryAlerts" id="showMemoryAlerts">Alert <span>()</span></a></li>
+                    </ul>
+                    <div class="clear"></div>
     
     
-    </div>
-    <div class="clusterDetailsContRight"  id="clusterDetailsRight">
-    <ul class="serverStat" id="serverStatSection">
-    <li>Monitoring</li>
-    <li class="activeServerName" id="activeServerName" title=""></li>
+                </div>
+                <div class="clusterDetailsContRight"  id="clusterDetailsRight">
+                    <ul class="serverStat" id="serverStatSection">
+                        <li>Monitoring</li>
+                        <li class="activeServerName" id="activeServerName" title=""></li>
     
-    </ul>
+                    </ul>
     
-    <div style="float:right; padding:0 0 0 10px;"> <a href="#" id="btnPopServerList" class="btn showServers">Server</a></div>
+                    <div style="float:right; padding:0 0 0 10px;"> <a href="#" id="btnPopServerList" class="btn showServers">Server</a></div>
     
-    <div class="clear"></div>
-    </div>
-    <div class="clear"></div>
+                    <div class="clear"></div>
+                </div>
+                <div class="clear"></div>
     
      
-      <!-- Server List popup-->
-      <div id="popServerList" style="display:none;">
-        <div class="slide-pop-wrapper">
-          <div class="slide-pop-title">
-          <div class="icon-server searchLeft">Servers</div>      
+                <!-- Server List popup-->
+                <div id="popServerList" style="display:none;">
+                    <div class="slide-pop-wrapper">
+                        <div class="slide-pop-title">
+                            <div class="icon-server searchLeft">Servers</div>      
           
-          <div class="searchRight">
-            <div class="search">
-              <input type="text" id="popServerSearch" class="icon-search" onclick="this.value='';" onblur="this.value=!this.value?'Search Server':this.value;" value="Search Server" />
-            </div>
-            <div class="thresholdVal">Alert Threshold
-            	<input type="text" id="threshold" class="theVal" maxlength="3" />%
-                 <a href="#" id="saveThreshold" class="setVal">Set</a>
-            </div>
-             <div class="clear"></div>
-            </div>
-            <div class="clear"></div>
-          </div>
-          <div class="slide-pop-content">
-          <div class="server-info-heading">
-          <span class="server">Server Name</span>
-          <span class="memory-use">Memory Usage</span>
-          <div class="clear"></div>
+                            <div class="searchRight">
+                                <div class="search">
+                                    <input type="text" id="popServerSearch" class="icon-search" onclick="this.value='';" onblur="this.value=!this.value?'Search Server':this.value;" value="Search Server" />
+                                </div>
+                                <div class="thresholdVal">Alert Threshold
+                                    <input type="text" id="threshold" class="theVal" maxlength="3" />%
+                                    <a href="#" id="saveThreshold" class="setVal">Set</a>
+                                </div>
+                                <div class="clear"></div>
+                            </div>
+                            <div class="clear"></div>
+                        </div>
+                        <div class="slide-pop-content">
+                            <div class="server-info-heading">
+                                <span class="server">Server Name</span>
+                                <span class="memory-use">Memory Usage</span>
+                                <div class="clear"></div>
           
-          </div>
-            <div id="serverListWrapper">            
-              <ul class="servers-list" id="serversList">
-              </ul>
+                            </div>
+                            <div id="serverListWrapper">            
+                                <ul class="servers-list" id="serversList">
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="content displayPre" id="contentServer">
-      <div class="leftShowhide">
-        <div id="GraphBlock" style="padding-bottom:8px;">
-          <h1 class="headText1"><a href="#" id="showHideGraphBlock" class="showhideIcon expanded arrowAdjust">Show/Hide Graph</a></h1>
-        </div>
-      </div>
-      <div class="rightShowhide">
-        <ul class="rightShowhideList" id="showHideRightlist">
-          <li class="viewSelect">
-            <label>View</label>
-            <select id="graphView">
-              <option selected="selected">Seconds</option>
-              <option>Minutes</option>
-              <option>Days</option>
-            </select>
-          </li>
-         
-        </ul>
-        <div class="preBtn">
-        <a href="#myPreference" class="btn" id="showMyPreference">Display Preference</a>
-        </div>
-      </div>
-      <div class="clear"></div>
-    </div>
-    <div id="graphBlock">
-    <div class="graphChart" id="graphChart">
-      <div id="chartServerCPU" class="chart">
-        <div class="chartHeader" id="chartHead">
-                <h1>Server CPU <span class="activeServerName" title=""></span></h1>
+            <div class="content displayPre" id="contentServer">
+                <div class="leftShowhide">
+                    <div id="GraphBlock"  class="">
+                        <h1 class="headText1"><a href="#" id="showHideGraphBlock" class="showhideIcon expanded arrowAdjust">Show/Hide Graph</a></h1>
+                    </div>
+                </div>
+                <div class="rightShowhide">
+                    <ul class="rightShowhideList" id="showHideRightlist">
+                        <li class="viewSelect">
+                            <label>View</label>
+                            <select id="graphView">
+                                <option selected="selected">Seconds</option>
+                                <option>Minutes</option>
+                                <option>Days</option>
+                            </select>
+                        </li>
+                    </ul>
+                    <div class="preBtn">
+                        <a href="#myPreference" class="btn" id="showMyPreference">Display Preference</a>
+                    </div>
+                </div>
+                <div class="clear"></div>
             </div>
+            <div id="graphBlock">
+                <div class="graphChart" id="graphChart">
+                    <div id="chartServerCPU" class="chart">
+                        <div class="chartHeader" id="chartHead">
+                            <h1>Server CPU <span class="activeServerName" title=""></span></h1>
+                        </div>
           
-          <svg id="visualisationCpu" width="100%" height="350"></svg>
+                        <svg id="visualisationCpu" width="100%" height="350"></svg>
         
-      </div>
-      <div id="chartServerRAM" class="chart">
-        <div class="chartHeader" id="chartRamHeader">
-            <h1>Server RAM<span class="activeServerName" title=""></span></h1>
-            </div>
+                    </div>
+                    <div id="chartServerRAM" class="chart">
+                        <div class="chartHeader" id="chartRamHeader">
+                            <h1>Server RAM<span class="activeServerName" title=""></span></h1>
+                        </div>
                    
-          <svg id="visualisationRam" width="100%" height="400"></svg>
+                        <svg id="visualisationRam" width="100%" height="400"></svg>
           
-      </div>
-      <div id="chartClusterLatency" class="chart">
-        <div class="chartHeader">
-            <h1>Cluster Latency (99th percentile, ms)</h1>
-            </div>
+                    </div>
+                    <div id="chartClusterLatency" class="chart">
+                        <div class="chartHeader">
+                            <h1>Cluster Latency (99th percentile, ms)</h1>
+                        </div>
                      
-          <svg id="visualisationLatency" width="100%" height="400"></svg>
+                        <svg id="visualisationLatency" width="100%" height="400"></svg>
           
         
-      </div>
-      <div id="chartClusterTransactions"class="chart">
-        <div class="chartHeader">
-            <h1>Cluster Transactions (tps)</h1>
-            </div>
+                    </div>
+                    <div id="chartClusterTransactions"class="chart">
+                        <div class="chartHeader">
+                            <h1>Cluster Transactions (tps)</h1>
+                        </div>
                      
-          <svg id="visualisationTransaction" width="100%" height="400"></svg>        
+                        <svg id="visualisationTransaction" width="100%" height="400"></svg>        
         
       </div>
       <div class="clear"></div>
@@ -192,57 +209,141 @@
               	<div class="filter"><input name="filter" id="filterStoredProc" type="text" class="search-box" onblur="this.value=!this.value?'Search Stored Procedures':this.value;" value="Search Stored Procedures" placeholder="Search Stored Procedures" /><a id="searchStoredProc" href="javascript:void(0)" class="icon-search" title="Search">search</a></div>
                 <div class="pagination">
                     <a id="previousProcedures" href="javascript:void(0)" class="prev" title="Previous Page">Prev</a>Page <label id="lblPrevious"></label>of<label id="lblTotalPages" ></label><a id="nextProcedures" href="javascript:void(0)" class="next"title="Next Page">Next</a>
-                </div>
-<div class="clear"></div>
-              </div>
-               <div class="tblScroll">
-              <table width="100%" border="0" cellspacing="0" cellpadding="0" class="storeTbl">
-                <thead>
-                  <tr>
-                    <th width="30%" class="breakWord">Stored Procedure</th>
-                    <th width="10%">Invocations</th>
-                    <th width="15%">Min Latency (ms)</th>
-                    <th width="15%">Max Latency (ms)</th>
-                    <th width="15%">Avg Latency (ms)</th>
-                    <th width="15%">% Time of Execution</th>
-                  </tr>
-                  </thead>
-                  <tbody id="storeProcedureBody">                
-                  </tbody>
-                </table>
-                </div>
-        </div>
+                                </div>
+                                <div class="clear"></div>
+                            </div>
+                            <div class="tblScroll">
+                                <table width="100%" border="0" cellspacing="0" cellpadding="0" class="storeTbl">
+                                    <thead>
+                                        <tr>
+                                            <th width="30%" class="breakWord">Stored Procedure</th>
+                                            <th width="10%">Invocations</th>
+                                            <th width="15%">Min Latency (ms)</th>
+                                            <th width="15%">Max Latency (ms)</th>
+                                            <th width="15%">Avg Latency (ms)</th>
+                                            <th width="15%">% Time of Execution</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="storeProcedureBody">                
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
         
-        <div id="tblDataTables" class="dataTablesWrapper">	
-        	<div class="tabs-filter-wrapper">
-            <div class="tableTitle icon-tables">Database Tables</div>
-              	<div class="filter"><input name="filter" id="filterDatabaseTable" type="text" class="search-box" onblur="this.value=!this.value?'Search Database Tables':this.value;" value="Search Database Tables" placeholder="Search Database Tables" /><a id="searchDataTable" href="javascript:void(0)" class="icon-search" title="Search">search</a></div>
-                <div class="pagination">
-                	<a id="previousTables" href="javascript:void(0)" class="prev" title="Previous Page">Prev</a>Page<label id="lblPreviousTable"></label>of<label id="lblTotalPagesofTables"></label><a id="nextTables" href="javascript:void(0)" class="next"title="Next Page">Next</a>
+                        <div id="tblDataTables" class="dataTablesWrapper">	
+                            <div class="tabs-filter-wrapper">
+                                <div class="tableTitle icon-tables">Database Tables</div>
+                                <div class="filter"><input name="filter" id="filterDatabaseTable" type="text" class="search-box" onblur="this.value=!this.value?'Search Database Tables':this.value;" value="Search Database Tables" placeholder="Search Database Tables" /><a id="searchDataTable" href="javascript:void(0)" class="icon-search" title="Search">search</a></div>
+                                <div class="pagination">
+                                    <a id="previousTables" href="javascript:void(0)" class="prev" title="Previous Page">Prev</a>Page<label id="lblPreviousTable"></label>of<label id="lblTotalPagesofTables"></label><a id="nextTables" href="javascript:void(0)" class="next"title="Next Page">Next</a>
+                                </div>
+                                <div class="clear"></div>
+                            </div>
+                            <div class="tblScroll">
+                                <table width="100%" border="0" cellspacing="0" cellpadding="0" class="dbTbl">
+                                    <thead>
+                                        <tr>
+                                            <th width="30%" class="breakWord">Table</th>
+                                            <th width="10%">Row Count</th>
+                                            <th width="15%">Max Rows (per partition)</th>
+                                            <th width="15%">Min Rows (per partition)</th>
+                                            <th width="15%">Avg Rows (per partition)</th>
+                                            <th width="15%">Type</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tablesBody">
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-<div class="clear"></div>
-              </div>
-               <div class="tblScroll">
-              <table width="100%" border="0" cellspacing="0" cellpadding="0" class="dbTbl">
-              <thead>
-                  <tr>
-                    <th width="30%" class="breakWord">Table</th>
-                    <th width="10%">Row Count</th>
-                    <th width="15%">Max Rows (per partition)</th>
-                    <th width="15%">Min Rows (per partition)</th>
-                    <th width="15%">Avg Rows (per partition)</th>
-                    <th width="15%">Type</th>
-                  </tr>
-                   </thead>
-                  <tbody id="tablesBody">
-                  </tbody>
-                </table>
-                </div>
+            </div>
         </div>
-        </div>
-      </div>
     </div>
-  </div>
+    
+    <!--Schema Tab-->
+    <div id="schema" class="contents">
+    </div>
+    
+    <!--Sql Query Tab-->
+    <div id="sqlQuery" class="containerStudio contents">
+        <div class="blockWrapper" id="BlockContainer01">
+            <div class="objectExplorer">
+                <div class="explorer"> 
+                    <!--tab-->
+                    <div class="tabContant" id="tabMain">
+                        <ul class="tabs">
+                            <li><a href="#tab1">Tables</a></li>
+                            <li><a href="#tab2">Views</a></li>
+                            <li><a href="#tab3">Stored Procedures</a></li>
+                        </ul>
+                        <div class="tab_container">
+                            <div  id="tabScroller">
+                                <div id="tab1" class="tab_content">
+                                    <div id="accordionTable">
+                      
+                                    </div>
+                                </div>
+                                <div id="tab2" class="tab_content">
+                                    <div id="accordionViews" >
+                      
+                                    </div>
+                                </div>
+                                <div id="tab3" class="tab_content">
+                                    <div id="accordionProcedures" >
+                      
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="clear"></div>
+            </div>
+            <div class="queryInput" id="inputQuery">
+                <ul class="btnList" id="queryBtnList">
+                    <li>
+                        <button class="btnStudio" id="runBTn">Run</button>
+                    </li>
+                    <li>
+                        <button class="btnStudio" id="clearQuery">Clear</button>
+                    </li>
+                </ul>
+                <h1 class="theHeading icon-query">Query</h1>
+                <div class="query">
+                    <form name="" id="queryForm">
+                        <div class="textWritingArea">
+                            <textarea id="theQueryText"></textarea>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <div class="clear"></div>
+        </div>
+        <div class="blockWrapper" id="blockContainer02">
+            <div class="exportType">
+                <form name="" id="queryResult">
+                    <select id="exportType">
+                        <option selected="selected">HTML</option>
+                        <option>CSV</option>
+                        <option>Monospace</option>
+                    </select>
+                </form>
+            </div>
+            <h1 class="theHeading icon-queryResult">Query Result</h1>
+            <div class="queryResult">
+                <div id="resultHtml" style="display:block;" class="resultHtml"> </div>
+                <div id="resultCsv" style="display:none;" class="resultCsv"> </div>
+                <div id="resultMonospace" style="display:none;" class="resultMonospace">
+                    <pre>
+                    </pre>
+                </div>
+            </div>
+            <div id="queryResults" class="queryStatus"></div>
+        </div>
+    </div>
+
 </div>
 </div>
 <div class="footer" id="mainFooter">
@@ -301,5 +402,10 @@
     </div>
     <!-- Loading -->
    
+    <!-- Placed at the end of the document so the pages load faster -->
+    <!--<script src="http://assets.voltdb.com/get.py?a=342E352C31343036353738383735383938&b=e&f=jquery-1.9.1.min.js"></script>-->
+    <script src="http://assets.voltdb.com/b/js/bootstrap.js"></script>
+    <script src="http://assets.voltdb.com/t/js/jquery.tablesorter.js"></script>
+    <script src="http://assets.voltdb.com/t/js/jquery.tablesorter.widgets.js"></script>
 </body>
 </html>

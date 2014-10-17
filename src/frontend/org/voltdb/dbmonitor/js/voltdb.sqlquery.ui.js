@@ -1,18 +1,10 @@
 ﻿$(document).ready(function () {
-    if (navigator.userAgent.indexOf('Safari') != -1 && navigator.userAgent.indexOf('Chrome') == -1) {
-        shortcut.add("f6", function () {
-            $("#runBTn").button().click();
-        });
-    } else {
-        shortcut.add("f5", function () {
-            $("#runBTn").button().click();
-        });
-    }
+
     //Default Action
     $(".tab_content").hide(); //Hide all content
     $("ul.tabs li:first").addClass("active").show(); //Activate first tab
     $(".tab_content:first").show(); //Show first tab content
-
+   
     //On Click Event
     $("ul.tabs li").click(function () {
         $("ul.tabs li").removeClass("active"); //Remove any "active" class
@@ -22,7 +14,7 @@
         $(activeTab).fadeIn(); //Fade in the active content
         return false;
     });
-
+    
 
     // Table Accordion	
     $('#accordionTable').accordion({
@@ -124,26 +116,15 @@
         height: '225px'
     });
     
-    //Attach the login popup to the page.
-    $("body").append(voltDbRenderer.GetLoginPopup());
-
-    var serverName = window.location.hostname == "localhost" ? null : window.location.hostname;
-    var portid = window.location.hostname == "localhost" ? null : window.location.port;
+    //var serverName = window.location.hostname == "localhost" ? null : window.location.hostname;
+    //var portid = window.location.hostname == "localhost" ? null : window.location.port;
     
     //If security is enabled, then it displays login popup. After user is verified, it calls loadPage().
     //If security is not enabled, then it simply calls loadPage().
-    voltDbRenderer.HandleLogin(serverName, portid, function() { loadPage(serverName, portid); });
+    //voltDbRenderer.HandleLogin(serverName, portid, function () { loadSQLQueryPage(serverName, portid); });
 });
 
-var saveCookie = function (name, value) {
-    $.cookie(name, value, { expires: 365 });
-};
-
-var saveSessionCookie = function (name, value) {
-    $.cookie(name, value, { path: '/', domain: window.location.hostname });
-};
-
-function loadPage(serverName, portid) {
+function loadSQLQueryPage(serverName, portid) {
     
     var userName = $.cookie('username') != undefined ? $.cookie('username') : "";
     var password = $.cookie('password') != undefined ? $.cookie('password') : "";
