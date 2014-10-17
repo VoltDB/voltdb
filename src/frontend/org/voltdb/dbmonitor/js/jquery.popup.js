@@ -266,6 +266,22 @@
 		        });
 		    }
 
+		    var errorMsgBtn = $("a[id='btnOk']");
+		    if (errorMsgBtn != undefined) {
+		        errorMsgBtn.unbind('click');
+		        errorMsgBtn.bind('click', function () {
+		            p.close();
+		        });
+		    }
+		    
+		    var cancelBtn = $("a[id='btnCancel']");
+		    if (cancelBtn != undefined) {
+		        cancelBtn.unbind('click');
+		        cancelBtn.bind('click', function () {
+		            p.close();
+		        });
+		    }
+
 			// Get the content
 			content = ( content === undefined || content === '#' )
 				? p.o.content

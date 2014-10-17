@@ -278,6 +278,8 @@
                 printResult(format, target, id + '_' + j, tables[j]);
         } else {
             target.append('<span class="errorValue">Error: ' + response.statusstring + '\r\n</span>');
+            $("#errorMessage").html(response.statusstring);
+            $("#errorPopup").click();
         }
     }
 

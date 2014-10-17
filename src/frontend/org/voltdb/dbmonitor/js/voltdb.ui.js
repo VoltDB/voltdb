@@ -1,6 +1,18 @@
 ﻿
 $(document).ready(function () {
-
+    if ($.cookie("username") != undefined && $.cookie("username") != 'null') {
+        $("#logOut").css('display', 'block');
+    } else {
+        $("#logOut").css('display', 'none');
+    }
+    $("#btnLogout").on("click", function() {
+        saveSessionCookie("username", null);
+        saveSessionCookie("password", null);
+        saveSessionCookie("admin", null);
+        $('#logOut').prop('title', '');
+        location.reload();
+    });
+    
     try {
         var savedData = getParameterByName("data");
 

@@ -143,9 +143,12 @@ function alertNodeClicked(obj) {
                             $("#loginBoxDialogue").hide();
                             $("#username").val("");
                             $("#password").val("");
-
+                            $("#logOut").css('display', 'block');
+                            $('#logOut').prop('title', $.cookie("username"));
                         } else {
                             $("#UnableToLoginMsg").show();
+                            $("#logOut").css('display', 'none');
+                            $('#logOut').prop('title', '');
                         }
                     });
                 }

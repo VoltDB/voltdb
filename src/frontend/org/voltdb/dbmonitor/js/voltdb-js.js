@@ -93,6 +93,12 @@ $(document).ready(function () {
 
     // shows server not reachable
     $('#showServerUnreachable').popup();
+    
+    //error popup
+    $('#errorPopup').popup();
+
+    //Logout popup
+    $('#logOut').popup();
 
     // Changes graph view
     $("select").change(function () {
