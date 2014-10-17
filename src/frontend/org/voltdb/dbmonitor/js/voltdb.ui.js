@@ -109,6 +109,7 @@ var loadPage = function (serverName, portid) {
     
     voltDbRenderer.ChangeServerConfiguration(serverName, portid, userName, password, true, admin);
     voltDbRenderer.ShowUsername(userName);
+    loadSQLQueryPage(serverName, portid);
 
     var loadSchemaTab = function () {
         var templateUrl = window.location.protocol + '//' + window.location.host;

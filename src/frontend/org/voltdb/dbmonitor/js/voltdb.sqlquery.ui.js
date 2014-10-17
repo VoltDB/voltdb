@@ -116,12 +116,12 @@
         height: '225px'
     });
     
-    var serverName = window.location.hostname == "localhost" ? null : window.location.hostname;
-    var portid = window.location.hostname == "localhost" ? null : window.location.port;
+    //var serverName = window.location.hostname == "localhost" ? null : window.location.hostname;
+    //var portid = window.location.hostname == "localhost" ? null : window.location.port;
     
     //If security is enabled, then it displays login popup. After user is verified, it calls loadPage().
     //If security is not enabled, then it simply calls loadPage().
-    voltDbRenderer.HandleLogin(serverName, portid, function () { loadSQLQueryPage(serverName, portid); });
+    //voltDbRenderer.HandleLogin(serverName, portid, function () { loadSQLQueryPage(serverName, portid); });
 });
 
 function loadSQLQueryPage(serverName, portid) {
