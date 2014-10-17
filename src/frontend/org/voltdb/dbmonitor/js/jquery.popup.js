@@ -273,6 +273,15 @@
 		            p.close();
 		        });
 		    }
+		    
+		    var cancelBtn = $("a[id='btnCancel']");
+		    if (cancelBtn != undefined) {
+		        cancelBtn.unbind('click');
+		        cancelBtn.bind('click', function () {
+		            p.close();
+		        });
+		    }
+
 			// Get the content
 			content = ( content === undefined || content === '#' )
 				? p.o.content

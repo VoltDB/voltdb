@@ -97,6 +97,9 @@ $(document).ready(function () {
     //error popup
     $('#errorPopup').popup();
 
+    //Logout popup
+    $('#logOut').popup();
+
     // Changes graph view
     $("select").change(function () {
         //$('#showServerUnreachable').trigger('click');

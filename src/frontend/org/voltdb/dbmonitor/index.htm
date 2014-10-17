@@ -64,8 +64,7 @@
     <div class="headRight">
       <ul class="topRightList" id="userSection">
         <li class="userN"> </li>
-        <li>
-          <div class="user" title="user"></div>
+        <li><a href="#logoutPopup" id="logOut" ><div class="user" title=""></div></a>
         </li>
         <li><a href="#"><div class="help" title="help"></div></a></li>
         <li class="responsiveMenuPlaceHolder">&nbsp;</li>
@@ -408,6 +407,26 @@
             <div class="overlay-btns" style="padding:0"><a href="#" class="btn" id="btnOk" title="save">Ok</a></div>
         </div>    
     </div>
+    <!--Error popup-->
+    
+    <!--Logout popup-->
+    <div id="logoutPopup"  style="display:none">
+        <div class="overlay-title "><img src="css/resources/images/Information.png" class="imgError"  />Logout</div>
+        <div class="clear"></div>
+        <div class="overlay-contentError errorMsg">
+            <p>Do you want to logout?</p>
+            <br/>
+            <ul class="btnList" id="Ul1">
+                    <li>
+                        <div class="overlay-btns" style="padding:0"><a href="#" class="btn" id="btnLogout" title="Ok">Ok</a></div>
+                    </li>
+                    <li>
+                        <div class="overlay-btns" style="padding:0"><a href="#" class="btn" id="btnCancel" title="Cancel">Cancel</a></div>
+                    </li>
+             </ul>
+        </div>    
+    </div>
+    <!--Logout popup-->
 
     <!-- Loading -->
     <div id="overlay" style="display: none;">
