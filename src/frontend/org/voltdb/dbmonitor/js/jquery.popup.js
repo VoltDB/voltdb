@@ -266,6 +266,13 @@
 		        });
 		    }
 
+		    var errorMsgBtn = $("a[id='btnOk']");
+		    if (errorMsgBtn != undefined) {
+		        errorMsgBtn.unbind('click');
+		        errorMsgBtn.bind('click', function () {
+		            p.close();
+		        });
+		    }
 			// Get the content
 			content = ( content === undefined || content === '#' )
 				? p.o.content

@@ -56,6 +56,7 @@ a.alertIcon{background-position: left -1315px;}
 
 
 
+
 /******sprite Ends*************/
 
 /******footer bottom*************/
@@ -650,6 +651,14 @@ h1.icon-queryResult{background-position:15px -1039px;}
 #overlay{ position: fixed;height: 100%;width: 100%;bottom: 0;background: rgba(0, 0, 0, 0.3);z-index: 9999;}
 .loading{ background: #fff url(images/loader.GIF) no-repeat center center;height: 75px;width: 75px;margin: 20% auto;}
 
+.imgError {position: relative;top: 5px;padding: 0 5px 0 0;}
+.overlay-contentError {padding: 20px;
+border-bottom: 1px solid #dbdbdb;
+margin-bottom: 15px;
+min-width:200px;
+overflow: auto;}
+.errorMsg { max-width: 300px;}
+.errorMsg p {padding: 0 0 10px 0;}
 
 /*********************************************media Qu********************/
 @media (max-width: 479px) {

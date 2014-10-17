@@ -103,6 +103,9 @@ $(document).ready(function () {
 
     // shows server not reachable
     $('#showServerUnreachable').popup();
+    
+    //error popup
+    $('#errorPopup').popup();
 
     // Changes graph view
     $("select").change(function () {
