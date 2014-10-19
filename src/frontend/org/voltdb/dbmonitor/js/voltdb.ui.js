@@ -5,13 +5,6 @@ $(document).ready(function () {
     } else {
         $("#logOut").css('display', 'none');
     }
-    $("#btnLogout").on("click", function() {
-        saveSessionCookie("username", null);
-        saveSessionCookie("password", null);
-        saveSessionCookie("admin", null);
-        $('#logOut').prop('title', '');
-        location.reload();
-    });
     
     try {
         var savedData = getParameterByName("data");
@@ -113,9 +106,16 @@ $(document).ready(function () {
 });
 
 var loadPage = function (serverName, portid) {
+    
+    $("#btnLogout").on("click", function () {
+        saveSessionCookie("username", null);
+        saveSessionCookie("password", null);
+        $('#logOut').prop('title', '');
+        location.reload(true);
+    });
+
     var userName = $.cookie('username');
     var password = $.cookie('password');
-
     voltDbRenderer.ChangeServerConfiguration(serverName, portid, userName, password, true, true);
     voltDbRenderer.ShowUsername(userName);
     loadSQLQueryPage(serverName, portid);
