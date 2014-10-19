@@ -119,6 +119,7 @@ var loadPage = function (serverName, portid) {
     var userName = $.cookie('username');
     var password = $.cookie('password');
     var admin = $.cookie('admin');
+        
     
     voltDbRenderer.ChangeServerConfiguration(serverName, portid, userName, password, true, admin);
     voltDbRenderer.ShowUsername(userName);
@@ -781,7 +782,7 @@ var loadPage = function (serverName, portid) {
         saveCookie("graph-view", $("#graphView").val());
 
     $("#graphView").val($.cookie("graph-view"));
-    MonitorGraphUI.AddGraph($.cookie("graph-view"));
+    MonitorGraphUI.AddGraph($.cookie("graph-view"), $('#chartServerCPU'), $('#chartServerRAM'), $('#chartClusterLatency'), $('#chartClusterTransactions'));
 
     var graphInterval = null;
     var refreshTime = 5000; //In milli seconds (i.e, 5 sec)

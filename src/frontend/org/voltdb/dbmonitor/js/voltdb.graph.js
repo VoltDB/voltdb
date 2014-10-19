@@ -12,10 +12,10 @@
         var memMinCount = 0;
         var latSecCount = 0;
         var latMinCount = 0;
-        var cpuChart = $('#chartServerCPU');
-        var ramChart = $('#chartServerRAM');
-        var latencyChart = $('#chartClusterLatency');
-        var transactionChart = $('#chartClusterTransactions');
+        var cpuChart;
+        var ramChart;
+        var latencyChart;
+        var transactionChart;
         this.Monitors = {};
         this.ChartCpu = nv.models.lineChart();
         this.ChartRam = nv.models.lineChart();
@@ -333,7 +333,11 @@
             return getEmptyData();
         };
 
-        this.AddGraph = function (view) {
+        this.AddGraph = function (view, cpuChartObj, ramChartObj, clusterChartObj, transactinoChartObj) {
+            cpuChart = cpuChartObj;
+            ramChart = ramChartObj;
+            latencyChart = clusterChartObj;
+            transactionChart = transactinoChartObj;
             currentView = view;
             MonitorGraphUI.Monitors = {
                 
