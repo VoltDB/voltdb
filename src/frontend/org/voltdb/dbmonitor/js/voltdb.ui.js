@@ -132,6 +132,11 @@ var loadPage = function (serverName, portid) {
         $.get(templateUrl, function (result) {
             var body = $(result).filter("#wrapper").html();
             $("#schema").html(body);
+            
+            var downloadDDL = $("#downloadDDL");
+            downloadDDL.attr("download", "../" + downloadDDL.attr("download"));
+            downloadDDL.attr("href", "../" + downloadDDL.attr("href"));
+            
             $.getScript(templateJavascript);
             $("#overlay").hide();
         });
