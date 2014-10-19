@@ -135,6 +135,11 @@ var loadPage = function (serverName, portid) {
             downloadDDL.attr("download", "../" + downloadDDL.attr("download"));
             downloadDDL.attr("href", "../" + downloadDDL.attr("href"));
             
+            $("#schemaLinkSqlQuery").on("click", function (e) {
+                $("#navSqlQuery").trigger("click");
+                e.preventDefault();
+            });
+            
             $.getScript(templateJavascript);
             $("#overlay").hide();
         });
