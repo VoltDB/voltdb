@@ -118,10 +118,8 @@ $(document).ready(function () {
 var loadPage = function (serverName, portid) {
     var userName = $.cookie('username');
     var password = $.cookie('password');
-    var admin = $.cookie('admin');
-        
-    
-    voltDbRenderer.ChangeServerConfiguration(serverName, portid, userName, password, true, admin);
+
+    voltDbRenderer.ChangeServerConfiguration(serverName, portid, userName, password, true, true);
     voltDbRenderer.ShowUsername(userName);
     loadSQLQueryPage(serverName, portid);
 
