@@ -16,14 +16,17 @@
  */
 package org.voltdb;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.AuthSystem.AuthUser;
-import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.Procedure;
 
 /**
  * Check ad hoc query parameters.
  */
-public class AdHocAcceptancePolicy extends InvocationAcceptancePolicy {
+public class AdHocAcceptancePolicy extends InvocationValidationPolicy {
+
+    private static final VoltLogger authLog = new VoltLogger("AUTH");
+
     public AdHocAcceptancePolicy(boolean isOn) {
         super(isOn);
     }

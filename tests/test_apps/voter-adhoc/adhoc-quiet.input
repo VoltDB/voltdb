@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8" ?>
+exec @UpdateLogging '
 <!DOCTYPE log4j:configuration SYSTEM "log4j.dtd">
 <log4j:configuration xmlns:log4j="http://jakarta.apache.org/log4j/">
     <!-- console is a special appender for the logger CONSOLE
@@ -56,21 +56,21 @@
         <level value="INFO"/>
     </logger -->
 
-    <!-- logger name="ADHOC">
+    <logger name="ADHOC">
         <level value="INFO"/>
-    </logger -->
+    </logger>
 
     <!-- logger name="EXPORT">
         <level value="INFO"/>
     </logger -->
 
-    <!-- logger name="IV2TRACE">
-        <level value="TRACE"/>
-    </logger -->
+    <logger name="IV2TRACE">
+        <level value="INFO"/>
+    </logger>
 
-    <!-- logger name="IV2QUEUETRACE">
-        <level value="TRACE"/>
-    </logger -->
+    <logger name="IV2QUEUETRACE">
+        <level value="INFO"/>
+    </logger>
 
     <!-- logger name="TM">
         <level value="INFO"/>
@@ -118,3 +118,4 @@
         <appender-ref ref="consolefiltered" />
     </root>
 </log4j:configuration>
+';

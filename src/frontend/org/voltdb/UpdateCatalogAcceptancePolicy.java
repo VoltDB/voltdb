@@ -23,7 +23,7 @@ import org.voltdb.utils.Encoder;
 /**
  * Check update catalog parameters.
  */
-public class UpdateCatalogAcceptancePolicy extends InvocationAcceptancePolicy {
+public class UpdateCatalogAcceptancePolicy extends InvocationValidationPolicy {
 
     public UpdateCatalogAcceptancePolicy(boolean isOn) {
         super(isOn);

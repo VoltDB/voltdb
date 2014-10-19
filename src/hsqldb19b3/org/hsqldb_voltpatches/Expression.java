@@ -1586,8 +1586,12 @@ public class Expression {
             for (int ii=startKey+1; ii < displayCols.size(); ++ii)
             {
                 Expression otherCol = displayCols.get(ii);
+                // This mechanism of finding the expression that a SIMPLE_COLUMN
+                // is referring to is inherently fragile---columnIndex is an
+                // offset into different things depending on context!
                 if (otherCol != null && (otherCol.opType != OpTypes.SIMPLE_COLUMN) &&
-                         (otherCol.columnIndex == this.columnIndex))
+                         (otherCol.columnIndex == this.columnIndex)  &&
+                         !(otherCol instanceof ExpressionColumn))
                 {
                     ignoredDisplayColIndexes.add(ii);
                     // serialize the column this simple column stands-in for.
@@ -1988,7 +1992,13 @@ public class Expression {
         assert(type != null);
 
         // return the original default impl + the type
-        return super.toString() + ": " + type;
+        String str = super.toString() + " with opType " + type +
+                ", isAggregate: " + isAggregate +
+                ", columnIndex: " + columnIndex;
+        if (this instanceof ExpressionOrderBy) {
+            str += "\n  " + this.nodes[LEFT].toString();
+        }
+        return str;
     }
     /**********************************************************************/
 }

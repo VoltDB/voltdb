@@ -1756,6 +1756,68 @@ public class TestFixedSQLSuite extends RegressionSuite {
         validateTableOfScalarLongs(vt, new long[]{0});
     }
 
+    public void testInsertWithCast() throws Exception {
+        Client client = getClient();
+        client.callProcedure("@AdHoc", "delete from p1");
+
+        // in ENG-5929, this would cause a null pointer exception,
+        // because OperatorException.refineValueType was not robust to casts.
+        String stmt = "insert into p1 (id, num) values (1, cast(1 + ? as integer))";
+        VoltTable vt = client.callProcedure("@AdHoc", stmt, 100).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {1});
+
+        // This should even work when assigning the expression to the partitioning column:
+        // Previously this would fail with a mispartitioned tuple error.
+        stmt = "insert into p1 (id, num) values (cast(1 + ? as integer), 1)";
+        vt = client.callProcedure("@AdHoc", stmt, 100).getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {1});
+
+        stmt = "select id, num from p1 order by id";
+        vt = client.callProcedure("@AdHoc", stmt).getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{1, 101}, {101, 1}});
+
+    }
+
+    public void testENG6926() throws Exception {
+        // Aggregation of a joined table was not ordered
+        // according to ORDER BY clause when the OB column
+        // was not first in the select list.
+
+        Client client = getClient();
+
+        String insStmt = "insert into eng6926_ipuser(ip, countrycode, province) values (?, ?, ?)";
+        client.callProcedure("@AdHoc", insStmt, "23.101.135.101", "US", "District of Columbia");
+        client.callProcedure("@AdHoc", insStmt, "23.101.142.5", "US", "District of Columbia");
+        client.callProcedure("@AdHoc", insStmt, "23.101.143.89", "US", "District of Columbia");
+        client.callProcedure("@AdHoc", insStmt, "23.101.138.62", "US", "District of Columbia");
+        client.callProcedure("@AdHoc", insStmt, "69.67.23.26", "US", "Minnesota");
+        client.callProcedure("@AdHoc", insStmt, "198.179.137.202", "US", "Minnesota");
+        client.callProcedure("@AdHoc", insStmt, "23.99.35.61", "US", "Washington");
+
+        insStmt = "insert into eng6926_hits(ip, week) values (?, ?)";
+        client.callProcedure("@AdHoc", insStmt, "23.101.135.101", 20140914);
+        client.callProcedure("@AdHoc", insStmt, "23.101.142.5", 20140914);
+        client.callProcedure("@AdHoc", insStmt, "23.101.143.89", 20140914);
+        client.callProcedure("@AdHoc", insStmt, "23.101.138.62", 20140914);
+        client.callProcedure("@AdHoc", insStmt, "69.67.23.26", 20140914);
+        client.callProcedure("@AdHoc", insStmt, "198.179.137.202", 20140914);
+        client.callProcedure("@AdHoc", insStmt, "23.99.35.61", 20140914);
+
+        String query = "select count(ip.ip), ip.province as state " +
+                "from eng6926_hits as h, eng6926_ipuser as ip " +
+                "where ip.ip=h.ip and ip.countrycode='US' " +
+                    "group by ip.province " + "order by count(ip.ip) desc";
+
+        VoltTable vt = client.callProcedure("@AdHoc", query).getResults()[0];
+        long[] col0Expected = new long[] {4, 2, 1};
+        String[] col1Expected = new String[] {"District of Columbia", "Minnesota", "Washington"};
+        int i = 0;
+        while (vt.advanceRow()) {
+            assertEquals(col0Expected[i], vt.getLong(0));
+            assertEquals(col1Expected[i], vt.getString(1));
+            ++i;
+        }
+    }
 
     //
     // JUnit / RegressionSuite boilerplate
