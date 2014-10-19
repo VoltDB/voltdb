@@ -24,9 +24,13 @@ table.tablesorter .headerSortDown {
 
 table.tablesorter .sorttable_sorted_reverse {
 	background-image: url(images/asc.gif);
+    background-repeat: no-repeat;
+    background-position: right;
 }
 table.tablesorter .sorttable_sorted {
 	background-image: url(images/desc.gif);
+    background-repeat: no-repeat;
+    background-position: right;
 }
 
 table.tablesorter .headerSortDown, table.tablesorter .headerSortUp, table.tablesorter .sorttable_sorted, table.tablesorter .sorttable_sorted_reverse {

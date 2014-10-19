@@ -8,7 +8,7 @@ Last update on : 11 Sept 2014
 @import url(reset.css);
 
 /*****Global******/
-body { font-family:Arial, Helvetica, sans-serif; font-size:12px; background: #dee0e0;}
+body { font-family:Arial, Helvetica, sans-serif; font-size:12px; background: #dee0e0 !important;}
 a { color:#000000}
 a:focus, input:focus{ outline:none;}
 a, a:hover { text-decoration:none; }
@@ -20,6 +20,7 @@ a, a:hover { text-decoration:none; }
 	src: local('MYRIADPROREGULAR'), url('fonts/MYRIADPROREGULAR.woff') format('woff'), url('fonts/MYRIADPROREGULAR.ttf') format('truetype');
 }
 h1 {font:16px 'MYRIADPROREGULAR'}
+
 .btn { background-color:#aa1f2f; padding:8px 10px; text-align:center; color:#FFFFFF; font:14px Arial, Helvetica, sans-serif; text-shadow:none; border-radius:0; border:none;} 
 .btn:hover{background-color:#76bd1d; color:#fff;}
 .graphOpacity {opacity: 0.5}
@@ -435,7 +436,7 @@ ul.catalogNav li.active a, ul.catalogNav li.active a:hover{background:#76bd1d; d
 .rightCont { width:98%; padding:0 ; margin:0 auto;}
 .dataBlock { margin:0 0 20px 0; padding:0; background:#fff; }
 .dataBlock h1{font-weight:bold;}
-.dataBlock table td:nth-child(1) { width: 30%; }
+/*.dataBlock table td:nth-child(1) { width: 30%; }*/
 #rendersCatalogUrl h3, #rendersCatalogUrl h4 {font:14px 'MYRIADPROREGULAR'; font-weight:bold;}
 #catalogContainer h3 { font-weight: bold;}
 #rendersCatalogUrl h4{ background:#fbfbfb; padding:20px;}
@@ -445,18 +446,20 @@ ul.catalogNav li.active a, ul.catalogNav li.active a:hover{background:#76bd1d; d
 }
 #catalogContainer h4 {
     background: none repeat scroll 0 0 #fbfbfb;
-    padding: 20px;
+   /* padding: 20px;*/
+   padding: 20px 20px 10px 20px;
 }
 .dataBlockHeading {background: none repeat scroll 0 0 #fbfbfb;
 border-bottom: 1px solid #cccccc;
 height: 38px; padding:20px 20px 0 20px}
 .dataBlockContent .dataBlockHeading{padding:15px; height:15px;}
 .dataBlockContent { padding:20px; }
-.dataBlockContent p {font-size:16px; line-height:35px;}
+.dataBlockContent p {font-size:16px;/* line-height:35px;*/line-height:20px;}
 .prop a{color:#0079c2; font-weight:bold; font-size:16px;}
 .prop a:hover{text-decoration:underline;}
 
-.dataBlock h4 { font-size:13px; font-weight:bold;}
+.dataBlock h4 { /*font-size:13px;*/font-size:14px; font-weight:bold;}
+.table.table-condensed td {padding: 8px 0 8px 20px; font-size: 13px; }
 .sysOverviewContent {}
 .table { margin:0; padding:0;}
 .table td { margin:0; padding:10px; border-bottom:1px solid #ccc; border-right: none;}
@@ -467,7 +470,11 @@ table.z-table td{ padding:10px; line-height:25px; font-size:14px;}
 table.z-table ul li{ list-style-type:disc; list-style-position:outside; margin-left:40px; margin-bottom:5px;}
 .documentation{background:#fff; padding:10px 20px;}
 .documentation span{float:right; position:relative; top:10px;}
-a.icon-document{background-position: left -942px; padding-left:20px; font-weight:bold; height:30px; line-height:32px; display:inline-block; width:auto;}
+/*a.icon-document{background-position: left -942px; padding-left:20px; font-weight:bold; height:30px; line-height:32px; display:inline-block; width:auto;}*/
+a.icon-document{background-position: left -942px; padding-left:20px;
+ font-size:13px; font-weight:bold; height:30px; line-height:32px; 
+display:inline-block; width:auto;
+}
 a.icon-document:hover{color:#76bd1d;}
 #schema, #sqlQuery{ display:none;}
 
@@ -593,7 +600,7 @@ display:block;
  margin:0; padding:0; float:left; font:16px/10px Arial, Helvetica, sans-serif; height:42px;
 }
 #nav ul li a {
-  display:block; margin:0; padding:28px 20px 0 20px; color:#000000; border-right:1px solid #CCCCCC; height:42px;
+  display:block; margin:0; padding:28px 20px 0 20px; color:#000000; border-right:1px solid #CCCCCC; height:42px; text-decoration: none;
 }
 #nav ul li a:hover {background:#AA1F2F; color:#FFFFFF;}
 #nav ul li a.active { background:#76bd1d;color:#FFFFFF;}
@@ -661,6 +668,15 @@ overflow: auto;}
 .errorMsg { max-width: 300px;}
 .errorMsg p {padding: 0 0 10px 0;}
 
+.tablesorter-bootstrap .tablesorter-header-inner {
+padding: 4px 4px 4px 4px!important;
+}
+
+
+.tablesorter-bootstrap .tablesorter-header i {
+right: -31px!important;
+}
+
 /*********************************************media Qu********************/
 @media (max-width: 479px) {
 .serverStat {float:none; clear:left;}
@@ -719,7 +735,7 @@ ul.topRightList li.responsiveMenuPlaceHolder{display:block;}
   
 ul.catalogNav { margin:0 0 20px 0; }  
 ul.catalogNav li { float:none; background:#FFFFFF; margin:0; padding:0; line-height:50px;  font-family:'MYRIADPROREGULAR'; font-size:16px; border-bottom:1px solid #CCCCCC;}
-ul.catalogNav li a { margin:0; padding:0 10px; color:#32323a; display:block;}
+ul.catalogNav li a { margin:0; padding:0 10px; color:#32323a; display:block; text-decoration: none;}
 ul.catalogNav li a:hover { background:#AA1F2F; display:block; color:#FFFFFF; }
 ul.catalogNav li.active a, ul.catalogNav li.active a:hover{background:#76bd1d; display:block; color:#FFFFFF!important;}
 

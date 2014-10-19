@@ -116,19 +116,14 @@
         height: '225px'
     });
     
-    //var serverName = window.location.hostname == "localhost" ? null : window.location.hostname;
-    //var portid = window.location.hostname == "localhost" ? null : window.location.port;
-    
-    //If security is enabled, then it displays login popup. After user is verified, it calls loadPage().
-    //If security is not enabled, then it simply calls loadPage().
-    //voltDbRenderer.HandleLogin(serverName, portid, function () { loadSQLQueryPage(serverName, portid); });
 });
 
 function loadSQLQueryPage(serverName, portid) {
     
     var userName = $.cookie('username') != undefined ? $.cookie('username') : "";
     var password = $.cookie('password') != undefined ? $.cookie('password') : "";
-    var admin = $.cookie('username') != undefined && ($.cookie('admin') != undefined ? $.cookie('admin') : true);
+    //var admin = $.cookie('username') != undefined && ($.cookie('admin') != undefined ? $.cookie('admin') : true);
+    var admin = true; //Hardcoded
     voltDbRenderer.ChangeServerConfiguration(serverName, portid, userName, password, true, admin);
     voltDbRenderer.ShowUsername(userName);
 
@@ -341,4 +336,6 @@ function loadSQLQueryPage(serverName, portid) {
     $('#clearQuery').click(function () {
         $('#theQueryText').val('');
     });
+
+    $("#overlay").hide();
 }
