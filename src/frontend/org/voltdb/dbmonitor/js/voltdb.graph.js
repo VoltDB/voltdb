@@ -4,6 +4,14 @@
     var IMonitorGraphUI = (function () {
 
         var currentView = "seconds";
+        var cpuSecCount = 0;
+        var cpuMinCount = 0;
+        var tpsSecCount = 0;
+        var tpsMinCount = 0;
+        var memSecCount = 0;
+        var memMinCount = 0;
+        var latSecCount = 0;
+        var latMinCount = 0;
         this.Monitors = {};
         this.ChartCpu = nv.models.lineChart();
         this.ChartRam = nv.models.lineChart();
@@ -14,7 +22,7 @@
             var arr = [];
             var theDate = new Date();
 
-            for (var i = 121; i >= 0; i--) {
+            for (var i = 360; i >= 0; i--) {
                 arr[i] = { x: new Date(theDate.getTime()), y:null };
                 theDate.setSeconds(theDate.getSeconds() - 5);
             }
@@ -26,9 +34,9 @@
             var arr = [];
             var theDate = new Date();
 
-            for (var i = 121; i >= 0; i--) {
+            for (var i = 360; i >= 0; i--) {
                 arr[i] = { x: new Date(theDate.getTime()), y: null };
-                theDate.setMinutes(theDate.getMinutes() - 1);
+                theDate.setSeconds(theDate.getSeconds() - 30);
             }
 
             return arr;
@@ -38,9 +46,9 @@
             var arr = [];
             var theDate = new Date();
 
-            for (var i = 121; i >= 0; i--) {
+            for (var i = 360; i >= 0; i--) {
                 arr[i] = { x: new Date(theDate.getTime()), y: null };
-                theDate.setDate(theDate.getDate() - 1);
+                theDate.setMinutes(theDate.getMinutes() - 5);
             }
 
             return arr;
@@ -326,10 +334,18 @@
             MonitorGraphUI.Monitors = {
                 
                 'latHistogram': null,
-                'latData': getEmptyDataForView(view),
-                'tpsData': getEmptyDataForView(view),
-                'memData': getEmptyDataForView(view),
-                'cpuData': getEmptyDataForView(view),
+                'latData': getEmptyData(),
+                'latDataMin': getEmptyDataForMinutes(),
+                'latDataDay':getEmptyDataForDays(),
+                'tpsData': getEmptyData(),
+                'tpsDataMin': getEmptyDataForMinutes(),
+                'tpsDataDay':getEmptyDataForDays(),
+                'memData': getEmptyData(),
+                'memDataMin': getEmptyDataForMinutes(),
+                'memDataDay':getEmptyDataForDays(),
+                'cpuData': getEmptyData(),
+                'cpuDataMin': getEmptyDataForMinutes(),
+                'cpuDataHrs': getEmptyDataForDays(),
                 'lastTimedTransactionCount': -1,
                 'lastTimerTick': -1
             };
@@ -338,37 +354,33 @@
             dataRam[0]["values"] = getEmptyDataForView(view);
             dataLatency[0]["values"] = getEmptyDataForView(view);
             dataTransactions[0]["values"] = getEmptyDataForView(view);
-            var dateFormat = (view != undefined && view.toLowerCase() == "days") ? "%x" : "%X";
             
-            //%b %d : Feb 01, %x : 02/01/2012, %X: HH:MM:ss
-            MonitorGraphUI.ChartCpu.xAxis
-                .tickFormat(function (d) {
-                    return d3.time.format(dateFormat)(new Date(d));
-                });
-            MonitorGraphUI.ChartRam.xAxis
-                .tickFormat(function (d) {
-                    return d3.time.format(dateFormat)(new Date(d));
-                });
-            MonitorGraphUI.ChartLatency.xAxis
-                .tickFormat(function (d) {
-                    return d3.time.format(dateFormat)(new Date(d));
-                });
-            MonitorGraphUI.ChartTransactions.xAxis
-                .tickFormat(function(d) {
-                    return d3.time.format(dateFormat)(new Date(d));
-                });
         };
 
-        this.RefreshLatency = function (latency, graphView, currentTab) {
-
-            //Do not plot the point if the passed view is not for the currently chosen view.
-            //It might be of remaining the previous AJAX call.
-            if (graphView != undefined && currentView.toLowerCase() != graphView.toLowerCase()) {
-                return;
+        this.RefreshGraph = function(view) {
+            if (view == 'Days') {
+                dataCpu[0]["values"] = MonitorGraphUI.Monitors.cpuDataHrs;
+                dataTransactions[0]["values"] = MonitorGraphUI.Monitors.tpsDataDay;
+                dataRam[0]["values"] = MonitorGraphUI.Monitors.memDataDay;
+                dataLatency[0]["values"] = MonitorGraphUI.Monitors.latDataDay;
+            } else if (view == 'Minutes') {
+                dataCpu[0]["values"] = MonitorGraphUI.Monitors.cpuDataMin;
+                dataTransactions[0]["values"] = MonitorGraphUI.Monitors.tpsDataMin;
+                dataRam[0]["values"] = MonitorGraphUI.Monitors.memDataMin;
+                dataLatency[0]["values"] = MonitorGraphUI.Monitors.latDataMin;
+            } else {
+                dataCpu[0]["values"] = MonitorGraphUI.Monitors.cpuData;
+                dataTransactions[0]["values"] = MonitorGraphUI.Monitors.tpsData;
+                dataRam[0]["values"] = MonitorGraphUI.Monitors.memData;
+                dataLatency[0]["values"] = MonitorGraphUI.Monitors.latData;
             }
-            
+        };
+
+        this.RefreshLatency = function (latency, graphView, currentTab, isHidden) {
             var monitor = MonitorGraphUI.Monitors;
             var dataLat = monitor.latData;
+            var dataLatMin = monitor.latDataMin;
+            var dataLatDay = monitor.latDataDay;
             var strLatStats = "";
             var timeStamp;
 
@@ -385,14 +397,33 @@
                 lat = latStats.getValueAtPercentile(99);
             else
                 lat = monitor.latHistogram.diff(latStats).getValueAtPercentile(99);
-
             lat = parseFloat(lat).toFixed(1) * 1;
-            
             monitor.latHistogram = latStats;
+
+            if (latSecCount > 6) {
+                dataLatMin = dataLatMin.slice(1);
+                dataLatMin.push({ 'x': new Date(timeStamp), 'y': lat });
+                MonitorGraphUI.Monitors.latDataMin = dataLatMin;
+                latSecCount = 0;
+            }
+
+            if (latMinCount > 60) {
+                dataLatDay = dataLatDay.slice(1);
+                dataLatDay.push({ 'x': new Date(timeStamp), 'y': lat });
+                MonitorGraphUI.Monitors.latDataDay = dataLatDay;
+                latMinCount = 0;
+            }
+
             dataLat = dataLat.slice(1);
             dataLat.push({ 'x': new Date(timeStamp), 'y': lat });
-            dataLatency[0]["values"] = dataLat;
             MonitorGraphUI.Monitors.latData = dataLat;
+
+            if (graphView == 'Minutes')
+                dataLatency[0]["values"] = dataLatMin;
+            else if (graphView == 'Days')
+                dataLatency[0]["values"] = dataLatDay;
+            else
+                dataLatency[0]["values"] = dataLat;
 
             if (currentTab == NavigationTabs.DBMonitor) {
                 d3.select("#visualisationLatency")
@@ -400,27 +431,45 @@
                     .transition().duration(500)
                     .call(MonitorGraphUI.ChartLatency);
             }
-
+            latSecCount++;
+            latMinCount++;
         };
 
         this.RefreshMemory = function (memoryDetails, currentServer, graphView, currentTab) {
-            
-            //Do not plot the point if the passed view is not for the currently chosen view.
-            //It might be of remaining the previous AJAX call.
-            if (graphView != undefined && currentView.toLowerCase() != graphView.toLowerCase()) {
-                return;
-            }
-
             var monitor = MonitorGraphUI.Monitors;
             var dataMem = monitor.memData;
+            var dataMemMin = monitor.memDataMin;
+            var dataMemDay = monitor.memDataDay;
             var memDetails = memoryDetails;
             var memRss = parseFloat(memDetails[currentServer].RSS * 1.0 / 1048576.0).toFixed(3) * 1;
             var memTimeStamp = new Date(memDetails[currentServer].TIMESTAMP);
 
+            if (memSecCount == 6) {
+                dataMemMin = dataMemMin.slice(1);
+                dataMemMin.push({ 'x': new Date(memTimeStamp), 'y': memRss });
+                MonitorGraphUI.Monitors.memDataMin = dataMemMin;
+                memSecCount = 0;
+            }
+
+            if (memMinCount == 60) {
+                dataMemDay = dataMemDay.slice(1);
+                dataMemDay.push({ 'x': new Date(memTimeStamp), 'y': memRss });
+                MonitorGraphUI.Monitors.memDataDay = dataMemDay;
+                memMinCount = 0;
+            }
+
             dataMem = dataMem.slice(1);
-            dataMem.push({ 'x': new Date(memTimeStamp), 'y' : memRss });
-            dataRam[0]["values"] = dataMem;
+            dataMem.push({ 'x': new Date(memTimeStamp), 'y': memRss });
             MonitorGraphUI.Monitors.memData = dataMem;
+
+            
+            if (graphView == 'Minutes')
+                dataRam[0]["values"] = dataMemMin;
+            else if (graphView == 'Days')
+                dataRam[0]["values"] = dataMemDay;
+            else
+                dataRam[0]["values"] = dataMem;
+
 
             if (currentTab == NavigationTabs.DBMonitor) {
                 d3.select('#visualisationRam')
@@ -428,32 +477,44 @@
                     .transition().duration(500)
                     .call(MonitorGraphUI.ChartRam);
             }
-
+            memSecCount++;
+            memMinCount++;
         };
 
         this.RefreshTransaction = function (transactionDetails, graphView, currentTab) {
-            
-            //Do not plot the point if the passed view is not for the currently chosen view.
-            //It might be of remaining the previous AJAX call.
-            if (graphView != undefined && currentView.toLowerCase() != graphView.toLowerCase()) {
-                return;
-            }
-
             var monitor = MonitorGraphUI.Monitors;
             var datatrans = monitor.tpsData;
+            var datatransMin = monitor.tpsDataMin;
+            var datatransDay = monitor.tpsDataDay;
             var transacDetail = transactionDetails;
             var currentTimedTransactionCount = transacDetail["CurrentTimedTransactionCount"];
             var currentTimerTick = transacDetail["currentTimerTick"];
 
-            
             if (monitor.lastTimedTransactionCount > 0 && monitor.lastTimerTick > 0 && monitor.lastTimerTick != currentTimerTick) {
                 var delta = currentTimedTransactionCount - monitor.lastTimedTransactionCount;
+                if (tpsSecCount == 6) {
+                    datatransMin = datatransMin.slice(1);
+                    datatransMin.push({ "x": new Date(transacDetail["TimeStamp"]), "y": parseFloat(delta * 1000.0 / (currentTimerTick - monitor.lastTimerTick)).toFixed(1) * 1 });
+                    MonitorGraphUI.Monitors.tpsDataMin = datatransMin;
+                    tpsSecCount = 0;
+                }
+                if (tpsMinCount == 60) {
+                    datatransDay = datatransDay.slice(1);
+                    datatransDay.push({ "x": new Date(transacDetail["TimeStamp"]), "y": parseFloat(delta * 1000.0 / (currentTimerTick - monitor.lastTimerTick)).toFixed(1) * 1 });
+                    MonitorGraphUI.Monitors.tpsDataDay = datatransDay;
+                    tpsMinCount = 0;
+                }
                 datatrans = datatrans.slice(1);
                 datatrans.push({ "x": new Date(transacDetail["TimeStamp"]), "y": parseFloat(delta * 1000.0 / (currentTimerTick - monitor.lastTimerTick)).toFixed(1) * 1 });
+                MonitorGraphUI.Monitors.tpsData = datatrans;
             }
-            
-            dataTransactions[0]["values"] = datatrans;
-            MonitorGraphUI.Monitors.tpsData = datatrans;
+
+            if (graphView == 'Minutes')
+                dataTransactions[0]["values"] = datatransMin;
+            else if (graphView == 'Days')
+                dataTransactions[0]["values"] = datatransDay;
+            else
+                dataTransactions[0]["values"] = datatrans;
 
             monitor.lastTimedTransactionCount = currentTimedTransactionCount;
             monitor.lastTimerTick = currentTimerTick;
@@ -464,33 +525,54 @@
                     .transition().duration(500)
                     .call(MonitorGraphUI.ChartTransactions);
             }
-
+            
+            tpsSecCount++;
+            tpsMinCount++;
         };
 
         this.RefreshCpu = function (cpuDetails, currentServer, graphView, currentTab) {
-            
-            //Do not plot the point if the passed view is not for the currently chosen view.
-            //It might be of remaining the previous AJAX call.
-            if (graphView != undefined && currentView.toLowerCase() != graphView.toLowerCase()) {
-                return;
-            }
-
             var monitor = MonitorGraphUI.Monitors;
             var cpuData = monitor.cpuData;
+            var cpuDataMin = monitor.cpuDataMin;
+            var cpuDataDay = monitor.cpuDataHrs;
             var cpuDetail = cpuDetails;
             var percentageUsage = parseFloat(cpuDetail[currentServer].PERCENT_USED).toFixed(1) * 1;
             var timeStamp = cpuDetail[currentServer].TIMESTAMP;
+
+            if (cpuSecCount == 6) {
+                cpuDataMin = cpuDataMin.slice(1);
+                cpuDataMin.push({ "x": new Date(timeStamp), "y": percentageUsage });
+                MonitorGraphUI.Monitors.cpuDataMin = cpuDataMin;
+                cpuSecCount = 0;
+            }
+            if (cpuMinCount == 60) {
+                cpuDataDay = cpuDataDay.slice(1);
+                cpuDataDay.push({ "x": new Date(timeStamp), "y": percentageUsage });
+                MonitorGraphUI.Monitors.cpuDataHrs = cpuDataDay;
+                cpuMinCount = 0;
+            }
+
             cpuData = cpuData.slice(1);
             cpuData.push({ "x": new Date(timeStamp), "y": percentageUsage });
-            dataCpu[0]["values"] = cpuData;
             MonitorGraphUI.Monitors.cpuData = cpuData;
 
-            if (currentTab == NavigationTabs.DBMonitor) {
-                d3.select('#visualisationCpu')
-                    .datum(dataCpu)
-                    .transition().duration(500)
-                    .call(MonitorGraphUI.ChartCpu);
+            if (graphView == 'Minutes')
+                dataCpu[0]["values"] = cpuDataMin;
+            else if (graphView == 'Days')
+                dataCpu[0]["values"] = cpuDataDay;
+            else {
+                dataCpu[0]["values"] = cpuData;
+
             }
+
+            if (currentTab == NavigationTabs.DBMonitor) {
+            d3.select('#visualisationCpu')
+                .datum(dataCpu)
+                .transition().duration(500)
+                .call(MonitorGraphUI.ChartCpu);
+            }
+            cpuSecCount++;
+            cpuMinCount++;
         };
     });
     

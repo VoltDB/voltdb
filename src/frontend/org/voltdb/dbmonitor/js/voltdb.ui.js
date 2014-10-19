@@ -794,13 +794,13 @@ var loadPage = function (serverName, portid) {
     $("#graphView").on("change", function () {
         var graphView = $("#graphView").val();
         saveCookie("graph-view", graphView);
-        MonitorGraphUI.AddGraph(graphView);
+        MonitorGraphUI.RefreshGraph(graphView);
         MonitorGraphUI.ChartRam.update();
         MonitorGraphUI.ChartCpu.update();
         MonitorGraphUI.ChartLatency.update();
         MonitorGraphUI.ChartTransactions.update();
         
-        refreshGraphAndDataInLoop(getRefreshTime(), graphView);
+        //refreshGraphAndDataInLoop(getRefreshTime(), graphView);
     });
 
     //slides the element with class "menu_body" when paragraph with class "menu_head" is clicked 
@@ -834,9 +834,12 @@ var loadPage = function (serverName, portid) {
     });
 
     refreshClusterHealth();
-
+    refreshGraphAndData($.cookie("graph-view"), VoltDbUI.CurrentTab);
     setInterval(refreshClusterHealth, 5000);
-    refreshGraphAndDataInLoop(getRefreshTime(), $.cookie("graph-view"));
+    setInterval(function() {
+        refreshGraphAndData($.cookie("graph-view"), VoltDbUI.CurrentTab);
+    }, 5000);
+    //refreshGraphAndDataInLoop(getRefreshTime(), $.cookie("graph-view"));
     configureUserPreferences();
     adjustGraphSpacing();
     saveThreshold();
