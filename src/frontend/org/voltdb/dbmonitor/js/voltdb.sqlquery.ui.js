@@ -336,4 +336,6 @@ function loadSQLQueryPage(serverName, portid) {
     $('#clearQuery').click(function () {
         $('#theQueryText').val('');
     });
+
+    $("#overlay").hide();
 }

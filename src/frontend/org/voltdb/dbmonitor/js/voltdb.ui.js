@@ -76,6 +76,7 @@ $(document).ready(function () {
         $(this).addClass('active');
         VoltDbUI.CurrentTab = getCurrentTab();
         refreshCss();
+        saveSessionCookie("current-tab", VoltDbUI.CurrentTab);
         
         //Activate Shortcut keys only if the current tab is "SQL Query".
         if (VoltDbUI.CurrentTab == NavigationTabs.SQLQuery) {
@@ -129,11 +130,25 @@ var loadPage = function (serverName, portid) {
 
         $.get(templateUrl, function (result) {
             var body = $(result).filter("#wrapper").html();
+            $("#overlay").hide();
             $("#schema").html(body);
             $.getScript(templateJavascript);
         });
     };
     loadSchemaTab();
+    
+    //Retain current tab while page refreshing.
+    var curTab = $.cookie("current-tab");
+    if (curTab != undefined) {
+        curTab = curTab * 1;
+        if (curTab == NavigationTabs.Schema) {
+            $("#overlay").show();
+            setTimeout(function() { $("#navSchema > a").trigger("click"); }, 100);
+        } else if (curTab == NavigationTabs.SQLQuery) {
+            $("#overlay").show();
+            setTimeout(function() { $("#navSqlQuery > a").trigger("click"); }, 100);
+        }
+    }
     
     var defaultSearchTextProcedure = 'Search Stored Procedures';
     var defaultSearchTextTable = 'Search Database Tables';
