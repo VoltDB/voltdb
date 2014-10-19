@@ -130,9 +130,9 @@ var loadPage = function (serverName, portid) {
 
         $.get(templateUrl, function (result) {
             var body = $(result).filter("#wrapper").html();
-            $("#overlay").hide();
             $("#schema").html(body);
             $.getScript(templateJavascript);
+            $("#overlay").hide();
         });
     };
     loadSchemaTab();
