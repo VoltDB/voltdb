@@ -26,7 +26,7 @@
             var arr = [];
             var theDate = new Date();
 
-            for (var i = 360; i >= 0; i--) {
+            for (var i = 121; i >= 0; i--) {
                 arr[i] = { x: new Date(theDate.getTime()), y:null };
                 theDate.setSeconds(theDate.getSeconds() - 5);
             }
@@ -38,7 +38,7 @@
             var arr = [];
             var theDate = new Date();
 
-            for (var i = 360; i >= 0; i--) {
+            for (var i = 121; i >= 0; i--) {
                 arr[i] = { x: new Date(theDate.getTime()), y: null };
                 theDate.setSeconds(theDate.getSeconds() - 30);
             }
@@ -50,7 +50,7 @@
             var arr = [];
             var theDate = new Date();
 
-            for (var i = 360; i >= 0; i--) {
+            for (var i = 121; i >= 0; i--) {
                 arr[i] = { x: new Date(theDate.getTime()), y: null };
                 theDate.setMinutes(theDate.getMinutes() - 5);
             }
