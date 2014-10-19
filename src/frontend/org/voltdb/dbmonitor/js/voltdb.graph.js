@@ -12,6 +12,10 @@
         var memMinCount = 0;
         var latSecCount = 0;
         var latMinCount = 0;
+        var cpuChart = $('#chartServerCPU');
+        var ramChart = $('#chartServerRAM');
+        var latencyChart = $('#chartClusterLatency');
+        var transactionChart = $('#chartClusterTransactions');
         this.Monitors = {};
         this.ChartCpu = nv.models.lineChart();
         this.ChartRam = nv.models.lineChart();
@@ -376,7 +380,7 @@
             }
         };
 
-        this.RefreshLatency = function (latency, graphView, currentTab, isHidden) {
+        this.RefreshLatency = function (latency, graphView, currentTab) {
             var monitor = MonitorGraphUI.Monitors;
             var dataLat = monitor.latData;
             var dataLatMin = monitor.latDataMin;
@@ -425,7 +429,7 @@
             else
                 dataLatency[0]["values"] = dataLat;
 
-            if (currentTab == NavigationTabs.DBMonitor) {
+            if (currentTab == NavigationTabs.DBMonitor && latencyChart.is(":visible")) {
                 d3.select("#visualisationLatency")
                     .datum(dataLatency)
                     .transition().duration(500)
@@ -471,7 +475,7 @@
                 dataRam[0]["values"] = dataMem;
 
 
-            if (currentTab == NavigationTabs.DBMonitor) {
+            if (currentTab == NavigationTabs.DBMonitor && ramChart.is(":visible")) {
                 d3.select('#visualisationRam')
                     .datum(dataRam)
                     .transition().duration(500)
@@ -519,7 +523,7 @@
             monitor.lastTimedTransactionCount = currentTimedTransactionCount;
             monitor.lastTimerTick = currentTimerTick;
 
-            if (currentTab == NavigationTabs.DBMonitor) {
+            if (currentTab == NavigationTabs.DBMonitor && transactionChart.is(":visible")) {
                 d3.select('#visualisationTransaction')
                     .datum(dataTransactions)
                     .transition().duration(500)
@@ -565,11 +569,11 @@
 
             }
 
-            if (currentTab == NavigationTabs.DBMonitor) {
-            d3.select('#visualisationCpu')
-                .datum(dataCpu)
-                .transition().duration(500)
-                .call(MonitorGraphUI.ChartCpu);
+            if (currentTab == NavigationTabs.DBMonitor && cpuChart.is(":visible")) {
+                d3.select('#visualisationCpu')
+                    .datum(dataCpu)
+                    .transition().duration(500)
+                    .call(MonitorGraphUI.ChartCpu);
             }
             cpuSecCount++;
             cpuMinCount++;
