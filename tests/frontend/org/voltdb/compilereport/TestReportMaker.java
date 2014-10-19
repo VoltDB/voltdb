@@ -23,47 +23,110 @@
 
 package org.voltdb.compilereport;
 
-import java.io.File;
-import java.util.ArrayList;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.UUID;
 
+import junit.extensions.TestSetup;
+import junit.framework.Test;
 import junit.framework.TestCase;
+import junit.framework.TestSuite;
 
-import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
-import org.voltdb.catalog.Catalog;
-import org.voltdb.compiler.VoltCompiler.Feedback;
-import org.voltdb.utils.BuildDirectoryUtils;
-import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.MiscUtils;
+import org.voltdb.compiler.VoltCompiler;
+
+import com.google_voltpatches.common.base.Charsets;
 
 public class TestReportMaker extends TestCase {
 
-    private static Catalog getCatalog(String name) throws Exception {
-        TPCCProjectBuilder builder = new TPCCProjectBuilder();
-        builder.addDefaultSchema();
-        builder.addDefaultPartitioning();
-        builder.addStmtProcedure("NeedsEscape",
-                "SELECT COUNT(*) FROM ORDER_LINE WHERE OL_QUANTITY<10 AND OL_QUANTITY>5");
+    private static String compileAndGenerateCatalogReport(String ddl) throws IOException {
+        // Let's try not to "drool" files into the current directory.
+        // Generate random temporary names for the .jar and DDL files,
+        // and delete them before we exit this method.  We will still
+        // drool the catalog-report.html file, though (many tests seem
+        // to do this).
+        UUID uuid = UUID.randomUUID();
+        String jarName = uuid + ".jar";
+        String ddlName = uuid + ".sql";
+        String report = null;
+        PrintWriter ddlWriter = null;
+        try {
+            ddlWriter = new PrintWriter(ddlName);
+            ddlWriter.println(ddl);
+            ddlWriter.close();
+            VoltCompiler vc = new VoltCompiler();
+            boolean success = vc.compileFromDDL(jarName, ddlName);
+            assertTrue("Catalog compilation failed!", success);
+            report = new String(Files.readAllBytes(Paths.get("catalog-report.html")), Charsets.UTF_8);
+        }
+        catch (Exception e) {
+        }
+        finally {
+            if (ddlWriter != null)
+                ddlWriter.close();
+            Path ddlPath = Paths.get(ddlName);
+            if (ddlPath.toFile().exists()) {
+                Files.delete(ddlPath);
+            }
 
-        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
-        String retval = testDir + File.separator + "test-reportmaker-" + name + ".jar";
-        builder.compile(retval);
+            Path jarPath = Paths.get(jarName);
+            if (jarPath.toFile().exists()) {
+                Files.delete(jarPath);
+            }
+        }
 
-        byte[] bytes = MiscUtils.fileToBytes(new File(retval));
-        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes).getFirst());
-        assertNotNull(serializedCatalog);
-        Catalog c = new Catalog();
-        c.execute(serializedCatalog);
-
-        return c;
+        return report;
     }
 
-    public void testEscapeSqlText() throws Exception {
-        Catalog catalog = getCatalog("escape-html");
-        String report = ReportMaker.report(catalog, new ArrayList<Feedback>(), "");
+    public void testEscapesRenderedText() throws IOException {
+        final String ddl =
+                        // The very large varchar column will generate a compiler warning
+                        // Type needs to be converted to "VARCHAR(... bytes)"
+                "CREATE TABLE FunkyDefaults ( " +
+                "vc VARCHAR(262145) DEFAULT '<b>Hello, \"World\"!</b>', " +
+                "i INTEGER " +
+                "); " +
+                "CREATE INDEX FunkyIndex on FUNKYDEFAULTS (CASE WHEN i < 10 THEN 0 ELSE 10 END CASE); " +
+                "CREATE INDEX NormalIndex on FUNKYDEFAULTS (vc); " +
+                "CREATE VIEW MyView (vc, TheCount, TheMax) AS " +
+                "SELECT vc, COUNT(*), MAX(i) " +
+                "FROM FunkyDefaults " +
+                "WHERE i < 100 AND i > 50 AND vc LIKE '%\"!<b/b>' " +
+                "GROUP BY vc; " +
+                "CREATE PROCEDURE NeedsEscape AS " +
+                "SELECT i FROM FUNKYDEFAULTS WHERE i<? AND i>?;";
+        String report = compileAndGenerateCatalogReport(ddl);
 
-        assertTrue(report.contains("SELECT COUNT(*) FROM ORDER_LINE WHERE OL_QUANTITY&lt;10 AND OL_QUANTITY&gt;5"));
-        assertFalse(report.contains("OL_QUANTITY<10"));
-        assertFalse(report.contains("OL_QUANTITY>5"));
+        // Lock down all the places in ReportMaker
+        // where we insert escape sequences for HTML entities:
+        //   - In the DDL output in the Schema tab
+        //   - The SQL statement text in the Procedures & SQL tab
+        //   - The "explain plan" text under the SQL statement
+        //   - DDL seems also to be in the Size Worksheet tab,
+        //       but I can't see it rendered?
+        //   - The Overview tab warnings section
+        //   - The DDL Source tab
+
+        // < and > in SQL statements should be escaped.
+        // Procedures & SQL
+        assertTrue(report.contains("WHERE i&lt;? AND i&gt;?"));
+        assertFalse(report.contains("i<?"));
+        assertFalse(report.contains("i>?"));
+
+        // DEFAULT '<b>Hello, "World"!<b>
+        // Should have its angle brackets and quotes escaped.  Table definitions are
+        // visible in both the "Schema" and "DDL Source" tabs.
+        assertTrue(report.contains("DEFAULT '&lt;b&gt;Hello, &quot;World&quot;!&lt;/b&gt;'"));
+        assertFalse(report.contains("DEFAULT '<b>Hello, \"World\"!</b>'"));
+
+        // "Explain Plan" output should also be escaped:
+        // (spaces in explain plan are replaced by &nbsp;)
+        assertTrue(report.contains("filter&nbsp;by&nbsp;((I&nbsp;&lt;&nbsp;?0)&nbsp;AND&nbsp;(I&nbsp;&gt;&nbsp;?1))"));
+
+        // Warnings in the Overview tab should have escaped ", &, <, >, etc.
+        assertTrue(report.contains("To eliminate this warning, specify &quot;VARCHAR(262145 BYTES)&quot;"));
+        assertFalse(report.contains("To eliminate this warning, specify \"VARCHAR(262145 BYTES)\""));
     }
-
 }

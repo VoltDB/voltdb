@@ -268,7 +268,7 @@ public class ReportMaker {
                 sb.append("<p>MISSING DDL</p>\n");
             }
             else {
-                String ddl = annotation.ddl;
+                String ddl = escapeHtml4(annotation.ddl);
                 sb.append("<p><pre>" + ddl + "</pre></p>\n");
             }
 
@@ -377,7 +377,7 @@ public class ReportMaker {
         sb.append("<div class='well well-small'><h4>Explain Plan:</h4>\n");
         StatementAnnotation annotation = (StatementAnnotation) statement.getAnnotation();
         if (annotation != null) {
-            String plan = annotation.explainPlan;
+            String plan = escapeHtml4(annotation.explainPlan);
             plan = plan.replace("\n", "<br/>");
             plan = plan.replace(" ", "&nbsp;");
 
@@ -585,6 +585,7 @@ public class ReportMaker {
 
     static String generateSizeTable(DatabaseSizes sizes) {
         StringBuilder sb = new StringBuilder();
+        sb.append("<!--##SIZES##>\n");
         int nrow = 0;
         for (TableSize tsize: sizes.tableSizes) {
             sb.append(generateSizeRow(tsize, ++nrow));
@@ -672,7 +673,7 @@ public class ReportMaker {
                 sb.append("<p>MISSING DDL</p>\n");
             }
             else {
-                String ddl = annotation.ddl;
+                String ddl = escapeHtml4(annotation.ddl);
                 sb.append("<p><pre>" + ddl + "</pre></p>\n");
             }
         }
@@ -859,7 +860,7 @@ public class ReportMaker {
                 } else {
                     nameLink = "<a href='#p-" + procName.toLowerCase() + "'>" + procName + "</a>";
                 }
-                sb.append("<tr><td>").append(nameLink).append("</td><td>").append(warning.getMessage()).append("</td></tr>\n");
+                sb.append("<tr><td>").append(nameLink).append("</td><td>").append(escapeHtml4(warning.getMessage())).append("</td></tr>\n");
             }
             sb.append("").append("</table>\n").append("</td></tr>\n");
         }
@@ -910,7 +911,7 @@ public class ReportMaker {
 
         contents = contents.replace("##VERSION##", VoltDB.instance().getVersionString());
 
-        contents = contents.replace("##DDL##", autoGenDDL);
+        contents = contents.replace("##DDL##", escapeHtml4(autoGenDDL));
 
         DateFormat df = new SimpleDateFormat("d MMM yyyy HH:mm:ss z");
         contents = contents.replace("##TIMESTAMP##", df.format(m_timestamp));
