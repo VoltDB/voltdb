@@ -33,9 +33,6 @@ $(document).ready(function () {
 
             if (json["password"] != undefined && json["password"] != "")
                 saveSessionCookie("password", json["password"]);
-            
-            if (json["admin"] != undefined && json["admin"] != "")
-                saveSessionCookie("admin", json["admin"]);
 
             if (json["AlertThreshold"] != undefined && json["AlertThreshold"] != "")
                 saveCookie("alert-threshold", json["AlertThreshold"]);
@@ -230,8 +227,7 @@ var loadPage = function (serverName, portid) {
                     DisplayPreferences: $.cookie("user-preferences"),
                     AlertThreshold: $.cookie("alert-threshold"),
                     username: $.cookie("username"),
-                    password: $.cookie("password"),
-                    admin: $.cookie("admin")
+                    password: $.cookie("password")
                 };
 
                 var win = window.open(newUrl + '?data=' + encodeURIComponent(JSON.stringify(data)), '_parent');
