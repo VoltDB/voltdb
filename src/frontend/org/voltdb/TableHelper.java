@@ -507,6 +507,16 @@ public class TableHelper {
      * 50% chance of partitioned or replicated.
      */
     public static VoltTable getTotallyRandomTable(String name, Random rand) {
+        return getTotallyRandomTable(name, rand, true);
+    }
+
+    /**
+     * Generate a totally random (valid) schema.
+     * One constraint is that it will have a single bigint pkey somewhere.
+     * For now, no non-pkey unique columns.
+     * Parameter determines if it's possible to return a 50% chance of partitioned table.
+     */
+    public static VoltTable getTotallyRandomTable(String name, Random rand, boolean partitionable) {
         // pick a number of cols between 1 and 1000, with most tables < 25 cols
         int numColumns = Math.max(1, Math.min(Math.abs((int) (rand.nextGaussian() * 25)), 1000));
 
@@ -526,7 +536,8 @@ public class TableHelper {
                                                       "0");
         int[] pkeyIndexes = new int[] { pkeyIndex };
 
-        boolean partitioned = rand.nextBoolean();
+        // if partitionable, flip a coin
+        boolean partitioned = partitionable ? rand.nextBoolean() : false;
         int partitionColumn = partitioned ? pkeyIndexes[0] : -1;
 
         // return the table from the columns
