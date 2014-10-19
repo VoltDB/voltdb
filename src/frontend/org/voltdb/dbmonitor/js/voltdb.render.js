@@ -179,7 +179,7 @@ function alertNodeClicked(obj) {
                 $("#overlay").hide();
                 if (!popupDisplayed) {
                     //If security is enabled, then display popup to get username and password.
-                    if (!result || true) {
+                    if (!result) {
                         saveSessionCookie("username", null);
                         saveSessionCookie("password", null);
 
