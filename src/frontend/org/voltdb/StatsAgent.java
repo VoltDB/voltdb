@@ -284,15 +284,22 @@ public class StatsAgent extends OpsAgent
     protected void handleJSONMessage(JSONObject obj) throws Exception {
         VoltTable[] results = null;
 
-        OpsSelector selector = OpsSelector.valueOf(obj.getString("selector").toUpperCase());
-        if (selector == OpsSelector.STATISTICS) {
-            results = collectDistributedStats(obj);
-        }
-        else {
-            hostLog.warn("StatsAgent received a non-STATISTICS OPS selector: " + selector);
-        }
+        try {
+            OpsSelector selector = OpsSelector.valueOf(obj.getString("selector").toUpperCase());
+            if (selector == OpsSelector.STATISTICS) {
+                results = collectDistributedStats(obj);
+            }
+            else {
+                hostLog.warn("StatsAgent received a non-STATISTICS OPS selector: " + selector);
+            }
 
-        sendOpsResponse(results, obj);
+            sendOpsResponse(results, obj);
+        } catch (Exception e) {
+            hostLog.warn("Error processing stats request " + obj.toString(4), e);
+        } catch (Throwable t) {
+            //Handle throwable because otherwise the future swallows up other exceptions
+            VoltDB.crashLocalVoltDB("Error processing stats request " + obj.toString(4), true, t);
+        }
     }
 
     private void collectTopoStats(PendingOpsRequest psr)
