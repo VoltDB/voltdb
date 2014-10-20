@@ -877,6 +877,9 @@ function alertNodeClicked(obj) {
 
                 if (replicationCount > 0 && table_type != "VIEW" && table_type != "PARTITIONED")
                     table_type = "REPLICATED";
+                
+                else if (kFactor > 0 && table_type != "VIEW" && table_type != "PARTITIONED")
+                    table_type = "REPLICATED";
 
 
                 maxTupleValue = Math.max.apply(null, tupleCountPartitions);

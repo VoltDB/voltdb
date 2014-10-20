@@ -128,10 +128,6 @@ var loadPage = function (serverName, portid) {
             var body = $(result).filter("#wrapper").html();
             $("#schema").html(body);
             
-            var downloadDDL = $("#downloadDDL");
-            downloadDDL.attr("download", "../" + downloadDDL.attr("download"));
-            downloadDDL.attr("href", "../" + downloadDDL.attr("href"));
-            
             $("#schemaLinkSqlQuery").on("click", function (e) {
                 $("#navSqlQuery").trigger("click");
                 e.preventDefault();
