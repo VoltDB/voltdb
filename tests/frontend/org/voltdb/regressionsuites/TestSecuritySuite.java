@@ -303,9 +303,6 @@ public class TestSecuritySuite extends RegressionSuite {
 
         result = client.callProcedure("@SystemInformation").getStatus();
         assertEquals(ClientResponse.SUCCESS, result);
-
-        result = client.callProcedure("@GetHashinatorConfig").getStatus();
-        assertEquals(ClientResponse.SUCCESS, result);
     }
 
     /**
