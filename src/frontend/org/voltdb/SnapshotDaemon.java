@@ -1294,7 +1294,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         if (m_state == State.STARTUP) {
             initiateSnapshotScan();
         } else if (m_state == State.SCANNING) {
-            RateLimitedLogger.tryLogForMessage("Blocked in scanning", System.nanoTime(), 5, TimeUnit.MINUTES, SNAP_LOG, Level.INFO);
+            RateLimitedLogger.tryLogForMessage(System.nanoTime(), 5, TimeUnit.MINUTES, SNAP_LOG, Level.INFO, "Blocked in scanning");
             return;
         } else if (m_state == State.WAITING){
             processWaitingPeriodicWork(now);

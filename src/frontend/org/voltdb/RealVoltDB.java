@@ -169,9 +169,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    static final String m_defaultVersionString = "4.8";
+    static final String m_defaultVersionString = "4.9";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q4.8\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q4.9\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -984,6 +984,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     class StartActionWatcher implements Watcher {
         @Override
         public void process(WatchedEvent event) {
+            if (m_mode == OperationMode.SHUTTINGDOWN) return;
             m_es.submit(new Runnable() {
                 @Override
                 public void run() {

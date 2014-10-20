@@ -10,7 +10,7 @@
 
     If you modify this schema, the jaxb bindings must be regenerated.
     It is normally handled by the ant build.
-    
+
     It's also easy to do manually:
 
     cd src/frontend
@@ -74,6 +74,7 @@
           <xsd:attribute name="sysproc" type="xsd:boolean" default="false"/>
           <xsd:attribute name="defaultproc" type="xsd:boolean" default="false"/>
           <xsd:attribute name="adhoc" type="xsd:boolean" default="false"/>
+          <xsd:attribute name="defaultprocread" type="xsd:boolean" default="false"/>
         </xsd:complexType>
       </xsd:element>
     </xsd:sequence>
@@ -88,6 +89,7 @@
           <xsd:attribute name="sysproc" type="xsd:boolean" default="false"/>
           <xsd:attribute name="defaultproc" type="xsd:boolean" default="false"/>
           <xsd:attribute name="adhoc" type="xsd:boolean" default="false"/>
+          <xsd:attribute name="defaultprocread" type="xsd:boolean" default="false"/>
         </xsd:complexType>
       </xsd:element>
     </xsd:sequence>

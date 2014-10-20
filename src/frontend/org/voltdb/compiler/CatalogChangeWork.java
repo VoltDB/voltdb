@@ -41,13 +41,14 @@ public class CatalogChangeWork extends AsyncCompilerWork {
             String invocationName, ProcedureInvocationType type,
             long originalTxnId, long originalUniqueId,
             boolean onReplica, boolean useAdhocDDL,
-            AsyncCompilerWorkCompletionHandler completionHandler)
+            AsyncCompilerWorkCompletionHandler completionHandler,
+            String userName)
     {
         super(replySiteId, false, clientHandle, connectionId, hostname,
               adminConnection, clientData, invocationName, type,
               originalTxnId, originalUniqueId,
               onReplica, useAdhocDDL,
-              completionHandler);
+              completionHandler, userName);
         if (operationBytes != null) {
             this.operationBytes = operationBytes.clone();
         }
@@ -78,7 +79,8 @@ public class CatalogChangeWork extends AsyncCompilerWork {
               adhocDDL.originalUniqueId,
               adhocDDL.onReplica,
               adhocDDL.useAdhocDDL,
-              adhocDDL.completionHandler);
+              adhocDDL.completionHandler,
+              adhocDDL.userName);
         // AsyncCompilerAgentHelper will fill in the current catalog bytes later.
         this.operationBytes = null;
         // Ditto for deployment string

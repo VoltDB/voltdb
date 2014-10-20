@@ -253,6 +253,36 @@ public class TestSecuritySuite extends RegressionSuite {
         assertTrue(exceptionThrown);
     }
 
+    // Tests permissions applied to auto-generated read/write CRUD procedures.
+    public void testDefaultProcReadPermissions() throws Exception {
+        Client client;
+        boolean exceptionThrown;
+
+        // userWithDefaultProcReadPerm is not allowed to invoke write CRUD procs
+        m_username = "userWithDefaultProcReadPerm";
+        client = getClient();
+        exceptionThrown = false;
+        try {
+            client.callProcedure("NEW_ORDER.insert", 100, 100, 100);
+        } catch (ProcCallException e) {
+            e.printStackTrace();
+            exceptionThrown = true;
+        }
+        assertTrue(exceptionThrown);
+
+        // userWithoutDefaultProcReadPerm is  allowed to invoke read CRUD procs
+        m_username = "userWithDefaultProcReadPerm";
+        client = getClient();
+        exceptionThrown = false;
+        try {
+            client.callProcedure("NEW_ORDER.select", 0, 0, 0);
+        } catch (ProcCallException e) {
+            e.printStackTrace();
+            exceptionThrown = true;
+        }
+        assertFalse(exceptionThrown);
+    }
+
     /**
      * Build a list of the tests that will be run when TestSecuritySuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
@@ -283,17 +313,19 @@ public class TestSecuritySuite extends RegressionSuite {
                 new UserInfo("user3", "password", new String[] {"group3"}),
                 new UserInfo("user4", "password", new String[] {"group4"}),
                 new UserInfo("userWithDefaultProcPerm", "password", new String[] {"groupWithDefaultProcPerm"}),
-                new UserInfo("userWithoutDefaultProcPerm", "password", new String[] {"groupWithoutDefaultProcPerm"})
+                new UserInfo("userWithoutDefaultProcPerm", "password", new String[] {"groupWithoutDefaultProcPerm"}),
+                new UserInfo("userWithDefaultProcReadPerm", "password", new String[] {"groupWithDefaultProcReadPerm"})
         };
         project.addUsers(users);
 
         GroupInfo groups[] = new GroupInfo[] {
-                new GroupInfo("group1", false, false, false),
-                new GroupInfo("group2", false, true, true),
-                new GroupInfo("group3", true, false, false),
-                new GroupInfo("group4", true, true, true),
-                new GroupInfo("groupWithDefaultProcPerm", false, false, true),
-                new GroupInfo("groupWithoutDefaultProcPerm", false, false, false)
+                new GroupInfo("group1", false, false, false, false),
+                new GroupInfo("group2", false, true, true, false),
+                new GroupInfo("group3", true, false, false, false),
+                new GroupInfo("group4", true, true, true, false),
+                new GroupInfo("groupWithDefaultProcPerm", false, false, true, false),
+                new GroupInfo("groupWithoutDefaultProcPerm", false, false, false, false),
+                new GroupInfo("groupWithDefaultProcReadPerm", false, false, false, true)
         };
         project.addGroups(groups);
         project.setSecurityEnabled(true);

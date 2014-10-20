@@ -44,13 +44,13 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
             String invocationName, ProcedureInvocationType type,
             long originalTxnId, long originalUniqueId,
             boolean onReplica, boolean useAdhocDDL,
-            AsyncCompilerWorkCompletionHandler completionHandler)
+            AsyncCompilerWorkCompletionHandler completionHandler, String userName)
     {
         super(replySiteId, false, clientHandle, connectionId,
               clientConnection == null ? "" : clientConnection.getHostnameAndIPAndPort(),
               adminConnection, clientConnection, invocationName, type,
               originalTxnId, originalUniqueId, onReplica, useAdhocDDL,
-              completionHandler);
+              completionHandler, userName);
         this.sqlBatchText = sqlBatchText;
         this.sqlStatements = sqlStatements;
         this.userParamSet = userParamSet;
@@ -84,7 +84,8 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
                 orig.originalUniqueId,
                 orig.onReplica,
                 orig.useAdhocDDL,
-                completionHandler);
+                completionHandler,
+                orig.userName);
         }
 
     /**
@@ -109,7 +110,7 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
             false, (singlePartition ? new Object[1] /*any vector element will do, even null*/ : null),
             "@AdHoc_RW_MP", ProcedureInvocationType.ORIGINAL, 0, 0,
             false, false, // don't allow adhoc DDL in this path
-            completionHandler);
+            completionHandler, null);
     }
 
     @Override
@@ -130,7 +131,7 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
         } else {
             retval += "\n  user partitioning: " +
                       (userPartitionKey[0] == null ? "null" : userPartitionKey[0].toString());
-    }
+        }
         assert(sqlStatements != null);
         if (sqlStatements.length == 0) {
             retval += "\n  sql: empty";
@@ -142,6 +143,16 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
             }
         }
         return retval;
+    }
+
+    public int getStatementCount()
+    {
+        return (this.sqlStatements != null ? this.sqlStatements.length : 0);
+    }
+
+    public int getParameterCount()
+    {
+        return (this.userParamSet != null ? this.userParamSet.length : 0);
     }
 
 }

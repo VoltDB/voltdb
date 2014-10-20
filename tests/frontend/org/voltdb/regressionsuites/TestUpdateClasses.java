@@ -178,8 +178,8 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
         builder.addLiteralSchema("-- Don't care");
         builder.setUseAdhocSchema(true);
         GroupInfo groups[] = new GroupInfo[] {
-            new GroupInfo("adhoc", true, false, false),
-            new GroupInfo("sysproc", false, true, false)
+            new GroupInfo("adhoc", true, false, false, false),
+            new GroupInfo("sysproc", false, true, false, false)
         };
         UserInfo users[] = new UserInfo[] {
             new UserInfo("adhocuser", "adhocuser", new String[] {"adhoc"}),
