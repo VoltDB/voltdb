@@ -98,6 +98,11 @@ class TheHashinator;
 
 const int64_t DEFAULT_TEMP_TABLE_MEMORY = 1024 * 1024 * 100;
 
+/** A constant only being used temporarily for testing purposes
+ * for the LIMIT PARTITION ROWS EXECUTE DELETE fragment
+ */
+const int64_t MAGIC_PURGE_FRAGMENT_ID = 9223372036854775807LL; // 2^63 - 1
+
 /**
  * Represents an Execution Engine which holds catalog objects (i.e. table) and executes
  * plans on the objects. Every operation starts from this object.
@@ -159,6 +164,13 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         inline int64_t pullTuplesRemainingUntilProgressReport(AbstractExecutor* exec, Table* target_table);
         inline int64_t pushTuplesProcessedForProgressMonitoring(int64_t tuplesProcessed);
         inline void pushFinalTuplesProcessedForProgressMonitoring(int64_t tuplesProcessed);
+
+        // If an insert will fail due to row limit constraint and user
+        // has defined a delete action to make space, this method
+        // executes the corresponding fragment.
+        //
+        // Returns ENGINE_ERRORCODE_SUCCESS on success
+        int executePurgeFragment(PersistentTable* table);
 
         // -------------------------------------------------
         // Dependency Transfer Functions
