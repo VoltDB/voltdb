@@ -880,7 +880,7 @@ function alertNodeClicked(obj) {
 
 
                 maxTupleValue = Math.max.apply(null, tupleCountPartitions);
-                minTupleValue = Math.max.apply(null, tupleCountPartitions);
+                minTupleValue = Math.min.apply(null, tupleCountPartitions);
                 avgTupleValue = getAverage(tupleCountPartitions);
                 //avgTupleValue = tupleCountPartitions.reduce(function (a) {
                 //    return a;
