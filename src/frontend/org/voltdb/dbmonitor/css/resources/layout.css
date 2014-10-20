@@ -628,7 +628,7 @@ ul.topRightList li.responsiveMenuPlaceHolder{border-left:1px solid #ccc; height:
 .btnList { margin:10px 0 0 0; padding:0; float:right;}
 .btnList li { margin:0; padding:0 10px 0 0 ; float:left;}
 
-.blockWrapper h1.theHeading{margin: 0 0 1.5px 0;
+.blockWrapper h1.theHeading{margin: 0 0 1.5px 0!important;
 padding: 17px 20px 17px 45px;
 background-color: #FFFFFF;
 -webkit-box-shadow: 0px 6px 7px -5px #ccc;
