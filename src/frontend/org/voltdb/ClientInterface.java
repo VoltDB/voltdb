@@ -115,7 +115,6 @@ import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListenableFutureTask;
-import org.voltdb.InvocationPermissionPolicy.PolicyResult;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -186,19 +185,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     private final Cartographer m_cartographer;
 
-    /**
-     * Policies used to determine if we can accept an invocation.
-     */
-    private final List<InvocationPermissionPolicy> m_permissionpolicies = new ArrayList<InvocationPermissionPolicy>();
 
-    /**
-     * Policies used to determine if we can accept an invocation.
-     */
-    private final Map<String, List<InvocationValidationPolicy>> m_validationpolicies =
-            new HashMap<String, List<InvocationValidationPolicy>>();
-
-    private ReplicaInvocationAcceptancePolicy m_replicationpolicy = null;
-    private ParameterDeserializationPolicy m_paramdeserializationpolicy = null;
+    //This validator will check permissions in AUTH system.
+    private final PermissionValidator m_permissionValidator = new PermissionValidator();
+    //This validator will verify params or per procedure invocation vaidation.
+    private final InvocationValidator m_invocationValidator;
 
     /*
      * Allow the async compiler thread to immediately process completed planning tasks
@@ -364,8 +355,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             m_socket.socket().setKeepAlive(true);
 
                             if (handler instanceof ClientInputHandler) {
-                                final Connection c
-                                        = m_network.registerChannel(
+                                m_network.registerChannel(
                                                 m_socket,
                                                 handler,
                                                 0,
@@ -970,8 +960,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     return false;
                 }
 
-                int partitionParamIndex = catProc.getPartitionparameter();
-                int partitionParamType = catProc.getPartitioncolumn().getType();
                 boolean isReadonly = catProc.getReadonly();
 
                 try {
@@ -1142,7 +1130,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_acceptor = new ClientAcceptor(clientIntf, clientPort, messenger.getNetwork(), false);
         m_adminAcceptor = null;
         m_adminAcceptor = new ClientAcceptor(adminIntf, adminPort, messenger.getNetwork(), true);
-        registerPolicies(replicationRole);
+        m_invocationValidator = new InvocationValidator(replicationRole);
 
         m_mailbox = new LocalMailbox(messenger,  messenger.getHSIdForLocalSite(HostMessenger.CLIENT_INTERFACE_SITE_ID)) {
             LinkedBlockingQueue<VoltMessage> m_d = new LinkedBlockingQueue<VoltMessage>();
@@ -1243,90 +1231,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
     }
 
-    private void registerPolicies(ReplicationRole replicationRole) {
-        m_permissionpolicies.add(new InvocationSysprocPermissionPolicy());
-        m_permissionpolicies.add(new InvocationAdHocPermissionPolicy());
-        m_permissionpolicies.add(new InvocationDefaultProcPermissionPolicy());
-        m_permissionpolicies.add(new InvocationUserDefinedProcedurePermissionPolicy());
-
-        m_replicationpolicy = new ReplicaInvocationAcceptancePolicy(replicationRole == ReplicationRole.REPLICA);
-        m_paramdeserializationpolicy = new ParameterDeserializationPolicy(true);
-
-        // NOTE: These "policies" are really parameter correctness checks, not permissions
-        registerValidationPolicy("@AdHoc", new AdHocAcceptancePolicy(true));
-        registerValidationPolicy("@AdHocSpForTest", new AdHocAcceptancePolicy(true));
-        registerValidationPolicy("@UpdateApplicationCatalog", new UpdateCatalogAcceptancePolicy(true));
-        registerValidationPolicy("@UpdateClasses", new UpdateClassesAcceptancePolicy(true));
-    }
-
-    private void registerValidationPolicy(String procName, InvocationValidationPolicy policy) {
-        List<InvocationValidationPolicy> policies = m_validationpolicies.get(procName);
-        if (policies == null) {
-            policies = new ArrayList<InvocationValidationPolicy>();
-            m_validationpolicies.put(procName, policies);
-        }
-        policies.add(policy);
-    }
-
-    /**
-     * Check the procedure invocation against a set of policies to see if it
-     * should be rejected.
-     *
-     * @param name The procedure name, null for generic policies.
-     * @return ClientResponseImpl on error or null if okay.
-     */
-    private ClientResponseImpl checkPolicies(String name, AuthSystem.AuthUser user,
-                                  final StoredProcedureInvocation task,
-                                  final Procedure catProc) {
-        //Check permission policies first check all if any ALLOW go through DENY counts only if we didnt allow.
-        boolean deny = false;
-        ClientResponseImpl error = null;
-        for (InvocationPermissionPolicy policy : m_permissionpolicies) {
-            PolicyResult res = policy.shouldAccept(user, task, catProc);
-            if (res == PolicyResult.ALLOW) {
-                deny = false;
-                break;
-            }
-            if (res == PolicyResult.DENY) {
-                deny = true;
-                if (error == null) {
-                    //Take first denied
-                    error = policy.getErrorResponse(user, task, catProc);
-                }
-            }
-        }
-        if (deny) {
-            return error;
-        }
-
-        //Check replication policy
-        if ((error = m_replicationpolicy.shouldAccept(user, task, catProc)) != null) {
-            return error;
-        }
-
-        //Check param deserialization policy for sysprocs
-        if ((error = m_paramdeserializationpolicy.shouldAccept(user, task, catProc)) != null) {
-            return error;
-        }
-
-        //Check validation policies
-        List<InvocationValidationPolicy> vpolicies = m_validationpolicies.get(name);
-        if (vpolicies != null) {
-            for (InvocationValidationPolicy policy : vpolicies) {
-                if ((error = policy.shouldAccept(user, task, catProc)) != null) {
-                    return error;
-                }
-            }
-        }
-        return null;
-    }
-
     /**
      * Called when the replication role of the cluster changes.
      * @param role
      */
     public void setReplicationRole(ReplicationRole role) {
-        m_replicationpolicy.setMode(role == ReplicationRole.REPLICA);
+        m_invocationValidator.setReplicationRole(role);
     }
 
     /**
@@ -1529,7 +1439,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 task.procName, task.type, task.originalTxnId, task.originalUniqueId,
                 VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
                 VoltDB.instance().getCatalogContext().cluster.getUseadhocschema(),
-                m_adhocCompletionHandler);
+                m_adhocCompletionHandler, handler.m_username);
         LocalObjectMessage work = new LocalObjectMessage( ahpw );
 
         m_mailbox.send(m_plannerSiteId, work);
@@ -1567,7 +1477,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     task.procName, task.type, task.originalTxnId, task.originalUniqueId,
                     VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
                     VoltDB.instance().getCatalogContext().cluster.getUseadhocschema(),
-                    m_adhocCompletionHandler));
+                    m_adhocCompletionHandler, handler.m_username));
 
         m_mailbox.send(m_plannerSiteId, work);
         return null;
@@ -1828,8 +1738,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         final ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)catProc.getAttachment();
 
-        error = checkPolicies(task.procName, user, task, catProc);
-        if (error != null) {
+        //Check permissions
+        if ((error = m_permissionValidator.shouldAccept(task.procName, user, task, catProc)) != null) {
+            return error;
+        }
+
+        //Check param deserialization policy for sysprocs
+        if ((error = m_invocationValidator.shouldAccept(task.procName, user, task, catProc)) != null) {
             return error;
         }
 
@@ -2081,8 +1996,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     }
 
     private ClientResponseImpl dispatchStopNode(StoredProcedureInvocation task) {
-        VoltTable table = new VoltTable(
-                new ColumnInfo("RESULT", VoltType.STRING));
         Object params[] = task.getParams().toArray();
         if (params.length != 1 || params[0] == null) {
             return new ClientResponseImpl(

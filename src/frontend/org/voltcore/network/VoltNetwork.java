@@ -134,9 +134,6 @@ class VoltNetwork implements Runnable, IOStatsIntf
             throw new RuntimeException(ex);
         }
         m_ninjaSelectedKeys = NinjaKeySet.instrumentSelector(m_selector);
-        if (m_ninjaSelectedKeys == null) {
-            throw new AssertionError("Failed to instrument selector");
-        }
     }
 
     VoltNetwork( Selector s) {
@@ -315,7 +312,11 @@ class VoltNetwork implements Runnable, IOStatsIntf
                         }
 
                         if (readyKeys > 0) {
-                            optimizedInvokeCallbacks(r);
+                            if (NinjaKeySet.supported) {
+                                optimizedInvokeCallbacks(r);
+                            } else {
+                                invokeCallbacks(r);
+                            }
                         }
 
                         /*

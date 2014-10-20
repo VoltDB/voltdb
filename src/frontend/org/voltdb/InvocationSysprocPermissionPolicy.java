@@ -34,6 +34,10 @@ public class InvocationSysprocPermissionPolicy extends InvocationPermissionPolic
 
     /**
      *
+     * @param user whose permission needs to be checked.
+     * @param invocation invocation associated with this request
+     * @param proc procedure associated.
+     * @return PolicyResult ALLOW, DENY or NOT_APPLICABLE
      * @see org.voltdb.InvocationAcceptancePolicy#shouldAccept(org.voltdb.AuthSystem.AuthUser,
      *      org.voltdb.StoredProcedureInvocation, org.voltdb.catalog.Procedure,
      *      org.voltcore.network.WriteStream)
@@ -42,7 +46,7 @@ public class InvocationSysprocPermissionPolicy extends InvocationPermissionPolic
     public PolicyResult shouldAccept(AuthUser user, StoredProcedureInvocation invocation, Procedure proc) {
 
         //Since AdHoc perms are diff we only check sysprocs other than AdHoc
-        if (!invocation.procName.startsWith("@AdHoc") && proc.getSystemproc()) {
+        if (proc.getSystemproc() && !invocation.procName.startsWith("@AdHoc")) {
             if (!user.hasSystemProcPermission()) {
                 return PolicyResult.DENY;
             }

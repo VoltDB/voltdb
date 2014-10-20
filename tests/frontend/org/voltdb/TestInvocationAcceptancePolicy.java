@@ -85,17 +85,32 @@ public class TestInvocationAcceptancePolicy {
     }
 
     @Test
+    public void testUserDefinedProcPermission()
+    {
+        Procedure proc = new Procedure();
+        AuthSystem.AuthUser user = createUser(false, false, false, proc, true);
+
+        StoredProcedureInvocation invocation = new StoredProcedureInvocation();
+        invocation.setProcName("MyProc");
+        invocation.setParams("test");
+
+        InvocationPermissionPolicy policy = new InvocationUserDefinedProcedurePermissionPolicy();
+        assertEquals(policy.shouldAccept(user, invocation, proc), PolicyResult.ALLOW);
+
+    }
+
+    @Test
     public void testUserPermission()
     {
         Procedure proc = new Procedure();
         proc.setDefaultproc(true);
-        AuthSystem.AuthUser user = createUser(false, false, false, proc, true);
+        AuthSystem.AuthUser user = createUser(false, true, false, proc, true);
 
         StoredProcedureInvocation invocation = new StoredProcedureInvocation();
         invocation.setProcName("A.insert");
         invocation.setParams("test");
 
-        InvocationPermissionPolicy policy = new InvocationUserDefinedProcedurePermissionPolicy();
+        InvocationPermissionPolicy policy = new InvocationDefaultProcPermissionPolicy();
         assertEquals(policy.shouldAccept(user, invocation, proc), PolicyResult.ALLOW);
 
         // A user that doesn't have crud permission

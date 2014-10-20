@@ -194,7 +194,7 @@ public class SchemaChangeClient {
 
         if (newTable) {
             newName = currentName.equals("A") ? "B" : "A";
-            t2 = TableHelper.getTotallyRandomTable(newName, rand);
+            t2 = TableHelper.getTotallyRandomTable(newName, rand, false);
         }
         else {
             t2 = TableHelper.mutateTable(t1, true, rand);

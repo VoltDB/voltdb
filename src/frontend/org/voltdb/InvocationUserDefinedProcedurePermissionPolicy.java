@@ -41,12 +41,8 @@ public class InvocationUserDefinedProcedurePermissionPolicy extends InvocationPe
     @Override
     public PolicyResult shouldAccept(AuthUser user, StoredProcedureInvocation invocation, Procedure proc) {
 
-        if (proc == null) {
-            return PolicyResult.DENY;
-        }
-
         //We dont check adhoc or sys procs
-        if (proc.getSystemproc() || invocation.procName.startsWith("@AdHoc")) {
+        if (proc.getSystemproc() || proc.getDefaultproc()) {
             return PolicyResult.NOT_APPLICABLE;
         }
 

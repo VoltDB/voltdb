@@ -1992,7 +1992,13 @@ public class Expression {
         assert(type != null);
 
         // return the original default impl + the type
-        return super.toString() + ": " + type;
+        String str = super.toString() + " with opType " + type +
+                ", isAggregate: " + isAggregate +
+                ", columnIndex: " + columnIndex;
+        if (this instanceof ExpressionOrderBy) {
+            str += "\n  " + this.nodes[LEFT].toString();
+        }
+        return str;
     }
     /**********************************************************************/
 }
