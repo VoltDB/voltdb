@@ -88,6 +88,9 @@ $(document).ready(function () {
                 MonitorGraphUI.ChartLatency.update();
                 MonitorGraphUI.ChartTransactions.update();
             }
+            else if (VoltDbUI.CurrentTab == NavigationTabs.Schema) {
+                location.hash = "#o";
+            }
             
             shortcut.remove("f5");
             shortcut.remove("f6");
