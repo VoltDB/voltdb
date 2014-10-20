@@ -114,11 +114,11 @@ var loadPage = function (serverName, portid) {
         location.reload(true);
     });
 
-    var userName = $.cookie('username');
-    var password = $.cookie('password');
+    var userName = $.cookie('username') != undefined ? $.cookie('username') : "";
+    var password = $.cookie('password') != undefined ? $.cookie('password') : "";
     voltDbRenderer.ChangeServerConfiguration(serverName, portid, userName, password, true, true);
     voltDbRenderer.ShowUsername(userName);
-    loadSQLQueryPage(serverName, portid);
+    loadSQLQueryPage(serverName, portid, userName, password, true);
 
     var loadSchemaTab = function () {
         var templateUrl = window.location.protocol + '//' + window.location.host;
