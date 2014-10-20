@@ -882,6 +882,11 @@ public class TableWorks {
                     table.setColumnTypeVars(constraint.notNullColumnIndex);
                 }
                 break;
+            // A VoltDB Extention to support LIMIT PARTITION ROWS
+            case Constraint.LIMIT :
+                database.schemaManager.removeSchemaObject(constraint.getName());
+                break;
+            // End of VoltDB extention
         }
     }
 
@@ -1229,4 +1234,23 @@ public class TableWorks {
         database.schemaManager.recompileDependentObjects(table);
     } /* addUniqueExprConstraint */
     /**********************************************************************/
+
+    // A VoltDB extention to support LIMT PARTITION ROWS
+    void addLimitConstraint(Constraint c)
+    {
+        // Find any pre-existing LIMIT constraint on the table and remove it
+        for (Constraint cst : table.constraintList) {
+            if (cst.getConstraintType() == Constraint.LIMIT) {
+                OrderedHashSet constraintNameSet = new OrderedHashSet();
+                HsqlName name = cst.getName();
+                constraintNameSet.add(name);
+                updateConstraints(table, constraintNameSet);
+                database.schemaManager.removeSchemaObject(name);
+                break; // Highlander rules for Constraint.LIMIT
+            }
+        }
+
+        table.addConstraint(c);
+        database.schemaManager.addSchemaObject(c);
+    }
 }
