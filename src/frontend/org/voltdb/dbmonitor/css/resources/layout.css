@@ -24,7 +24,7 @@ h1 {font:16px 'MYRIADPROREGULAR'}
 .btn { background-color:#aa1f2f; padding:8px 10px; text-align:center; color:#FFFFFF; font:14px Arial, Helvetica, sans-serif; text-shadow:none; border-radius:0; border:none;} 
 .btn:hover{background-color:#76bd1d; color:#fff;}
 .graphOpacity {opacity: 0.5}
-h1, h2, h3, h4, h5, h6 {margin:0;}
+h1, h2, h3, h4, h5, h6 {margin:0!important;}
 
 /*****Global Ends******/
 /******sprite*************/
@@ -430,7 +430,7 @@ ul.servers-list li a.alertIcon{display:inline-block; padding-left:20px;}
 .catalogMenu { background:#FFFFFF; margin:0 0 20px 0;}
 ul.catalogNav { margin:0; padding:0; background:#FFFFFF; margin-bottom:20px;}
 ul.catalogNav li { float:left; margin:0; padding:0; line-height:50px; font-family:'MYRIADPROREGULAR'; font-size:16px; border-right:1px solid #CCCCCC;}
-ul.catalogNav li a { margin:0; padding:0 10px; color:#32323a; display:block;}
+ul.catalogNav li a { margin:0; padding:0 10px; color:#32323a; display:block; text-decoration:none;}
 ul.catalogNav li a:hover { background:#AA1F2F; display:block; color:#FFFFFF; }
 ul.catalogNav li.active a, ul.catalogNav li.active a:hover{background:#76bd1d; display:block; color:#FFFFFF!important;}
 
