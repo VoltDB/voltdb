@@ -210,6 +210,10 @@ public class CatalogContext {
     public Class<?> classForProcedure(String procedureClassName) throws ClassNotFoundException {
         //System.out.println("Loading class " + procedureClassName);
 
+        // this is for sysprocs that don't have a procedure class
+        if (procedureClassName == null)
+            return null;
+
         // this is a safety mechanism to prevent catalog classes overriding voltdb stuff
         if (procedureClassName.startsWith("org.voltdb."))
             return Class.forName(procedureClassName);

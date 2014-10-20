@@ -185,21 +185,24 @@ public class LoadedProcedureSet {
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
 
-            try {
-                procedure = (VoltSystemProcedure) procClass.newInstance();
-            }
-            catch (final InstantiationException e) {
-                hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
-                        new Object[] { m_siteId, m_siteIndex }, e);
-            }
-            catch (final IllegalAccessException e) {
-                hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
-                        new Object[] { m_siteId, m_siteIndex }, e);
-            }
+            // this is for sysprocs that don't have a procedure class
+            if (procClass != null) {
+                try {
+                    procedure = (VoltSystemProcedure) procClass.newInstance();
+                }
+                catch (final InstantiationException e) {
+                    hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
+                            new Object[] { m_siteId, m_siteIndex }, e);
+                }
+                catch (final IllegalAccessException e) {
+                    hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
+                            new Object[] { m_siteId, m_siteIndex }, e);
+                }
 
-            runner = m_runnerFactory.create(procedure, proc, csp);
-            procedure.initSysProc(m_site, this, proc, catalogContext.cluster);
-            builder.put(entry.getKey().intern(), runner);
+                runner = m_runnerFactory.create(procedure, proc, csp);
+                procedure.initSysProc(m_site, this, proc, catalogContext.cluster);
+                builder.put(entry.getKey().intern(), runner);
+            }
         }
     }
 
