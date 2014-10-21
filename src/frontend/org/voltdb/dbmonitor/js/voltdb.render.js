@@ -99,7 +99,7 @@ function alertNodeClicked(obj) {
                             '<div  class="overlay-content" style="height:215px; min-width: 441px; padding: 0" >' +
                             '<div id="loginBox">' +
                                 '<label for="username">Username:</label>' +
-                                '<input type="text" id="username" name="username">' +
+                                '<input type="text" id="username" name="username"><br/>' +
                                 '<label for="password">Password:</label>' +
                                 '<input type="password" id="password" name="password">' +
                                 '<div class="lower">' +
@@ -1492,6 +1492,11 @@ function alertNodeClicked(obj) {
 $(function () {
     $('#toggleMenu').click(function () {
         $("#nav").slideToggle('slow');
+		$("#nav").css('left', '0');
+		$("#nav ul li").click(function(){
+				$("#nav").css('display', 'none');
+				$(window).resize();		
+			});
     });
 });
 
@@ -1501,6 +1506,7 @@ $(window).resize(function () {
     if (windowWidth > 699) {
         //alert(windowWidth);
         $("#nav").css('display', 'block');
+
     } else if (windowWidth < 699) {
         $("#nav").css('display', 'none');
     }

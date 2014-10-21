@@ -101,8 +101,9 @@ html, body { height: 100%; }
     display: inline-block;
     margin-left: 18px;
     padding-top: 10px;
-    font-size: 14px;
+    font-size: 13px;
 	font-weight:bold;
+	width:55px;
 }
 #loginBox p, #loginBox a {
     font-size: 11px;
@@ -169,7 +170,7 @@ html, body { height: 100%; }
 	background:#AA1F2F;
 	border:1px solid #AA1F2F;
     float: right;
-    margin-right: 20px;
+    margin-right: 30px;
     margin-top: 20px;
     width: 80px;
     height: 30px;
@@ -201,7 +202,7 @@ font-size: 14px;
 			ul.nav li a:hover, ul.nav li a.active, #nav li.active a  { background:#76bd1d;color:#FFFFFF;}
 .headRight { float:right;}
 	ul.topRightList {  margin:0; padding:0;}
-	ul.topRightList li {  margin:0 0 0 5px; padding:20px 0 0 0; float:left;}
+	ul.topRightList li {  margin:0 0 0 5px; padding:20px 0 0 0; float:left; line-height:12px;}
 
 .userN { position:relative; top:6px; font-size:12px;}
 .container { margin:0 20px;}
@@ -316,7 +317,7 @@ ul.tabs li a {
 	color: #000;
 	display: block;
 	font-size: 1.2em;
-	padding: 0 10px;
+	padding: 0 5px;
 	border: 1px solid #fff;
 	outline: none;
 }
@@ -546,7 +547,7 @@ div.popup {background: #fff;box-shadow: 0 3px 10px #222;}
 .preloader {left: 50%;margin: -10px 0 0 -25px;position: fixed;top: 50%;}
 
 .overlay-title{background:#fbfbfb; height:42px; line-height:42px; padding:4px 4px 4px 20px; border-bottom:1px solid #dbdbdb; font-size:16px; font-weight:bold; color:#3e3a3a;}
-.overlay-content{ padding:20px; border-bottom:1px solid #dbdbdb; margin-bottom:15px; min-width:450px;height:200px; overflow:auto;}
+.overlay-content{ padding:20px; margin-bottom:15px; min-width:450px;height:200px; overflow:auto;}
 .overlay-btns{ text-align:right; padding:5px 20px 20px 20px;}
 
 
@@ -671,7 +672,7 @@ overflow: auto;}
 .tablesorter-bootstrap .tablesorter-header-inner {
 padding: 4px 4px 4px 4px!important;
 }
-
+#schema table.tablesorter th { padding-right:10px!important;}
 
 /*.tablesorter-bootstrap .tablesorter-header i {
 right: -31px!important;
@@ -730,7 +731,7 @@ ul.topRightList li.responsiveMenuPlaceHolder{display:block;}
   }
   #nav ul li a:hover {background:#AA1F2F}
   
-  .clusterStat { background-image:none!important; float:left; width:100%; line-height:28px; margin-left:15px; background-position:left -456px; padding-left:8px;}	
+  .clusterStat { background-image:none!important; float:left; width:100%; line-height:28px; margin-left:15px; background-position:left 87px; padding-left:8px;}	
   .clusterStat li{ color:#3e3a3a;font-family:'MYRIADPROREGULAR'; font-size:15px;}
   
   .tabs-filter-wrapper .filter { float:right; width:auto;} 
@@ -773,12 +774,17 @@ h3.systemHeader{}
 	#popServerList {width: 100%;position: absolute;right:-1px;top:205px;}
 	
 .rightShowhideList li a { margin:0 0 0 46px}  
+ .popup_cont {margin: 0 0 0 9px; width: 305px;}
+ #loginBox { width:305px;}
+ #loginBox input[type=text], #loginBox input[type=password]{ width:160px;}
 	
 	 }
 
 @media (width: 320px) {
 
  input.icon-search { width:182px;}
+ 
+
  
  
 
