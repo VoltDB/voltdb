@@ -33,7 +33,7 @@ public class TestFailureDetectSuite extends RegressionSuite
     public void testMultiPartitionTxnAfterFailure()
     throws Exception
     {
-        Client client = getClient();
+        Client client = getFullyConnectedClient();
         VoltTable[] results = client.callProcedure("InsertMultiPart", 1,
                                                    "desc", 100, 14.5).getResults();
         assertEquals(1, results[0].asScalarLong());
@@ -52,7 +52,7 @@ public class TestFailureDetectSuite extends RegressionSuite
     public void testSinglePartitionTxnAfterFailure()
     throws Exception
     {
-        Client client = getClient();
+        Client client = getFullyConnectedClient();
         VoltTable[] results = client.callProcedure("InsertSinglePart", 1,
                                                    "desc", 100, 14.5).getResults();
         assertEquals(1, results[0].asScalarLong());
@@ -78,7 +78,7 @@ public class TestFailureDetectSuite extends RegressionSuite
 
     static public junit.framework.Test suite()
     {
-        VoltServerConfig config = null;
+        LocalCluster config = null;
         MultiConfigSuiteBuilder builder =
             new MultiConfigSuiteBuilder(TestFailureDetectSuite.class);
 
@@ -108,12 +108,14 @@ public class TestFailureDetectSuite extends RegressionSuite
         // CLUSTER, two hosts, each with two sites, replication of 1
         config = new LocalCluster("replication-1-cluster.jar", 2, 2,
                                   1, BackendTarget.NATIVE_EE_JNI);
+        config.setHasLocalServer(false);
         config.compile(project);
         builder.addServerConfig(config);
 
         // CLUSTER, three hosts, each with two sites, replication of 2
         config = new LocalCluster("replication-2-cluster.jar", 2, 3,
                                   2, BackendTarget.NATIVE_EE_JNI);
+        config.setHasLocalServer(false);
         config.compile(project);
         builder.addServerConfig(config);
 
