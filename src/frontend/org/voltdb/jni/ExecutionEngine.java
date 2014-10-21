@@ -327,6 +327,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     }
 
     static final long LONG_OP_THRESHOLD = 10000;
+    private static long TIME_OUT_MILLIS = 1000 * 1000; // 1000s
 
     public long fragmentProgressUpdate(int batchIndex,
             String planNodeName,
@@ -346,6 +347,15 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             m_startTime = m_lastMsgTime = currentTime;
             return LONG_OP_THRESHOLD;
         }
+        long latency = currentTime - m_startTime;
+        if (latency > TIME_OUT_MILLIS) {
+            String msg = getLongRunningQueriesMessage(latency, planNodeName);
+            log.info(msg);
+
+            // timing out the long running queries
+            return -1 * latency;
+        }
+
         if (currentTime <= (m_logDuration + m_lastMsgTime)) {
             // The callback was triggered earlier than we were ready to log.
             // If this keeps happening, it might makes sense to ramp up the threshold
@@ -364,26 +374,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             // future callbacks per log entry, ideally so that one callback arrives just in time to log.
             return LONG_OP_THRESHOLD;
         }
-        String msg = String.format(
-                "Procedure %s is taking a long time to execute -- at least " +
-                        "%.1f seconds spent accessing " +
-                        "%d tuples. Current plan fragment " +
-                        "%s in call " +
-                        "%d to voltExecuteSQL on site " +
-                        "%s. Current temp table uses " +
-                        "%d bytes memory, and the peak usage of memory for temp table is " +
-                        "%d bytes.",
-                        m_currentProcedureName,
-                        (currentTime - m_startTime) / 1000.0,
-                        tuplesProcessed,
-                        planNodeName,
-                        m_currentBatchIndex,
-                        CoreUtils.hsIdToString(m_siteId),
-                        currMemoryInBytes,
-                        peakMemoryInBytes);
-        if (m_sqlTexts != null) {
-            msg += "  Executing SQL statement is \"" + m_sqlTexts[m_currentBatchIndex] + "\".";
-        }
+        String msg = getLongRunningQueriesMessage(latency, planNodeName);
         log.info(msg);
 
         m_logDuration = (m_logDuration < 30000) ? (2 * m_logDuration) : 30000;
@@ -392,6 +383,31 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         // pass before the next call. For now, this is a fixed number. Ideally the threshold would vary
         // to try to get one callback to arrive just after the log duration interval expires.
         return LONG_OP_THRESHOLD;
+    }
+
+    private String getLongRunningQueriesMessage(long latency, String planNodeName) {
+        String msg = String.format(
+                "Procedure %s is taking a long time to execute -- at least " +
+                        "%.2f seconds spent accessing " +
+                        "%d tuples. Current plan fragment " +
+                        "%s in call " +
+                        "%d to voltExecuteSQL on site " +
+                        "%s. Current temp table uses " +
+                        "%d bytes memory, and the peak usage of memory for temp table is " +
+                        "%d bytes.",
+                        m_currentProcedureName,
+                        latency / 1000.0,
+                        m_lastTuplesAccessed,
+                        planNodeName,
+                        m_currentBatchIndex,
+                        CoreUtils.hsIdToString(m_siteId),
+                        m_currMemoryInBytes,
+                        m_peakMemoryInBytes);
+        if (m_sqlTexts != null) {
+            msg += "  Executing SQL statement is \"" + m_sqlTexts[m_currentBatchIndex] + "\".";
+        }
+
+        return msg;
     }
 
     /**
@@ -937,5 +953,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     @Deprecated
     public void setInitialLogDurationForTest(long newDuration) {
         INITIAL_LOG_DURATION = newDuration;
+    }
+
+    @Deprecated
+    public void setTimeoutLatencyForTest(long newLatency) {
+        TIME_OUT_MILLIS = newLatency;
     }
 }

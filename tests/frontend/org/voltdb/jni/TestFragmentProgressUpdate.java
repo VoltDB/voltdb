@@ -44,6 +44,7 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
+import org.voltdb.exceptions.EEException;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
@@ -151,7 +152,6 @@ public class TestFragmentProgressUpdate extends TestCase {
         assertTrue(900000 < m_ee.m_peakMemoryInBytes);
         assertTrue(1100000 > m_ee.m_peakMemoryInBytes);
         assertTrue(m_ee.m_peakMemoryInBytes >= m_ee.m_currMemoryInBytes);
-        long previousMemoryInBytes = m_ee.m_currMemoryInBytes;
         long previousPeakMemory = m_ee.m_peakMemoryInBytes;
 
         Statement deleteStmt = m_testProc.getStatements().getIgnoreCase("warehouse_del_half");
@@ -299,6 +299,110 @@ public class TestFragmentProgressUpdate extends TestCase {
                 3, 3, 2, 42, Long.MAX_VALUE);
         verify(mockedLogger, atLeastOnce()).info(
                 contains("Executing SQL statement is \"SELECT COUNT(*) FROM ITEM i1, ITEM i2, ITEM i3;\"."));
+    }
+
+    public void testTimingoutQueriesMillis() throws Exception {
+        m_ee.loadCatalog( 0, m_catalog.serialize());
+
+        m_tableSize = 100;
+        int timeout = 100;
+
+        m_itemData.clearRowData();
+        for (int i = 0; i < m_tableSize; ++i) {
+            m_itemData.addRow(i, i + 50, "item" + i, (double)i / 2, "data" + i);
+        }
+
+        m_ee.loadTable(ITEM_TABLEID, m_itemData, 0, 0, 0, false, false, Long.MAX_VALUE);
+        assertEquals(m_tableSize, m_ee.serializeTable(ITEM_TABLEID).getRowCount());
+        System.out.println("Rows loaded to table "+m_ee.serializeTable(ITEM_TABLEID).getRowCount());
+
+        Statement selectStmt = m_testProc.getStatements().getIgnoreCase("item_crazy_join");
+
+        assertEquals(1, selectStmt.getFragments().size());
+        PlanFragment frag = selectStmt.getFragments().iterator().next();
+
+        // populate plan cache
+        ActivePlanRepository.clear();
+        ActivePlanRepository.addFragmentForTest(
+                CatalogUtil.getUniqueIdForFragment(frag),
+                Encoder.decodeBase64AndDecompressToBytes(frag.getPlannodetree()),
+                selectStmt.getSqltext());
+        ParameterSet params = ParameterSet.emptyParameterSet();
+
+        // Replace the normal logger with a mocked one, so we can verify the message
+        VoltLogger mockedLogger = Mockito.mock(VoltLogger.class);
+        ExecutionEngine.setVoltLoggerForTest(mockedLogger);
+
+        m_ee.setTimeoutLatencyForTest(timeout);
+
+        try {
+            m_ee.executePlanFragments(
+                    1,
+                    new long[] { CatalogUtil.getUniqueIdForFragment(frag) },
+                    null,
+                    new ParameterSet[] { params },
+                    new String[] { selectStmt.getSqltext() },
+                    3, 3, 2, 42, Long.MAX_VALUE);
+            fail();
+        } catch (Exception ex) {
+            String msg = String.format("Query/Procedure timing out in %.2f seconds.", timeout/1000.0);
+            assertEquals(msg, ex.getMessage());
+        }
+        verify(mockedLogger, atLeastOnce()).info(
+                contains("Executing SQL statement is \"SELECT COUNT(*) FROM ITEM i1, ITEM i2, ITEM i3;\"."));
+
+    }
+
+    public void testTimingoutQueriesSeconds() throws Exception {
+        m_ee.loadCatalog( 0, m_catalog.serialize());
+
+        m_tableSize = 500;
+        int timeout = 1000 * 10;
+
+        m_itemData.clearRowData();
+        for (int i = 0; i < m_tableSize; ++i) {
+            m_itemData.addRow(i, i + 50, "item" + i, (double)i / 2, "data" + i);
+        }
+
+        m_ee.loadTable(ITEM_TABLEID, m_itemData, 0, 0, 0, false, false, Long.MAX_VALUE);
+        assertEquals(m_tableSize, m_ee.serializeTable(ITEM_TABLEID).getRowCount());
+        System.out.println("Rows loaded to table "+m_ee.serializeTable(ITEM_TABLEID).getRowCount());
+
+        Statement selectStmt = m_testProc.getStatements().getIgnoreCase("item_crazy_join");
+
+        assertEquals(1, selectStmt.getFragments().size());
+        PlanFragment frag = selectStmt.getFragments().iterator().next();
+
+        // populate plan cache
+        ActivePlanRepository.clear();
+        ActivePlanRepository.addFragmentForTest(
+                CatalogUtil.getUniqueIdForFragment(frag),
+                Encoder.decodeBase64AndDecompressToBytes(frag.getPlannodetree()),
+                selectStmt.getSqltext());
+        ParameterSet params = ParameterSet.emptyParameterSet();
+
+        // Replace the normal logger with a mocked one, so we can verify the message
+        VoltLogger mockedLogger = Mockito.mock(VoltLogger.class);
+        ExecutionEngine.setVoltLoggerForTest(mockedLogger);
+
+        m_ee.setTimeoutLatencyForTest(timeout);
+
+        try {
+            m_ee.executePlanFragments(
+                    1,
+                    new long[] { CatalogUtil.getUniqueIdForFragment(frag) },
+                    null,
+                    new ParameterSet[] { params },
+                    new String[] { selectStmt.getSqltext() },
+                    3, 3, 2, 42, Long.MAX_VALUE);
+            fail();
+        } catch (Exception ex) {
+            String msg = String.format("Query/Procedure timing out in %.2f seconds.", timeout/1000.0);
+            assertEquals(msg, ex.getMessage());
+        }
+        verify(mockedLogger, atLeastOnce()).info(
+                contains("Executing SQL statement is \"SELECT COUNT(*) FROM ITEM i1, ITEM i2, ITEM i3;\"."));
+
     }
 
     private ExecutionEngine m_ee;
