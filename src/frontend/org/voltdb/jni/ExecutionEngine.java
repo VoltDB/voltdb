@@ -327,7 +327,11 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     }
 
     static final long LONG_OP_THRESHOLD = 10000;
-    private static long TIME_OUT_MILLIS = 1000 * 1000; // 1000s
+    private static int TIME_OUT_MILLIS = Integer.MAX_VALUE; // 1000s
+
+    public void setTimeoutLatency(int newLatency) {
+        TIME_OUT_MILLIS = newLatency;
+    }
 
     public long fragmentProgressUpdate(int batchIndex,
             String planNodeName,
@@ -953,10 +957,5 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     @Deprecated
     public void setInitialLogDurationForTest(long newDuration) {
         INITIAL_LOG_DURATION = newDuration;
-    }
-
-    @Deprecated
-    public void setTimeoutLatencyForTest(long newLatency) {
-        TIME_OUT_MILLIS = newLatency;
     }
 }

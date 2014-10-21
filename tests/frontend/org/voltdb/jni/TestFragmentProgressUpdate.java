@@ -333,7 +333,7 @@ public class TestFragmentProgressUpdate extends TestCase {
         VoltLogger mockedLogger = Mockito.mock(VoltLogger.class);
         ExecutionEngine.setVoltLoggerForTest(mockedLogger);
 
-        m_ee.setTimeoutLatencyForTest(timeout);
+        m_ee.setTimeoutLatency(timeout);
 
         try {
             m_ee.executePlanFragments(
@@ -385,7 +385,7 @@ public class TestFragmentProgressUpdate extends TestCase {
         VoltLogger mockedLogger = Mockito.mock(VoltLogger.class);
         ExecutionEngine.setVoltLoggerForTest(mockedLogger);
 
-        m_ee.setTimeoutLatencyForTest(timeout);
+        m_ee.setTimeoutLatency(timeout);
 
         try {
             m_ee.executePlanFragments(
