@@ -310,18 +310,32 @@
                 }
             });
         };
-        
-        this.CheckServerConnection=function (server, port, admin, user, password, isHashedPassword, processName,checkConnection) {
+
+        this.CheckServerConnection = function (server, port, admin, user, password, isHashedPassword, processName, checkConnection) {
             var conn = new DbConnection(server, port, admin, user, password, isHashedPassword, processName);
-            conn.BeginExecute('@Statistics', ['TABLE', 0], function (response) {
-                try {
-                    if (response.status != 1) {
-                        checkConnection(false);
+            var uri = 'http://' + server + ':' + port + '/api/1.0/';
+            var params = conn.BuildParamSet('@Statistics', ['TABLE', 0]);
+            $.ajax({
+                url: uri + '?' + params,
+                dataType: "jsonp",
+                success:function(e) {
+                    if (e.status === 200) {
+                        checkConnection(true);
                     }
-                } catch (x) {
-                    checkConnection(false);
-                }
+                },
+                complete: function (e) {
+                    if (e.status === 200) {
+                        checkConnection(true);
+                    } 
+                },
+                error: function(e) {
+                    if (e.status != 200) {
+                        checkConnection(false);
+                    } 
+                },
+                timeout: 20000
             });
+            
         };
         
         this.AddConnection = function (server, port, admin, user, password, isHashedPassword,procedureNames,parameters,values,processName,onConnectionAdded) {
