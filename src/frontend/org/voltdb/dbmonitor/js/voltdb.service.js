@@ -27,6 +27,14 @@
             }
         };
 
+        this.CheckServerConnection = function(checkConnection) {
+            try {
+                VoltDBCore.CheckServerConnection(server, port, admin, user, password, isHashedPassword, "DATABASE_LOGIN",checkConnection);
+            } catch(e) {
+                console.log(e.message);
+            }
+        };
+
         this.SetUserCredentials = function(lUsername, lPassword, lAdmin) {
             user = lUsername;
             password = lPassword;
