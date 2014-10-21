@@ -124,7 +124,7 @@ function alertNodeClicked(obj) {
                     var usernameVal = $("#username").val();
                     var passwordVal = $().crypt({ method: "sha1", source: $("#password").val() });
 
-                    testConnection($("#username").data("servername"), $("#username").data("portid"), usernameVal, passwordVal, true, function (result) {
+                    testConnection($("#username").data("servername"), $("#username").data("portid"), usernameVal, passwordVal, false, function (result) {
                         $("#overlay").hide();
                         if (result) {
 
@@ -174,7 +174,7 @@ function alertNodeClicked(obj) {
 
             $("#overlay").show();
             //Try to login with saved username/password or no username and password
-            testConnection(serverName, portId, username, password, true, function (result) {
+            testConnection(serverName, portId, username, password, false, function (result) {
 
                 $("#overlay").hide();
                 if (!popupDisplayed) {

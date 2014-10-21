@@ -5,7 +5,7 @@
     var iVoltDbCore = (function () {
         this.connections = {};
 
-        DbConnection = function(aServer, aPort, aAdmin, aUser, aPassword, aIsHashPassword,aProcess) {
+        DbConnection = function (aServer, aPort, aAdmin, aUser, aPassword, aIsHashPassword, aProcess) {
             this.server = aServer == null ? 'localhost' : $.trim(aServer);
             this.port = aPort == null ? '8080' : $.trim(aPort);
             this.admin = (aAdmin == true || aAdmin == "true");
