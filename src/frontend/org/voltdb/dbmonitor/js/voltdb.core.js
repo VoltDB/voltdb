@@ -4,7 +4,7 @@
 
     var iVoltDbCore = (function () {
         this.connections = {};
-
+        this.isServerConnected = true;
         DbConnection = function(aServer, aPort, aAdmin, aUser, aPassword, aIsHashPassword,aProcess) {
             this.server = aServer == null ? 'localhost' : $.trim(aServer);
             this.port = aPort == null ? '8080' : $.trim(aPort);
@@ -100,11 +100,12 @@
             this.CallExecute = function (procedure, parameters, callback) {
                 var uri = 'http://' + this.server + ':' + this.port + '/api/1.0/';
                 var params = this.BuildParamSet(procedure, parameters);
-                if (typeof (params) == 'string')
-                    jQuery.postJSON(uri, params, callback);
-                else
-                    if (callback != null)
-                        callback({ "status": -1, "statusstring": "PrepareStatement error: " + params[0], "results": [] });
+                if (typeof(params) == 'string') {
+                    if (VoltDBCore.isServerConnected) {
+                        jQuery.postJSON(uri, params, callback);
+                    }
+                } else if (callback != null)
+                    callback({ "status": -1, "statusstring": "PrepareStatement error: " + params[0], "results": [] });
             };
             
             var callbackWrapper = function(userCallback) {
@@ -300,10 +301,25 @@
                     if (response.status == 1) {
                         clearTimeout(timeout);
                         onConnectionTested(true);
-                    } else onConnectionTested(false);
+                    } else {
+                        onConnectionTested(false);
+                    }
                 } catch(x) {
                     clearTimeout(timeout);
                     onConnectionTested(true);
+                }
+            });
+        };
+        
+        this.CheckServerConnection=function (server, port, admin, user, password, isHashedPassword, processName,checkConnection) {
+            var conn = new DbConnection(server, port, admin, user, password, isHashedPassword, processName);
+            conn.BeginExecute('@Statistics', ['TABLE', 0], function (response) {
+                try {
+                    if (response.status != 1) {
+                        checkConnection(false);
+                    }
+                } catch (x) {
+                    checkConnection(false);
                 }
             });
         };
@@ -405,6 +421,7 @@
 
 jQuery.extend({
     postJSON: function (url, data, callback) {
+        
         return jQuery.post(url, data, callback, "json");
     }
 });

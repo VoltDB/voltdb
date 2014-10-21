@@ -85,6 +85,10 @@ function alertNodeClicked(obj) {
             });
         };
 
+        this.CheckServerConnection = function (checkConnection) {
+            VoltDBService.CheckServerConnection(checkConnection);
+        };
+
         this.GetLoginPopup = function () {
             var loginHtml =
                 '<a href="#loginBoxDialogue" id="loginLink" style="display: none;">Login</a>' +

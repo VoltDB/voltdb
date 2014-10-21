@@ -49,46 +49,53 @@
 	 *
 	 * @param {Object} settings
 	 */
-	$.Popup = function(settings)
-	{
+	$.Popup = function(settings) {
 
-		var p = this,
-			defaults = {
+	    var p = this,
+	        defaults = {
+	            // Markup
+	            backClass: 'popup_back',
+	            backOpacity: 0.7,
+	            containerClass: 'popup_cont',
+	            closeContent: '<div class="popup_close">&times;</div>',
+	            markup: '<div class="popup"><div class="popup_content"/></div>',
+	            contentClass: 'popup_content',
+	            preloaderContent: '<p class="preloader">Loading</p>',
+	            activeClass: 'popup_active',
+	            hideFlash: false,
+	            speed: 200,
+	            popupPlaceholderClass: 'popup_placeholder',
+	            keepInlineChanges: true,
 
-				// Markup
-				backClass : 'popup_back',
-				backOpacity : 0.7,
-				containerClass : 'popup_cont',
-				closeContent : '<div class="popup_close">&times;</div>',
-				markup : '<div class="popup"><div class="popup_content"/></div>',
-				contentClass : 'popup_content',
-				preloaderContent : '<p class="preloader">Loading</p>',
-				activeClass : 'popup_active',
-				hideFlash : false,
-				speed : 200,
-				popupPlaceholderClass : 'popup_placeholder',
-				keepInlineChanges :  true,
+	            // Content
+	            modal: false,
+	            content: null,
+	            type: 'auto',
+	            width: null,
+	            height: null,
 
-			    // Content
-				modal : false,
-				content : null,
-				type : 'auto',
-				width : null,
-				height : null,
+	            // Params
+	            typeParam: 'pt',
+	            widthParam: 'pw',
+	            heightParam: 'ph',
 
-				// Params
-				typeParam : 'pt',
-				widthParam : 'pw',
-				heightParam : 'ph',
-
-				// Callbacks
-				beforeOpen : function(type){},
-				afterOpen : function(){},
-				beforeClose : function(){},
-				afterClose : function(){},
-				error: function () { },
-				save: function () { },
-				login: function () { },
+	            // Callbacks
+	            beforeOpen: function(type) {
+	            },
+	            afterOpen: function() {
+	            },
+	            beforeClose: function() {
+	            },
+	            afterClose: function() {
+	            },
+	            error: function() {
+	            },
+	            save: function() {
+	            },
+	            login: function() {
+	            },
+	            closeDialog: function() {
+	            },
 				
 				show : function($popup, $back){
 
@@ -282,6 +289,16 @@
 		        });
 		    }
 
+		    var connectionBtn = $("a[id='btnConOk']");
+		    if (connectionBtn != undefined) {
+		        connectionBtn.unbind('click');
+		        connectionBtn.bind('click', function() {
+		            p.o.closeDialog();
+		            VoltDBCore.isServerConnected = true;
+		            p.close();
+		        });
+		    }
+
 			// Get the content
 			content = ( content === undefined || content === '#' )
 				? p.o.content
@@ -328,7 +345,7 @@
 
                 
 			    // If modal isn't specified, bind click event
-			    if( !p.o.modal && p.ele.id != "loginLink"){
+				if (!p.o.modal && p.ele.id != "loginLink" && p.ele.id != "conPopup") {
 
 					$back.one('click.popup', function(){
 						p.close();
@@ -515,7 +532,7 @@
 					.appendTo($pCont);
 			    
 			    // Add in the close button
-			    if (p.ele.id != "loginLink") {
+				if (p.ele.id != "loginLink" && p.ele.id != "conPopup") {
 			        $close = $(p.o.closeContent)
 			            .one('click', function() {
 

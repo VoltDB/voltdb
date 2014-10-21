@@ -118,7 +118,7 @@ $(document).ready(function () {
 var loadPage = function (serverName, portid) {
     var userName = $.cookie('username');
     var password = $.cookie('password');
-
+    var isConnectionChecked = false;
     voltDbRenderer.ChangeServerConfiguration(serverName, portid, userName, password, true, true);
     voltDbRenderer.ShowUsername(userName);
     loadSQLQueryPage(serverName, portid);
@@ -857,6 +857,43 @@ var loadPage = function (serverName, portid) {
     configureUserPreferences();
     adjustGraphSpacing();
     saveThreshold();
+
+    var connectionTimeInterval = null;
+    var refreshConnectionTime = function (seconds) {
+            if (connectionTimeInterval != null)
+                window.clearInterval(connectionTimeInterval);
+
+            connectionTimeInterval = window.setInterval(checkServerConnection, seconds);
+    };
+
+    var checkServerConnection = function() {
+        if (!isConnectionChecked) {
+            isConnectionChecked = true;
+            voltDbRenderer.CheckServerConnection(
+                function(result) {
+                    if (result == false) {
+                        VoltDBCore.isServerConnected = false;
+                        if (!$('#conpop').is(':visible')) {
+                            window.clearInterval(connectionTimeInterval);
+                            $('#conPopup').click();
+                        }
+                    } else {
+                        isConnectionChecked = false;
+                    }
+                }
+            );
+        }
+    };
+
+    $("#conPopup").popup({
+        closeDialog: function () {
+            isConnectionChecked = false;
+            refreshConnectionTime('20000');
+            $('#connectionPopup').hide();
+        }
+    });
+    
+    refreshConnectionTime('20000');
 };
 
 
