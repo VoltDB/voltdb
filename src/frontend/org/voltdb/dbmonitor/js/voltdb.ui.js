@@ -123,7 +123,7 @@ var loadPage = function (serverName, portid) {
     var password = $.cookie('password') != undefined ? $.cookie('password') : "";
     voltDbRenderer.ChangeServerConfiguration(serverName, portid, userName, password, true, false);
     voltDbRenderer.ShowUsername(userName);
-    loadSQLQueryPage(serverName, portid, userName, password, true);
+    loadSQLQueryPage(serverName, portid, userName, password, false);
 
     var loadSchemaTab = function () {
         var templateUrl = window.location.protocol + '//' + window.location.host;
