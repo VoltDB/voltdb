@@ -23,13 +23,7 @@ import numpy as np
 
 STATS_SERVER = 'volt2'
 
-def COLORS(k):
-    return (((k ** 3) % 255) / 255.0,
-            ((k * 100) % 255) / 255.0,
-            ((k * k) % 255) / 255.0)
-
-#COLORS = plt.cm.Spectral(numpy.linspace(0, 1, 10)).tolist()
-COLORS = ['b','g','r','c','m','y','k']
+COLORS = ['b','g','c','m','k']
 
 MARKERS = ['+', '*', '<', '>', '^', '_',
            'D', 'H', 'd', 'h', 'o', 'p']
