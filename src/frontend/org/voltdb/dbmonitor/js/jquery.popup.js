@@ -284,8 +284,9 @@
 		    var cancelBtn = $("a[id='btnCancel']");
 		    if (cancelBtn != undefined) {
 		        cancelBtn.unbind('click');
-		        cancelBtn.bind('click', function () {
+		        cancelBtn.bind('click', function (e) {
 		            p.close();
+		            e.preventDefault();
 		        });
 		    }
 
