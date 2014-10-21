@@ -1826,7 +1826,7 @@ void VoltDBEngine::reportProgressToTopend() {
     if (m_tupleReportThreshold < 0) {
         VOLT_DEBUG("Interrupt query.");
         char buff[100];
-        snprintf(buff, 100, "Query/Procedure timing out in %.2f seconds.", static_cast<double>(m_tupleReportThreshold / -1000.0));
+        snprintf(buff, 100, "Query/Procedure timing out in %.2f seconds.", static_cast<double>(m_tupleReportThreshold) / -1000.0);
         throw InterruptException(std::string(buff));
     }
 }
