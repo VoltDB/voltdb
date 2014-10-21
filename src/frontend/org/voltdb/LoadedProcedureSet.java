@@ -170,23 +170,24 @@ public class LoadedProcedureSet {
 
             final String className = sysProc.getClassname();
             Class<?> procClass = null;
-            try {
-                procClass = catalogContext.classForProcedure(className);
-            }
-            catch (final ClassNotFoundException e) {
-                if (sysProc.commercial) {
-                    continue;
-                }
-                hostLog.l7dlog(
-                        Level.WARN,
-                        LogKeys.host_ExecutionSite_GenericException.name(),
-                        new Object[] { m_siteId, m_siteIndex },
-                        e);
-                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
-            }
 
-            // this is for sysprocs that don't have a procedure class
-            if (procClass != null) {
+            // this check is for sysprocs that don't have a procedure class
+            if (className != null) {
+                try {
+                    procClass = catalogContext.classForProcedure(className);
+                }
+                catch (final ClassNotFoundException e) {
+                    if (sysProc.commercial) {
+                        continue;
+                    }
+                    hostLog.l7dlog(
+                            Level.WARN,
+                            LogKeys.host_ExecutionSite_GenericException.name(),
+                            new Object[] { m_siteId, m_siteIndex },
+                            e);
+                    VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+                }
+
                 try {
                     procedure = (VoltSystemProcedure) procClass.newInstance();
                 }
