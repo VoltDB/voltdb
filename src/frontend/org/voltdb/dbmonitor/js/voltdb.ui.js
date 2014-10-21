@@ -5,13 +5,6 @@ $(document).ready(function () {
     } else {
         $("#logOut").css('display', 'none');
     }
-    $("#btnLogout").on("click", function() {
-        saveSessionCookie("username", null);
-        saveSessionCookie("password", null);
-        saveSessionCookie("admin", null);
-        $('#logOut').prop('title', '');
-        location.reload();
-    });
     
     try {
         var savedData = getParameterByName("data");
@@ -33,9 +26,6 @@ $(document).ready(function () {
 
             if (json["password"] != undefined && json["password"] != "")
                 saveSessionCookie("password", json["password"]);
-            
-            if (json["admin"] != undefined && json["admin"] != "")
-                saveSessionCookie("admin", json["admin"]);
 
             if (json["AlertThreshold"] != undefined && json["AlertThreshold"] != "")
                 saveCookie("alert-threshold", json["AlertThreshold"]);
@@ -98,6 +88,11 @@ $(document).ready(function () {
                 MonitorGraphUI.ChartLatency.update();
                 MonitorGraphUI.ChartTransactions.update();
             }
+            else if (VoltDbUI.CurrentTab == NavigationTabs.Schema) {
+                setTimeout(function () {
+                    window.scrollTo(0, 0);
+                }, 10);
+            }
             
             shortcut.remove("f5");
             shortcut.remove("f6");
@@ -116,12 +111,19 @@ $(document).ready(function () {
 });
 
 var loadPage = function (serverName, portid) {
-    var userName = $.cookie('username');
-    var password = $.cookie('password');
+    $("#btnLogout").on("click", function () {
+        saveSessionCookie("username", null);
+        saveSessionCookie("password", null);
+        $('#logOut').prop('title', '');
+        location.reload(true);
+    });
+
+    var userName = $.cookie('username') != undefined ? $.cookie('username') : "";
+    var password = $.cookie('password') != undefined ? $.cookie('password') : "";
     var isConnectionChecked = false;
-    voltDbRenderer.ChangeServerConfiguration(serverName, portid, userName, password, true, true);
+    voltDbRenderer.ChangeServerConfiguration(serverName, portid, userName, password, true, false);
     voltDbRenderer.ShowUsername(userName);
-    loadSQLQueryPage(serverName, portid);
+    loadSQLQueryPage(serverName, portid, userName, password, true);
 
     var loadSchemaTab = function () {
         var templateUrl = window.location.protocol + '//' + window.location.host;
@@ -130,6 +132,12 @@ var loadPage = function (serverName, portid) {
         $.get(templateUrl, function (result) {
             var body = $(result).filter("#wrapper").html();
             $("#schema").html(body);
+            
+            $("#schemaLinkSqlQuery").on("click", function (e) {
+                $("#navSqlQuery").trigger("click");
+                e.preventDefault();
+            });
+            
             $.getScript(templateJavascript);
             $("#overlay").hide();
         });
@@ -220,8 +228,7 @@ var loadPage = function (serverName, portid) {
                     DisplayPreferences: $.cookie("user-preferences"),
                     AlertThreshold: $.cookie("alert-threshold"),
                     username: $.cookie("username"),
-                    password: $.cookie("password"),
-                    admin: $.cookie("admin")
+                    password: $.cookie("password")
                 };
 
                 var win = window.open(newUrl + '?data=' + encodeURIComponent(JSON.stringify(data)), '_parent');

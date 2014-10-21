@@ -24,6 +24,7 @@ h1 {font:16px 'MYRIADPROREGULAR'}
 .btn { background-color:#aa1f2f; padding:8px 10px; text-align:center; color:#FFFFFF; font:14px Arial, Helvetica, sans-serif; text-shadow:none; border-radius:0; border:none;} 
 .btn:hover{background-color:#76bd1d; color:#fff;}
 .graphOpacity {opacity: 0.5}
+h1, h2, h3, h4, h5, h6 {margin:0!important;}
 
 /*****Global Ends******/
 /******sprite*************/
@@ -42,7 +43,7 @@ ul.servers-list li.joining,
 ul.clusterStat, li.activeServerName,
 ul.servers-list li.active, 
 ul.servers-list li.joining, a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-procedures, .pref-storedProc, .pref-tables, .pref-graph, .icon-server, #toggleMenu
-{ background-image:url(images/voltdb-icon-sprite.png); background-repeat:no-repeat;}
+{ background-image:url(images/voltdb-icon-sprite.png)!important; background-repeat:no-repeat;}
 
 .user {background-position:left -209px; width:25px; height:25px;}
 .help {background-position:left -1354px; width:25px; height:25px;}
@@ -429,7 +430,7 @@ ul.servers-list li a.alertIcon{display:inline-block; padding-left:20px;}
 .catalogMenu { background:#FFFFFF; margin:0 0 20px 0;}
 ul.catalogNav { margin:0; padding:0; background:#FFFFFF; margin-bottom:20px;}
 ul.catalogNav li { float:left; margin:0; padding:0; line-height:50px; font-family:'MYRIADPROREGULAR'; font-size:16px; border-right:1px solid #CCCCCC;}
-ul.catalogNav li a { margin:0; padding:0 10px; color:#32323a; display:block;}
+ul.catalogNav li a { margin:0; padding:0 10px; color:#32323a; display:block; text-decoration:none;}
 ul.catalogNav li a:hover { background:#AA1F2F; display:block; color:#FFFFFF; }
 ul.catalogNav li.active a, ul.catalogNav li.active a:hover{background:#76bd1d; display:block; color:#FFFFFF!important;}
 
@@ -438,7 +439,7 @@ ul.catalogNav li.active a, ul.catalogNav li.active a:hover{background:#76bd1d; d
 .dataBlock h1{font-weight:bold;}
 /*.dataBlock table td:nth-child(1) { width: 30%; }*/
 #rendersCatalogUrl h3, #rendersCatalogUrl h4 {font:14px 'MYRIADPROREGULAR'; font-weight:bold;}
-#catalogContainer h3 { font-weight: bold;}
+#catalogContainer h3 { font-weight: bold; font-size:14px;}
 #rendersCatalogUrl h4{ background:#fbfbfb; padding:20px;}
 #catalogContainer .container {
     margin: 0;
@@ -473,8 +474,7 @@ table.z-table ul li{ list-style-type:disc; list-style-position:outside; margin-l
 /*a.icon-document{background-position: left -942px; padding-left:20px; font-weight:bold; height:30px; line-height:32px; display:inline-block; width:auto;}*/
 a.icon-document{background-position: left -942px; padding-left:20px;
  font-size:13px; font-weight:bold; height:30px; line-height:32px; 
-display:inline-block; width:auto;
-}
+display:inline-block; width:auto;color:#000000;}
 a.icon-document:hover{color:#76bd1d;}
 #schema, #sqlQuery{ display:none;}
 
@@ -628,7 +628,7 @@ ul.topRightList li.responsiveMenuPlaceHolder{border-left:1px solid #ccc; height:
 .btnList { margin:10px 0 0 0; padding:0; float:right;}
 .btnList li { margin:0; padding:0 10px 0 0 ; float:left;}
 
-.blockWrapper h1.theHeading{margin: 0 0 1.5px 0;
+.blockWrapper h1.theHeading{margin: 0 0 1.5px 0!important;
 padding: 17px 20px 17px 45px;
 background-color: #FFFFFF;
 -webkit-box-shadow: 0px 6px 7px -5px #ccc;
@@ -638,7 +638,7 @@ box-shadow: 0px 6px 7px -5px #ccc;}
 .queryStatus{ padding:10px; background:#f2f2f2; border-bottom:1px solid #ccc; color:#333;}
 .ui-accordion{font-size:14px; line-height:18px;}
 .ui-accordion li{font-size:12px; margin-bottom:5px;}
-h3.ui-accordion-header{padding:8px 5px 8px 23px; margin-bottom:5px; font-weight:bold; font-size:12px; border-bottom:1px solid #f2f2f2; width:auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+h3.ui-accordion-header{padding:8px 5px 8px 23px; margin-bottom:5px!important; font-weight:bold; font-size:12px; border-bottom:1px solid #f2f2f2; width:auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
 h3.ui-accordion-header:focus, h3.ui-accordion-header:active{outline:none;}
 h3.ui-accordion-header:hover{cursor:pointer;}
 .ui-accordion-content{border:1px solid #f2f2f2; padding:10px; margin-bottom:15px; height:auto !important;}
@@ -673,8 +673,12 @@ padding: 4px 4px 4px 4px!important;
 }
 
 
-.tablesorter-bootstrap .tablesorter-header i {
+/*.tablesorter-bootstrap .tablesorter-header i {
 right: -31px!important;
+}*/
+
+.dataBlockContent.systemOver table td:nth-child(1) {
+    width: 34.6%;
 }
 
 /*********************************************media Qu********************/

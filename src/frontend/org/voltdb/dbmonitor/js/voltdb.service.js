@@ -7,7 +7,7 @@
     var port = "8080";
     var user = "";
     var password = "";
-    var admin = true;
+    var admin = false;
     var isHashedPassword = true;
     this.connection = null;
     var iVoltDbService = (function () {

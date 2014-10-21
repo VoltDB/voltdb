@@ -339,21 +339,24 @@
             latencyChart = clusterChartObj;
             transactionChart = transactinoChartObj;
             currentView = view;
-            MonitorGraphUI.Monitors = {
-                
+            MonitorGraphUI.Monitors = {                
                 'latHistogram': null,
                 'latData': getEmptyData(),
                 'latDataMin': getEmptyDataForMinutes(),
-                'latDataDay':getEmptyDataForDays(),
+                'latDataDay': getEmptyDataForDays(),
+                'latFirstData': true,
                 'tpsData': getEmptyData(),
                 'tpsDataMin': getEmptyDataForMinutes(),
-                'tpsDataDay':getEmptyDataForDays(),
+                'tpsDataDay': getEmptyDataForDays(),
+                'tpsFirstData': true,
                 'memData': getEmptyData(),
                 'memDataMin': getEmptyDataForMinutes(),
-                'memDataDay':getEmptyDataForDays(),
+                'memDataDay': getEmptyDataForDays(),
+                'memFirstData': true,
                 'cpuData': getEmptyData(),
                 'cpuDataMin': getEmptyDataForMinutes(),
                 'cpuDataHrs': getEmptyDataForDays(),
+                'cpuFirstData': true,
                 'lastTimedTransactionCount': -1,
                 'lastTimerTick': -1
             };
@@ -408,14 +411,14 @@
             lat = parseFloat(lat).toFixed(1) * 1;
             monitor.latHistogram = latStats;
 
-            if (latSecCount > 6) {
+            if (latSecCount == 6 || monitor.latFirstData) {
                 dataLatMin = dataLatMin.slice(1);
                 dataLatMin.push({ 'x': new Date(timeStamp), 'y': lat });
                 MonitorGraphUI.Monitors.latDataMin = dataLatMin;
                 latSecCount = 0;
             }
 
-            if (latMinCount > 60) {
+            if (latMinCount == 60 || monitor.latFirstData) {
                 dataLatDay = dataLatDay.slice(1);
                 dataLatDay.push({ 'x': new Date(timeStamp), 'y': lat });
                 MonitorGraphUI.Monitors.latDataDay = dataLatDay;
@@ -439,6 +442,7 @@
                     .transition().duration(500)
                     .call(MonitorGraphUI.ChartLatency);
             }
+            monitor.latFirstData = false;
             latSecCount++;
             latMinCount++;
         };
@@ -452,14 +456,14 @@
             var memRss = parseFloat(memDetails[currentServer].RSS * 1.0 / 1048576.0).toFixed(3) * 1;
             var memTimeStamp = new Date(memDetails[currentServer].TIMESTAMP);
 
-            if (memSecCount == 6) {
+            if (memSecCount == 6 || monitor.memFirstData) {
                 dataMemMin = dataMemMin.slice(1);
                 dataMemMin.push({ 'x': new Date(memTimeStamp), 'y': memRss });
                 MonitorGraphUI.Monitors.memDataMin = dataMemMin;
                 memSecCount = 0;
             }
 
-            if (memMinCount == 60) {
+            if (memMinCount == 60 || monitor.memFirstData) {
                 dataMemDay = dataMemDay.slice(1);
                 dataMemDay.push({ 'x': new Date(memTimeStamp), 'y': memRss });
                 MonitorGraphUI.Monitors.memDataDay = dataMemDay;
@@ -470,7 +474,6 @@
             dataMem.push({ 'x': new Date(memTimeStamp), 'y': memRss });
             MonitorGraphUI.Monitors.memData = dataMem;
 
-            
             if (graphView == 'Minutes')
                 dataRam[0]["values"] = dataMemMin;
             else if (graphView == 'Days')
@@ -478,13 +481,13 @@
             else
                 dataRam[0]["values"] = dataMem;
 
-
             if (currentTab == NavigationTabs.DBMonitor && ramChart.is(":visible")) {
                 d3.select('#visualisationRam')
                     .datum(dataRam)
                     .transition().duration(500)
                     .call(MonitorGraphUI.ChartRam);
             }
+            monitor.memFirstData = false;
             memSecCount++;
             memMinCount++;
         };
@@ -500,13 +503,13 @@
 
             if (monitor.lastTimedTransactionCount > 0 && monitor.lastTimerTick > 0 && monitor.lastTimerTick != currentTimerTick) {
                 var delta = currentTimedTransactionCount - monitor.lastTimedTransactionCount;
-                if (tpsSecCount == 6) {
+                if (tpsSecCount == 6 || monitor.tpsFirstData) {
                     datatransMin = datatransMin.slice(1);
                     datatransMin.push({ "x": new Date(transacDetail["TimeStamp"]), "y": parseFloat(delta * 1000.0 / (currentTimerTick - monitor.lastTimerTick)).toFixed(1) * 1 });
                     MonitorGraphUI.Monitors.tpsDataMin = datatransMin;
                     tpsSecCount = 0;
                 }
-                if (tpsMinCount == 60) {
+                if (tpsMinCount == 60 || monitor.tpsFirstData) {
                     datatransDay = datatransDay.slice(1);
                     datatransDay.push({ "x": new Date(transacDetail["TimeStamp"]), "y": parseFloat(delta * 1000.0 / (currentTimerTick - monitor.lastTimerTick)).toFixed(1) * 1 });
                     MonitorGraphUI.Monitors.tpsDataDay = datatransDay;
@@ -526,6 +529,7 @@
 
             monitor.lastTimedTransactionCount = currentTimedTransactionCount;
             monitor.lastTimerTick = currentTimerTick;
+            monitor.tpsFirstData = false;
 
             if (currentTab == NavigationTabs.DBMonitor && transactionChart.is(":visible")) {
                 d3.select('#visualisationTransaction')
@@ -547,13 +551,13 @@
             var percentageUsage = parseFloat(cpuDetail[currentServer].PERCENT_USED).toFixed(1) * 1;
             var timeStamp = cpuDetail[currentServer].TIMESTAMP;
 
-            if (cpuSecCount == 6) {
+            if (cpuSecCount == 6 || monitor.cpuFirstData) {
                 cpuDataMin = cpuDataMin.slice(1);
                 cpuDataMin.push({ "x": new Date(timeStamp), "y": percentageUsage });
                 MonitorGraphUI.Monitors.cpuDataMin = cpuDataMin;
                 cpuSecCount = 0;
             }
-            if (cpuMinCount == 60) {
+            if (cpuMinCount == 60 || monitor.cpuFirstData) {
                 cpuDataDay = cpuDataDay.slice(1);
                 cpuDataDay.push({ "x": new Date(timeStamp), "y": percentageUsage });
                 MonitorGraphUI.Monitors.cpuDataHrs = cpuDataDay;
@@ -563,6 +567,7 @@
             cpuData = cpuData.slice(1);
             cpuData.push({ "x": new Date(timeStamp), "y": percentageUsage });
             MonitorGraphUI.Monitors.cpuData = cpuData;
+            monitor.cpuFirstData = false;
 
             if (graphView == 'Minutes')
                 dataCpu[0]["values"] = cpuDataMin;

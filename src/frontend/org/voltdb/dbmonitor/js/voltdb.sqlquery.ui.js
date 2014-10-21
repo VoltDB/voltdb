@@ -118,14 +118,8 @@
     
 });
 
-function loadSQLQueryPage(serverName, portid) {
+function loadSQLQueryPage(serverName, portid, userName, password, admin) {
     
-    var userName = $.cookie('username') != undefined ? $.cookie('username') : "";
-    var password = $.cookie('password') != undefined ? $.cookie('password') : "";
-    var admin = true;
-    voltDbRenderer.ChangeServerConfiguration(serverName, portid, userName, password, true, admin);
-    voltDbRenderer.ShowUsername(userName);
-
     function saveConnectionKey() {
         var server = serverName == null ? '184_73_30_156' : $.trim(serverName);
         var port = portid == null ? '8080' : $.trim(portid);

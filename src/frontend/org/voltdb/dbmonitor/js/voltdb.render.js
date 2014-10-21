@@ -31,8 +31,7 @@ function alertNodeClicked(obj) {
             DisplayPreferences: $.cookie("user-preferences"),
             AlertThreshold: $.cookie("alert-threshold"),
             username: $.cookie("username"),
-            password: $.cookie("password"),
-            admin: $.cookie("admin")
+            password: $.cookie("password")
         };
 
         var win = window.open(newUrl + '?data=' + JSON.stringify(data), '_parent');
@@ -97,14 +96,12 @@ function alertNodeClicked(obj) {
                     '<div class="overlay-title">Login</div>' +
                         '<div id="UnableToLoginMsg" style="padding: 5px 0 0 20px; color: #ff0000; display: none;">Unable to connect!! Please try to login using another username/password.</div>' +
                             '<div class="clear"></div>' +
-                            '<div  class="overlay-content" style="height:235px; min-width: 441px; padding: 0" >' +
+                            '<div  class="overlay-content" style="height:215px; min-width: 441px; padding: 0" >' +
                             '<div id="loginBox">' +
                                 '<label for="username">Username:</label>' +
                                 '<input type="text" id="username" name="username">' +
                                 '<label for="password">Password:</label>' +
                                 '<input type="password" id="password" name="password">' +
-                                '<input type="checkbox" name="chkAdmin" id="chkAdmin" checked="checked" style="margin:0 0 0 74px;">' +
-                                '<label for="chkAdmin" style="font-weight:normal; font-size:13px;">Allow Admin Mode operations</label>' +
                                 '<div class="lower">' +
                                     '<input type="submit" id="LoginBtn" value="Login">' +
                                 '</div>' +
@@ -130,16 +127,15 @@ function alertNodeClicked(obj) {
                     $("#UnableToLoginMsg").hide();
                     var usernameVal = $("#username").val();
                     var passwordVal = $().crypt({ method: "sha1", source: $("#password").val() });
-                    var chkAdmin = $("#chkAdmin").is(':checked');
 
-                    testConnection($("#username").data("servername"), $("#username").data("portid"), usernameVal, passwordVal, chkAdmin, function (result) {
+                    testConnection($("#username").data("servername"), $("#username").data("portid"), usernameVal, passwordVal, false, function (result) {
                         $("#overlay").hide();
                         if (result) {
 
                             //Save user details to cookie.
                             saveSessionCookie("username", usernameVal);
                             saveSessionCookie("password", passwordVal);
-                            saveSessionCookie("admin", chkAdmin);
+                            voltDbRenderer.ShowUsername(usernameVal);
                             popupDisplayed = true;
 
                             pageLoadCallback();
@@ -179,11 +175,10 @@ function alertNodeClicked(obj) {
 
             var username = ($.cookie("username") != undefined) ? $.cookie("username") : "";
             var password = (username != "" && $.cookie("password") != undefined) ? $.cookie("password") : "";
-            var admin = ($.cookie("admin") != undefined) ? $.cookie("admin") == "true" : true;
 
             $("#overlay").show();
             //Try to login with saved username/password or no username and password
-            testConnection(serverName, portId, username, password, admin, function (result) {
+            testConnection(serverName, portId, username, password, false, function (result) {
 
                 $("#overlay").hide();
                 if (!popupDisplayed) {
@@ -191,7 +186,6 @@ function alertNodeClicked(obj) {
                     if (!result) {
                         saveSessionCookie("username", null);
                         saveSessionCookie("password", null);
-                        saveSessionCookie("admin", null);
 
                         $("#loginLink").trigger("click");
                     } else {
@@ -887,10 +881,13 @@ function alertNodeClicked(obj) {
 
                 if (replicationCount > 0 && table_type != "VIEW" && table_type != "PARTITIONED")
                     table_type = "REPLICATED";
+                
+                else if (kFactor > 0 && table_type != "VIEW" && table_type != "PARTITIONED")
+                    table_type = "REPLICATED";
 
 
                 maxTupleValue = Math.max.apply(null, tupleCountPartitions);
-                minTupleValue = Math.max.apply(null, tupleCountPartitions);
+                minTupleValue = Math.min.apply(null, tupleCountPartitions);
                 avgTupleValue = getAverage(tupleCountPartitions);
                 //avgTupleValue = tupleCountPartitions.reduce(function (a) {
                 //    return a;
