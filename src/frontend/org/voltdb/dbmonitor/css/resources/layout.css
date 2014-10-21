@@ -628,7 +628,7 @@ ul.topRightList li.responsiveMenuPlaceHolder{border-left:1px solid #ccc; height:
 .btnList { margin:10px 0 0 0; padding:0; float:right;}
 .btnList li { margin:0; padding:0 10px 0 0 ; float:left;}
 
-.blockWrapper h1.theHeading{margin: 0 0 1.5px 0;
+.blockWrapper h1.theHeading{margin: 0 0 1.5px 0!important;
 padding: 17px 20px 17px 45px;
 background-color: #FFFFFF;
 -webkit-box-shadow: 0px 6px 7px -5px #ccc;
@@ -638,7 +638,7 @@ box-shadow: 0px 6px 7px -5px #ccc;}
 .queryStatus{ padding:10px; background:#f2f2f2; border-bottom:1px solid #ccc; color:#333;}
 .ui-accordion{font-size:14px; line-height:18px;}
 .ui-accordion li{font-size:12px; margin-bottom:5px;}
-h3.ui-accordion-header{padding:8px 5px 8px 23px; margin-bottom:5px; font-weight:bold; font-size:12px; border-bottom:1px solid #f2f2f2; width:auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+h3.ui-accordion-header{padding:8px 5px 8px 23px; margin-bottom:5px!important; font-weight:bold; font-size:12px; border-bottom:1px solid #f2f2f2; width:auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
 h3.ui-accordion-header:focus, h3.ui-accordion-header:active{outline:none;}
 h3.ui-accordion-header:hover{cursor:pointer;}
 .ui-accordion-content{border:1px solid #f2f2f2; padding:10px; margin-bottom:15px; height:auto !important;}
