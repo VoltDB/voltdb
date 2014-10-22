@@ -44,9 +44,9 @@ public class InvocationDefaultProcPermissionPolicy extends InvocationPermissionP
         if (proc.getDefaultproc()) {
             boolean res = false;
             if (!proc.getReadonly()) {
-                res = user.hasDefaultProcPermission();
+                res = user.hasGroupWithDefaultProcPermission();
             } else {
-                res = (user.hasDefaultProcReadPermission() || user.hasDefaultProcPermission());
+                res = (user.hasGroupWithDefaultProcReadPermission() || user.hasGroupWithDefaultProcPermission());
             }
             if (!res) {
                 return PolicyResult.DENY;
