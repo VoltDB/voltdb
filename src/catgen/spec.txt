@@ -91,10 +91,6 @@ end
 
 begin User
   GroupRef* groups
-  bool sysproc          "Can invoke system procedures"
-  bool defaultproc      "Can invoke default procedures"
-  bool adhoc            "Can invoke the adhoc system procedure
-  bool defaultprocread  "Can invoke read-only default procedures"
   string shadowPassword "SHA-1 double hashed hex encoded version of the password"
 end
 
