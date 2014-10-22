@@ -21,7 +21,7 @@ a, a:hover { text-decoration:none; }
 }
 h1 {font:16px 'MYRIADPROREGULAR'}
 
-.btn { background-color:#aa1f2f; padding:8px 10px; text-align:center; color:#FFFFFF; font:14px Arial, Helvetica, sans-serif; text-shadow:none; border-radius:0; border:none;} 
+.btn { background-color:#aa1f2f; cursor:pointer; padding:8px 10px; text-align:center; color:#FFFFFF; font:14px Arial, Helvetica, sans-serif; text-shadow:none; text-decoration:none; border-radius:0; border:none;} 
 .btn:hover{background-color:#76bd1d; color:#fff;}
 .graphOpacity {opacity: 0.5}
 h1, h2, h3, h4, h5, h6 {margin:0!important;}

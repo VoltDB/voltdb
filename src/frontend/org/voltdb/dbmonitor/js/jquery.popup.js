@@ -293,7 +293,8 @@
 		    var connectionBtn = $("a[id='btnConOk']");
 		    if (connectionBtn != undefined) {
 		        connectionBtn.unbind('click');
-		        connectionBtn.bind('click', function() {
+		        connectionBtn.bind('click', function (e) {
+		            e.preventDefault();
 		            p.o.closeDialog();
 		            VoltDBCore.isServerConnected = true;
 		            p.close();
