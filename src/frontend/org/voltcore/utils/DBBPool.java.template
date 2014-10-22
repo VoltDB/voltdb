@@ -73,7 +73,7 @@ public final class DBBPool {
         private final Throwable m_allocationThrowable;
         private List<String> m_tags = null;
 #else
-        private volatile boolean m_previouslyFreed = false;
+        private boolean m_previouslyFreed = false;
 #endif
 
         public BBContainer(ByteBuffer b) {
