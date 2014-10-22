@@ -271,7 +271,7 @@ void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
 }
 
 
-void PersistentTable::truncateTable(VoltDBEngine* engine) {
+void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
     TableCatalogDelegate * tcd = engine->getTableDelegate(m_name);
     assert(tcd);
 
@@ -307,16 +307,39 @@ void PersistentTable::truncateTable(VoltDBEngine* engine) {
     }
     engine->rebuildTableCollections();
 
+    ExecutorContext *ec = ExecutorContext::getExecutorContext();
+    DRTupleStream *drStream = ec->drStream();
+    size_t drMark = drStream->m_uso;
+    if (!m_isMaterialized && m_drEnabled) {
+        const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
+        const int64_t currentTxnId = ec->currentTxnId();
+        const int64_t currentSpHandle = ec->currentSpHandle();
+        const int64_t currentUniqueId = ec->currentUniqueId();
+        const int64_t currentSpUniqueId = ec->currentSpUniqueId();
+        drStream->truncateTable(lastCommittedSpHandle, m_signature, m_name, currentTxnId, currentSpHandle, currentUniqueId, currentSpUniqueId);
+    }
+
     UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
     if (uq) {
+        if (!fallible) {
+            throwFatalException("Attempted to truncate table %s when there was an "
+                                "active undo quantum, and presumably an active transaction that should be there",
+                                m_name.c_str());
+        }
         emptyTable->m_tuplesPinnedByUndo = emptyTable->m_tupleCount;
         emptyTable->m_invisibleTuplesPendingDeleteCount = emptyTable->m_tupleCount;
         // Create and register an undo action.
-        uq->registerUndoAction(new (*uq) PersistentTableUndoTruncateTableAction(engine, tcd, this, emptyTable));
-        return;
-    }
+        uq->registerUndoAction(new (*uq) PersistentTableUndoTruncateTableAction(engine, tcd, this, emptyTable, &m_surgeon, drMark));
+    } else {
+        if (fallible) {
+            throwFatalException("Attempted to truncate table %s when there was no "
+                                "active undo quantum even though one was expected", m_name.c_str());
+        }
 
-    this->decrementRefcount();
+        //Skip the undo log and "commit" immediately by asking the new emptyTable to perform
+        //the truncate table release work rather then having it invoked by PersistentTableUndoTruncateTableAction
+        emptyTable->truncateTableRelease(this);
+    }
 }
 
 

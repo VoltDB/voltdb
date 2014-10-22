@@ -362,6 +362,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_mode = OperationMode.INITIALIZING;
             m_config = config;
             m_startMode = null;
+            SnapshotSaveAPI.m_lastAppliedUniqueId.clear();
+            m_replicaDRGateway = new ReplicaDRGateway.DummyReplicaDRGateway();
 
             // set a bunch of things to null/empty/new for tests
             // which reusue the process
@@ -1011,6 +1013,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     class StartActionWatcher implements Watcher {
         @Override
         public void process(WatchedEvent event) {
+            if (m_mode == OperationMode.SHUTTINGDOWN) return;
             m_es.submit(new Runnable() {
                 @Override
                 public void run() {

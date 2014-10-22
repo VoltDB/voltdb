@@ -32,7 +32,7 @@ namespace voltdb {
 
 BinaryLogSink::BinaryLogSink() {}
 
-void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool) {
+void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, PersistentTable*> &tables, Pool *pool, VoltDBEngine *engine) {
     ReferenceSerializeInputLE taskInfo(taskParams + 4, ntohl(*reinterpret_cast<const int32_t*>(taskParams)));
 
     int64_t __attribute__ ((unused)) uniqueId = 0;
@@ -61,7 +61,8 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
 
             boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
             if (tableIter == tables.end()) {
-                throwFatalException("Where is my table at yo? %jd", (intmax_t)tableHandle);
+                throwFatalException("Unable to find table hash %jd while applying a binary log insert/delete record",
+                                    (intmax_t)tableHandle);
             }
 
             PersistentTable *table = tableIter->second;
@@ -92,6 +93,24 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
             spUniqueId = taskInfo.readLong();
             checksum = taskInfo.readInt();
             validateChecksum(checksum, recordStart, taskInfo.getRawPointer());
+            break;
+        }
+        case DR_RECORD_TRUNCATE_TABLE: {
+            tableHandle = taskInfo.readLong();
+            std::string tableName = taskInfo.readTextString();
+
+            checksum = taskInfo.readInt();
+            validateChecksum(checksum, recordStart, taskInfo.getRawPointer());
+
+            boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
+            if (tableIter == tables.end()) {
+                throwFatalException("Unable to find table %s hash %jd while applying binary log for truncate record",
+                                    tableName.c_str(), (intmax_t)tableHandle);
+            }
+
+            PersistentTable *table = tableIter->second;
+
+            table->truncateTable(engine, false);
             break;
         }
         case DR_RECORD_UPDATE:

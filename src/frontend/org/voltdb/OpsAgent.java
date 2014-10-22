@@ -194,6 +194,9 @@ public abstract class OpsAgent
             }
         } catch (Exception e) {
             hostLog.error("Exception processing message in OpsAgent for " + m_name + ": " + message, e);
+        } catch (Throwable t) {
+            //Handle throwable because otherwise the future swallows up other exceptions
+            VoltDB.crashLocalVoltDB("Exception processing message in OpsAgent for " + m_name + ": " + message, true, t);
         }
 
     }

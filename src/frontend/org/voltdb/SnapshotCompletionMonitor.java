@@ -16,6 +16,7 @@
  */
 package org.voltdb;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -203,6 +204,29 @@ public class SnapshotCompletionMonitor {
                 }
             }
 
+            /*
+             * Collect all the last seen ids from the remote data centers so they can
+             * be used by live rejoin to initialize a starting state for applying DR
+             * data
+             */
+            Map<Integer, Map<Integer, Long>> remoteDCLastUniqueIds = new HashMap<>();
+            final JSONObject remoteDCLastUniqueIdsObj = jsonObj.getJSONObject("remoteDCUniqueIds");
+            final Iterator<String> dcIdIter = remoteDCLastUniqueIdsObj.keys();
+            while (dcIdIter.hasNext()) {
+                final String dcIdKey = dcIdIter.next();
+
+                final JSONObject dataCenterUniqueIds = remoteDCLastUniqueIdsObj.getJSONObject(dcIdKey);
+
+                final HashMap<Integer, Long> lastSeenIds = new HashMap<>();
+
+                final Iterator<String> partitionKeyIter = dataCenterUniqueIds.keys();
+                while (partitionKeyIter.hasNext()) {
+                    final String partitionIdString = partitionKeyIter.next();
+                    lastSeenIds.put(Integer.valueOf(partitionIdString), dataCenterUniqueIds.getLong(partitionIdString));
+                }
+                remoteDCLastUniqueIds.put(Integer.valueOf(dcIdKey), Collections.unmodifiableMap(lastSeenIds));
+            }
+
             Iterator<SnapshotCompletionInterest> iter = m_interests.iterator();
             while (iter.hasNext()) {
                 SnapshotCompletionInterest interest = iter.next();
@@ -216,7 +240,8 @@ public class SnapshotCompletionMonitor {
                                 truncation,
                                 didSucceed,
                                 truncReqId,
-                                exportSequenceNumbers));
+                                exportSequenceNumbers,
+                                Collections.unmodifiableMap(remoteDCLastUniqueIds)));
                 } catch (Exception e) {
                     SNAP_LOG.warn("Exception while executing snapshot completion interest", e);
                 }
