@@ -115,6 +115,7 @@ import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListenableFutureTask;
+import org.voltdb.common.Permission;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -1885,7 +1886,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     private ClientResponseImpl dispatchSystemGC(final ClientInputHandler handler,
             final StoredProcedureInvocation task, AuthSystem.AuthUser user) {
-        if (user.hasGroupWithSysProcPermission()) {
+        if (user.hasPermission(Permission.SYSPROC)) {
             m_systemGCThread.execute(new Runnable() {
                 @Override
                 public void run() {

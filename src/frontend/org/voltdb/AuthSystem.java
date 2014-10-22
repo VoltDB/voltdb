@@ -63,7 +63,7 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import java.util.EnumSet;
 import org.voltdb.catalog.Group;
-import org.voltdb.compiler.DDLCompiler.Permission;
+import org.voltdb.common.Permission;
 
 
 /**
@@ -248,62 +248,15 @@ public class AuthSystem {
         }
 
         /**
-         * Check if a user has permission to invoke adhoc queries by virtue of group membership,
-         * or having permission to invoke system procedures of which adhoc is one.
+         * Check if a user has any one of given permission.
          * @return true if the user has permission and false otherwise
          */
-        public boolean hasAdhocPermission() {
-            return hasGroupWithAdhocPermission() || hasGroupWithSysProcPermission();
-        }
-
-        /**
-         * Utility function to iterate through groups and check if any group the user is a member of
-         * grants adhoc permission
-         * @return true if the user has permission and false otherwise
-         */
-        private boolean hasGroupWithAdhocPermission() {
-            for (AuthGroup group : m_groups) {
-                if (group.m_permissions.contains(Permission.ADHOC)) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        /**
-         * Check if a user has permission to invoke system procedures by virtue of group membership,
-         * @return true if the user has permission and false otherwise
-         */
-        public boolean hasGroupWithSysProcPermission() {
-            for (AuthGroup group : m_groups) {
-                if (group.m_permissions.contains(Permission.SYSPROC)) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        /**
-         * Check if a user has permission to invoke default procedures by virtue of group membership,
-         * @return true if the user has permission and false otherwise
-         */
-        public boolean hasGroupWithDefaultProcPermission() {
-            for (AuthGroup group : m_groups) {
-                if (group.m_permissions.contains(Permission.DEFAULTPROC)) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        /**
-         * Check if a user has permission to invoke read-only default procedures by virtue of group membership,
-         * @return true if the user has permission and false otherwise
-         */
-        public boolean hasGroupWithDefaultProcReadPermission() {
-            for (AuthGroup group : m_groups) {
-                if (group.m_permissions.contains(Permission.DEFAULTPROCREAD)) {
-                    return true;
+        public boolean hasPermission(Permission... perms) {
+            for (int i = 0; i < perms.length;i++) {
+                for (AuthGroup group : m_groups) {
+                    if (group.m_permissions.contains(perms[i])) {
+                        return true;
+                    }
                 }
             }
             return false;
@@ -453,7 +406,7 @@ public class AuthSystem {
                 final org.voltdb.catalog.Group  catalogGroup = catalogGroupRef.getGroup();
                 AuthGroup group = null;
                 if (!m_groups.containsKey(catalogGroup.getTypeName())) {
-                    group = new AuthGroup(catalogGroup.getTypeName(), getPermissionSetForGroup(catalogGroup));
+                    group = new AuthGroup(catalogGroup.getTypeName(), Permission.getPermissionSetForGroup(catalogGroup));
                     m_groups.put(group.m_name, group);
                 } else {
                     group = m_groups.get(catalogGroup.getTypeName());
@@ -466,7 +419,7 @@ public class AuthSystem {
         for (org.voltdb.catalog.Group catalogGroup : db.getGroups()) {
             AuthGroup group = null;
             if (!m_groups.containsKey(catalogGroup.getTypeName())) {
-                group = new AuthGroup(catalogGroup.getTypeName(), getPermissionSetForGroup(catalogGroup));
+                group = new AuthGroup(catalogGroup.getTypeName(), Permission.getPermissionSetForGroup(catalogGroup));
                 m_groups.put(group.m_name, group);
                 //A group not associated with any users? Weird stuff.
             } else {
@@ -569,22 +522,7 @@ public class AuthSystem {
         }
 
         @Override
-        public boolean hasAdhocPermission() {
-            return true;
-        }
-
-        @Override
-        public boolean hasGroupWithSysProcPermission() {
-            return true;
-        }
-
-        @Override
-        public boolean hasGroupWithDefaultProcPermission() {
-            return true;
-        }
-
-        @Override
-        public boolean hasGroupWithDefaultProcReadPermission() {
+        public boolean hasPermission(Permission... p) {
             return true;
         }
 
@@ -610,20 +548,6 @@ public class AuthSystem {
             return new String[] {};
         }
         return user.getGroupNames();
-    }
-
-    /**
-     * This is there so that bools in spec are converted to enums in one place.
-     * @param catGroup defined in catalog
-     * @return permissions as <code>EnumSet&ltPermission&gt</code>
-     */
-    public static EnumSet<Permission> getPermissionSetForGroup(Group catGroup) {
-        EnumSet<Permission> perms = EnumSet.noneOf(Permission.class);
-        if (catGroup.getAdhoc()) perms.add(Permission.ADHOC);
-        if (catGroup.getSysproc()) perms.add(Permission.SYSPROC);
-        if (catGroup.getDefaultproc()) perms.add(Permission.DEFAULTPROC);
-        if (catGroup.getDefaultprocread()) perms.add(Permission.DEFAULTPROCREAD);
-        return perms;
     }
 
     public class HashAuthenticationRequest extends AuthenticationRequest {

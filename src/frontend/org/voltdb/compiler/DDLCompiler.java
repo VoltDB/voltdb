@@ -53,6 +53,11 @@ import org.voltdb.catalog.Group;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Table;
+import org.voltdb.common.Permission;
+import static org.voltdb.common.Permission.ADHOC;
+import static org.voltdb.common.Permission.DEFAULTPROC;
+import static org.voltdb.common.Permission.DEFAULTPROCREAD;
+import static org.voltdb.common.Permission.SYSPROC;
 import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
@@ -408,17 +413,6 @@ public class DDLCompiler {
     static final String REPLICATE = "REPLICATE";
     static final String EXPORT = "EXPORT";
     static final String ROLE = "ROLE";
-
-    public enum Permission {
-        ADHOC,
-        SYSPROC,
-        DEFAULTPROC,
-        DEFAULTPROCREAD;
-
-        static String toListString() {
-            return Arrays.asList(values()).toString();
-        }
-    }
 
     HSQLInterface m_hsql;
     VoltCompiler m_compiler;
