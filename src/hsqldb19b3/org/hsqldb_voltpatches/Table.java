@@ -2755,6 +2755,7 @@ public class Table extends TableBase implements SchemaObject {
         }
         return result;
     }
+    // End of VoltDB extension
 
     /* (non-Javadoc)
      * @see java.lang.Object#toString()

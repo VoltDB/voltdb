@@ -561,8 +561,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
                         "alter table foo add limit partition rows 10;");
             }
             catch (ProcCallException pce) {
-                pce.printStackTrace();
-                fail();
+                fail("Should be able to alter partition row limit: " + pce.toString());
             }
             do {
                 results = m_client.callProcedure("@Statistics", "TABLE", 0).getResults()[0];
@@ -578,8 +577,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
                         "alter table foo drop limit partition rows;");
             }
             catch (ProcCallException pce) {
-                pce.printStackTrace();
-                fail();
+                fail("Should be able to drop partition row limit: " + pce.toString());
             }
             do {
                 results = m_client.callProcedure("@Statistics", "TABLE", 0).getResults()[0];
