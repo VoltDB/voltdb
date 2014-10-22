@@ -749,6 +749,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
 
+            m_replicaDRGateway = null;
             // Configure replica-side DR if relevant
             if (m_config.m_isEnterprise && useDRV2 && m_config.m_replicationRole == ReplicationRole.REPLICA) {
                 String drMasterHost = m_catalogContext.cluster.getDrmasterhost();

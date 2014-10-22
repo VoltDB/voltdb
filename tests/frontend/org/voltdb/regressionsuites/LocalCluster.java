@@ -980,12 +980,13 @@ public class LocalCluster implements VoltServerConfig {
 
     public void killSingleHost(int hostNum) throws InterruptedException
     {
-        if (hostNum == 0) {
-            // This doesn't work correctly when killing the local server,
-            // so take the easy way out and just don't support this behavior
-            assert (m_localServer == null);
+        log.info("Killing " + hostNum);
+        if (hostNum == 0 && m_localServer != null) {
+            m_localServer.shutdown();
         }
-        silentKillSingleHost(hostNum, false);
+        else {
+            silentKillSingleHost(hostNum, false);
+        }
     }
 
     private void silentKillSingleHost(int hostNum, boolean forceKillEEProcs) throws InterruptedException {

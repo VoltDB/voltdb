@@ -25,6 +25,7 @@ package org.voltdb.regressionsuites;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.replication.SelectEmptyTable;
 
@@ -44,9 +45,17 @@ public class TestFailureDetectSuite extends RegressionSuite
         config.killSingleHost(0);
         for (int i = 0; i < 100; i++)
         {
-            results = client.callProcedure("SelectMultiPart").getResults();
-            assertEquals(1, results[0].getRowCount());
+            try {
+                results = client.callProcedure("SelectMultiPart").getResults();
+                assertEquals(1, results[0].getRowCount());
+            } catch (ProcCallException e) {
+                // Can throw when mastership changes. This should trigger
+                // failure handling, so the next call should succeed again.
+                break;
+            }
         }
+        results = client.callProcedure("SelectMultiPart").getResults();
+        assertEquals(1, results[0].getRowCount());
     }
 
     public void testSinglePartitionTxnAfterFailure()
@@ -66,9 +75,17 @@ public class TestFailureDetectSuite extends RegressionSuite
         // be roughly like pulling the plug
         for (int i = 0; i < 100; i++)
         {
-            results = client.callProcedure("UpdateSinglePart", 1, 200).getResults();
-            assertEquals(1, results[0].getRowCount());
+            try {
+                results = client.callProcedure("UpdateSinglePart", 1, 200).getResults();
+                assertEquals(1, results[0].getRowCount());
+            } catch (ProcCallException e) {
+                // Can throw when mastership changes. This should trigger
+                // failure handling, so the next call should succeed again.
+                break;
+            }
         }
+        results = client.callProcedure("UpdateSinglePart", 1, 200).getResults();
+        assertEquals(1, results[0].getRowCount());
     }
 
     public TestFailureDetectSuite(String name)
@@ -78,7 +95,7 @@ public class TestFailureDetectSuite extends RegressionSuite
 
     static public junit.framework.Test suite()
     {
-        LocalCluster config = null;
+        VoltServerConfig config = null;
         MultiConfigSuiteBuilder builder =
             new MultiConfigSuiteBuilder(TestFailureDetectSuite.class);
 
@@ -108,14 +125,12 @@ public class TestFailureDetectSuite extends RegressionSuite
         // CLUSTER, two hosts, each with two sites, replication of 1
         config = new LocalCluster("replication-1-cluster.jar", 2, 2,
                                   1, BackendTarget.NATIVE_EE_JNI);
-        config.setHasLocalServer(false);
         config.compile(project);
         builder.addServerConfig(config);
 
         // CLUSTER, three hosts, each with two sites, replication of 2
         config = new LocalCluster("replication-2-cluster.jar", 2, 3,
                                   2, BackendTarget.NATIVE_EE_JNI);
-        config.setHasLocalServer(false);
         config.compile(project);
         builder.addServerConfig(config);
 
