@@ -94,7 +94,7 @@ function alertNodeClicked(obj) {
                 '<!-- POPUP Login -->' +
                 '<div id="loginBoxDialogue" style="overflow: hidden" >' +
                     '<div class="overlay-title">Login</div>' +
-                        '<div id="UnableToLoginMsg" style="padding: 5px 0 0 20px; color: #ff0000; display: none;">Unable to connect!! Please try to login using another username/password.</div>' +
+                        '<div id="UnableToLoginMsg" style="padding: 5px 0 0 20px; color: #ff0000; display: none;">Unable to connect. Please try to login using another username/password.</div>' +
                             '<div class="clear"></div>' +
                             '<div  class="overlay-content" style="height:215px; min-width: 441px; padding: 0" >' +
                             '<div id="loginBox">' +
@@ -354,7 +354,7 @@ function alertNodeClicked(obj) {
 
         this.GetClusterHealth = function (callback) {
             if (systemOverview == null || systemOverview == undefined) {
-                alert("Error: Unable to extract cluster health information!!");
+                alert("Error: Unable to extract cluster health information.");
                 return;
             }
 
