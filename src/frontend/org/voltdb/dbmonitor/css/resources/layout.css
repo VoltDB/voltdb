@@ -668,7 +668,7 @@ min-width:200px;
 overflow: auto;}
 .errorMsg { max-width: 300px;}
 .errorMsg p {padding: 0 0 10px 0;}
-
+.errorIcon {background:url(images/error.png) no-repeat 10px 12px;text-indent:20px;}
 .tablesorter-bootstrap .tablesorter-header-inner {
 padding: 4px 4px 4px 4px!important;
 }
