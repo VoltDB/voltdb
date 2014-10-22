@@ -358,6 +358,9 @@ public class StatsAgent extends OpsAgent
         case MEMORY:
             stats = collectMemoryStats(interval);
             break;
+        case CPU:
+            stats = collectCpuStats(interval);
+            break;
         case IOSTATS:
             stats = collectIOStats(interval);
             break;
@@ -473,6 +476,19 @@ public class StatsAgent extends OpsAgent
         if (mStats != null) {
             stats = new VoltTable[1];
             stats[0] = mStats;
+        }
+        return stats;
+    }
+
+    private VoltTable[] collectCpuStats(boolean interval)
+    {
+        Long now = System.currentTimeMillis();
+        VoltTable[] stats = null;
+
+        VoltTable cStats = getStatsAggregate(StatsSelector.CPU, interval, now);
+        if (cStats != null) {
+            stats = new VoltTable[1];
+            stats[0] = cStats;
         }
         return stats;
     }
@@ -621,16 +637,17 @@ public class StatsAgent extends OpsAgent
         VoltTable[] tStats = collectTableStats(interval);
         VoltTable[] indStats = collectIndexStats(interval);
         VoltTable[] sStats = collectStarvationStats(interval);
+        VoltTable[] cStats = collectCpuStats(interval);
         // Ugh, this is ugly.  Currently need to return null if
         // we're missing any of the tables so that we
         // don't screw up the aggregation in handleStatsResponse (see my rant there)
         if (mStats == null || iStats == null || pStats == null ||
                 ioStats == null || tStats == null || indStats == null ||
-                sStats == null)
+                sStats == null || cStats == null)
         {
             return null;
         }
-        VoltTable[] stats = new VoltTable[7];
+        VoltTable[] stats = new VoltTable[8];
         stats[0] = mStats[0];
         stats[1] = iStats[0];
         stats[2] = pStats[0];
@@ -638,6 +655,7 @@ public class StatsAgent extends OpsAgent
         stats[4] = tStats[0];
         stats[5] = indStats[0];
         stats[6] = sStats[0];
+        stats[7] = cStats[0];
 
         return stats;
     }

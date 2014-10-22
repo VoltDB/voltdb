@@ -31,7 +31,7 @@ namespace voltdb {
 class DummyUndoQuantum : public UndoQuantum {
 
 public:
-    DummyUndoQuantum() : UndoQuantum( INT64_MIN + 1, new Pool()) {}
+    DummyUndoQuantum() : UndoQuantum( INT64_MIN + 1, new Pool(TEMP_POOL_CHUNK_SIZE, 1)) {}
     ~DummyUndoQuantum() {
         delete m_dataPool;
     }

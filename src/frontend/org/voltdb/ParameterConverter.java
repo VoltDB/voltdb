@@ -23,6 +23,7 @@ import java.lang.reflect.Array;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Date;
+import java.util.regex.Pattern;
 
 import org.voltdb.common.Constants;
 import org.voltdb.types.TimestampType;
@@ -105,6 +106,7 @@ public class ParameterConverter {
         return true;
     }
 
+    private static final Pattern thousandSeparator = Pattern.compile("\\,");
     /**
      * Given a string, covert it to a primitive type or return null.
      */
@@ -115,7 +117,7 @@ public class ParameterConverter {
         // detect CSV null
         if (value.equals(Constants.CSV_NULL)) return nullValueForType(expectedClz);
         // remove commas and escape chars
-        value = value.replaceAll("\\,","");
+        value = thousandSeparator.matcher(value).replaceAll("");
 
         try {
             if (expectedClz == long.class) {

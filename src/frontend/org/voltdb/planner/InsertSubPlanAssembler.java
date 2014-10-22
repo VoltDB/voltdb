@@ -38,7 +38,6 @@ import org.voltdb.types.PlanNodeType;
 public class InsertSubPlanAssembler extends SubPlanAssembler {
 
     private boolean m_bestAndOnlyPlanWasGenerated = false;
-
     InsertSubPlanAssembler(Database db, AbstractParsedStmt parsedStmt,
             StatementPartitioning partitioning) {
         super(db, parsedStmt, partitioning);
@@ -67,7 +66,7 @@ public class InsertSubPlanAssembler extends SubPlanAssembler {
 
             // Cannot access any partitioned tables in subquery for replicated table
             if (! subquery.getIsReplicated()) {
-                throw new PlanningErrorException("Subquery in INSERT INTO ... SELECT statement may not access " +
+                throw new PlanningErrorException("Subquery in "+ getSqlType() +" INTO ... SELECT statement may not access " +
                                                  "partitioned data for insertion into replicated table " + targetTable.getTypeName() + ".");
             }
         }
@@ -88,7 +87,7 @@ public class InsertSubPlanAssembler extends SubPlanAssembler {
 
             if (subquery.getBestCostPlan().rootPlanGraph.hasAnyNodeOfType(PlanNodeType.SEND)) {
                 // What is the appropriate level of detail for this message?
-                m_recentErrorMsg = "INSERT INTO ... SELECT statement subquery is too complex.  " +
+                m_recentErrorMsg = getSqlType() +" INTO ... SELECT statement subquery is too complex.  " +
                     "Please either simplify the subquery or use a SELECT followed by an INSERT.";
                 return null;
             }
@@ -129,14 +128,14 @@ public class InsertSubPlanAssembler extends SubPlanAssembler {
             if (!setEquivalenceForPartitioningCol) {
                 // partitioning column of target table is not being set from value produced by the subquery.
                 m_recentErrorMsg = "Partitioning column must be assigned a value " +
-                    "produced by the subquery in an INSERT INTO ... SELECT statement.";
+                    "produced by the subquery in an "+ getSqlType() +" INTO ... SELECT statement.";
                 return null;
             }
 
             m_partitioning.analyzeForMultiPartitionAccess(tables, valueEquivalence);
 
             if (! m_partitioning.isJoinValid()) {
-                m_recentErrorMsg = "Partitioning could not be determined for INSERT INTO ... SELECT statement.  " +
+                m_recentErrorMsg = "Partitioning could not be determined for "+ getSqlType() +" INTO ... SELECT statement.  " +
                     "Please ensure that statement does not attempt to copy row data from one partition to another, " +
                     "which is unsupported.";
                 return null;
@@ -145,6 +144,13 @@ public class InsertSubPlanAssembler extends SubPlanAssembler {
 
 
         return subquery.getBestCostPlan().rootPlanGraph;
+    }
+
+    public String getSqlType() {
+        if (m_parsedStmt.m_isUpsert) {
+            return "UPSERT";
+        }
+        return "INSERT";
     }
 
 }

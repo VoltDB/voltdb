@@ -43,6 +43,11 @@ public class CSVBulkDataLoader implements CSVDataLoader {
         m_loader.setFlushInterval(delay, seconds);
     }
 
+    @Override
+    public void flush() {
+        m_loader.flush();
+    }
+
     public class CsvFailureCallback implements BulkLoaderFailureCallBack {
         @Override
         public void failureCallback(Object rowHandle, Object[] fieldList, ClientResponse response) {

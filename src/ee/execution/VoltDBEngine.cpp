@@ -103,7 +103,7 @@ ENABLE_BOOST_FOREACH_ON_CONST_MAP(Index);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(MaterializedViewInfo);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Table);
 
-static const size_t PLAN_CACHE_SIZE = 1024 * 10;
+static const size_t PLAN_CACHE_SIZE = 1000;
 // how many initial tuples to scan before calling into java
 const int64_t LONG_OP_THRESHOLD = 10000;
 
@@ -444,9 +444,9 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
         m_tuplesProcessedInBatch += m_tuplesProcessedInFragment;
         m_tuplesProcessedInFragment = 0;
         m_tuplesProcessedSinceReport = 0;
-    }
 
-    m_stringPool.purge();
+        m_stringPool.purge();
+    }
 
     return failures;
 }
@@ -1834,7 +1834,7 @@ void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
 
 static std::string dummy_last_accessed_plan_node_name("no plan node in progress");
 
-void VoltDBEngine::reportProgessToTopend() {
+void VoltDBEngine::reportProgressToTopend() {
     std::string tableName;
     int64_t tableSize;
 

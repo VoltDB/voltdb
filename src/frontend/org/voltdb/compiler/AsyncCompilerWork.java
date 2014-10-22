@@ -42,6 +42,7 @@ public class AsyncCompilerWork implements Serializable {
     public final long originalUniqueId;
     final boolean onReplica;
     final boolean useAdhocDDL;
+    final String userName;
 
     final AsyncCompilerWorkCompletionHandler completionHandler;
 
@@ -51,7 +52,8 @@ public class AsyncCompilerWork implements Serializable {
             ProcedureInvocationType invocationType,
             long originalTxnId, long originalUniqueId,
             boolean onReplica, boolean useAdhocDDL,
-            AsyncCompilerWorkCompletionHandler completionHandler)
+            AsyncCompilerWorkCompletionHandler completionHandler,
+            String userName)
     {
         this.replySiteId = replySiteId;
         this.shouldShutdown = shouldShutdown;
@@ -67,6 +69,7 @@ public class AsyncCompilerWork implements Serializable {
         this.originalUniqueId = originalUniqueId;
         this.onReplica = onReplica;
         this.useAdhocDDL = useAdhocDDL;
+        this.userName = userName;
         if (completionHandler == null) {
             throw new IllegalArgumentException("Completion handler can't be null");
         }

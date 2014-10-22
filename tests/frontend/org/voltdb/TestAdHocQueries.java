@@ -622,7 +622,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 fail("did not fail on subquery In/Exists");
             }
             catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("In/Exists are only supported in SELECT clause") > 0);
+                assertTrue(pcex.getMessage().indexOf("IN/EXISTS subquery clauses are only supported in SELECT statements") > 0);
             }
 
             adHocQuery = "     SELECT 'ZZ', EMPNUM, EMPNAME, -99 \n" +

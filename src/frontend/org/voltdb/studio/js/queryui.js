@@ -35,8 +35,8 @@ function QueryUI(queryTab) {
             // Any statement keyword that does not get listed here simply requires an explicit semicolon before
             // it to mark the end of the preceding statement.
             MatchStatementStarts =
-                /\s((?:(?:\s\()*select)|insert|update|delete|truncate|create|partition|exec|execute|explain|explainproc)\s/gim,
-            //     ($1-------------------------------------------------------------------------------------------------)
+                /\s((?:(?:\s\()*select)|insert|update|upsert|delete|truncate|create|partition|exec|execute|explain|explainproc)\s/gim,
+            //     ($1----------------------------------------------------------------------------------------------------------)
             GenerateSplitStatements = ';$1 ',
             // Stored procedure parameters can be separated by commas or whitespace.
             // Multiple commas like "execute proc a,,b" are merged into one separator because that's easy.
@@ -66,8 +66,8 @@ function QueryUI(queryTab) {
             // If "explain" on ddl statements (?) (create|partition) is ever supported,
             // add them as options to the $2 suffix keyword pattern.
             MatchNonBreakingInsertIntoSelect =
-                /(\s*insert\s+into(?=\"|\s)\s*(?:[a-z][a-z0-9_]*|\"(?:[^\"]|\"\")+\")\s*(?:\((?:\"(?:[^\"]|\"\")+\"|[^\")])+\))?[(\s]*)(select)/gim,
-            //   ($1------------------------------------------------------------------------------------------------------------------)($2----)
+                /(\s*(?:insert|upsert)\s+into(?=\"|\s)\s*(?:[a-z][a-z0-9_]*|\"(?:[^\"]|\"\")+\")\s*(?:\((?:\"(?:[^\"]|\"\")+\"|[^\")])+\))?[(\s]*)(select)/gim,
+            //   ($1-----------------------------------------------------------------------------------------------------------------------------)($2----)
             // Note on            (?=\"|\s) :
             // This subpattern consumes no input itself but ensures that the next
             // character is either whitespace or a double quote. This is handy
@@ -79,8 +79,8 @@ function QueryUI(queryTab) {
             // can be found in the comments for the functionally identical InsertIntoSelect
             // variable and related pattern variables in SQLCommand.java.
             MatchNonBreakingCompoundKeywords =
-                /(\s+(?:explain|union|intersect|except|all)\s|(?:\())\s*((?:(?:\s\()*select)|insert|update|delete|truncate)\s+/gim,
-            //   ($1------------------------------------------------)   ($2-----------------------------------------------)
+                /(\s+(?:explain|union|intersect|except|all)\s|(?:\())\s*((?:(?:\s\()*select)|insert|update|upsert|delete|truncate)\s+/gim,
+            //   ($1------------------------------------------------)   ($2------------------------------------------------------)
             MatchCompoundKeywordDisguise = /#NON_BREAKING_SUFFIX_KEYWORD#/g,
             GenerateDisguisedCompoundKeywords = ' $1 #NON_BREAKING_SUFFIX_KEYWORD#$2 ';
 

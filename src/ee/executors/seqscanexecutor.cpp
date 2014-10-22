@@ -166,6 +166,8 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         TableTuple tuple(input_table->schema());
         TableIterator iterator = input_table->iteratorDeletingAsWeGo();
         AbstractExpression *predicate = node->getPredicate();
+        // A semi scan node must have a predicate
+        assert((m_isSemiScan && predicate == NULL) == false);
 
         if (predicate)
         {
@@ -177,9 +179,12 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         if (limit_node) {
             limit_node->getLimitAndOffsetByReference(params, limit, offset);
         }
+        // A semi scan node must not have an offset
+        assert((m_isSemiScan && offset != -1) == false);
 
         int tuple_ctr = 0;
         int tuple_skipped = 0;
+        bool hasMatchingTuple = false;
         bool hasNullTuple = false;
         TempTable* output_temp_table = dynamic_cast<TempTable*>(output_table);
 
@@ -206,16 +211,18 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
             //
             // For each tuple we need to evaluate it against our predicate
             //
-            bool passedPredicate = false;
             if (predicate != NULL) {
                 NValue retval = predicate->eval(&tuple, NULL);
                 if (retval.isTrue()) {
-                    passedPredicate = true;
-                } else if (m_isSemiScan && retval.isNull()) {
-                    hasNullTuple = true;
+                    hasMatchingTuple = true;
+                } else {
+                    hasMatchingTuple = false;
+                    if (m_isSemiScan && retval.isNull()) {
+                        hasNullTuple = true;
+                    }
                 }
             }
-            if (predicate == NULL || passedPredicate == true)
+            if (predicate == NULL || hasMatchingTuple == true)
             {
                 // Check if we have to skip this tuple because of offset
                 if (tuple_skipped < offset) {
@@ -274,8 +281,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         // non of the tuples pass the predicate, and all of them are not NULL) and
         // the NULL tuple result set (the input table is not empty, non of the tuples pass
         // the predicate, and there are NULL tuples
-        if (m_isSemiScan && output_temp_table->activeTupleCount() == 0 &&
-            input_table->activeTupleCount() != 0 && hasNullTuple) {
+        if (m_isSemiScan && !hasMatchingTuple && hasNullTuple) {
             tuple.setAllNulls();
             output_temp_table->insertTupleNonVirtual(tuple);
         }

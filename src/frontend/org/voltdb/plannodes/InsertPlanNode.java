@@ -28,11 +28,22 @@ public class InsertPlanNode extends AbstractOperationPlanNode {
 
     public enum Members {
         MULTI_PARTITION,
-        FIELD_MAP
+        FIELD_MAP,
+        UPSERT
     }
 
     protected boolean m_multiPartition = false;
     private int[] m_fieldMap;
+
+    private boolean m_isUpsert = false;
+
+    public boolean isUpsert() {
+        return m_isUpsert;
+    }
+
+    public void setUpsert(boolean isUpsert) {
+        this.m_isUpsert = isUpsert;
+    }
 
     public InsertPlanNode() {
         super();
@@ -68,9 +79,12 @@ public class InsertPlanNode extends AbstractOperationPlanNode {
             stringer.value(i);
         }
         stringer.endArray();
+
+        if (m_isUpsert) {
+            stringer.key(Members.UPSERT.name()).value(true);
+        }
     }
 
-    // TODO:Members not loaded
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         super.loadFromJSONObject(jobj, db);
@@ -83,11 +97,21 @@ public class InsertPlanNode extends AbstractOperationPlanNode {
                 m_fieldMap[i] = jarray.getInt(i);
             }
         }
+
+        m_isUpsert = false;
+        if (jobj.has(Members.UPSERT.name())) {
+            m_isUpsert = true;
+        }
     }
 
     @Override
     protected String explainPlanForNode(String indent) {
-        return "INSERT into \"" + m_targetTableName + "\"";
+        String type = "INSERT";
+        if (m_isUpsert) {
+            type = "UPSERT";
+        }
+
+        return type + " into \"" + m_targetTableName + "\"";
     }
 
     /** Order determinism for insert nodes depends on the determinism of child nodes.  For subqueries producing

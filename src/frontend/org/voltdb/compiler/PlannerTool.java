@@ -116,8 +116,6 @@ public class PlannerTool {
             // remove any spaces or newlines
             String sql = sqlIn.trim();
 
-            hostLog.debug("received sql stmt: " + sql);
-
             // No caching for forced single partition or forced multi partition SQL,
             // since these options potentially get different plans that may be invalid
             // or sub-optimal in other contexts. Likewise, plans cached from other contexts
@@ -137,7 +135,7 @@ public class PlannerTool {
                 }
             }
 
-            //Reset plan node id counter
+            // Reset plan node id counter
             AbstractPlanNode.resetPlanNodeIds();
 
             //////////////////////
@@ -174,13 +172,13 @@ public class PlannerTool {
                             }
                         }
                         if (matched != null) {
-                            CorePlan core = matched.core;
+                            CorePlan core = matched.m_core;
                             ParameterSet params = planner.extractedParamValues(core.parameterTypes);
                             AdHocPlannedStatement ahps = new AdHocPlannedStatement(sql.getBytes(Constants.UTF8ENCODING),
                                                                                    core,
                                                                                    params,
                                                                                    null);
-                            ahps.setBoundConstants(matched.constants);
+                            ahps.setBoundConstants(matched.m_constants);
                             m_cache.put(sql, parsedToken, ahps, extractedLiterals);
                             cacheUse = CacheUse.HIT2;
                             return ahps;

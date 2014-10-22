@@ -413,12 +413,8 @@ string planNodeToString(PlanNodeType type)
     case PLAN_NODE_TYPE_MATERIALIZEDSCAN: {
         return "MATERIALIZEDSCAN";
     }
-
     case PLAN_NODE_TYPE_SEMISEQSCAN: {
         return "SEMISEQSCAN";
-    }
-    case PLAN_NODE_TYPE_UPSERT: {
-        return "UPSERT";
     }
     } // END OF SWITCH
     return "UNDEFINED";
@@ -472,8 +468,6 @@ PlanNodeType stringToPlanNode(string str )
         return PLAN_NODE_TYPE_MATERIALIZEDSCAN;
     } else if (str == "SEMISEQSCAN") {
         return PLAN_NODE_TYPE_SEMISEQSCAN;
-    } else if (str == "UPSERT") {
-        return PLAN_NODE_TYPE_UPSERT;
     }
     return PLAN_NODE_TYPE_INVALID;
 }
