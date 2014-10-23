@@ -989,4 +989,92 @@ public class TestJSONInterface extends TestCase {
     }
     }
 
+    public void testEmptyAuth() throws Exception {
+        try {
+            String simpleSchema =
+                    "CREATE TABLE HELLOWORLD (\n" +
+                            "    HELLO VARCHAR(15),\n" +
+                            "    WORLD VARCHAR(20),\n" +
+                            "    DIALECT VARCHAR(15) NOT NULL,\n" +
+                            "    PRIMARY KEY (DIALECT)\n" +
+                            ");";
+
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+            String schemaPath = schemaFile.getPath();
+            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addSchema(schemaPath);
+            builder.addPartitionInfo("HELLOWORLD", "DIALECT");
+
+            GroupInfo gi = new GroupInfo("foo", true, true, true, true);
+            builder.addGroups(new GroupInfo[] { gi } );
+
+            // create 20 users, only the first one has an interesting user/pass
+            UserInfo[] ui = new UserInfo[1];
+            ui[0] = new UserInfo("ry@nlikesthe", "y@nkees", new String[] { "foo" } );
+            builder.addUsers(ui);
+
+            builder.setSecurityEnabled(true);
+
+            ProcedureInfo[] pi = new ProcedureInfo[2];
+            pi[0] = new ProcedureInfo(new String[] { "foo" }, "Insert", "insert into HELLOWORLD values (?,?,?);", null);
+            pi[1] = new ProcedureInfo(new String[] { "foo" }, "Select", "select * from HELLOWORLD;", null);
+            builder.addProcedures(pi);
+
+            builder.setHTTPDPort(8095);
+
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            assertTrue(success);
+
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
+
+            ParameterSet pset;
+            String responseJSON;
+            Response response;
+
+            // Normal client port
+            // Should be able to make requests back to back with no username and password specified,
+            // and not fail because too many attempts in a second.
+            for (int i = 0; i < 5; i++) {
+                pset = ParameterSet.fromArrayNoCopy("hello", "world", "dialect");
+                responseJSON = callProcOverJSON("Insert", pset, null, null, true, false);
+                response = responseFromJSON(responseJSON);
+                assertEquals(ClientResponse.UNEXPECTED_FAILURE, response.status);
+                assertEquals("Authentication rejected", response.statusString);
+            }
+            // This request should succeed
+            pset = ParameterSet.fromArrayNoCopy("hello", "world", "dialect");
+            responseJSON = callProcOverJSON("Insert", pset, ui[0].name, ui[0].password, false, false);
+            response = responseFromJSON(responseJSON);
+            assertEquals(ClientResponse.SUCCESS, response.status);
+
+            // Now on the admin port
+            // Should be able to make requests back to back with no username and password specified,
+            // and not fail because too many attempts in a second.
+            for (int i = 0; i < 5; i++) {
+                pset = ParameterSet.fromArrayNoCopy("hello", "world", "dialect");
+                responseJSON = callProcOverJSON("Insert", pset, null, null, true, true);
+                response = responseFromJSON(responseJSON);
+                assertEquals(ClientResponse.UNEXPECTED_FAILURE, response.status);
+                assertEquals("Authentication rejected", response.statusString);
+            }
+            // This request should succeed
+            pset = ParameterSet.fromArrayNoCopy("hello", "world", "newdialect");
+            responseJSON = callProcOverJSON("Insert", pset, ui[0].name, ui[0].password, false, true);
+            response = responseFromJSON(responseJSON);
+            assertEquals(ClientResponse.SUCCESS, response.status);
+        } finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
+        }
+    }
 }

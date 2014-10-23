@@ -211,7 +211,7 @@ public class ConnectionUtil {
                     if (!successfulWrite) {
                         throw new IOException("Unable to write authentication info to server");
                     }
-                    throw new IOException("Authentication rejected");
+                    throw new AuthenticationException("Authentication rejected");
                 }
             }
             lengthBuffer.flip();
@@ -229,7 +229,7 @@ public class ConnectionUtil {
                     if (!successfulWrite) {
                         throw new IOException("Unable to write authentication info to server");
                     }
-                    throw new IOException("Authentication rejected");
+                    throw new AuthenticationException("Authentication rejected");
                 }
             }
             loginResponse.flip();
@@ -240,7 +240,7 @@ public class ConnectionUtil {
                 byte tag = loginResponseCode;
                 if (subject == null) {
                     aChannel.close();
-                    throw new IOException("Server requires an authenticated JAAS principal");
+                    throw new AuthenticationException("Server requires an authenticated JAAS principal");
                 }
                 if (tag != Constants.AUTH_SERVICE_NAME) {
                     aChannel.close();
@@ -266,7 +266,7 @@ public class ConnectionUtil {
                 case Constants.AUTHENTICATION_FAILURE_DUE_TO_REJOIN:
                     throw new IOException("Failed to authenticate to rejoining node");
                 default:
-                    throw new IOException("Authentication rejected");
+                    throw new AuthenticationException("Authentication rejected");
                 }
             }
             retvals[0] = loginResponse.getInt();

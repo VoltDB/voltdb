@@ -164,7 +164,16 @@ public class AuthenticatedConnectionCache {
             }
             catch (IOException ioe)
             {
-                setRejectHold();
+                // Don't treat authentication failures as failures if no username and password were passed in,
+                // so that subsequent requests won't be rate-limited. The DB Monitor uses the first request to
+                // figure out if security is turned on, then pass the username and password in the second
+                // request.
+                if (ioe instanceof AuthenticationException) {
+                    if ((userName != null && !userName.isEmpty()) ||
+                        (password != null && !password.isEmpty())) {
+                        setRejectHold();
+                    }
+                }
                 try {
                     adminClient.close();
                 } catch (InterruptedException ex) {
@@ -193,7 +202,16 @@ public class AuthenticatedConnectionCache {
                     m_unauthClient.createConnection(m_hostname, m_port);
                 }
                 catch (IOException e) {
-                    setRejectHold();
+                    // Don't treat authentication failures as failures if no username and password were passed in,
+                    // so that subsequent requests won't be rate-limited. The DB Monitor uses the first request to
+                    // figure out if security is turned on, then pass the username and password in the second
+                    // request.
+                    if (e instanceof AuthenticationException) {
+                        if ((userName != null && !userName.isEmpty()) ||
+                            (password != null && !password.isEmpty())) {
+                            setRejectHold();
+                        }
+                    }
                     try {
                         m_unauthClient.close();
                     } catch (InterruptedException ex) {
