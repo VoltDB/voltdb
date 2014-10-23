@@ -375,7 +375,7 @@ public class TestCatalogUtil extends TestCase {
         assertEquals(200, sysset.getMaxtemptablesize());
     }
 
-    public void testSystemSettingsMaxTimeout() throws Exception
+    public void testSystemSettingsQueryTimeout() throws Exception
     {
         final String depOff =
             "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
@@ -392,7 +392,7 @@ public class TestCatalogUtil extends TestCase {
             "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
             "   <snapshot frequency=\"5s\" retain=\"10\" prefix=\"pref2\" enabled=\"true\"/>" +
             "   <systemsettings>" +
-            "      <querytimeout maxlatency=\"200\"/>" +
+            "      <query timeout=\"200\"/>" +
             "   </systemsettings>" +
             "</deployment>";
 
@@ -400,14 +400,14 @@ public class TestCatalogUtil extends TestCase {
         long crcDepOff = CatalogUtil.compileDeployment(catalog, tmpDepOff.getPath(), true, false);
         assertTrue(crcDepOff >= 0);
         Systemsettings sysset = catalog.getClusters().get("cluster").getDeployment().get("deployment").getSystemsettings().get("systemsettings");
-        assertEquals(Integer.MAX_VALUE, sysset.getQuerytimeout());
+        assertEquals(0, sysset.getQuerymaxlatency());
 
         setUp();
         final File tmpDepOn = VoltProjectBuilder.writeStringToTempFile(depOn);
         long crcDepOn = CatalogUtil.compileDeployment(catalog, tmpDepOn.getPath(), true, false);
         assertTrue(crcDepOn >= 0);
         sysset = catalog.getClusters().get("cluster").getDeployment().get("deployment").getSystemsettings().get("systemsettings");
-        assertEquals(200, sysset.getQuerytimeout());
+        assertEquals(200, sysset.getQuerymaxlatency());
     }
 
 

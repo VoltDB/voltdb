@@ -750,9 +750,9 @@ public abstract class CatalogUtil {
             catDeployment.getSystemsettings().add("systemsettings");
         int maxtemptablesize = 100;
         int snapshotpriority = 6;
-        int elasticPauseTime = 50;
+        int elasticDuration = 50;
         int elasticThroughput = 2;
-        int maxlatency = Integer.MAX_VALUE;
+        int maxlatency = 0;
         if (deployment.getSystemsettings() != null)
         {
             Temptables temptables = deployment.getSystemsettings().getTemptables();
@@ -766,21 +766,21 @@ public abstract class CatalogUtil {
             }
             SystemSettingsType.Elastic elastic = deployment.getSystemsettings().getElastic();
             if (elastic != null) {
-                elasticPauseTime = deployment.getSystemsettings().getElastic().getDuration();
+                elasticDuration = deployment.getSystemsettings().getElastic().getDuration();
                 elasticThroughput = deployment.getSystemsettings().getElastic().getThroughput();
             }
 
-            SystemSettingsType.Querytimeout timeout = deployment.getSystemsettings().getQuerytimeout();
+            SystemSettingsType.Query timeout = deployment.getSystemsettings().getQuery();
             if (timeout != null)
             {
-                maxlatency = timeout.getMaxlatency();
+                maxlatency = timeout.getTimeout();
             }
         }
         syssettings.setMaxtemptablesize(maxtemptablesize);
         syssettings.setSnapshotpriority(snapshotpriority);
-        syssettings.setElasticpausetime(elasticPauseTime);
+        syssettings.setElasticduration(elasticDuration);
         syssettings.setElasticthroughput(elasticThroughput);
-        syssettings.setQuerytimeout(maxlatency);;
+        syssettings.setQuerymaxlatency(maxlatency);
     }
 
     private static void validateDirectory(String type, File path, boolean crashOnFailedValidation) {
