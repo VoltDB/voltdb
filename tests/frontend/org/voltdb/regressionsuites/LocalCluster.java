@@ -355,11 +355,7 @@ public class LocalCluster implements VoltServerConfig {
 
     @Override
     public void startUp(boolean clearLocalDataDirectories) {
-        startUp(clearLocalDataDirectories, ReplicationRole.NONE, null);
-    }
-
-    public void startUp(boolean clearLocalDataDirectories, ReplicationRole role) {
-        startUp(clearLocalDataDirectories, role, null);
+        startUp(clearLocalDataDirectories, ReplicationRole.NONE);
     }
 
     public void setDeploymentAndVoltDBRoot(String pathToDeployment, String pathToVoltDBRoot) {
@@ -486,7 +482,7 @@ public class LocalCluster implements VoltServerConfig {
         }
     }
 
-    public void startUp(boolean clearLocalDataDirectories, ReplicationRole role, ArrayList<Integer> startOrder) {
+    public void startUp(boolean clearLocalDataDirectories, ReplicationRole role) {
         assert (!m_running);
         if (m_running) {
             return;
@@ -530,27 +526,14 @@ public class LocalCluster implements VoltServerConfig {
         int oopStartIndex = 0;
 
         // create the in-process server instance.
-        if (startOrder == null || startOrder.size() != m_hostCount) {
-            if (m_hasLocalServer) {
-                startLocalServer(oopStartIndex, clearLocalDataDirectories);
-                ++oopStartIndex;
-            }
-
-            // create all the out-of-process servers
-            for (int i = oopStartIndex; i < m_hostCount; i++) {
-                startOne(i, clearLocalDataDirectories, role, StartAction.CREATE);
-            }
+        if (m_hasLocalServer) {
+            startLocalServer(oopStartIndex, clearLocalDataDirectories);
+            ++oopStartIndex;
         }
-        else {
-            for (int hostId : startOrder) {
-                assert(hostId < m_hostCount);
-                if (m_hasLocalServer && hostId == 0) {
-                    startLocalServer(hostId, clearLocalDataDirectories);
-                }
-                else {
-                    startOne(hostId, clearLocalDataDirectories, role, StartAction.CREATE);
-                }
-            }
+
+        // create all the out-of-process servers
+        for (int i = oopStartIndex; i < m_hostCount; i++) {
+            startOne(i, clearLocalDataDirectories, role, StartAction.CREATE);
         }
 
         printTiming(logtime, "Pre-witness: " + (System.currentTimeMillis() - startTime) + "ms");
