@@ -61,6 +61,9 @@ import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
+import java.util.EnumSet;
+import org.voltdb.catalog.Group;
+import org.voltdb.common.Permission;
 
 
 /**
@@ -155,24 +158,7 @@ public class AuthSystem {
          */
         private Set<AuthUser> m_users = new HashSet<AuthUser>();
 
-        /**
-         * Whether membership in this group grants permission to invoke system procedures
-         */
-        private final boolean m_sysproc;
-
-        /**
-         * Whether membership in this group grants permission to invoke default procedures
-         */
-        private final boolean m_defaultproc;
-
-        /**
-         * Whether membership in this group grants permission to invoke default read only procedures
-         */
-        private final boolean m_defaultprocread;
-        /**
-         * Whether membership in this group grants permission to invoke adhoc queries
-         */
-        private final boolean m_adhoc;
+        private final EnumSet<Permission> m_permissions = EnumSet.noneOf(Permission.class);
 
         /**
          *
@@ -182,12 +168,9 @@ public class AuthSystem {
          * @param defaultprocread Whether membership in this group grants permission to invoke only read default procedures
          * @param adhoc Whether membership in this group grants permission to invoke adhoc queries
          */
-        private AuthGroup(String name, boolean sysproc, boolean defaultproc, boolean adhoc, boolean defaultprocread) {
+        private AuthGroup(String name, EnumSet<Permission> permissions) {
             m_name = name.intern();
-            m_sysproc = sysproc;
-            m_defaultproc = defaultproc;
-            m_defaultprocread = defaultprocread;
-            m_adhoc = adhoc;
+            m_permissions.addAll(permissions);
         }
 
         private void finish() {
@@ -265,89 +248,15 @@ public class AuthSystem {
         }
 
         /**
-         * Check if a user has permission to invoke adhoc queries by virtue of group membership,
-         * or having permission to invoke system procedures of which adhoc is one.
+         * Check if a user has any one of given permission.
          * @return true if the user has permission and false otherwise
          */
-        public boolean hasAdhocPermission() {
-            return hasGroupWithAdhocPermission() || hasSystemProcPermission();
-        }
-
-        /**
-         * Utility function to iterate through groups and check if any group the user is a member of
-         * grants adhoc permission
-         * @return true if the user has permission and false otherwise
-         */
-        private boolean hasGroupWithAdhocPermission() {
-            for (AuthGroup group : m_groups) {
-                if (group.m_adhoc) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        /**
-         * Check if a user has permission to invoke system procedures by virtue of group membership,
-         * @return true if the user has permission and false otherwise
-         */
-        public boolean hasSystemProcPermission() {
-            return hasGroupWithSysProcPermission();
-        }
-
-        /**
-         * Check if a user has permission to invoke default procedures by virtue of group membership,
-         * @return true if the user has permission and false otherwise
-         */
-        public boolean hasDefaultProcPermission() {
-            return hasGroupWithDefaultProcPermission();
-        }
-
-        /**
-         * Check if a user has permission to invoke read-only default procedures by virtue of group membership,
-         * @return true if the user has permission and false otherwise
-         */
-        public boolean hasDefaultProcReadPermission() {
-            return hasGroupWithDefaultProcReadPermission();
-        }
-
-        /**
-         * Utility function to iterate through groups and check if any group the user is a member of
-         * grants sysproc permission
-         * @return true if the user has permission and false otherwise
-         */
-        private boolean hasGroupWithSysProcPermission() {
-            for (AuthGroup group : m_groups) {
-                if (group.m_sysproc) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        /**
-         * Utility function to iterate through groups and check if any group the user is a member of
-         * grants defaultproc permission
-         * @return true if the user has permission and false otherwise
-         */
-        private boolean hasGroupWithDefaultProcPermission() {
-            for (AuthGroup group : m_groups) {
-                if (group.m_defaultproc) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        /**
-         * Utility function to iterate through groups and check if any group the user is a member of
-         * grants defaultprocread permission
-         * @return true if the user has permission and false otherwise
-         */
-        private boolean hasGroupWithDefaultProcReadPermission() {
-            for (AuthGroup group : m_groups) {
-                if (group.m_defaultprocread) {
-                    return true;
+        public boolean hasPermission(Permission... perms) {
+            for (int i = 0; i < perms.length;i++) {
+                for (AuthGroup group : m_groups) {
+                    if (group.m_permissions.contains(perms[i])) {
+                        return true;
+                    }
                 }
             }
             return false;
@@ -497,8 +406,7 @@ public class AuthSystem {
                 final org.voltdb.catalog.Group  catalogGroup = catalogGroupRef.getGroup();
                 AuthGroup group = null;
                 if (!m_groups.containsKey(catalogGroup.getTypeName())) {
-                    group = new AuthGroup(catalogGroup.getTypeName(), catalogGroup.getSysproc(),
-                                          catalogGroup.getDefaultproc(), catalogGroup.getAdhoc(), catalogGroup.getDefaultprocread());
+                    group = new AuthGroup(catalogGroup.getTypeName(), Permission.getPermissionSetForGroup(catalogGroup));
                     m_groups.put(group.m_name, group);
                 } else {
                     group = m_groups.get(catalogGroup.getTypeName());
@@ -511,8 +419,7 @@ public class AuthSystem {
         for (org.voltdb.catalog.Group catalogGroup : db.getGroups()) {
             AuthGroup group = null;
             if (!m_groups.containsKey(catalogGroup.getTypeName())) {
-                group = new AuthGroup(catalogGroup.getTypeName(), catalogGroup.getSysproc(),
-                                      catalogGroup. getDefaultproc(), catalogGroup.getAdhoc(), catalogGroup.getDefaultprocread());
+                group = new AuthGroup(catalogGroup.getTypeName(), Permission.getPermissionSetForGroup(catalogGroup));
                 m_groups.put(group.m_name, group);
                 //A group not associated with any users? Weird stuff.
             } else {
@@ -615,22 +522,7 @@ public class AuthSystem {
         }
 
         @Override
-        public boolean hasAdhocPermission() {
-            return true;
-        }
-
-        @Override
-        public boolean hasSystemProcPermission() {
-            return true;
-        }
-
-        @Override
-        public boolean hasDefaultProcPermission() {
-            return true;
-        }
-
-        @Override
-        public boolean hasDefaultProcReadPermission() {
+        public boolean hasPermission(Permission... p) {
             return true;
         }
 

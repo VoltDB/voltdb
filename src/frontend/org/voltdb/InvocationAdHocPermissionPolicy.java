@@ -21,6 +21,7 @@ import org.voltcore.logging.Level;
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.catalog.Procedure;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.common.Permission;
 import org.voltdb.utils.LogKeys;
 
 /**
@@ -42,10 +43,10 @@ public class InvocationAdHocPermissionPolicy extends InvocationPermissionPolicy 
     public PolicyResult shouldAccept(AuthUser user, StoredProcedureInvocation invocation, Procedure proc) {
         // AdHoc requires unique permission. Then has to plan in a separate thread.
         if (proc.getSystemproc() && invocation.procName.startsWith("@AdHoc")) {
-            if (!user.hasAdhocPermission()) {
-                return PolicyResult.DENY;
+            if (user.hasPermission(Permission.ADHOC, Permission.SYSPROC)) {
+                return PolicyResult.ALLOW;
             }
-            return PolicyResult.ALLOW;
+            return PolicyResult.DENY;
         }
 
         return PolicyResult.NOT_APPLICABLE;

@@ -21,6 +21,7 @@ import org.voltcore.logging.Level;
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.catalog.Procedure;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.common.Permission;
 import org.voltdb.utils.LogKeys;
 
 /**
@@ -44,9 +45,9 @@ public class InvocationDefaultProcPermissionPolicy extends InvocationPermissionP
         if (proc.getDefaultproc()) {
             boolean res = false;
             if (!proc.getReadonly()) {
-                res = user.hasDefaultProcPermission();
+                res = user.hasPermission(Permission.DEFAULTPROC);
             } else {
-                res = (user.hasDefaultProcReadPermission() || user.hasDefaultProcPermission());
+                res = (user.hasPermission(Permission.DEFAULTPROCREAD) || user.hasPermission(Permission.DEFAULTPROC));
             }
             if (!res) {
                 return PolicyResult.DENY;
