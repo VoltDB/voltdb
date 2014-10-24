@@ -28,11 +28,11 @@ begin Deployment   "Run-time deployment settings"
 end
 
 begin Systemsettings    "Container for deployment systemsettings element"
-  int maxtemptablesize  "The maximum allocation size for temp tables in the EE"
+  int temptablemaxsize  "The maximum allocation size for temp tables in the EE"
   int snapshotpriority  "The priority of snapshot work"
   int elasticduration   "Maximum duration time for rebalancing"
   int elasticthroughput "Target throughput in megabytes for elasticity"
-  int querymaxlatency   "The maximum latency for a query before timing out"
+  int querytimeout      "The maximum latency for a query batch before timing out"
 end
 
 begin Database          "A set of schema, procedures and other metadata that together comprise an application"

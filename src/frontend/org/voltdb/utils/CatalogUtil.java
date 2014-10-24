@@ -748,21 +748,21 @@ public abstract class CatalogUtil {
         // Create catalog Systemsettings
         Systemsettings syssettings =
             catDeployment.getSystemsettings().add("systemsettings");
-        int maxtemptablesize = 100;
-        int snapshotpriority = 6;
+        int temptableMaxSize = 100;
+        int snapshotPriority = 6;
         int elasticDuration = 50;
         int elasticThroughput = 2;
-        int maxlatency = 0;
+        int queryTimeout = 0;
         if (deployment.getSystemsettings() != null)
         {
             Temptables temptables = deployment.getSystemsettings().getTemptables();
             if (temptables != null)
             {
-                maxtemptablesize = temptables.getMaxsize();
+                temptableMaxSize = temptables.getMaxsize();
             }
             SystemSettingsType.Snapshot snapshot = deployment.getSystemsettings().getSnapshot();
             if (snapshot != null) {
-                snapshotpriority = snapshot.getPriority();
+                snapshotPriority = snapshot.getPriority();
             }
             SystemSettingsType.Elastic elastic = deployment.getSystemsettings().getElastic();
             if (elastic != null) {
@@ -773,14 +773,14 @@ public abstract class CatalogUtil {
             SystemSettingsType.Query timeout = deployment.getSystemsettings().getQuery();
             if (timeout != null)
             {
-                maxlatency = timeout.getTimeout();
+                queryTimeout = timeout.getTimeout();
             }
         }
-        syssettings.setMaxtemptablesize(maxtemptablesize);
-        syssettings.setSnapshotpriority(snapshotpriority);
+        syssettings.setTemptablemaxsize(temptableMaxSize);
+        syssettings.setSnapshotpriority(snapshotPriority);
         syssettings.setElasticduration(elasticDuration);
         syssettings.setElasticthroughput(elasticThroughput);
-        syssettings.setQuerymaxlatency(maxlatency);
+        syssettings.setQuerytimeout(queryTimeout);
     }
 
     private static void validateDirectory(String type, File path, boolean crashOnFailedValidation) {
