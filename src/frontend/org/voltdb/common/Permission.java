@@ -24,10 +24,13 @@ import org.voltdb.catalog.Group;
 //If you add a permission here add a boolean in spec.txt and update getPermissionSetForGroup method
 public enum Permission {
     //These enums maps to specific boolean in spec.txt
-    ADHOC,
+
     SYSPROC,
     DEFAULTPROC,
-    DEFAULTPROCREAD;
+    ADHOC,
+    DEFAULTPROCREAD,
+    SQL,
+    SQLREAD;
 
     public static final String toListString() {
         return Arrays.asList(values()).toString();
@@ -40,7 +43,8 @@ public enum Permission {
      */
     public static final EnumSet<Permission> getPermissionSetForGroup(Group catGroup) {
         EnumSet<Permission> perms = EnumSet.noneOf(Permission.class);
-        if (catGroup.getAdhoc()) perms.add(Permission.ADHOC);
+        if (catGroup.getSql()) perms.add(Permission.SQL);
+        if (catGroup.getSqlread()) perms.add(Permission.SQLREAD);
         if (catGroup.getSysproc()) perms.add(Permission.SYSPROC);
         if (catGroup.getDefaultproc()) perms.add(Permission.DEFAULTPROC);
         if (catGroup.getDefaultprocread()) perms.add(Permission.DEFAULTPROCREAD);

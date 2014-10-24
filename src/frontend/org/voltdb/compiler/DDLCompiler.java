@@ -54,7 +54,8 @@ import org.voltdb.catalog.Index;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Permission;
-import static org.voltdb.common.Permission.ADHOC;
+import static org.voltdb.common.Permission.SQL;
+import static org.voltdb.common.Permission.SQLREAD;
 import static org.voltdb.common.Permission.DEFAULTPROC;
 import static org.voltdb.common.Permission.DEFAULTPROCREAD;
 import static org.voltdb.common.Permission.SYSPROC;
@@ -909,7 +910,7 @@ public class DDLCompiler {
                     }
                     switch( permission) {
                     case ADHOC:
-                        catGroup.setAdhoc(true);
+                        catGroup.setSql(true);
                         break;
                     case SYSPROC:
                         catGroup.setSysproc(true);
@@ -919,6 +920,12 @@ public class DDLCompiler {
                         break;
                     case DEFAULTPROCREAD:
                         catGroup.setDefaultprocread(true);
+                        break;
+                    case SQL:
+                        catGroup.setSql(true);
+                        break;
+                    case SQLREAD:
+                        catGroup.setSqlread(true);
                         break;
                     }
                 }

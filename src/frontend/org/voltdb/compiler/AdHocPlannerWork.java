@@ -18,6 +18,7 @@
 package org.voltdb.compiler;
 
 import org.voltcore.network.Connection;
+import org.voltdb.AuthSystem;
 import org.voltdb.CatalogContext;
 import org.voltdb.client.ProcedureInvocationType;
 
@@ -28,7 +29,7 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
     final String sqlBatchText;
     final String[] sqlStatements;
     final Object[] userParamSet;
-    final CatalogContext catalogContext;
+    public final CatalogContext catalogContext;
     final boolean inferPartitioning;
     // The user partition key is usually null
     // -- otherwise, it contains one element to support @AdHocSpForTest and
@@ -44,13 +45,13 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
             String invocationName, ProcedureInvocationType type,
             long originalTxnId, long originalUniqueId,
             boolean onReplica, boolean useAdhocDDL,
-            AsyncCompilerWorkCompletionHandler completionHandler, String userName)
+            AsyncCompilerWorkCompletionHandler completionHandler, AuthSystem.AuthUser user)
     {
         super(replySiteId, false, clientHandle, connectionId,
               clientConnection == null ? "" : clientConnection.getHostnameAndIPAndPort(),
               adminConnection, clientConnection, invocationName, type,
               originalTxnId, originalUniqueId, onReplica, useAdhocDDL,
-              completionHandler, userName);
+              completionHandler, user);
         this.sqlBatchText = sqlBatchText;
         this.sqlStatements = sqlStatements;
         this.userParamSet = userParamSet;
@@ -85,7 +86,7 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
                 orig.onReplica,
                 orig.useAdhocDDL,
                 completionHandler,
-                orig.userName);
+                orig.user);
         }
 
     /**

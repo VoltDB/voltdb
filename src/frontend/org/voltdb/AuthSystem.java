@@ -183,7 +183,7 @@ public class AuthSystem {
      * clear text password.
      *
      */
-    class AuthUser {
+    public class AuthUser {
         /**
          * SHA-1 double hashed copy of the users clear text password
          */

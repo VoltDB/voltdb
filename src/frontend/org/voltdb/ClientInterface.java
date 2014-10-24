@@ -115,6 +115,7 @@ import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListenableFutureTask;
+
 import org.voltdb.common.Permission;
 
 /**
@@ -1395,7 +1396,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     }
 
     private final ClientResponseImpl dispatchAdHoc(StoredProcedureInvocation task,
-            ClientInputHandler handler, Connection ccxn, boolean isExplain) {
+            ClientInputHandler handler, Connection ccxn, boolean isExplain, AuthSystem.AuthUser user) {
         ParameterSet params = task.getParams();
         Object[] paramArray = params.toArray();
         String sql = (String) paramArray[0];
@@ -1403,12 +1404,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (params.size() > 1) {
             userParams = Arrays.copyOfRange(paramArray, 1, paramArray.length);
         }
-        dispatchAdHocCommon(task, handler, ccxn, isExplain, sql, userParams, null);
+        dispatchAdHocCommon(task, handler, ccxn, isExplain, sql, userParams, null, user);
         return null;
     }
 
     private final ClientResponseImpl dispatchAdHocSpForTest(StoredProcedureInvocation task,
-            ClientInputHandler handler, Connection ccxn, boolean isExplain) {
+            ClientInputHandler handler, Connection ccxn, boolean isExplain, AuthSystem.AuthUser user) {
         ParameterSet params = task.getParams();
         assert(params.size() > 1);
         Object[] paramArray = params.toArray();
@@ -1421,13 +1422,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (params.size() > 2) {
             userParams = Arrays.copyOfRange(paramArray, 2, paramArray.length);
         }
-        dispatchAdHocCommon(task, handler, ccxn, isExplain, sql, userParams, userPartitionKey);
+        dispatchAdHocCommon(task, handler, ccxn, isExplain, sql, userParams, userPartitionKey, user);
         return null;
     }
 
     private final void dispatchAdHocCommon(StoredProcedureInvocation task,
             ClientInputHandler handler, Connection ccxn, boolean isExplain,
-            String sql, Object[] userParams, Object[] userPartitionKey) {
+            String sql, Object[] userParams, Object[] userPartitionKey, AuthSystem.AuthUser user) {
         List<String> sqlStatements = MiscUtils.splitSQLStatements(sql);
         String[] stmtsArray = sqlStatements.toArray(new String[sqlStatements.size()]);
 
@@ -1440,14 +1441,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 task.procName, task.type, task.originalTxnId, task.originalUniqueId,
                 VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
                 VoltDB.instance().getCatalogContext().cluster.getUseadhocschema(),
-                m_adhocCompletionHandler, handler.m_username);
+                m_adhocCompletionHandler, user);
         LocalObjectMessage work = new LocalObjectMessage( ahpw );
 
         m_mailbox.send(m_plannerSiteId, work);
     }
 
     ClientResponseImpl dispatchUpdateApplicationCatalog(StoredProcedureInvocation task,
-            ClientInputHandler handler, Connection ccxn)
+            ClientInputHandler handler, Connection ccxn, AuthSystem.AuthUser user)
     {
         ParameterSet params = task.getParams();
         // default catalogBytes to null, when passed along, will tell the
@@ -1478,7 +1479,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     task.procName, task.type, task.originalTxnId, task.originalUniqueId,
                     VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
                     VoltDB.instance().getCatalogContext().cluster.getUseadhocschema(),
-                    m_adhocCompletionHandler, handler.m_username));
+                    m_adhocCompletionHandler, user));
 
         m_mailbox.send(m_plannerSiteId, work);
         return null;
@@ -1746,7 +1747,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
 
             else if (task.procName.equals("@Explain")) {
-                return dispatchAdHoc(task, handler, ccxn, true);
+                return dispatchAdHoc(task, handler, ccxn, true, user);
             }
             else if (task.procName.equals("@ExplainProc")) {
                 return dispatchExplainProcedure(task, handler, ccxn);
@@ -1757,10 +1758,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
 
             else if (task.procName.equals("@AdHoc")) {
-                return dispatchAdHoc(task, handler, ccxn, false);
+                return dispatchAdHoc(task, handler, ccxn, false, user);
             }
             else if (task.procName.equals("@AdHocSpForTest")) {
-                return dispatchAdHocSpForTest(task, handler, ccxn, false);
+                return dispatchAdHocSpForTest(task, handler, ccxn, false, user);
             }
             else if (task.procName.equals("@LoadMultipartitionTable")) {
                 /*
@@ -1792,10 +1793,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             // PRO SYSPROC SPECIAL HANDLING
 
             if (task.procName.equals("@UpdateApplicationCatalog")) {
-                return dispatchUpdateApplicationCatalog(task, handler, ccxn);
+                return dispatchUpdateApplicationCatalog(task, handler, ccxn, user);
             }
             else if (task.procName.equals("@UpdateClasses")) {
-                return dispatchUpdateApplicationCatalog(task, handler, ccxn);
+                return dispatchUpdateApplicationCatalog(task, handler, ccxn, user);
             }
             else if (task.procName.equals("@SnapshotSave")) {
                 m_snapshotDaemon.requestUserSnapshot(task, ccxn);
@@ -2038,7 +2039,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "SUCCESS", task.clientHandle);
     }
 
-    void createAdHocTransaction(final AdHocPlannedStmtBatch plannedStmtBatch)
+    void createAdHocTransaction(final AdHocPlannedStmtBatch plannedStmtBatch, Connection c)
             throws VoltTypeException
     {
         ByteBuffer buf = null;
@@ -2096,20 +2097,29 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
         task.clientHandle = plannedStmtBatch.clientHandle;
 
-        /*
-         * Round trip the invocation to initialize it for command logging
-         */
-        try {
-            task = MiscUtils.roundTripForCL(task);
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+        ClientResponseImpl error = null;
+        if ((error = m_permissionValidator.shouldAccept(task.procName, plannedStmtBatch.work.user, task, SystemProcedureCatalog.listing.get(task.procName).asCatalogProcedure())) != null) {
+            ByteBuffer buffer = ByteBuffer.allocate(error.getSerializedSize() + 4);
+            buffer.putInt(buffer.capacity() - 4);
+            error.flattenToBuffer(buffer).flip();
+            c.writeStream().enqueue(buffer);
         }
+        else {
+            /*
+             * Round trip the invocation to initialize it for command logging
+             */
+            try {
+                task = MiscUtils.roundTripForCL(task);
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+            }
 
-        // initiate the transaction
-        createTransaction(plannedStmtBatch.connectionId, task,
-                plannedStmtBatch.isReadOnly(), isSinglePartition, false,
-                partition,
-                task.getSerializedSize(), System.nanoTime());
+            // initiate the transaction
+            createTransaction(plannedStmtBatch.connectionId, task,
+                    plannedStmtBatch.isReadOnly(), isSinglePartition, false,
+                    partition,
+                    task.getSerializedSize(), System.nanoTime());
+        }
     }
 
     /*
@@ -2138,6 +2148,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             /* The adhoc planner learns of catalog updates after the EE and the
                                rest of the system. If the adhoc sql was planned against an
                                obsolete catalog, re-plan. */
+                            authLog.error("rework invoked");
                             LocalObjectMessage work = new LocalObjectMessage(
                                     AdHocPlannerWork.rework(plannedStmtBatch.work, m_adhocCompletionHandler));
 
@@ -2148,7 +2159,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         }
                         else {
                             try {
-                                createAdHocTransaction(plannedStmtBatch);
+                                createAdHocTransaction(plannedStmtBatch, c);
                             }
                             catch (VoltTypeException vte) {
                                 String msg = "Unable to execute adhoc sql statement(s): " +

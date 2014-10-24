@@ -77,8 +77,10 @@ begin Group
   UserRef* users
   bool sysproc          "Can invoke system procedures"
   bool defaultproc      "Can invoke default procedures"
-  bool adhoc            "Can invoke the adhoc system procedure
+  bool adhoc            "Can invoke the adhoc system procedures (alias for SQL)"
   bool defaultprocread  "Can invoke read-only default procedures"
+  bool sql              "Can invoke the adhoc system procedures"
+  bool sqlread          "Can invoke read-only adhoc system procedures"
 end
 
 begin GroupRef
