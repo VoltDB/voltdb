@@ -17,12 +17,13 @@ If you have installed VoltDB from the distribution kit, you now have
 a directory containing this README file and several subdirectories, 
 including:
 
-bin      - Scripts for starting VoltDB, the export client, catalog
-           compiler, and SQL command tool
-doc      - Using VoltDB guide, Management guide, tutorials, java-doc
+bin      - Scripts for compiling the application catalog, starting 
+           VoltDB, bulk loading data, as well as interacting with
+           and managing the running database
+doc      - Documentation, tutorials, and java-doc
 examples - sample programs demonstrating the use of VoltDB
 lib      - Third party libraries
-tools    - SQLCmd tool, Web dashboard, project generator, XML schemas
+tools    - XML schemas, monitoring plugins, and other tools
 voltdb   - the VoltDB software itself
 
 The easiest way to get started using VoltDB is to try building and 
