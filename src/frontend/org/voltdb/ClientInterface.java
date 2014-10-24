@@ -1885,39 +1885,31 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * Can be used to perform old gen GCs on a schedule during non-peak times
      */
     private ClientResponseImpl dispatchSystemGC(final ClientInputHandler handler,
-            final StoredProcedureInvocation task, AuthSystem.AuthUser user) {
-        if (user.hasPermission(Permission.ADMIN)) {
-            m_systemGCThread.execute(new Runnable() {
-                @Override
-                public void run() {
-                    final long start = System.nanoTime();
-                    System.gc();
-                    final long duration = System.nanoTime() - start;
-                    VoltTable vt = new VoltTable(
-                            new ColumnInfo[] { new ColumnInfo("SYSTEM_GC_DURATION_NANOS", VoltType.BIGINT) });
-                    vt.addRow(duration);
-                    final ClientResponseImpl response = new ClientResponseImpl(
-                            ClientResponseImpl.SUCCESS,
-                            new VoltTable[] { vt },
-                            null,
-                            task.clientHandle);
-                    ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
-                    buf.putInt(buf.capacity() - 4);
-                    response.flattenToBuffer(buf).flip();
+                                                final StoredProcedureInvocation task, AuthSystem.AuthUser user) {
+        m_systemGCThread.execute(new Runnable() {
+            @Override
+            public void run() {
+                final long start = System.nanoTime();
+                System.gc();
+                final long duration = System.nanoTime() - start;
+                VoltTable vt = new VoltTable(
+                        new ColumnInfo[] { new ColumnInfo("SYSTEM_GC_DURATION_NANOS", VoltType.BIGINT) });
+                vt.addRow(duration);
+                final ClientResponseImpl response = new ClientResponseImpl(
+                        ClientResponseImpl.SUCCESS,
+                        new VoltTable[] { vt },
+                        null,
+                        task.clientHandle);
+                ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
+                buf.putInt(buf.capacity() - 4);
+                response.flattenToBuffer(buf).flip();
 
-                    ClientInterfaceHandleManager cihm = m_cihm.get(handler.connectionId());
-                    if (cihm == null) return;
-                    cihm.connection.writeStream().enqueue(buf);
-                }
-            });
-            return null;
-        } else {
-            return new ClientResponseImpl(
-                    ClientResponseImpl.GRACEFUL_FAILURE,
-                    new VoltTable[] {},
-                    "User " + handler.m_username + " doesn't have sysproc permission needed to invoke @GC",
-                    task.clientHandle);
-        }
+                ClientInterfaceHandleManager cihm = m_cihm.get(handler.connectionId());
+                if (cihm == null) return;
+                cihm.connection.writeStream().enqueue(buf);
+            }
+        });
+        return null;
     }
 
     private ClientResponseImpl dispatchSubscribe(ClientInputHandler c, StoredProcedureInvocation task) {
