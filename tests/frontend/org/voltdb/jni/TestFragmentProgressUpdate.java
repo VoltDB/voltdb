@@ -44,12 +44,14 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
-import org.voltdb.exceptions.EEException;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 
 public class TestFragmentProgressUpdate extends TestCase {
+
+    private long READ_ONLY_TOKEN = Long.MAX_VALUE;
+    private long WRITE_TOKEN = 0;
 
     public void testFragmentProgressUpdate() throws Exception {
         m_ee.loadCatalog( 0, m_catalog.serialize());
@@ -62,7 +64,7 @@ public class TestFragmentProgressUpdate extends TestCase {
             m_warehousedata.addRow(i, "name" + i, "st1", "st2", "city", "ST", "zip", 0, 0);
         }
 
-        m_ee.loadTable(WAREHOUSE_TABLEID, m_warehousedata, 0, 0, 0, false, false, Long.MAX_VALUE);
+        m_ee.loadTable(WAREHOUSE_TABLEID, m_warehousedata, 0, 0, 0, false, false, WRITE_TOKEN);
         assertEquals(m_tableSize, m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
         System.out.println("Rows loaded to table "+m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
 
@@ -177,7 +179,7 @@ public class TestFragmentProgressUpdate extends TestCase {
                 null,
                 new ParameterSet[] { params },
                 new String[] { deleteStmt.getSqltext() },
-                3, 3, 2, 42, Long.MAX_VALUE);
+                3, 3, 2, 42, WRITE_TOKEN);
 
         // populate plan cache
         ActivePlanRepository.clear();
@@ -217,7 +219,7 @@ public class TestFragmentProgressUpdate extends TestCase {
             m_warehousedata.addRow(i, "name" + i, "st1", "st2", "city", "ST", "zip", 0, 0);
         }
 
-        m_ee.loadTable(WAREHOUSE_TABLEID, m_warehousedata, 0, 0, 0, false, false, Long.MAX_VALUE);
+        m_ee.loadTable(WAREHOUSE_TABLEID, m_warehousedata, 0, 0, 0, false, false, WRITE_TOKEN);
         assertEquals(m_tableSize, m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
         System.out.println("Rows loaded to table "+m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
 
@@ -257,69 +259,37 @@ public class TestFragmentProgressUpdate extends TestCase {
 
     @SuppressWarnings("deprecation")
     public void testProgressUpdateLogSqlStmt() throws Exception {
-        m_ee.loadCatalog( 0, m_catalog.serialize());
-
         m_tableSize = 50;
-        m_itemData.clearRowData();
-
-        for (int i = 0; i < m_tableSize; ++i) {
-            m_itemData.addRow(i, i + 50, "item" + i, (double)i / 2, "data" + i);
-        }
-
-        m_ee.loadTable(ITEM_TABLEID, m_itemData, 0, 0, 0, false, false, Long.MAX_VALUE);
-        assertEquals(m_tableSize, m_ee.serializeTable(ITEM_TABLEID).getRowCount());
-        System.out.println("Rows loaded to table "+m_ee.serializeTable(ITEM_TABLEID).getRowCount());
-
-        Statement selectStmt = m_testProc.getStatements().getIgnoreCase("item_crazy_join");
-
-        assertEquals(1, selectStmt.getFragments().size());
-        PlanFragment frag = selectStmt.getFragments().iterator().next();
-
-        // populate plan cache
-        ActivePlanRepository.clear();
-        ActivePlanRepository.addFragmentForTest(
-                CatalogUtil.getUniqueIdForFragment(frag),
-                Encoder.decodeBase64AndDecompressToBytes(frag.getPlannodetree()),
-                selectStmt.getSqltext());
-        ParameterSet params = ParameterSet.emptyParameterSet();
-
-        // Replace the normal logger with a mocked one, so we can verify the message
-        VoltLogger mockedLogger = Mockito.mock(VoltLogger.class);
-        ExecutionEngine.setVoltLoggerForTest(mockedLogger);
 
         // Set the log duration to be very short, to ensure that a message will be logged.
         m_ee.setInitialLogDurationForTest(1);
 
-        m_ee.executePlanFragments(
-                1,
-                new long[] { CatalogUtil.getUniqueIdForFragment(frag) },
-                null,
-                new ParameterSet[] { params },
-                new String[] { selectStmt.getSqltext() },
-                3, 3, 2, 42, Long.MAX_VALUE);
-        verify(mockedLogger, atLeastOnce()).info(
-                contains("Executing SQL statement is \"SELECT COUNT(*) FROM ITEM i1, ITEM i2, ITEM i3;\"."));
+        verifyLongRunningQueries(0, "item_crazy_join", true);
     }
 
-    public void testTimingoutQueriesMillis() throws Exception {
+    private void verifyLongRunningQueries(int timeout, String query, boolean readOnly) {
         m_ee.loadCatalog( 0, m_catalog.serialize());
-
-        m_tableSize = 100;
-        int timeout = 100;
 
         m_itemData.clearRowData();
         for (int i = 0; i < m_tableSize; ++i) {
             m_itemData.addRow(i, i + 50, "item" + i, (double)i / 2, "data" + i);
         }
 
-        m_ee.loadTable(ITEM_TABLEID, m_itemData, 0, 0, 0, false, false, Long.MAX_VALUE);
+        m_ee.loadTable(ITEM_TABLEID, m_itemData, 0, 0, 0, false, false, WRITE_TOKEN);
         assertEquals(m_tableSize, m_ee.serializeTable(ITEM_TABLEID).getRowCount());
-        System.out.println("Rows loaded to table "+m_ee.serializeTable(ITEM_TABLEID).getRowCount());
+        System.out.println("Rows loaded to table " + m_ee.serializeTable(ITEM_TABLEID).getRowCount());
 
-        Statement selectStmt = m_testProc.getStatements().getIgnoreCase("item_crazy_join");
+        Statement selectStmt = m_testProc.getStatements().getIgnoreCase(query);
 
-        assertEquals(1, selectStmt.getFragments().size());
+        int fragSize = selectStmt.getFragments().size();
         PlanFragment frag = selectStmt.getFragments().iterator().next();
+        if (fragSize == 2) {
+            int j = 0;
+            for (PlanFragment f : selectStmt.getFragments()) {
+                if (j != 0) frag = f;
+                j++;
+            }
+        }
 
         // populate plan cache
         ActivePlanRepository.clear();
@@ -342,67 +312,52 @@ public class TestFragmentProgressUpdate extends TestCase {
                     null,
                     new ParameterSet[] { params },
                     new String[] { selectStmt.getSqltext() },
-                    3, 3, 2, 42, Long.MAX_VALUE);
-            fail();
+                    3, 3, 2, 42,
+                    readOnly ? READ_ONLY_TOKEN : WRITE_TOKEN);
+            if (readOnly && timeout > 0) {
+                // only readl
+                fail();
+            }
         } catch (Exception ex) {
-            String msg = String.format("Query/Procedure timing out in %.2f seconds.", timeout/1000.0);
+            String msg = String.format("A SQL query was interrupted after %.2f seconds "
+                    + "because it exceeded the query timeout period.",
+                    timeout/1000.0);
+            System.err.println(msg);
             assertEquals(msg, ex.getMessage());
         }
-        verify(mockedLogger, atLeastOnce()).info(
-                contains("Executing SQL statement is \"SELECT COUNT(*) FROM ITEM i1, ITEM i2, ITEM i3;\"."));
 
+        verify(mockedLogger, atLeastOnce()).info(contains(
+            String.format("Executing SQL statement is \"%s\".", selectStmt.getSqltext())));
     }
 
-    public void testTimingoutQueriesSeconds() throws Exception {
-        m_ee.loadCatalog( 0, m_catalog.serialize());
+    public void testTimingoutQueriesReadOnly() throws Exception {
+        int tableSizeAry[] = {200, 200, 300};
+        int timeoutAry[] = {0, 100, 1000* 5};
+        String queryAry[] = {"item_crazy_join", "item_crazy_join", "item_crazy_join"};
 
-        m_tableSize = 500;
-        int timeout = 1000 * 10;
+        for (int iter = 0; iter < tableSizeAry.length; iter++) {
+            m_tableSize = tableSizeAry[iter];
+            verifyLongRunningQueries(timeoutAry[iter], queryAry[iter], true);
 
-        m_itemData.clearRowData();
-        for (int i = 0; i < m_tableSize; ++i) {
-            m_itemData.addRow(i, i + 50, "item" + i, (double)i / 2, "data" + i);
+            tearDown();
+            setUp();
         }
+    }
 
-        m_ee.loadTable(ITEM_TABLEID, m_itemData, 0, 0, 0, false, false, Long.MAX_VALUE);
-        assertEquals(m_tableSize, m_ee.serializeTable(ITEM_TABLEID).getRowCount());
-        System.out.println("Rows loaded to table "+m_ee.serializeTable(ITEM_TABLEID).getRowCount());
+    public void testTimingoutQueriesWrite() throws Exception {
+        int tableSizeAry[] = {50000, 50000};
+        int timeoutAry[] = {0, 100};
+        String queryAry[] = {"item_big_del", "item_big_del"};
 
-        Statement selectStmt = m_testProc.getStatements().getIgnoreCase("item_crazy_join");
+        for (int iter = 0; iter < tableSizeAry.length; iter++) {
+            m_tableSize = tableSizeAry[iter];
+            m_ee.setInitialLogDurationForTest(1);
 
-        assertEquals(1, selectStmt.getFragments().size());
-        PlanFragment frag = selectStmt.getFragments().iterator().next();
+            verifyLongRunningQueries(timeoutAry[iter], queryAry[iter], false);
 
-        // populate plan cache
-        ActivePlanRepository.clear();
-        ActivePlanRepository.addFragmentForTest(
-                CatalogUtil.getUniqueIdForFragment(frag),
-                Encoder.decodeBase64AndDecompressToBytes(frag.getPlannodetree()),
-                selectStmt.getSqltext());
-        ParameterSet params = ParameterSet.emptyParameterSet();
-
-        // Replace the normal logger with a mocked one, so we can verify the message
-        VoltLogger mockedLogger = Mockito.mock(VoltLogger.class);
-        ExecutionEngine.setVoltLoggerForTest(mockedLogger);
-
-        m_ee.setTimeoutLatency(timeout);
-
-        try {
-            m_ee.executePlanFragments(
-                    1,
-                    new long[] { CatalogUtil.getUniqueIdForFragment(frag) },
-                    null,
-                    new ParameterSet[] { params },
-                    new String[] { selectStmt.getSqltext() },
-                    3, 3, 2, 42, Long.MAX_VALUE);
-            fail();
-        } catch (Exception ex) {
-            String msg = String.format("Query/Procedure timing out in %.2f seconds.", timeout/1000.0);
-            assertEquals(msg, ex.getMessage());
+            tearDown();
+            setUp();
         }
-        verify(mockedLogger, atLeastOnce()).info(
-                contains("Executing SQL statement is \"SELECT COUNT(*) FROM ITEM i1, ITEM i2, ITEM i3;\"."));
-
     }
 
     private ExecutionEngine m_ee;

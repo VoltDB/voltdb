@@ -266,18 +266,24 @@ public class VoltProjectBuilder {
 
     private Integer m_deadHostTimeout = null;
 
-    private Integer m_elasticTargetThroughput = null;
-    private Integer m_elasticTargetPauseTime = null;
+    private Integer m_elasticThroughput = null;
+    private Integer m_elasticDuration = null;
+    private Integer m_queryTimeOut = null;
 
     private boolean m_useAdhocSchema = false;
 
-    public VoltProjectBuilder setElasticTargetThroughput(int target) {
-        m_elasticTargetThroughput = target;
+    public VoltProjectBuilder setQueryTimeout(int target) {
+        m_queryTimeOut = target;
         return this;
     }
 
-    public VoltProjectBuilder setElasticTargetPauseTime(int target) {
-        m_elasticTargetPauseTime = target;
+    public VoltProjectBuilder setElasticThroughput(int target) {
+        m_elasticThroughput = target;
+        return this;
+    }
+
+    public VoltProjectBuilder setElasticDuration(int target) {
+        m_elasticDuration = target;
         return this;
     }
 
@@ -916,12 +922,16 @@ public class VoltProjectBuilder {
             snapshot.setPriority(m_snapshotPriority);
             systemSettingType.setSnapshot(snapshot);
         }
-        if (m_elasticTargetThroughput != null || m_elasticTargetPauseTime != null) {
+        if (m_elasticThroughput != null || m_elasticDuration != null) {
             SystemSettingsType.Elastic elastic = factory.createSystemSettingsTypeElastic();
-            if (m_elasticTargetThroughput != null) elastic.setThroughput(m_elasticTargetThroughput);
-            if (m_elasticTargetPauseTime != null) elastic.setDuration(m_elasticTargetPauseTime);
+            if (m_elasticThroughput != null) elastic.setThroughput(m_elasticThroughput);
+            if (m_elasticDuration != null) elastic.setDuration(m_elasticDuration);
             systemSettingType.setElastic(elastic);
         }
+        if (m_queryTimeOut != null) {
+            factory.createSystemSettingsTypeQuery().setTimeout(m_queryTimeOut);
+        }
+
         deployment.setSystemsettings(systemSettingType);
 
         // <users>
