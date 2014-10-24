@@ -92,7 +92,7 @@
     </xs:restriction>
   </xs:simpleType>
 
-  <xs:simpleType name="elasticPauseType">
+  <xs:simpleType name="elasticDurationType">
     <xs:restriction base="xs:int">
       <xs:minInclusive value="1"/>
     </xs:restriction>
@@ -101,6 +101,12 @@
   <xs:simpleType name="elasticThroughputType">
     <xs:restriction base="xs:int">
       <xs:minInclusive value="1"/>
+    </xs:restriction>
+  </xs:simpleType>
+  
+  <xs:simpleType name="latencyType">
+    <xs:restriction base="xs:int">
+      <xs:minInclusive value="0"/>
     </xs:restriction>
   </xs:simpleType>
 
@@ -112,15 +118,20 @@
                 <xs:attribute name="maxsize" type="memorySizeType" default="100"/>
             </xs:complexType>
         </xs:element>
-         <xs:element name="snapshot" minOccurs="0" maxOccurs="1">
+        <xs:element name="snapshot" minOccurs="0" maxOccurs="1">
             <xs:complexType>
                 <xs:attribute name="priority" type="snapshotPriorityType" default="6"/>
             </xs:complexType>
         </xs:element>
-            <xs:element name="elastic" minOccurs="0" maxOccurs="1">
+        <xs:element name="elastic" minOccurs="0" maxOccurs="1">
             <xs:complexType>
-                <xs:attribute name="duration" type="elasticPauseType" default="50"/>
+                <xs:attribute name="duration" type="elasticDurationType" default="50"/>
                 <xs:attribute name="throughput" type="elasticThroughputType" default="2"/>
+            </xs:complexType>
+        </xs:element>
+        <xs:element name="query" minOccurs="0" maxOccurs="1">
+            <xs:complexType>
+                <xs:attribute name="timeout" type="latencyType" default="0"/>
             </xs:complexType>
         </xs:element>
 
