@@ -85,7 +85,7 @@ public class TestInvocationAcceptancePolicy {
         user = createUser(false, false, false, null, true, true);
         assertEquals(policy.shouldAccept(user, invocation, proc), PolicyResult.DENY);
     }
-    
+
     @Test
     public void testAdHocReadUserPermission()
     {
