@@ -68,7 +68,7 @@ public class TestInMemoryJarfile extends TestCase {
             "<project>" +
             "<database name='database'>" +
             "<%ss>" +
-            "<%s adhoc='" + Boolean.toString(adhoc) + "' name='default' sysproc='true'/>" +
+            "<%s adhoc='" + Boolean.toString(adhoc) + "' name='default' sysproc='false'/>" +
             "</%ss>" +
             "<schemas><schema path='" + schemaPath + "' /></schemas>" +
             "<procedures><procedure class='org.voltdb.compiler.procedures.TPCCTestProc' /></procedures>" +

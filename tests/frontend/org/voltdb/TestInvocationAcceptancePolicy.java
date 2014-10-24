@@ -38,8 +38,8 @@ public class TestInvocationAcceptancePolicy {
     {
 
         AuthSystem.AuthUser user = mock(AuthSystem.AuthUser.class);
-        when(user.hasPermission(Permission.SYSPROC)).thenReturn(sysproc);
-        when(user.hasPermission(Permission.ADHOC, Permission.SYSPROC)).thenReturn(adhoc);
+        when(user.hasPermission(Permission.ADMIN)).thenReturn(sysproc);
+        when(user.hasPermission(Permission.ADHOC, Permission.ADMIN)).thenReturn(adhoc);
         when(user.hasPermission(Permission.DEFAULTPROC)).thenReturn(crud);
         when(user.hasPermission(Permission.DEFAULTPROCREAD)).thenReturn(readonly);
         if (userProc != null) {

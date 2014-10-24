@@ -920,6 +920,14 @@ public class VoltCompiler {
                 catGroup.setSysproc(group.isSysproc());
                 catGroup.setDefaultproc(group.isDefaultproc());
                 catGroup.setDefaultprocread(group.isDefaultprocread());
+
+                if (catGroup.getSysproc() || catGroup.getAdmin()) {
+                    catGroup.setAdmin(true);
+                    catGroup.setSysproc(true);
+                    catGroup.setAdhoc(true);
+                    catGroup.setDefaultproc(true);
+                    catGroup.setDefaultprocread(true);
+                }
             }
         }
 
@@ -931,6 +939,14 @@ public class VoltCompiler {
                 catGroup.setSysproc(role.isSysproc());
                 catGroup.setDefaultproc(role.isDefaultproc());
                 catGroup.setDefaultprocread(role.isDefaultprocread());
+
+                if (catGroup.getSysproc() || catGroup.getAdmin()) {
+                    catGroup.setAdmin(true);
+                    catGroup.setSysproc(true);
+                    catGroup.setAdhoc(true);
+                    catGroup.setDefaultproc(true);
+                    catGroup.setDefaultprocread(true);
+                }
             }
         }
 

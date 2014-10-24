@@ -1886,7 +1886,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     private ClientResponseImpl dispatchSystemGC(final ClientInputHandler handler,
             final StoredProcedureInvocation task, AuthSystem.AuthUser user) {
-        if (user.hasPermission(Permission.SYSPROC)) {
+        if (user.hasPermission(Permission.ADMIN)) {
             m_systemGCThread.execute(new Runnable() {
                 @Override
                 public void run() {

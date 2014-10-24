@@ -3064,14 +3064,15 @@ public class TestVoltCompiler extends TestCase {
         goodRoleDDL("create role r1;", new TestRole("r1"));
         goodRoleDDL("create role r1;create role r2;", new TestRole("r1"), new TestRole("r2"));
         goodRoleDDL("create role r1 with adhoc;", new TestRole("r1", true, false, false, false));
-        goodRoleDDL("create role r1 with sysproc;", new TestRole("r1", false, true, false, false));
+        goodRoleDDL("create role r1 with sysproc;", new TestRole("r1", true, true, true, true));
         goodRoleDDL("create role r1 with defaultproc;", new TestRole("r1", false, false, true, false));
-        goodRoleDDL("create role r1 with adhoc,sysproc,defaultproc;", new TestRole("r1", true, true, true, false));
-        goodRoleDDL("create role r1 with adhoc,sysproc,sysproc;", new TestRole("r1", true, true, false, false));
-        goodRoleDDL("create role r1 with AdHoc,SysProc,DefaultProc;", new TestRole("r1", true, true, true, false));
+        goodRoleDDL("create role r1 with adhoc,sysproc,defaultproc;", new TestRole("r1", true, true, true, true));
+        goodRoleDDL("create role r1 with adhoc,sysproc,sysproc;", new TestRole("r1", true, true, true, true));
+        goodRoleDDL("create role r1 with AdHoc,SysProc,DefaultProc;", new TestRole("r1", true, true, true, true));
         //Defaultprocread.
         goodRoleDDL("create role r1 with defaultprocread;", new TestRole("r1", false, false, false, true));
         goodRoleDDL("create role r1 with AdHoc,SysProc,DefaultProc,DefaultProcRead;", new TestRole("r1", true, true, true, true));
+        goodRoleDDL("create role r1 with AdHoc,Admin,DefaultProc,DefaultProcRead;", new TestRole("r1", true, true, true, true));
     }
 
     public void testBadRoleDDL() throws Exception {
