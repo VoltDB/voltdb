@@ -33,6 +33,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
@@ -102,7 +103,7 @@ public class TestSecuritySuite extends RegressionSuite {
         assertTrue(exceptionThrown);
         exceptionThrown = false;
         try {
-            results = client.callProcedure("@Statistics", "INITIATOR", 0).getResults();
+            results = client.callProcedure("@Quiesce").getResults();
         } catch (ProcCallException e) {
             e.printStackTrace();
             exceptionThrown = true;
@@ -115,7 +116,7 @@ public class TestSecuritySuite extends RegressionSuite {
         modCount = client.callProcedure("@AdHoc", "INSERT INTO NEW_ORDER VALUES (4, 4, 4);").getResults()[0];
         assertTrue(modCount.getRowCount() == 1);
         assertTrue(modCount.asScalarLong() == 1);
-        results = client.callProcedure("@Statistics", "INITIATOR", 0).getResults();
+        results = client.callProcedure("@Quiesce").getResults();
         // one aggregate table returned
         assertTrue(results.length == 1);
 
@@ -127,7 +128,7 @@ public class TestSecuritySuite extends RegressionSuite {
         assertTrue(modCount.asScalarLong() == 1);
         exceptionThrown = false;
         try {
-            results = client.callProcedure("@Statistics", "INITIATOR", 0).getResults();
+            results = client.callProcedure("@Quiesce").getResults();
         } catch (ProcCallException e) {
             e.printStackTrace();
             exceptionThrown = true;
@@ -140,7 +141,7 @@ public class TestSecuritySuite extends RegressionSuite {
         modCount = client.callProcedure("@AdHoc", "INSERT INTO NEW_ORDER VALUES (6, 6, 6);").getResults()[0];
         assertTrue(modCount.getRowCount() == 1);
         assertTrue(modCount.asScalarLong() == 1);
-        results = client.callProcedure("@Statistics", "INITIATOR", 0).getResults();
+        results = client.callProcedure("@Quiesce").getResults();
         // one aggregate table returned
         assertTrue(results.length == 1);
     }
@@ -281,6 +282,27 @@ public class TestSecuritySuite extends RegressionSuite {
             exceptionThrown = true;
         }
         assertFalse(exceptionThrown);
+    }
+
+    public void testReadOnlyProcs() throws Exception {
+        m_username = "user1";
+        m_password = "password";
+        Client client = getClient();
+
+        byte result = client.callProcedure("@SystemCatalog", "TABLES").getStatus();
+        assertEquals(ClientResponse.SUCCESS, result);
+
+        result = client.callProcedure("@Statistics", "INITIATOR", 0).getStatus();
+        assertEquals(ClientResponse.SUCCESS, result);
+
+        result = client.callProcedure("@Subscribe", "TOPOLOGY").getStatus();
+        assertEquals(ClientResponse.SUCCESS, result);
+
+        result = client.callProcedure("@GetPartitionKeys", "INTEGER").getStatus();
+        assertEquals(ClientResponse.SUCCESS, result);
+
+        result = client.callProcedure("@SystemInformation").getStatus();
+        assertEquals(ClientResponse.SUCCESS, result);
     }
 
     /**

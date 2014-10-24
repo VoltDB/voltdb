@@ -3078,9 +3078,9 @@ public class TestVoltCompiler extends TestCase {
         badRoleDDL("create role r1", ".*no semicolon.*");
         badRoleDDL("create role r1;create role r1;", ".*already exists.*");
         badRoleDDL("create role r1 with ;", ".*Invalid CREATE ROLE statement.*");
-        badRoleDDL("create role r1 with blah;", ".*Invalid permission \"blah\".*");
+        badRoleDDL("create role r1 with blah;", ".*Invalid permission \"BLAH\".*");
         badRoleDDL("create role r1 with adhoc sysproc;", ".*Invalid CREATE ROLE statement.*");
-        badRoleDDL("create role r1 with adhoc, blah;", ".*Invalid permission \"blah\".*");
+        badRoleDDL("create role r1 with adhoc, blah;", ".*Invalid permission \"BLAH\".*");
     }
 
     private Database checkDDLAgainstSimpleSchema(String errorRegex, String... ddl) throws Exception {
