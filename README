@@ -27,18 +27,14 @@ voltdb   - the VoltDB software itself
 
 The easiest way to get started using VoltDB is to try building and 
 running one or more of the sample programs. Read examples/README for 
-instructions.
+instructions. There is also a complete tutorial available online:
 
-There is also a tutorial online, as well as a _Getting Started with 
-VoltDB_ document available:
-
-    http://voltdb.com/docs/tutorial/
-    http://voltdb.com/docs/GettingStarted/
-
+    http://docs.voltdb.com/tutorial/
+ 
 Additional documentation on using VoltDB to build high performance
 applications is available from the VoltDB community site:
 
-    http://voltdb.com/docs/
+    http://docs.voltdb.com/
 
 
 Feedback
@@ -46,4 +42,4 @@ Feedback
 If you have any questions or comments about VoltDB, we encourage you
 to post and discuss your feedback in the forums available online at:
 
-    http://community.voltdb.com/forum/
+    http://forum.voltdb.com/
