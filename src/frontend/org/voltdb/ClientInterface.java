@@ -115,6 +115,7 @@ import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListenableFutureTask;
+import org.voltdb.common.Permission;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -1659,61 +1660,27 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         final CatalogContext catalogContext = m_catalogContext.get();
         final AuthSystem.AuthUser user = catalogContext.authSystem.getUser(handler.m_username);
 
-        // ping just responds as fast as possible to show the connection is alive
-        // nb: ping is not a real procedure, so this is checked before other "sysprocs"
-        if (task.procName.startsWith("@")) {
-            if (task.procName.equals("@Ping")) {
-                return new ClientResponseImpl(ClientResponseImpl.SUCCESS, new VoltTable[0], "", task.clientHandle);
-            }
-            if (task.procName.equals("@GetPartitionKeys")) {
-                return dispatchGetPartitionKeys(task);
-            }
-            if (task.procName.equals("@Subscribe")) {
-                return dispatchSubscribe( handler, task);
-            }
-            if (task.procName.equals("@GC")) {
-                return dispatchSystemGC(handler, task, user);
-            }
-            if (task.procName.equals("@StopNode")) {
-                return dispatchStopNode(task);
-            }
-        }
-
         Procedure catProc = catalogContext.procedures.get(task.procName);
 
         if (catProc == null) {
-            Config sysProc = SystemProcedureCatalog.listing.get(task.procName);
-            if (sysProc != null) {
-                catProc = sysProc.asCatalogProcedure();
-            }
-        }
-
-        if (catProc == null) {
+            String proc = task.procName;
             if (task.procName.equals("@AdHoc") || task.procName.equals("@AdHocSpForTest")) {
                 // Map @AdHoc... to @AdHoc_RW_MP for validation. In the future if security is
                 // configured differently for @AdHoc... variants this code will have to
                 // change in order to use the proper variant based on whether the work
                 // is single or multi partition and read-only or read-write.
-                catProc = SystemProcedureCatalog.listing.get("@AdHoc_RW_MP").asCatalogProcedure();
-                assert(catProc != null);
-            }
-            else if (task.procName.equals("@Explain")) {
-                return dispatchAdHoc(task, handler, ccxn, true);
-            }
-            else if (task.procName.equals("@ExplainProc")) {
-                return dispatchExplainProcedure(task, handler, ccxn);
-            }
-            else if (task.procName.equals("@SendSentinel")) {
-                dispatchSendSentinel(handler.connectionId(), nowNanos, buf.capacity(), task);
-                return null;
+                proc = "@AdHoc_RW_MP";
             }
             else if (task.procName.equals("@UpdateClasses")) {
                 // Icky.  Map @UpdateClasses to @UpdateApplicationCatalog.  We want the
                 // permissions and replication policy for @UAC, and we'll deal with the
                 // parameter validation stuff separately (the different name will
                 // skip the @UAC-specific policy)
-                catProc =
-                    SystemProcedureCatalog.listing.get("@UpdateApplicationCatalog").asCatalogProcedure();
+                proc = "@UpdateApplicationCatalog";
+            }
+            Config sysProc = SystemProcedureCatalog.listing.get(proc);
+            if (sysProc != null) {
+                catProc = sysProc.asCatalogProcedure();
             }
         }
 
@@ -1751,7 +1718,45 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (catProc.getSystemproc()) {
             // COMMUNITY SYSPROC SPECIAL HANDLING
 
-            if (task.procName.equals("@AdHoc")) {
+            // ping just responds as fast as possible to show the connection is alive
+            // nb: ping is not a real procedure, so this is checked before other "sysprocs"
+            if (task.procName.equals("@Ping")) {
+                return new ClientResponseImpl(ClientResponseImpl.SUCCESS, new VoltTable[0], "", task.clientHandle);
+            }
+            else if (task.procName.equals("@GetPartitionKeys")) {
+                return dispatchGetPartitionKeys(task);
+            }
+            else if (task.procName.equals("@Subscribe")) {
+                return dispatchSubscribe( handler, task);
+            }
+            else if (task.procName.equals("@Statistics")) {
+                return dispatchStatistics(OpsSelector.STATISTICS, task, ccxn);
+            }
+            else if (task.procName.equals("@SystemCatalog")) {
+                return dispatchStatistics(OpsSelector.SYSTEMCATALOG, task, ccxn);
+            }
+            else if (task.procName.equals("@SystemInformation")) {
+                return dispatchStatistics(OpsSelector.SYSTEMINFORMATION, task, ccxn);
+            }
+            else if (task.procName.equals("@GC")) {
+                return dispatchSystemGC(handler, task, user);
+            }
+            else if (task.procName.equals("@StopNode")) {
+                return dispatchStopNode(task);
+            }
+
+            else if (task.procName.equals("@Explain")) {
+                return dispatchAdHoc(task, handler, ccxn, true);
+            }
+            else if (task.procName.equals("@ExplainProc")) {
+                return dispatchExplainProcedure(task, handler, ccxn);
+            }
+            else if (task.procName.equals("@SendSentinel")) {
+                dispatchSendSentinel(handler.connectionId(), nowNanos, buf.capacity(), task);
+                return null;
+            }
+
+            else if (task.procName.equals("@AdHoc")) {
                 return dispatchAdHoc(task, handler, ccxn, false);
             }
             else if (task.procName.equals("@AdHocSpForTest")) {
@@ -1770,15 +1775,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             else if (task.procName.equals("@LoadSinglepartitionTable")) {
                 // FUTURE: When we get rid of the legacy hashinator, this should go away
                 return dispatchLoadSinglepartitionTable(buf, catProc, task, handler, ccxn);
-            }
-            else if (task.procName.equals("@Statistics")) {
-                return dispatchStatistics(OpsSelector.STATISTICS, task, ccxn);
-            }
-            else if (task.procName.equals("@SystemCatalog")) {
-                return dispatchStatistics(OpsSelector.SYSTEMCATALOG, task, ccxn);
-            }
-            else if (task.procName.equals("@SystemInformation")) {
-                return dispatchStatistics(OpsSelector.SYSTEMINFORMATION, task, ccxn);
             }
 
             // ERROR MESSAGE FOR PRO SYSPROC USE IN COMMUNITY
@@ -1890,7 +1886,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     private ClientResponseImpl dispatchSystemGC(final ClientInputHandler handler,
             final StoredProcedureInvocation task, AuthSystem.AuthUser user) {
-        if (user.hasSystemProcPermission()) {
+        if (user.hasPermission(Permission.SYSPROC)) {
             m_systemGCThread.execute(new Runnable() {
                 @Override
                 public void run() {

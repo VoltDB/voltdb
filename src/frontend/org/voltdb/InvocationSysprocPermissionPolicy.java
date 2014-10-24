@@ -21,6 +21,7 @@ import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.catalog.Procedure;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.common.Permission;
 import org.voltdb.utils.LogKeys;
 
 /**
@@ -47,7 +48,7 @@ public class InvocationSysprocPermissionPolicy extends InvocationPermissionPolic
 
         //Since AdHoc perms are diff we only check sysprocs other than AdHoc
         if (proc.getSystemproc() && !invocation.procName.startsWith("@AdHoc")) {
-            if (!user.hasSystemProcPermission()) {
+            if (!user.hasPermission(Permission.SYSPROC)&& !proc.getReadonly()) {
                 return PolicyResult.DENY;
             }
             return PolicyResult.ALLOW;

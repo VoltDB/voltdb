@@ -30,6 +30,7 @@ import org.voltdb.catalog.Procedure;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import org.voltdb.InvocationPermissionPolicy.PolicyResult;
+import org.voltdb.common.Permission;
 
 public class TestInvocationAcceptancePolicy {
     private AuthSystem.AuthUser createUser(boolean adhoc, boolean crud, boolean sysproc,
@@ -37,10 +38,10 @@ public class TestInvocationAcceptancePolicy {
     {
 
         AuthSystem.AuthUser user = mock(AuthSystem.AuthUser.class);
-        when(user.hasSystemProcPermission()).thenReturn(sysproc);
-        when(user.hasAdhocPermission()).thenReturn(adhoc);
-        when(user.hasDefaultProcPermission()).thenReturn(crud);
-        when(user.hasDefaultProcReadPermission()).thenReturn(readonly);
+        when(user.hasPermission(Permission.SYSPROC)).thenReturn(sysproc);
+        when(user.hasPermission(Permission.ADHOC, Permission.SYSPROC)).thenReturn(adhoc);
+        when(user.hasPermission(Permission.DEFAULTPROC)).thenReturn(crud);
+        when(user.hasPermission(Permission.DEFAULTPROCREAD)).thenReturn(readonly);
         if (userProc != null) {
             when(user.hasUserDefinedProcedurePermission(userProc)).thenReturn(true);
         }

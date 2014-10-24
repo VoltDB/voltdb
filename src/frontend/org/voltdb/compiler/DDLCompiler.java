@@ -24,6 +24,7 @@ import java.io.Reader;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -52,6 +53,11 @@ import org.voltdb.catalog.Group;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Table;
+import org.voltdb.common.Permission;
+import static org.voltdb.common.Permission.ADHOC;
+import static org.voltdb.common.Permission.DEFAULTPROC;
+import static org.voltdb.common.Permission.DEFAULTPROCREAD;
+import static org.voltdb.common.Permission.SYSPROC;
 import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
@@ -407,17 +413,6 @@ public class DDLCompiler {
     static final String REPLICATE = "REPLICATE";
     static final String EXPORT = "EXPORT";
     static final String ROLE = "ROLE";
-
-    enum Permission {
-        adhoc,
-        sysproc,
-        defaultproc,
-        defaultprocread;
-
-        static String toListString() {
-            return Arrays.asList(values()).toString();
-        }
-    }
 
     HSQLInterface m_hsql;
     VoltCompiler m_compiler;
@@ -897,11 +892,13 @@ public class DDLCompiler {
             }
             org.voltdb.catalog.Group catGroup = groupMap.add(roleName);
             if (statementMatcher.group(2) != null) {
+                EnumSet<Permission> permset = EnumSet.noneOf(Permission.class);
                 for (String tokenRaw : StringUtils.split(statementMatcher.group(2), ',')) {
-                    String token = tokenRaw.trim().toLowerCase();
+                    String token = tokenRaw.trim().toUpperCase();
                     Permission permission;
                     try {
                         permission = Permission.valueOf(token);
+                        permset.add(permission);
                     }
                     catch (IllegalArgumentException iaex) {
                         throw m_compiler.new VoltCompilerException(String.format(
@@ -911,16 +908,16 @@ public class DDLCompiler {
                                 Permission.toListString()));
                     }
                     switch( permission) {
-                    case adhoc:
+                    case ADHOC:
                         catGroup.setAdhoc(true);
                         break;
-                    case sysproc:
+                    case SYSPROC:
                         catGroup.setSysproc(true);
                         break;
-                    case defaultproc:
+                    case DEFAULTPROC:
                         catGroup.setDefaultproc(true);
                         break;
-                    case defaultprocread:
+                    case DEFAULTPROCREAD:
                         catGroup.setDefaultprocread(true);
                         break;
                     }
