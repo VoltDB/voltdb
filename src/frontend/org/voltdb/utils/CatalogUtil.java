@@ -766,8 +766,8 @@ public abstract class CatalogUtil {
             }
             SystemSettingsType.Elastic elastic = deployment.getSystemsettings().getElastic();
             if (elastic != null) {
-                elasticDuration = deployment.getSystemsettings().getElastic().getDuration();
-                elasticThroughput = deployment.getSystemsettings().getElastic().getThroughput();
+                elasticDuration = elastic.getDuration();
+                elasticThroughput = elastic.getThroughput();
             }
 
             SystemSettingsType.Query timeout = deployment.getSystemsettings().getQuery();
