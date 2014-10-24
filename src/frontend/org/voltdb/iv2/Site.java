@@ -475,7 +475,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         CoreUtils.getHostIdFromHSId(m_siteId),
                         hostname,
                         m_context.cluster.getDeployment().get("deployment").
-                        getSystemsettings().get("systemsettings").getMaxtemptablesize(),
+                        getSystemsettings().get("systemsettings").getTemptablemaxsize(),
                         hashinatorConfig);
             }
             else {
@@ -488,7 +488,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             CoreUtils.getHostIdFromHSId(m_siteId),
                             hostname,
                             m_context.cluster.getDeployment().get("deployment").
-                            getSystemsettings().get("systemsettings").getMaxtemptablesize(),
+                            getSystemsettings().get("systemsettings").getTemptablemaxsize(),
                             m_backend,
                             VoltDB.instance().getConfig().m_ipcPort,
                             hashinatorConfig);

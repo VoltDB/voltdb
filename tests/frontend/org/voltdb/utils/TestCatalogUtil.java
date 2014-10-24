@@ -365,14 +365,14 @@ public class TestCatalogUtil extends TestCase {
         long crcDepOff = CatalogUtil.compileDeployment(catalog, tmpDepOff.getPath(), true, false);
         assertTrue(crcDepOff >= 0);
         Systemsettings sysset = catalog.getClusters().get("cluster").getDeployment().get("deployment").getSystemsettings().get("systemsettings");
-        assertEquals(100, sysset.getMaxtemptablesize());
+        assertEquals(100, sysset.getTemptablemaxsize());
 
         setUp();
         final File tmpDepOn = VoltProjectBuilder.writeStringToTempFile(depOn);
         long crcDepOn = CatalogUtil.compileDeployment(catalog, tmpDepOn.getPath(), true, false);
         assertTrue(crcDepOn >= 0);
         sysset = catalog.getClusters().get("cluster").getDeployment().get("deployment").getSystemsettings().get("systemsettings");
-        assertEquals(200, sysset.getMaxtemptablesize());
+        assertEquals(200, sysset.getTemptablemaxsize());
     }
 
     public void testSystemSettingsQueryTimeout() throws Exception
@@ -400,14 +400,14 @@ public class TestCatalogUtil extends TestCase {
         long crcDepOff = CatalogUtil.compileDeployment(catalog, tmpDepOff.getPath(), true, false);
         assertTrue(crcDepOff >= 0);
         Systemsettings sysset = catalog.getClusters().get("cluster").getDeployment().get("deployment").getSystemsettings().get("systemsettings");
-        assertEquals(0, sysset.getQuerymaxlatency());
+        assertEquals(0, sysset.getQuerytimeout());
 
         setUp();
         final File tmpDepOn = VoltProjectBuilder.writeStringToTempFile(depOn);
         long crcDepOn = CatalogUtil.compileDeployment(catalog, tmpDepOn.getPath(), true, false);
         assertTrue(crcDepOn >= 0);
         sysset = catalog.getClusters().get("cluster").getDeployment().get("deployment").getSystemsettings().get("systemsettings");
-        assertEquals(200, sysset.getQuerymaxlatency());
+        assertEquals(200, sysset.getQuerytimeout());
     }
 
 
