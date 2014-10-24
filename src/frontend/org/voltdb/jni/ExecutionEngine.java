@@ -401,8 +401,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                         "%s. Current temp table uses " +
                         "%d bytes memory, and the peak usage of memory for temp table is " +
                         "%d bytes.",
-                        status,
                         m_currentProcedureName,
+                        status,
                         latency / 1000.0,
                         m_lastTuplesAccessed,
                         planNodeName,
