@@ -693,14 +693,20 @@ public class QuerySpecification extends QueryExpression {
                 throw Error.error(ErrorCode.X_42568);
             }
             /************************* Volt DB Extensions *************************/
-            // Make sure no aggregates in WHERE clause
-            tempSet.clear();
-            Expression.collectAllExpressions(
-                    tempSet, queryCondition, Expression.aggregateFunctionSet,
-                    Expression.subqueryExpressionSet);
+            // Make sure no aggregates in WHERE clause if this is not a subquery
+            // which WHERE clause may have aggregate expression with parent columns
+            // SELECT ... FROM T1 HAVING EXISTS (SELECT 1 FROM T2 WHERE T2.C = MAX(T1.C))
+            // Still doesn't solve the whole problem allowing a subquery to have invalid
+            // WHERE clauses
+            if (isTopLevel) {
+                tempSet.clear();
+                Expression.collectAllExpressions(
+                        tempSet, queryCondition, Expression.aggregateFunctionSet,
+                        Expression.subqueryExpressionSet);
 
-            if (!tempSet.isEmpty()) {
-                throw Error.error(ErrorCode.X_42580);
+                if (!tempSet.isEmpty()) {
+                    throw Error.error(ErrorCode.X_42580);
+                }
             }
             /*********************************************************************/
 
