@@ -692,6 +692,18 @@ public class QuerySpecification extends QueryExpression {
             if (queryCondition.getDataType() != Type.SQL_BOOLEAN) {
                 throw Error.error(ErrorCode.X_42568);
             }
+            /************************* Volt DB Extensions *************************/
+            // Make sure no aggregates in WHERE clause
+            tempSet.clear();
+            Expression.collectAllExpressions(
+                    tempSet, queryCondition, Expression.aggregateFunctionSet,
+                    Expression.subqueryExpressionSet);
+
+            if (!tempSet.isEmpty()) {
+                throw Error.error(ErrorCode.X_42580);
+            }
+            /*********************************************************************/
+
         }
 
         if (havingCondition != null) {

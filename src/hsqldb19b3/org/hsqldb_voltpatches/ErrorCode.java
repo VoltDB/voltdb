@@ -555,6 +555,9 @@ public interface ErrorCode {
     int X_42577 = 5577;                                   // duplicate name in column list
     int X_42578 = 5578;                                   // duplicate column name in derived table
     int X_42579 = 5579;                                   // duplicate update of column
+    /************************* Volt DB Extensions *************************/
+    int X_42580 = 5580;                                   // invalid WHERE expression
+    /**********************************************************************/
 
     // identifiers
     int X_42581 = 5581;                                   // unexpected token
