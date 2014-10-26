@@ -127,22 +127,30 @@ public:
      * Construct an ExecutorVector instance.  Object will not be
      * initialized until its init method is called.  (Initialization
      * has been placed there to avoid throwing an exception in the
-     * constructor.) */
+     * constructor.)
+     *
+     * Note: This constructed instance of ExecutorVector takes
+     * ownership of the PlanNodeFragment here; it will be released
+     * (automatically via boost::scoped_ptr) when this instance goes
+     * away.
+     */
     ExecutorVector(int64_t fragmentId,
                    int64_t logThreshold,
-                   int64_t memoryLimit)
+                   int64_t memoryLimit,
+                   PlanNodeFragment* fragment)
         : m_fragId(fragmentId)
         , m_list()
         , m_limits(memoryLimit, logThreshold)
+        , m_fragment(fragment)
     {
     }
 
     /** Build the list of executors from its plan node fragment */
     void init(VoltDBEngine* engine,
-              PlanNodeFragment *fragment) {
-        BOOST_FOREACH(AbstractPlanNode* planNode, fragment->getExecuteList()) {
+              const std::vector<AbstractPlanNode*>& planNodeList) {
+        BOOST_FOREACH(AbstractPlanNode* planNode, planNodeList) {
             initPlanNode(engine, planNode);
-            addExecutor(planNode->getExecutor());
+            m_list.push_back(planNode->getExecutor());
         }
     }
 
@@ -168,12 +176,12 @@ public:
     }
 
     /** Execute each executor, in order. */
-    int execute(VoltDBEngine* engine,
-                const NValueArray& params) {
+    int execute(VoltDBEngine* engine) {
         // Walk through the queue and execute each plannode.  The
         // query planner guarantees that for a given plannode, all of
         // its children are positioned before it in this list,
         // therefore dependency tracking is not needed here.
+        const NValueArray& params = engine->getParameterContainer();
         int ctr = 0;
         BOOST_FOREACH(AbstractExecutor *executor, m_list) {
             assert (executor);
@@ -230,10 +238,6 @@ public:
 
 private:
 
-    void addExecutor(AbstractExecutor* executor) {
-        m_list.push_back(executor);
-    }
-
     void initPlanNode(VoltDBEngine* engine, AbstractPlanNode* node)
     {
         assert(node);
@@ -277,6 +281,7 @@ private:
     const int64_t m_fragId;
     std::vector<AbstractExecutor*> m_list;
     TempTableLimits m_limits;
+    boost::scoped_ptr<PlanNodeFragment> m_fragment;
 };
 
 /**
@@ -613,13 +618,11 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
     assert(execsForFrag);
     m_currExecutorVec = execsForFrag;
 
-    int rc = execsForFrag->execute(this, m_staticParams);
+    int rc = execsForFrag->execute(this);
+    resetExecutionMetadata();
     if (rc != 0) {
-        resetExecutionMetadata();
         return rc;
     }
-
-    resetExecutionMetadata();
 
     // assume this is sendless dml
     if (m_numResultDependencies == 0) {
@@ -1291,10 +1294,12 @@ ExecutorVector *VoltDBEngine::getExecutorVectorForFragmentId(const int64_t fragI
             frag_temptable_limit = -1;
         }
 
+        // Note: the executor vector takes ownership of the plan node
+        // fragment here.
         ExecutorVector* ev =
-            new ExecutorVector(fragId, frag_temptable_log_limit, frag_temptable_limit);
-        ev->init(this, pnf);
+          new ExecutorVector(fragId, frag_temptable_log_limit, frag_temptable_limit, pnf);
         boost::shared_ptr<ExecutorVector> ev_guard(ev);
+        ev->init(this, pnf->getExecuteList());
 
         // add the plan to the back
         plans.get<0>().push_back(ev_guard);
