@@ -70,4 +70,8 @@ public class TestConstants extends PlannerTestCase {
         failToCompile("select 1 from T1 where max(INT1) > 0", "invalid WHERE expression");
     }
 
+    public void testAggrInSubqueryWhere() {
+        failToCompile("select INT1 from T1 where exists (select 1 from T1 where max(INT1) > 0)", "invalid WHERE expression");
+    }
+
 }

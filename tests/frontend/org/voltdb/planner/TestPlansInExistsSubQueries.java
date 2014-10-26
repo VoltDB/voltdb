@@ -585,7 +585,8 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         }
         {
             failToCompile("select a from r1 group by a " +
-                    " having exists (select c from r2 where r2.c = max(r1.a))", "");
+                    " having exists (select c from r2 where r2.c = max(r1.a))",
+                    "subquery with WHERE expression with aggregates on parent columns are not supported");
         }
     }
 
