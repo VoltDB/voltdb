@@ -93,6 +93,7 @@ import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
+import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.dtxn.InitiatorStats;
 import org.voltdb.dtxn.LatencyHistogramStats;
@@ -1408,6 +1409,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 TheHashinator.setConfiguredHashinatorType(HashinatorType.LEGACY);
             }
 
+            // log system setting information
+            SystemSettingsType sysType = m_deployment.getSystemsettings();
+            if (sysType != null && sysType.getQuery() != null) {
+                if (sysType.getQuery().getTimeout() > 0) {
+                    hostLog.info("Host query timeout set to " + sysType.getQuery().getTimeout() + " milliseconds");
+                }
+            }
 
             // create a dummy catalog to load deployment info into
             Catalog catalog = new Catalog();

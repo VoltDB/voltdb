@@ -589,7 +589,12 @@ inline int64_t VoltDBEngine::pushTuplesProcessedForProgressMonitoring(int64_t tu
 
 inline void VoltDBEngine::pushFinalTuplesProcessedForProgressMonitoring(int64_t tuplesProcessed)
 {
-    pushTuplesProcessedForProgressMonitoring(tuplesProcessed);
+    try {
+        pushTuplesProcessedForProgressMonitoring(tuplesProcessed);
+    } catch(const SerializableEEException &e) {
+        e.serialize(getExceptionOutputSerializer());
+    }
+
     m_lastAccessedExec = NULL;
 }
 
