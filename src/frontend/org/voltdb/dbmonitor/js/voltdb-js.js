@@ -99,6 +99,8 @@ $(document).ready(function () {
 
     //Logout popup
     $('#logOut').popup();
+    $('#btnlogOut').popup();
+
 
     // Changes graph view
     $("select").change(function () {
