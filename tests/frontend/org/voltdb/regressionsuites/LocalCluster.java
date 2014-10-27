@@ -964,7 +964,12 @@ public class LocalCluster implements VoltServerConfig {
     public void killSingleHost(int hostNum) throws InterruptedException
     {
         log.info("Killing " + hostNum);
-        silentKillSingleHost(hostNum, false);
+        if (hostNum == 0 && m_localServer != null) {
+            m_localServer.shutdown();
+        }
+        else {
+            silentKillSingleHost(hostNum, false);
+        }
     }
 
     private void silentKillSingleHost(int hostNum, boolean forceKillEEProcs) throws InterruptedException {

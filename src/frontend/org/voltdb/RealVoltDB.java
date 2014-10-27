@@ -653,9 +653,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     } else {
                         ndrgwClass = Class.forName("org.voltdb.dr.InvocationBufferServer");
                     }
-                    Constructor<?> ndrgwConstructor = ndrgwClass.getConstructor(File.class, boolean.class);
+                    Constructor<?> ndrgwConstructor = ndrgwClass.getConstructor(File.class, boolean.class, int.class);
                     m_nodeDRGateway = (NodeDRGateway) ndrgwConstructor.newInstance(drOverflowDir,
-                                                                                   m_replicationActive);
+                                                                                   m_replicationActive,
+                                                                                   m_configuredNumberOfPartitions);
                 } catch (Exception e) {
                     VoltDB.crashLocalVoltDB("Unable to load DR system", true, e);
                 }
@@ -750,7 +751,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
 
-            m_replicaDRGateway = null;
             // Configure replica-side DR if relevant
             if (m_config.m_isEnterprise && useDRV2 && m_config.m_replicationRole == ReplicationRole.REPLICA) {
                 String drMasterHost = m_catalogContext.cluster.getDrmasterhost();
@@ -2295,6 +2295,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         e);
                 VoltDB.crashLocalVoltDB("Error starting client interface.", true, e);
             }
+            if (m_nodeDRGateway != null && !m_nodeDRGateway.isStarted()) {
+                // Start listening on the DR ports
+                prepareReplication();
+            }
         }
 
         if (m_config.m_startAction == StartAction.REJOIN) {
@@ -2386,8 +2390,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private void shutdownReplicaRole() {
         if (m_replicaDRGateway != null) {
             try {
-                m_replicaDRGateway.shutdown();
-                m_replicaDRGateway.join();
+                m_replicaDRGateway.shutdown(true);
             } catch (InterruptedException e) {
                 hostLog.warn("Interrupted shutting down dr replication", e);
             }
@@ -2456,10 +2459,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     VoltDB.crashLocalVoltDB("Error starting client interface.", true, e);
                 }
             }
-        }
 
-        // Start listening on the DR ports
-        prepareReplication();
+            // Start listening on the DR ports
+            prepareReplication();
+        }
 
         if (m_startMode != null) {
             m_mode = m_startMode;

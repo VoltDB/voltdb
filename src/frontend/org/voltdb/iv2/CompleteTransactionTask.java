@@ -55,7 +55,7 @@ public class CompleteTransactionTask extends TransactionTask
             siteConnection.truncateUndoLog(m_completeMsg.isRollback(),
                     m_txnState.getBeginUndoToken(),
                     m_txnState.m_spHandle,
-                    m_txnState.m_spHandle,
+                    m_txnState.m_spUniqueId,
                     m_txnState.getUndoLog());
         }
         if (!m_completeMsg.isRestart()) {

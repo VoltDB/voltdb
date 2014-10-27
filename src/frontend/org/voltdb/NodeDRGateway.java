@@ -27,6 +27,11 @@ public interface NodeDRGateway {
     public abstract void bindPorts();
 
     /**
+     * @return true if bindPorts has been called.
+     */
+    public abstract boolean isStarted();
+
+    /**
      * Called by an EE to make the buffer server is aware it's going to be
      * handling buffers from a specific partition.
      * Call this at startup before sending buffers.

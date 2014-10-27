@@ -136,7 +136,7 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
             endTransaction(m_openSpUniqueId);
         }
         //std::cout << "m_openSpHandle(" << m_openSpHandle << ") < currentSpHandle("
-        //<< currentSpHandle << ")" << std::endl;T
+        //<< currentSpHandle << ")" << std::endl;
         m_committedUso = m_uso;
         m_committedSpUniqueId = m_openSpUniqueId;
         // Advance the tip to the new transaction.
@@ -270,9 +270,7 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
     StreamBlock *oldBlock = NULL;
     size_t uso = m_uso;
 
-    int64_t lastSpUniqueId = std::numeric_limits<int64_t>::max();
     if (m_currBlock) {
-        lastSpUniqueId = m_currBlock->lastSpUniqueId();
         if (m_currBlock->offset() > 0) {
             m_pendingBlocks.push_back(m_currBlock);
             oldBlock = m_currBlock;
@@ -297,8 +295,6 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
         m_currBlock->setType(LARGE_STREAM_BLOCK);
     }
 
-    m_currBlock->startSpUniqueId(lastSpUniqueId);
-
     if (blockSize == 0) {
         rollbackTo(uso);
         throw SQLException(SQLException::volt_output_buffer_overflow, "Transaction is bigger than DR Buffer size");
@@ -307,6 +303,7 @@ void TupleStreamBase::extendBufferChain(size_t minLength)
     if (openTransaction) {
         size_t partialTxnLength = oldBlock->offset() - oldBlock->lastDRBeginTxnOffset();
         ::memcpy(m_currBlock->mutableDataPtr(), oldBlock->mutableLastBeginTxnDataPtr(), partialTxnLength);
+        m_currBlock->startSpUniqueId(m_openSpUniqueId);
         m_currBlock->recordLastBeginTxnOffset();
         m_currBlock->consumed(partialTxnLength);
         ::memset(oldBlock->mutableLastBeginTxnDataPtr(), 0, partialTxnLength);

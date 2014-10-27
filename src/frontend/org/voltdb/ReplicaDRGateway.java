@@ -28,13 +28,15 @@ import org.voltdb.iv2.UniqueIdGenerator;
 // Interface through which the outside world can interact with the replica-side
 // of DR. Currently, there's not much to do here, since the subsystem is
 // largely self-contained
-public abstract class ReplicaDRGateway extends Thread implements Promotable {
+public interface ReplicaDRGateway extends Promotable {
 
     public abstract void updateCatalog(CatalogContext catalog);
 
     public abstract boolean isActive();
 
-    public abstract void shutdown();
+    public abstract void start();
+
+    public abstract void shutdown(boolean blocking) throws InterruptedException;
 
     public abstract void promotePartition(int partitionId, long maxUniqueId);
 
@@ -42,11 +44,11 @@ public abstract class ReplicaDRGateway extends Thread implements Promotable {
 
     public abstract Map<Integer, Map<Integer, Long>> getLastReceivedUniqueIds();
 
-    public static class DummyReplicaDRGateway extends ReplicaDRGateway {
+    public static class DummyReplicaDRGateway implements ReplicaDRGateway {
         Map<Integer, Map<Integer, Long>> ids = new HashMap<Integer, Map<Integer, Long>>();
 
         @Override
-        public void run() {}
+        public void start() {}
 
         @Override
         public void acceptPromotion() throws InterruptedException,
@@ -59,7 +61,7 @@ public abstract class ReplicaDRGateway extends Thread implements Promotable {
         public boolean isActive() { return false; }
 
         @Override
-        public void shutdown() {}
+        public void shutdown(boolean blocking) {}
 
         @Override
         public void promotePartition(int partitionId, long maxUniqueId) {}

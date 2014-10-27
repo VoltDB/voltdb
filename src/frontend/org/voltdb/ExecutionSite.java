@@ -173,8 +173,8 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             Long.parseLong(System.getProperty("MAX_REJOIN_BEHIND_DURATION", "10000"));
     private long m_lastTimeMadeProgress = 0;
     private long m_remainingTasks = 0;
-    private long m_executedTaskCount = 0;
-    private long m_loggedTaskCount = 0;
+    private final long m_executedTaskCount = 0;
+    private final long m_loggedTaskCount = 0;
     private final SnapshotCompletionInterest m_snapshotCompletionHandler =
             new SnapshotCompletionInterest() {
         @Override
@@ -379,21 +379,21 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 
     ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox,
             String serializedCatalog,
-            boolean recovering,
+            StartAction startAction,
             NodeDRGateway nodeDRGateway,
             final long txnId,
             int configuredNumberOfPartitions,
             CatalogSpecificPlanner csp) throws Exception
     {
         this(voltdb, mailbox, serializedCatalog,
-             new ProcedureRunnerFactory(), recovering,
+             new ProcedureRunnerFactory(), startAction,
              nodeDRGateway, txnId, configuredNumberOfPartitions, csp);
     }
 
     ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox,
                   String serializedCatalogIn,
                   ProcedureRunnerFactory runnerFactory,
-                  boolean recovering,
+                  StartAction startAction,
                   NodeDRGateway nodeDRGateway,
                   final long txnId,
                   int configuredNumberOfPartitions,
@@ -408,12 +408,12 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         final int partitionId = m_tracker.getPartitionForSite(m_siteId);
         String txnlog_name = ExecutionSite.class.getName() + "." + m_siteId;
         m_txnlog = new VoltLogger(txnlog_name);
-        m_rejoining = recovering;
+        m_rejoining = startAction.doesRejoin();
         //lastCommittedTxnId = txnId;
 
         // initialize the DR gateway
         m_partitionDRGateway =
-            PartitionDRGateway.getInstance(partitionId, nodeDRGateway, m_rejoining);
+            PartitionDRGateway.getInstance(partitionId, nodeDRGateway, startAction);
 
         if (voltdb.getBackendTargetType() == BackendTarget.NONE) {
             ee = new MockExecutionEngine();

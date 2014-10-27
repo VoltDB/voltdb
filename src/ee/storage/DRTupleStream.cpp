@@ -224,20 +224,20 @@ DRTupleStream::computeOffsets(TableTuple &tuple,
 
 void DRTupleStream::pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) {
     if (sync) return;
+//    std::cout << "Pushing block with start " << block->startSpUniqueId() << " and end " << block->lastSpUniqueId() << std::endl;
+//    std::cout << "Pushing block with start " << (block->startSpUniqueId() & UniqueId::PARTITION_ID_MASK) << " and end " << (block->lastSpUniqueId() & UniqueId::PARTITION_ID_MASK) << std::endl;
     if (UniqueId::pid(block->startSpUniqueId()) != m_partitionId) {
         throwFatalException("oops");
     }
     if (UniqueId::pid(block->lastSpUniqueId()) != m_partitionId) {
         throwFatalException("oops");
     }
-//    std::cout << "Pushing block with start " << block->startSpUniqueId() << " and end " << block->lastSpUniqueId() << std::endl;
-//    std::cout << "Pushing block with start " << (block->startSpUniqueId() & PARTITION_ID_MASK) << " and end " << (block->lastSpUniqueId() & PARTITION_ID_MASK) << std::endl;
     ExecutorContext::getExecutorContext()->getTopend()->pushDRBuffer(m_partitionId, block);
 }
 
 void DRTupleStream::beginTransaction(int64_t uniqueId, int64_t spUniqueId) {
 //    std::cout << "Beginning txn uniqueId " << uniqueId << " spUniqueId " << spUniqueId << std::endl;
-//    std::cout << "Beginning txn uniqueId " << (uniqueId & PARTITION_ID_MASK) << " spUniqueId " << (spUniqueId & PARTITION_ID_MASK) << std::endl;
+//    std::cout << "Beginning txn uniqueId " << (uniqueId & UniqueId::PARTITION_ID_MASK) << " spUniqueId " << (spUniqueId & UniqueId::PARTITION_ID_MASK) << std::endl;
     if (!m_currBlock) {
          extendBufferChain(m_defaultCapacity);
      }
@@ -248,7 +248,6 @@ void DRTupleStream::beginTransaction(int64_t uniqueId, int64_t spUniqueId) {
          extendBufferChain(BEGIN_RECORD_SIZE);
      }
 
-     //Set start sp handle if necessary, also sneakily updates last uniqueId
      m_currBlock->startSpUniqueId(spUniqueId);
 
      ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
@@ -274,6 +273,8 @@ void DRTupleStream::endTransaction(int64_t spUniqueId) {
      if (m_currBlock->remaining() < END_RECORD_SIZE) {
          extendBufferChain(END_RECORD_SIZE);
      }
+
+     m_currBlock->lastSpUniqueId(spUniqueId);
 
      ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                               m_currBlock->remaining());

@@ -108,11 +108,7 @@ namespace voltdb
             return m_startSpUniqueId;
         }
 
-        /*
-         * Sneakily set both start and last
-         */
         void startSpUniqueId(int64_t spUniqueId) {
-            m_lastSpUniqueId = spUniqueId;
             m_startSpUniqueId = std::min(spUniqueId, m_startSpUniqueId);
         }
 
