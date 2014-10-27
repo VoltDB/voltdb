@@ -892,7 +892,8 @@ var loadPage = function (serverName, portid) {
             );
         }
     };
-
+	
+	 $('#showMyHelp').popup();
     $("#conPopup").popup({
         closeDialog: function () {
             isConnectionChecked = false;
