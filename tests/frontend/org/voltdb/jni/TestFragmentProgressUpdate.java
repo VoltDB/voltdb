@@ -259,15 +259,15 @@ public class TestFragmentProgressUpdate extends TestCase {
 
     @SuppressWarnings("deprecation")
     public void testProgressUpdateLogSqlStmt() throws Exception {
-        m_tableSize = 50;
-
         // Set the log duration to be very short, to ensure that a message will be logged.
         m_ee.setInitialLogDurationForTest(1);
 
-        verifyLongRunningQueries(0, "item_crazy_join", true);
+        verifyLongRunningQueries(50, 0, "item_crazy_join", true);
     }
 
-    private void verifyLongRunningQueries(int timeout, String query, boolean readOnly) {
+    private void verifyLongRunningQueries(int scale, int timeout, String query, boolean readOnly) {
+        m_tableSize = scale;
+
         m_ee.loadCatalog( 0, m_catalog.serialize());
 
         m_itemData.clearRowData();
@@ -279,16 +279,12 @@ public class TestFragmentProgressUpdate extends TestCase {
         assertEquals(m_tableSize, m_ee.serializeTable(ITEM_TABLEID).getRowCount());
         System.out.println("Rows loaded to table " + m_ee.serializeTable(ITEM_TABLEID).getRowCount());
 
-        Statement selectStmt = m_testProc.getStatements().getIgnoreCase(query);
+        Statement queryStmt = m_testProc.getStatements().getIgnoreCase(query);
+        String sqlText = queryStmt.getSqltext();
 
-        int fragSize = selectStmt.getFragments().size();
-        PlanFragment frag = selectStmt.getFragments().iterator().next();
-        if (fragSize == 2) {
-            int j = 0;
-            for (PlanFragment f : selectStmt.getFragments()) {
-                if (j != 0) frag = f;
-                j++;
-            }
+        PlanFragment frag = null;
+        for (PlanFragment f : queryStmt.getFragments()) {
+            frag = f;
         }
 
         // populate plan cache
@@ -296,7 +292,7 @@ public class TestFragmentProgressUpdate extends TestCase {
         ActivePlanRepository.addFragmentForTest(
                 CatalogUtil.getUniqueIdForFragment(frag),
                 Encoder.decodeBase64AndDecompressToBytes(frag.getPlannodetree()),
-                selectStmt.getSqltext());
+                sqlText);
         ParameterSet params = ParameterSet.emptyParameterSet();
 
         // Replace the normal logger with a mocked one, so we can verify the message
@@ -311,53 +307,50 @@ public class TestFragmentProgressUpdate extends TestCase {
                     new long[] { CatalogUtil.getUniqueIdForFragment(frag) },
                     null,
                     new ParameterSet[] { params },
-                    new String[] { selectStmt.getSqltext() },
+                    new String[] { queryStmt.getSqltext() },
                     3, 3, 2, 42,
                     readOnly ? READ_ONLY_TOKEN : WRITE_TOKEN);
             if (readOnly && timeout > 0) {
-                // only readl
+                // only time out read queries
                 fail();
             }
         } catch (Exception ex) {
-            String msg = String.format("A SQL query was interrupted after %.2f seconds "
+            String msg = String.format("A SQL query was terminated after %.2f seconds "
                     + "because it exceeded the query timeout period.",
                     timeout/1000.0);
-            System.err.println(msg);
             assertEquals(msg, ex.getMessage());
         }
 
         verify(mockedLogger, atLeastOnce()).info(contains(
-            String.format("Executing SQL statement is \"%s\".", selectStmt.getSqltext())));
+            String.format("Executing SQL statement is \"%s\".", sqlText)));
     }
 
-    public void testTimingoutQueriesReadOnly() throws Exception {
-        int tableSizeAry[] = {200, 200, 300};
-        int timeoutAry[] = {0, 100, 1000* 5};
-        String queryAry[] = {"item_crazy_join", "item_crazy_join", "item_crazy_join"};
+    public void testTimingoutQueries() throws Exception {
+        //
+        // ReadOnly query
+        //
+        String procName = "item_crazy_join";
 
-        for (int iter = 0; iter < tableSizeAry.length; iter++) {
-            m_tableSize = tableSizeAry[iter];
-            verifyLongRunningQueries(timeoutAry[iter], queryAry[iter], true);
+        verifyLongRunningQueries(200, 0, procName, true);
+        tearDown(); setUp();
 
-            tearDown();
-            setUp();
-        }
-    }
+        verifyLongRunningQueries(200, 0, procName, true);
+        tearDown(); setUp();
 
-    public void testTimingoutQueriesWrite() throws Exception {
-        int tableSizeAry[] = {50000, 50000};
-        int timeoutAry[] = {0, 100};
-        String queryAry[] = {"item_big_del", "item_big_del"};
+        verifyLongRunningQueries(300, 0, procName, true);
+        tearDown(); setUp();
 
-        for (int iter = 0; iter < tableSizeAry.length; iter++) {
-            m_tableSize = tableSizeAry[iter];
-            m_ee.setInitialLogDurationForTest(1);
 
-            verifyLongRunningQueries(timeoutAry[iter], queryAry[iter], false);
+        //
+        // Write query (negative)
+        //
+        procName = "item_big_del";
 
-            tearDown();
-            setUp();
-        }
+        verifyLongRunningQueries(50000, 0, procName, false);
+        tearDown(); setUp();
+
+        verifyLongRunningQueries(50000, 100, procName, false);
+        tearDown(); setUp();
     }
 
     private ExecutionEngine m_ee;
