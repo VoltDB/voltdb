@@ -371,9 +371,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // Initialization Functions
         // -------------------------------------------------
         bool initCluster();
-
-        void initPlanNode(const int64_t fragId, AbstractPlanNode* node, TempTableLimits* limits);
-
+        AbstractExecutor* initPlanNode(AbstractPlanNode* node, TempTableLimits* limits, int64_t fragId);
         void processCatalogDeletes(int64_t timestamp);
         void initMaterializedViews();
         bool updateCatalogDatabaseReference();
@@ -401,7 +399,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * If not, get a plan from the Java topend and load it up,
          * putting it in the cache and possibly bumping something else.
          */
-        ExecutorVector *getExecutorVectorForFragmentId(const int64_t fragId);
+        void setExecutorVectorForFragmentId(const int64_t fragId);
 
         bool checkTempTableCleanup(ExecutorVector * execsForFrag);
 

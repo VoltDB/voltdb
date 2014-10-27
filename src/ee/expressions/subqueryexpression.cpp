@@ -33,18 +33,16 @@ namespace voltdb {
 SubqueryExpression::SubqueryExpression(
         ExpressionType subqueryType,
         int subqueryId,
-        std::vector<int> paramIdxs,
-        std::vector<int> otherParamIdxs,
+        const std::vector<int>& paramIdxs,
+        const std::vector<int>& otherParamIdxs,
         const std::vector<AbstractExpression*>* tveParams) :
             AbstractExpression(subqueryType),
             m_subqueryId(subqueryId),
             m_paramIdxs(paramIdxs),
             m_otherParamIdxs(otherParamIdxs),
-            m_tveParams(tveParams),
-            m_parameterContainer(NULL)
+            m_tveParams(tveParams)
 {
     VOLT_TRACE("SubqueryExpression %d", subqueryId);
-    m_parameterContainer = ExecutorContext::getExecutorContext()->getParameterContainer();
     assert((m_tveParams.get() == NULL && m_paramIdxs.empty()) ||
         (m_tveParams.get() != NULL && m_paramIdxs.size() == m_tveParams->size()));
     assert(subqueryType == EXPRESSION_TYPE_IN_SUBQUERY || subqueryType == EXPRESSION_TYPE_EXISTS_SUBQUERY);
@@ -68,8 +66,9 @@ NValue SubqueryExpression::eval(const TableTuple *tuple1, const TableTuple *tupl
 
     SubqueryContext* context = exeContext->getSubqueryContext(m_subqueryId);
 
-    bool hasPriorResult = context != NULL;
-    bool paramsChanged = !hasPriorResult;
+    bool hasPriorResult = (context != NULL) && context->hasValidResult();
+    bool paramsChanged = false;
+    NValueArray& parameterContainer = *(exeContext->getParameterContainer());
     VOLT_TRACE ("Running subquery: %d", m_subqueryId);
 
     // Substitute parameters.
@@ -79,50 +78,44 @@ NValue SubqueryExpression::eval(const TableTuple *tuple1, const TableTuple *tupl
             AbstractExpression* tveParam = (*m_tveParams)[i];
             NValue param = tveParam->eval(tuple1, tuple2);
             // compare the new param value with the previous one. Since this parameter is set
-            // by this subquery, no other subquery can change it value. So, we don't need to
-            // save its value on a side for future comparisons.
-            NValue& prevParam = (*m_parameterContainer)[m_paramIdxs[i]];
+            // by this subquery, no other subquery can change its value. So, we don't need to
+            // save its value on the side for future comparisons.
+            NValue& prevParam = parameterContainer[m_paramIdxs[i]];
             if (hasPriorResult) {
-                if (param.compare(prevParam) != VALUE_COMPARE_EQUAL) {
-                    prevParam = NValue::copyNValue(param);
-                    paramsChanged = true;
+                if (param.compare(prevParam) == VALUE_COMPARE_EQUAL) {
+                    continue;
                 }
-            } else {
-                prevParam = NValue::copyNValue(param);
+                paramsChanged = true;
             }
+            prevParam = param.copyNValue();
         }
     }
 
-    // Compare the other parameter values since the last invocation.
+    // Note the other (non-tve) parameter values and check if they've changed since the last invocation.
     if (hasPriorResult) {
-        std::vector<NValue>& lastParams = context->getLastParams();
+        std::vector<NValue>& lastParams = context->accessLastParams();
         assert(lastParams.size() == m_otherParamIdxs.size());
         for (size_t i = 0; i < lastParams.size(); ++i) {
-            NValue& prevParam = (*m_parameterContainer)[m_otherParamIdxs[i]];
-            bool paramChanged = lastParams[i].compare(prevParam) != VALUE_COMPARE_EQUAL;
-            if (paramChanged) {
-                lastParams[i] = NValue::copyNValue(prevParam);
+            NValue& prevParam = parameterContainer[m_otherParamIdxs[i]];
+            if (lastParams[i].compare(prevParam) != VALUE_COMPARE_EQUAL) {
+                lastParams[i] = prevParam.copyNValue();
                 paramsChanged = true;
             }
         }
+        if (paramsChanged) {
+            // If parameters have changed since the last execution,
+            // the cached result of the prior execution is obsolete.
+            // In particular, it should not be mistaken for the correct result for the current
+            // parameters in the event that the current execution fails.
+            // DisableRestore this subquery context and its (new) result only after execution succeeds.
+            context->invalidateResult();
+        } else {
+            // If the parameters haven't changed since the last execution, reuse the known result.
+            return context->getResult();
+        }
     }
 
-    // if parameters haven't changed since the last execution try to reuse the result
-    if (!paramsChanged && hasPriorResult) {
-        return context->getResult();
-    }
     // Out of luck. Need to run the executors
-    std::vector<AbstractExecutor*>* executionStack = &exeContext->getExecutorList(m_subqueryId);
-    assert(executionStack != NULL);
-    assert(!executionStack->empty());
-
-    int status = executeExecutionVector(*executionStack, *m_parameterContainer);
-
-    if (status != ENGINE_ERRORCODE_SUCCESS) {
-        char message[256];
-        snprintf(message, 256, "Failed to execute the subquery '%d'", m_subqueryId);
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
-    }
 
     NValue retval = NValue::getFalse();
 
@@ -136,7 +129,7 @@ NValue SubqueryExpression::eval(const TableTuple *tuple1, const TableTuple *tupl
     // The EXISTS (SELECT inner_expr ...) evaluates as follows:
     // The subquery produces a row => TRUE
     // The subquery produces an empty result set => FALSE
-    Table* outputTable = executionStack->back()->getPlanNode()->getOutputTable();
+    Table* outputTable = exeContext->executeExecutors(m_subqueryId);
     assert(outputTable != NULL);
     // Check the first tuple if it's NULL tuple or not
     TableIterator& it = outputTable->iterator();
@@ -158,28 +151,28 @@ NValue SubqueryExpression::eval(const TableTuple *tuple1, const TableTuple *tupl
         }
     }
 
-    if (hasPriorResult) {
-        // simply update the result. All params are already updated
-        context->setResult(retval);
-    } else {
+    if (context == NULL) {
         // Preserve the value for the next run. Only 'other' parameters need to be copied
         std::vector<NValue> lastParams;
         lastParams.reserve(m_otherParamIdxs.size());
         for (size_t i = 0; i < m_otherParamIdxs.size(); ++i) {
-            lastParams.push_back(NValue::copyNValue((*m_parameterContainer)[m_otherParamIdxs[i]]));
+            NValue& prevParam = parameterContainer[m_otherParamIdxs[i]];
+            lastParams.push_back(prevParam.copyNValue());
         }
-        SubqueryContext newContext(m_subqueryId, retval, lastParams);
-        ExecutorContext::getExecutorContext()->setSubqueryContext(m_subqueryId, newContext);
+        context = exeContext->setSubqueryContext(m_subqueryId, lastParams);
     }
 
-    exeContext->getEngine()->cleanupExecutorList(*executionStack);
+    // Update the cached result for the current params. All params are already updated
+    context->setResult(retval);
 
+    exeContext->cleanupExecutors(m_subqueryId);
     return retval;
 }
 
-std::string SubqueryExpression::debugInfo(const std::string &spacer) const {
+std::string SubqueryExpression::debugInfo(const std::string &spacer) const
+{
     std::ostringstream buffer;
-    buffer << spacer << "SubqueryExpression: " << m_subqueryId;
+    buffer << spacer << expressionToString(getExpressionType()) << ": subqueryId: " << m_subqueryId;
     return (buffer.str());
 }
 

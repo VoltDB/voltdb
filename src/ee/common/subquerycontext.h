@@ -24,8 +24,6 @@
 
 namespace voltdb {
 
-class AbstractExecutor;
-
 /*
 * Keep track of the actual parameter values coming into a subquery invocation
 * and if they have not changed since last invocation reuses the cached result
@@ -40,34 +38,35 @@ class AbstractExecutor;
 * post-fragment cleanup, allowing results to be retained between invocations.
 */
 struct SubqueryContext {
-    SubqueryContext(int stmtId, NValue result, std::vector<NValue> lastParams) :
-        m_stmtId(stmtId), m_lastResult(result), m_lastParams(lastParams) {
+    SubqueryContext(std::vector<NValue> lastParams)
+      : m_hasValidResult(false)
+      , m_lastParams(lastParams)
+    { }
+
+    SubqueryContext(const SubqueryContext& other)
+      : m_hasValidResult(other.m_hasValidResult)
+      , m_lastParams(other.m_lastParams)
+    {
+        if (m_hasValidResult) {
+            m_lastResult = other.m_lastResult;
+        }
     }
 
-    SubqueryContext(const SubqueryContext& other) :
-        m_stmtId(other.m_stmtId), m_lastResult(other.m_lastResult), m_lastParams(other.m_lastParams) {
+    bool hasValidResult() const { return m_hasValidResult; }
+    void invalidateResult() { m_hasValidResult = false; }
+
+    const NValue& getResult() const { return m_lastResult; }
+
+    void setResult(const NValue& result)
+    {
+        m_lastResult = result.copyNValue();
+        m_hasValidResult = true;
     }
 
-    int getStatementId() const {
-        return m_stmtId;
-    }
+    std::vector<NValue>& accessLastParams() { return m_lastParams; }
 
-    NValue getResult() const {
-        return m_lastResult;
-    }
-
-    void setResult(NValue result) {
-        m_lastResult = NValue::copyNValue(result);
-    }
-
-    std::vector<NValue>& getLastParams() {
-        return m_lastParams;
-    }
-
-  private:
-    // Subquery ID
-    int m_stmtId;
-    // The result (TRUE/FALSE) of the previous IN/EXISTS subquery invocation
+private:
+    bool m_hasValidResult;
     NValue m_lastResult;
     // The parameter values that were used to obtain the last result in the ascending
     // order of the parameter indexes

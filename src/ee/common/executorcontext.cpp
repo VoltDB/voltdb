@@ -17,6 +17,9 @@
 #include "common/executorcontext.hpp"
 
 #include "common/debuglog.h"
+#include "executors/abstractexecutor.h"
+
+#include "boost/foreach.hpp"
 
 #include <pthread.h>
 
@@ -64,14 +67,14 @@ ExecutorContext::~ExecutorContext() {
     // ... or none, now that the one is going away.
     VOLT_DEBUG("De-installing EC(%ld)", (long)this);
 
-    pthread_setspecific( static_key, NULL);
+    pthread_setspecific(static_key, NULL);
 }
 
 void ExecutorContext::bindToThread()
 {
     // There can be only one (per thread).
-    assert(pthread_getspecific( static_key) == NULL);
-    pthread_setspecific( static_key, this);
+    assert(pthread_getspecific(static_key) == NULL);
+    pthread_setspecific(static_key, this);
     VOLT_DEBUG("Installing EC(%ld)", (long)this);
 }
 
@@ -80,5 +83,50 @@ ExecutorContext* ExecutorContext::getExecutorContext() {
     (void)pthread_once(&static_keyOnce, createThreadLocalKey);
     return static_cast<ExecutorContext*>(pthread_getspecific(static_key));
 }
+
+Table* ExecutorContext::executeExecutors(int subqueryId) const
+{
+    const std::vector<AbstractExecutor*>& executorList = getExecutors(subqueryId);
+    // Walk through the list and execute each plannode.
+    // The query planner guarantees that for a given plannode,
+    // all of its children are positioned before it in this list,
+    // therefore dependency tracking is not needed here.
+    size_t ttl = executorList.size();
+    int ctr = 0;
+
+    try {
+        BOOST_FOREACH (AbstractExecutor *executor, executorList) {
+            assert(executor);
+            // Call the execute method to actually perform whatever action
+            // it is that the node is supposed to do...
+            if (!executor->execute(*m_staticParams)) {
+                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                    "Unspecified execution error detected");
+            }
+            ++ctr;
+        }
+    } catch (const SerializableEEException &e) {
+        // Clean up any tempTables when the plan finishes abnormally.
+        // This needs to be the caller's responsibility for normal returns because
+        // the caller may want to first examine the final output table.
+        cleanupExecutors(subqueryId);
+        if (subqueryId == 0) {
+            VOLT_TRACE("The Executor's execution at position '%d' failed", ctr);
+        } else {
+            VOLT_TRACE("The Executor's execution at position '%d' in subquery %d failed", ctr, subqueryId);
+        }
+        throw;
+    }
+    return executorList[ttl-1]->getPlanNode()->getOutputTable();
 }
 
+void ExecutorContext::cleanupExecutors(int subqueryId) const
+{
+    const std::vector<AbstractExecutor*>& executorList = getExecutors(subqueryId);
+    BOOST_FOREACH (AbstractExecutor *executor, executorList) {
+        assert(executor);
+        executor->cleanupTempOutputTable();
+    }
+}
+
+} // end namespace voltdb
