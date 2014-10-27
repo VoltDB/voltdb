@@ -107,7 +107,8 @@ NValue SubqueryExpression::eval(const TableTuple *tuple1, const TableTuple *tupl
             // the cached result of the prior execution is obsolete.
             // In particular, it should not be mistaken for the correct result for the current
             // parameters in the event that the current execution fails.
-            // DisableRestore this subquery context and its (new) result only after execution succeeds.
+            // This subquery context will be restored to validity when its new result is set
+            // after execution succeeds.
             context->invalidateResult();
         } else {
             // If the parameters haven't changed since the last execution, reuse the known result.
