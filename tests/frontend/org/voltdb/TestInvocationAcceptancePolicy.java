@@ -39,7 +39,7 @@ public class TestInvocationAcceptancePolicy {
 
         AuthSystem.AuthUser user = mock(AuthSystem.AuthUser.class);
         when(user.hasPermission(Permission.SYSPROC)).thenReturn(sysproc);
-        when(user.hasPermission(Permission.ADHOC, Permission.SYSPROC)).thenReturn(adhoc);
+        when(user.hasPermission(Permission.SQL)).thenReturn(adhoc);
         when(user.hasPermission(Permission.DEFAULTPROC)).thenReturn(crud);
         when(user.hasPermission(Permission.DEFAULTPROCREAD)).thenReturn(readonly);
         when(user.hasPermission(Permission.SQLREAD)).thenReturn(readonlysql);
@@ -97,7 +97,7 @@ public class TestInvocationAcceptancePolicy {
 
         Procedure proc = SystemProcedureCatalog.listing.get("@AdHoc_RO_MP").asCatalogProcedure();
 
-        InvocationPermissionPolicy policy = new InvocationSqlPermissionPolicy();
+        InvocationPermissionPolicy policy = new InvocationSqlReadPermissionPolicy();
         assertEquals(policy.shouldAccept(user, invocation, proc), PolicyResult.ALLOW);
 
         // A user that doesn't have adhoc permission

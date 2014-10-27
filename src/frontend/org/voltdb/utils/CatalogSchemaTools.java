@@ -336,14 +336,23 @@ public abstract class CatalogSchemaTools {
      * @param Group
      */
     public static void toSchema(StringBuilder sb, Group grp) {
-        if (grp.getAdhoc() || grp.getDefaultproc() || grp.getSysproc() || grp.getDefaultprocread()) {
+        if (grp.getSql() || grp.getSqlread() || grp.getDefaultproc() || grp.getSysproc() || grp.getDefaultprocread()) {
             sb.append("CREATE ROLE " + grp.getTypeName() + " WITH ");
-            if (grp.getAdhoc()) {
-                if (grp.getDefaultproc() || grp.getSysproc() || grp.getDefaultprocread()) {
-                    sb.append("ADHOC, ");
+            if (grp.getSql()) {
+                if (grp.getSqlread() || grp.getDefaultproc() || grp.getSysproc() || grp.getDefaultprocread()) {
+                    sb.append("SQL, ");
                 }
                 else {
-                    sb.append("ADHOC;\n");
+                    sb.append("SQL;\n");
+                    return;
+                }
+            }
+            if (grp.getSqlread()) {
+                if (grp.getDefaultproc() || grp.getSysproc() || grp.getDefaultprocread()) {
+                    sb.append("SQLREAD, ");
+                }
+                else {
+                    sb.append("SQLREAD;\n");
                     return;
                 }
             }
