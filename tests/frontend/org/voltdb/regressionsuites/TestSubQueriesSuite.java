@@ -406,6 +406,12 @@ public class TestSubQueriesSuite extends RegressionSuite {
             vt = client.callProcedure("@Explain", sql).getResults()[0];
             assertFalse(vt.toString().toLowerCase().contains("subquery: null"));
 
+          sql = "select dept from " + tb + " group by dept " +
+                  " having max(wage) in (select wage from R1) order by dept desc";
+          vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+          System.out.println(vt.toString());
+          validateTableOfLongs(vt, new long[][] {{2} ,{1}});
+
             // having with subquery
             vt = client.callProcedure("@AdHoc", sql).getResults()[0];
             validateTableOfLongs(vt, new long[][] {{2}, {1}});
@@ -424,11 +430,10 @@ public class TestSubQueriesSuite extends RegressionSuite {
                             " (select dept from R1  group by dept having max(wage) = TBA.wage))").getResults()[0];
             validateTableOfLongs(vt, new long[][] {{3}, {5}});
 
-//          // subquery with having and user parameter - HSQL fails to parse
-//          vt = client.callProcedure("@AdHoc",
-//                  "select id from " + tb + " TBA where exists " +
-//                          " (select dept from R1  group by dept having max(wage) = ?)", 3).getResults()[0];
-//          validateTableOfLongs(vt, new long[][] {});
+          vt = client.callProcedure("@AdHoc",
+                  "select id from " + tb + " TBA where exists " +
+                          " (select dept from R1  group by dept having max(wage) = ?)", 3).getResults()[0];
+          validateTableOfLongs(vt, new long[][] {});
 
             // having with subquery with having
             vt = client.callProcedure("@AdHoc",
