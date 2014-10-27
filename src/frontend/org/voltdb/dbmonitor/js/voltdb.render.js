@@ -491,8 +491,6 @@ function alertNodeClicked(obj) {
         var populateProceduresInformation = function (connection) {
             var counter = 0;
             if (connection != null) {
-                connection.Metadata['@Statistics_PROCEDUREPROFILE'] = GetTestProcedureData(connection);
-
                 connection.Metadata['@Statistics_PROCEDUREPROFILE'].schema.forEach(function (columnInfo) {
                     if (columnInfo["name"] == "PROCEDURE")
                         procedureNameIndex = counter;
