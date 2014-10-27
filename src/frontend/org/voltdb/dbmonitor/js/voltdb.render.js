@@ -149,7 +149,7 @@ function alertNodeClicked(obj) {
                     var usernameVal = $("#username").val();
                     var passwordVal = $().crypt({ method: "sha1", source: $("#password").val() });
 
-                    testConnection($("#username").data("servername"), $("#username").data("portid"), usernameVal, passwordVal, false, function (result) {
+                    testConnection($("#username").data("servername"), $("#username").data("portid"), usernameVal, passwordVal, true, function (result) {
                         $("#overlay").hide();
                         if (result) {
 
@@ -199,7 +199,7 @@ function alertNodeClicked(obj) {
 
             $("#overlay").show();
             //Try to login with saved username/password or no username and password
-            testConnection(serverName, portId, username, password, false, function (result) {
+            testConnection(serverName, portId, username, password, true, function (result) {
 
                 $("#overlay").hide();
                 if (!popupDisplayed) {
@@ -791,27 +791,27 @@ function alertNodeClicked(obj) {
                     **************************************************************************/
                     if (val["HOSTNAME"] != null && val["CLUSTERSTATE"] == "RUNNING" && (currentServerHtml == "" || currentServer == hostName)) {
                         if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
-                            htmlMarkup = "<li class=\"active monitoring\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\"  href=\"#\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
+                            htmlMarkup = "<li class=\"active monitoring\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\"  href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
                             currentServerHtml = hostName;
 
                         } else {
-                            htmlMarkup = "<li class=\"active monitoring\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"#\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
+                            htmlMarkup = "<li class=\"active monitoring\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
                             currentServerHtml = hostName;
                         }
 
                     } else if (val["HOSTNAME"] != null && val["CLUSTERSTATE"] == "RUNNING" && currentServer != hostName) {
                         if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
-                            htmlMarkup = "<li class=\"active\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"#\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span><span class=\"hostIdHidden\" style=\"display:none\">" + systemMemory[hostName]["HOST_ID"] + "</span></li>";
+                            htmlMarkup = "<li class=\"active\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span><span class=\"hostIdHidden\" style=\"display:none\">" + systemMemory[hostName]["HOST_ID"] + "</span></li>";
                         } else {
-                            htmlMarkup = "<li class=\"active\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"#\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
+                            htmlMarkup = "<li class=\"active\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
                         }
 
                     } else if (val["HOSTNAME"] != null && val["CLUSTERSTATE"] == "JOINING") {
                         if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
-                            htmlMarkup = htmlMarkup + "<li class=\"joining\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"#\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span><span class=\"hostIdHidden\" style=\"display:none\">" + systemMemory[hostName]["HOST_ID"] + "</span></li>";
+                            htmlMarkup = htmlMarkup + "<li class=\"joining\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span><span class=\"hostIdHidden\" style=\"display:none\">" + systemMemory[hostName]["HOST_ID"] + "</span></li>";
 
                         } else {
-                            htmlMarkup = htmlMarkup + "<li class=\"joining\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"#\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
+                            htmlMarkup = htmlMarkup + "<li class=\"joining\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
                         }
                     }
 
@@ -822,29 +822,29 @@ function alertNodeClicked(obj) {
                     *********************************************************************************************/
                     if (val["HOSTNAME"] != null && val["CLUSTERSTATE"] == "RUNNING" && currentServerHtml != "" && currentServerHtml == val["HOSTNAME"]) {
                         if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
-                            htmlMarkup = htmlMarkup + "<li class=\"active monitoring\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"#\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
+                            htmlMarkup = htmlMarkup + "<li class=\"active monitoring\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
 
                         } else {
-                            htmlMarkup = htmlMarkup + "<li class=\"active monitoring\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"#\">" + hostName + "</a> <span data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\"class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
+                            htmlMarkup = htmlMarkup + "<li class=\"active monitoring\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\"class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
                         }
                     }
 
                     if (val["HOSTNAME"] != null && val["CLUSTERSTATE"] == "RUNNING" && currentServerHtml != val["HOSTNAME"]) {
                         if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
-                            htmlMarkup = htmlMarkup + "<li class=\"active\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"#\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
+                            htmlMarkup = htmlMarkup + "<li class=\"active\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
 
                         } else {
-                            htmlMarkup = htmlMarkup + "<li class=\"active\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"#\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
+                            htmlMarkup = htmlMarkup + "<li class=\"active\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
                         }
 
                     }
 
                     if (val["HOSTNAME"] != null && val["CLUSTERSTATE"] == "JOINING") {
                         if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
-                            htmlMarkup = htmlMarkup + "<li class=\"joining\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"#\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
+                            htmlMarkup = htmlMarkup + "<li class=\"joining\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
 
                         } else {
-                            htmlMarkup = htmlMarkup + "<li class=\"joining\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"#\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
+                            htmlMarkup = htmlMarkup + "<li class=\"joining\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
                         }
 
                     }
