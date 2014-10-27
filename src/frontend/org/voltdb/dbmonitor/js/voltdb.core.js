@@ -2,7 +2,7 @@
 
 (function (window, unused) {
 
-    var iVoltDbCore = (function () {
+    var iVoltDbCore = (function () { 
         this.connections = {};
         this.isServerConnected = true;
         DbConnection = function(aServer, aPort, aAdmin, aUser, aPassword, aIsHashPassword,aProcess) {
