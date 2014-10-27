@@ -694,7 +694,7 @@ public abstract class AbstractParsedStmt {
         } else {
             // Need to replace TVE from the IN list with the corresponding PVE
             // to be passed as parameters to the subquery similar to the correlated TVE
-            inColumns = ParsedSelectStmt.replaceExpressionsWithPve(subquery, inColumns, false);
+            inColumns = ParsedSelectStmt.replaceExpressionsWithPve(subquery, inColumns);
             subqueryExpr.moveUpTVE();
             inExpr.setLeft(inColumns);
             return inExpr;
