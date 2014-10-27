@@ -194,6 +194,11 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         int getParameterBufferCapacity() const { return m_parameterBufferCapacity; }
 
         /**
+         * Sets the output and exception buffer to be empty, and then
+         * serializes the exception. */
+        void serializeException(const SerializableEEException& e);
+
+        /**
          * Retrieves the size in bytes of the data that has been placed in the reused result buffer
          */
         int getResultsSize() const;
@@ -361,7 +366,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         // Initialization Functions
         // -------------------------------------------------
-        void initPlanNode(const int64_t fragId, AbstractPlanNode* node, TempTableLimits* limits);
         void processCatalogDeletes(int64_t timestamp);
         void initMaterializedViews();
         bool updateCatalogDatabaseReference();
@@ -392,7 +396,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         ExecutorVector *getExecutorVectorForFragmentId(const int64_t fragId);
 
         bool checkTempTableCleanup(ExecutorVector * execsForFrag);
-        void cleanupExecutors(ExecutorVector * execsForFrag, bool hasException = false);
+        void resetExecutionMetadata();
 
         // -------------------------------------------------
         // Data Members
