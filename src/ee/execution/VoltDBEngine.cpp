@@ -146,9 +146,8 @@ public:
     }
 
     /** Build the list of executors from its plan node fragment */
-    void init(VoltDBEngine* engine,
-              const std::vector<AbstractPlanNode*>& planNodeList) {
-        BOOST_FOREACH(AbstractPlanNode* planNode, planNodeList) {
+    void init(VoltDBEngine* engine) {
+        BOOST_FOREACH(AbstractPlanNode* planNode, m_fragment->getExecuteList()) {
             initPlanNode(engine, planNode);
             m_list.push_back(planNode->getExecutor());
         }
@@ -1299,7 +1298,7 @@ ExecutorVector *VoltDBEngine::getExecutorVectorForFragmentId(const int64_t fragI
         ExecutorVector* ev =
           new ExecutorVector(fragId, frag_temptable_log_limit, frag_temptable_limit, pnf);
         boost::shared_ptr<ExecutorVector> ev_guard(ev);
-        ev->init(this, pnf->getExecuteList());
+        ev->init(this);
 
         // add the plan to the back
         plans.get<0>().push_back(ev_guard);
@@ -1316,47 +1315,6 @@ ExecutorVector *VoltDBEngine::getExecutorVectorForFragmentId(const int64_t fragI
 // -------------------------------------------------
 // Initialization Functions
 // -------------------------------------------------
-
-void VoltDBEngine::initPlanNode(const int64_t fragId,
-                                AbstractPlanNode* node,
-                                TempTableLimits* limits)
-{
-    assert(node);
-    assert(node->getExecutor() == NULL);
-
-    // Executor is created here. An executor is *devoted* to this plannode
-    // so that it can cache anything for the plannode
-    AbstractExecutor* executor = getNewExecutor(this, node);
-    if (executor == NULL) {
-        char message[256];
-        snprintf(message, sizeof(message), "Unexpected error. "
-            "Invalid statement plan. A fragment (%jd) has an unknown plan node type (%d)",
-            (intmax_t)fragId, (int)node->getPlanNodeType());
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
-    }
-    node->setExecutor(executor);
-
-    // If this PlanNode has an internal PlanNode (e.g., AbstractScanPlanNode can
-    // have internal Projections), set that internal node's executor as well.
-    map<PlanNodeType, AbstractPlanNode*>::const_iterator internal_it;
-    for (internal_it = node->getInlinePlanNodes().begin();
-         internal_it != node->getInlinePlanNodes().end(); internal_it++) {
-        AbstractPlanNode* inline_node = internal_it->second;
-        initPlanNode(fragId, inline_node, limits);
-    }
-
-    // Now use the plannode to initialize the executor for execution later on
-    if (executor->init(this, limits)) {
-        return;
-    }
-
-    char msg[1024 * 10];
-    snprintf(msg, sizeof(msg),
-             "The executor failed to initialize for PlanNode '%s' for PlanFragment '%jd'",
-             node->debug().c_str(), (intmax_t)fragId);
-    VOLT_ERROR("%s", msg);
-    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
-}
 
 /*
  * Iterate catalog tables looking for tables that are materialized
