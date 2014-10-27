@@ -44,6 +44,7 @@ import org.hsqldb_voltpatches.lib.HashSet;
 import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.lib.HsqlList;
 import org.hsqldb_voltpatches.lib.IntValueHashMap;
+import org.hsqldb_voltpatches.lib.Iterator;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.lib.OrderedIntHashSet;
 import org.hsqldb_voltpatches.lib.Set;
@@ -692,6 +693,56 @@ public class QuerySpecification extends QueryExpression {
             if (queryCondition.getDataType() != Type.SQL_BOOLEAN) {
                 throw Error.error(ErrorCode.X_42568);
             }
+            /************************* Volt DB Extensions *************************/
+            // Make sure no aggregates in WHERE clause
+            tempSet.clear();
+            Expression.collectAllExpressions(
+                    tempSet, queryCondition, Expression.aggregateFunctionSet,
+                    Expression.subqueryExpressionSet);
+            if (!tempSet.isEmpty()) {
+                if (isTopLevel) {
+                    // Top level WHERE clause can't have aggregate expressions
+                    throw Error.error(ErrorCode.X_47000);
+                } else {
+                    // Subquery WHERE clause may have an aggregate expression only if it
+                    // references columns from top query(s). 
+                    // At the moment, VoltDB doesn't support them.
+                    HsqlList columnSet = new OrderedHashSet();
+                    Iterator aggIt = tempSet.iterator();
+                    while(aggIt.hasNext()) {
+                        Expression nextAggr = (Expression) aggIt.next();
+                        Expression.collectAllExpressions(columnSet, nextAggr,
+                                Expression.columnExpressionSet, Expression.emptyExpressionSet);
+                    }
+                    Iterator columnIt = columnSet.iterator();
+                    while(columnIt.hasNext()) {
+                        Expression nextColumn = (Expression) columnIt.next();
+                        assert(nextColumn instanceof ExpressionColumn);
+                        ExpressionColumn nextColumnEx = (ExpressionColumn) nextColumn;
+                        String tableName = nextColumnEx.rangeVariable.rangeTable.tableName.name;
+                        String tableAlias = (nextColumnEx.rangeVariable.tableAlias != null) ?
+                                nextColumnEx.rangeVariable.tableAlias.name : null;
+                        boolean resolved = false;
+                        for (RangeVariable rv : rangeVariables) {
+                            if (rv.rangeTable.tableName.name.equals(tableName)) {
+                                if (rv.tableAlias == null && tableAlias == null) {
+                                    resolved = true;
+                                } else if (rv.tableAlias != null && tableAlias != null) {
+                                    resolved = tableAlias.equals(rv.tableAlias.name);
+                                }
+                            }
+                        }
+                        if (!resolved) {
+                            throw Error.error(ErrorCode.X_47001);
+                        }
+                    }
+                    // If we get there it means that WHERE expression has an aggregate expression
+                    // with local columns
+                    throw Error.error(ErrorCode.X_47000);
+                }
+            }
+            /*********************************************************************/
+
         }
 
         if (havingCondition != null) {
