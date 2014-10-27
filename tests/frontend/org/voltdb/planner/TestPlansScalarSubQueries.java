@@ -46,15 +46,11 @@ import org.voltdb.types.PlanNodeType;
 
 public class TestPlansScalarSubQueries extends PlannerTestCase {
 
-//    public void testWhereScalar() {
-//        AbstractPlanNode pn = compile("select r2.c from r2 where r2.a = (select r1.a from r1 where a = 3);");
-//    }
 //    public void testInToExist() {
 //        AbstractPlanNode pn = compile("select r2.c from r2 where r2.c in (select c from r1)");
 //        AbstractPlanNode pn = compile("select r2.c from r2 where r2.c in (1,2)");
 //    }
 
-    
     public void testSelectScalar() {
         AbstractPlanNode pn = compile("select r2.c, (select d from r1) scalar from r2");
         pn = pn.getChild(0);
@@ -85,10 +81,32 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         assertEquals(new Integer(0), params.get(0));
     }
 
+    public void testSelectParameterScalar() {
+        AbstractPlanNode pn = compile("select r2.c, (select d from r1 where r1.c = ? ) scalar from r2");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof AbstractScanPlanNode);
+        AbstractPlanNode proj = pn.getInlinePlanNode(PlanNodeType.PROJECTION);
+        NodeSchema schema = proj.getOutputSchema();
+        assertEquals(2, schema.size());
+        SchemaColumn col = schema.getColumns().get(1);
+        assertTrue(col != null);
+        assertEquals("SCALAR", col.getColumnName());
+        AbstractExpression colExpr = col.getExpression();
+        assertTrue(colExpr instanceof SubqueryExpression);
+        SubqueryExpression subqueryExpr = (SubqueryExpression) colExpr;
+        AbstractPlanNode subquery = subqueryExpr.getSubqueryNode();
+        assertEquals(PlanNodeType.SEQSCAN, subquery.getPlanNodeType());
+        AbstractExpression pred = ((SeqScanPlanNode) subquery).getPredicate();
+        assertEquals(ExpressionType.VALUE_PARAMETER, pred.getRight().getExpressionType());
+    }
+
     public void testMultiColumnSelect() {
         failToCompile("select r2.c, (select d, c from r1) from r2", "warning");
     }
 
+    public void testWhereScalar() {
+        AbstractPlanNode pn = compile("select r2.c from r2 where r2.a = (select r1.a from r1 where a = 3);");
+    }
 
     @Override
     protected void setUp() throws Exception {
