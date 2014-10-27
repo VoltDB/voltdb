@@ -268,12 +268,12 @@ public class VoltProjectBuilder {
 
     private Integer m_elasticThroughput = null;
     private Integer m_elasticDuration = null;
-    private Integer m_queryTimeOut = null;
+    private Integer m_queryTimeout = null;
 
     private boolean m_useAdhocSchema = false;
 
     public VoltProjectBuilder setQueryTimeout(int target) {
-        m_queryTimeOut = target;
+        m_queryTimeout = target;
         return this;
     }
 
@@ -928,8 +928,8 @@ public class VoltProjectBuilder {
             if (m_elasticDuration != null) elastic.setDuration(m_elasticDuration);
             systemSettingType.setElastic(elastic);
         }
-        if (m_queryTimeOut != null) {
-            factory.createSystemSettingsTypeQuery().setTimeout(m_queryTimeOut);
+        if (m_queryTimeout != null) {
+            factory.createSystemSettingsTypeQuery().setTimeout(m_queryTimeout);
         }
 
         deployment.setSystemsettings(systemSettingType);
