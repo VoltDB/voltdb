@@ -751,7 +751,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
 
-            m_replicaDRGateway = null;
             // Configure replica-side DR if relevant
             if (m_config.m_isEnterprise && useDRV2 && m_config.m_replicationRole == ReplicationRole.REPLICA) {
                 String drMasterHost = m_catalogContext.cluster.getDrmasterhost();
@@ -2391,8 +2390,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private void shutdownReplicaRole() {
         if (m_replicaDRGateway != null) {
             try {
-                m_replicaDRGateway.shutdown();
-                m_replicaDRGateway.join();
+                m_replicaDRGateway.shutdown(true);
             } catch (InterruptedException e) {
                 hostLog.warn("Interrupted shutting down dr replication", e);
             }
