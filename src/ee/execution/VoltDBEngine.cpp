@@ -1350,20 +1350,20 @@ void VoltDBEngine::initMaterializedViews() {
     BOOST_FOREACH (LabeledTable labeledTable, m_database->tables()) {
         catalog::Table *srcCatalogTable = labeledTable.second;
         Table *srcTable = m_tables[srcCatalogTable->relativeIndex()];
+
+        // Only persistent tables can have views.
         PersistentTable *srcPTable = dynamic_cast<PersistentTable*>(srcTable);
-        if ( ! srcPTable) {
-            // Streamed tables don't have views.
-            return;
-        }
-        // walk views
-        BOOST_FOREACH (LabeledView labeledView, srcCatalogTable->views()) {
-            catalog::MaterializedViewInfo *catalogView = labeledView.second;
-            const catalog::Table *destCatalogTable = catalogView->dest();
-            PersistentTable *destTable = dynamic_cast<PersistentTable*>(m_tables[destCatalogTable->relativeIndex()]);
-            assert(destTable);
-            // Either connect source and destination tables with a new link...
-            // Or Ensure that the materialized view is using the latest version of the target table.
-            srcPTable->updateMaterializedViewTargetTable(destTable, catalogView);
+        if (srcPTable != NULL) {
+            // walk views
+            BOOST_FOREACH (LabeledView labeledView, srcCatalogTable->views()) {
+                catalog::MaterializedViewInfo *catalogView = labeledView.second;
+                const catalog::Table *destCatalogTable = catalogView->dest();
+                PersistentTable *destTable = dynamic_cast<PersistentTable*>(m_tables[destCatalogTable->relativeIndex()]);
+                assert(destTable);
+                // Either connect source and destination tables with a new link...
+                // Or Ensure that the materialized view is using the latest version of the target table.
+                srcPTable->updateMaterializedViewTargetTable(destTable, catalogView);
+            }
         }
     }
 }
