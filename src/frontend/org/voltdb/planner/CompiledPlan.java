@@ -98,17 +98,20 @@ public class CompiledPlan {
 
     private Object m_partitioningValue;
 
-    void resetPlanNodeIds() {
-        int nextId = resetPlanNodeIds(rootPlanGraph, 1);
+    public int resetPlanNodeIds(int startId) {
+        int nextId = resetPlanNodeIds(rootPlanGraph, startId);
         if (subPlanGraph != null) {
-            resetPlanNodeIds(subPlanGraph, nextId);
+            nextId = resetPlanNodeIds(subPlanGraph, nextId);
         }
+        return nextId;
     }
 
     private int resetPlanNodeIds(AbstractPlanNode node, int nextId) {
-        node.overrideId(nextId++);
+        nextId = node.overrideId(nextId);
         for (AbstractPlanNode inNode : node.getInlinePlanNodes().values()) {
-            inNode.overrideId(0);
+            // Inline nodes also need their ids to be overridden to make sure
+            // the subquery node ids are also globaly unique
+            nextId = inNode.overrideId(nextId);
         }
 
         for (int i = 0; i < node.getChildCount(); i++) {
@@ -285,7 +288,7 @@ public class CompiledPlan {
         return m_extractedParamValues;
     }
 
-    public boolean getReadOnly() {
+    public boolean isReadOnly() {
         return m_readOnly;
     }
 

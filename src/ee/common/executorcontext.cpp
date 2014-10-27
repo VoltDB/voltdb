@@ -36,6 +36,7 @@ ExecutorContext::ExecutorContext(int64_t siteId,
                 UndoQuantum *undoQuantum,
                 Topend* topend,
                 Pool* tempStringPool,
+                NValueArray* params,
                 VoltDBEngine* engine,
                 bool exportEnabled,
                 std::string hostname,
@@ -43,6 +44,7 @@ ExecutorContext::ExecutorContext(int64_t siteId,
                 DRTupleStream *drStream) :
     m_topEnd(topend), m_tempStringPool(tempStringPool),
     m_undoQuantum(undoQuantum),
+    m_staticParams(params), m_executorsMap(),
     m_drStream(drStream), m_engine(engine),
     m_txnId(0), m_spHandle(0),
     m_lastCommittedSpHandle(0),
@@ -52,14 +54,6 @@ ExecutorContext::ExecutorContext(int64_t siteId,
 {
     (void)pthread_once(&static_keyOnce, createThreadLocalKey);
     bindToThread();
-}
-
-void ExecutorContext::bindToThread()
-{
-    // There can be only one (per thread).
-    assert(pthread_getspecific( static_key) == NULL);
-    pthread_setspecific( static_key, this);
-    VOLT_DEBUG("Installing EC(%ld)", (long)this);
 }
 
 ExecutorContext::~ExecutorContext() {
@@ -73,9 +67,18 @@ ExecutorContext::~ExecutorContext() {
     pthread_setspecific( static_key, NULL);
 }
 
+void ExecutorContext::bindToThread()
+{
+    // There can be only one (per thread).
+    assert(pthread_getspecific( static_key) == NULL);
+    pthread_setspecific( static_key, this);
+    VOLT_DEBUG("Installing EC(%ld)", (long)this);
+}
+
+
 ExecutorContext* ExecutorContext::getExecutorContext() {
     (void)pthread_once(&static_keyOnce, createThreadLocalKey);
-    return static_cast<ExecutorContext*>(pthread_getspecific( static_key));
+    return static_cast<ExecutorContext*>(pthread_getspecific(static_key));
 }
 }
 

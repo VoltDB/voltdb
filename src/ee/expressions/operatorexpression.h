@@ -133,7 +133,6 @@ private:
     ValueType m_targetType;
 };
 
-
 class OperatorAlternativeExpression : public AbstractExpression {
 public:
     OperatorAlternativeExpression(AbstractExpression *left, AbstractExpression *right)

@@ -48,7 +48,6 @@
 #include "common/debuglog.h"
 #include "common/valuevector.h"
 #include "common/executorcontext.hpp"
-#include "execution/VoltDBEngine.h"
 
 namespace voltdb {
 
@@ -58,11 +57,11 @@ namespace voltdb {
     {
         VOLT_TRACE("ParameterValueExpression %d", value_idx);
         ExecutorContext* context = ExecutorContext::getExecutorContext();
-        VoltDBEngine* engine = context->getEngine();
-        assert(engine != NULL);
-        NValueArray& params = engine->getParameterContainer();
-        assert(value_idx < params.size());
-        m_paramValue = &params[value_idx];
+
+        NValueArray* params = context->getParameterContainer();
+
+        assert(value_idx < params->size());
+        m_paramValue = &(*params)[value_idx];
     };
 
 }

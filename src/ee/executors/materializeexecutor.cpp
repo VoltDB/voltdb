@@ -119,7 +119,6 @@ bool MaterializeExecutor::p_execute(const NValueArray &params) {
     }
 
 
-    // substitute parameterized values in expression trees.
     if (all_param_array == NULL) {
         for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
             assert(expression_array[ctr]);

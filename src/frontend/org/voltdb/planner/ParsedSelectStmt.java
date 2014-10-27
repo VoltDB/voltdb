@@ -41,11 +41,13 @@ import org.voltdb.catalog.Table;
 import org.voltdb.compiler.StatementCompiler;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
+import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.expressions.VectorValueExpression;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
@@ -157,10 +159,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private final ArrayList<JoinNode> m_joinOrderList = new ArrayList<>();
 
     /**
-    * Class constructor
-    * @param paramValues
-    * @param db
-    */
+     * Class constructor
+     * @param paramValues
+     * @param db
+     */
     public ParsedSelectStmt(String[] paramValues, Database db) {
         super(paramValues, db);
     }
@@ -662,7 +664,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             if (col.alias == null) {
                 col.alias = col.columnName;
             }
-           // This index calculation is only used for sanity checking
+            // This index calculation is only used for sanity checking
             // materialized views (which use the parsed select statement but
             // don't go through the planner pass that does more involved
             // column index resolution).
@@ -799,8 +801,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             if ((child.name.equals("operation") == false) &&
                     (child.name.equals("aggregation") == false) &&
                     (child.name.equals("function") == false)) {
-               throw new RuntimeException("ORDER BY parsed with strange child node type: " + child.name);
-           }
+                throw new RuntimeException("ORDER BY parsed with strange child node type: " + child.name);
+            }
         }
 
         // Mark the order by column if it is in displayColumns
@@ -961,6 +963,219 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         retval = retval.trim();
 
         return retval;
+    }
+
+
+    /**
+     * Converts an IN expression into the equivalent EXISTS one
+     * IN (SELECT" forms e.g. "(A, B) IN (SELECT X, Y, FROM ...) ==
+     * EXISTS (SELECT 42 FROM ... AND|WHERE|HAVING A=X AND|WHERE|HAVING B=Y)
+     *
+     * @param selectStmt select subquery from the IN expression
+     * @param inListExpr TVE for the columns from the IN list
+     * @return modified subquery
+     */
+    protected static void rewriteInSubqueryAsExists(ParsedSelectStmt selectStmt, AbstractExpression inListExpr) {
+        List<AbstractExpression> whereList = new ArrayList<AbstractExpression>();
+        List<AbstractExpression> havingList = new ArrayList<AbstractExpression>();
+
+        // multi-column IN expression is a VectorValueExpression
+        // where each arg represents individual columns
+        List<AbstractExpression> inExprList = null;
+        if (inListExpr instanceof VectorValueExpression) {
+            inExprList = inListExpr.getArgs();
+        } else {
+            inExprList = new ArrayList<AbstractExpression>();
+            inExprList.add(inListExpr);
+        }
+        int idx = 0;
+        assert(inExprList.size() == selectStmt.m_displayColumns.size());
+        selectStmt.m_aggregationList = new ArrayList<AbstractExpression>();
+
+        // Iterate over the columns from the IN list and the subquery output schema
+        // For each pair create a new equality expression.
+        // If the output column is part of the aggregate expression, the new expression
+        // must be added to the subquery's HAVING expressions. If not, it should be added
+        // to the WHERE expressions
+        for (AbstractExpression expr : inExprList) {
+            ParsedSelectStmt.ParsedColInfo colInfo = selectStmt.m_displayColumns.get(idx++);
+            assert(colInfo.expression != null);
+            // The TVE and the aggregated expressions from the IN clause will be
+            // parameters to the child select statement once the IN expression is
+            // replaced with the EXISTS one
+            expr = replaceExpressionsWithPve(selectStmt, expr);
+            // Finalize the expression. The subquery's own expressions are already finalized
+            // but not the expressions from the IN list
+            ExpressionUtil.finalizeValueTypes(expr);
+
+            // Create new compare equal expression
+            AbstractExpression equalityExpr = new ComparisonExpression(ExpressionType.COMPARE_EQUAL,
+                    expr, (AbstractExpression) colInfo.expression.clone());
+            // Check if this column contains aggregate expression
+            if (ExpressionUtil.containsAggregateExpression(colInfo.expression)) {
+                // we are not creating any new aggregate expressions so
+                // the aggregation list doen't need to be updated. Only HAVING expression itself
+                havingList.add(equalityExpr);
+            } else {
+                whereList.add(equalityExpr);
+            }
+        }
+        // Add new WHERE expressions
+        if (!whereList.isEmpty()) {
+            if (selectStmt.m_joinTree.getWhereExpression() != null) {
+                whereList.add(selectStmt.m_joinTree.getWhereExpression());
+            }
+            selectStmt.m_joinTree.setWhereExpression(ExpressionUtil.combine(whereList));
+        }
+        // Add new HAVING expressions
+        if (!havingList.isEmpty()) {
+            if (selectStmt.m_having != null) {
+                havingList.add(selectStmt.m_having);
+            }
+            selectStmt.m_having = ExpressionUtil.combine(havingList);
+            // reprocess HAVING expressions
+            ExpressionUtil.finalizeValueTypes(selectStmt.m_having);
+        }
+
+        selectStmt.m_aggregationList = null;
+
+        if (selectStmt.needComplexAggregation()) {
+            selectStmt.fillUpAggResultColumns();
+        } else {
+            selectStmt.m_aggResultColumns = selectStmt.m_displayColumns;
+        }
+        selectStmt.placeTVEsinColumns();
+    }
+
+    /**
+     * Simplify the select statement from the EXISTS expression:
+     *  1. Replace the display columns with a single dummy column "1"
+     *  2. Drop DISTINCT expression
+     *  3. Add LIMIT 1
+     *  4. @TODO Remove ORDER BY, GROUP BY expressions
+     *           if HAVING and OFFSET expression is not present
+     *
+     * @param selectStmt
+     * @return existsExpr
+     */
+    protected void simplifyExistsExpression() {
+        // Collect having, group by column names
+        Set<String> havingColumnNamesSet = new HashSet<String>();
+        Set<String> groupByColumnNamesSet = new HashSet<String>();
+        if (m_having != null) {
+            List<TupleValueExpression> havingTves = ExpressionUtil.getTupleValueExpressions(m_having);
+            for (TupleValueExpression tve : havingTves) {
+                havingColumnNamesSet.add(tve.getColumnAlias());
+            }
+        }
+        for (ParsedSelectStmt.ParsedColInfo colInfo: m_groupByColumns) {
+            groupByColumnNamesSet.add(colInfo.alias);
+        }
+
+        ArrayList<ParsedColInfo> aggrExpressions = new ArrayList<ParsedColInfo>();
+        aggrExpressions.addAll(m_aggResultColumns);
+        m_aggResultColumns = aggrExpressions;
+
+        // Replace the display schema with the single dummy column
+        m_displayColumns.clear();
+        ParsedColInfo col = new ParsedColInfo();
+        ConstantValueExpression colExpr = new ConstantValueExpression();
+        colExpr.setValueType(VoltType.NUMERIC);
+        colExpr.setValue("1");
+        col.expression = colExpr;
+        ExpressionUtil.finalizeValueTypes(col.expression);
+
+        col.tableName = "VOLT_TEMP_TABLE";
+        col.tableAlias = "VOLT_TEMP_TABLE";
+        col.columnName = "$$_EXISTS_$$";
+        col.alias = "$$_EXISTS_$$";
+        col.index = 0;
+        m_projectSchema = null;
+        m_displayColumns.add(col);
+        placeTVEsinColumns();
+
+        // If HAVING clause is missing we can drop GROUP BY and ORDER BY
+        if (m_having == null) {
+            m_aggResultColumns.clear();
+            m_orderColumns.clear();
+            m_groupByColumns.clear();
+        } else {
+            // Iterate over the aggregate columns and delete all columns that are not
+            // part of the HAVING or GROUP BY expressions (used to be in the original display schema
+            Iterator<ParsedColInfo> aggColumnIt = m_aggResultColumns.iterator();
+            while (aggColumnIt.hasNext()) {
+                ParsedColInfo aggrColumn = aggColumnIt.next();
+                boolean canDropColumn = !havingColumnNamesSet.contains(aggrColumn.alias) &&
+                        !groupByColumnNamesSet.contains(aggrColumn.alias);
+                if (canDropColumn) {
+                    aggColumnIt.remove();
+                }
+            }
+        }
+        if (m_aggResultColumns.isEmpty()) {
+            m_hasAggregateExpression = false;
+            m_hasAverage = false;
+        }
+        needComplexAggregation();
+
+        // Drop DISTINCT expression
+        m_distinct = false;
+
+        // Add LIMIT 1
+        m_limit = 1;
+
+        prepareLimitPlanNode();
+    }
+
+    /**
+     * Helper method to replace all TVEs and aggregated expressions with the corresponding PVEs.
+     * The original expressions are placed into the map to be propagated to the EE.
+     * The key to the map is the parameter index.
+     *
+     *
+     * @param stmt - subquery statement
+     * @param expr - expression with parent TVEs
+     * @return Expression with parent TVE replaced with PVE
+     */
+    public static AbstractExpression replaceExpressionsWithPve(AbstractParsedStmt stmt, AbstractExpression expr) {
+        assert(expr != null);
+        if (expr instanceof AggregateExpression || expr instanceof TupleValueExpression) {
+            int paramIdx = AbstractParsedStmt.NEXT_PARAMETER_ID++;
+            ParameterValueExpression pve = new ParameterValueExpression();
+            pve.setParameterIndex(paramIdx);
+            pve.setValueSize(expr.getValueSize());
+            pve.setValueType(expr.getValueType());
+            pve.setCorrelatedExpression(expr);
+            // Disallow aggregation of parent columns in a subquery.
+            // except the case HAVING AGG(T1.C1) IN (SELECT T2.C2 ...)
+            if (expr instanceof AggregateExpression) {
+                List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(expr);
+                assert(stmt.m_parentStmt != null);
+                for(TupleValueExpression tve : tves) {
+                    if (stmt.m_parentStmt.m_stmtId != tve.getOrigStmtId() &&
+                            stmt.m_stmtId != tve.getOrigStmtId()) {
+                        throw new PlanningErrorException(
+                                "Subquery Expression do not support aggregation of parent columns");
+                    }
+                }
+            }
+            stmt.m_parameterTveMap.put(paramIdx, expr);
+            return pve;
+        }
+        if (expr.getLeft() != null) {
+            expr.setLeft(replaceExpressionsWithPve(stmt, expr.getLeft()));
+        }
+        if (expr.getRight() != null) {
+            expr.setRight(replaceExpressionsWithPve(stmt, expr.getRight()));
+        }
+        if (expr.getArgs() != null) {
+            List<AbstractExpression> newArgs = new ArrayList<AbstractExpression>();
+            for (AbstractExpression argument : expr.getArgs()) {
+                newArgs.add(replaceExpressionsWithPve(stmt, argument));
+            }
+            expr.setArgs(newArgs);
+        }
+        return expr;
     }
 
     public boolean hasJoinOrder() {
@@ -1156,7 +1371,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 }
                 joinOrderSubTree = JoinNode.reconstructJoinTreeFromTableNodes(joinOrderSubNodes);
                 //Collect all the join/where conditions to reassign them later
-                AbstractExpression combinedWhereExpr = subTree.getAllInnerJoinFilters();
+                AbstractExpression combinedWhereExpr = subTree.getAllFilters();
                 if (combinedWhereExpr != null) {
                     joinOrderSubTree.setWhereExpression((AbstractExpression)combinedWhereExpr.clone());
                 }
@@ -1171,7 +1386,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         m_joinOrderList.add(newNode);
         return true;
     }
-
 
     public boolean hasAggregateExpression () {
         return m_hasAggregateExpression;
@@ -1231,8 +1445,18 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     @Override
     public boolean hasLimitOrOffset() {
-        if ((m_limit != -1) || (m_limitParameterId != -1) ||
-            (m_offset > 0) || (m_offsetParameterId != -1)) {
+        return hasLimit() || hasOffset();
+    }
+
+    public boolean hasOffset() {
+        if ((m_offset > 0) || (m_offsetParameterId != -1)) {
+            return true;
+        }
+        return false;
+    }
+
+    public boolean hasLimit() {
+        if ((m_limit != -1) || (m_limitParameterId != -1)) {
             return true;
         }
         return false;
@@ -1419,11 +1643,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 if (jsonExpr.isEmpty()) {
                     for (ColumnRef cref : index.getColumns()) {
                         Column col = cref.getColumn();
-                        TupleValueExpression tve = new TupleValueExpression(table.getTypeName(),
-                                                                            orderedAlias.getKey(),
-                                                                            col.getName(),
-                                                                            col.getName(),
-                                                                            col.getIndex());
+                        TupleValueExpression tve = new TupleValueExpression(
+                                table.getTypeName(),
+                                orderedAlias.getKey(),
+                                col.getName(),
+                                col.getName(),
+                                col.getIndex());
                         indexExpressions.add(tve);
                     }
                 }
@@ -1467,9 +1692,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 // Round up the usual suspects -- if there were uncooperative GROUP BY expressions,
                 // they will often also be uncooperative display column expressions.
                 for (AbstractExpression nonStarter : nonOrdered) {
-                     if (displayExpr.equals(nonStarter)) {
-                         return false;
-                     }
+                    if (displayExpr.equals(nonStarter)) {
+                        return false;
+                    }
                 }
                 // A GROUP BY expression that was not nonOrdered must be covered.
                 continue;
@@ -1480,7 +1705,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     private boolean orderByColumnsDetermineAllColumns(ArrayList<ParsedColInfo> candidateColumns,
-                                                      ArrayList<AbstractExpression> outNonOrdered) {
+            ArrayList<AbstractExpression> outNonOrdered) {
         HashSet<AbstractExpression> orderByExprs = null;
         ArrayList<AbstractExpression> candidateExprHardCases = null;
         // First try to get away with a brute force N by M search for exact equalities.
@@ -1678,5 +1903,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             throw new PlanningErrorException(
                     "Mismatched plan output cols to parsed display columns");
         }
+    }
+
+    @Override
+    public List<AbstractExpression> findAllSubexpressionsOfType(ExpressionType exprType) {
+        List<AbstractExpression> exprs = super.findAllSubexpressionsOfType(exprType);
+        if (m_having != null) {
+            exprs.addAll(m_having.findAllSubexpressionsOfType(exprType));
+        }
+        return exprs;
     }
 }

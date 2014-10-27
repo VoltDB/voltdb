@@ -61,9 +61,10 @@ public class StmtSubqueryScan extends StmtTableScan {
     /*
      * This 'subquery' actually is the parent query on the derived table with alias 'tableAlias'
      */
-    public StmtSubqueryScan(AbstractParsedStmt subqueryStmt, String tableAlias) {
-        super(tableAlias);
+    public StmtSubqueryScan(AbstractParsedStmt subqueryStmt, String tableAlias, int stmtId) {
+        super(tableAlias, stmtId);
         m_subqueryStmt = subqueryStmt;
+
         // A union or other set operator uses the output columns of its left-most leaf child statement.
         while (subqueryStmt instanceof ParsedUnionStmt) {
             assert( ! ((ParsedUnionStmt)subqueryStmt).m_children.isEmpty());
@@ -79,7 +80,10 @@ public class StmtSubqueryScan extends StmtTableScan {
             m_outputColumnIndexMap.put(colAlias, i);
             i++;
         }
+    }
 
+    public StmtSubqueryScan(AbstractParsedStmt subqueryStmt, String tableAlias) {
+        this(subqueryStmt, tableAlias, 0);
     }
 
     public StatementPartitioning getPartitioningForStatement() {

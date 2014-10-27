@@ -323,6 +323,10 @@ class NValue {
     // the pool, use the temp string pool.
     void allocateObjectFromInlinedValue(Pool* pool);
 
+    // Copy a tuple. If the source tuple is inlined, then allocate
+    // memory from the temp string pool and copy data there
+    static NValue copyNValue(NValue value);
+
     /* Check if the value represents SQL NULL */
     bool isNull() const;
 

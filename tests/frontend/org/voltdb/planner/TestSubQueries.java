@@ -51,8 +51,9 @@ import org.voltdb.types.PlanNodeType;
 
 public class TestSubQueries extends PlannerTestCase {
 
+    // Supported
     public void testUnsupportedSyntax() {
-        failToCompile("DELETE FROM R1 WHERE A IN (SELECT A A1 FROM R1 WHERE A>1)", "Unsupported subquery syntax");
+        failToCompile("DELETE FROM R1 WHERE A IN (SELECT A A1 FROM R1 WHERE A>1)");
     }
 
     private void checkOutputSchema(AbstractPlanNode planNode, String... columns) {
@@ -273,6 +274,7 @@ public class TestSubQueries extends PlannerTestCase {
                 "       from (select C, COUNT(*) A from P1 GROUP BY C ORDER BY A LIMIT 6) T1 group by A) T2 " +
                 "group by A_count order by A_count";
         planNodes = compileToFragments(sql);
+        printExplainPlan(planNodes);
         // send node
         pn = planNodes.get(1).getChild(0);
         checkPrimaryKeyIndexScan(pn, "P1");
@@ -1298,19 +1300,11 @@ public class TestSubQueries extends PlannerTestCase {
         checkPushedDownJoins(planNodes, 3);
 
         // Distinct apply on replicated table only
-        // Simplified for now:
-        // TODO: Re-enable the original more realistic version of the test
-        // once multi-column distinct is correctly re-enabled.
-        // This will most likely happen as a side effect of fixing ENG-6436.
         planNodes = compileToFragments(
-                "SELECT     * " +
-                "  FROM     (SELECT   P1.A, R1.C " +
-                //* original   */ "              FROM   R1, P1, (SELECT     Distinct A, C" +
-                /*  simplified */ "              FROM   R1, P1, (SELECT     Distinct A   " +
-                "                                FROM     R2" +
-                "                                WHERE    A > 3) T0" +
-                "              WHERE  R1.A = T0.A ) T1, P2 " +
-                "  WHERE    T1.A = P2.A");
+                "SELECT * FROM (SELECT P1.A, R1.C FROM R1, P1,  " +
+                "                (SELECT Distinct A, C FROM R2 where A > 3) T0 where R1.A = T0.A ) T1, " +
+                "              P2 " +
+                "where T1.A = P2.A");
         for (AbstractPlanNode apn: planNodes) {
             System.out.println(apn.toExplainPlanString());
         }
@@ -1619,13 +1613,11 @@ public class TestSubQueries extends PlannerTestCase {
         checkPrimaryKeyIndexScan(pn, "P2");
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
 
-        // TODO: Re-enable the original stronger version of the test
-        // that insists on matching the joinErrorMsg
-        // once multi-column distinct is correctly re-enabled.
-        // This will most likely happen as a side effect of fixing ENG-6436.
+        // T
         failToCompile(
-                //* stronger */ "SELECT * FROM (SELECT DISTINCT A, C FROM P1) T1, P2 where T1.A = P2.A", joinErrorMsg);
-                /*  weaker   */ "SELECT * FROM (SELECT DISTINCT A, C FROM P1) T1, P2 where T1.A = P2.A");
+                "SELECT * FROM (SELECT DISTINCT A, C FROM P1) T1, P2 where T1.A = P2.A",
+                joinErrorMsg);
+
 
         failToCompile(
                 "SELECT * FROM (SELECT DISTINCT A, C FROM P1 GROUP BY A, C) T1, P2 " +
@@ -2027,8 +2019,6 @@ public class TestSubQueries extends PlannerTestCase {
     @Override
     protected void setUp() throws Exception {
         setupSchema(TestSubQueries.class.getResource("testplans-subqueries-ddl.sql"), "dd", false);
-        AbstractPlanNode.enableVerboseExplainForDebugging();
-        AbstractExpression.enableVerboseExplainForDebugging();
     }
 
 }

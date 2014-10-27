@@ -57,7 +57,6 @@ public class InsertSubPlanAssembler extends SubPlanAssembler {
         m_bestAndOnlyPlanWasGenerated = true;
         ParsedInsertStmt insertStmt = (ParsedInsertStmt)m_parsedStmt;
         Table targetTable = insertStmt.m_tableList.get(0);
-        targetTable.getTypeName();
         StmtSubqueryScan subquery = insertStmt.getSubqueries().get(0);
 
         if (targetTable.getIsreplicated()) {

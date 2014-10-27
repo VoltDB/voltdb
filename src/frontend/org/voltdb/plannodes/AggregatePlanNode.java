@@ -182,6 +182,9 @@ public class AggregatePlanNode extends AbstractPlanNode {
             m_children.get(0).generateOutputSchema(db);
             // aggregate's output schema is pre-determined, don't touch
         }
+        // Possible subquery expressions
+        generateSubqueryExpressionOutputSchema(m_postPredicate, db);
+        generateSubqueryExpressionOutputSchema(m_prePredicate, db);
         return;
     }
 
@@ -258,6 +261,9 @@ public class AggregatePlanNode extends AbstractPlanNode {
             tve.setColumnIndex(index);
         }
 
+        // Possible subquery expressions
+        resolveSubqueryExpressionColumnIndexes(m_prePredicate);
+        resolveSubqueryExpressionColumnIndexes(m_postPredicate);
     }
 
     /**
@@ -405,7 +411,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
             m_aggregateDistinct.add( tempObj.getInt( Members.AGGREGATE_DISTINCT.name() ) );
             m_aggregateOutputColumns.add( tempObj.getInt( Members.AGGREGATE_OUTPUT_COLUMN.name() ));
 
-            if (jobj.isNull(Members.AGGREGATE_EXPRESSION.name())) {
+            if (tempObj.isNull(Members.AGGREGATE_EXPRESSION.name())) {
                 m_aggregateExpressions.add(null);
             }
             else {
@@ -429,6 +435,14 @@ public class AggregatePlanNode extends AbstractPlanNode {
         m_postPredicate = AbstractExpression.fromJSONChild(jobj, Members.POST_PREDICATE.name());
     }
 
+    @Override
+    public int overrideId(int newId) {
+        m_id = newId++;
+        newId = overrideSubqueryIds(newId, m_prePredicate);
+        newId = overrideSubqueryIds(newId, m_postPredicate);
+        return newId;
+
+    }
     public static AggregatePlanNode getInlineAggregationNode(AbstractPlanNode node) {
         AggregatePlanNode aggNode =
                 (AggregatePlanNode) (node.getInlinePlanNode(PlanNodeType.AGGREGATE));

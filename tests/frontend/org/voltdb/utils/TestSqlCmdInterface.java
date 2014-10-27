@@ -477,6 +477,33 @@ public class TestSqlCmdInterface
         assertThis(create, create, 1, ID);
     }
 
+    // test select statement with FROM subquery
+    @Test
+    public void testParseQuery30() {
+        String raw = "SELECT * FROM (SELECT * FROM table2)";
+        String expected = raw;
+        ID = 30;
+        assertThis(raw, expected, 1, ID);
+    }
+
+    // test select statement with IN subquery
+    @Test
+    public void testParseQuery31() {
+        String raw = "SELECT * FROM table1 WHERE (A,C) IN ( SELECT A,C FROM table2)";
+        String expected = raw;
+        ID = 31;
+        assertThis(raw, expected, 1, ID);
+    }
+
+    // test select statement with EXISTS subquery
+    @Test
+    public void testParseQuery32() {
+        String raw = "SELECT * FROM table1 WHERE EXISTS( SELECT 1FROM table2)";
+        String expected = raw;
+        ID = 32;
+        assertThis(raw, expected, 1, ID);
+    }
+
     private static void setQryString(File QryFileHandle) throws FileNotFoundException {
         // Prepare a Scanner that will "scan" the document
         Scanner opnScanner = new Scanner(QryFileHandle);
