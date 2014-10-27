@@ -6,9 +6,11 @@
         this.connections = {};
         this.isServerConnected = true;
         DbConnection = function(aServer, aPort, aAdmin, aUser, aPassword, aIsHashPassword,aProcess) {
+
             this.server = aServer == null ? 'localhost' : $.trim(aServer);
             this.port = aPort == null ? '8080' : $.trim(aPort);
-            this.admin = (aAdmin == true || aAdmin == "true");
+            this.admin = (aAdmin == true || aAdmin == "true"); 
+
             this.user = (aUser == '' || aUser == 'null') ? null : aUser;
             this.password = (aPassword == '' || aPassword == 'null' ) ? null : (aIsHashPassword == false ? aPassword : null);
             this.isHashedPassword = (aPassword == '' || aPassword == 'null') ? null : (aIsHashPassword == true ? aPassword : null);
