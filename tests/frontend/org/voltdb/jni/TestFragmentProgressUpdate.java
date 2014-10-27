@@ -307,7 +307,7 @@ public class TestFragmentProgressUpdate extends TestCase {
                     new long[] { CatalogUtil.getUniqueIdForFragment(frag) },
                     null,
                     new ParameterSet[] { params },
-                    new String[] { queryStmt.getSqltext() },
+                    new String[] { sqlText },
                     3, 3, 2, 42,
                     readOnly ? READ_ONLY_TOKEN : WRITE_TOKEN);
             if (readOnly && timeout > 0) {
