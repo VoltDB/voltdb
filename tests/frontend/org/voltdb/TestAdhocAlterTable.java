@@ -521,4 +521,74 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             teardownSystem();
         }
     }
+
+    public void testAlterLimitPartitionRows() throws Exception
+    {
+        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(
+                "create table FOO (" +
+                "ID integer not null," +
+                "VAL varchar(50), " +
+                "constraint PK_TREE primary key (ID)" +
+                ");\n"
+                );
+        builder.addPartitionInfo("FOO", "ID");
+        builder.setUseAdhocSchema(true);
+        boolean success = builder.compile(pathToCatalog, 1, 1, 0);
+        assertTrue("Schema compilation failed", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = pathToCatalog;
+        config.m_pathToDeployment = pathToDeployment;
+
+        try {
+            startSystem(config);
+            VoltTable results = m_client.callProcedure("@Statistics", "TABLE", 0).getResults()[0];
+            while (results.getRowCount() == 0) {
+                results = m_client.callProcedure("@Statistics", "TABLE", 0).getResults()[0];
+            }
+            System.out.println(results);
+            assertEquals(1, results.getRowCount());
+            results.advanceRow();
+            Long limit = results.getLong("TUPLE_LIMIT");
+            assertTrue(results.wasNull());
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "alter table foo add limit partition rows 10;");
+            }
+            catch (ProcCallException pce) {
+                fail("Should be able to alter partition row limit: " + pce.toString());
+            }
+            do {
+                results = m_client.callProcedure("@Statistics", "TABLE", 0).getResults()[0];
+                results.advanceRow();
+                limit = results.getLong("TUPLE_LIMIT");
+            }
+            while (results.wasNull());
+            System.out.println(results);
+            assertEquals(10L, (long)limit);
+
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "alter table foo drop limit partition rows;");
+            }
+            catch (ProcCallException pce) {
+                fail("Should be able to drop partition row limit: " + pce.toString());
+            }
+            do {
+                results = m_client.callProcedure("@Statistics", "TABLE", 0).getResults()[0];
+                results.advanceRow();
+                limit = results.getLong("TUPLE_LIMIT");
+            }
+            while (!results.wasNull());
+            System.out.println(results);
+        }
+        finally {
+            teardownSystem();
+        }
+    }
 }
