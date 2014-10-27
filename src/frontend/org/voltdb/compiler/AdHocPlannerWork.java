@@ -17,6 +17,8 @@
 
 package org.voltdb.compiler;
 
+import org.hsqldb_voltpatches.Database;
+import org.hsqldb_voltpatches.persist.HsqlProperties;
 import org.voltcore.network.Connection;
 import org.voltdb.AuthSystem;
 import org.voltdb.CatalogContext;
@@ -111,7 +113,7 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
             false, (singlePartition ? new Object[1] /*any vector element will do, even null*/ : null),
             "@AdHoc_RW_MP", ProcedureInvocationType.ORIGINAL, 0, 0,
             false, false, // don't allow adhoc DDL in this path
-            completionHandler, null);
+            completionHandler, new AuthSystem.AuthDisabledUser());
     }
 
     @Override
