@@ -62,7 +62,8 @@
       <ul class="topRightList" id="userSection">
         <li><a href="#logoutPopup" id="btnlogOut" ><div class="userN"></div></a></li>
         <li><a href="#logoutPopup" id="logOut" ><div class="user" title="Log Out"></div></a></li>
-        <li><a href="#"><div class="help" title="help"></div></a></li>
+        <li class="line"></li>
+        <li class="help"><a href="#help" id="showMyHelp">Help</a></li>
         <li class="responsiveMenuPlaceHolder">&nbsp;</li>
       </ul>
     </div>
@@ -414,7 +415,7 @@
             <br/>
             <ul class="btnList" id="Ul1">
                     <li>
-                        <div class="overlay-btns" style="padding:0"><a href="#" class="btn" id="btnLogout" onclick="logout();" title="Ok">Ok</a></div>
+                        <div class="overlay-btns" style="padding:0"><a href="javascript:void(0)" class="btn" id="btnLogout" onclick="logout();" title="Ok">Ok</a></div>
                     </li>
                     <li>
                         <div class="overlay-btns" style="padding:0"><a class="btn" id="btnCancel" title="Cancel">Cancel</a></div>
@@ -439,6 +440,20 @@
         </div>
         </div>
     <!--Connection popup-->
+    
+     <!--Help popup-->
+    <div id="help"  style="display:none">
+        <div class="overlay-title helpIcon ">Help</div>
+        <div class="clear"></div>
+        <div class="overlay-contentHelp">
+           <p>rem ipsum dolor sit amet, consectetur adipiscing elit. Quisque viverra id dolor at volutpat. Proin sed luctus tellus. Quisque ut ipsum ipsum. Vivamus at sagittis nibh. Ut aliquam, dolor eu ullamcorper rhoncus, nibh leo commodo ligula, vel efficitur leo neque quis nibh. Donec justo nulla, finibus vitae blandit eget, accumsan id mi. Quisque quis diam nunc. </p>
+           <p>
+           Maecenas porttitor est in ex viverra mattis. Curabitur orci nisi, mattis eu nulla ut, tincidunt convallis mi. Mauris sollicitudin tellus nisl, quis tempor orci euismod porta. Vivamus sit amet suscipit lectus. Nulla pharetra pellentesque lectus ut pulvinar. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Sed vel justo leo. In nibh elit, dapibus vel vestibulum venenatis, pharetra a metus. Etiam ut condimentum nisi, nec tincidunt ligula.</p>
+           
+        </div>
+         <div class="overlay-btns"><a href="javascript:void(0)" class="btn" title="OK" onclick="" >OK</a></div>
+    </div>
+    <!--help popup ends-->
 
     <!-- Loading -->
     <div id="overlay" style="display: none;">
