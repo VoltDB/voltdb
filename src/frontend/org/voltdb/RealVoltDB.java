@@ -1411,8 +1411,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             // log system setting information
             SystemSettingsType sysType = m_deployment.getSystemsettings();
-            if (sysType != null) {
-                hostLog.info("Host query timeout set to " + sysType.getQuery().getTimeout() + " milliseconds");
+            if (sysType != null && sysType.getQuery() != null) {
+            	if (sysType.getQuery().getTimeout() > 0) {
+            		hostLog.info("Host query timeout set to " + sysType.getQuery().getTimeout() + " milliseconds");
+            	}
             }
 
             // create a dummy catalog to load deployment info into
