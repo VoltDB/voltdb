@@ -89,6 +89,11 @@ $(document).ready(function () {
                 MonitorGraphUI.ChartLatency.update();
                 MonitorGraphUI.ChartTransactions.update();
             }
+            else if (VoltDbUI.CurrentTab == NavigationTabs.Schema) {
+                setTimeout(function () {
+                    window.scrollTo(0, 0);
+                }, 10);
+            }
 
             shortcut.remove("f5");
             shortcut.remove("f6");
@@ -107,19 +112,23 @@ $(document).ready(function () {
     voltDbRenderer.HandleLogin(serverName, portid, function () { loadPage(serverName, portid); });
 });
 
-var loadPage = function (serverName, portid) {
-    $("#btnLogout").on("click", function () {
-        saveSessionCookie("username", null);
-        saveSessionCookie("password", null);
-        $('#logOut').prop('title', '');
-        location.reload(true);
-    });
 
+function logout() {
+    saveSessionCookie("username", null);
+    saveSessionCookie("password", null);
+    saveSessionCookie("current-tab", NavigationTabs.DBMonitor);
+    $('#logOut').prop('title', '');
+    location.reload(true);
+};
+
+
+var loadPage = function (serverName, portid) {
     var userName = $.cookie('username') != undefined ? $.cookie('username') : "";
     var password = $.cookie('password') != undefined ? $.cookie('password') : "";
-    voltDbRenderer.ChangeServerConfiguration(serverName, portid, userName, password, true, true);
+    var isConnectionChecked = false;
+    voltDbRenderer.ChangeServerConfiguration(serverName, portid, userName, password, true, false);
     voltDbRenderer.ShowUsername(userName);
-    loadSQLQueryPage(serverName, portid, userName, password, true);
+    loadSQLQueryPage(serverName, portid, userName, password, false);
 
     var loadSchemaTab = function () {
         var templateUrl = window.location.protocol + '//' + window.location.host;
@@ -128,10 +137,6 @@ var loadPage = function (serverName, portid) {
         $.get(templateUrl, function (result) {
             var body = $(result).filter("#wrapper").html();
             $("#schema").html(body);
-
-            var downloadDDL = $("#downloadDDL");
-            downloadDDL.attr("download", "../" + downloadDDL.attr("download"));
-            downloadDDL.attr("href", "../" + downloadDDL.attr("href"));
 
             $("#schemaLinkSqlQuery").on("click", function (e) {
                 $("#navSqlQuery").trigger("click");
@@ -787,7 +792,6 @@ var loadPage = function (serverName, portid) {
                 $(this).addClass("sorttable_sorted");
 
             } else {
-                console.log("inside else of add and remove image");
                 $(this).addClass("sorttable_sorted");                
                 if ($("#" + voltDbRenderer.sortColumn) != undefined) {
                     $("#" + voltDbRenderer.sortColumn).data('name', 'none');
@@ -831,11 +835,10 @@ var loadPage = function (serverName, portid) {
 
                 });
             } else {
-                VoltDbUI.sortStatus = VoltDbUI.SORT_STATES.SORTING;
-                setPaginationIndicesOfProcedures(voltDbRenderer.isProcedureSearch);
+                VoltDbUI.sortStatus = VoltDbUI.SORT_STATES.SORTING;                
                 voltDbRenderer.sortProceduresByColumnsAsync();
                 voltDbRenderer.mapProcedureInformationAsync(currentProcedureAction, priorProcedureAction);
-                
+                setPaginationIndicesOfProcedures(voltDbRenderer.isProcedureSearch);
                 VoltDbUI.sortStatus = VoltDbUI.SORT_STATES.SORTED;
                 
 
@@ -899,6 +902,43 @@ var loadPage = function (serverName, portid) {
     configureUserPreferences();
     adjustGraphSpacing();
     saveThreshold();
+
+    var connectionTimeInterval = null;
+    var refreshConnectionTime = function (seconds) {
+            if (connectionTimeInterval != null)
+                window.clearInterval(connectionTimeInterval);
+
+            connectionTimeInterval = window.setInterval(checkServerConnection, seconds);
+    };
+
+    var checkServerConnection = function() {
+        if (!isConnectionChecked) {
+            isConnectionChecked = true;
+            voltDbRenderer.CheckServerConnection(
+                function(result) {
+                    if (result == false) {
+                        VoltDBCore.isServerConnected = false;
+                        if (!$('#conpop').is(':visible')) {
+                            window.clearInterval(connectionTimeInterval);
+                            $('#conPopup').click();
+                        }
+                    } else {
+                        isConnectionChecked = false;
+                    }
+                }
+            );
+        }
+    };
+
+    $("#conPopup").popup({
+        closeDialog: function () {
+            isConnectionChecked = false;
+            refreshConnectionTime('20000');
+            $('#connectionPopup').hide();
+        }
+    });
+    
+    refreshConnectionTime('20000');
 };
 
 

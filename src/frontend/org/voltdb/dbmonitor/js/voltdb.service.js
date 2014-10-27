@@ -7,7 +7,7 @@
     var port = "8080";
     var user = "";
     var password = "";
-    var admin = true;
+    var admin = false;
     var isHashedPassword = true;
     this.connection = null;
     var iVoltDbService = (function () {
@@ -27,6 +27,14 @@
             }
         };
 
+        this.CheckServerConnection = function(checkConnection) {
+            try {
+                VoltDBCore.CheckServerConnection(server, port, admin, user, password, isHashedPassword, "DATABASE_LOGIN",checkConnection);
+            } catch(e) {
+                console.log(e.message);
+            }
+        };
+
         this.SetUserCredentials = function(lUsername, lPassword, lAdmin) {
             user = lUsername;
             password = lPassword;
@@ -41,8 +49,6 @@
             isHashedPassword = isHashPw;
             admin = isAdmin != undefined ? isAdmin : true;
             
-            user = "voltdb";
-            password = "20e3aae7fc23385295505a6b703fd1fba66760d5";
         };
 
         this.GetSystemInformation = function (onConnectionAdded) {

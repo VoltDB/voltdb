@@ -416,9 +416,8 @@
     <div style="display: none"><a href="#error" id="errorPopup">Error</a></div>
 
     <!--Error popup-->
-    <div id="error" style="display: none">
-        <div class="overlay-title ">
-            <img src="css/resources/images/error.png" class="imgError" />Error</div>
+    <div id="error"  style="display:none">
+        <div class="overlay-title errorIcon ">Error</div>
         <div class="clear"></div>
         <div class="overlay-contentError errorMsg">
             <p id="errorMessage"></p>
@@ -445,8 +444,32 @@
                 </li>
             </ul>
         </div>
+                    <li>
+                        <div class="overlay-btns" style="padding:0"><a href="#" class="btn" id="btnLogout" onclick="logout();" title="Ok">Ok</a></div>
+                    </li>
+                    <li>
+                        <div class="overlay-btns" style="padding:0"><a class="btn" id="btnCancel" title="Cancel">Cancel</a></div>
+                    </li>
+             </ul>
+        </div>    
     </div>
     <!--Logout popup-->
+    
+    <!--Connection popup-->
+    <div style="display: none"><a href="#connectionPopup" id="conPopup">Connection Error</a></div>
+    
+    <div id="connectionPopup"  style="display:none">
+        <div id="conpop">
+            <div class="overlay-title "><img src="css/resources/images/error.png" class="imgError"  />Error</div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorMsg">
+                <p>Lost connection to DB Monitor service. Please click ok when the server is back online. </p>
+                <br/>
+                <div class="overlay-btns" style="padding:0"><a class="btn" id="btnConOk" title="save">Ok</a></div>
+            </div>    
+        </div>
+        </div>
+    <!--Connection popup-->
 
     <!-- Loading -->
     <div id="overlay" style="display: none;">

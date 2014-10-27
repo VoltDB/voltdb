@@ -109,18 +109,22 @@ function alertNodeClicked(obj) {
             });
         };
 
+        this.CheckServerConnection = function (checkConnection) {
+            VoltDBService.CheckServerConnection(checkConnection);
+        };
+
         this.GetLoginPopup = function () {
             var loginHtml =
                 '<a href="#loginBoxDialogue" id="loginLink" style="display: none;">Login</a>' +
                 '<!-- POPUP Login -->' +
                 '<div id="loginBoxDialogue" style="overflow: hidden" >' +
                     '<div class="overlay-title">Login</div>' +
-                        '<div id="UnableToLoginMsg" style="padding: 5px 0 0 20px; color: #ff0000; display: none;">Unable to connect!! Please try to login using another username/password.</div>' +
+                        '<div id="UnableToLoginMsg" style="padding: 5px 0 0 20px; color: #ff0000; display: none;">Unable to connect. Please try to login using another username/password.</div>' +
                             '<div class="clear"></div>' +
                             '<div  class="overlay-content" style="height:215px; min-width: 441px; padding: 0" >' +
                             '<div id="loginBox">' +
                                 '<label for="username">Username:</label>' +
-                                '<input type="text" id="username" name="username">' +
+                                '<input type="text" id="username" name="username"><br/>' +
                                 '<label for="password">Password:</label>' +
                                 '<input type="password" id="password" name="password">' +
                                 '<div class="lower">' +
@@ -149,7 +153,7 @@ function alertNodeClicked(obj) {
                     var usernameVal = $("#username").val();
                     var passwordVal = $().crypt({ method: "sha1", source: $("#password").val() });
 
-                    testConnection($("#username").data("servername"), $("#username").data("portid"), usernameVal, passwordVal, true, function (result) {
+                    testConnection($("#username").data("servername"), $("#username").data("portid"), usernameVal, passwordVal, false, function (result) {
                         $("#overlay").hide();
                         if (result) {
 
@@ -199,7 +203,7 @@ function alertNodeClicked(obj) {
 
             $("#overlay").show();
             //Try to login with saved username/password or no username and password
-            testConnection(serverName, portId, username, password, true, function (result) {
+            testConnection(serverName, portId, username, password, false, function (result) {
 
                 $("#overlay").hide();
                 if (!popupDisplayed) {
@@ -376,7 +380,7 @@ function alertNodeClicked(obj) {
 
         this.GetClusterHealth = function (callback) {
             if (systemOverview == null || systemOverview == undefined) {
-                alert("Error: Unable to extract cluster health information!!");
+                alert("Error: Unable to extract cluster health information.");
                 return;
             }
 
@@ -690,6 +694,8 @@ function alertNodeClicked(obj) {
                     });
                 }
 
+                procedureJsonArray = [];
+                procedureCount = 0;
                 if (voltDbRenderer.searchText == "" || voltDbRenderer.searchText == undefined || isPopulateSortData) {
                     jQuery.each(procedureData, function (key, data) {
                         if (!checkIfDuplicateJson(procedureJsonArray, key)) {
@@ -703,7 +709,6 @@ function alertNodeClicked(obj) {
                             };
                             procedureCount++;
                         }
-
                     });
 
                 }
@@ -1060,7 +1065,11 @@ function alertNodeClicked(obj) {
                     voltDbRenderer.procedureTableIndex = 0;
                 }
 
-                
+                if ((currentAction == VoltDbUI.ACTION_STATES.REFRESH && voltDbRenderer.isSortProcedures == true)) {
+                    pageStartIndex = 0;
+                    voltDbRenderer.procedureTableIndex = 0;
+                }
+
                 var lProcedureData = voltDbRenderer.isProcedureSearch ? this.searchData.procedures : procedureData;
                 jQuery.each(lProcedureData, function (id, val) {
                     if (currentAction == VoltDbUI.ACTION_STATES.NEXT && (voltDbRenderer.isProcedureSearch == false || voltDbRenderer.isProcedureSearch == undefined)) {
@@ -1254,6 +1263,9 @@ function alertNodeClicked(obj) {
                 });
 
                 if (replicationCount > 0 && table_type != "VIEW" && table_type != "PARTITIONED")
+                    table_type = "REPLICATED";
+                
+                else if (kFactor > 0 && table_type != "VIEW" && table_type != "PARTITIONED")
                     table_type = "REPLICATED";
 
                 else if (kFactor > 0 && table_type != "VIEW" && table_type != "PARTITIONED") {
@@ -2003,6 +2015,11 @@ function alertNodeClicked(obj) {
 $(function () {
     $('#toggleMenu').click(function () {
         $("#nav").slideToggle('slow');
+		$("#nav").css('left', '0');
+		$("#nav ul li").click(function(){
+				$("#nav").css('display', 'none');
+				$(window).resize();		
+			});
     });
 });
 
@@ -2012,6 +2029,7 @@ $(window).resize(function () {
     if (windowWidth > 699) {
         //alert(windowWidth);
         $("#nav").css('display', 'block');
+
     } else if (windowWidth < 699) {
         $("#nav").css('display', 'none');
     }
