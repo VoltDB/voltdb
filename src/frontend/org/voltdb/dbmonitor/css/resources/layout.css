@@ -497,6 +497,18 @@ tt, code, kbd, samp {
 font-family: monospace;
 }
 
+/*table sorting in dashboard*/
+table.storeTbl .sorttable_sorted_reverse {
+	background-image: url(images/asc.gif);
+    background-repeat: no-repeat;
+    background-position: right;
+}
+table.storeTbl .sorttable_sorted {
+	background-image: url(images/desc.gif);
+    background-repeat: no-repeat;
+    background-position: right;
+}
+
 /* CSS from old site */
  .invert {
         background-color: #0079BB;
