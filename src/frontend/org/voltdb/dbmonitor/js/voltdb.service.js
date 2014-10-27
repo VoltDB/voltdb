@@ -7,7 +7,7 @@
     var port = "8080";
     var user = "";
     var password = "";
-    var admin = false;
+    var admin = true;
     var isHashedPassword = true;
     this.connection = null;
     var iVoltDbService = (function () {
@@ -41,14 +41,13 @@
             admin = lAdmin;
         };
         
-        this.ChangeServerConfiguration = function(serverName,portId,userName,pw,isHashPw,isAdmin) {
+        this.ChangeServerConfiguration = function (serverName, portId, userName, pw, isHashPw, isAdmin) {
             server = serverName != null ? serverName : server;
             port = portId != null ? portId : port;
             user = userName != undefined ? userName : "";
             password = pw != undefined ? pw : "";
             isHashedPassword = isHashPw;
             admin = isAdmin != undefined ? isAdmin : true;
-            
         };
 
         this.GetSystemInformation = function (onConnectionAdded) {
@@ -78,7 +77,6 @@
                     
                 }
             } catch (e) {
-                debugger;
                 console.log(e.message);
             }
 
@@ -363,11 +361,12 @@
                 var procedureNames = ['@Statistics', '@Statistics', '@SystemCatalog', '@SystemCatalog', '@SystemCatalog'];
                 var parameters = ["TABLE", "INDEX", "COLUMNS", "PROCEDURES", "PROCEDURECOLUMNS"];
                 var values = ['0', '0', undefined];
-                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
+                var isAdmin = false;
+                _connection = VoltDBCore.HasConnection(server, port, isAdmin, user, processName);
                 if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
+                    VoltDBCore.TestConnection(server, port, isAdmin, user, password, isHashedPassword, processName, function (result) {
                         if (result == true) {
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                            VoltDBCore.AddConnection(server, port, isAdmin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
                                 onConnectionAdded(connection, status);
                             });
                         }
@@ -375,7 +374,7 @@
                     });
 
                 } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
+                    VoltDBCore.updateConnection(server, port, isAdmin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
                         onConnectionAdded(connection, status);
 
                     });
