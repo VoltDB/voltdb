@@ -1820,12 +1820,16 @@ public class TestFixedSQLSuite extends RegressionSuite {
         }
     }
 
-    public void testTableNamedTransaction() throws Exception {
+    public void testENG7041ViewAndExportTable() throws Exception {
         Client client = getClient();
 
-        // Materialized view wasn't being updated, because the connection with its source
-        // table wasn't getting created when there was a (completely unrelated) export table
-        // in the database.
+        // Materialized view wasn't being updated, because the
+        // connection with its source table wasn't getting created
+        // when there was a (completely unrelated) export table in the
+        // database.
+        //
+        // When loading the catalog in the EE, we were erroneously
+        // aborting view processing when encountering an export table.
         client.callProcedure("TRANSACTION.insert", 1, 99, 100.0, "NH", "Manchester", new TimestampType(), 20);
 
         validateTableOfLongs(client, "select count(*) from transaction",
