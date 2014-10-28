@@ -113,9 +113,14 @@ public class TestSecuritySuite extends RegressionSuite {
         // user2 can run sysprocs due to his group
         m_username = "user2";
         client = getClient();
-        modCount = client.callProcedure("@AdHoc", "INSERT INTO NEW_ORDER VALUES (4, 4, 4);").getResults()[0];
-        assertTrue(modCount.getRowCount() == 1);
-        assertTrue(modCount.asScalarLong() == 1);
+        try {
+            modCount = client.callProcedure("@AdHoc", "INSERT INTO NEW_ORDER VALUES (4, 4, 4);").getResults()[0];
+        } catch (ProcCallException e) {
+            e.printStackTrace();
+            exceptionThrown = true;
+        }
+        assertTrue(exceptionThrown);
+        exceptionThrown = false;
         results = client.callProcedure("@Quiesce").getResults();
         // one aggregate table returned
         assertTrue(results.length == 1);
@@ -341,13 +346,13 @@ public class TestSecuritySuite extends RegressionSuite {
         project.addUsers(users);
 
         GroupInfo groups[] = new GroupInfo[] {
-                new GroupInfo("group1", false, false, false, false),
-                new GroupInfo("group2", false, true, true, false),
-                new GroupInfo("group3", true, false, false, false),
-                new GroupInfo("group4", true, true, true, false),
-                new GroupInfo("groupWithDefaultProcPerm", false, false, true, false),
-                new GroupInfo("groupWithoutDefaultProcPerm", false, false, false, false),
-                new GroupInfo("groupWithDefaultProcReadPerm", false, false, false, true)
+                new GroupInfo("group1", false, false, false, false, false),
+                new GroupInfo("group2", false, false, true, true, false),
+                new GroupInfo("group3", true, false, false, false, false),
+                new GroupInfo("group4", true, false, true, true, false),
+                new GroupInfo("groupWithDefaultProcPerm", false, false, false, true, false),
+                new GroupInfo("groupWithoutDefaultProcPerm", false, false, false, false, false),
+                new GroupInfo("groupWithDefaultProcReadPerm", false, false, false, false, true)
         };
         project.addGroups(groups);
         project.setSecurityEnabled(true);
