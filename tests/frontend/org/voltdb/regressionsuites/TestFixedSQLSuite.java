@@ -34,6 +34,7 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.types.TimestampType;
 import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
 import org.voltdb_testprocs.regressionsuites.fixedsql.TestENG1232;
 import org.voltdb_testprocs.regressionsuites.fixedsql.TestENG1232_2;
@@ -1818,6 +1819,27 @@ public class TestFixedSQLSuite extends RegressionSuite {
             ++i;
         }
     }
+
+    public void testENG7041ViewAndExportTable() throws Exception {
+        Client client = getClient();
+
+        // Materialized view wasn't being updated, because the
+        // connection with its source table wasn't getting created
+        // when there was a (completely unrelated) export table in the
+        // database.
+        //
+        // When loading the catalog in the EE, we were erroneously
+        // aborting view processing when encountering an export table.
+        client.callProcedure("TRANSACTION.insert", 1, 99, 100.0, "NH", "Manchester", new TimestampType(), 20);
+
+        validateTableOfLongs(client, "select count(*) from transaction",
+                new long[][] {{1}});
+
+        // The buggy behavior would show zero rows in the view.
+        validateTableOfLongs(client, "select count(*) from acct_vendor_totals",
+                new long[][] {{1}});
+    }
+
 
     //
     // JUnit / RegressionSuite boilerplate
