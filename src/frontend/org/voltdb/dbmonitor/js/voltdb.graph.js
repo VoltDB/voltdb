@@ -108,7 +108,6 @@
 
             MonitorGraphUI.ChartCpu.margin({ left: 80 });
 
-            //d3.select('#chart svg')
             d3.select('#visualisationCpu')
                 .datum(dataCpu)
                 .transition().duration(500)
