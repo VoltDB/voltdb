@@ -67,10 +67,6 @@ public class TestPermission {
         final EnumSet<Permission> adhoc = Permission.getPermissionSetForGroup(group);
 
         group = new Group();
-        group.setSysproc(true);
-        final EnumSet<Permission> sysproc = Permission.getPermissionSetForGroup(group);
-
-        group = new Group();
         group.setAdmin(true);
         final EnumSet<Permission> admin = Permission.getPermissionSetForGroup(group);
 
@@ -86,7 +82,7 @@ public class TestPermission {
         group.setAdmin(true);
         final EnumSet<Permission> mixed = Permission.getPermissionSetForGroup(group);
 
-        verify(none, adhoc, sysproc, admin, allthree, mixed);
+        verify(none, adhoc, admin, admin, allthree, mixed);
     }
 
     private void verify(EnumSet<Permission> none,
@@ -112,7 +108,6 @@ public class TestPermission {
         Permission.setPermissionsInGroup(group, EnumSet.noneOf(Permission.class));
         assertFalse(group.getAdhoc());
         assertFalse(group.getAdmin());
-        assertFalse(group.getSysproc());
         assertFalse(group.getDefaultproc());
         assertFalse(group.getDefaultprocread());
 
@@ -120,7 +115,6 @@ public class TestPermission {
         Permission.setPermissionsInGroup(group, EnumSet.of(Permission.ADHOC));
         assertTrue(group.getAdhoc());
         assertFalse(group.getAdmin());
-        assertFalse(group.getSysproc());
         assertFalse(group.getDefaultproc());
         assertFalse(group.getDefaultprocread());
 
@@ -128,7 +122,6 @@ public class TestPermission {
         Permission.setPermissionsInGroup(group, EnumSet.of(Permission.ADMIN));
         assertFalse(group.getAdhoc());
         assertTrue(group.getAdmin());
-        assertTrue(group.getSysproc());
         assertFalse(group.getDefaultproc());
         assertFalse(group.getDefaultprocread());
 
@@ -136,7 +129,6 @@ public class TestPermission {
         Permission.setPermissionsInGroup(group, EnumSet.of(Permission.ADHOC, Permission.DEFAULTPROC, Permission.DEFAULTPROCREAD));
         assertTrue(group.getAdhoc());
         assertFalse(group.getAdmin());
-        assertFalse(group.getSysproc());
         assertTrue(group.getDefaultproc());
         assertTrue(group.getDefaultprocread());
 
@@ -144,7 +136,6 @@ public class TestPermission {
         Permission.setPermissionsInGroup(group, EnumSet.of(Permission.ADHOC, Permission.ADMIN));
         assertTrue(group.getAdhoc());
         assertTrue(group.getAdmin());
-        assertTrue(group.getSysproc());
         assertFalse(group.getDefaultproc());
         assertFalse(group.getDefaultprocread());
     }

@@ -3030,7 +3030,7 @@ public class TestVoltCompiler extends TestCase {
                 Group group = groups.get(role.name);
                 assertNotNull(String.format("Missing role \"%s\"", role.name), group);
                 assertEquals(String.format("Role \"%s\" adhoc flag mismatch:", role.name), role.adhoc, group.getAdhoc());
-                assertEquals(String.format("Role \"%s\" sysproc flag mismatch:", role.name), role.sysproc, group.getSysproc());
+                assertEquals(String.format("Role \"%s\" admin flag mismatch:", role.name), role.sysproc, group.getAdmin());
                 assertEquals(String.format("Role \"%s\" defaultproc flag mismatch:", role.name), role.defaultproc, group.getDefaultproc());
                 assertEquals(String.format("Role \"%s\" defaultprocread flag mismatch:", role.name), role.defaultprocread, group.getDefaultprocread());
             }
