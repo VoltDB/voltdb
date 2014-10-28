@@ -86,10 +86,12 @@ function alertNodeClicked(obj) {
         var maxLatencyIndex = 0;
         var avgLatencyIndex = 0;
         var perExecutionIndex = 0;
+
         var tableNameIndex = 5;
         var partitionIndex = 4;
         var hostIndex = 1;
         var tupleCountIndex = 7;
+
 
         //sorting related variables
         this.isSortProcedures = false;
@@ -662,8 +664,6 @@ function alertNodeClicked(obj) {
 
         };
 
-
-
         var populateProcedureJsonArray = function (connection) {
             var procedureCount = 0;
             if (connection != undefined) {
@@ -728,7 +728,6 @@ function alertNodeClicked(obj) {
             }
         };
 
-
         var populateTableJsonArrayForSorting = function (connection) {
             var tableCount = 0;
             if (connection != undefined) {
@@ -772,7 +771,6 @@ function alertNodeClicked(obj) {
                 }
             }
         };
-
 
         var populateTableJsonArray = function (connection) {
             var tableCount = 0;
@@ -1935,15 +1933,27 @@ function alertNodeClicked(obj) {
             var procedureCount = 0;
             var lConnection = VoltDBService.getProcedureContextForSorting();
             populateProcedureJsonArrayForSorting(lConnection);
+            if (!voltDbRenderer.isProcedureSearch) {
 
-            if (voltDbRenderer.sortOrder == "descending") {
-                procedureJsonArray = descendingSortJSON(procedureJsonArray, this.sortColumn);
-            }
+                if (voltDbRenderer.sortOrder == "descending") {
+                    procedureJsonArray = descendingSortJSON(procedureJsonArray, this.sortColumn);
+                }
 
-            else if (voltDbRenderer.sortOrder == "ascending") {
-                procedureJsonArray = ascendingSortJSON(procedureJsonArray, this.sortColumn);
+                else if (voltDbRenderer.sortOrder == "ascending") {
+                    procedureJsonArray = ascendingSortJSON(procedureJsonArray, this.sortColumn);
+                }
+                mapJsonArrayToProcedures();
             }
-            mapJsonArrayToProcedures();
+            else if (voltDbRenderer.isProcedureSearch) {
+                if (voltDbRenderer.sortOrder == "descending") {
+                    procedureSearchJsonArray = descendingSortJSON(procedureSearchJsonArray, this.sortColumn);
+                }
+
+                else if (voltDbRenderer.sortOrder == "ascending") {
+                    procedureSearchJsonArray = ascendingSortJSON(procedureSearchJsonArray, this.sortColumn);
+                }
+                mapJsonArrayToSearchedProcedures();
+            }
         };
 
         var getLatencyDetails = function (connection, latency) {

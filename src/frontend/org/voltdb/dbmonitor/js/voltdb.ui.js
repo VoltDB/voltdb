@@ -266,9 +266,8 @@ var loadPage = function (serverName, portid) {
             MonitorGraphUI.RefreshCpu(cpuDetails, getCurrentServer(), graphView, currentTab);
         });
 
-
-
-        voltDbRenderer.getDatabaseInformation(function (procedureMetadata, tableMetadata) {
+       
+        voltDbRenderer.getDatabaseInformation(function (procedureMetadata, tableMetadata) {               
             if ((procedureMetadata != "" && procedureMetadata != undefined)) {
                 voltDbRenderer.mapProcedureInformation(currentProcedureAction, priorProcedureAction, voltDbRenderer.isProcedureSearch, function (traverse, htmlData) {
 
@@ -307,8 +306,19 @@ var loadPage = function (serverName, portid) {
                 lblPrevious.innerHTML = " ".concat(0, ' ');
                 lblTotalPages.innerHTML = " ".concat(0);
                 $('#storeProcedureBody').html("<tr><td colspan=6> No Data to be displayed</td></tr>");
+                                   
+
+                if (currentProcedureAction == VoltDbUI.ACTION_STATES.SEARCH) {
+                    priorProcedureAction = currentProcedureAction;
+                }
+
+
+                currentProcedureAction = VoltDbUI.ACTION_STATES.REFRESH;
+                VoltDbUI.CurrentProcedureDataProgress = VoltDbUI.DASHBOARD_PROGRESS_STATES.REFRESH_PROCEDUREDATA_NONE;
 
             }
+
+                           
 
             if (tableMetadata != "" && tableMetadata != undefined) {
                 voltDbRenderer.mapTableInformation(currentTableAction, priorTableAction, voltDbRenderer.isTableSearch, function (htmlData) {
@@ -712,7 +722,7 @@ var loadPage = function (serverName, portid) {
         }
     };
 
-
+   
     var saveThreshold = function () {
 
         var defaultThreshold = 90;
@@ -851,6 +861,7 @@ var loadPage = function (serverName, portid) {
                     priorProcedureAction = currentProcedureAction;
                     currentProcedureAction = VoltDbUI.ACTION_STATES.SEARCH;
                     voltDbRenderer.formatSearchDataToJsonArray();
+                    voltDbRenderer.sortProceduresByColumnsAsync();
                     voltDbRenderer.mapProcedureInformationAsync(currentProcedureAction, priorProcedureAction);
 
                     //set pagination
