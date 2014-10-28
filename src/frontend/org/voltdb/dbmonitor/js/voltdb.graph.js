@@ -50,7 +50,7 @@
             var arr = [];
             var theDate = new Date();
 
-            for (var i = 121; i >= 0; i--) {
+            for (var i = 180; i >= 0; i--) {
                 arr[i] = { x: new Date(theDate.getTime()), y: null };
                 theDate.setMinutes(theDate.getMinutes() - 5);
             }
@@ -364,7 +364,7 @@
             dataRam[0]["values"] = getEmptyDataForView(view);
             dataLatency[0]["values"] = getEmptyDataForView(view);
             dataTransactions[0]["values"] = getEmptyDataForView(view);
-            
+            changeAxisTimeFormat(view);
         };
 
         this.RefreshGraph = function(view) {
@@ -384,6 +384,36 @@
                 dataRam[0]["values"] = MonitorGraphUI.Monitors.memData;
                 dataLatency[0]["values"] = MonitorGraphUI.Monitors.latData;
             }
+            d3.select('#visualisationCpu')
+                .datum(dataCpu)
+                .transition().duration(500)
+                .call(MonitorGraphUI.ChartCpu);
+
+            nv.utils.windowResize(MonitorGraphUI.ChartCpu.update);
+            changeAxisTimeFormat(view);
+        };
+
+        var changeAxisTimeFormat = function (view) {
+            var dateFormat = '%X';
+            if (view == 'Days')
+                dateFormat = '%d %b %X';
+
+            MonitorGraphUI.ChartCpu.xAxis
+                .tickFormat(function (d) {
+                    return d3.time.format(dateFormat)(new Date(d));
+                });
+            MonitorGraphUI.ChartRam.xAxis
+                .tickFormat(function (d) {
+                    return d3.time.format(dateFormat)(new Date(d));
+                });
+            MonitorGraphUI.ChartLatency.xAxis
+                .tickFormat(function (d) {
+                    return d3.time.format(dateFormat)(new Date(d));
+                });
+            MonitorGraphUI.ChartTransactions.xAxis
+                .tickFormat(function (d) {
+                    return d3.time.format(dateFormat)(new Date(d));
+                });
         };
 
         this.RefreshLatency = function (latency, graphView, currentTab) {
@@ -417,7 +447,7 @@
                 latSecCount = 0;
             }
 
-            if (latMinCount == 60 || monitor.latFirstData) {
+            if (latMinCount == 120 || monitor.latFirstData) {
                 dataLatDay = dataLatDay.slice(1);
                 dataLatDay.push({ 'x': new Date(timeStamp), 'y': lat });
                 MonitorGraphUI.Monitors.latDataDay = dataLatDay;
@@ -462,7 +492,7 @@
                 memSecCount = 0;
             }
 
-            if (memMinCount == 60 || monitor.memFirstData) {
+            if (memMinCount == 120 || monitor.memFirstData) {
                 dataMemDay = dataMemDay.slice(1);
                 dataMemDay.push({ 'x': new Date(memTimeStamp), 'y': memRss });
                 MonitorGraphUI.Monitors.memDataDay = dataMemDay;
@@ -508,7 +538,7 @@
                     MonitorGraphUI.Monitors.tpsDataMin = datatransMin;
                     tpsSecCount = 0;
                 }
-                if (tpsMinCount == 60 || monitor.tpsFirstData) {
+                if (tpsMinCount == 120 || monitor.tpsFirstData) {
                     datatransDay = datatransDay.slice(1);
                     datatransDay.push({ "x": new Date(transacDetail["TimeStamp"]), "y": parseFloat(delta * 1000.0 / (currentTimerTick - monitor.lastTimerTick)).toFixed(1) * 1 });
                     MonitorGraphUI.Monitors.tpsDataDay = datatransDay;
@@ -556,7 +586,7 @@
                 MonitorGraphUI.Monitors.cpuDataMin = cpuDataMin;
                 cpuSecCount = 0;
             }
-            if (cpuMinCount == 60 || monitor.cpuFirstData) {
+            if (cpuMinCount == 120 || monitor.cpuFirstData) {
                 cpuDataDay = cpuDataDay.slice(1);
                 cpuDataDay.push({ "x": new Date(timeStamp), "y": percentageUsage });
                 MonitorGraphUI.Monitors.cpuDataHrs = cpuDataDay;
