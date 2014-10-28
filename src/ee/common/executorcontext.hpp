@@ -106,7 +106,7 @@ class ExecutorContext {
         m_undoQuantum = undoQuantum;
     }
 
-    void setupForExecutors(std::map<int, std::vector<AbstractExecutor*>* >* executorsMap) {
+    void setupForExecutors(std::map<int, std::vector<AbstractExecutor*> >* executorsMap) {
         assert(executorsMap != NULL);
         m_executorsMap = executorsMap;
         m_subqueryContextMap.clear();
@@ -158,14 +158,16 @@ class ExecutorContext {
     }
 
     /** Executor List for a given sub statement id */
-    std::vector<AbstractExecutor*>& getExecutorList(int stmtId = 0) {
-        assert(m_executorsMap->find(stmtId) != m_executorsMap->end());
-        return *m_executorsMap->find(stmtId)->second;
+    const std::vector<AbstractExecutor*>& getExecutors(int subqueryId) const
+    {
+        assert(m_executorsMap->find(subqueryId) != m_executorsMap->end());
+        return m_executorsMap->find(subqueryId)->second;
     }
 
     /** Return pointer to a subquery context or NULL */
-    SubqueryContext* getSubqueryContext(int stmtId) {
-        std::map<int, SubqueryContext>::iterator it = m_subqueryContextMap.find(stmtId);
+    SubqueryContext* getSubqueryContext(int subqueryId)
+    {
+        std::map<int, SubqueryContext>::iterator it = m_subqueryContextMap.find(subqueryId);
         if (it != m_subqueryContextMap.end()) {
             return &(it->second);
         } else {
@@ -173,16 +175,22 @@ class ExecutorContext {
         }
     }
 
-    /** Set a new subquery context or NULL */
-    void setSubqueryContext(int stmtId, SubqueryContext context) {
+    /** Set a new subquery context for the statement id. */
+    SubqueryContext* setSubqueryContext(int subqueryId, const std::vector<NValue>& lastParams)
+    {
+        SubqueryContext fromCopy(lastParams);
+#ifdef DEBUG
         std::pair<std::map<int, SubqueryContext>::iterator, bool> result =
-            m_subqueryContextMap.insert(std::make_pair(stmtId, context));
-        if (!result.second) {
-            // the old context is there
-            result.first->second = context;
-        }
-
+#endif
+            m_subqueryContextMap.insert(std::make_pair(subqueryId, fromCopy));
+        assert(result.second);
+        return &(m_subqueryContextMap.find(subqueryId)->second);
     }
+
+    Table* executeExecutors(int subqueryId) const;
+
+    void cleanupExecutors(int subqueryId) const;
+
     DRTupleStream* drStream() {
         return m_drStream;
     }
@@ -197,7 +205,6 @@ class ExecutorContext {
     }
 
   private:
-
     Topend *m_topEnd;
     Pool *m_tempStringPool;
     UndoQuantum *m_undoQuantum;
@@ -206,7 +213,7 @@ class ExecutorContext {
     NValueArray* m_staticParams;
     // Executor stack map. The key is the statement id (0 means the main/parent statement)
     // The value is the pointer to the executor stack for that statement
-    std::map<int, std::vector<AbstractExecutor*>* >* m_executorsMap;
+    std::map<int, std::vector<AbstractExecutor*> >* m_executorsMap;
     std::map<int, SubqueryContext> m_subqueryContextMap;
 
     DRTupleStream *m_drStream;

@@ -18,23 +18,20 @@
 #ifndef HSTORESUBQUERYEXPRESSION_H
 #define HSTORESUBQUERYEXPRESSION_H
 
-#include <vector>
+#include "expressions/abstractexpression.h"
 
 #include <boost/shared_ptr.hpp>
 
-#include "common/valuevector.h"
-#include "expressions/abstractexpression.h"
+#include <vector>
 
 namespace voltdb {
-
-class NValue;
 
 class SubqueryExpression : public AbstractExpression {
     public:
     SubqueryExpression(ExpressionType subqueryType,
         int subqueryId,
-        std::vector<int> paramIdxs,
-        std::vector<int> otherParamIdxs,
+        const std::vector<int>& paramIdxs,
+        const std::vector<int>& otherParamIdxs,
         const std::vector<AbstractExpression*>* tveParams);
 
     ~SubqueryExpression();
@@ -44,7 +41,7 @@ class SubqueryExpression : public AbstractExpression {
     std::string debugInfo(const std::string &spacer) const;
 
   private:
-    int m_subqueryId;
+    const int m_subqueryId;
 
     // The list of parameter indexes that need to be set by this subquery
     // before the expression can be evaluated.
@@ -57,10 +54,6 @@ class SubqueryExpression : public AbstractExpression {
 
     // The list of the corresponding TVE for each parameter index
     boost::shared_ptr<const std::vector<AbstractExpression*> > m_tveParams;
-
-    // The pointer to the global parameters
-    NValueArray* m_parameterContainer;
-
 };
 
 }

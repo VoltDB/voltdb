@@ -648,14 +648,4 @@ int warn_if(int condition, const char* message)
     return condition;
 }
 
-NValue NValue::copyNValue(NValue value) {
-    NValue copy = value;
-    if (copy.m_sourceInlined) {
-        // The NValue storage is inlined (a pointer to the backing tuple storage) and needs
-        // to be copied to a local storage
-        copy.allocateObjectFromInlinedValue();
-    }
-    return copy;
-}
-
 };
