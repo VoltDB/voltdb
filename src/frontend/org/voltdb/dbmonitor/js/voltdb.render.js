@@ -84,7 +84,7 @@ function alertNodeClicked(obj) {
         var maxLatencyIndex = 0;
         var avgLatencyIndex = 0;
         var perExecutionIndex = 0;
-        
+
         //sorting related variables
         this.isSortProcedures = false;
         this.isSortTables = false;
@@ -312,7 +312,7 @@ function alertNodeClicked(obj) {
                 var procedureColumnsData = {};
                 var sysProceduresData = {};
                 getTableData(connection, tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData, 'TABLE_INFORMATION');
-                onInformationLoaded(tablesData, viewsData,proceduresData,procedureColumnsData,sysProceduresData);
+                onInformationLoaded(tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData);
             });
         };
 
@@ -537,7 +537,7 @@ function alertNodeClicked(obj) {
                 voltDbRenderer.procedureDataSize = connection.Metadata['@Statistics_PROCEDUREPROFILE'].data.length;
             }
         };
-        
+
         var populateProcedureData = function (connection) {
             var procedureCount = 0;
             if (connection.Metadata['@Statistics_PROCEDUREPROFILE'].data != undefined) {
@@ -567,7 +567,7 @@ function alertNodeClicked(obj) {
                 });
             }
         };
-        
+
         var populateProcedureJsonArrayForSorting = function (connection) {
             var procedureCount = 0;
             if (connection != null) {
@@ -628,7 +628,6 @@ function alertNodeClicked(obj) {
             }
 
         };
-
         var populateProcedureJsonArray = function (connection) {
             var procedureCount = 0;
             if (connection != undefined) {
@@ -692,7 +691,7 @@ function alertNodeClicked(obj) {
                 }
             }
         };
-       
+
         var populateTableTypes = function (connection) {
             var counter = 0;
             var tableName;
@@ -1175,7 +1174,7 @@ function alertNodeClicked(obj) {
             VoltDbUI.CurrentProcedureDataProgress = VoltDbUI.DASHBOARD_PROGRESS_STATES.REFRESH_PROCEDUREDATA_NONE;
 
         };
-        
+
         this.mapTableInformation = function (currentAction, priorAction, isSearch, callback) {
             var counter = 0;
             var tablePageStartIndex = 0;
@@ -1237,7 +1236,7 @@ function alertNodeClicked(obj) {
 
                 if (replicationCount > 0 && table_type != "VIEW" && table_type != "PARTITIONED")
                     table_type = "REPLICATED";
-                
+
                 else if (kFactor > 0 && table_type != "VIEW" && table_type != "PARTITIONED")
                     table_type = "REPLICATED";
 
@@ -1463,7 +1462,7 @@ function alertNodeClicked(obj) {
             });
             return serverAddress;
         };
-        
+
         this.sortProceduresByColumns = function () {
             var procedureCount = 0;
             var lConnection = VoltDBService.getProcedureContextForSorting();
@@ -1483,15 +1482,27 @@ function alertNodeClicked(obj) {
             var procedureCount = 0;
             var lConnection = VoltDBService.getProcedureContextForSorting();
             populateProcedureJsonArrayForSorting(lConnection);
+            if (!voltDbRenderer.isProcedureSearch) {
 
-            if (voltDbRenderer.sortOrder == "descending") {
-                procedureJsonArray = descendingSortJSON(procedureJsonArray, this.sortColumn);
-            }
+                if (voltDbRenderer.sortOrder == "descending") {
+                    procedureJsonArray = descendingSortJSON(procedureJsonArray, this.sortColumn);
+                }
 
-            else if (voltDbRenderer.sortOrder == "ascending") {
-                procedureJsonArray = ascendingSortJSON(procedureJsonArray, this.sortColumn);
+                else if (voltDbRenderer.sortOrder == "ascending") {
+                    procedureJsonArray = ascendingSortJSON(procedureJsonArray, this.sortColumn);
+                }
+                mapJsonArrayToProcedures();
             }
-            mapJsonArrayToProcedures();
+            else if (voltDbRenderer.isProcedureSearch) {
+                if (voltDbRenderer.sortOrder == "descending") {
+                    procedureSearchJsonArray = descendingSortJSON(procedureSearchJsonArray, this.sortColumn);
+                }
+
+                else if (voltDbRenderer.sortOrder == "ascending") {
+                    procedureSearchJsonArray = ascendingSortJSON(procedureSearchJsonArray, this.sortColumn);
+                }
+                mapJsonArrayToSearchedProcedures();
+            }
         };
 
         var getLatencyDetails = function (connection, latency) {
@@ -1713,7 +1724,7 @@ function alertNodeClicked(obj) {
                         ' (' + rawColumns[i][5].toLowerCase() + ')';
                 }
             }
-            
+
             // User Procedures
             for (var i = 0; i < procedures.length; ++i) {
                 var connTypeParams = [];
@@ -1862,7 +1873,7 @@ function alertNodeClicked(obj) {
             }
             return 0;
         };
-        
+
         var ascendingSortJSON = function (data, key) {
             return data.sort(function (a, b) {
                 var x = a[key]; var y = b[key];
@@ -1901,7 +1912,7 @@ function alertNodeClicked(obj) {
 
             return isSearchable;
         };
-        
+
         //Search methods
         var lSearchData = this.searchData;
         this.searchProcedures = function (searchType, searchKey, onProcedureSearched) {
@@ -1953,7 +1964,7 @@ function alertNodeClicked(obj) {
             this.tableSearchDataSize = searchDataCount;
             onTablesSearched(searchDataCount > 0);
         };
-        
+
         this.formatSearchDataToJsonArray = function () {
             var searchProcedureCount = 0;
             procedureSearchJsonArray = [];
@@ -2014,11 +2025,11 @@ function alertNodeClicked(obj) {
 $(function () {
     $('#toggleMenu').click(function () {
         $("#nav").slideToggle('slow');
-		$("#nav").css('left', '0');
-		$("#nav ul li").click(function(){
-				$("#nav").css('display', 'none');
-				$(window).resize();		
-			});
+        $("#nav").css('left', '0');
+        $("#nav ul li").click(function () {
+            $("#nav").css('display', 'none');
+            $(window).resize();
+        });
     });
 });
 
