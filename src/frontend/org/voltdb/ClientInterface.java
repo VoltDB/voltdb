@@ -1739,7 +1739,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 return dispatchStatistics(OpsSelector.SYSTEMINFORMATION, task, ccxn);
             }
             else if (task.procName.equals("@GC")) {
-                return dispatchSystemGC(handler, task, user);
+                return dispatchSystemGC(handler, task);
             }
             else if (task.procName.equals("@StopNode")) {
                 return dispatchStopNode(task);
@@ -1885,7 +1885,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * Can be used to perform old gen GCs on a schedule during non-peak times
      */
     private ClientResponseImpl dispatchSystemGC(final ClientInputHandler handler,
-                                                final StoredProcedureInvocation task, AuthSystem.AuthUser user) {
+                                                final StoredProcedureInvocation task) {
         m_systemGCThread.execute(new Runnable() {
             @Override
             public void run() {

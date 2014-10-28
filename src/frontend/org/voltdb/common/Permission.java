@@ -57,7 +57,7 @@ public enum Permission {
      */
     public static final EnumSet<Permission> getPermissionSetForGroup(Group catGroup) {
         EnumSet<Permission> perms;
-        if (catGroup.getAdmin() || catGroup.getSysproc()) {
+        if (catGroup.getAdmin()) {
             perms = EnumSet.allOf(Permission.class);
         } else {
             perms = EnumSet.noneOf(Permission.class);
@@ -107,7 +107,6 @@ public enum Permission {
                 break;
             case ADMIN:
                 group.setAdmin(true);
-                group.setSysproc(true);
                 break;
             case DEFAULTPROC:
                 group.setDefaultproc(true);
