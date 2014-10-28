@@ -229,6 +229,39 @@
             }
         };
         
+        this.getTablesContextForSorting = function () {
+            try {
+                var processName = "DATABASE_INFORMATION";
+                var procedureNames = ['@Statistics'];
+                var parameters = ["TABLE"];
+                var values = ['0'];
+                var lconnection = VoltDBCore.HasConnection(server, port, false, user, processName);
+                if (lconnection == null) {
+                    VoltDBCore.TestConnection(server, port, false, user, password, isHashedPassword, processName, function (result) {
+                        if (result == true) {
+                            VoltDBCore.AddConnection(server, port, false, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                                lconnection = connection;
+                            });
+                        }
+
+                    });
+                } else {
+                    VoltDBCore.updateConnection(server, port, false, user, password, isHashedPassword, procedureNames, parameters, values, processName, lconnection, function (connection, status) {
+                        lconnection = connection;
+                    });
+
+                }
+
+
+
+                return lconnection;
+
+
+            } catch (e) {
+                console.log(e.message);
+            }
+        };
+        
         this.GetMemoryInformation = function (onConnectionAdded) {
             try {
                 var processName = "GRAPH_MEMORY";
