@@ -52,7 +52,7 @@
 
             for (var i = 180; i >= 0; i--) {
                 arr[i] = { x: new Date(theDate.getTime()), y: null };
-                theDate.setMinutes(theDate.getMinutes() - 5);
+                theDate.setMinutes(theDate.getMinutes() - 10);
             }
 
             return arr;
