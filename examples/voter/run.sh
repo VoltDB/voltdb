@@ -43,7 +43,7 @@ HOST="localhost"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar voltdbroot voltdbroot
+    rm -rf obj debugoutput $APPNAME.jar $APPNAME-empty.jar voltdbroot voltdbroot
 }
 
 # compile the source code for procedures and the client
@@ -69,6 +69,30 @@ function catalog() {
     if [ $? != 0 ]; then exit; fi
 }
 
+# build an application catalog
+function empty-server() {
+    srccompile
+    echo "Compiling the application catalog with no DDL, Procedure classes will be added to ctalog."
+    echo "To perform this action manually, use the command line: "
+    echo
+    echo "voltdb create -d deployment-adhoc.xml -l $LICENSE -H $HOST $APPNAME-empty.jar"
+    echo
+    $VOLTDB compile --classpath obj -o $APPNAME-empty.jar ddl-empty.sql
+    echo "Adding classes to empty catalog"
+    jar uf $APPNAME-empty.jar -C obj .
+    echo "voltdb create -d deployment-adhoc.xml -l $LICENSE -H $HOST $APPNAME-empty.jar"
+    $VOLTDB create -d deployment-adhoc.xml -l $LICENSE -H $HOST $APPNAME-empty.jar
+    # stop if compilation fails
+    if [ $? != 0 ]; then exit; fi
+}
+
+# Reloads the database schema from loadschema.sql
+# The sql can add additional schema elements or completely rebuild an existing schema.
+function loadschema() {
+while read p; do
+  echo $p | sqlcmd
+done < loadschema.sql
+}
 # run the voltdb server locally
 function server() {
     # if a catalog doesn't exist, build one
