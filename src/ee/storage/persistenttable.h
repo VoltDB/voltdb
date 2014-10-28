@@ -424,6 +424,28 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
         }
     }
 
+    /**
+     * Returns true if this table has a fragment that may be executed
+     * when the table's row limit will be exceeded.
+     *
+     * Until there is frontend support, treat tables with this magic
+     * name as if they have a purge fragment.
+     */
+    bool hasPurgeFragment() const {
+        return name().compare("CAPPED3_LIMIT_ROWS_EXEC") == 0;
+    }
+
+    /**
+     * Returns the fragment ID of the table's purge fragment.
+     *
+     * Temporarily assume the fragment ID to be a magic number defined
+     * in VoltDBEngine.h
+     */
+    int64_t getPurgeFragmentId() const {
+        assert(hasPurgeFragment());
+        return MAGIC_PURGE_FRAGMENT_ID;
+    }
+
   private:
 
     // Zero allocation size uses defaults.
