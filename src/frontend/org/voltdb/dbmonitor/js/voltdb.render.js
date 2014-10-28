@@ -243,7 +243,7 @@ function alertNodeClicked(obj) {
                 setKFactor(connection);
                 VoltDBService.GetProceduresInformation(function (nestConnection) {
                     populateProceduresInformation(nestConnection);
-                    procedureMetadata = nestConnection.Metadata['@Statistics_PROCEDUREPROFILE'].data;
+                    procedureMetadata = procedureData;
 
                     VoltDBService.GetDataTablesInformation(function (inestConnection) {
                         populateTablesInformation(inestConnection);
