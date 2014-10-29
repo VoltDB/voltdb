@@ -219,6 +219,27 @@ public class TestSecuritySuite extends RegressionSuite {
             exceptionThrown = true;
         }
         assertTrue(exceptionThrown);
+
+        // userWithAllProc must be able to invoke any just like user4
+        String procusers[] = { "user4", "userWithAllProc" };
+        for (String user : procusers) {
+            m_username = user;
+            client = getClient();
+            client.callProcedure("DoNothing1", 1);
+            client.callProcedure("DoNothing2", 1);
+            client.callProcedure("DoNothing3", 1);
+
+            // user3 shouldn't gleam much info from a made up proc
+            try {
+                client.callProcedure("RyanLikesTheYankees", 1);
+            } catch (ProcCallException e) {
+                assertFalse(e.getMessage().contains("lost before a response was received"));
+                e.printStackTrace();
+                exceptionThrown = true;
+            }
+            assertTrue(exceptionThrown);
+        }
+
     }
 
     // Tests permissions applied to auto-generated default CRUD procedures.
@@ -351,6 +372,7 @@ public class TestSecuritySuite extends RegressionSuite {
                 new UserInfo("user2", "password", new String[] {"group2"}),
                 new UserInfo("user3", "password", new String[] {"group3"}),
                 new UserInfo("user4", "password", new String[] {"group4"}),
+                new UserInfo("userWithAllProc", "password", new String[] {"groupWithAllProcPerm"}),
                 new UserInfo("userWithDefaultProcPerm", "password", new String[] {"groupWithDefaultProcPerm"}),
                 new UserInfo("userWithoutDefaultProcPerm", "password", new String[] {"groupWithoutDefaultProcPerm"}),
                 new UserInfo("userWithDefaultProcReadPerm", "password", new String[] {"groupWithDefaultProcReadPerm"})
@@ -358,13 +380,14 @@ public class TestSecuritySuite extends RegressionSuite {
         project.addUsers(users);
 
         GroupInfo groups[] = new GroupInfo[] {
-                new GroupInfo("group1", false, false, false, false),
-                new GroupInfo("group2", true, false, false, false),
-                new GroupInfo("group3", true, false, false, false),
-                new GroupInfo("group4", false, true, false, false),
-                new GroupInfo("groupWithDefaultProcPerm", false, false, true, false),
-                new GroupInfo("groupWithoutDefaultProcPerm", false, false, false, false),
-                new GroupInfo("groupWithDefaultProcReadPerm", false, false, false, true)
+                new GroupInfo("group1", false, false, false, false, false),
+                new GroupInfo("group2", true, false, false, false, false),
+                new GroupInfo("group3", true, false, false, false, false),
+                new GroupInfo("group4", false, true, false, false, false),
+                new GroupInfo("groupWithAllProcPerm", false, false, false, false, true),
+                new GroupInfo("groupWithDefaultProcPerm", false, false, true, false, false),
+                new GroupInfo("groupWithoutDefaultProcPerm", false, false, false, false, false),
+                new GroupInfo("groupWithDefaultProcReadPerm", false, false, false, true, false)
         };
         project.addGroups(groups);
         project.setSecurityEnabled(true);

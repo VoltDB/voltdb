@@ -27,6 +27,7 @@ public enum Permission {
     //These enums maps to specific boolean in spec.txt
     ADHOC,
     ADMIN,           // aliased by SYSPROC
+    ALLPROC,
     DEFAULTPROC,
     DEFAULTPROCREAD;
 
@@ -64,6 +65,7 @@ public enum Permission {
             if (catGroup.getAdhoc()) perms.add(Permission.ADHOC);
             if (catGroup.getDefaultproc()) perms.add(Permission.DEFAULTPROC);
             if (catGroup.getDefaultprocread()) perms.add(Permission.DEFAULTPROCREAD);
+            if (catGroup.getAllproc()) perms.add(Permission.ALLPROC);
         }
         return perms;
     }
@@ -113,6 +115,9 @@ public enum Permission {
                 break;
             case DEFAULTPROCREAD:
                 group.setDefaultprocread(true);
+                break;
+            case ALLPROC:
+                group.setAllproc(true);
                 break;
             }
         }

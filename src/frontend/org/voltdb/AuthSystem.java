@@ -62,7 +62,6 @@ import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import java.util.EnumSet;
-import org.voltdb.catalog.Group;
 import org.voltdb.common.Permission;
 
 
@@ -244,7 +243,7 @@ public class AuthSystem {
             if (proc == null) {
                 return false;
             }
-            return hasPermission(Permission.ADMIN) || m_authorizedProcedures.contains(proc);
+            return hasPermission(Permission.ADMIN, Permission.ALLPROC) || m_authorizedProcedures.contains(proc);
         }
 
         /**

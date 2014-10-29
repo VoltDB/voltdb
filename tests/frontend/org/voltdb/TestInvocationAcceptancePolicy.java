@@ -34,7 +34,7 @@ import org.voltdb.common.Permission;
 
 public class TestInvocationAcceptancePolicy {
     private AuthSystem.AuthUser createUser(boolean adhoc, boolean crud, boolean sysproc,
-                                           Procedure userProc, boolean readonly)
+                                           Procedure userProc, boolean readonly, boolean allprocs)
     {
 
         AuthSystem.AuthUser user = mock(AuthSystem.AuthUser.class);
@@ -43,6 +43,9 @@ public class TestInvocationAcceptancePolicy {
         when(user.hasPermission(Permission.DEFAULTPROC)).thenReturn(crud);
         when(user.hasPermission(Permission.DEFAULTPROCREAD)).thenReturn(readonly);
         if (userProc != null) {
+            if (allprocs) {
+                when(user.hasUserDefinedProcedurePermission(userProc)).thenReturn(allprocs);
+            }
             when(user.hasUserDefinedProcedurePermission(userProc)).thenReturn(true);
         }
         return user;
@@ -51,7 +54,7 @@ public class TestInvocationAcceptancePolicy {
     @Test
     public void testSysprocUserPermission()
     {
-        AuthSystem.AuthUser user = createUser(false, false, true, null, true);
+        AuthSystem.AuthUser user = createUser(false, false, true, null, true, false);
 
         StoredProcedureInvocation invocation = new StoredProcedureInvocation();
         invocation.setProcName("@Pause");
@@ -62,14 +65,14 @@ public class TestInvocationAcceptancePolicy {
         assertEquals(policy.shouldAccept(user, invocation, proc), PolicyResult.ALLOW);
 
         // A user that doesn't have sysproc permission
-        user = createUser(false, false, false, null, true);
+        user = createUser(false, false, false, null, true, false);
         assertEquals(policy.shouldAccept(user, invocation, proc), PolicyResult.DENY);
     }
 
     @Test
     public void testAdHocUserPermission()
     {
-        AuthSystem.AuthUser user = createUser(true, false, false, null, true);
+        AuthSystem.AuthUser user = createUser(true, false, false, null, true, false);
 
         StoredProcedureInvocation invocation = new StoredProcedureInvocation();
         invocation.setProcName("@AdHoc_RW_MP");
@@ -81,7 +84,7 @@ public class TestInvocationAcceptancePolicy {
         assertEquals(policy.shouldAccept(user, invocation, proc), PolicyResult.ALLOW);
 
         // A user that doesn't have adhoc permission
-        user = createUser(false, false, false, null, true);
+        user = createUser(false, false, false, null, true, false);
         assertEquals(policy.shouldAccept(user, invocation, proc), PolicyResult.DENY);
     }
 
@@ -89,7 +92,7 @@ public class TestInvocationAcceptancePolicy {
     public void testUserDefinedProcPermission()
     {
         Procedure proc = new Procedure();
-        AuthSystem.AuthUser user = createUser(false, false, false, proc, true);
+        AuthSystem.AuthUser user = createUser(false, false, false, proc, true, false);
 
         StoredProcedureInvocation invocation = new StoredProcedureInvocation();
         invocation.setProcName("MyProc");
@@ -98,6 +101,8 @@ public class TestInvocationAcceptancePolicy {
         InvocationPermissionPolicy policy = new InvocationUserDefinedProcedurePermissionPolicy();
         assertEquals(policy.shouldAccept(user, invocation, proc), PolicyResult.ALLOW);
 
+        AuthSystem.AuthUser user2 = createUser(false, false, false, proc, true, false);
+        assertEquals(policy.shouldAccept(user2, invocation, proc), PolicyResult.ALLOW);
     }
 
     @Test
@@ -105,7 +110,7 @@ public class TestInvocationAcceptancePolicy {
     {
         Procedure proc = new Procedure();
         proc.setDefaultproc(true);
-        AuthSystem.AuthUser user = createUser(false, true, false, proc, true);
+        AuthSystem.AuthUser user = createUser(false, true, false, proc, true, false);
 
         StoredProcedureInvocation invocation = new StoredProcedureInvocation();
         invocation.setProcName("A.insert");
@@ -115,7 +120,7 @@ public class TestInvocationAcceptancePolicy {
         assertEquals(policy.shouldAccept(user, invocation, proc), PolicyResult.ALLOW);
 
         // A user that doesn't have crud permission
-        user = createUser(false, false, false, null, true);
+        user = createUser(false, false, false, null, true, false);
         assertEquals(policy.shouldAccept(user, invocation, proc), PolicyResult.DENY);
     }
 
@@ -125,7 +130,7 @@ public class TestInvocationAcceptancePolicy {
         Procedure proc = new Procedure();
         proc.setDefaultproc(true);
         proc.setReadonly(true);
-        AuthSystem.AuthUser user = createUser(false, false, false, proc, true);
+        AuthSystem.AuthUser user = createUser(false, false, false, proc, true, false);
 
         StoredProcedureInvocation invocation = new StoredProcedureInvocation();
         invocation.setProcName("X.select");
@@ -138,7 +143,7 @@ public class TestInvocationAcceptancePolicy {
         Procedure procw = new Procedure();
         procw.setDefaultproc(true);
         procw.setReadonly(false);
-        user = createUser(false, false, false, null, false);
+        user = createUser(false, false, false, null, false, false);
         assertEquals(policy.shouldAccept(user, invocation, proc), PolicyResult.DENY);
     }
 
