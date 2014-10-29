@@ -130,6 +130,7 @@ begin Table                   "A table (relation) in the database"
   Table? materializer         "If this is a materialized view, this field stores the source table"
   string signature            "Catalog version independent signature of the table consisting of name and schema"
   int tuplelimit              "A maximum number of rows in a table"
+  string tuplelimitDeleteStmt "Delete statement to execute if tuple limit will be exceeded"
 end
 
 begin MaterializedViewInfo "Information used to build and update a materialized view"
