@@ -25,12 +25,12 @@ import org.voltdb.catalog.Group;
 public enum Permission {
     //These enums maps to specific boolean in spec.txt
 
-    SYSPROC,
-    DEFAULTPROC,
     ADHOC,
+    DEFAULTPROC,
     DEFAULTPROCREAD,
     SQL,
-    SQLREAD;
+    SQLREAD,
+    SYSPROC;
 
     public static final String toListString() {
         return Arrays.asList(values()).toString();

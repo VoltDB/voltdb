@@ -2097,7 +2097,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         task.clientHandle = plannedStmtBatch.clientHandle;
 
         ClientResponseImpl error = null;
-        if ((error = m_permissionValidator.shouldAccept(task.procName, plannedStmtBatch.work.user, task, SystemProcedureCatalog.listing.get(task.procName).asCatalogProcedure())) != null) {
+        if ((error = m_permissionValidator.shouldAccept(task.procName, plannedStmtBatch.work.user, task,
+                SystemProcedureCatalog.listing.get(task.procName).asCatalogProcedure())) != null) {
             ByteBuffer buffer = ByteBuffer.allocate(error.getSerializedSize() + 4);
             buffer.putInt(buffer.capacity() - 4);
             error.flattenToBuffer(buffer).flip();
@@ -2147,7 +2148,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             /* The adhoc planner learns of catalog updates after the EE and the
                                rest of the system. If the adhoc sql was planned against an
                                obsolete catalog, re-plan. */
-                            authLog.error("rework invoked");
                             LocalObjectMessage work = new LocalObjectMessage(
                                     AdHocPlannerWork.rework(plannedStmtBatch.work, m_adhocCompletionHandler));
 
@@ -2212,21 +2212,31 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             task.originalTxnId = changeResult.originalTxnId;
                             task.originalUniqueId = changeResult.originalUniqueId;
 
-                            /*
-                             * Round trip the invocation to initialize it for command logging
-                             */
-                            try {
-                                task = MiscUtils.roundTripForCL(task);
-                            } catch (Exception e) {
-                                hostLog.fatal(e);
-                                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+                            ClientResponseImpl error = null;
+                            if ((error = m_permissionValidator.shouldAccept(task.procName, result.user, task,
+                                    SystemProcedureCatalog.listing.get(task.procName).asCatalogProcedure())) != null) {
+                                ByteBuffer buffer = ByteBuffer.allocate(error.getSerializedSize() + 4);
+                                buffer.putInt(buffer.capacity() - 4);
+                                error.flattenToBuffer(buffer).flip();
+                                c.writeStream().enqueue(buffer);
                             }
+                            else {
+                                /*
+                                 * Round trip the invocation to initialize it for command logging
+                                 */
+                                try {
+                                    task = MiscUtils.roundTripForCL(task);
+                                } catch (Exception e) {
+                                    hostLog.fatal(e);
+                                    VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+                                }
 
-                            // initiate the transaction. These hard-coded values from catalog
-                            // procedure are horrible, horrible, horrible.
-                            createTransaction(changeResult.connectionId,
-                                    task, false, false, false, 0, task.getSerializedSize(),
-                                    System.nanoTime());
+                                // initiate the transaction. These hard-coded values from catalog
+                                // procedure are horrible, horrible, horrible.
+                                createTransaction(changeResult.connectionId,
+                                        task, false, false, false, 0, task.getSerializedSize(),
+                                        System.nanoTime());
+                            }
                         }
                     }
                     else {

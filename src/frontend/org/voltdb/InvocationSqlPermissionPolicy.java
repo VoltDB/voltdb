@@ -38,7 +38,6 @@ public class InvocationSqlPermissionPolicy extends InvocationPermissionPolicy {
      */
     @Override
     public PolicyResult shouldAccept(AuthUser user, StoredProcedureInvocation invocation, Procedure proc) {
-        // AdHoc requires unique permission. Then has to plan in a separate thread.
         if (proc.getSystemproc() && invocation.procName.startsWith("@AdHoc_RW")) {
             if (user.hasPermission(Permission.SQL)) {
                 return PolicyResult.ALLOW;

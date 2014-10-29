@@ -17,8 +17,6 @@
 
 package org.voltdb.compiler;
 
-import org.hsqldb_voltpatches.Database;
-import org.hsqldb_voltpatches.persist.HsqlProperties;
 import org.voltcore.network.Connection;
 import org.voltdb.AuthSystem;
 import org.voltdb.CatalogContext;
