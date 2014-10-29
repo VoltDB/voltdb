@@ -1906,6 +1906,10 @@ public class DDLCompiler {
             }
 
             table.setTuplelimit(tupleLimit);
+            String deleteStmt = node.attributes.get("rowsLimitDeleteStmt");
+            if (deleteStmt != null) {
+                table.setTuplelimitdeletestmt(deleteStmt);
+            }
             return;
         }
 

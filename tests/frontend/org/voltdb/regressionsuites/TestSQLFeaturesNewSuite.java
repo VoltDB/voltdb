@@ -211,7 +211,7 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
     public void testTableLimitPartitionRowsExec() throws IOException, ProcCallException {
 
         if (isHSQL())
-                return;
+            return;
 
         Client client = getClient();
 
@@ -257,6 +257,13 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         vt = client.callProcedure("@AdHoc", selectAll).getResults()[0];
         validateTableOfLongs(vt, new long[][] {{0, 70, 140}});
 
+        // Execute in a longer loop, just to illustrate that we can now
+        // insert indefinitely, as long as there are rows to be purged.
+        for (int i = 0; i < 100; ++i) {
+            vt = client.callProcedure("CAPPED3_LIMIT_ROWS_EXEC.insert", 1, 71 + i, 141 + i).getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{1}});
+        }
+
         // Delete remaining row
         client.callProcedure("CAPPED3_LIMIT_ROWS_EXEC.delete", 70);
     }
@@ -264,7 +271,7 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
     public void testTableLimitPartitionRowsExecUnique() throws IOException, ProcCallException {
 
         if (isHSQL())
-                return;
+            return;
 
         Client client = getClient();
 
