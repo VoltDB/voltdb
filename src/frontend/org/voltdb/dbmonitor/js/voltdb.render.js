@@ -1553,13 +1553,18 @@ function alertNodeClicked(obj) {
                 });
 
 
-                if (this.isTableSearch)
-                    callback(htmlTableMarkup);
-
+                if (voltDbRenderer.isSortTables) {
+                    if (htmlTableMarkup != "") {
+                        //if ((currentAction == VoltDbUI.ACTION_STATES.SEARCH || currentAction == VoltDbUI.ACTION_STATES.REFRESH) && (priorAction == VoltDbUI.ACTION_STATES.SEARCH || priorAction == VoltDbUI.ACTION_STATES.REFRESH)) {
+                        $('#tablesBody').html(htmlTableMarkup);
+                        htmlTableMarkup = undefined;
+                        //}
+                    }
+                }
                 else {
                     htmlTableMarkups.SystemInformation.push(htmlTableMarkup);
                     htmlTableMarkup = undefined;
-                    callback(htmlTableMarkups);
+                    callback(htmlTableMarkups.SystemInformation);
                 }
 
                 if (voltDbRenderer.isSortTables && VoltDbUI.tableSortStatus == VoltDbUI.SORT_STATES.SORTED) {
@@ -1865,25 +1870,25 @@ function alertNodeClicked(obj) {
             return serverAddress;
         };
 
+        //this.sortTablesByColumns = function () {
+        //    var tableCount = 0;
+        //    var lConnection = VoltDBService.getTablesContextForSorting();
+        //    populateTableJsonArray(lConnection);
+
+        //    if (voltDbRenderer.sortOrder == "descending") {
+        //        tableJsonArray = descendingSortJSON(tableJsonArray, this.tableSortColumn);
+        //    }
+
+        //    else if (voltDbRenderer.sortOrder == "ascending") {
+        //        tableJsonArray = ascendingSortJSON(tableJsonArray, this.tableSortColumn);
+        //    }
+        //    mapJsonArrayToTables();
+
+
+        //};
+
+
         this.sortTablesByColumns = function () {
-            var tableCount = 0;
-            var lConnection = VoltDBService.getTablesContextForSorting();
-            populateTableJsonArray(lConnection);
-
-            if (voltDbRenderer.sortOrder == "descending") {
-                tableJsonArray = descendingSortJSON(tableJsonArray, this.tableSortColumn);
-            }
-
-            else if (voltDbRenderer.sortOrder == "ascending") {
-                tableJsonArray = ascendingSortJSON(tableJsonArray, this.tableSortColumn);
-            }
-            mapJsonArrayToTables();
-
-
-        };
-
-
-        this.sortTablesByColumnsSync = function () {
             var tableCount = 0;
             var lConnection = VoltDBService.getTablesContextForSorting();
             populateTableJsonArray(lConnection);

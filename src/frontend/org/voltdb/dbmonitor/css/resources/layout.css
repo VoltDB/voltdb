@@ -365,6 +365,8 @@ html ul.tabs li.active, html ul.tabs li.active a:hover  {
 .storeTbl th, .dbTbl th { margin:0; padding:0; background:#3f5364; color:#FFFFFF;}
 .storeTbl th, td, .dbTbl th,td { padding:10px 10px; border-right:1px solid #CCCCCC;border-bottom:1px solid #CCCCCC;}
 td.txt-center{text-align:center;}
+.storeTbl tr:hover, .dbTbl tr:hover {cursor: pointer}
+ 
 
 
 
