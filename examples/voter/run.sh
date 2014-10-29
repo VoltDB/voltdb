@@ -43,7 +43,7 @@ HOST="localhost"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar $APPNAME-empty.jar voltdbroot voltdbroot
+    rm -rf obj debugoutput $APPNAME.jar $APPNAME-procs.jar voltdbroot voltdbroot
 }
 
 # compile the source code for procedures and the client
@@ -54,6 +54,7 @@ function srccompile() {
         src/voter/procedures/*.java
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
+    jar cf $APPNAME-procs.jar -C obj voter/procedures
 }
 
 # build an application catalog
@@ -75,13 +76,9 @@ function empty-server() {
     echo "Compiling the application catalog with no DDL, Procedure classes will be added to ctalog."
     echo "To perform this action manually, use the command line: "
     echo
-    echo "voltdb create -d deployment-adhoc.xml -l $LICENSE -H $HOST $APPNAME-empty.jar"
+    echo "voltdb create -d deployment-liveddl.xml -l $LICENSE -H $HOST"
     echo
-    $VOLTDB compile --classpath obj -o $APPNAME-empty.jar ddl-empty.sql
-    echo "Adding classes to empty catalog"
-    jar uf $APPNAME-empty.jar -C obj .
-    echo "voltdb create -d deployment-adhoc.xml -l $LICENSE -H $HOST $APPNAME-empty.jar"
-    $VOLTDB create -d deployment-adhoc.xml -l $LICENSE -H $HOST $APPNAME-empty.jar
+    $VOLTDB create -d deployment-liveddl.xml -l $LICENSE -H $HOST
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }

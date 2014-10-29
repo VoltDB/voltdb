@@ -1,9 +1,5 @@
 -- This DDL demonstrates how to work with just DDLs and use VoltDB like a traditional database by updating your schema.
 -- This DDL rebuilds Voter schema without changes but one can change schema by using ALTER commands.
--- Truncate tables - tables must be empty to drop
-TRUNCATE TABLE votes;
-TRUNCATE TABLE area_code_state;
-TRUNCATE TABLE contestants;
 -- Drop Procedures - procedures on tables must be dropped before table.
 DROP PROCEDURE voter.procedures.GetStateHeatmap;
 DROP PROCEDURE voter.procedures.ContestantWinningStates;
@@ -28,7 +24,7 @@ CREATE TABLE area_code_state (area_code smallint NOT NULL, state varchar(2) NOT 
 CREATE VIEW v_votes_by_phone_number (phone_number, num_votes) AS SELECT phone_number, COUNT(*) FROM votes GROUP BY phone_number;
 CREATE VIEW v_votes_by_contestant_number_state (contestant_number, state, num_votes) AS SELECT contestant_number, state, COUNT(*) FROM votes GROUP BY contestant_number, state;
 -- Update classes from jar to that server will know about classes but not procedures yet.
-exec @UpdateClasses voter-empty.jar ''
+exec @UpdateClasses voter-procs.jar ''
 -- Now create procedures.
 CREATE PROCEDURE FROM CLASS voter.procedures.Initialize;
 CREATE PROCEDURE FROM CLASS voter.procedures.Results;
