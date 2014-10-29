@@ -730,15 +730,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
         final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
         final VoltCompiler compiler = new VoltCompiler();
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertFalse(success);
-        //PARTITION has unknown COLUMN
-        int foundUnknownError = 0;
-        for (VoltCompiler.Feedback f : compiler.m_errors) {
-            if (f.message.contains("PARTITION has unknown COLUMN")) {
-                foundUnknownError++;
-            }
-        }
-        assertEquals(1, foundUnknownError);
+        assertTrue(success);
     }
 
     public void testAlterTableSizeChangeAndConstraintChangeOfPartitionColumn() throws IOException {

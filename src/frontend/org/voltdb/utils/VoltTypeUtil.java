@@ -20,9 +20,9 @@ package org.voltdb.utils;
 import java.math.BigDecimal;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.Random;
+import java.util.TreeMap;
 import java.util.logging.Logger;
 
 import org.voltdb.VoltType;
@@ -285,18 +285,10 @@ public abstract class VoltTypeUtil {
         return (ret);
     }
 
-    public static String getSignatureForTable(String name, ArrayList<VoltType> schema) {
+    public static String getSignatureForTable(String name, TreeMap<Integer, VoltType> schema) {
         StringBuilder sb = new StringBuilder();
         sb.append(name);
-        for (VoltType t : schema) {
-            sb.append(t.getSignatureChar());
-        }
-        return sb.toString();
-    }
-
-    public static String getSignatureForTable(ArrayList<VoltType> schema) {
-        StringBuilder sb = new StringBuilder();
-        for (VoltType t : schema) {
+        for (VoltType t : schema.values()) {
             sb.append(t.getSignatureChar());
         }
         return sb.toString();
