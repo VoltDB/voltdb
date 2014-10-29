@@ -44,7 +44,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
                 ");\n"
                 );
         builder.addPartitionInfo("FOO", "ID");
-        builder.setUseAdhocSchema(true);
+        builder.setUseDDLSchema(true);
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
@@ -160,7 +160,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
                 "constraint pk_tree2 primary key (PKCOL1, PKCOL2)" +
                 ");\n"
                 );
-        builder.setUseAdhocSchema(true);
+        builder.setUseDDLSchema(true);
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
@@ -333,7 +333,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
                 ");\n"
                 );
         builder.addPartitionInfo("FOO", "ID");
-        builder.setUseAdhocSchema(true);
+        builder.setUseDDLSchema(true);
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
@@ -467,7 +467,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
                 );
         builder.addPartitionInfo("FOO", "ID");
         builder.addPartitionInfo("EMPTYFOO", "ID");
-        builder.setUseAdhocSchema(true);
+        builder.setUseDDLSchema(true);
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
@@ -536,7 +536,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
                 ");\n"
                 );
         builder.addPartitionInfo("FOO", "ID");
-        builder.setUseAdhocSchema(true);
+        builder.setUseDDLSchema(true);
         boolean success = builder.compile(pathToCatalog, 1, 1, 0);
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);

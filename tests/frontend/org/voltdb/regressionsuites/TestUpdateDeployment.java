@@ -398,7 +398,7 @@ public class TestUpdateDeployment extends RegressionSuite {
         project.addDefaultSchema();
         project.addDefaultPartitioning();
         project.addProcedures(BASEPROCS);
-        project.setUseAdhocSchema(true);
+        project.setUseDDLSchema(true);
         // build the jarfile
         compile = config.compile(project);
         assertTrue(compile);

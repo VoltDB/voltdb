@@ -270,7 +270,7 @@ public class VoltProjectBuilder {
     private Integer m_elasticDuration = null;
     private Integer m_queryTimeout = null;
 
-    private boolean m_useAdhocSchema = false;
+    private boolean m_useDDLSchema = false;
 
     public VoltProjectBuilder setQueryTimeout(int target) {
         m_queryTimeout = target;
@@ -291,8 +291,8 @@ public class VoltProjectBuilder {
         m_deadHostTimeout = deadHostTimeout;
     }
 
-    public void setUseAdhocSchema(boolean useIt) {
-        m_useAdhocSchema = useIt;
+    public void setUseDDLSchema(boolean useIt) {
+        m_useDDLSchema = useIt;
     }
 
     public void configureLogging(String internalSnapshotPath, String commandLogPath, Boolean commandLogSync,
@@ -821,7 +821,7 @@ public class VoltProjectBuilder {
         cluster.setHostcount(dinfo.hostCount);
         cluster.setSitesperhost(dinfo.sitesPerHost);
         cluster.setKfactor(dinfo.replication);
-        cluster.setSchema(m_useAdhocSchema ? SchemaType.ADHOC : SchemaType.CATALOG);
+        cluster.setSchema(m_useDDLSchema ? SchemaType.DDL : SchemaType.CATALOG);
 
         // <paths>
         PathsType paths = factory.createPathsType();
