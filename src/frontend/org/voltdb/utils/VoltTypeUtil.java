@@ -22,6 +22,7 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Random;
+import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.logging.Logger;
 
@@ -285,7 +286,13 @@ public abstract class VoltTypeUtil {
         return (ret);
     }
 
-    public static String getSignatureForTable(String name, TreeMap<Integer, VoltType> schema) {
+    /**
+     * Get a string signature for the table represented by the args
+     * @param name The name of the table
+     * @param schema A sorted map of the columns in the table, keyed by column index
+     * @return The table signature string.
+     */
+    public static String getSignatureForTable(String name, SortedMap<Integer, VoltType> schema) {
         StringBuilder sb = new StringBuilder();
         sb.append(name);
         for (VoltType t : schema.values()) {
