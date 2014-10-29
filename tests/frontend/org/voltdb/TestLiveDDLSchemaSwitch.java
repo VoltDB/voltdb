@@ -37,7 +37,7 @@ import org.voltdb.iv2.TxnEgo;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
 
-public class TestAdhocDDLSchemaSwitch extends AdhocDDLTestBase {
+public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
     // Test cases:
     // 1) Configure for master and UAC
     //    - Verify UAC works
@@ -65,7 +65,7 @@ public class TestAdhocDDLSchemaSwitch extends AdhocDDLTestBase {
     String m_pathToOtherCatalog;
     String m_pathToOtherDeployment;
 
-    void generateCatalogsAndDeployments(boolean useAdhocDDL) throws Exception
+    void generateCatalogsAndDeployments(boolean useLiveDDL) throws Exception
     {
         m_pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
         m_pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
@@ -86,7 +86,7 @@ public class TestAdhocDDLSchemaSwitch extends AdhocDDLTestBase {
                 ");\n"
                 );
         builder.addPartitionInfo("FOO", "ID");
-        builder.setUseAdhocSchema(useAdhocDDL);
+        builder.setUseDDLSchema(useLiveDDL);
         boolean success = builder.compile(m_pathToCatalog, 2, 1, 0);
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), m_pathToDeployment);
@@ -106,7 +106,7 @@ public class TestAdhocDDLSchemaSwitch extends AdhocDDLTestBase {
                 ");\n"
                 );
         builder.addPartitionInfo("FOO", "ID");
-        builder.setUseAdhocSchema(useAdhocDDL);
+        builder.setUseDDLSchema(useLiveDDL);
         builder.setDeadHostTimeout(6);
         success = builder.compile(m_pathToOtherCatalog, 2, 1, 0);
         assertTrue("2nd schema compilation failed", success);

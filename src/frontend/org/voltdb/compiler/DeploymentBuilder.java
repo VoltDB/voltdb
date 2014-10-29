@@ -118,7 +118,7 @@ public class DeploymentBuilder {
     private boolean m_elenabled;      // true if enabled; false if disabled
 
     // whether to allow DDL over adhoc or use full catalog updates
-    private boolean m_useAdhocSchema = false;
+    private boolean m_useDDLSchema = false;
 
     public DeploymentBuilder() {
         this(1, 1, 0);
@@ -173,8 +173,8 @@ public class DeploymentBuilder {
     /**
      * whether to allow DDL over adhoc or use full catalog updates
      */
-    public void setUseAdhocSchema(boolean useIt) {
-        m_useAdhocSchema = useIt;
+    public void setUseDDLSchema(boolean useIt) {
+        m_useDDLSchema = useIt;
     }
 
     public void configureLogging(String internalSnapshotPath, String commandLogPath, Boolean commandLogSync,
@@ -293,7 +293,7 @@ public class DeploymentBuilder {
         cluster.setHostcount(m_hostCount);
         cluster.setSitesperhost(m_sitesPerHost);
         cluster.setKfactor(m_replication);
-        cluster.setSchema(m_useAdhocSchema ? SchemaType.ADHOC : SchemaType.CATALOG);
+        cluster.setSchema(m_useDDLSchema ? SchemaType.DDL : SchemaType.CATALOG);
 
         // <paths>
         PathsType paths = factory.createPathsType();

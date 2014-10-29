@@ -54,10 +54,6 @@ import org.voltdb.catalog.Index;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Permission;
-import static org.voltdb.common.Permission.ADHOC;
-import static org.voltdb.common.Permission.DEFAULTPROC;
-import static org.voltdb.common.Permission.DEFAULTPROCREAD;
-import static org.voltdb.common.Permission.SYSPROC;
 import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
@@ -892,35 +888,16 @@ public class DDLCompiler {
             }
             org.voltdb.catalog.Group catGroup = groupMap.add(roleName);
             if (statementMatcher.group(2) != null) {
-                EnumSet<Permission> permset = EnumSet.noneOf(Permission.class);
-                for (String tokenRaw : StringUtils.split(statementMatcher.group(2), ',')) {
-                    String token = tokenRaw.trim().toUpperCase();
-                    Permission permission;
-                    try {
-                        permission = Permission.valueOf(token);
-                        permset.add(permission);
-                    }
-                    catch (IllegalArgumentException iaex) {
-                        throw m_compiler.new VoltCompilerException(String.format(
-                                "Invalid permission \"%s\" in CREATE ROLE statement: \"%s\", " +
-                                "available permissions: %s", token,
-                                statement.substring(0,statement.length()-1), // remove trailing semicolon
-                                Permission.toListString()));
-                    }
-                    switch( permission) {
-                    case ADHOC:
-                        catGroup.setAdhoc(true);
-                        break;
-                    case SYSPROC:
-                        catGroup.setSysproc(true);
-                        break;
-                    case DEFAULTPROC:
-                        catGroup.setDefaultproc(true);
-                        break;
-                    case DEFAULTPROCREAD:
-                        catGroup.setDefaultprocread(true);
-                        break;
-                    }
+                try {
+                    EnumSet<Permission> permset =
+                            Permission.getPermissionsFromAliases(Arrays.asList(StringUtils.split(statementMatcher.group(2), ',')));
+                    Permission.setPermissionsInGroup(catGroup, permset);
+                } catch (IllegalArgumentException iaex) {
+                    throw m_compiler.new VoltCompilerException(String.format(
+                            "Invalid permission \"%s\" in CREATE ROLE statement: \"%s\", " +
+                                    "available permissions: %s", iaex.getMessage(),
+                            statement.substring(0,statement.length()-1), // remove trailing semicolon
+                            Permission.toListString()));
                 }
             }
             return true;

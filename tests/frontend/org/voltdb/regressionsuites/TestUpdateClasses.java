@@ -68,7 +68,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
         String pathToDeployment = Configuration.getPathToCatalogForTest("updateclasses.xml");
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("-- Don't care");
-        builder.setUseAdhocSchema(true);
+        builder.setUseDDLSchema(true);
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
@@ -176,7 +176,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
         String pathToDeployment = Configuration.getPathToCatalogForTest("updateclasses.xml");
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("-- Don't care");
-        builder.setUseAdhocSchema(true);
+        builder.setUseDDLSchema(true);
         GroupInfo groups[] = new GroupInfo[] {
             new GroupInfo("adhoc", true, false, false, false),
             new GroupInfo("sysproc", false, true, false, false)
@@ -289,7 +289,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
         String pathToDeployment = Configuration.getPathToCatalogForTest("updateclasses.xml");
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("-- Don't care");
-        builder.setUseAdhocSchema(true);
+        builder.setUseDDLSchema(true);
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
@@ -380,7 +380,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
         String pathToDeployment = Configuration.getPathToCatalogForTest("updateclasses.xml");
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("-- Don't care");
-        builder.setUseAdhocSchema(true);
+        builder.setUseDDLSchema(true);
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
@@ -418,7 +418,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
         String pathToDeployment = Configuration.getPathToCatalogForTest("updateclasses.xml");
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("-- Don't care");
-        builder.setUseAdhocSchema(true);
+        builder.setUseDDLSchema(true);
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
@@ -470,7 +470,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
         String pathToDeployment = Configuration.getPathToCatalogForTest("updateclasses.xml");
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("-- Don't care");
-        builder.setUseAdhocSchema(true);
+        builder.setUseDDLSchema(true);
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
@@ -529,7 +529,7 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
         String pathToDeployment = Configuration.getPathToCatalogForTest("updateclasses.xml");
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("-- Don't care");
-        builder.setUseAdhocSchema(true);
+        builder.setUseDDLSchema(true);
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);

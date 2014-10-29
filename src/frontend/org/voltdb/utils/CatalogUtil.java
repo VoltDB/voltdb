@@ -731,13 +731,13 @@ public abstract class CatalogUtil {
 
             // copy schema modification behavior from xml to catalog
             if (cluster.getSchema() != null) {
-                catCluster.setUseadhocschema(cluster.getSchema() == SchemaType.ADHOC);
+                catCluster.setUseddlschema(cluster.getSchema() == SchemaType.DDL);
             }
             else {
                 // Don't think we can get here, deployment schema guarantees a default value
                 hostLog.warn("Schema modification setting not found. " +
                         "Forcing default behavior of UpdateCatalog to modify database schema.");
-                catCluster.setUseadhocschema(false);
+                catCluster.setUseddlschema(false);
             }
         }
     }

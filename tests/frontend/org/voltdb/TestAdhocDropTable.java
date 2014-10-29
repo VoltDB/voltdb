@@ -59,7 +59,7 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
             "PRIMARY KEY(ID));");
         builder.addPartitionInfo("BLAH", "ID");
         builder.addPartitionInfo("DROPME", "ID");
-        builder.setUseAdhocSchema(true);
+        builder.setUseDDLSchema(true);
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
@@ -148,7 +148,7 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
         builder.addPartitionInfo("BLAH", "ID");
         builder.addPartitionInfo("DROPME", "ID");
         builder.addStmtProcedure("BLERG", "select * from BLAH where ID = ?");
-        builder.setUseAdhocSchema(true);
+        builder.setUseDDLSchema(true);
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
