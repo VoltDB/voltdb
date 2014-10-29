@@ -179,8 +179,10 @@ public class VoltLog4jLogger implements CoreVoltLogger {
      */
     public static void configure(String xmlConfig) {
         DOMConfigurator configurator = new DOMConfigurator();
+        // DOMConfigurator is unable to parse "<?xml" part of <?xml version="1.0" .. ?> line
+        // so trimming out the line before passing it on for configuration
+        // assuming <?xml version="1.0" .. ?> to be the first line in the xml file
         if(xmlConfig.contains( "<?xml") && xmlConfig.contains("?>")) {
-
             String line = xmlConfig.trim().split("\n")[0];
             xmlConfig = xmlConfig.replace(line, "");
         }
