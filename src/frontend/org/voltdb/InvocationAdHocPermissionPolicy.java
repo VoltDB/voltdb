@@ -43,7 +43,7 @@ public class InvocationAdHocPermissionPolicy extends InvocationPermissionPolicy 
     public PolicyResult shouldAccept(AuthUser user, StoredProcedureInvocation invocation, Procedure proc) {
         // AdHoc requires unique permission. Then has to plan in a separate thread.
         if (proc.getSystemproc() && invocation.procName.startsWith("@AdHoc")) {
-            if (user.hasPermission(Permission.ADHOC, Permission.SYSPROC)) {
+            if (user.hasPermission(Permission.ADHOC, Permission.ADMIN)) {
                 return PolicyResult.ALLOW;
             }
             return PolicyResult.DENY;
