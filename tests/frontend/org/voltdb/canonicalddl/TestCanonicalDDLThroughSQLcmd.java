@@ -71,7 +71,7 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
         VoltCompiler compiler = new VoltCompiler();
         VoltProjectBuilder builder = new VoltProjectBuilder();
 
-        builder.setUseAdhocSchema(true);
+        builder.setUseDDLSchema(true);
         boolean success = builder.compile(pathToCatalog);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
@@ -95,7 +95,7 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
 
-        builder.setUseAdhocSchema(true);
+        builder.setUseDDLSchema(true);
         PortGenerator pg = new PortGenerator();
         int httpdPort = pg.next();
         builder.setHTTPDPort(httpdPort);

@@ -54,7 +54,7 @@
   <xs:simpleType name="schemaType">
       <xs:restriction base="xs:string">
           <xs:enumeration value="catalog"/>
-          <xs:enumeration value="adhoc"/>
+          <xs:enumeration value="ddl"/>
       </xs:restriction>
   </xs:simpleType>
 
