@@ -70,7 +70,7 @@ function catalog() {
     if [ $? != 0 ]; then exit; fi
 }
 
-# build an application catalog
+# Run a server with no catalog 
 function empty-server() {
     srccompile
     echo "Compiling the application catalog with no DDL, Procedure classes will be added to ctalog."
@@ -90,6 +90,7 @@ while read p; do
   echo $p | sqlcmd
 done < loadschema.sql
 }
+
 # run the voltdb server locally
 function server() {
     # if a catalog doesn't exist, build one
