@@ -935,7 +935,6 @@ public class VoltCompiler {
             for (RolesType.Role role : database.getRoles().getRole()) {
                 org.voltdb.catalog.Group catGroup = db.getGroups().add(role.getName());
                 catGroup.setSql(role.isAdhoc());
-                catGroup.setSysproc(role.isSysproc());
                 catGroup.setDefaultproc(role.isDefaultproc());
                 catGroup.setDefaultprocread(role.isDefaultprocread());
 

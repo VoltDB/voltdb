@@ -3135,7 +3135,6 @@ public class TestVoltCompiler extends TestCase {
                 assertEquals(String.format("Role \"%s\" adhoc flag mismatch:", role.name), role.adhoc, group.getSql());
                 assertEquals(String.format("Role \"%s\" sql flag mismatch:", role.name), role.sql, group.getSql());
                 assertEquals(String.format("Role \"%s\" sqlread flag mismatch:", role.name), role.sqlread, group.getSqlread());
-                assertEquals(String.format("Role \"%s\" sysproc flag mismatch:", role.name), role.sysproc, group.getSysproc());
                 assertEquals(String.format("Role \"%s\" admin flag mismatch:", role.name), role.sysproc, group.getAdmin());
                 assertEquals(String.format("Role \"%s\" defaultproc flag mismatch:", role.name), role.defaultproc, group.getDefaultproc());
                 assertEquals(String.format("Role \"%s\" defaultprocread flag mismatch:", role.name), role.defaultprocread, group.getDefaultprocread());
