@@ -365,15 +365,51 @@ public class TestCatalogUtil extends TestCase {
         long crcDepOff = CatalogUtil.compileDeployment(catalog, tmpDepOff.getPath(), true, false);
         assertTrue(crcDepOff >= 0);
         Systemsettings sysset = catalog.getClusters().get("cluster").getDeployment().get("deployment").getSystemsettings().get("systemsettings");
-        assertEquals(100, sysset.getMaxtemptablesize());
+        assertEquals(100, sysset.getTemptablemaxsize());
 
         setUp();
         final File tmpDepOn = VoltProjectBuilder.writeStringToTempFile(depOn);
         long crcDepOn = CatalogUtil.compileDeployment(catalog, tmpDepOn.getPath(), true, false);
         assertTrue(crcDepOn >= 0);
         sysset = catalog.getClusters().get("cluster").getDeployment().get("deployment").getSystemsettings().get("systemsettings");
-        assertEquals(200, sysset.getMaxtemptablesize());
+        assertEquals(200, sysset.getTemptablemaxsize());
     }
+
+    public void testSystemSettingsQueryTimeout() throws Exception
+    {
+        final String depOff =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+            "<deployment>" +
+            "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
+            "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
+            "   <snapshot frequency=\"5s\" retain=\"10\" prefix=\"pref2\" enabled=\"false\"/>" +
+            "</deployment>";
+
+        final String depOn =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+            "<deployment>" +
+            "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
+            "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
+            "   <snapshot frequency=\"5s\" retain=\"10\" prefix=\"pref2\" enabled=\"true\"/>" +
+            "   <systemsettings>" +
+            "      <query timeout=\"200\"/>" +
+            "   </systemsettings>" +
+            "</deployment>";
+
+        final File tmpDepOff = VoltProjectBuilder.writeStringToTempFile(depOff);
+        long crcDepOff = CatalogUtil.compileDeployment(catalog, tmpDepOff.getPath(), true, false);
+        assertTrue(crcDepOff >= 0);
+        Systemsettings sysset = catalog.getClusters().get("cluster").getDeployment().get("deployment").getSystemsettings().get("systemsettings");
+        assertEquals(0, sysset.getQuerytimeout());
+
+        setUp();
+        final File tmpDepOn = VoltProjectBuilder.writeStringToTempFile(depOn);
+        long crcDepOn = CatalogUtil.compileDeployment(catalog, tmpDepOn.getPath(), true, false);
+        assertTrue(crcDepOn >= 0);
+        sysset = catalog.getClusters().get("cluster").getDeployment().get("deployment").getSystemsettings().get("systemsettings");
+        assertEquals(200, sysset.getQuerytimeout());
+    }
+
 
     // XXX Need to add command log paths here when command logging
     // gets tweaked to create directories if they don't exist

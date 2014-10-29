@@ -499,7 +499,8 @@ public class CatalogDiffEngine {
         // should generate this from spec.txt
 
         if (suspect instanceof Systemsettings &&
-                (field.equals("elasticPauseTime") || field.equals("elasticThroughput"))) {
+                (field.equals("elasticduration") || field.equals("elasticthroughput")
+                        || field.equals("querytimeout"))) {
             return null;
         } else {
             m_canOccurWithElasticRebalance = false;

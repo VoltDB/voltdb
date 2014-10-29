@@ -20,6 +20,7 @@ package org.voltdb.utils;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -41,6 +42,7 @@ import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
+import org.voltdb.common.Permission;
 import org.voltdb.compilereport.ProcedureAnnotation;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.expressions.AbstractExpression;
@@ -336,51 +338,16 @@ public abstract class CatalogSchemaTools {
      * @param Group
      */
     public static void toSchema(StringBuilder sb, Group grp) {
-        if (grp.getSql() || grp.getSqlread() || grp.getDefaultproc() || grp.getSysproc() || grp.getDefaultprocread()) {
-            sb.append("CREATE ROLE " + grp.getTypeName() + " WITH ");
-            if (grp.getSql()) {
-                if (grp.getSqlread() || grp.getDefaultproc() || grp.getSysproc() || grp.getDefaultprocread()) {
-                    sb.append("SQL, ");
-                }
-                else {
-                    sb.append("SQL;\n");
-                    return;
-                }
-            }
-            if (grp.getSqlread()) {
-                if (grp.getDefaultproc() || grp.getSysproc() || grp.getDefaultprocread()) {
-                    sb.append("SQLREAD, ");
-                }
-                else {
-                    sb.append("SQLREAD;\n");
-                    return;
-                }
-            }
-            if (grp.getDefaultproc()) {
-                if (grp.getSysproc() || grp.getDefaultprocread()) {
-                    sb.append("DEFAULTPROC, ");
-                }
-                else {
-                    sb.append("DEFAULTPROC;\n");
-                    return;
-                }
-            }
-            if (grp.getSysproc()) {
-                if (grp.getDefaultprocread()) {
-                    sb.append("SYSPROC, ");
-                }
-                else {
-                    sb.append("SYSPROC;\n");
-                    return;
-                }
-            }
-            if (grp.getDefaultprocread()) {
-                sb.append("DEFAULTPROCREAD;\n");
-            }
+        final EnumSet<Permission> permissions = Permission.getPermissionSetForGroup(grp);
+        sb.append("CREATE ROLE ").append(grp.getTypeName());
+
+        String delimiter = " WITH ";
+        for (Permission permission : permissions) {
+            sb.append(delimiter).append(permission.name());
+            delimiter = ", ";
         }
-        else {
-            sb.append("CREATE ROLE " + grp.getTypeName() + ";\n");
-        }
+
+        sb.append(";\n");
     }
 
     /**

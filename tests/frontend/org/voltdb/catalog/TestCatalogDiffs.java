@@ -1122,8 +1122,8 @@ public class TestCatalogDiffs extends TestCase {
         builder.compile(testDir + File.separator + "elastic1.jar");
         Catalog catOriginal = catalogForJar(testDir +  File.separator + "elastic1.jar");
 
-        builder.setElasticTargetPauseTime(100);
-        builder.setElasticTargetThroughput(50);
+        builder.setElasticDuration(100);
+        builder.setElasticThroughput(50);
         builder.compile(testDir + File.separator + "elastic2.jar");
         Catalog catUpdated = catalogForJar(testDir + File.separator + "elastic2.jar");
         verifyDiff(catOriginal, catUpdated, null, true);
@@ -1137,8 +1137,8 @@ public class TestCatalogDiffs extends TestCase {
         builder.compile(testDir + File.separator + "elastic1.jar");
         Catalog catOriginal = catalogForJar(testDir +  File.separator + "elastic1.jar");
 
-        builder.setElasticTargetPauseTime(100);
-        builder.setElasticTargetThroughput(50);
+        builder.setElasticDuration(100);
+        builder.setElasticThroughput(50);
         builder.addStmtProcedure("another_procedure", "select * from A;");
         builder.compile(testDir + File.separator + "elastic2.jar");
         Catalog catUpdated = catalogForJar(testDir + File.separator + "elastic2.jar");
@@ -1153,8 +1153,8 @@ public class TestCatalogDiffs extends TestCase {
         builder.compile(testDir + File.separator + "elastic1.jar");
         Catalog catOriginal = catalogForJar(testDir +  File.separator + "elastic1.jar");
 
-        builder.setElasticTargetPauseTime(100);
-        builder.setElasticTargetThroughput(50);
+        builder.setElasticDuration(100);
+        builder.setElasticThroughput(50);
         builder.addStmtProcedure("another_procedure", "select * from A;");
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.compile(testDir + File.separator + "elastic2.jar");

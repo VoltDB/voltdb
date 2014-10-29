@@ -917,9 +917,16 @@ public class VoltCompiler {
             for (GroupsType.Group group : database.getGroups().getGroup()) {
                 org.voltdb.catalog.Group catGroup = db.getGroups().add(group.getName());
                 catGroup.setSql(group.isAdhoc());
-                catGroup.setSysproc(group.isSysproc());
                 catGroup.setDefaultproc(group.isDefaultproc());
                 catGroup.setDefaultprocread(group.isDefaultprocread());
+
+                if (group.isSysproc()) {
+                    catGroup.setAdmin(true);
+                    catGroup.setSql(true);
+                    catGroup.setSqlread(true);
+                    catGroup.setDefaultproc(true);
+                    catGroup.setDefaultprocread(true);
+                }
             }
         }
 
@@ -931,6 +938,14 @@ public class VoltCompiler {
                 catGroup.setSysproc(role.isSysproc());
                 catGroup.setDefaultproc(role.isDefaultproc());
                 catGroup.setDefaultprocread(role.isDefaultprocread());
+
+                if (role.isSysproc()) {
+                    catGroup.setAdmin(true);
+                    catGroup.setSql(true);
+                    catGroup.setSqlread(true);
+                    catGroup.setDefaultproc(true);
+                    catGroup.setDefaultprocread(true);
+                }
             }
         }
 
