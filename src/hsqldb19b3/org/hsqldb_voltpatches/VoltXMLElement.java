@@ -150,9 +150,9 @@ public class VoltXMLElement {
     static public class VoltXMLDiff
     {
         final String m_name;
-        List<VoltXMLElement> m_addedNodes = new ArrayList<VoltXMLElement>();
-        List<VoltXMLElement> m_removedNodes = new ArrayList<VoltXMLElement>();
-        Map<String, VoltXMLDiff> m_changedNodes = new HashMap<String, VoltXMLDiff>();
+        List<VoltXMLElement> m_addedElements = new ArrayList<VoltXMLElement>();
+        List<VoltXMLElement> m_removedElements = new ArrayList<VoltXMLElement>();
+        Map<String, VoltXMLDiff> m_changedElements = new HashMap<String, VoltXMLDiff>();
         Map<String, String> m_addedAttributes = new HashMap<String, String>();
         Set<String> m_removedAttributes = new HashSet<String>();
         Map<String, String> m_changedAttributes = new HashMap<String, String>();
@@ -170,17 +170,17 @@ public class VoltXMLElement {
 
         public List<VoltXMLElement> getAddedNodes()
         {
-            return m_addedNodes;
+            return m_addedElements;
         }
 
         public List<VoltXMLElement> getRemovedNodes()
         {
-            return m_removedNodes;
+            return m_removedElements;
         }
 
         public Map<String, VoltXMLDiff> getChangedNodes()
         {
-            return m_changedNodes;
+            return m_changedElements;
         }
 
         public Map<String, String> getAddedAttributes()
@@ -200,9 +200,9 @@ public class VoltXMLElement {
 
         public boolean isEmpty()
         {
-            return (m_addedNodes.isEmpty() &&
-                    m_removedNodes.isEmpty() &&
-                    m_changedNodes.isEmpty() &&
+            return (m_addedElements.isEmpty() &&
+                    m_removedElements.isEmpty() &&
+                    m_changedElements.isEmpty() &&
                     m_addedAttributes.isEmpty() &&
                     m_removedAttributes.isEmpty() &&
                     m_changedAttributes.isEmpty());
@@ -216,15 +216,15 @@ public class VoltXMLElement {
             sb.append("REMOVED: " + m_removedAttributes + "\n");
             sb.append("CHANGED: " + m_changedAttributes + "\n");
             sb.append("NEW CHILDREN:\n");
-            for (VoltXMLElement add : m_addedNodes) {
+            for (VoltXMLElement add : m_addedElements) {
                 sb.append(add.toString());
             }
             sb.append("DEAD CHILDREN:\n");
-            for (VoltXMLElement remove : m_removedNodes) {
+            for (VoltXMLElement remove : m_removedElements) {
                 sb.append(remove.toString());
             }
             sb.append("CHANGED CHILDREN:\n");
-            for (VoltXMLDiff change : m_changedNodes.values()) {
+            for (VoltXMLDiff change : m_changedElements.values()) {
                 sb.append(change.toString());
             }
             sb.append("\n\n");
@@ -282,7 +282,7 @@ public class VoltXMLElement {
         for (VoltXMLElement firstChild : first.children) {
             if (!secondChildren.contains(firstChild.getUniqueName())) {
                 // Need to duplicate the
-                result.m_removedNodes.add(firstChild);
+                result.m_removedElements.add(firstChild);
             }
             else {
                 commonNames.add(firstChild.getUniqueName());
@@ -290,7 +290,7 @@ public class VoltXMLElement {
         }
         for (VoltXMLElement secondChild : second.children) {
             if (!firstChildren.contains(secondChild.getUniqueName())) {
-                result.m_addedNodes.add(secondChild);
+                result.m_addedElements.add(secondChild);
             }
             else {
                 assert(commonNames.contains(secondChild.getUniqueName()));
@@ -301,7 +301,7 @@ public class VoltXMLElement {
         for (String name : commonNames) {
             VoltXMLDiff childDiff = computeDiff(first.findChild(name), second.findChild(name));
             if (!childDiff.isEmpty()) {
-                result.m_changedNodes.put(name, childDiff);
+                result.m_changedElements.put(name, childDiff);
             }
         }
 
