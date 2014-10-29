@@ -179,6 +179,10 @@ public class VoltLog4jLogger implements CoreVoltLogger {
      */
     public static void configure(String xmlConfig) {
         DOMConfigurator configurator = new DOMConfigurator();
+        if(xmlConfig.contains( "<?xml") && xmlConfig.contains("?>")) {
+            String line = xmlConfig.split("\n")[1];
+            xmlConfig = xmlConfig.replace(line, "").trim();
+        }
         StringReader sr = new StringReader(xmlConfig);
         configurator.doConfigure(sr, LogManager.getLoggerRepository());
     }
