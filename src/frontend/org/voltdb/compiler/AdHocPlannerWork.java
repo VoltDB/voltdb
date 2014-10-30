@@ -111,7 +111,7 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
             false, (singlePartition ? new Object[1] /*any vector element will do, even null*/ : null),
             "@AdHoc_RW_MP", ProcedureInvocationType.ORIGINAL, 0, 0,
             false, false, // don't allow adhoc DDL in this path
-            completionHandler, new AuthSystem.AuthDisabledUser());
+            completionHandler, null);
     }
 
     @Override

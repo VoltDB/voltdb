@@ -17,7 +17,7 @@ begin Cluster           "A set of connected hosts running one or more database a
   bool adminstartup     "Does the server start in admin mode?"
   CommandLog* logconfig "Command log configuration"
   int heartbeatTimeout  "How long to wait, in seconds, between messages before deciding a host is dead"
-  bool useadhocschema   "Manage the database schemas via catalog updates or adhoc DDL"
+  bool useddlschema   "Manage the database schemas via catalog updates or live DDL"
 end
 
 begin Deployment   "Run-time deployment settings"
@@ -81,6 +81,7 @@ begin Group
   bool defaultprocread  "Can invoke read-only default procedures"
   bool sql              "Can invoke the adhoc system procedures"
   bool sqlread          "Can invoke read-only adhoc system procedures"
+  bool allproc          "Can invoke any user defined procedures"
 end
 
 begin GroupRef

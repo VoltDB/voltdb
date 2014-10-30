@@ -1664,7 +1664,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             hostLog.info(line);
         }
 
-        if (m_catalogContext.cluster.getUseadhocschema()) {
+        if (m_catalogContext.cluster.getUseddlschema()) {
             consoleLog.warn("Cluster is configured to use live DDL for application changes. " +
                   "This feature is currently a preview of work-in-progress and not recommended for " +
                   "production environments.  Remove the schema attribute in the <cluster> " +

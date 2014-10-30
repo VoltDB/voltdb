@@ -757,25 +757,25 @@ public class TestCatalogUtil extends TestCase {
         final String adhocSchema =
             "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
             "<deployment>" +
-            "   <cluster hostcount='3' kfactor='1' sitesperhost='2' schema='adhoc'/>" +
+            "   <cluster hostcount='3' kfactor='1' sitesperhost='2' schema='ddl'/>" +
             "</deployment>";
 
         final File tmpDefSchema = VoltProjectBuilder.writeStringToTempFile(defSchema);
         CatalogUtil.compileDeployment(catalog, tmpDefSchema.getPath(), true, false);
         Cluster cluster =  catalog.getClusters().get("cluster");
-        assertFalse(cluster.getUseadhocschema());
+        assertFalse(cluster.getUseddlschema());
 
         setUp();
         final File tmpCatalogSchema = VoltProjectBuilder.writeStringToTempFile(catalogSchema);
         CatalogUtil.compileDeployment(catalog, tmpCatalogSchema.getPath(), true, false);
         cluster =  catalog.getClusters().get("cluster");
-        assertFalse(cluster.getUseadhocschema());
+        assertFalse(cluster.getUseddlschema());
 
         setUp();
         final File tmpAdhocSchema = VoltProjectBuilder.writeStringToTempFile(adhocSchema);
         CatalogUtil.compileDeployment(catalog, tmpAdhocSchema.getPath(), true, false);
         cluster =  catalog.getClusters().get("cluster");
-        assertTrue(cluster.getUseadhocschema());
+        assertTrue(cluster.getUseddlschema());
     }
 
     public void testProcedureReadWriteAccess() {

@@ -27,6 +27,7 @@ public enum Permission {
     //These enums maps to specific boolean in spec.txt
 
     ADMIN,           // aliased by SYSPROC
+    ALLPROC,
     DEFAULTPROC,
     DEFAULTPROCREAD,
     SQL,             // aliased by ADHOC
@@ -69,6 +70,7 @@ public enum Permission {
             if (catGroup.getSqlread()) perms.add(Permission.SQLREAD);
             if (catGroup.getDefaultproc()) perms.add(Permission.DEFAULTPROC);
             if (catGroup.getDefaultprocread()) perms.add(Permission.DEFAULTPROCREAD);
+            if (catGroup.getAllproc()) perms.add(Permission.ALLPROC);
         }
         return perms;
     }
@@ -121,6 +123,8 @@ public enum Permission {
                 break;
             case SQLREAD:
                 group.setSqlread(true);
+            case ALLPROC:
+                group.setAllproc(true);
                 break;
             }
         }

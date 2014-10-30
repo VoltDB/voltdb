@@ -345,9 +345,11 @@ public class TestFragmentProgressUpdate extends TestCase {
         // Write query (negative)
         //
         procName = "item_big_del";
+        m_ee.setInitialLogDurationForTest(1);
 
         verifyLongRunningQueries(50000, 0, procName, false);
         tearDown(); setUp();
+        m_ee.setInitialLogDurationForTest(1);
 
         verifyLongRunningQueries(50000, 100, procName, false);
         tearDown(); setUp();
