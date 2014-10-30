@@ -63,10 +63,6 @@ public class TestMaxInSuite extends RegressionSuite {
 		assertEquals(1, resp.getResults().length);
 		VoltTable results = resp.getResults()[0];
 
-		System.out.println(results.getRowCount());
-		System.out.println(results.getColumnCount());
-		System.out.println(results.fetchRow(0).getLong(0));
-
 		assertEquals(10, results.getRowCount());
 		assertEquals(2, results.getColumnCount());
 		assertEquals(0, results.fetchRow(0).getLong(0));
