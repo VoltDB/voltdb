@@ -60,7 +60,6 @@ public enum LogKeys {
     //AUTH
     auth_ClientInterface_ProcedureNotFound,
     auth_ClientInterface_LackingPermissionForProcedure,
-    auth_ClientInterface_LackingPermissionForSqlRead,
     auth_ClientInterface_LackingPermissionForSql,
     auth_ClientInterface_LackingPermissionForSysproc,
     auth_ClientInterface_LackingPermissionForDefaultproc,

@@ -26,13 +26,11 @@ import org.voltdb.catalog.Group;
 public enum Permission {
     //These enums maps to specific boolean in spec.txt
 
-    ADHOC,
     ADMIN,           // aliased by SYSPROC
     DEFAULTPROC,
     DEFAULTPROCREAD,
     SQL,             // aliased by ADHOC
-    SQLREAD,
-    SYSPROC;
+    SQLREAD;
 
     public static final String toListString() {
         return Arrays.asList(values()).toString();
@@ -48,6 +46,8 @@ public enum Permission {
             // Put the aliases here
             if (name.equalsIgnoreCase("SYSPROC")) {
                 return ADMIN;
+            } else if (name.equalsIgnoreCase("ADHOC")) {
+                return SQL;
             } else {
                 throw e;
             }
@@ -107,9 +107,6 @@ public enum Permission {
     public static final void setPermissionsInGroup(Group group, EnumSet<Permission> permissions) {
         for (Permission p : permissions) {
             switch(p) {
-            case ADHOC:
-                group.setSql(true);
-                break;
             case ADMIN:
                 group.setAdmin(true);
                 break;

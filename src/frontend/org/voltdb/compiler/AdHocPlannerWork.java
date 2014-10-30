@@ -29,7 +29,7 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
     final String sqlBatchText;
     final String[] sqlStatements;
     final Object[] userParamSet;
-    public final CatalogContext catalogContext;
+    final CatalogContext catalogContext;
     final boolean inferPartitioning;
     // The user partition key is usually null
     // -- otherwise, it contains one element to support @AdHocSpForTest and

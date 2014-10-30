@@ -20,6 +20,7 @@ package org.voltdb;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.AuthSystem.AuthUser;
+import org.voltdb.InvocationPermissionPolicy.PolicyResult;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.common.Permission;
 import org.voltdb.utils.LogKeys;
@@ -40,6 +41,12 @@ public class InvocationSqlPermissionPolicy extends InvocationPermissionPolicy {
     public PolicyResult shouldAccept(AuthUser user, StoredProcedureInvocation invocation, Procedure proc) {
         if (proc.getSystemproc() && invocation.procName.startsWith("@AdHoc_RW")) {
             if (user.hasPermission(Permission.SQL)) {
+                return PolicyResult.ALLOW;
+            }
+            return PolicyResult.DENY;
+        }
+        if (proc.getSystemproc() && invocation.procName.startsWith("@AdHoc") && !invocation.procName.startsWith("@AdHoc_RW")) {
+            if (user.hasPermission(Permission.SQLREAD) || user.hasPermission(Permission.SQL)) {
                 return PolicyResult.ALLOW;
             }
             return PolicyResult.DENY;

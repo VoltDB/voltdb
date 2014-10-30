@@ -115,7 +115,6 @@ import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListenableFutureTask;
-import org.voltdb.common.Permission;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -2204,6 +2203,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             task.originalTxnId = changeResult.originalTxnId;
                             task.originalUniqueId = changeResult.originalUniqueId;
 
+                            String uname = result.user.m_name;
+                            Boolean tf = SystemProcedureCatalog.listing.get(task.procName).asCatalogProcedure().getReadonly();
                             ClientResponseImpl error = null;
                             if ((error = m_permissionValidator.shouldAccept(task.procName, result.user, task,
                                     SystemProcedureCatalog.listing.get(task.procName).asCatalogProcedure())) != null) {
