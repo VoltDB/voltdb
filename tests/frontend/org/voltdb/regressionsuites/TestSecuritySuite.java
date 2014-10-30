@@ -220,25 +220,32 @@ public class TestSecuritySuite extends RegressionSuite {
         }
         assertTrue(exceptionThrown);
 
-        // userWithAllProc must be able to invoke any just like user4
-        String procusers[] = { "user4", "userWithAllProc" };
-        for (String user : procusers) {
-            m_username = user;
-            client = getClient();
-            client.callProcedure("DoNothing1", 1);
-            client.callProcedure("DoNothing2", 1);
-            client.callProcedure("DoNothing3", 1);
+        //"userWithAllProc" should be able to call any user procs but not RW sysprocs
+        m_username = "userWithAllProc";
+        client = getClient();
+        client.callProcedure("DoNothing1", 1);
+        client.callProcedure("DoNothing2", 1);
+        client.callProcedure("DoNothing3", 1);
 
-            // user3 shouldn't gleam much info from a made up proc
-            try {
-                client.callProcedure("RyanLikesTheYankees", 1);
-            } catch (ProcCallException e) {
-                assertFalse(e.getMessage().contains("lost before a response was received"));
-                e.printStackTrace();
-                exceptionThrown = true;
-            }
-            assertTrue(exceptionThrown);
+        //We should not be able to call RW sysproc
+        exceptionThrown = false;
+        try {
+            client.callProcedure("@Quiesce").getResults();
+        } catch (ProcCallException e) {
+            e.printStackTrace();
+            exceptionThrown = true;
         }
+        assertTrue(exceptionThrown);
+
+        // users shouldn't gleam much info from a made up proc
+        try {
+            client.callProcedure("RyanLikesTheYankees", 1);
+        } catch (ProcCallException e) {
+            assertFalse(e.getMessage().contains("lost before a response was received"));
+            e.printStackTrace();
+            exceptionThrown = true;
+        }
+        assertTrue(exceptionThrown);
 
     }
 

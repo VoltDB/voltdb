@@ -43,10 +43,7 @@ public class TestInvocationAcceptancePolicy {
         when(user.hasPermission(Permission.DEFAULTPROC)).thenReturn(crud);
         when(user.hasPermission(Permission.DEFAULTPROCREAD)).thenReturn(readonly);
         if (userProc != null) {
-            if (allprocs) {
-                when(user.hasUserDefinedProcedurePermission(userProc)).thenReturn(allprocs);
-            }
-            when(user.hasUserDefinedProcedurePermission(userProc)).thenReturn(true);
+            when(user.hasUserDefinedProcedurePermission(userProc)).thenReturn(allprocs);
         }
         return user;
     }
@@ -92,17 +89,21 @@ public class TestInvocationAcceptancePolicy {
     public void testUserDefinedProcPermission()
     {
         Procedure proc = new Procedure();
-        AuthSystem.AuthUser user = createUser(false, false, false, proc, true, false);
 
         StoredProcedureInvocation invocation = new StoredProcedureInvocation();
         invocation.setProcName("MyProc");
         invocation.setParams("test");
 
         InvocationPermissionPolicy policy = new InvocationUserDefinedProcedurePermissionPolicy();
-        assertEquals(policy.shouldAccept(user, invocation, proc), PolicyResult.ALLOW);
 
-        AuthSystem.AuthUser user2 = createUser(false, false, false, proc, true, false);
+        //WITH allproc access
+        AuthSystem.AuthUser user2 = createUser(false, false, false, proc, true, true);
         assertEquals(policy.shouldAccept(user2, invocation, proc), PolicyResult.ALLOW);
+
+        //Without allproc
+        AuthSystem.AuthUser user3 = createUser(false, false, false, proc, false, false);
+        assertEquals(policy.shouldAccept(user3, invocation, proc), PolicyResult.DENY);
+        //We cant test individual authorized proc here.
     }
 
     @Test
