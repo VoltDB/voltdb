@@ -76,19 +76,11 @@ function empty-server() {
     echo "Compiling the application catalog with no DDL, Procedure classes will be added to ctalog."
     echo "To perform this action manually, use the command line: "
     echo
-    echo "voltdb create -d deployment-liveddl.xml -l $LICENSE -H $HOST"
+    echo "voltdb create -d deployment-noschema.xml -l $LICENSE -H $HOST"
     echo
-    $VOLTDB create -d deployment-liveddl.xml -l $LICENSE -H $HOST
+    $VOLTDB create -d deployment-noschema.xml -l $LICENSE -H $HOST
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
-}
-
-# Reloads the database schema from loadschema.sql
-# The sql can add additional schema elements or completely rebuild an existing schema.
-function loadschema() {
-while read p; do
-  echo $p | sqlcmd
-done < loadschema.sql
 }
 
 # run the voltdb server locally
