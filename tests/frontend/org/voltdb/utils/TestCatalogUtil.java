@@ -757,7 +757,7 @@ public class TestCatalogUtil extends TestCase {
         final String adhocSchema =
             "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
             "<deployment>" +
-            "   <cluster hostcount='3' kfactor='1' sitesperhost='2' schema='adhoc'/>" +
+            "   <cluster hostcount='3' kfactor='1' sitesperhost='2' schema='ddl'/>" +
             "</deployment>";
 
         final File tmpDefSchema = VoltProjectBuilder.writeStringToTempFile(defSchema);
