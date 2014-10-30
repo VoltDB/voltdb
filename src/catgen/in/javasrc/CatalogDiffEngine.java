@@ -419,7 +419,33 @@ public class CatalogDiffEngine {
      * String 2 is the error message to show the user if that table isn't empty.
      */
     private String[] checkAddDropIfTableIsEmptyWhitelist(final CatalogType suspect, final ChangeType changeType) {
-        // Nothing for now. Will need content here to support adding a unique index for example.
+        String[] retval = new String[2];
+
+        // handle adding an index - presumably unique
+        if (suspect instanceof Index) {
+            Index idx = (Index) suspect;
+            assert(idx.getUnique());
+
+            retval[0] = suspect.getParent().getTypeName();
+            retval[1] = String.format(
+                    "Unable to add unique index %s because table %s is not empty.",
+                    suspect.getTypeName(), retval[0]);
+            return retval;
+        }
+
+        // handle changes to columns in an index - presumably drops and presumably unique
+        if ((suspect instanceof ColumnRef) && (suspect.getParent() instanceof Index)) {
+            Index idx = (Index) suspect.getParent();
+            assert(idx.getUnique());
+            assert(changeType == ChangeType.DELETION);
+
+            retval[0] = suspect.getParent().getTypeName();
+            retval[1] = String.format(
+                    "Unable to restrict unique index %s because table %s is not empty.",
+                    suspect.getParent().getTypeName(), retval[0]);
+            return retval;
+        }
+
         return null;
     }
 
@@ -701,6 +727,38 @@ public class CatalogDiffEngine {
                 return retval;
             }
         }
+
+        // handle narrowing columns
+        if (prevType instanceof Column) {
+            // capture the table name
+            retval[0] = prevType.getParent().getTypeName();
+
+            if (field.equalsIgnoreCase("type")) {
+                // error message
+                retval[1] = String.format(
+                        "Unable to make a possibly-lossy type change to column %s in table %s because it is not empty.",
+                        prevType.getTypeName(), retval[0]);
+                return retval;
+            }
+
+            if (field.equalsIgnoreCase("size")) {
+                // error message
+                retval[1] = String.format(
+                        "Unable to narrow the width of column %s in table %s because it is not empty.",
+                        prevType.getTypeName(), retval[0]);
+                return retval;
+            }
+        }
+
+        /*if (prevType instanceof ColumnRef) {
+            ColumnRef cref = (ColumnRef) prevType;
+            cref.
+
+            retval[0] = prevType.getParent().getParent().getTypeName();
+            retval[1] = String.format(
+                    "Unable to narrow the width of column %s in table %s because it is not empty.",
+                    prevType.getTypeName(), retval[0]);
+        }*/
 
         return null;
     }
