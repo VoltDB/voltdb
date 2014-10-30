@@ -177,7 +177,7 @@ public class TestCatalogDiffs extends TestCase {
         Catalog catOriginal = catalogForJar(original);
 
         GroupInfo gi[] = new GroupInfo[1];
-        gi[0] = new GroupInfo("group1", true, true, true, true);
+        gi[0] = new GroupInfo("group1", true, true, true, true, true);
         String updated = compileWithGroups(false, null, gi, null, "base", BASEPROCS);
         Catalog catUpdated = catalogForJar(updated);
 
@@ -189,7 +189,7 @@ public class TestCatalogDiffs extends TestCase {
         Catalog catOriginal = catalogForJar(original);
 
         GroupInfo gi[] = new GroupInfo[1];
-        gi[0] = new GroupInfo("group1", true, true, true, true);
+        gi[0] = new GroupInfo("group1", true, true, true, true, false);
 
         UserInfo ui[] = new UserInfo[1];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
@@ -202,7 +202,7 @@ public class TestCatalogDiffs extends TestCase {
 
     public void testModifyUser() throws IOException {
         GroupInfo gi[] = new GroupInfo[1];
-        gi[0] = new GroupInfo("group1", true, true, true, false);
+        gi[0] = new GroupInfo("group1", true, true, true, false, false);
 
         UserInfo ui[] = new UserInfo[1];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
@@ -211,7 +211,7 @@ public class TestCatalogDiffs extends TestCase {
         Catalog catOriginal = catalogForJar(original);
 
         GroupInfo gi2[] = new GroupInfo[1];
-        gi2[0] = new GroupInfo("group2", true, true, true, true);
+        gi2[0] = new GroupInfo("group2", true, true, true, true, true);
         // change a user.
         ui[0] = new UserInfo("user1", "drowssap", new String[] {"group2"});
         String updated = compileWithGroups(false, null, gi2, ui, "base", BASEPROCS);
@@ -222,7 +222,7 @@ public class TestCatalogDiffs extends TestCase {
 
     public void testDeleteUser() throws IOException {
         GroupInfo gi[] = new GroupInfo[1];
-        gi[0] = new GroupInfo("group1", true, true, true, false);
+        gi[0] = new GroupInfo("group1", true, true, true, false, false);
 
         UserInfo ui[] = new UserInfo[1];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
@@ -239,7 +239,7 @@ public class TestCatalogDiffs extends TestCase {
 
     public void testDeleteGroupAndUser() throws IOException {
         GroupInfo gi[] = new GroupInfo[1];
-        gi[0] = new GroupInfo("group1", true, true, true, false);
+        gi[0] = new GroupInfo("group1", true, true, true, false, false);
 
         UserInfo ui[] = new UserInfo[1];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
@@ -256,8 +256,8 @@ public class TestCatalogDiffs extends TestCase {
 
     public void testChangeUsersAssignedGroups() throws IOException {
         GroupInfo gi[] = new GroupInfo[2];
-        gi[0] = new GroupInfo("group1", true, true, true, false);
-        gi[1] = new GroupInfo("group2", true, true, true, false);
+        gi[0] = new GroupInfo("group1", true, true, true, false, false);
+        gi[1] = new GroupInfo("group2", true, true, true, false, true);
 
         UserInfo ui[] = new UserInfo[2];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
@@ -277,8 +277,8 @@ public class TestCatalogDiffs extends TestCase {
 
     public void testChangeSecurityEnabled() throws IOException {
         GroupInfo gi[] = new GroupInfo[2];
-        gi[0] = new GroupInfo("group1", true, true, true, false);
-        gi[1] = new GroupInfo("group2", true, true, true, false);
+        gi[0] = new GroupInfo("group1", true, true, true, false, true);
+        gi[1] = new GroupInfo("group2", true, true, true, false, false);
 
         UserInfo ui[] = new UserInfo[2];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
@@ -296,8 +296,8 @@ public class TestCatalogDiffs extends TestCase {
 
     public void testChangeSecurityProvider() throws IOException {
         GroupInfo gi[] = new GroupInfo[2];
-        gi[0] = new GroupInfo("group1", true, true, true, false);
-        gi[1] = new GroupInfo("group2", true, true, true, false);
+        gi[0] = new GroupInfo("group1", true, true, true, false, false);
+        gi[1] = new GroupInfo("group2", true, true, true, false, false);
 
         UserInfo ui[] = new UserInfo[2];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});

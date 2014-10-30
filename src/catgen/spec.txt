@@ -80,6 +80,7 @@ begin Group
   bool defaultproc      "Can invoke default procedures"
   bool adhoc            "Can invoke the adhoc system procedure
   bool defaultprocread  "Can invoke read-only default procedures"
+  bool allproc          "Can invoke any user defined procedures"
 end
 
 begin GroupRef

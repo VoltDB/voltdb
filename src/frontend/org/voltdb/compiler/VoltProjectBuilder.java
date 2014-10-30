@@ -176,13 +176,15 @@ public class VoltProjectBuilder {
         private final boolean admin;
         private final boolean defaultproc;
         private final boolean defaultprocread;
+        private final boolean allproc;
 
-        public GroupInfo(final String name, final boolean adhoc, final boolean admin, final boolean defaultproc, final boolean defaultprocread){
+        public GroupInfo(final String name, final boolean adhoc, final boolean admin, final boolean defaultproc, final boolean defaultprocread, final boolean allproc){
             this.name = name;
             this.adhoc = adhoc;
             this.admin = admin;
             this.defaultproc = defaultproc;
             this.defaultprocread = defaultprocread;
+            this.allproc = allproc;
         }
 
         @Override
@@ -346,7 +348,7 @@ public class VoltProjectBuilder {
     public void addGroups(final GroupInfo groups[]) {
         for (final GroupInfo info : groups) {
             transformer.append("CREATE ROLE " + info.name);
-            if(info.adhoc || info.defaultproc || info.admin || info.defaultprocread) {
+            if(info.adhoc || info.defaultproc || info.admin || info.defaultprocread || info.allproc) {
                 transformer.append(" WITH ");
                 if(info.adhoc) {
                     transformer.append("adhoc,");
@@ -359,6 +361,9 @@ public class VoltProjectBuilder {
                 }
                 if(info.defaultprocread) {
                     transformer.append("defaultprocread,");
+                }
+                if(info.allproc) {
+                    transformer.append("allproc,");
                 }
                 transformer.replace(transformer.length() - 1, transformer.length(), ";");
             }
