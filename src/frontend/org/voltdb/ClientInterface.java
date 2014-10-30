@@ -2203,8 +2203,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             task.originalTxnId = changeResult.originalTxnId;
                             task.originalUniqueId = changeResult.originalUniqueId;
 
-                            String uname = result.user.m_name;
-                            Boolean tf = SystemProcedureCatalog.listing.get(task.procName).asCatalogProcedure().getReadonly();
                             ClientResponseImpl error = null;
                             if ((error = m_permissionValidator.shouldAccept(task.procName, result.user, task,
                                     SystemProcedureCatalog.listing.get(task.procName).asCatalogProcedure())) != null) {

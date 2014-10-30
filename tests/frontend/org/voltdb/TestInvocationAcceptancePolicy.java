@@ -97,7 +97,7 @@ public class TestInvocationAcceptancePolicy {
 
         Procedure proc = SystemProcedureCatalog.listing.get("@AdHoc_RO_MP").asCatalogProcedure();
 
-        InvocationPermissionPolicy policy = new InvocationSqlReadPermissionPolicy();
+        InvocationPermissionPolicy policy = new InvocationSqlPermissionPolicy();
         assertEquals(policy.shouldAccept(user, invocation, proc), PolicyResult.ALLOW);
 
         // A user that doesn't have adhoc permission
