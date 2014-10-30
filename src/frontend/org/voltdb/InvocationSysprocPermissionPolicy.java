@@ -48,7 +48,7 @@ public class InvocationSysprocPermissionPolicy extends InvocationPermissionPolic
 
         //Since AdHoc perms are diff we only check sysprocs other than AdHoc
         if (proc.getSystemproc() && !invocation.procName.startsWith("@AdHoc")) {
-            if (!user.hasPermission(Permission.SYSPROC)&& !proc.getReadonly()) {
+            if (!user.hasPermission(Permission.ADMIN) && !proc.getReadonly()) {
                 return PolicyResult.DENY;
             }
             return PolicyResult.ALLOW;

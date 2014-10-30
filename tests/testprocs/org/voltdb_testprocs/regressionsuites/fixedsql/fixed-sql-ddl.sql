@@ -219,4 +219,38 @@ CREATE TABLE ENG6926_HITS (
    WEEK BIGINT NOT NULL,
    PRIMARY KEY (WEEK, IP)
 );
-PARTITION TABLE HITS ON COLUMN WEEK;
+PARTITION TABLE ENG6926_HITS ON COLUMN WEEK;
+
+-- ************************* --
+-- Begin tables for ENG-7041 --
+CREATE TABLE transaction(
+  txn_id BIGINT NOT NULL,
+  acc_no BIGINT  NOT NULL,
+  txn_amt FLOAT NOT NULL,
+  txn_state VARCHAR(5) NOT NULL,
+  txn_city VARCHAR(50) NOT NULL,
+  txn_ts TIMESTAMP  NOT NULL,
+  vendor_id INTEGER,
+  PRIMARY KEY (acc_no, txn_ts, txn_id)
+);
+PARTITION TABLE transaction ON COLUMN acc_no;
+
+CREATE TABLE offers_given_exp(
+  acc_no BIGINT NOT NULL,
+  vendor_id INTEGER,
+  offer_ts TIMESTAMP NOT NULL,
+  offer_text VARCHAR(200)
+);
+PARTITION TABLE offers_given_exp ON COLUMN acc_no;
+EXPORT TABLE offers_given_exp;
+
+CREATE VIEW acct_vendor_totals AS
+SELECT
+  acc_no,
+  vendor_id,
+  COUNT(*) as total_visits,
+  SUM(txn_amt) as total_spend
+FROM transaction
+GROUP BY acc_no, vendor_id;
+-- End tables for ENG-7041   --
+-- ************************* --

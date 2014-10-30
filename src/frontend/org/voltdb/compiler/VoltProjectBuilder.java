@@ -173,14 +173,14 @@ public class VoltProjectBuilder {
     public static final class GroupInfo {
         private final String name;
         private final boolean adhoc;
-        private final boolean sysproc;
+        private final boolean admin;
         private final boolean defaultproc;
         private final boolean defaultprocread;
 
-        public GroupInfo(final String name, final boolean adhoc, final boolean sysproc, final boolean defaultproc, final boolean defaultprocread){
+        public GroupInfo(final String name, final boolean adhoc, final boolean admin, final boolean defaultproc, final boolean defaultprocread){
             this.name = name;
             this.adhoc = adhoc;
-            this.sysproc = sysproc;
+            this.admin = admin;
             this.defaultproc = defaultproc;
             this.defaultprocread = defaultprocread;
         }
@@ -270,7 +270,7 @@ public class VoltProjectBuilder {
     private Integer m_elasticDuration = null;
     private Integer m_queryTimeout = null;
 
-    private boolean m_useAdhocSchema = false;
+    private boolean m_useDDLSchema = false;
 
     public VoltProjectBuilder setQueryTimeout(int target) {
         m_queryTimeout = target;
@@ -291,8 +291,8 @@ public class VoltProjectBuilder {
         m_deadHostTimeout = deadHostTimeout;
     }
 
-    public void setUseAdhocSchema(boolean useIt) {
-        m_useAdhocSchema = useIt;
+    public void setUseDDLSchema(boolean useIt) {
+        m_useDDLSchema = useIt;
     }
 
     public void configureLogging(String internalSnapshotPath, String commandLogPath, Boolean commandLogSync,
@@ -346,7 +346,7 @@ public class VoltProjectBuilder {
     public void addGroups(final GroupInfo groups[]) {
         for (final GroupInfo info : groups) {
             transformer.append("CREATE ROLE " + info.name);
-            if(info.adhoc || info.defaultproc || info.sysproc || info.defaultprocread) {
+            if(info.adhoc || info.defaultproc || info.admin || info.defaultprocread) {
                 transformer.append(" WITH ");
                 if(info.adhoc) {
                     transformer.append("adhoc,");
@@ -354,8 +354,8 @@ public class VoltProjectBuilder {
                 if(info.defaultproc) {
                     transformer.append("defaultproc,");
                 }
-                if(info.sysproc) {
-                    transformer.append("sysproc,");
+                if(info.admin) {
+                    transformer.append("admin,");
                 }
                 if(info.defaultprocread) {
                     transformer.append("defaultprocread,");
@@ -821,7 +821,7 @@ public class VoltProjectBuilder {
         cluster.setHostcount(dinfo.hostCount);
         cluster.setSitesperhost(dinfo.sitesPerHost);
         cluster.setKfactor(dinfo.replication);
-        cluster.setSchema(m_useAdhocSchema ? SchemaType.ADHOC : SchemaType.CATALOG);
+        cluster.setSchema(m_useDDLSchema ? SchemaType.DDL : SchemaType.CATALOG);
 
         // <paths>
         PathsType paths = factory.createPathsType();
