@@ -173,14 +173,18 @@ public class VoltProjectBuilder {
     public static final class GroupInfo {
         private final String name;
         private final boolean adhoc;
-        private final boolean sysproc;
+        private final boolean admin;
         private final boolean defaultproc;
+        private final boolean defaultprocread;
+        private final boolean allproc;
 
-        public GroupInfo(final String name, final boolean adhoc, final boolean sysproc, final boolean defaultproc){
+        public GroupInfo(final String name, final boolean adhoc, final boolean admin, final boolean defaultproc, final boolean defaultprocread, final boolean allproc){
             this.name = name;
             this.adhoc = adhoc;
-            this.sysproc = sysproc;
+            this.admin = admin;
             this.defaultproc = defaultproc;
+            this.defaultprocread = defaultprocread;
+            this.allproc = allproc;
         }
 
         @Override
@@ -264,18 +268,24 @@ public class VoltProjectBuilder {
 
     private Integer m_deadHostTimeout = null;
 
-    private Integer m_elasticTargetThroughput = null;
-    private Integer m_elasticTargetPauseTime = null;
+    private Integer m_elasticThroughput = null;
+    private Integer m_elasticDuration = null;
+    private Integer m_queryTimeout = null;
 
-    private boolean m_useAdhocSchema = false;
+    private boolean m_useDDLSchema = false;
 
-    public VoltProjectBuilder setElasticTargetThroughput(int target) {
-        m_elasticTargetThroughput = target;
+    public VoltProjectBuilder setQueryTimeout(int target) {
+        m_queryTimeout = target;
         return this;
     }
 
-    public VoltProjectBuilder setElasticTargetPauseTime(int target) {
-        m_elasticTargetPauseTime = target;
+    public VoltProjectBuilder setElasticThroughput(int target) {
+        m_elasticThroughput = target;
+        return this;
+    }
+
+    public VoltProjectBuilder setElasticDuration(int target) {
+        m_elasticDuration = target;
         return this;
     }
 
@@ -283,8 +293,8 @@ public class VoltProjectBuilder {
         m_deadHostTimeout = deadHostTimeout;
     }
 
-    public void setUseAdhocSchema(boolean useIt) {
-        m_useAdhocSchema = useIt;
+    public void setUseDDLSchema(boolean useIt) {
+        m_useDDLSchema = useIt;
     }
 
     public void configureLogging(String internalSnapshotPath, String commandLogPath, Boolean commandLogSync,
@@ -338,7 +348,7 @@ public class VoltProjectBuilder {
     public void addGroups(final GroupInfo groups[]) {
         for (final GroupInfo info : groups) {
             transformer.append("CREATE ROLE " + info.name);
-            if(info.adhoc || info.defaultproc || info.sysproc) {
+            if(info.adhoc || info.defaultproc || info.admin || info.defaultprocread || info.allproc) {
                 transformer.append(" WITH ");
                 if(info.adhoc) {
                     transformer.append("adhoc,");
@@ -346,8 +356,14 @@ public class VoltProjectBuilder {
                 if(info.defaultproc) {
                     transformer.append("defaultproc,");
                 }
-                if(info.sysproc) {
-                    transformer.append("sysproc,");
+                if(info.admin) {
+                    transformer.append("admin,");
+                }
+                if(info.defaultprocread) {
+                    transformer.append("defaultprocread,");
+                }
+                if(info.allproc) {
+                    transformer.append("allproc,");
                 }
                 transformer.replace(transformer.length() - 1, transformer.length(), ";");
             }
@@ -810,7 +826,7 @@ public class VoltProjectBuilder {
         cluster.setHostcount(dinfo.hostCount);
         cluster.setSitesperhost(dinfo.sitesPerHost);
         cluster.setKfactor(dinfo.replication);
-        cluster.setSchema(m_useAdhocSchema ? SchemaType.ADHOC : SchemaType.CATALOG);
+        cluster.setSchema(m_useDDLSchema ? SchemaType.DDL : SchemaType.CATALOG);
 
         // <paths>
         PathsType paths = factory.createPathsType();
@@ -911,12 +927,16 @@ public class VoltProjectBuilder {
             snapshot.setPriority(m_snapshotPriority);
             systemSettingType.setSnapshot(snapshot);
         }
-        if (m_elasticTargetThroughput != null || m_elasticTargetPauseTime != null) {
+        if (m_elasticThroughput != null || m_elasticDuration != null) {
             SystemSettingsType.Elastic elastic = factory.createSystemSettingsTypeElastic();
-            if (m_elasticTargetThroughput != null) elastic.setThroughput(m_elasticTargetThroughput);
-            if (m_elasticTargetPauseTime != null) elastic.setDuration(m_elasticTargetPauseTime);
+            if (m_elasticThroughput != null) elastic.setThroughput(m_elasticThroughput);
+            if (m_elasticDuration != null) elastic.setDuration(m_elasticDuration);
             systemSettingType.setElastic(elastic);
         }
+        if (m_queryTimeout != null) {
+            factory.createSystemSettingsTypeQuery().setTimeout(m_queryTimeout);
+        }
+
         deployment.setSystemsettings(systemSettingType);
 
         // <users>

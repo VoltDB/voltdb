@@ -115,7 +115,7 @@ import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListenableFutureTask;
-import com.google_voltpatches.common.util.concurrent.MoreExecutors;
+import org.voltdb.common.Permission;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -186,11 +186,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     private final Cartographer m_cartographer;
 
-    /**
-     * Policies used to determine if we can accept an invocation.
-     */
-    private final Map<String, List<InvocationAcceptancePolicy>> m_policies =
-            new HashMap<String, List<InvocationAcceptancePolicy>>();
+
+    //This validator will check permissions in AUTH system.
+    private final PermissionValidator m_permissionValidator = new PermissionValidator();
+    //This validator will verify params or per procedure invocation vaidation.
+    private final InvocationValidator m_invocationValidator;
 
     /*
      * Allow the async compiler thread to immediately process completed planning tasks
@@ -356,8 +356,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             m_socket.socket().setKeepAlive(true);
 
                             if (handler instanceof ClientInputHandler) {
-                                final Connection c
-                                        = m_network.registerChannel(
+                                m_network.registerChannel(
                                                 m_socket,
                                                 handler,
                                                 0,
@@ -962,8 +961,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     return false;
                 }
 
-                int partitionParamIndex = catProc.getPartitionparameter();
-                int partitionParamType = catProc.getPartitioncolumn().getType();
                 boolean isReadonly = catProc.getReadonly();
 
                 try {
@@ -1134,7 +1131,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_acceptor = new ClientAcceptor(clientIntf, clientPort, messenger.getNetwork(), false);
         m_adminAcceptor = null;
         m_adminAcceptor = new ClientAcceptor(adminIntf, adminPort, messenger.getNetwork(), true);
-        registerPolicies(replicationRole);
+        m_invocationValidator = new InvocationValidator(replicationRole);
 
         m_mailbox = new LocalMailbox(messenger,  messenger.getHSIdForLocalSite(HostMessenger.CLIENT_INTERFACE_SITE_ID)) {
             LinkedBlockingQueue<VoltMessage> m_d = new LinkedBlockingQueue<VoltMessage>();
@@ -1235,71 +1232,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
     }
 
-    private void registerPolicies(ReplicationRole replicationRole) {
-        registerPolicy(new InvocationPermissionPolicy(true));
-        registerPolicy(new ParameterDeserializationPolicy(true));
-        registerPolicy(new ReplicaInvocationAcceptancePolicy(replicationRole == ReplicationRole.REPLICA));
-
-        // NOTE: These "policies" are really parameter correctness checks, not permissions
-        registerPolicy("@AdHoc", new AdHocAcceptancePolicy(true));
-        registerPolicy("@AdHocSpForTest", new AdHocAcceptancePolicy(true));
-        registerPolicy("@UpdateApplicationCatalog", new UpdateCatalogAcceptancePolicy(true));
-        registerPolicy("@UpdateClasses", new UpdateClassesAcceptancePolicy(true));
-    }
-
-    private void registerPolicy(InvocationAcceptancePolicy policy) {
-        List<InvocationAcceptancePolicy> policies = m_policies.get(null);
-        if (policies == null) {
-            policies = new ArrayList<InvocationAcceptancePolicy>();
-            m_policies.put(null, policies);
-        }
-        policies.add(policy);
-    }
-
-    private void registerPolicy(String procName, InvocationAcceptancePolicy policy) {
-        List<InvocationAcceptancePolicy> policies = m_policies.get(procName);
-        if (policies == null) {
-            policies = new ArrayList<InvocationAcceptancePolicy>();
-            m_policies.put(procName, policies);
-        }
-        policies.add(policy);
-    }
-
-    /**
-     * Check the procedure invocation against a set of policies to see if it
-     * should be rejected.
-     *
-     * @param name The procedure name, null for generic policies.
-     * @return ClientResponseImpl on error or null if okay.
-     */
-    private ClientResponseImpl checkPolicies(String name, AuthSystem.AuthUser user,
-                                  final StoredProcedureInvocation task,
-                                  final Procedure catProc) {
-        List<InvocationAcceptancePolicy> policies = m_policies.get(name);
-        ClientResponseImpl error = null;
-        if (policies != null) {
-            for (InvocationAcceptancePolicy policy : policies) {
-                if ((error = policy.shouldAccept(user, task, catProc)) != null) {
-                    return error;
-                }
-            }
-        }
-        return null;
-    }
-
     /**
      * Called when the replication role of the cluster changes.
      * @param role
      */
     public void setReplicationRole(ReplicationRole role) {
-        List<InvocationAcceptancePolicy> policies = m_policies.get(null);
-        if (policies != null) {
-            for (InvocationAcceptancePolicy policy : policies) {
-                if (policy instanceof ReplicaInvocationAcceptancePolicy) {
-                    policy.setMode(role == ReplicationRole.REPLICA);
-                }
-            }
-        }
+        m_invocationValidator.setReplicationRole(role);
     }
 
     /**
@@ -1501,8 +1439,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 userPartitionKey == null, userPartitionKey,
                 task.procName, task.type, task.originalTxnId, task.originalUniqueId,
                 VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
-                VoltDB.instance().getCatalogContext().cluster.getUseadhocschema(),
-                m_adhocCompletionHandler);
+                VoltDB.instance().getCatalogContext().cluster.getUseddlschema(),
+                m_adhocCompletionHandler, handler.m_username);
         LocalObjectMessage work = new LocalObjectMessage( ahpw );
 
         m_mailbox.send(m_plannerSiteId, work);
@@ -1539,8 +1477,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     handler.isAdmin(), ccxn, catalogBytes, deploymentString,
                     task.procName, task.type, task.originalTxnId, task.originalUniqueId,
                     VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
-                    VoltDB.instance().getCatalogContext().cluster.getUseadhocschema(),
-                    m_adhocCompletionHandler));
+                    VoltDB.instance().getCatalogContext().cluster.getUseddlschema(),
+                    m_adhocCompletionHandler, handler.m_username));
 
         m_mailbox.send(m_plannerSiteId, work);
         return null;
@@ -1722,61 +1660,27 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         final CatalogContext catalogContext = m_catalogContext.get();
         final AuthSystem.AuthUser user = catalogContext.authSystem.getUser(handler.m_username);
 
-        // ping just responds as fast as possible to show the connection is alive
-        // nb: ping is not a real procedure, so this is checked before other "sysprocs"
-        if (task.procName.startsWith("@")) {
-            if (task.procName.equals("@Ping")) {
-                return new ClientResponseImpl(ClientResponseImpl.SUCCESS, new VoltTable[0], "", task.clientHandle);
-            }
-            if (task.procName.equals("@GetPartitionKeys")) {
-                return dispatchGetPartitionKeys(task);
-            }
-            if (task.procName.equals("@Subscribe")) {
-                return dispatchSubscribe( handler, task);
-            }
-            if (task.procName.equals("@GC")) {
-                return dispatchSystemGC(handler, task, user);
-            }
-            if (task.procName.equals("@StopNode")) {
-                return dispatchStopNode(task);
-            }
-        }
-
         Procedure catProc = catalogContext.procedures.get(task.procName);
 
         if (catProc == null) {
-            Config sysProc = SystemProcedureCatalog.listing.get(task.procName);
-            if (sysProc != null) {
-                catProc = sysProc.asCatalogProcedure();
-            }
-        }
-
-        if (catProc == null) {
+            String proc = task.procName;
             if (task.procName.equals("@AdHoc") || task.procName.equals("@AdHocSpForTest")) {
                 // Map @AdHoc... to @AdHoc_RW_MP for validation. In the future if security is
                 // configured differently for @AdHoc... variants this code will have to
                 // change in order to use the proper variant based on whether the work
                 // is single or multi partition and read-only or read-write.
-                catProc = SystemProcedureCatalog.listing.get("@AdHoc_RW_MP").asCatalogProcedure();
-                assert(catProc != null);
-            }
-            else if (task.procName.equals("@Explain")) {
-                return dispatchAdHoc(task, handler, ccxn, true);
-            }
-            else if (task.procName.equals("@ExplainProc")) {
-                return dispatchExplainProcedure(task, handler, ccxn);
-            }
-            else if (task.procName.equals("@SendSentinel")) {
-                dispatchSendSentinel(handler.connectionId(), nowNanos, buf.capacity(), task);
-                return null;
+                proc = "@AdHoc_RW_MP";
             }
             else if (task.procName.equals("@UpdateClasses")) {
                 // Icky.  Map @UpdateClasses to @UpdateApplicationCatalog.  We want the
                 // permissions and replication policy for @UAC, and we'll deal with the
                 // parameter validation stuff separately (the different name will
                 // skip the @UAC-specific policy)
-                catProc =
-                    SystemProcedureCatalog.listing.get("@UpdateApplicationCatalog").asCatalogProcedure();
+                proc = "@UpdateApplicationCatalog";
+            }
+            Config sysProc = SystemProcedureCatalog.listing.get(proc);
+            if (sysProc != null) {
+                catProc = sysProc.asCatalogProcedure();
             }
         }
 
@@ -1801,21 +1705,58 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         final ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)catProc.getAttachment();
 
-        // Check procedure policies
-        error = checkPolicies(null, user, task, catProc);
-        if (error != null) {
+        //Check permissions
+        if ((error = m_permissionValidator.shouldAccept(task.procName, user, task, catProc)) != null) {
             return error;
         }
 
-        error = checkPolicies(task.procName, user, task, catProc);
-        if (error != null) {
+        //Check param deserialization policy for sysprocs
+        if ((error = m_invocationValidator.shouldAccept(task.procName, user, task, catProc)) != null) {
             return error;
         }
 
         if (catProc.getSystemproc()) {
             // COMMUNITY SYSPROC SPECIAL HANDLING
 
-            if (task.procName.equals("@AdHoc")) {
+            // ping just responds as fast as possible to show the connection is alive
+            // nb: ping is not a real procedure, so this is checked before other "sysprocs"
+            if (task.procName.equals("@Ping")) {
+                return new ClientResponseImpl(ClientResponseImpl.SUCCESS, new VoltTable[0], "", task.clientHandle);
+            }
+            else if (task.procName.equals("@GetPartitionKeys")) {
+                return dispatchGetPartitionKeys(task);
+            }
+            else if (task.procName.equals("@Subscribe")) {
+                return dispatchSubscribe( handler, task);
+            }
+            else if (task.procName.equals("@Statistics")) {
+                return dispatchStatistics(OpsSelector.STATISTICS, task, ccxn);
+            }
+            else if (task.procName.equals("@SystemCatalog")) {
+                return dispatchStatistics(OpsSelector.SYSTEMCATALOG, task, ccxn);
+            }
+            else if (task.procName.equals("@SystemInformation")) {
+                return dispatchStatistics(OpsSelector.SYSTEMINFORMATION, task, ccxn);
+            }
+            else if (task.procName.equals("@GC")) {
+                return dispatchSystemGC(handler, task);
+            }
+            else if (task.procName.equals("@StopNode")) {
+                return dispatchStopNode(task);
+            }
+
+            else if (task.procName.equals("@Explain")) {
+                return dispatchAdHoc(task, handler, ccxn, true);
+            }
+            else if (task.procName.equals("@ExplainProc")) {
+                return dispatchExplainProcedure(task, handler, ccxn);
+            }
+            else if (task.procName.equals("@SendSentinel")) {
+                dispatchSendSentinel(handler.connectionId(), nowNanos, buf.capacity(), task);
+                return null;
+            }
+
+            else if (task.procName.equals("@AdHoc")) {
                 return dispatchAdHoc(task, handler, ccxn, false);
             }
             else if (task.procName.equals("@AdHocSpForTest")) {
@@ -1834,15 +1775,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             else if (task.procName.equals("@LoadSinglepartitionTable")) {
                 // FUTURE: When we get rid of the legacy hashinator, this should go away
                 return dispatchLoadSinglepartitionTable(buf, catProc, task, handler, ccxn);
-            }
-            else if (task.procName.equals("@Statistics")) {
-                return dispatchStatistics(OpsSelector.STATISTICS, task, ccxn);
-            }
-            else if (task.procName.equals("@SystemCatalog")) {
-                return dispatchStatistics(OpsSelector.SYSTEMCATALOG, task, ccxn);
-            }
-            else if (task.procName.equals("@SystemInformation")) {
-                return dispatchStatistics(OpsSelector.SYSTEMINFORMATION, task, ccxn);
             }
 
             // ERROR MESSAGE FOR PRO SYSPROC USE IN COMMUNITY
@@ -1953,39 +1885,31 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * Can be used to perform old gen GCs on a schedule during non-peak times
      */
     private ClientResponseImpl dispatchSystemGC(final ClientInputHandler handler,
-            final StoredProcedureInvocation task, AuthSystem.AuthUser user) {
-        if (user.hasSystemProcPermission()) {
-            m_systemGCThread.execute(new Runnable() {
-                @Override
-                public void run() {
-                    final long start = System.nanoTime();
-                    System.gc();
-                    final long duration = System.nanoTime() - start;
-                    VoltTable vt = new VoltTable(
-                            new ColumnInfo[] { new ColumnInfo("SYSTEM_GC_DURATION_NANOS", VoltType.BIGINT) });
-                    vt.addRow(duration);
-                    final ClientResponseImpl response = new ClientResponseImpl(
-                            ClientResponseImpl.SUCCESS,
-                            new VoltTable[] { vt },
-                            null,
-                            task.clientHandle);
-                    ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
-                    buf.putInt(buf.capacity() - 4);
-                    response.flattenToBuffer(buf).flip();
+                                                final StoredProcedureInvocation task) {
+        m_systemGCThread.execute(new Runnable() {
+            @Override
+            public void run() {
+                final long start = System.nanoTime();
+                System.gc();
+                final long duration = System.nanoTime() - start;
+                VoltTable vt = new VoltTable(
+                        new ColumnInfo[] { new ColumnInfo("SYSTEM_GC_DURATION_NANOS", VoltType.BIGINT) });
+                vt.addRow(duration);
+                final ClientResponseImpl response = new ClientResponseImpl(
+                        ClientResponseImpl.SUCCESS,
+                        new VoltTable[] { vt },
+                        null,
+                        task.clientHandle);
+                ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
+                buf.putInt(buf.capacity() - 4);
+                response.flattenToBuffer(buf).flip();
 
-                    ClientInterfaceHandleManager cihm = m_cihm.get(handler.connectionId());
-                    if (cihm == null) return;
-                    cihm.connection.writeStream().enqueue(buf);
-                }
-            });
-            return null;
-        } else {
-            return new ClientResponseImpl(
-                    ClientResponseImpl.GRACEFUL_FAILURE,
-                    new VoltTable[] {},
-                    "User " + handler.m_username + " doesn't have sysproc permission needed to invoke @GC",
-                    task.clientHandle);
-        }
+                ClientInterfaceHandleManager cihm = m_cihm.get(handler.connectionId());
+                if (cihm == null) return;
+                cihm.connection.writeStream().enqueue(buf);
+            }
+        });
+        return null;
     }
 
     private ClientResponseImpl dispatchSubscribe(ClientInputHandler c, StoredProcedureInvocation task) {
@@ -2060,8 +1984,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     }
 
     private ClientResponseImpl dispatchStopNode(StoredProcedureInvocation task) {
-        VoltTable table = new VoltTable(
-                new ColumnInfo("RESULT", VoltType.STRING));
         Object params[] = task.getParams().toArray();
         if (params.length != 1 || params[0] == null) {
             return new ClientResponseImpl(

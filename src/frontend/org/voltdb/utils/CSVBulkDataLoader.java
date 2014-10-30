@@ -22,6 +22,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
 import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
 
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -44,7 +45,7 @@ public class CSVBulkDataLoader implements CSVDataLoader {
     }
 
     @Override
-    public void flush() {
+    public void flush() throws ExecutionException, InterruptedException {
         m_loader.flush();
     }
 
@@ -68,8 +69,7 @@ public class CSVBulkDataLoader implements CSVDataLoader {
     }
 
     @Override
-    public void close() throws InterruptedException
-    {
+    public void close() throws Exception {
         m_loader.close();
     }
 

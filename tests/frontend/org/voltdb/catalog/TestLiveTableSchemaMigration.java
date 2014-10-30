@@ -161,7 +161,7 @@ public class TestLiveTableSchemaMigration extends TestCase {
 
             DeploymentBuilder depBuilder = new DeploymentBuilder(1, 1, 0);
             depBuilder.setVoltRoot("/tmp/foobar");
-            depBuilder.setUseAdhocSchema(true);
+            depBuilder.setUseDDLSchema(true);
             // disable logging
             depBuilder.configureLogging("/tmp/foobar", "/tmp/foobar", false, false, 1, 1, 3);
             String deployment = depBuilder.getXML();

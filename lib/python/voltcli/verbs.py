@@ -404,7 +404,8 @@ class ServerBundle(JavaBundle):
                  supports_daemon=False,
                  daemon_name=None,
                  daemon_description=None,
-                 daemon_output=None):
+                 daemon_output=None,
+                 supports_multiple_daemons=False):
         JavaBundle.__init__(self, 'org.voltdb.VoltDB')
         self.subcommand = subcommand
         self.needs_catalog = needs_catalog
@@ -415,6 +416,7 @@ class ServerBundle(JavaBundle):
         self.daemon_name = daemon_name
         self.daemon_description = daemon_description
         self.daemon_output = daemon_output
+        self.supports_multiple_daemons = supports_multiple_daemons
 
     def initialize(self, verb):
         JavaBundle.initialize(self, verb)
@@ -442,6 +444,12 @@ class ServerBundle(JavaBundle):
             verb.add_options(
                 cli.BooleanOption('-B', '--background', 'daemon',
                                   'run the VoltDB server in the background (as a daemon process)'))
+            if self.supports_multiple_daemons:
+                # Keep the -I/--instance option hidden for now.
+                verb.add_options(
+                    cli.IntegerOption('-I', '--instance', 'instance',
+                                  #'specify an instance number for multiple servers on the same host'))
+                                  None))
 
     def go(self, verb, runner):
         if self.subcommand == 'create':

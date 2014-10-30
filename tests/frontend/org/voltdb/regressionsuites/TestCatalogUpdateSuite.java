@@ -42,7 +42,6 @@ import org.apache.zookeeper_voltpatches.ZooDefs;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.BackendTarget;
-import org.voltdb.ClientResponseImpl;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;
@@ -905,6 +904,31 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         System.out.println("-----\n\n");
     }
 
+    public void testSystemSettingsUpdateTimeout() throws IOException, ProcCallException, InterruptedException  {
+        Client client = getClient();
+        String newCatalogURL, deploymentURL;
+        VoltTable[] results;
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-timeout.jar");
+
+
+        deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-timeout-1000.xml");
+        results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
+        assertTrue(results.length == 1);
+
+        deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-timeout-5000.xml");
+        results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
+        assertTrue(results.length == 1);
+
+        deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-timeout-600.xml");
+        results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
+        assertTrue(results.length == 1);
+
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.jar");
+        deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.xml");
+        results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
+        assertTrue(results.length == 1);
+    }
+
     private void deleteDirectory(File dir) {
         if (!dir.exists() || !dir.isDirectory()) {
             return;
@@ -988,7 +1012,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
         // As catalogupdate-cluster-base but with security enabled. This requires users and groups..
         // We piggy-back the heartbeat change here.
-        GroupInfo groups[] = new GroupInfo[] {new GroupInfo("group1", false, true, false)};
+        GroupInfo groups[] = new GroupInfo[] {new GroupInfo("group1", false, true, false, false, false)};
         UserInfo users[] = new UserInfo[] {new UserInfo("user1", "userpass1", new String[] {"group1"})};
         ProcedureInfo procInfo = new ProcedureInfo(new String[] {"group1"}, InsertNewOrder.class);
 
@@ -1012,8 +1036,8 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project.addSchema(TestCatalogUpdateSuite.class.getResource("testorderby-ddl.sql").getPath());
         project.addDefaultPartitioning();
         project.addProcedures(BASEPROCS_OPROCS);
-        project.setElasticTargetPauseTime(100);
-        project.setElasticTargetThroughput(50);
+        project.setElasticDuration(100);
+        project.setElasticThroughput(50);
         compile = config.compile(project);
         assertTrue(compile);
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-addtables.xml"));
@@ -1149,6 +1173,39 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         hugeCatalogXMLPath = Configuration.getPathToCatalogForTest("catalogupdate-cluster-huge.xml");
         hugeCatalogJarPath = Configuration.getPathToCatalogForTest("catalogupdate-cluster-huge.jar");
         MiscUtils.copyFile(project.getPathToDeployment(), hugeCatalogXMLPath);
+
+        // a catalog with different system settings on query time out
+        config = new LocalCluster("catalogupdate-cluster-change_snapshot_dir_not_exist.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
+        project.addDefaultPartitioning();
+        project.addProcedures(BASEPROCS);
+        project.setSnapshotSettings( "1s", 3, "/tmp/snapshotdirasda2", "foo2");
+        // build the jarfile
+        compile = config.compile(project);
+        assertTrue(compile);
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot_dir_not_exist.xml"));
+
+        config = new LocalCluster("catalogupdate-cluster-timeout.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
+        project.addDefaultPartitioning();
+        project.addProcedures(BASEPROCS);
+        // build the jarfile
+        project.setQueryTimeout(1000);
+        compile = config.compile(project);
+        assertTrue(compile);
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-timeout-1000.xml"));
+
+        project.setQueryTimeout(5000);
+        compile = config.compile(project);
+        assertTrue(compile);
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-timeout-5000.xml"));
+
+        project.setQueryTimeout(600);
+        compile = config.compile(project);
+        assertTrue(compile);
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-timeout-600.xml"));
 
         return builder;
     }

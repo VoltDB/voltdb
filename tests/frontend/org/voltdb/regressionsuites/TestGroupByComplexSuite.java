@@ -41,10 +41,10 @@ import org.voltdb.compiler.VoltProjectBuilder;
  * org.voltdb.planner.TestComplexGroupBySuite.
  */
 
-public class TestPlansGroupByComplexSuite extends RegressionSuite {
+public class TestGroupByComplexSuite extends RegressionSuite {
 
-    private final String[] procs = {"R1.insert", "P1.insert", "P2.insert", "P3.insert"};
-    private final String [] tbs = {"R1","P1","P2","P3"};
+    private final static String[] procs = {"R1.insert", "P1.insert", "P2.insert", "P3.insert"};
+    private final static String [] tbs = {"R1","P1","P2","P3"};
 
     private void loadData() throws IOException, ProcCallException {
         Client client = this.getClient();
@@ -323,6 +323,15 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             expected = new long[][] { {1, 3}, {2, 4} };
             validateTableOfLongs(vt, expected);
 
+            // repeat above test with GROUP BY ALIAS feature
+            cr = client.callProcedure("@AdHoc", "SELECT abs(dept) as tag, count(wage) from " + tb +
+                    " GROUP BY tag ORDER BY tag ");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {1, 3}, {2, 4} };
+            validateTableOfLongs(vt, expected);
+
+
             // Test complex group-by (normal expression) without complex aggregation.
             // Actually this AdHoc query has an extra projection node because of the pass-by column dept in order by columns.
             // ParameterValueExpression equal function return false. AggResultColumns contains: dept+1, count(wage) and dept.
@@ -334,6 +343,22 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             expected = new long[][] { {2, 3}, {3, 4} };
             validateTableOfLongs(vt, expected);
 
+            // repeat above test with GROUP BY ALIAS feature
+            cr = client.callProcedure("@AdHoc", "SELECT (dept+1) as tag, count(wage) from " + tb +
+                    " GROUP BY tag ORDER BY tag ");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {2, 3}, {3, 4} };
+            validateTableOfLongs(vt, expected);
+
+            // test group by alias with constants in expression for stored procedure
+            cr = client.callProcedure(tb +"_GroupbyAlias1", 1);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {2, 3}, {3, 4} };
+            validateTableOfLongs(vt, expected);
+
+
             // (2) With extra aggregation expression
             // Test complex group-by with with complex aggregation.
             cr = client.callProcedure("@AdHoc", "SELECT abs(dept) as tag, count(wage)+1 from " + tb +
@@ -343,6 +368,15 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             expected = new long[][] { {2, 5}, {1, 4} };
             validateTableOfLongs(vt, expected);
 
+            // repeat above test with GROUP BY ALIAS feature
+            cr = client.callProcedure("@AdHoc", "SELECT abs(dept) as tag, count(wage)+1 from " + tb +
+                    " GROUP BY tag ORDER BY tag DESC;");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {2, 5}, {1, 4} };
+            validateTableOfLongs(vt, expected);
+
+
             // Test more complex group-by with with complex aggregation.
             cr = client.callProcedure("@AdHoc", "SELECT abs(dept-2) as tag, count(wage)+1 from " + tb +
                     " GROUP BY abs(dept-2) ORDER BY tag;");
@@ -351,6 +385,22 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             expected = new long[][] { {0, 5}, {1, 4} };
             validateTableOfLongs(vt, expected);
 
+            // repeat above test with GROUP BY ALIAS feature
+            cr = client.callProcedure("@AdHoc", "SELECT abs(dept-2) as tag, count(wage)+1 from " + tb +
+                    " GROUP BY tag ORDER BY tag;");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {0, 5}, {1, 4} };
+            validateTableOfLongs(vt, expected);
+
+            // test group by alias with constants in expression for stored procedure
+            cr = client.callProcedure(tb +"_GroupbyAlias2", -2);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {0, 5}, {1, 4} };
+            validateTableOfLongs(vt, expected);
+
+
             // More hard general test case with multi group by columns and complex aggs
             cr = client.callProcedure("@AdHoc", "SELECT abs(dept-2) as tag, wage, wage/2, count(*)*2, " +
                     "sum(id)/count(id)+1 from " + tb + " GROUP BY abs(dept-2), wage ORDER BY tag, wage;");
@@ -358,6 +408,15 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             vt = cr.getResults()[0];
             expected = new long[][] { {0,10,5,2,7}, {0,40,20,4,6}, {0,50,25,2,6}, {1,10,5,2,2}, {1,20,10,2,3}, {1,30,15,2,4} };
             validateTableOfLongs(vt, expected);
+
+            // repeat above test with GROUP BY ALIAS feature
+            cr = client.callProcedure("@AdHoc", "SELECT abs(dept-2) as tag, wage, wage/2, count(*)*2, " +
+                    "sum(id)/count(id)+1 from " + tb + " GROUP BY tag, wage ORDER BY tag, wage;");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            vt = cr.getResults()[0];
+            expected = new long[][] { {0,10,5,2,7}, {0,40,20,4,6}, {0,50,25,2,6}, {1,10,5,2,2}, {1,20,10,2,3}, {1,30,15,2,4} };
+            validateTableOfLongs(vt, expected);
+
 
             if (!isHSQL()) {
                 // Timestamp function for complex group by
@@ -1027,19 +1086,26 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
     // Suite builder boilerplate
     //
 
-    public TestPlansGroupByComplexSuite(String name) {
+    public TestGroupByComplexSuite(String name) {
         super(name);
     }
-    static final Class<?>[] PROCEDURES = {
-        org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.CountT1A1.class,
-        org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.InsertF.class,
-        org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.InsertDims.class,
-        org.voltdb_testprocs.regressionsuites.plansgroupbyprocs.SumGroupSingleJoin.class };
 
     static public junit.framework.Test suite() {
         VoltServerConfig config = null;
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(
-                TestPlansGroupByComplexSuite.class);
+                TestGroupByComplexSuite.class);
+
+        String addProcs = "";
+        for (String tb: tbs) {
+            addProcs += "CREATE PROCEDURE " + tb + "_GroupbyAlias1 AS "
+                    + " SELECT (dept+?) as tag, count(wage) from " + tb
+                    + " GROUP BY tag ORDER BY tag;";
+
+            addProcs += "CREATE PROCEDURE " + tb + "_GroupbyAlias2 AS "
+                    + " SELECT abs(dept+?) as tag, count(wage)+1 from " + tb
+                    + " GROUP BY tag ORDER BY tag;";
+        }
+
         VoltProjectBuilder project = new VoltProjectBuilder();
         final String literalSchema =
                 "CREATE TABLE R1 ( " +
@@ -1071,7 +1137,9 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
                 "DEPT INTEGER NOT NULL, " +
                 "TM TIMESTAMP DEFAULT NULL, " +
                 "PRIMARY KEY (ID, WAGE) );" +
-                "PARTITION TABLE P3 ON COLUMN WAGE;"
+                "PARTITION TABLE P3 ON COLUMN WAGE;" +
+
+                addProcs
                 ;
         try {
             project.addLiteralSchema(literalSchema);

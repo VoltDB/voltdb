@@ -93,6 +93,7 @@ import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
+import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.dtxn.InitiatorStats;
 import org.voltdb.dtxn.LatencyHistogramStats;
@@ -169,9 +170,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    static final String m_defaultVersionString = "4.8";
+    static final String m_defaultVersionString = "4.9";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q4.8\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q4.9\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -984,6 +985,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     class StartActionWatcher implements Watcher {
         @Override
         public void process(WatchedEvent event) {
+            if (m_mode == OperationMode.SHUTTINGDOWN) return;
             m_es.submit(new Runnable() {
                 @Override
                 public void run() {
@@ -1407,6 +1409,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 TheHashinator.setConfiguredHashinatorType(HashinatorType.LEGACY);
             }
 
+            // log system setting information
+            SystemSettingsType sysType = m_deployment.getSystemsettings();
+            if (sysType != null && sysType.getQuery() != null) {
+                if (sysType.getQuery().getTimeout() > 0) {
+                    hostLog.info("Host query timeout set to " + sysType.getQuery().getTimeout() + " milliseconds");
+                }
+            }
 
             // create a dummy catalog to load deployment info into
             Catalog catalog = new Catalog();
@@ -1655,7 +1664,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             hostLog.info(line);
         }
 
-        if (m_catalogContext.cluster.getUseadhocschema()) {
+        if (m_catalogContext.cluster.getUseddlschema()) {
             consoleLog.warn("Cluster is configured to use live DDL for application changes. " +
                   "This feature is currently a preview of work-in-progress and not recommended for " +
                   "production environments.  Remove the schema attribute in the <cluster> " +
