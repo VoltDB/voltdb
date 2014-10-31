@@ -836,12 +836,7 @@ h3.systemHeader{}
 
  input.icon-search { width:182px;}
  
-
- 
- 
-
-
-}
+ }
 @media screen and (orientation:landscape) {
 	.popup_cont {top:5%;}
 	

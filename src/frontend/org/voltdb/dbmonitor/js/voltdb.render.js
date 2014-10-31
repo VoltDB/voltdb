@@ -2572,5 +2572,3 @@ $(window).resize(function () {
     }
 
 });
-
-

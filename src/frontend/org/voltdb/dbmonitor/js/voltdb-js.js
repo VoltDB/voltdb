@@ -144,9 +144,3 @@ $(document).ready(function () {
     //$('#showServerUnreachable').trigger('click');
 
 });
-
-
-
-
-
-
