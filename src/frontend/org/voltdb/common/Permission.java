@@ -89,17 +89,37 @@ public enum Permission {
     }
 
     /**
-     * Add the given permission to the permission set. No-op if the permission is already in the set.
+     * Add the given permission to the permission set.
      * @param permissions    The permission set
-     * @param toAdd          The permission to add
+     * @param toAdd          The permissions to add
      * @return The same permission set as passed in
      */
-    private static EnumSet<Permission> addPermission(EnumSet<Permission> permissions, Permission toAdd)
+    private static EnumSet<Permission> addPermission(EnumSet<Permission> permissions, Permission...toAdd)
     {
-        if (toAdd == ADMIN) {
-            permissions.addAll(EnumSet.allOf(Permission.class));
-        } else {
-            permissions.add(toAdd);
+        for (Permission onePerm : toAdd) {
+            // Permissions that infer other permissions need to be listed here and
+            // set the inferred permissions as well as itself.
+            //
+            // Always add the permission itself and then call this method to add
+            // the inferred permissions.
+            switch (onePerm) {
+            case ADMIN:
+                permissions.addAll(EnumSet.allOf(Permission.class));
+                break;
+            case SQL:
+                permissions.add(SQL);
+                addPermission(permissions, SQLREAD, DEFAULTPROC);
+                break;
+            case SQLREAD:
+                permissions.add(SQLREAD);
+                addPermission(permissions, DEFAULTPROCREAD);
+                break;
+            case DEFAULTPROC:
+                permissions.add(DEFAULTPROC);
+                addPermission(permissions, DEFAULTPROCREAD);
+            default:
+                permissions.add(onePerm);
+            }
         }
         return permissions;
     }

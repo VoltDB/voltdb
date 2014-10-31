@@ -46,7 +46,7 @@ public class InvocationSqlPermissionPolicy extends InvocationPermissionPolicy {
             return PolicyResult.DENY;
         }
         if (proc.getSystemproc() && invocation.procName.startsWith("@AdHoc")) {
-            if (user.hasPermission(Permission.SQLREAD, Permission.SQL)) {
+            if (user.hasPermission(Permission.SQLREAD)) {
                 return PolicyResult.ALLOW;
             }
             return PolicyResult.DENY;
