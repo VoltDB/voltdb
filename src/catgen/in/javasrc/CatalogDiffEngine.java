@@ -426,10 +426,10 @@ public class CatalogDiffEngine {
             Index idx = (Index) suspect;
             assert(idx.getUnique());
 
-            retval[0] = suspect.getParent().getTypeName();
+            retval[0] = idx.getParent().getTypeName();
             retval[1] = String.format(
                     "Unable to add unique index %s because table %s is not empty.",
-                    suspect.getTypeName(), retval[0]);
+                    idx.getTypeName(), retval[0]);
             return retval;
         }
 
@@ -438,11 +438,12 @@ public class CatalogDiffEngine {
             Index idx = (Index) suspect.getParent();
             assert(idx.getUnique());
             assert(changeType == ChangeType.DELETION);
+            Table table = (Table) idx.getParent();
 
-            retval[0] = suspect.getParent().getTypeName();
+            retval[0] = table.getTypeName();
             retval[1] = String.format(
                     "Unable to restrict unique index %s because table %s is not empty.",
-                    suspect.getParent().getTypeName(), retval[0]);
+                    idx.getTypeName(), retval[0]);
             return retval;
         }
 
@@ -730,8 +731,16 @@ public class CatalogDiffEngine {
 
         // handle narrowing columns
         if (prevType instanceof Column) {
+            Table table = (Table) prevType.getParent();
+            Database db = (Database) table.getParent();
+
+            // for now, no changes to export tables
+            if (CatalogUtil.isTableExportOnly(db, table)) {
+                return null;
+            }
+
             // capture the table name
-            retval[0] = prevType.getParent().getTypeName();
+            retval[0] = table.getTypeName();
 
             if (field.equalsIgnoreCase("type")) {
                 // error message
@@ -749,16 +758,6 @@ public class CatalogDiffEngine {
                 return retval;
             }
         }
-
-        /*if (prevType instanceof ColumnRef) {
-            ColumnRef cref = (ColumnRef) prevType;
-            cref.
-
-            retval[0] = prevType.getParent().getParent().getTypeName();
-            retval[1] = String.format(
-                    "Unable to narrow the width of column %s in table %s because it is not empty.",
-                    prevType.getTypeName(), retval[0]);
-        }*/
 
         return null;
     }

@@ -361,7 +361,7 @@ public class TestLiveTableSchemaMigration extends TestCase {
     // The number of times the loop is run can be changed to make the test
     // better at the cost of runtime.
     //
-    /*public void testRandomSchemas() throws Exception {
+    public void testRandomSchemas() throws Exception {
         int count = 15;
         Random rand = new Random(0);
         for (int i = 0; i < count; i++) {
@@ -370,9 +370,9 @@ public class TestLiveTableSchemaMigration extends TestCase {
             migrateSchema(t1, t2);
             System.out.printf("testRandomSchemas tested %d/%d\n", i+1, count);
         }
-    }*/
+    }
 
-    /*public void testRandomSchemasUsingAlter() throws Exception {
+    public void testRandomSchemasUsingAlter() throws Exception {
         int count = 15;
         Random rand = new Random(0);
         for (int i = 0; i < count; i++) {
@@ -381,5 +381,5 @@ public class TestLiveTableSchemaMigration extends TestCase {
             migrateSchemaUsingAlter(t1, t2, true);
             System.out.printf("testRandomSchemasUsingAlter tested %d/%d\n", i+1, count);
         }
-    }*/
+    }
 }
