@@ -90,8 +90,7 @@ function alertNodeClicked(obj) {
         var tableNameIndex = 5;
         var partitionIndex = 4;
         var hostIndex = 1;
-        var tupleCountIndex = 7;
-
+        var tupleCountIndex = 3;
 
         //sorting related variables
         this.isSortProcedures = false;
@@ -105,7 +104,6 @@ function alertNodeClicked(obj) {
         this.ChangeServerConfiguration = function (serverName, portId, userName, pw, isHashPw, isAdmin) {
             VoltDBService.ChangeServerConfiguration(serverName, portId, userName, pw, isHashPw, isAdmin);
         };
-
 
         var testConnection = function (serverName, portId, username, password, admin, onInformationLoaded) {
             VoltDBService.TestConnection(serverName, portId, username, password, admin, function (result) {
@@ -228,10 +226,12 @@ function alertNodeClicked(obj) {
         };
 
         this.ShowUsername = function (userName) {
-            if (userName != undefined && userName != 'null') {
+            if (userName != undefined && userName != 'null' && userName != '') {
                 $(".userN").html(userName);
+                $("#userLine").show();
             } else {
                 $(".userN").html("");
+                $("#userLine").hide();
             }
         };
 
@@ -245,8 +245,6 @@ function alertNodeClicked(obj) {
 
         this.getDatabaseInformation = function (onInformationLoaded) {
             var procedureMetadata = "";
-            var isProcedurePopulated = false;
-            var isTablePopulated = false;
 
             VoltDBService.GetSystemInformationDeployment(function (connection) {
                 setKFactor(connection);
@@ -254,9 +252,10 @@ function alertNodeClicked(obj) {
                     populateProceduresInformation(nestConnection);
                     procedureMetadata = procedureData;
 
-                    VoltDBService.GetDataTablesInformation(function (inestConnection) {
-                        populateTablesInformation(inestConnection);
+                    VoltDBService.GetDataTablesInformation(function (inestConnection) {                        
                         populateTableTypes(inestConnection);
+                        populateTablesInformation(inestConnection);
+
                         populatePartitionColumnTypes(inestConnection);
                         onInformationLoaded(procedureMetadata, inestConnection.Metadata['@Statistics_TABLE'].data);
                     });
@@ -274,6 +273,11 @@ function alertNodeClicked(obj) {
 
         };
 
+        this.GetDataTablesInformation = function (contextConnectionReturned) {
+            VoltDBService.GetDataTablesInformation(function (inestConnection) {
+                contextConnectionReturned(inestConnection);
+            });
+        };
 
         this.getMemoryGraphInformation = function (onInformationLoaded) {
             var memoryDetails = {};
@@ -439,9 +443,7 @@ function alertNodeClicked(obj) {
         };
 
         var populateTablesInformation = function (connection) {
-            var counter = 0;
-            //connection.Metadata['@Statistics_TABLE'] = GetTestTableData(connection);
-
+            var counter = 0;           
             connection.Metadata['@Statistics_TABLE'].schema.forEach(function (columnInfo) {
 
                 if (columnInfo["name"] == "HOST_ID")
@@ -463,30 +465,6 @@ function alertNodeClicked(obj) {
             counter = 0;
             var tableName = "";
 
-            if (connection.Metadata['@Statistics_TABLE'].data != undefined) {
-                connection.Metadata['@Statistics_TABLE'].data.forEach(function (entry) {
-                    tableName = entry[tableNameIndex];
-
-                    if (!tableData.hasOwnProperty(tableName)) {
-                        voltDbRenderer.tableDataSize++;
-                        tableData[tableName] = [];
-                        counter = 0;
-
-                        connection.Metadata['@Statistics_TABLE'].data.forEach(function (nestEntry) {
-                            if (nestEntry[tableNameIndex] === tableName) {
-                                tableData[tableName][counter] = {};
-                                tableData[tableName][counter]['HOST_ID'] = nestEntry[hostIndex];
-                                tableData[tableName][counter]['PARTITION_ID'] = nestEntry[partitionIndex];
-                                tableData[tableName][counter]['TUPLE_COUNT'] = nestEntry[tupleCountIndex];
-                                counter++;
-                            }
-                        });
-
-                    }
-
-                });
-            }
-
             if (voltDbRenderer.isSortTables && !voltDbRenderer.isTableSearch) { //is sorting is enabled create json array first to contain sort data on it,
                 //then after sorting add it to a parent json object procedureData
                 populateTableJsonArray(connection);
@@ -500,7 +478,7 @@ function alertNodeClicked(obj) {
                 mapJsonArrayToTables();
 
             } else if (voltDbRenderer.isSortTables && voltDbRenderer.isTableSearch) {
-                voltDbRenderer.formatSearchTablesDataToJsonArray(voltDbRenderer.searchText);
+                voltDbRenderer.formatSearchTablesDataToJsonArray(connection, voltDbRenderer.searchText);
                 if (voltDbRenderer.sortOrder == "ascending") {
                     tableSearchJsonArray = ascendingSortJSON(tableSearchJsonArray, voltDbRenderer.tableSortColumn);
 
@@ -510,12 +488,10 @@ function alertNodeClicked(obj) {
                 }
                 mapJsonArrayToSearchedTables();
 
+            } else {
+                formatTableData(connection);
+
             }
-
-
-
-
-
         };
 
         var populateProceduresInformation = function (connection) {
@@ -670,7 +646,6 @@ function alertNodeClicked(obj) {
                 if (connection.Metadata['@Statistics_PROCEDUREPROFILE'].data != undefined) {
                     //apply search only if column is "PROCEDURE"
                     var isPopulateSortData = checkSortColumnSortable();
-                    //if (isPopulateSortData)
                     procedureJsonArray = [];
 
                     connection.Metadata['@Statistics_PROCEDUREPROFILE'].data.forEach(function (entry) {
@@ -727,92 +702,48 @@ function alertNodeClicked(obj) {
                 }
             }
         };
-
-        var populateTableJsonArrayForSorting = function (connection) {
-            var tableCount = 0;
-            if (connection != undefined) {
-                if (connection.Metadata['@Statistics_TABLE']) {
-                    if (connection.Metadata['@Statistics_TABLE'].data != undefined) {
-                        //apply search only if column is "TABLENAME"
-                        var isPopulateSortData = checkSortColumnSortable();
-                        if (isPopulateSortData) {
-                            tableJsonArray = [];
-
-                            connection.Metadata['@Statistics_TABLE'].data.forEach(function (entry) {
-                                if (voltDbRenderer.searchText == "" || voltDbRenderer.searchText == undefined) {
-                                    if (!checkIfDuplicateJson(tableJsonArray, entry[tableNameIndex])) {
-                                        tableJsonArray[tableCount] = {
-                                            "TABLE_NAME": entry[tableNameIndex],
-                                            "HOST_ID": entry[hostIndex],
-                                            "PARTITION_ID": entry[partitionIndex],
-                                            "TUPLE_COUNT": entry[tupleCountIndex]
-                                        };
-                                        tableCount++;
-                                    }
-
-                                } else {
-                                    if (isPopulateSortData) {
-                                        tableJsonArray[tableCount] = {
-                                            "TABLE_NAME": entry[tableNameIndex],
-                                            "HOST_ID": entry[hostIndex],
-                                            "PARTITION_ID": entry[partitionIndex],
-                                            "TUPLE_COUNT": entry[tupleCountIndex]
-                                        };
-                                        tableCount++;
-                                    }
-                                }
-
-                            });
-
-                        }
-
-
-                    }
-                }
-            }
-        };
-
+        
         var populateTableJsonArray = function (connection) {
             var tableCount = 0;
-            if (connection != undefined) {
-                if (connection.Metadata['@Statistics_TABLE']) {
-                    if (connection.Metadata['@Statistics_TABLE'].data != undefined) {
-                        //apply search only if column is "TABLENAME"
-                        var isPopulateSortData = checkSortColumnSortable();
-                        if (isPopulateSortData) {
-                            tableJsonArray = [];
+            formatTableData(connection);
+            if (tableData != undefined || tableData != "") {
 
-                            connection.Metadata['@Statistics_TABLE'].data.forEach(function (entry) {
-                                if (voltDbRenderer.searchText == "" || voltDbRenderer.searchText == undefined) {
-                                    if (!checkIfDuplicateJson(tableJsonArray, entry[tableNameIndex])) {
-                                        tableJsonArray[tableCount] = {
-                                            "TABLE_NAME": entry[tableNameIndex],
-                                            "HOST_ID": entry[hostIndex],
-                                            "PARTITION_ID": entry[partitionIndex],
-                                            "TUPLE_COUNT": entry[tupleCountIndex]
-                                        };
-                                        tableCount++;
-                                    }
+                //apply search only if column is "TABLENAME"
+                var isPopulateSortData = checkSortColumnSortable();
+                //if (isPopulateSortData) {
+                if (!voltDbRenderer.isTableSearch) {
 
-                                } else {
-                                    if (isPopulateSortData) {
-                                        tableJsonArray[tableCount] = {
-                                            "TABLE_NAME": entry[tableNameIndex],
-                                            "HOST_ID": entry[hostIndex],
-                                            "PARTITION_ID": entry[partitionIndex],
-                                            "TUPLE_COUNT": entry[tupleCountIndex]
-                                        };
-                                        tableCount++;
-                                    }
-                                }
+                    tableJsonArray = [];
 
-                            });
-
-                        }
-
-
-                    }
+                    $.each(tableData, function (key, data) {
+                        tableJsonArray[tableCount] = {
+                            "TABLE_NAME": key,
+                            "MAX_ROWS": data["MAX_ROWS"],
+                            "MIN_ROWS": data["MIN_ROWS"],
+                            "AVG_ROWS": data["AVG_ROWS"],
+                            "TUPLE_COUNT": data["TUPLE_COUNT"]
+                        };
+                        tableCount++;
+                    });
                 }
+                else {
+
+                    tableSearchJsonArray = [];
+
+                    $.each(lSearchData.tables, function (key, data) {
+                        tableSearchJsonArray[tableCount] = {
+                            "TABLE_NAME": key,
+                            "MAX_ROWS": data["MAX_ROWS"],
+                            "MIN_ROWS": data["MIN_ROWS"],
+                            "AVG_ROWS": data["AVG_ROWS"],
+                            "TUPLE_COUNT": data["TUPLE_COUNT"]
+                        };
+                        tableCount++;
+                    });
+                }
+
+
+                //}
             }
         };
 
@@ -1016,7 +947,6 @@ function alertNodeClicked(obj) {
                 }
 
 
-                //if (VoltDbUI.sortStatus == VoltDbUI.SORT_STATES.SORTED || VoltDbUI.sortStatus == VoltDbUI.SORT_STATES.NONE) {
                 var lProcedureData = voltDbRenderer.isProcedureSearch ? this.searchData.procedures : procedureData;
                 jQuery.each(lProcedureData, function (id, val) {
                     if (currentAction == VoltDbUI.ACTION_STATES.NEXT && (voltDbRenderer.isProcedureSearch == false || voltDbRenderer.isProcedureSearch == undefined)) {
@@ -1120,9 +1050,6 @@ function alertNodeClicked(obj) {
             if (voltDbRenderer.isSortProcedures && VoltDbUI.sortStatus == VoltDbUI.SORT_STATES.SORTED) {
                 VoltDbUI.sortStatus = VoltDbUI.SORT_STATES.NONE;
             }
-
-
-            //}
         };
 
         this.mapProcedureInformationAsync = function (currentAction, priorAction) {
@@ -1149,6 +1076,7 @@ function alertNodeClicked(obj) {
                 if (currentAction == VoltDbUI.ACTION_STATES.PREVIOUS) { // pageStartIndex need not be initialized if isNext is undefined(when page loads intially or during reload operation)
                     pageStartIndex = (voltDbRenderer.procedureTableIndex - 1) * voltDbRenderer.maxVisibleRows;
                 }
+
                 if ((currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.NEXT)) {
                     pageStartIndex = (voltDbRenderer.procedureTableIndex) * voltDbRenderer.maxVisibleRows;
 
@@ -1284,7 +1212,6 @@ function alertNodeClicked(obj) {
                     lblPrevious.innerHTML = " ".concat(0, ' ');
                     lblTotalPages.innerHTML = " ".concat(0);
 
-
                 }
 
             }
@@ -1389,11 +1316,15 @@ function alertNodeClicked(obj) {
                                 if (columnType == "PARTITIONED")
                                     table_type = columnType;
 
+                                else if (typeVal['TABLE_TYPE'] == "REPLICATED")
+                                    table_type = "REPLICATED";
+
                                 else {
                                     table_type = "";
                                 }
 
                             }
+
                             else {
                                 table_type = "";
                             }
@@ -1461,9 +1392,9 @@ function alertNodeClicked(obj) {
 
 
                 $.each(lTableData, function (id, val) {
-                    if (currentAction == VoltDbUI.ACTION_STATES.NEXT && (voltDbRenderer.isTableSearch == false || voltDbRenderer.isTableSearch == undefined)) {
+                    if (currentAction == VoltDbUI.ACTION_STATES.NEXT && (vfoltDbRenderer.isTableSearch == false || voltDbRenderer.isTableSearch == undefined)) {
                         if (counter >= tablePageStartIndex && counter <= (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1) {
-                            formatTableTupleData(id, val);
+                            setTableTupleDataHtml(val, id, table_type);
                             if (counter == (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1 || counter == voltDbRenderer.tableDataSize - 1) {
                                 voltDbRenderer.tableIndex++;
                                 return false;
@@ -1477,7 +1408,7 @@ function alertNodeClicked(obj) {
                     } else if (currentAction == VoltDbUI.ACTION_STATES.PREVIOUS && (voltDbRenderer.isTableSearch == false || voltDbRenderer.isTableSearch == undefined)) {
                         if (tablePageStartIndex >= 0 && counter >= tablePageStartIndex && counter < (voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows)) {
                             setTableTypes(id);
-                            formatTableTupleData(id, val);
+                            setTableTupleDataHtml(val, id, table_type);
                         }
                         if (tablePageStartIndex >= 0 && counter == (voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows - 1)) {
                             voltDbRenderer.tableIndex--;
@@ -1485,7 +1416,7 @@ function alertNodeClicked(obj) {
                     } else if (currentAction == VoltDbUI.ACTION_STATES.PREVIOUS && priorAction == VoltDbUI.ACTION_STATES.PREVIOUS) {
                         if (counter >= 0 && counter >= tablePageStartIndex && counter < voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows) {
                             setTableTypes(id);
-                            formatTableTupleData(id, val);
+                            setTableTupleDataHtml(val, id, table_type);
                         }
 
                         if (tablePageStartIndex >= 0 && counter == (voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows - 1)) {
@@ -1494,7 +1425,7 @@ function alertNodeClicked(obj) {
                     } else if (currentAction == VoltDbUI.ACTION_STATES.PREVIOUS && priorAction == VoltDbUI.ACTION_STATES.NEXT) {
                         if (counter >= 0 && counter >= tablePageStartIndex && counter < voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows) {
                             setTableTypes(id);
-                            formatTableTupleData(id, val);
+                            setTableTupleDataHtml(val, id, table_type);
                         }
 
                         if (tablePageStartIndex >= 0 && counter == (voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows - 1)) {
@@ -1503,13 +1434,13 @@ function alertNodeClicked(obj) {
                     } else if (currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.NEXT) {
                         if (counter >= tablePageStartIndex && counter <= (voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows - 1) {
                             setTableTypes(id);
-                            formatTableTupleData(id, val);
+                            setTableTupleDataHtml(val, id, table_type);
                         }
 
                     } else if ((currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.PREVIOUS)) {
                         if (tablePageStartIndex >= 0 && counter >= tablePageStartIndex && counter < ((voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows)) {
                             setTableTypes(id);
-                            formatTableTupleData(id, val);
+                            setTableTupleDataHtml(val, id, table_type);
 
                         }
 
@@ -1517,13 +1448,13 @@ function alertNodeClicked(obj) {
                     (currentAction == VoltDbUI.ACTION_STATES.SEARCH && priorAction == VoltDbUI.ACTION_STATES.REFRESH)) {
                         if (tablePageStartIndex >= 0 && counter >= tablePageStartIndex && counter < ((voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows)) {
                             setTableTypes(id);
-                            formatTableTupleData(id, val);
+                            setTableTupleDataHtml(val, id, table_type);
                         }
 
                     } else if ((currentAction == VoltDbUI.ACTION_STATES.NEXT && priorAction == VoltDbUI.ACTION_STATES.SEARCH) || (currentAction == VoltDbUI.ACTION_STATES.NEXT && priorAction == VoltDbUI.ACTION_STATES.NEXT)) {
                         if (counter >= tablePageStartIndex && counter <= (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1) {
                             setTableTypes(id);
-                            formatTableTupleData(id, val);
+                            setTableTupleDataHtml(val, id, table_type);
                         }
 
                         if ((counter == (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1 || counter == voltDbRenderer.tableSearchDataSize - 1) && htmlTableMarkup != "") {
@@ -1534,7 +1465,7 @@ function alertNodeClicked(obj) {
                     } else if ((currentAction == VoltDbUI.ACTION_STATES.NEXT && priorAction == VoltDbUI.ACTION_STATES.PREVIOUS)) {
                         if (counter >= tablePageStartIndex && counter <= (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1) {
                             setTableTypes(id);
-                            formatTableTupleData(id, val);
+                            setTableTupleDataHtml(val, id, table_type);
                         }
 
                         if ((counter == (voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows - 1 || counter == voltDbRenderer.tableSearchDataSize - 1) && htmlTableMarkup != "") {
@@ -1545,7 +1476,7 @@ function alertNodeClicked(obj) {
                     } else {
                         if (counter < voltDbRenderer.maxVisibleRows) {
                             setTableTypes(id);
-                            formatTableTupleData(id, val);
+                            setTableTupleDataHtml(val, id, table_type);
                         }
                     }
                     counter++;
@@ -1555,10 +1486,9 @@ function alertNodeClicked(obj) {
 
                 if (voltDbRenderer.isSortTables) {
                     if (htmlTableMarkup != "") {
-                        //if ((currentAction == VoltDbUI.ACTION_STATES.SEARCH || currentAction == VoltDbUI.ACTION_STATES.REFRESH) && (priorAction == VoltDbUI.ACTION_STATES.SEARCH || priorAction == VoltDbUI.ACTION_STATES.REFRESH)) {
                         $('#tablesBody').html(htmlTableMarkup);
                         htmlTableMarkup = undefined;
-                        //}
+
                     }
                 }
                 else {
@@ -1573,292 +1503,7 @@ function alertNodeClicked(obj) {
             }
 
         };
-
-        this.mapTableInformationAsync = function (currentAction, priorAction) {
-            var counter = 0;
-            var tablePageStartIndex = 0;
-            var replicationCount = 0;
-            var tupleCountPartitions = [];
-            var partitionKeyPairData = [];
-            var table_type = "";
-
-            var formatTableTupleData = function (key, tupleData) {
-                var tableName = "";
-                var tupleCounter = 0;
-                var partitionId = "";
-                var totalTupleCount = 0;
-                var partitionEntryCount = 0;
-
-
-                var maxTupleValue;
-                var minTupleValue;
-                var avgTupleValue;
-
-                var newPartition = false;
-                replicationCount = 0;
-                tupleCountPartitions = [];
-                partitionKeyPairData = [];
-
-                $.each(tupleData, function (nestKey, partitionData) {
-                    if (partitionData != undefined) {
-                        if (tupleCounter > 0) {
-                            partitionEntryCount = 0;
-                            partitionKeyPairData.forEach(function (partitionId) {
-                                if (partitionId == partitionData['PARTITION_ID']) {
-                                    newPartition = false;
-                                    return false;
-
-                                } else if (partitionEntryCount == partitionKeyPairData.length - 1) {
-                                    newPartition = true;
-                                    return true;
-
-                                }
-                                partitionEntryCount++;
-                            });
-
-                        }
-
-
-                        if (newPartition || tupleCounter == 0) {
-                            partitionKeyPairData.push(partitionData['PARTITION_ID']); //added new partition id under the table name
-                            totalTupleCount += parseInt(partitionData['TUPLE_COUNT']);
-                            tupleCountPartitions[tupleCounter] = partitionData['TUPLE_COUNT'];
-                            tupleCounter++;
-
-                        } else if (!newPartition && tupleCounter > 0) { //not if it is the just the first partition
-                            replicationCount++;
-
-                        }
-
-                    }
-                });
-
-                if (replicationCount > 0 && table_type != "VIEW" && table_type != "PARTITIONED")
-                    table_type = "REPLICATED";
-
-                else if (kFactor > 0 && table_type != "VIEW" && table_type != "PARTITIONED")
-                    table_type = "REPLICATED";
-
-                else if (kFactor > 0 && table_type != "VIEW" && table_type != "PARTITIONED") {
-                    table_type = "REPLICATED";
-                }
-
-                maxTupleValue = Math.max.apply(null, tupleCountPartitions);
-                minTupleValue = Math.min.apply(null, tupleCountPartitions);
-                avgTupleValue = getAverage(tupleCountPartitions);
-
-
-
-                setTableTupleDataHtml(key, totalTupleCount, maxTupleValue, minTupleValue, avgTupleValue, table_type);
-
-            };
-
-            var setTableTypes = function (id) {
-                if (counter < voltDbRenderer.maxVisibleRows) {
-                    var tableName = id;
-
-                    //before formatting individual table data validate table type with reference to SystemCatalog data
-                    $.each(schemaCatalogTableTypes, function (key, typeVal) {
-                        if (tableName == typeVal['TABLE_NAME']) {
-                            if (typeVal['TABLE_TYPE'] == 'VIEW') {
-                                table_type = "VIEW";
-                            }
-
-                            else if (typeVal['REMARKS'] == null) {
-                                var columnType = getColumnTypes(tableName);
-
-                                if (columnType == "PARTITIONED")
-                                    table_type = columnType;
-
-                                else {
-                                    table_type = "";
-                                }
-
-                            }
-                            else {
-                                table_type = "";
-                            }
-
-                        }
-
-                    });
-
-                }
-            };
-
-            var getColumnTypes = function (tableName) {
-                var columnType;
-                $.each(schemaCatalogColumnTypes, function (key, typeVal) {
-                    if (tableName == typeVal['TABLE_NAME']) {
-                        columnType = typeVal['REMARKS'];
-                        return false;
-                    }
-                });
-
-                if (columnType == "PARTITION_COLUMN") {
-                    return "PARTITIONED";
-                } else {
-                    return columnType;
-                }
-
-
-            };
-
-            if (tableData == null || tableData == undefined) {
-                alert("Error: Unable to extract Table Data");
-                return;
-            }
-
-            htmlTableMarkup = "";
-            htmlTableMarkups.SystemInformation = [];
-
-            if ((((voltDbRenderer.tableIndex + 1) * this.maxVisibleRows < voltDbRenderer.tableDataSize) && currentAction == VoltDbUI.ACTION_STATES.NEXT) ||
-                (currentAction == VoltDbUI.ACTION_STATES.PREVIOUS && voltDbRenderer.tableIndex > 0) ||
-                currentAction == VoltDbUI.ACTION_STATES.REFRESH || currentAction == VoltDbUI.ACTION_STATES.SEARCH || currentAction == VoltDbUI.ACTION_STATES.NONE) {
-                if (currentAction == VoltDbUI.ACTION_STATES.NEXT) {
-                    tablePageStartIndex = (voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows;
-
-                }
-
-                if (currentAction == VoltDbUI.ACTION_STATES.PREVIOUS) { // pageStartIndex need not be initialized if isNext is undefined(when page loads intially or during reload operation)
-                    tablePageStartIndex = (voltDbRenderer.tableIndex - 1) * voltDbRenderer.maxVisibleRows;
-
-                }
-
-                if ((currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.NEXT) ||
-                    (currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.PREVIOUS)) {
-                    tablePageStartIndex = (voltDbRenderer.tableIndex) * voltDbRenderer.maxVisibleRows;
-
-                }
-
-                if (currentAction == VoltDbUI.ACTION_STATES.SEARCH || currentAction == VoltDbUI.ACTION_STATES.NONE) {
-                    tablePageStartIndex = 0;
-                    voltDbRenderer.tableIndex = 0;
-
-                }
-
-                var lTableData = this.isTableSearch ? this.searchData.tables : tableData;
-                if (this.isTableSearch == false) voltDbRenderer.tableDataSize = Object.keys(tableData).length;
-
-
-                $.each(lTableData, function (id, val) {
-                    if (currentAction == VoltDbUI.ACTION_STATES.NEXT && (voltDbRenderer.isTableSearch == false || voltDbRenderer.isTableSearch == undefined)) {
-                        if (counter >= tablePageStartIndex && counter <= (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1) {
-                            formatTableTupleData(id, val);
-                            if (counter == (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1 || counter == voltDbRenderer.tableDataSize - 1) {
-                                voltDbRenderer.tableIndex++;
-                                return false;
-                            }
-
-                        } else if (counter == tablePageStartIndex * 2) {
-                            voltDbRenderer.tableIndex++;
-                            return false;
-                        }
-
-                    } else if (currentAction == VoltDbUI.ACTION_STATES.PREVIOUS && (voltDbRenderer.isTableSearch == false || voltDbRenderer.isTableSearch == undefined)) {
-                        if (tablePageStartIndex >= 0 && counter >= tablePageStartIndex && counter < (voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows)) {
-                            setTableTypes(id);
-                            formatTableTupleData(id, val);
-                        }
-                        if (tablePageStartIndex >= 0 && counter == (voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows - 1)) {
-                            voltDbRenderer.tableIndex--;
-                        }
-                    } else if (currentAction == VoltDbUI.ACTION_STATES.PREVIOUS && priorAction == VoltDbUI.ACTION_STATES.PREVIOUS) {
-                        if (counter >= 0 && counter >= tablePageStartIndex && counter < voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows) {
-                            setTableTypes(id);
-                            formatTableTupleData(id, val);
-                        }
-
-                        if (tablePageStartIndex >= 0 && counter == (voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows - 1)) {
-                            voltDbRenderer.tableIndex--;
-                        }
-                    } else if (currentAction == VoltDbUI.ACTION_STATES.PREVIOUS && priorAction == VoltDbUI.ACTION_STATES.NEXT) {
-                        if (counter >= 0 && counter >= tablePageStartIndex && counter < voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows) {
-                            setTableTypes(id);
-                            formatTableTupleData(id, val);
-                        }
-
-                        if (tablePageStartIndex >= 0 && counter == (voltDbRenderer.tableIndex * voltDbRenderer.maxVisibleRows - 1)) {
-                            voltDbRenderer.tableIndex--;
-                        }
-                    } else if (currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.NEXT) {
-                        if (counter >= tablePageStartIndex && counter <= (voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows - 1) {
-                            setTableTypes(id);
-                            formatTableTupleData(id, val);
-                        }
-
-                    } else if ((currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.PREVIOUS)) {
-                        if (tablePageStartIndex >= 0 && counter >= tablePageStartIndex && counter < ((voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows)) {
-                            setTableTypes(id);
-                            formatTableTupleData(id, val);
-
-                        }
-
-                    } else if ((currentAction == VoltDbUI.ACTION_STATES.SEARCH && priorAction == VoltDbUI.ACTION_STATES.NONE) || (currentAction == VoltDbUI.ACTION_STATES.SEARCH && priorAction == VoltDbUI.ACTION_STATES.SEARCH) ||
-                    (currentAction == VoltDbUI.ACTION_STATES.SEARCH && priorAction == VoltDbUI.ACTION_STATES.REFRESH)) {
-                        if (tablePageStartIndex >= 0 && counter >= tablePageStartIndex && counter < ((voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows)) {
-                            setTableTypes(id);
-                            formatTableTupleData(id, val);
-                        }
-
-                    } else if ((currentAction == VoltDbUI.ACTION_STATES.NEXT && priorAction == VoltDbUI.ACTION_STATES.SEARCH) || (currentAction == VoltDbUI.ACTION_STATES.NEXT && priorAction == VoltDbUI.ACTION_STATES.NEXT)) {
-                        if (counter >= tablePageStartIndex && counter <= (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1) {
-                            setTableTypes(id);
-                            formatTableTupleData(id, val);
-                        }
-
-                        if ((counter == (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1 || counter == voltDbRenderer.tableSearchDataSize - 1) && htmlTableMarkup != "") {
-                            voltDbRenderer.tableIndex++;
-                            return false;
-                        }
-
-                    } else if ((currentAction == VoltDbUI.ACTION_STATES.NEXT && priorAction == VoltDbUI.ACTION_STATES.PREVIOUS)) {
-                        if (counter >= tablePageStartIndex && counter <= (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1) {
-                            setTableTypes(id);
-                            formatTableTupleData(id, val);
-                        }
-
-                        if ((counter == (voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows - 1 || counter == voltDbRenderer.tableSearchDataSize - 1) && htmlTableMarkup != "") {
-                            voltDbRenderer.tableIndex++;
-                            return false;
-                        }
-
-                    } else {
-                        if (counter < voltDbRenderer.maxVisibleRows) {
-                            setTableTypes(id);
-                            formatTableTupleData(id, val);
-                        }
-                    }
-                    counter++;
-
-                });
-
-
-                //if (voltDbRenderer.isTableSearch) {
-                    if (htmlTableMarkup != "") {
-                        if ((currentAction == VoltDbUI.ACTION_STATES.SEARCH || currentAction == VoltDbUI.ACTION_STATES.REFRESH) && (priorAction == VoltDbUI.ACTION_STATES.SEARCH || priorAction == VoltDbUI.ACTION_STATES.REFRESH)) {
-                            $('#tablesBody').html(htmlTableMarkup);
-                            htmlTableMarkup = undefined;
-                        }
-
-                    }
-                    priorAction = currentAction;
-
-                //} else {
-                //    htmlTableMarkups.SystemInformation.push(htmlTableMarkup);
-                //    htmlTableMarkup = undefined;
-
-                //}
-               
-                if (voltDbRenderer.isSortTables && VoltDbUI.tableSortStatus == VoltDbUI.SORT_STATES.SORTED) {
-                    VoltDbUI.tableSortStatus = VoltDbUI.SORT_STATES.NONE;
-                }
-                //callback(htmlTableMarkups);
-            }
-
-
-        };
-
+       
         this.getServerIP = function (hostId) {
             var serverAddress;
             $.each(systemOverview, function (key, val) {
@@ -1870,30 +1515,12 @@ function alertNodeClicked(obj) {
             return serverAddress;
         };
 
-        //this.sortTablesByColumns = function () {
-        //    var tableCount = 0;
-        //    var lConnection = VoltDBService.getTablesContextForSorting();
-        //    populateTableJsonArray(lConnection);
-
-        //    if (voltDbRenderer.sortOrder == "descending") {
-        //        tableJsonArray = descendingSortJSON(tableJsonArray, this.tableSortColumn);
-        //    }
-
-        //    else if (voltDbRenderer.sortOrder == "ascending") {
-        //        tableJsonArray = ascendingSortJSON(tableJsonArray, this.tableSortColumn);
-        //    }
-        //    mapJsonArrayToTables();
-
-
-        //};
-
-
-        this.sortTablesByColumns = function () {
+        this.sortTablesByColumns = function (isSearched) {
             var tableCount = 0;
-            var lConnection = VoltDBService.getTablesContextForSorting();
-            populateTableJsonArray(lConnection);
 
+            var lConnection = VoltDBService.getTablesContextForSorting();
             if (voltDbRenderer.isTableSearch) {
+                voltDbRenderer.formatSearchTablesDataToJsonArray(lConnection, $('#filterDatabaseTable')[0].value, isSearched);
                 if (voltDbRenderer.sortOrder == "descending") {
                     tableSearchJsonArray = descendingSortJSON(tableSearchJsonArray, this.tableSortColumn);
                 }
@@ -1905,6 +1532,8 @@ function alertNodeClicked(obj) {
             }
 
             else if (!voltDbRenderer.isTableSearch) {
+                populateTableJsonArray(lConnection);
+
                 if (voltDbRenderer.sortOrder == "descending") {
                     tableJsonArray = descendingSortJSON(tableJsonArray, this.tableSortColumn);
                 }
@@ -1917,7 +1546,6 @@ function alertNodeClicked(obj) {
             }
 
         };
-
 
         this.sortProceduresByColumns = function () {
             var procedureCount = 0;
@@ -1983,7 +1611,6 @@ function alertNodeClicked(obj) {
         };
 
         var getMemoryDetails = function (connection, sysMemory, processName) {
-
             var counter = 0;
             var hostNameIndex = 0;
             var tupledDataIndex = 0;
@@ -2229,6 +1856,75 @@ function alertNodeClicked(obj) {
 
 
         //common methods
+        var formatTableData = function (connection) {
+            var i = 0;
+            var tableMetadata = [];
+            var totalTupleCount = 0;
+            var partitionEntryCount = 0;
+            var newPartition = false;
+            var tupleCountPartitions = [];
+            var partitionData = {};
+
+            if (connection.Metadata["@Statistics_TABLE"] != undefined || connection.Metadata["@Statistics_TABLE"] != null) {
+                if (connection.Metadata["@Statistics_TABLE"].data != "") {
+                    tableMetadata = connection.Metadata["@Statistics_TABLE"].data;
+                    tableData = {};
+
+                    $.each(tableMetadata, function (key, tupleData) {
+                        if (tupleData != undefined) {
+                            partitionEntryCount = 0;
+
+                            if (!partitionData.hasOwnProperty(tupleData[tableNameIndex])) {
+                                partitionData[tupleData[tableNameIndex]] = [];
+                                partitionData[tupleData[tableNameIndex]].push(tupleData);
+
+                            }
+                            else {
+                                $.each(partitionData[tupleData[tableNameIndex]], function (nestKey, nestData) {
+                                    for (i = 0; i < partitionData[tupleData[tableNameIndex]].length; i++) {
+                                        partitionEntryCount++;
+                                        if (tupleData[partitionIndex] == partitionData[tupleData[tableNameIndex]][i][partitionIndex]) {
+                                            newPartition = false;
+                                            schemaCatalogTableTypes[tupleData[tableNameIndex]]["TABLE_TYPE"] = "REPLICATED";
+                                            return false;
+                                        }
+
+                                    }
+                                    if (partitionEntryCount == partitionData[tupleData[tableNameIndex]].length) {
+                                        newPartition = true;
+                                        partitionData[tupleData[tableNameIndex]].push(tupleData);
+                                        return true;
+
+                                    }
+                                });
+                            }
+                        }
+                    });
+
+                    //formulate max, min, average for each table
+                    $.each(partitionData, function (key, data) {
+                        if (!tableData.hasOwnProperty(key)) {
+                            tableData[key] = {};
+                        }
+                        for (i = 0; i < data.length; i++) {
+                            totalTupleCount += parseInt(data[i][tupleCountIndex]);
+                            tupleCountPartitions[i] = data[i][tupleCountIndex];
+                        }
+
+                        tableData[key] = {
+                            "TUPLE_COUNT": totalTupleCount,
+                            "MAX_ROWS": Math.max.apply(null, tupleCountPartitions),
+                            "MIN_ROWS": Math.min.apply(null, tupleCountPartitions),
+                            "AVG_ROWS": getAverage(tupleCountPartitions)
+                        };
+
+                    });
+                }
+
+            }
+
+        };
+
         var mapJsonArrayToProcedures = function () {
             var i = 0;
             var procedureName;
@@ -2308,16 +2004,17 @@ function alertNodeClicked(obj) {
                 }
                 if (!tableData.hasOwnProperty(tableName)) {
                     tableName = tableJsonArray[i].TABLE_NAME;
-                    tableData[tableName] = [];
+                    tableData[tableName] = {};
                 }
 
-                tableData[tableName][i] = {};
-                tableData[tableName][i]['HOST_ID'] = tableJsonArray[i].HOST_ID;
-                tableData[tableName][i]['PARTITION_ID'] = tableJsonArray[i].PARTITION_ID;
-                tableData[tableName][i]['TUPLE_COUNT'] = tableJsonArray[i].TUPLE_COUNT;
+                tableData[tableName] = {
+                    "TABLE_NAME": tableName,
+                    "MAX_ROWS": tableJsonArray[i].MAX_ROWS,
+                    "MIN_ROWS": tableJsonArray[i].MIN_ROWS,
+                    "AVG_ROWS": tableJsonArray[i].AVG_ROWS,
+                    "TUPLE_COUNT": tableJsonArray[i].TUPLE_COUNT
 
-
-
+                };
             }
 
         };
@@ -2327,8 +2024,7 @@ function alertNodeClicked(obj) {
             var counter = 0;
             var tableName = "";
             lSearchData.tables = {};
-            
-            //lSearchData['tables'][nestKey] = tupleData;
+
             for (i = 0; i < tableSearchJsonArray.length; i++) {
                 if (i > 0) {
                     if (tableSearchJsonArray[i].TABLE_NAME != tableSearchJsonArray[i - 1].TABLE_NAME) {
@@ -2337,38 +2033,41 @@ function alertNodeClicked(obj) {
                 }
                 if (!lSearchData.tables.hasOwnProperty(tableName)) {
                     tableName = tableSearchJsonArray[i].TABLE_NAME;
-                    lSearchData.tables[tableName] = [];
+                    lSearchData.tables[tableName] = {};
                     counter = 0;
                 }
 
-                lSearchData.tables[tableName][counter] = {};
-                lSearchData.tables[tableName][counter]['HOST_ID'] = tableSearchJsonArray[i].HOST_ID;
-                lSearchData.tables[tableName][counter]['PARTITION_ID'] = tableSearchJsonArray[i].PARTITION_ID;
-                lSearchData.tables[tableName][counter]['TUPLE_COUNT'] = tableSearchJsonArray[i].TUPLE_COUNT;
+                lSearchData.tables[tableName] = {
+                    "TABLE_NAME": tableName,
+                    "MAX_ROWS": tableSearchJsonArray[i].MAX_ROWS,
+                    "MIN_ROWS": tableSearchJsonArray[i].MIN_ROWS,
+                    "AVG_ROWS": tableSearchJsonArray[i].AVG_ROWS,
+                    "TUPLE_COUNT": tableSearchJsonArray[i].TUPLE_COUNT
+
+                };
                 counter++;
 
             }
 
         };
 
-        var setTableTupleDataHtml = function (tableName, totalTupleCount, maxTupleCountPartition, minTupleCountPartition, avgTupleCountPartition, tableType) {
+        var setTableTupleDataHtml = function (tuple, tableName, tableType) {
             if (htmlTableMarkup == undefined || htmlTableMarkup == "") {
                 htmlTableMarkup = "<tr><td>" + tableName + "</td>" +
-                    "<td class=\"txt-center\">" + totalTupleCount + "</td>" +
-                    "<td class=\"txt-center\">" + maxTupleCountPartition + "</td>" +
-                    "<td class=\"txt-center\">" + minTupleCountPartition + "</td>" +
-                    "<td class=\"txt-center\">" + avgTupleCountPartition + "</td>" +
-                    "<td class=\"txt-center\">" + tableType + "</td></tr>";
+                         "<td class=\"txt-center\">" + tuple['TUPLE_COUNT'] + "</td>" +
+                         "<td class=\"txt-center\">" + tuple['MAX_ROWS'] + "</td>" +
+                         "<td class=\"txt-center\">" + tuple['MIN_ROWS'] + "</td>" +
+                         "<td class=\"txt-center\">" + tuple['AVG_ROWS'] + "</td>" +
+                         "<td class=\"txt-center\">" + tableType + "</td></tr>";
             } else {
                 htmlTableMarkup += "<tr><td>" + tableName + "</td>" +
-                    "<td class=\"txt-center\">" + totalTupleCount + "</td>" +
-                    "<td class=\"txt-center\">" + maxTupleCountPartition + "</td>" +
-                   "<td class=\"txt-center\">" + minTupleCountPartition + "</td>" +
-                   "<td class=\"txt-center\">" + avgTupleCountPartition + "</td>" +
-                   "<td class=\"txt-center\">" + tableType + "</td></tr>";
+                        "<td class=\"txt-center\">" + tuple['TUPLE_COUNT'] + "</td>" +
+                        "<td class=\"txt-center\">" + tuple['MAX_ROWS'] + "</td>" +
+                        "<td class=\"txt-center\">" + tuple['MIN_ROWS'] + "</td>" +
+                       "<td class=\"txt-center\">" + tuple['AVG_ROWS'] + "</td>" +
+                       "<td class=\"txt-center\">" + tableType + "</td></tr>";
             }
         };
-
 
         var getAverage = function (arrayData) {
             var i;
@@ -2408,7 +2107,6 @@ function alertNodeClicked(obj) {
                     break;
 
                 }
-
             }
             return isDuplicate;
         };
@@ -2460,15 +2158,14 @@ function alertNodeClicked(obj) {
 
         };
 
-        this.searchTables = function (searchType, searchKey, onTablesSearched) {
+        this.searchTables = function (connection, searchKey, onTablesSearched) {
             var searchDataCount = 0;
             var jsonTupleData = {};
 
             if (tableData == null || tableData == undefined) {
                 return;
             }
-
-            //lSearchData['tables'] = {};
+            formatTableData(connection);
             lSearchData.tables = {};
             $.each(tableData, function (nestKey, tupleData) {
                 if (tupleData != undefined) {
@@ -2512,32 +2209,65 @@ function alertNodeClicked(obj) {
             });
         };
 
-        this.formatSearchTablesDataToJsonArray = function (searchKey) {
+        this.formatSearchTablesDataToJsonArray = function (connection, searchKey, isSearched) {
             var searchTableCount = 0;
             tableSearchJsonArray = [];
             var i = 0;
 
-            $.each(lSearchData.tables, function (nestKey, tupleData) {
-                if (tupleData != undefined) {
-                    if (nestKey.toLowerCase().indexOf(searchKey.toLowerCase()) >= 0) {
+            if (isSearched) {
+                if (lSearchData.tables != "" || lSearchData.tables != undefined) {
+                    $.each(lSearchData.tables, function (nestKey, tupleData) {
+                        if (tupleData != undefined) {
+                            if (nestKey.toLowerCase().indexOf(searchKey.toLowerCase()) >= 0) {
+                                //for (i = 0; i < tupleData.length; i++) {
+                                //    if (tupleData[i] == undefined) {
+                                //        //alert("here");
+                                //    }
+                                    tableSearchJsonArray[searchTableCount] = {
+                                        "TABLE_NAME": nestKey,
+                                        "MAX_ROWS": tupleData["MAX_ROWS"],
+                                        "MIN_ROWS": tupleData["MIN_ROWS"],
+                                        "AVG_ROWS": tupleData["AVG_ROWS"],
+                                        "TUPLE_COUNT": tupleData["TUPLE_COUNT"]
+                                    };
+                                    searchTableCount++;
+                                //}
 
-                        for (i = 0; i < tupleData.length; i++) {
-                            if (tupleData[i] == undefined) {
-                                //alert("here");
                             }
-                            tableSearchJsonArray[searchTableCount] = {
-                                "TABLE_NAME": nestKey,
-                                "HOST_ID": tupleData[i].HOST_ID,
-                                "PARTITION_ID": tupleData[i].PARTITION_ID,
-                                "TUPLE_COUNT": tupleData[i].TUPLE_COUNT
-                            };
-                            searchTableCount++;
                         }
 
-                    }
+                    });
                 }
 
-            });
+            } else {
+                voltDbRenderer.searchTables(connection, $('#filterDatabaseTable')[0].value, function (searchResult) {
+                    if (searchResult) {
+                        $.each(lSearchData.tables, function (nestKey, tupleData) {
+                            if (tupleData != undefined) {
+                                if (nestKey.toLowerCase().indexOf(searchKey.toLowerCase()) >= 0) {
+                                    //for (i = 0; i < tupleData.length; i++) {
+                                    //    if (tupleData[i] == undefined) {
+                                    //        //alert("here");
+                                    //    }
+                                        tableSearchJsonArray[searchTableCount] = {
+                                            "TABLE_NAME": nestKey,
+                                            "MAX_ROWS": tupleData["MAX_ROWS"],
+                                            "MIN_ROWS": tupleData["MIN_ROWS"],
+                                            "AVG_ROWS": tupleData["AVG_ROWS"],
+                                            "TUPLE_COUNT": tupleData["TUPLE_COUNT"]
+                                        };
+                                        searchTableCount++;
+                                    //}
+
+                                }
+                            }
+
+                        });
+                    }
+
+                });
+            }
+
         };
 
     });
@@ -2570,5 +2300,3 @@ $(window).resize(function () {
     }
 
 });
-
-

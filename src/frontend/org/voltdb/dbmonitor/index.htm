@@ -16,7 +16,7 @@
     <link href="css/resources/schema/theme.bootstrap.css" id="styleThemeBootstrap" disabled="disabled" rel="stylesheet">
 
     <script type="text/javascript" src="js/jquery-1.11.1.min.js"></script>
-    <script type="text/javascript" src="js/d3/d3.v3.js"></script>
+    <script type="text/javascript" src="js/d3/d3.v3.min.js"></script>
     <script type="text/javascript" src="js/d3/nv.d3.min.js"></script>
     <script type="text/javascript" src="js/jquery.slimscroll.min.js"></script>
     <script type="text/javascript" src="js/jquery.popup.js"></script>
@@ -67,7 +67,7 @@
                         <li><a href="#logoutPopup" id="logOut">
                             <div class="user" title="Log Out"></div>
                         </a></li>
-                        <li class="line"></li>
+                        <li class="line" id="userLine"></li>
                         <li class="help"><a href="#help" id="showMyHelp">Help</a></li>
                         <li class="responsiveMenuPlaceHolder">&nbsp;</li>
                     </ul>
@@ -102,7 +102,6 @@
                             <div class="clear"></div>
                         </div>
                         <div class="clear"></div>
-
 
                         <!-- Server List popup-->
                         <div id="popServerList" style="display: none;">
@@ -254,7 +253,7 @@
                                                     <th id="TUPLE_COUNT" width="10%" data-name="none">Row Count</th>
                                                     <th id="MAX_ROWS" width="15%" data-name="none">Max Rows (per partition)</th>
                                                     <th id="MIN_ROWS" width="15%" data-name="none">Min Rows (per partition)</th>
-                                                    <th id="AVERAGE_ROWS" width="15%" data-name="none">Avg Rows (per partition)</th>
+                                                    <th id="AVG_ROWS" width="15%" data-name="none">Avg Rows (per partition)</th>
                                                     <th id="TABLE_TYPE" width="15%" data-name="none">Type</th>
                                                 </tr>
                                             </thead>
