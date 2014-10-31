@@ -298,7 +298,7 @@ public class AsyncCompilerAgent {
         final int numParams = batch.work.getParameterCount();
         final String readOnly = batch.readOnly ? "yes" : "no";
         final String singlePartition = batch.isSinglePartitionCompatible() ? "yes" : "no";
-        final String user = batch.work.userName;
+        final String user = batch.work.user.m_name;
         final CatalogContext context = (batch.work.catalogContext != null
                                             ? batch.work.catalogContext
                                             : VoltDB.instance().getCatalogContext());

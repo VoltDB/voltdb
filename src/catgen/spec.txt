@@ -78,8 +78,9 @@ begin Group
   UserRef* users
   bool admin            "Can perform all database operations"
   bool defaultproc      "Can invoke default procedures"
-  bool adhoc            "Can invoke the adhoc system procedure
   bool defaultprocread  "Can invoke read-only default procedures"
+  bool sql              "Can invoke the adhoc system procedures"
+  bool sqlread          "Can invoke read-only adhoc system procedures"
   bool allproc          "Can invoke any user defined procedures"
 end
 
