@@ -916,13 +916,14 @@ public class VoltCompiler {
         if (database.getGroups() != null) {
             for (GroupsType.Group group : database.getGroups().getGroup()) {
                 org.voltdb.catalog.Group catGroup = db.getGroups().add(group.getName());
-                catGroup.setAdhoc(group.isAdhoc());
+                catGroup.setSql(group.isAdhoc());
                 catGroup.setDefaultproc(group.isDefaultproc());
                 catGroup.setDefaultprocread(group.isDefaultprocread());
 
                 if (group.isSysproc()) {
                     catGroup.setAdmin(true);
-                    catGroup.setAdhoc(true);
+                    catGroup.setSql(true);
+                    catGroup.setSqlread(true);
                     catGroup.setDefaultproc(true);
                     catGroup.setDefaultprocread(true);
                 }
@@ -933,13 +934,14 @@ public class VoltCompiler {
         if (database.getRoles() != null) {
             for (RolesType.Role role : database.getRoles().getRole()) {
                 org.voltdb.catalog.Group catGroup = db.getGroups().add(role.getName());
-                catGroup.setAdhoc(role.isAdhoc());
+                catGroup.setSql(role.isAdhoc());
                 catGroup.setDefaultproc(role.isDefaultproc());
                 catGroup.setDefaultprocread(role.isDefaultprocread());
 
                 if (role.isSysproc()) {
                     catGroup.setAdmin(true);
-                    catGroup.setAdhoc(true);
+                    catGroup.setSql(true);
+                    catGroup.setSqlread(true);
                     catGroup.setDefaultproc(true);
                     catGroup.setDefaultprocread(true);
                 }

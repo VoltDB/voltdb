@@ -111,36 +111,6 @@ public class CatalogBuilder {
         }
     }
 
-    public static final class GroupInfo {
-        private final String name;
-        private final boolean adhoc;
-        private final boolean sysproc;
-        private final boolean defaultproc;
-        private final boolean defaultprocread;
-
-        public GroupInfo(final String name, final boolean adhoc, final boolean sysproc, final boolean defaultproc, final boolean defaultprocread){
-            this.name = name;
-            this.adhoc = adhoc;
-            this.sysproc = sysproc;
-            this.defaultproc = defaultproc;
-            this.defaultprocread = defaultprocread;
-        }
-
-        @Override
-        public int hashCode() {
-            return name.hashCode();
-        }
-
-        @Override
-        public boolean equals(final Object o) {
-            if (o instanceof GroupInfo) {
-                final GroupInfo oInfo = (GroupInfo)o;
-                return name.equals(oInfo.name);
-            }
-            return false;
-        }
-    }
-
     final LinkedHashSet<Class<?>> m_supplementals = new LinkedHashSet<Class<?>>();
 
     List<String> m_elAuthGroups;      // authorized groups
@@ -171,31 +141,6 @@ public class CatalogBuilder {
 
     public void addAllDefaults() {
         // does nothing in the base class
-    }
-
-    public void addGroups(final GroupInfo groups[]) {
-        for (final GroupInfo info : groups) {
-            transformer.append("CREATE ROLE " + info.name);
-            if(info.adhoc || info.defaultproc || info.sysproc || info.defaultprocread) {
-                transformer.append(" WITH ");
-                if(info.adhoc) {
-                    transformer.append("adhoc,");
-                }
-                if(info.defaultproc) {
-                    transformer.append("defaultproc,");
-                }
-                if(info.sysproc) {
-                    transformer.append("sysproc,");
-                }
-                if(info.defaultprocread) {
-                    transformer.append("defaultprocread,");
-                }
-                transformer.replace(transformer.length() - 1, transformer.length(), ";");
-            }
-            else {
-                transformer.append(";");
-            }
-        }
     }
 
     public void addSchema(final URL schemaURL) {

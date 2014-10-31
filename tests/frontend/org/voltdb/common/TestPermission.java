@@ -38,7 +38,7 @@ public class TestPermission {
     @Test
     public void testPermissionFromAlias()
     {
-        assertEquals(Permission.ADHOC,           Permission.valueOfFromAlias("ADHOC"));
+        assertEquals(Permission.SQL,           Permission.valueOfFromAlias("SQL"));
         assertEquals(Permission.DEFAULTPROC,     Permission.valueOfFromAlias("DEFAULTPROC"));
         assertEquals(Permission.DEFAULTPROCREAD, Permission.valueOfFromAlias("DEFAULTPROCREAD"));
         assertEquals(Permission.ADMIN,           Permission.valueOfFromAlias("ADMIN"));
@@ -49,11 +49,11 @@ public class TestPermission {
     public void testPermissionsFromAliases()
     {
         verify(Permission.getPermissionsFromAliases(Lists.<String>newArrayList()),
-                Permission.getPermissionsFromAliases(Arrays.asList("ADHOC")),
+                Permission.getPermissionsFromAliases(Arrays.asList("SQL")),
                 Permission.getPermissionsFromAliases(Arrays.asList("SYSPROC")),
                 Permission.getPermissionsFromAliases(Arrays.asList("ADMIN")),
-                Permission.getPermissionsFromAliases(Arrays.asList("ADHOC", "DEFAULTPROC", "DEFAULTPROCREAD")),
-                Permission.getPermissionsFromAliases(Arrays.asList("ADHOC", "DEFAULTPROC", "ADMIN")));
+                Permission.getPermissionsFromAliases(Arrays.asList("SQL", "DEFAULTPROC", "DEFAULTPROCREAD")),
+                Permission.getPermissionsFromAliases(Arrays.asList("SQL", "DEFAULTPROC", "ADMIN")));
     }
 
     @Test
@@ -63,41 +63,41 @@ public class TestPermission {
         final EnumSet<Permission> none = Permission.getPermissionSetForGroup(group);
 
         group = new Group();
-        group.setAdhoc(true);
-        final EnumSet<Permission> adhoc = Permission.getPermissionSetForGroup(group);
+        group.setSql(true);
+        final EnumSet<Permission> sql = Permission.getPermissionSetForGroup(group);
 
         group = new Group();
         group.setAdmin(true);
         final EnumSet<Permission> admin = Permission.getPermissionSetForGroup(group);
 
         group = new Group();
-        group.setAdhoc(true);
+        group.setSql(true);
         group.setDefaultprocread(true);
         group.setDefaultproc(true);
         final EnumSet<Permission> allthree = Permission.getPermissionSetForGroup(group);
 
         group = new Group();
-        group.setAdhoc(true);
+        group.setSql(true);
         group.setDefaultproc(true);
         group.setAdmin(true);
         final EnumSet<Permission> mixed = Permission.getPermissionSetForGroup(group);
 
-        verify(none, adhoc, admin, admin, allthree, mixed);
+        verify(none, sql, admin, admin, allthree, mixed);
     }
 
     private void verify(EnumSet<Permission> none,
-                        EnumSet<Permission> adhoc,
+                        EnumSet<Permission> sql,
                         EnumSet<Permission> sysproc,
                         EnumSet<Permission> admin,
                         EnumSet<Permission> allthree,
                         EnumSet<Permission> mixed)
     {
         assertEquals(EnumSet.noneOf(Permission.class), none);
-        assertEquals(EnumSet.of(Permission.ADHOC),     adhoc);
+        assertEquals(EnumSet.of(Permission.SQL),     sql);
         assertEquals(EnumSet.allOf(Permission.class),  sysproc);
         assertEquals(EnumSet.allOf(Permission.class),  admin);
 
-        assertEquals(EnumSet.of(Permission.ADHOC, Permission.DEFAULTPROC, Permission.DEFAULTPROCREAD), allthree);
+        assertEquals(EnumSet.of(Permission.SQL, Permission.DEFAULTPROC, Permission.DEFAULTPROCREAD), allthree);
         assertEquals(EnumSet.allOf(Permission.class), mixed);
     }
 
@@ -106,35 +106,35 @@ public class TestPermission {
     {
         Group group = new Group();
         Permission.setPermissionsInGroup(group, EnumSet.noneOf(Permission.class));
-        assertFalse(group.getAdhoc());
+        assertFalse(group.getSql());
         assertFalse(group.getAdmin());
         assertFalse(group.getDefaultproc());
         assertFalse(group.getDefaultprocread());
 
         group = new Group();
-        Permission.setPermissionsInGroup(group, EnumSet.of(Permission.ADHOC));
-        assertTrue(group.getAdhoc());
+        Permission.setPermissionsInGroup(group, EnumSet.of(Permission.SQL));
+        assertTrue(group.getSql());
         assertFalse(group.getAdmin());
         assertFalse(group.getDefaultproc());
         assertFalse(group.getDefaultprocread());
 
         group = new Group();
         Permission.setPermissionsInGroup(group, EnumSet.of(Permission.ADMIN));
-        assertFalse(group.getAdhoc());
+        assertFalse(group.getSql());
         assertTrue(group.getAdmin());
         assertFalse(group.getDefaultproc());
         assertFalse(group.getDefaultprocread());
 
         group = new Group();
-        Permission.setPermissionsInGroup(group, EnumSet.of(Permission.ADHOC, Permission.DEFAULTPROC, Permission.DEFAULTPROCREAD));
-        assertTrue(group.getAdhoc());
+        Permission.setPermissionsInGroup(group, EnumSet.of(Permission.SQL, Permission.DEFAULTPROC, Permission.DEFAULTPROCREAD));
+        assertTrue(group.getSql());
         assertFalse(group.getAdmin());
         assertTrue(group.getDefaultproc());
         assertTrue(group.getDefaultprocread());
 
         group = new Group();
-        Permission.setPermissionsInGroup(group, EnumSet.of(Permission.ADHOC, Permission.ADMIN));
-        assertTrue(group.getAdhoc());
+        Permission.setPermissionsInGroup(group, EnumSet.of(Permission.SQL, Permission.ADMIN));
+        assertTrue(group.getSql());
         assertTrue(group.getAdmin());
         assertFalse(group.getDefaultproc());
         assertFalse(group.getDefaultprocread());

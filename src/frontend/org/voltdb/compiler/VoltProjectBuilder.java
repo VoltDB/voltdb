@@ -172,15 +172,17 @@ public class VoltProjectBuilder {
 
     public static final class GroupInfo {
         private final String name;
-        private final boolean adhoc;
+        private final boolean sql;
+        private final boolean sqlread;
         private final boolean admin;
         private final boolean defaultproc;
         private final boolean defaultprocread;
         private final boolean allproc;
 
-        public GroupInfo(final String name, final boolean adhoc, final boolean admin, final boolean defaultproc, final boolean defaultprocread, final boolean allproc){
+        public GroupInfo(final String name, final boolean sql, final boolean sqlread, final boolean admin, final boolean defaultproc, final boolean defaultprocread, final boolean allproc){
             this.name = name;
-            this.adhoc = adhoc;
+            this.sql = sql;
+            this.sqlread = sqlread;
             this.admin = admin;
             this.defaultproc = defaultproc;
             this.defaultprocread = defaultprocread;
@@ -348,10 +350,13 @@ public class VoltProjectBuilder {
     public void addGroups(final GroupInfo groups[]) {
         for (final GroupInfo info : groups) {
             transformer.append("CREATE ROLE " + info.name);
-            if(info.adhoc || info.defaultproc || info.admin || info.defaultprocread || info.allproc) {
+            if(info.sql || info.sqlread || info.defaultproc || info.admin || info.defaultprocread || info.allproc) {
                 transformer.append(" WITH ");
-                if(info.adhoc) {
-                    transformer.append("adhoc,");
+                if(info.sql) {
+                    transformer.append("sql,");
+                }
+                if(info.sqlread) {
+                    transformer.append("sqlread,");
                 }
                 if(info.defaultproc) {
                     transformer.append("defaultproc,");

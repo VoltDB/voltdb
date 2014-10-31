@@ -19,6 +19,8 @@ package org.voltdb.compiler;
 
 import java.io.Serializable;
 
+import org.voltdb.AuthSystem;
+
 public class AsyncCompilerResult implements Serializable, Cloneable {
     private static final long serialVersionUID = -1538141431615585812L;
 
@@ -28,6 +30,7 @@ public class AsyncCompilerResult implements Serializable, Cloneable {
     public String hostname = "";
     public boolean adminConnection = false;
     public int expectedCatalogVersion = -1;
+    public AuthSystem.AuthUser user = null;
     transient public Object clientData = null;
 
     /**
@@ -42,6 +45,7 @@ public class AsyncCompilerResult implements Serializable, Cloneable {
         result.adminConnection = work.adminConnection;
         result.clientData = work.clientData;
         result.errorMsg = errMsg;
+        result.user = work.user;
         return result;
     }
 

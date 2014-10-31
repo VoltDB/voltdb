@@ -18,6 +18,8 @@
 package org.voltdb.compiler;
 
 import org.voltcore.network.Connection;
+import org.voltdb.AuthSystem;
+import org.voltdb.AuthSystem.AuthDisabledUser;
 import org.voltdb.CatalogContext;
 import org.voltdb.client.ProcedureInvocationType;
 
@@ -44,13 +46,13 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
             String invocationName, ProcedureInvocationType type,
             long originalTxnId, long originalUniqueId,
             boolean onReplica, boolean useAdhocDDL,
-            AsyncCompilerWorkCompletionHandler completionHandler, String userName)
+            AsyncCompilerWorkCompletionHandler completionHandler, AuthSystem.AuthUser user)
     {
         super(replySiteId, false, clientHandle, connectionId,
               clientConnection == null ? "" : clientConnection.getHostnameAndIPAndPort(),
               adminConnection, clientConnection, invocationName, type,
               originalTxnId, originalUniqueId, onReplica, useAdhocDDL,
-              completionHandler, userName);
+              completionHandler, user);
         this.sqlBatchText = sqlBatchText;
         this.sqlStatements = sqlStatements;
         this.userParamSet = userParamSet;
@@ -85,7 +87,7 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
                 orig.onReplica,
                 orig.useAdhocDDL,
                 completionHandler,
-                orig.userName);
+                orig.user);
         }
 
     /**
@@ -110,7 +112,7 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
             false, (singlePartition ? new Object[1] /*any vector element will do, even null*/ : null),
             "@AdHoc_RW_MP", ProcedureInvocationType.ORIGINAL, 0, 0,
             false, false, // don't allow adhoc DDL in this path
-            completionHandler, null);
+            completionHandler, new AuthSystem.AuthDisabledUser());
     }
 
     @Override
