@@ -115,14 +115,17 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
 
         assert(firstCanonicalDDL != null);
 
+        int exitValue;
+
         if ( ! triedSqlcmdDryRun) {
-            assertEquals("sqlcmd dry run failed -- maybe sqlcmd needs to be rebuilt.", 0, callSQLcmd("\n"));
+            exitValue = callSQLcmd("\n");
+            assertFalse("sqlcmd dry run timed out", TIMEOUT_PSEUDO_EXIT_VALUE == exitValue);
+            assertEquals("sqlcmd dry run failed -- maybe some sqlcmd component (the voltdb jar file?) needs to be rebuilt.", 0, exitValue);
             triedSqlcmdDryRun = true;
         }
 
-        int exitValue = callSQLcmd(firstCanonicalDDL);
+        exitValue = callSQLcmd(firstCanonicalDDL);
         assertFalse("sqlcmd timed out on input:\n" + firstCanonicalDDL, TIMEOUT_PSEUDO_EXIT_VALUE == exitValue);
-
         assertEquals("sqlcmd failed on input:\n" + firstCanonicalDDL, 0, exitValue);
         roundtripDDL = getDDLFromHTTP(httpdPort);
         // IZZY: we force single statement SQL keywords to lower case, it seems
@@ -130,7 +133,6 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
 
         exitValue = callSQLcmd("CREATE TABLE NONSENSE (id INTEGER);\n");
         assertFalse("sqlcmd timed out on last call", TIMEOUT_PSEUDO_EXIT_VALUE == exitValue);
-
         assertEquals("sqlcmd failed on last call", 0, exitValue);
         roundtripDDL = getDDLFromHTTP(httpdPort);
         assertFalse(firstCanonicalDDL.equals(roundtripDDL));
