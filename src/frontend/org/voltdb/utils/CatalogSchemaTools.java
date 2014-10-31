@@ -338,6 +338,11 @@ public abstract class CatalogSchemaTools {
      * @param Group
      */
     public static void toSchema(StringBuilder sb, Group grp) {
+        // Don't output the default roles because user cannot change them.
+        if (grp.getTypeName().equalsIgnoreCase("ADMINISTRATOR") || grp.getTypeName().equalsIgnoreCase("USER")) {
+            return;
+        }
+
         final EnumSet<Permission> permissions = Permission.getPermissionSetForGroup(grp);
         sb.append("CREATE ROLE ").append(grp.getTypeName());
 

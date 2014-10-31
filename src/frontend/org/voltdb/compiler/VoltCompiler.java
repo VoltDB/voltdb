@@ -849,6 +849,7 @@ public class VoltCompiler {
 
     /**
      * Create default roles. These roles cannot be removed nor overridden in the DDL.
+     * Make sure to omit these roles in the generated DDL in {@link org.voltdb.utils.CatalogSchemaTools}
      */
     private void addDefaultRoles()
     {
