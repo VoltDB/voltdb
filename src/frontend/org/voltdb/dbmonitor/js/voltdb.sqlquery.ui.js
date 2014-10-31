@@ -332,3 +332,4 @@ function loadSQLQueryPage(serverName, portid, userName, password, admin) {
 
     $("#overlay").hide();
 }
+

@@ -621,4 +621,3 @@
     window.MonitorGraphUI = MonitorGraphUI = new IMonitorGraphUI();
 })(window);
 
-

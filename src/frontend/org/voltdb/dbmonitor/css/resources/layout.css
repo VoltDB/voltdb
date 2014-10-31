@@ -709,6 +709,31 @@ right: -31px!important;
     width: 34.6%;
 }
 
+/************help******************/
+.VDBMonitorHelp { height:500px; overflow:auto; } 
+.helpStyleButton {
+   color: white;
+   background-color: #AA1F2F;
+   padding: .3em;
+   font-family: sans-serif;
+   font-size: 95%;
+}
+h2.help {font: bold 15px 'MYRIADPROREGULAR';
+	padding-bottom: 10px;
+	border-bottom: 1px dashed #ddd;
+	}
+.VDBMonitorHelp p { line-height:20px;font:15px 'MYRIADPROREGULAR';}
+.helpStyleTitle { font-weight:bold;}
+ul.helpList {}
+ul.helpList li { list-style:disc; line-height:20px!important; padding:0; margin:0 0 0 20px; font:15px 'MYRIADPROREGULAR'}
+.VDBSchemaHel {height:500px; overflow:auto;}
+.VDBSchemaHelp p { line-height:20px;font:15px 'MYRIADPROREGULAR';}
+ul.helpSchemaList {}
+ul.helpSchemaList li { list-style:disc; line-height:25px!important; padding:0; margin:0 0 0 20px; font:15px 'MYRIADPROREGULAR'} 
+.VDBQueryHelp {}
+.VDBQueryHelp p { line-height:20px;font:15px 'MYRIADPROREGULAR';}
+
+
 /*********************************************media Qu********************/
 @media (max-width: 479px) {
 .serverStat {float:none; clear:left;}
@@ -811,12 +836,7 @@ h3.systemHeader{}
 
  input.icon-search { width:182px;}
  
-
- 
- 
-
-
-}
+ }
 @media screen and (orientation:landscape) {
 	.popup_cont {top:5%;}
 	

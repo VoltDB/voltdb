@@ -3,7 +3,6 @@
  * HTML CSS
  */
 
-
 .chartWrap {
   margin: 0;
   padding: 0;
@@ -780,4 +779,3 @@ Interactive Layer
 .nvd3 line.nv-guideline {
   stroke: #ccc;
 }
-
