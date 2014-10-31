@@ -18,19 +18,17 @@
 package org.voltdb;
 
 import org.voltcore.logging.Level;
-import org.voltdb.AuthSystem.AuthUser;
-import org.voltdb.catalog.Procedure;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.AuthSystem.AuthUser;
+import org.voltdb.InvocationPermissionPolicy.PolicyResult;
+import org.voltdb.catalog.Procedure;
 import org.voltdb.common.Permission;
 import org.voltdb.utils.LogKeys;
 
-/**
- * Checks if a user has permission to call a procedure.
- */
-public class InvocationAdHocPermissionPolicy extends InvocationPermissionPolicy {
+public class InvocationSqlPermissionPolicy extends InvocationPermissionPolicy {
     private static final VoltLogger authLog = new VoltLogger("AUTH");
 
-    public InvocationAdHocPermissionPolicy() {
+    public InvocationSqlPermissionPolicy() {
     }
 
     /**
@@ -41,9 +39,14 @@ public class InvocationAdHocPermissionPolicy extends InvocationPermissionPolicy 
      */
     @Override
     public PolicyResult shouldAccept(AuthUser user, StoredProcedureInvocation invocation, Procedure proc) {
-        // AdHoc requires unique permission. Then has to plan in a separate thread.
+        if (proc.getSystemproc() && invocation.procName.startsWith("@AdHoc_RW")) {
+            if (user.hasPermission(Permission.SQL)) {
+                return PolicyResult.ALLOW;
+            }
+            return PolicyResult.DENY;
+        }
         if (proc.getSystemproc() && invocation.procName.startsWith("@AdHoc")) {
-            if (user.hasPermission(Permission.ADHOC, Permission.ADMIN)) {
+            if (user.hasPermission(Permission.SQLREAD, Permission.SQL)) {
                 return PolicyResult.ALLOW;
             }
             return PolicyResult.DENY;
@@ -55,11 +58,10 @@ public class InvocationAdHocPermissionPolicy extends InvocationPermissionPolicy 
     @Override
     public ClientResponseImpl getErrorResponse(AuthUser user, StoredProcedureInvocation invocation, Procedure procedure) {
         authLog.l7dlog(Level.INFO,
-                LogKeys.auth_ClientInterface_LackingPermissionForAdhoc.name(),
+                LogKeys.auth_ClientInterface_LackingPermissionForSql.name(),
                 new String[] {user.m_name}, null);
         return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
-                new VoltTable[0], "User does not have @AdHoc permission",
+                new VoltTable[0], "User does not have SQL read/write permission",
                 invocation.clientHandle);
     }
-
 }

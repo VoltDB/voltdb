@@ -33,7 +33,7 @@ public class PermissionValidator {
 
     public PermissionValidator() {
         m_permissionpolicies.add(new InvocationSysprocPermissionPolicy());
-        m_permissionpolicies.add(new InvocationAdHocPermissionPolicy());
+        m_permissionpolicies.add(new InvocationSqlPermissionPolicy());
         m_permissionpolicies.add(new InvocationDefaultProcPermissionPolicy());
         m_permissionpolicies.add(new InvocationUserDefinedProcedurePermissionPolicy());
     }

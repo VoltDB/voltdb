@@ -3068,21 +3068,26 @@ public class TestVoltCompiler extends TestCase {
 
     class TestRole {
         final String name;
-        boolean adhoc = false;
+        boolean sql = false;
+        boolean sqlread = false;
         boolean sysproc = false;
         boolean defaultproc = false;
         boolean defaultprocread = false;
+        boolean allproc = false;
 
         public TestRole(String name) {
             this.name = name;
         }
 
-        public TestRole(String name, boolean adhoc, boolean sysproc, boolean defaultproc, boolean defaultprocread) {
+        public TestRole(String name, boolean sql, boolean sqlread, boolean sysproc,
+                        boolean defaultproc, boolean defaultprocread, boolean allproc) {
             this.name = name;
-            this.adhoc = adhoc;
+            this.sql = sql;
+            this.sqlread = sqlread;
             this.sysproc = sysproc;
             this.defaultproc = defaultproc;
             this.defaultprocread = defaultprocread;
+            this.allproc = allproc;
         }
     }
 
@@ -3128,10 +3133,12 @@ public class TestVoltCompiler extends TestCase {
             for (TestRole role : roles) {
                 Group group = groups.get(role.name);
                 assertNotNull(String.format("Missing role \"%s\"", role.name), group);
-                assertEquals(String.format("Role \"%s\" adhoc flag mismatch:", role.name), role.adhoc, group.getAdhoc());
+                assertEquals(String.format("Role \"%s\" sql flag mismatch:", role.name), role.sql, group.getSql());
+                assertEquals(String.format("Role \"%s\" sqlread flag mismatch:", role.name), role.sqlread, group.getSqlread());
                 assertEquals(String.format("Role \"%s\" admin flag mismatch:", role.name), role.sysproc, group.getAdmin());
                 assertEquals(String.format("Role \"%s\" defaultproc flag mismatch:", role.name), role.defaultproc, group.getDefaultproc());
                 assertEquals(String.format("Role \"%s\" defaultprocread flag mismatch:", role.name), role.defaultprocread, group.getDefaultprocread());
+                assertEquals(String.format("Role \"%s\" allproc flag mismatch:", role.name), role.allproc, group.getAllproc());
             }
         }
         else {
@@ -3162,16 +3169,19 @@ public class TestVoltCompiler extends TestCase {
     public void testRoleDDL() throws Exception {
         goodRoleDDL("create role r1;", new TestRole("r1"));
         goodRoleDDL("create role r1;create role r2;", new TestRole("r1"), new TestRole("r2"));
-        goodRoleDDL("create role r1 with adhoc;", new TestRole("r1", true, false, false, false));
-        goodRoleDDL("create role r1 with sysproc;", new TestRole("r1", true, true, true, true));
-        goodRoleDDL("create role r1 with defaultproc;", new TestRole("r1", false, false, true, false));
-        goodRoleDDL("create role r1 with adhoc,sysproc,defaultproc;", new TestRole("r1", true, true, true, true));
-        goodRoleDDL("create role r1 with adhoc,sysproc,sysproc;", new TestRole("r1", true, true, true, true));
-        goodRoleDDL("create role r1 with AdHoc,SysProc,DefaultProc;", new TestRole("r1", true, true, true, true));
+        goodRoleDDL("create role r1 with adhoc;", new TestRole("r1", true, false, false, false, false, false));
+        goodRoleDDL("create role r1 with sql;", new TestRole("r1", true, false, false, false, false, false));
+        goodRoleDDL("create role r1 with sqlread;", new TestRole("r1", false, true, false, false, false, false));
+        goodRoleDDL("create role r1 with sysproc;", new TestRole("r1", true, true, true, true, true, true));
+        goodRoleDDL("create role r1 with defaultproc;", new TestRole("r1", false, false, false, true, false, false));
+        goodRoleDDL("create role r1 with adhoc,sysproc,defaultproc;", new TestRole("r1", true, true, true, true, true, true));
+        goodRoleDDL("create role r1 with adhoc,sysproc,sysproc;", new TestRole("r1", true, true, true, true, true, true));
+        goodRoleDDL("create role r1 with AdHoc,SysProc,DefaultProc;", new TestRole("r1", true, true, true, true, true, true));
         //Defaultprocread.
-        goodRoleDDL("create role r1 with defaultprocread;", new TestRole("r1", false, false, false, true));
-        goodRoleDDL("create role r1 with AdHoc,SysProc,DefaultProc,DefaultProcRead;", new TestRole("r1", true, true, true, true));
-        goodRoleDDL("create role r1 with AdHoc,Admin,DefaultProc,DefaultProcRead;", new TestRole("r1", true, true, true, true));
+        goodRoleDDL("create role r1 with defaultprocread;", new TestRole("r1", false, false, false, false, true, false));
+        goodRoleDDL("create role r1 with AdHoc,SysProc,DefaultProc,DefaultProcRead;", new TestRole("r1", true, true, true, true, true, true));
+        goodRoleDDL("create role r1 with AdHoc,Admin,DefaultProc,DefaultProcRead;", new TestRole("r1", true, true, true, true, true, true));
+        goodRoleDDL("create role r1 with allproc;", new TestRole("r1", false, false, false, false, false, true));
     }
 
     public void testBadRoleDDL() throws Exception {

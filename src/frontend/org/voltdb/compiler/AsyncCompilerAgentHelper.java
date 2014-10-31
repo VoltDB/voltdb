@@ -48,6 +48,7 @@ public class AsyncCompilerAgentHelper
         retval.invocationType = work.invocationType;
         retval.originalTxnId = work.originalTxnId;
         retval.originalUniqueId = work.originalUniqueId;
+        retval.user = work.user;
         retval.tablesThatMustBeEmpty = new String[0]; // ensure non-null
 
         try {
