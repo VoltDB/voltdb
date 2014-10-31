@@ -35,6 +35,7 @@ import org.voltcore.utils.Pair;
 import org.voltdb.CLIConfig;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.TableHelper;
+import org.voltdb.TableHelper.ViewRep;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -46,6 +47,8 @@ import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.VoltCompilerUtils;
+import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
 
 public class SchemaChangeClient {
@@ -54,13 +57,22 @@ public class SchemaChangeClient {
 
     Client client = null;
     private SchemaChangeConfig config = null;
-    private Random rand = new Random(0);
+    private final Random rand = new Random(0);
     private Topology topo = null;
-    private AtomicInteger totalConnections = new AtomicInteger(0);
-    private AtomicInteger fatalLevel = new AtomicInteger(0);
+    private final AtomicInteger totalConnections = new AtomicInteger(0);
+    private final AtomicInteger fatalLevel = new AtomicInteger(0);
+
+    // If catalog update is chosen deployment.xml must not have schema="ddl" in the cluster element.
+    private final boolean useCatalogUpdate = false;
+    SchemaChanger schemaChanger = useCatalogUpdate ? new CatalogSchemaChanger() : new DDLSchemaChanger();
+
+    // Current active view and verification proc. Supports dropping before re-creating.
+    TableHelper.ViewRep viewRep = null;
+    Class<?> verifyProc = null;
 
     private int schemaVersionNo = 0;
 
+    @SuppressWarnings("unused")
     private long startTime;
 
     private static String _F(String str, Object... parameters) {
@@ -183,14 +195,13 @@ public class SchemaChangeClient {
      * Perform a schema change to a mutated version of the current table (80%) or
      * to a new table entirely (20%, drops and adds the new table).
      */
-    private Pair<VoltTable,TableHelper.ViewRep> catalogChange(VoltTable t1, boolean newTable, TableHelper.ViewRep view) throws Exception {
-        CatalogBuilder builder = new CatalogBuilder();
+    private Pair<VoltTable,TableHelper.ViewRep> catalogChange(VoltTable t1, boolean newTable, TableHelper.ViewRep viewIn) throws Exception {
         VoltTable t2 = null;
         String currentName = t1 == null ? "B" : TableHelper.getTableName(t1);
         String newName = currentName;
 
         // add an empty table with the schema version number in it
-        VoltTable versionT = TableHelper.quickTable(String.format("V%s (BIGINT)", schemaVersionNo + 1));
+        VoltTable versionT = TableHelper.quickTable(_F("V%d (BIGINT)", schemaVersionNo + 1));
 
         if (newTable) {
             newName = currentName.equals("A") ? "B" : "A";
@@ -203,105 +214,91 @@ public class SchemaChangeClient {
         log.info(_F("New Schema:\n%s", TableHelper.ddlForTable(t2)));
 
         // handle views
-        if (view == null) {
-            view = TableHelper.ViewRep.viewRepForTable("MV", t2, rand);
+        TableHelper.ViewRep newViewRep = viewIn;
+        if (newViewRep == null) {
+            newViewRep = TableHelper.ViewRep.viewRepForTable("MV", t2, rand);
         }
         else {
-            if (!view.compatibleWithTable(t2)) {
-                view = null;
+            if (!newViewRep.compatibleWithTable(t2)) {
+                newViewRep = null;
             }
         }
-        if (view != null) {
-            log.info(_F("New View:\n%s", view.ddlForView()));
+        if (newViewRep != null) {
+            log.info(_F("New View:\n%s", newViewRep.ddlForView()));
         }
         else {
             log.info("New View: NULL");
         }
 
-        builder.addLiteralSchema(TableHelper.ddlForTable(t2));
-        if (view != null) {
-            builder.addLiteralSchema(view.ddlForView());
+        schemaChanger.beginUpdate();
+
+        try {
+            schemaChanger.dropTables(_F("V%d", schemaVersionNo));
+            if (viewRep != null) {
+                schemaChanger.dropViews(viewRep.viewName);
+                viewRep = null;
+            }
+            viewRep = newViewRep;
+            if (verifyProc != null) {
+                schemaChanger.dropProcedures(verifyProc.getName());
+                verifyProc = null;
+            }
+            schemaChanger.createTable(versionT);
+            // make tables name A partitioned and tables named B replicated
+            boolean partitioned = newName.equalsIgnoreCase("A");
+            if (newTable) {
+                schemaChanger.createTable(t2);
+            }
+            else {
+                schemaChanger.updateTable(t1, t2);
+            }
+            if (partitioned) {
+                schemaChanger.addTablePartitionInfo(t2, newName);
+                verifyProc = VerifySchemaChangedA.class;
+            }
+            else {
+                verifyProc = VerifySchemaChangedB.class;
+            }
+            schemaChanger.createProcedures(client, verifyProc);
+            if (viewRep != null) {
+                schemaChanger.createView(viewRep);
+            }
+            schemaChanger.prepare();
         }
-        builder.addLiteralSchema(TableHelper.ddlForTable(versionT));
-        // make tables name A partitioned and tables named B replicated
-        if (newName.equalsIgnoreCase("A")) {
-            int pkeyIndex = TableHelper.getBigintPrimaryKeyIndexIfExists(t2);
-            builder.addPartitionInfo(newName, t2.getColumnName(pkeyIndex));
-            builder.addProcedures(VerifySchemaChangedA.class);
+        catch (IOException e) {
+            return null;
         }
-        else {
-            builder.addProcedures(VerifySchemaChangedB.class);
-        }
-        byte[] catalogData = builder.compileToBytes();
-        assert(catalogData != null);
 
         long count = tupleCount(t1);
         long start = System.nanoTime();
 
         if (newTable) {
-            log.info(_F("Starting catalog update to swap tables."));
+            log.info(_F("Starting %s to swap tables.", schemaChanger.getActionName()));
         }
         else {
-            log.info(_F("Starting catalog update to change schema."));
+            log.info(_F("Starting %s to change schema.", schemaChanger.getActionName()));
         }
 
-        boolean success = false;
-        ClientResponse cr = null;
-        try {
-            cr = client.callProcedure("@UpdateApplicationCatalog", catalogData, null);
-        }
-        catch (NoConnectionsException e) {
-            // failure
-        }
-        catch (IOException e) {
-            // IOException is not cool man
-            logStackTrace(e);
-            System.exit(-1);
-        }
-        catch (ProcCallException e) {
-            cr = e.getClientResponse();
-        }
-
-        if (cr != null) {
-            switch (cr.getStatus()) {
-            case ClientResponse.SUCCESS:
-                // hooray!
-                success = true;
-                log.info("Catalog update was reported to be successful");
-                break;
-            case ClientResponse.CONNECTION_LOST:
-            case ClientResponse.CONNECTION_TIMEOUT:
-            case ClientResponse.RESPONSE_UNKNOWN:
-            case ClientResponse.SERVER_UNAVAILABLE:
-                // can try again after a break
-                break;
-            case ClientResponse.UNEXPECTED_FAILURE:
-            case ClientResponse.GRACEFUL_FAILURE:
-            case ClientResponse.USER_ABORT:
-                // should never happen
-                log.error(_F("USER_ABORT in procedure call for Catalog update"));
-                log.error(((ClientResponseImpl)cr).toJSONString());
-                assert(false);
-                System.exit(-1);
-            }
-        }
-
-        // don't actually trust the call... manually verify
-        int obsCatVersion = verifyAndGetSchemaVersion();
-
-        if (obsCatVersion == schemaVersionNo) {
-            if (success == true) {
-                log.error(_F("Catalog update was reported to be successful but did not pass verification: expected V%d, observed V%d", schemaVersionNo+1, obsCatVersion));
-                assert(false);
-                System.exit(-1);
-            }
-
-            // UAC didn't work
+        if (!schemaChanger.perform(this.client)) {
             return null;
         }
 
+        schemaChanger.endUpdate();
+
+        // don't actually trust the call... manually verify
+        int obsCatVersion = verifyAndGetSchemaVersion();
         // UAC worked
-        if (obsCatVersion == schemaVersionNo+1) schemaVersionNo++;
+        if (obsCatVersion == schemaVersionNo) {
+            log.error(_F("Catalog update was reported to be successful but did not pass "
+                       + "verification: expected V%d, observed V%d",
+                         schemaVersionNo+1, obsCatVersion));
+            assert(false);
+            System.exit(-1);
+        }
+
+        if (obsCatVersion == schemaVersionNo+1) {
+            schemaVersionNo++;
+        }
         else {
             assert(false);
             System.exit(-1);
@@ -311,15 +308,220 @@ public class SchemaChangeClient {
         double seconds = (end - start) / 1000000000.0;
 
         if (newTable) {
-            log.info(_F("Completed catalog update that swapped tables in %.4f seconds",
-                    seconds));
+            log.info(_F("Completed %s that swapped tables in %.4f seconds",
+                        schemaChanger.getActionName(), seconds));
         }
         else {
-            log.info(_F("Completed catalog update of %d tuples in %.4f seconds (%d tuples/sec)",
-                    count, seconds, (long) (count / seconds)));
+            log.info(_F("Completed %s of %d tuples in %.4f seconds (%d tuples/sec)",
+                        schemaChanger.getActionName(), count, seconds, (long) (count / seconds)));
+        }
+        return new Pair<VoltTable,TableHelper.ViewRep>(t2, newViewRep, false);
+    }
+
+    interface SchemaChanger {
+        void addProcedureClasses(Client client, Class<?>... procedures) throws IOException;
+        void beginUpdate();
+        void endUpdate();
+        void createTable(VoltTable table) throws IOException;
+        void createView(ViewRep view) throws IOException;
+        void createProcedures(Client client, Class<?>... procedures) throws IOException;
+        void dropTables(String... names) throws IOException;
+        void dropViews(String... names) throws IOException;
+        void dropProcedures(String... names) throws IOException;
+        void updateTable(VoltTable t1, VoltTable t2) throws IOException;
+        void addTablePartitionInfo(VoltTable table, String name) throws IOException;
+        void prepare() throws IOException;
+        boolean perform(Client client) throws IOException;
+        String getActionName();
+    }
+
+    /**
+     * SchemaChanger subclass that uses catalog updates.
+     */
+    static class CatalogSchemaChanger implements SchemaChanger {
+
+        CatalogBuilder builder = null;
+        byte[] catalogData = null;
+
+        CatalogSchemaChanger() {
         }
 
-        return new Pair<VoltTable,TableHelper.ViewRep>(t2, view, false);
+        @Override
+        public void addProcedureClasses(Client client, Class<?>... procedures) throws IOException {
+        }
+
+        @Override
+        public void beginUpdate() {
+            this.builder = new CatalogBuilder();
+        }
+
+        @Override
+        public void endUpdate() {
+            this.builder = null;
+        }
+
+        @Override
+        public void createTable(VoltTable table) throws IOException {
+            this.builder.addLiteralSchema(TableHelper.ddlForTable(table));
+        }
+
+        @Override
+        public void createView(ViewRep view) throws IOException {
+            this.builder.addLiteralSchema(view.ddlForView());
+        }
+
+        @Override
+        public void createProcedures(Client client, Class<?>... procedures) throws IOException {
+            this.builder.addProcedures(procedures);
+        }
+
+        @Override
+        public void dropTables(String... names) throws IOException {
+        }
+
+        @Override
+        public void dropViews(String... names) throws IOException {
+        }
+
+        @Override
+        public void dropProcedures(String... names) throws IOException {
+        }
+
+        @Override
+        public void updateTable(VoltTable t1, VoltTable t2) throws IOException {
+            this.createTable(t2);
+        }
+
+        @Override
+        public void addTablePartitionInfo(VoltTable table, String name) throws IOException {
+            int pkeyIndex = TableHelper.getBigintPrimaryKeyIndexIfExists(table);
+            this.builder.addPartitionInfo(name, table.getColumnName(pkeyIndex));
+        }
+
+        @Override
+        public void prepare() throws IOException {
+            this.catalogData = this.builder.compileToBytes();
+        }
+
+        @Override
+        public boolean perform(Client client) throws IOException {
+            assert(this.catalogData != null);
+            return execUpdate(client, "@UpdateApplicationCatalog", catalogData, false);
+        }
+
+        @Override
+        public String getActionName()
+        {
+            return "catalog update";
+        }
+    }
+
+    /**
+     * SchemaChanger subclass that uses ad hoc DDL.
+     */
+    static class DDLSchemaChanger implements SchemaChanger {
+
+        StringBuilder ddl = null;
+
+        DDLSchemaChanger() {
+        }
+
+        @Override
+        public void addProcedureClasses(Client client, Class<?>... procedures) throws IOException {
+            // Use @UpdateClasses to inject procedure(s).
+            InMemoryJarfile jar = VoltCompilerUtils.createClassesJar(procedures);
+            // true => fail hard with exception.
+            execUpdate(client, "@UpdateClasses", jar.getFullJarBytes(), true);
+        }
+
+        @Override
+        public void beginUpdate() {
+            this.ddl = new StringBuilder();
+        }
+
+        @Override
+        public void endUpdate() {
+            this.ddl = null;
+        }
+
+       @Override
+        public void createTable(VoltTable table) throws IOException {
+            this.add(TableHelper.ddlForTable(table));
+        }
+
+       @Override
+       public void createView(ViewRep view) throws IOException {
+           this.add(view.ddlForView());
+       }
+
+       @Override
+       public void createProcedures(Client client, Class<?>... procedures) throws IOException {
+           // Prepare CREATE PROCEDURE DDL statement(s).
+           for (final Class<?> procedure : procedures) {
+               this.add(_F("CREATE PROCEDURE FROM CLASS %s", procedure.getName()));
+           }
+       }
+
+        @Override
+        public void dropTables(String... names) throws IOException {
+            for (String name : names) {
+                this.add(_F("DROP TABLE %s", name));
+            }
+        }
+
+        @Override
+        public void dropViews(String... names) throws IOException {
+            for (String name : names) {
+                this.add(_F("DROP VIEW %s", name));
+            }
+        }
+
+        @Override
+        public void dropProcedures(String... names) throws IOException {
+            for (String name : names) {
+                this.add(_F("DROP PROCEDURE %s", name));
+            }
+        }
+
+        @Override
+        public void updateTable(VoltTable t1, VoltTable t2) throws IOException {
+            this.add(TableHelper.getAlterTableDDLToMigrate(t1, t2));
+        }
+
+        @Override
+        public void addTablePartitionInfo(VoltTable table, String name) throws IOException {
+        }
+
+        @Override
+        public void prepare() throws IOException {
+            // No final preparation needed. The DDL string is ready to use.
+        }
+
+        @Override
+        public boolean perform(Client client) throws IOException {
+            String ddlString = this.ddl.toString();
+            log.info(_F("DDL:\n%s", ddlString));
+            try {
+                ClientResponse cr = client.callProcedure("@AdHoc", ddlString);
+                return (cr.getStatus() == ClientResponse.SUCCESS);
+            }
+            catch (ProcCallException e) {
+                throw new IOException(e);
+            }
+        }
+
+        @Override
+        public String getActionName()
+        {
+            return "ad hoc DDL";
+        }
+
+        void add(String query) {
+            if (this.ddl.length() > 0) {
+                this.ddl.append(_F(";%n"));
+            }
+            this.ddl.append(query);
+        }
     }
 
     private static class Topology {
@@ -337,7 +539,7 @@ public class SchemaChangeClient {
         }
     }
 
-    private Topology getCluterTopology() {
+    private Topology getClusterTopology() {
         int hosts = -1;
         int sitesPerHost = -1;
         int k = -1;
@@ -383,8 +585,8 @@ public class SchemaChangeClient {
     }
 
     private boolean isSchemaVersionObservable(int schemaid) {
-        ClientResponse cr = callROProcedureWithRetry("@AdHoc",
-                String.format("select count(*) from V%d;", schemaid));
+        String query = _F("select count(*) from V%d;", schemaid);
+        ClientResponse cr = callROProcedureWithRetry("@AdHoc", query);
         return (cr.getStatus() == ClientResponse.SUCCESS);
     }
 
@@ -592,7 +794,10 @@ public class SchemaChangeClient {
         connect(config.servers);
 
         // get the topo
-        topo = getCluterTopology();
+        topo = getClusterTopology();
+
+        // The ad hoc DDL mechanism requires the procs be available on the server.
+        schemaChanger.addProcedureClasses(client, VerifySchemaChangedA.class, VerifySchemaChangedB.class);
 
         // kick this off with a random schema
         VoltTable t = null;
@@ -655,8 +860,7 @@ public class SchemaChangeClient {
 
                     // deterministically sample the same rows
                     assert(sampleOffset >= 0);
-                    ClientResponse cr = callROProcedureWithRetry(
-                            "VerifySchemaChanged" + tableName, sampleOffset, guessT);
+                    ClientResponse cr = callROProcedureWithRetry("VerifySchemaChanged" + tableName, sampleOffset, guessT);
                     assert(cr.getStatus() == ClientResponse.SUCCESS);
                     VoltTable result = cr.getResults()[0];
                     boolean success = result.fetchRow(0).getLong(0) == 1;
@@ -678,5 +882,56 @@ public class SchemaChangeClient {
 
         SchemaChangeClient schemaChange = new SchemaChangeClient(config);
         schemaChange.runTestWorkload();
+    }
+
+    /**
+     * Perform @Update... call.
+     */
+    private static boolean execUpdate(Client client, String procName, byte[] bytes, boolean hardFail) throws IOException
+    {
+        boolean success = false;
+        ClientResponse cr = null;
+        try {
+            cr = client.callProcedure(procName, bytes, null);
+            success = true;
+        }
+        catch (NoConnectionsException e) {
+        }
+        catch (ProcCallException e) {
+            log.error(_F("Procedure %s call exception: %s", procName, e.getMessage()));
+            cr = e.getClientResponse();
+        }
+
+        if (success && cr != null) {
+            switch (cr.getStatus()) {
+            case ClientResponse.SUCCESS:
+                // hooray!
+                log.info("Catalog update was reported to be successful");
+                break;
+            case ClientResponse.CONNECTION_LOST:
+            case ClientResponse.CONNECTION_TIMEOUT:
+            case ClientResponse.RESPONSE_UNKNOWN:
+            case ClientResponse.SERVER_UNAVAILABLE:
+                // can try again after a break
+                success = false;
+                break;
+            case ClientResponse.UNEXPECTED_FAILURE:
+            case ClientResponse.GRACEFUL_FAILURE:
+            case ClientResponse.USER_ABORT:
+                // should never happen
+                log.error(_F("USER_ABORT in procedure call for Catalog update"));
+                log.error(((ClientResponseImpl)cr).toJSONString());
+                assert(false);
+                System.exit(-1);
+            }
+        }
+
+        // Fail hard or allow retries?
+        if (!success && hardFail) {
+            String msg = (cr != null ? ((ClientResponseImpl)cr).toJSONString() : _F("Unknown %s failure", procName));
+            throw new IOException(msg);
+        }
+
+        return success;
     }
 }

@@ -62,7 +62,18 @@ function client() {
     java -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
         schemachange.SchemaChangeClient \
         --servers=localhost \
-        --targetrowcount=100000
+        --targetrowcount=100000 \
+        --duration=1800
+}
+
+# quick client run
+function quick() {
+    srccompile
+    java -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
+        schemachange.SchemaChangeClient \
+        --servers=localhost \
+        --targetrowcount=100000 \
+        --duration=60
 }
 
 function help() {
