@@ -388,14 +388,14 @@ public class TestSecuritySuite extends RegressionSuite {
         project.addUsers(users);
 
         GroupInfo groups[] = new GroupInfo[] {
-                new GroupInfo("group1", false, false, false, false, false),
-                new GroupInfo("group2", true, false, false, false, false),
-                new GroupInfo("group3", true, false, false, false, false),
-                new GroupInfo("group4", false, true, false, false, false),
-                new GroupInfo("groupWithAllProcPerm", false, false, false, false, true),
-                new GroupInfo("groupWithDefaultProcPerm", false, false, true, false, false),
-                new GroupInfo("groupWithoutDefaultProcPerm", false, false, false, false, false),
-                new GroupInfo("groupWithDefaultProcReadPerm", false, false, false, true, false)
+                new GroupInfo("group1", false, false, false, false, false, false),
+                new GroupInfo("group2", true, false, false, false, false, false),
+                new GroupInfo("group3", true, false, false, false, false, false),
+                new GroupInfo("group4", false, false, true, false, false, false),
+                new GroupInfo("groupWithAllProcPerm", false, false, false, false, false, true),
+                new GroupInfo("groupWithDefaultProcPerm", false, false, false, true, false, false),
+                new GroupInfo("groupWithoutDefaultProcPerm", false, false, false, false, false, false),
+                new GroupInfo("groupWithDefaultProcReadPerm", false, false, false, false, true, false)
         };
         project.addGroups(groups);
         project.setSecurityEnabled(true);

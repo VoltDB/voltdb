@@ -25,11 +25,13 @@ import org.voltdb.catalog.Group;
 //If you add a permission here add a boolean in spec.txt and update getPermissionSetForGroup method
 public enum Permission {
     //These enums maps to specific boolean in spec.txt
-    ADHOC,
+
     ADMIN,           // aliased by SYSPROC
     ALLPROC,
     DEFAULTPROC,
-    DEFAULTPROCREAD;
+    DEFAULTPROCREAD,
+    SQL,             // aliased by ADHOC
+    SQLREAD;
 
     public static final String toListString() {
         return Arrays.asList(values()).toString();
@@ -45,6 +47,8 @@ public enum Permission {
             // Put the aliases here
             if (name.equalsIgnoreCase("SYSPROC")) {
                 return ADMIN;
+            } else if (name.equalsIgnoreCase("ADHOC")) {
+                return SQL;
             } else {
                 throw e;
             }
@@ -62,7 +66,8 @@ public enum Permission {
             perms = EnumSet.allOf(Permission.class);
         } else {
             perms = EnumSet.noneOf(Permission.class);
-            if (catGroup.getAdhoc()) perms.add(Permission.ADHOC);
+            if (catGroup.getSql()) perms.add(Permission.SQL);
+            if (catGroup.getSqlread()) perms.add(Permission.SQLREAD);
             if (catGroup.getDefaultproc()) perms.add(Permission.DEFAULTPROC);
             if (catGroup.getDefaultprocread()) perms.add(Permission.DEFAULTPROCREAD);
             if (catGroup.getAllproc()) perms.add(Permission.ALLPROC);
@@ -104,9 +109,6 @@ public enum Permission {
     public static final void setPermissionsInGroup(Group group, EnumSet<Permission> permissions) {
         for (Permission p : permissions) {
             switch(p) {
-            case ADHOC:
-                group.setAdhoc(true);
-                break;
             case ADMIN:
                 group.setAdmin(true);
                 break;
@@ -116,6 +118,11 @@ public enum Permission {
             case DEFAULTPROCREAD:
                 group.setDefaultprocread(true);
                 break;
+            case SQL:
+                group.setSql(true);
+                break;
+            case SQLREAD:
+                group.setSqlread(true);
             case ALLPROC:
                 group.setAllproc(true);
                 break;
