@@ -862,22 +862,27 @@ public class SQLCommand
                 printResponse(VoltDB.callProcedure(procedure, objectParams));
             }
         }
-        else if (ExplainCall.matcher(query).matches()) {
-            // We've got a query that starts with "explain", pre-pend
-            // the @Explain sp invocatino ahead of the query (after stripping "explain").
+        else if (ExplainCall.matcher(query).find()) {
+            // We've got a query that starts with "explain", send the query to
+            // @Explain (after stripping "explain").
+            // This all could probably be done more elegantly via a group extracted
+            // from a more comprehensive regexp.
             query = query.substring("explain ".length());
             query = StripCRLF.matcher(query).replaceAll(" ");
             printResponse(VoltDB.callProcedure("@Explain", query));
         }
-        else if (ExplainProcCall.matcher(query).matches()) {
-            // We've got a query that starts with "explainplan", pre-pend
-            // the @ExplainPlan sp invocation ahead of the query (after stripping "explainplan").
+        else if (ExplainProcCall.matcher(query).find()) {
+            // We've got a query that starts with "explainproc", send the proc name
+            // to @ExplainPlan (after stripping "explainproc").
+            // This all could probably be done more elegantly via a group extracted
+            // from a more comprehensive regexp.
             query = query.substring("explainProc ".length());
             query = StripCRLF.matcher(query).replaceAll(" ");
+            // Clean up any extra spaces from between explainproc and the proc name.
+            query = query.trim();
             printResponse(VoltDB.callProcedure("@ExplainProc", query));
         }
-        // Ad hoc query
-        else {
+        else { // All other commands get forwarded to @AdHoc
             query = StripCRLF.matcher(query).replaceAll(" ");
             printResponse(VoltDB.callProcedure("@AdHoc", query));
             // if the query was DDL, reload the stored procedures.
@@ -895,8 +900,8 @@ public class SQLCommand
     // Trim
     private static String preprocessParam(String param)
     {
-        if ((param.charAt(0)=='\'' && param.charAt(param.length()-1)=='\'') ||
-                (param.charAt(0)=='"' && param.charAt(param.length()-1)=='"')) {
+        if ((param.charAt(0) == '\'' && param.charAt(param.length()-1) == '\'') ||
+                (param.charAt(0) == '"' && param.charAt(param.length()-1) == '"')) {
             param = param.substring(1, param.length()-2);
         }
         param = param.trim();
@@ -1096,9 +1101,9 @@ public class SQLCommand
     {
         Tables tables = new Tables();
         VoltTable tableData = VoltDB.callProcedure("@SystemCatalog", "TABLES").getResults()[0];
-        for (int i = 0; i < tableData.getRowCount(); i++) {
-            String tableName = tableData.fetchRow(i).getString("TABLE_NAME");
-            String tableType = tableData.fetchRow(i).getString("TABLE_TYPE");
+        while (tableData.advanceRow()) {
+            String tableName = tableData.getString("TABLE_NAME");
+            String tableType = tableData.getString("TABLE_TYPE");
             if (tableType.equalsIgnoreCase("EXPORT")) {
                 tables.exports.add(tableName);
             }
@@ -1135,13 +1140,12 @@ public class SQLCommand
             e.printStackTrace();
             return;
         }
-        Map<String, Integer> proc_param_counts =
-            Collections.synchronizedMap(new HashMap<String, Integer>());
+        Map<String, Integer> proc_param_counts = Collections.synchronizedMap(new HashMap<String, Integer>());
         while (params.advanceRow()) {
             String this_proc = params.getString("PROCEDURE_NAME");
             Integer curr_val = proc_param_counts.get(this_proc);
             if (curr_val == null) {
-                curr_val = 0;
+                curr_val = 1;
             } else {
                 ++curr_val;
             }
@@ -1197,15 +1201,9 @@ public class SQLCommand
         }
     }
 
-    static public void mockVoltDBForTest(Client testVoltDB)
-    {
-        VoltDB = testVoltDB;
-    }
+    static public void mockVoltDBForTest(Client testVoltDB) { VoltDB = testVoltDB; }
 
-    static public void mockLineReaderForTest(SQLConsoleReader reader)
-    {
-        lineInputReader = reader;
-    }
+    static public void mockLineReaderForTest(SQLConsoleReader reader) { lineInputReader = reader; }
 
     private static InputStream in = null;
     private static OutputStream out = null;
@@ -1393,7 +1391,7 @@ public class SQLCommand
             System.exit(-1);
         }
         finally {
-            try { VoltDB.close(); } catch (Exception _) {}
+            try { VoltDB.close(); } catch (Exception x) { }
             // Flush input history to a file.
             if (historyFile != null) {
                 try {

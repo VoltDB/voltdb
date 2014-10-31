@@ -50,6 +50,8 @@ import org.voltdb.utils.MiscUtils;
 
 public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
 
+    private final int TIMEOUT_PSEUDO_EXIT_VALUE = -123;
+
     private String firstCanonicalDDL = null;
     private boolean triedSqlcmdDryRun = false;
 
@@ -118,12 +120,18 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
             triedSqlcmdDryRun = true;
         }
 
-        assertEquals("sqlcmd failed or timed out", 0, callSQLcmd(firstCanonicalDDL));
+        int exitValue = callSQLcmd(firstCanonicalDDL);
+        assertFalse("sqlcmd timed out on input:\n" + firstCanonicalDDL, TIMEOUT_PSEUDO_EXIT_VALUE == exitValue);
+
+        assertEquals("sqlcmd failed on input:\n" + firstCanonicalDDL, 0, exitValue);
         roundtripDDL = getDDLFromHTTP(httpdPort);
         // IZZY: we force single statement SQL keywords to lower case, it seems
         assertTrue(firstCanonicalDDL.equalsIgnoreCase(roundtripDDL));
 
-        assertEquals("sqlcmd failed or timed out on last call", 0, callSQLcmd("CREATE TABLE NONSENSE (id INTEGER);\n"));
+        exitValue = callSQLcmd("CREATE TABLE NONSENSE (id INTEGER);\n");
+        assertFalse("sqlcmd timed out on last call", TIMEOUT_PSEUDO_EXIT_VALUE == exitValue);
+
+        assertEquals("sqlcmd failed on last call", 0, exitValue);
         roundtripDDL = getDDLFromHTTP(httpdPort);
         assertFalse(firstCanonicalDDL.equals(roundtripDDL));
 
@@ -151,7 +159,7 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
         long starttime = System.currentTimeMillis();
         long endtime = starttime + 60000;
 
-        int exitValue = -1;
+        int exitValue = TIMEOUT_PSEUDO_EXIT_VALUE;
         while(System.currentTimeMillis() < endtime) {
             Thread.sleep(1000);
             try{
