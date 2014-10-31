@@ -123,6 +123,7 @@ public enum Permission {
                 break;
             case SQLREAD:
                 group.setSqlread(true);
+                break;
             case ALLPROC:
                 group.setAllproc(true);
                 break;
