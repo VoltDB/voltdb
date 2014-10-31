@@ -69,7 +69,13 @@ $(document).ready(function () {
         saveSessionCookie("current-tab", VoltDbUI.CurrentTab);
 
         //Activate Shortcut keys only if the current tab is "SQL Query".
+        //Also show proper help contents as per the choosen tab.
         if (VoltDbUI.CurrentTab == NavigationTabs.SQLQuery) {
+
+            $("#VDBMonHelp").hide();
+            $("#VDBSchHelp").hide();
+            $("#VDBQHelp").show();
+
             if (navigator.userAgent.indexOf('Safari') != -1 && navigator.userAgent.indexOf('Chrome') == -1) {
                 shortcut.add("f6", function () {
                     $("#runBTn").button().click();
@@ -83,12 +89,22 @@ $(document).ready(function () {
 
             //Refresh the charts if the current tab is "DB Monitor"
             if (VoltDbUI.CurrentTab == NavigationTabs.DBMonitor) {
+                
+                $("#VDBMonHelp").show();
+                $("#VDBSchHelp").hide();
+                $("#VDBQHelp").hide();
+                
                 MonitorGraphUI.ChartRam.update();
                 MonitorGraphUI.ChartCpu.update();
                 MonitorGraphUI.ChartLatency.update();
                 MonitorGraphUI.ChartTransactions.update();
             }
             else if (VoltDbUI.CurrentTab == NavigationTabs.Schema) {
+                
+                $("#VDBMonHelp").hide();
+                $("#VDBSchHelp").show();
+                $("#VDBQHelp").hide();
+                
                 setTimeout(function () {
                     window.scrollTo(0, 0);
                 }, 10);

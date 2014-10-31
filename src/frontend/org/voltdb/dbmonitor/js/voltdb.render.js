@@ -228,10 +228,12 @@ function alertNodeClicked(obj) {
         };
 
         this.ShowUsername = function (userName) {
-            if (userName != undefined && userName != 'null') {
+            if (userName != undefined && userName != 'null' && userName != '') {
                 $(".userN").html(userName);
+                $("#userLine").show();
             } else {
                 $(".userN").html("");
+                $("#userLine").hide();
             }
         };
 
