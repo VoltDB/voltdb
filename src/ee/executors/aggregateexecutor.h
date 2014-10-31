@@ -68,7 +68,7 @@ public:
     void operator delete(void*, Pool& memoryPool) { /* NOOP -- on alloc error unroll nothing */ }
     void operator delete(void*) { /* NOOP -- deallocate wholesale with pool */ }
 
-    Agg() : m_haveAdvanced(false)
+    Agg() : m_haveAdvanced(false), m_inlineCopiedToOutline(false)
     {
         m_value.setNull();
     }
@@ -82,10 +82,16 @@ public:
     {
         m_haveAdvanced = false;
         m_value.setNull();
+        m_inlineCopiedToOutline = false;
+    }
+
+    virtual bool isOutlineDataInAggTempPool() {
+        return m_inlineCopiedToOutline;
     }
 protected:
     bool m_haveAdvanced;
     NValue m_value;
+    bool m_inlineCopiedToOutline;
 };
 
 /**

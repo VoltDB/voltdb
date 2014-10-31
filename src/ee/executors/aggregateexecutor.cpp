@@ -267,6 +267,7 @@ public:
                 // avoid this, un-inline the incoming NValue to its
                 // own storage.
                 m_value.allocateObjectFromInlinedValue(m_memoryPool);
+                m_inlineCopiedToOutline = true;
             }
             m_haveAdvanced = true;
         }
@@ -304,6 +305,7 @@ public:
                 // see comment in MaxAgg above, regarding why we're
                 // doing this.
                 m_value.allocateObjectFromInlinedValue(m_memoryPool);
+                m_inlineCopiedToOutline = true;
             }
             m_haveAdvanced = true;
         }
@@ -481,7 +483,11 @@ inline bool AggregateExecutorBase::insertOutputTuple(AggregateRow* aggregateRow)
     Agg** aggs = aggregateRow->m_aggregates;
     for (int ii = 0; ii < m_aggregateOutputColumns.size(); ii++) {
         const int columnIndex = m_aggregateOutputColumns[ii];
-        tempTuple.setNValue(columnIndex, aggs[ii]->finalize().castAs(tempTuple.getSchema()->columnType(columnIndex)));
+        NValue result = aggs[ii]->finalize().castAs(tempTuple.getSchema()->columnType(columnIndex));
+        if (aggs[ii]->isOutlineDataInAggTempPool()) {
+            result.allocateObjectFromOutlineValue();
+        }
+        tempTuple.setNValue(columnIndex, result);
     }
 
     VOLT_TRACE("Setting passthrough columns");

@@ -323,6 +323,8 @@ class NValue {
     // the pool, use the temp string pool.
     void allocateObjectFromInlinedValue(Pool* pool);
 
+    void allocateObjectFromOutlineValue(Pool* pool);
+
     /* Check if the value represents SQL NULL */
     bool isNull() const;
 
@@ -3117,6 +3119,38 @@ inline void NValue::allocateObjectFromInlinedValue(Pool* pool = NULL)
     char* storage = sref->get();
     // Copy length and value into the allocated out-of-line storage
     ::memcpy(storage, source, length + SHORT_OBJECT_LENGTHLENGTH);
+    setObjectValue(sref);
+    setSourceInlined(false);
+}
+
+inline void NValue::allocateObjectFromOutlineValue(Pool* pool = NULL)
+{
+    if (m_valueType == VALUE_TYPE_NULL || m_valueType == VALUE_TYPE_INVALID) {
+        return;
+    }
+
+    assert(m_valueType == VALUE_TYPE_VARCHAR || m_valueType == VALUE_TYPE_VARBINARY);
+    assert(!m_sourceInlined);
+
+    if (isNull()) {
+        *reinterpret_cast<void**>(m_data) = NULL;
+        // serializeToTupleStorage fusses about this inline flag being set, even for NULLs
+        setSourceInlined(false);
+        return;
+    }
+
+    if (pool == NULL) {
+        pool = getTempStringPool();
+    }
+
+    // get the outline data
+    const char* source = (*reinterpret_cast<StringRef* const*>(m_data))->get();
+
+    const int32_t length = getObjectLength_withoutNull() + getObjectLengthLength();
+    StringRef* sref = StringRef::create(length, pool);
+    char* storage = sref->get();
+    // Copy the value into the allocated out-of-line storage
+    ::memcpy(storage, source, length);
     setObjectValue(sref);
     setSourceInlined(false);
 }
