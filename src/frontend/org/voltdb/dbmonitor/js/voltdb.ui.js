@@ -151,6 +151,7 @@ var loadPage = function (serverName, portid) {
         var templateJavascript = "js/template.js";
 
         $.get(templateUrl, function (result) {
+            result = result.replace('<!--##SIZES##>', '');
             var body = $(result).filter("#wrapper").html();
             $("#schema").html(body);
 
