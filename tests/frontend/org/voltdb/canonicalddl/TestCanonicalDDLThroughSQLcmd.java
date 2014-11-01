@@ -50,8 +50,6 @@ import org.voltdb.utils.MiscUtils;
 
 public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
 
-    private final int TIMEOUT_PSEUDO_EXIT_VALUE = -123;
-
     private String firstCanonicalDDL = null;
     private boolean triedSqlcmdDryRun = false;
 
@@ -115,25 +113,18 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
 
         assert(firstCanonicalDDL != null);
 
-        int exitValue;
-
         if ( ! triedSqlcmdDryRun) {
-            exitValue = callSQLcmd("\n");
-            assertFalse("sqlcmd dry run timed out", TIMEOUT_PSEUDO_EXIT_VALUE == exitValue);
-            assertEquals("sqlcmd dry run failed -- maybe some sqlcmd component (the voltdb jar file?) needs to be rebuilt.", 0, exitValue);
+            assertEquals("sqlcmd dry run failed -- maybe some sqlcmd component (the voltdb jar file?) needs to be rebuilt.",
+                    0, callSQLcmd("\n"));
             triedSqlcmdDryRun = true;
         }
 
-        exitValue = callSQLcmd(firstCanonicalDDL);
-        assertFalse("sqlcmd timed out on input:\n" + firstCanonicalDDL, TIMEOUT_PSEUDO_EXIT_VALUE == exitValue);
-        assertEquals("sqlcmd failed on input:\n" + firstCanonicalDDL, 0, exitValue);
+        assertEquals("sqlcmd failed on input:\n" + firstCanonicalDDL, 0, callSQLcmd(firstCanonicalDDL));
         roundtripDDL = getDDLFromHTTP(httpdPort);
         // IZZY: we force single statement SQL keywords to lower case, it seems
         assertTrue(firstCanonicalDDL.equalsIgnoreCase(roundtripDDL));
 
-        exitValue = callSQLcmd("CREATE TABLE NONSENSE (id INTEGER);\n");
-        assertFalse("sqlcmd timed out on last call", TIMEOUT_PSEUDO_EXIT_VALUE == exitValue);
-        assertEquals("sqlcmd failed on last call", 0, exitValue);
+        assertEquals("sqlcmd failed on last call", 0, callSQLcmd("CREATE TABLE NONSENSE (id INTEGER);\n"));
         roundtripDDL = getDDLFromHTTP(httpdPort);
         assertFalse(firstCanonicalDDL.equals(roundtripDDL));
 
@@ -141,6 +132,9 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
     }
 
     private int callSQLcmd(String ddl) throws Exception {
+        final String commandPath = "bin/sqlcmd";
+        final long timeout = 60000; // 60,000 millis -- give up after 1 minute of trying.
+
         File f = new File("ddl.sql");
         f.deleteOnExit();
         FileOutputStream fos = new FileOutputStream(f);
@@ -151,7 +145,7 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
 
         File error = new File("error.log");
 
-        ProcessBuilder pb = new ProcessBuilder("bin/sqlcmd");
+        ProcessBuilder pb = new ProcessBuilder(commandPath);
         pb.redirectInput(f);
         pb.redirectOutput(out);
         pb.redirectError(error);
@@ -159,23 +153,30 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
 
         // Set timeout to 1 minute
         long starttime = System.currentTimeMillis();
-        long endtime = starttime + 60000;
-
-        int exitValue = TIMEOUT_PSEUDO_EXIT_VALUE;
-        while(System.currentTimeMillis() < endtime) {
+        long elapsedtime = 0;
+        long pollcount = 0;
+        do {
             Thread.sleep(1000);
-            try{
-                exitValue = process.exitValue();
-                if(exitValue == 0) {
-                    break;
+            try {
+                int exitValue = process.exitValue();
+                // Only verbosely report the successful exit after verbosely reporting a delay.
+                // Frequent false alarms might lead to raising the sleep time.
+                if (pollcount > 0) {
+                    elapsedtime = System.currentTimeMillis() - starttime;
+                    System.err.println("External process (" + commandPath + ") exited after being polled " +
+                            pollcount + " times over " + elapsedtime + "ms");
                 }
+                return exitValue;
             }
             catch (Exception e) {
-                System.out.println("Process hasn't exited");
+                elapsedtime = System.currentTimeMillis() - starttime;
+                ++pollcount;
+                System.err.println("External process (" + commandPath + ") has not yet exited after " + elapsedtime + "ms");
             }
-        }
+        } while (elapsedtime < timeout);
 
-        return exitValue;
+        fail("External process (" + commandPath + ") timed out after " + elapsedtime + "ms on input:\n" + ddl);
+        return 0;
     }
 
     private String getDDLFromHTTP(int httpdPort) throws Exception {
@@ -188,15 +189,15 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
 
         BufferedReader in = null;
         try {
-            if(conn.getInputStream() != null){
+            if (conn.getInputStream() != null) {
                 in = new BufferedReader(
                         new InputStreamReader(
                         conn.getInputStream(), "UTF-8"));
             }
-        } catch(IOException e){
+        } catch (IOException e) {
             e.printStackTrace();
         }
-        if(in == null) {
+        if (in == null) {
             throw new Exception("Unable to read response from server");
         }
 
