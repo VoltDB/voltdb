@@ -902,7 +902,9 @@ public class SQLCommand
     {
         if ((param.charAt(0) == '\'' && param.charAt(param.length()-1) == '\'') ||
                 (param.charAt(0) == '"' && param.charAt(param.length()-1) == '"')) {
-            param = param.substring(1, param.length()-2);
+            // The position of the closing quote, param.length()-1 is where to end the substring
+            // to get a result with two fewer characters.
+            param = param.substring(1, param.length()-1);
         }
         param = param.trim();
         param = param.toUpperCase();
