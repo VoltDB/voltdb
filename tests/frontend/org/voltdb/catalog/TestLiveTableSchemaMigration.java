@@ -59,7 +59,7 @@ public class TestLiveTableSchemaMigration extends TestCase {
         boolean success = builder.compile(retval);
         // good spot below for a breakpoint if compiling fails
         if (!success) {
-            assert(false);
+            fail();
         }
         return retval;
     }
@@ -320,8 +320,8 @@ public class TestLiveTableSchemaMigration extends TestCase {
         migrateSchemaWithDataExpectFail("FOO (A:INTEGER-N, B:DECIMAL) P(A)", "FOO (A:INTEGER-N, B:FLOAT) P(A)", "Unable to");
 
         // EXPECT FAIL shrink a unique index
-        migrateSchemaWithDataExpectFail("FOO (A:INTEGER-N, B:TINYINT) PK(A,B)", "FOO (A:INTEGER-N, B:TINYINT) PK(A)", "Unable to");
-        migrateSchemaWithDataExpectFail("FOO (A:INTEGER-N, B:TINYINT) PK(A,B) P(B)", "FOO (A:INTEGER-N, B:TINYINT) PK(B) P(B)", "Unable to");
+        migrateSchemaWithDataExpectFail("FOO (A:INTEGER-N, B:TINYINT-N) PK(A,B)", "FOO (A:INTEGER-N, B:TINYINT-N) PK(A)", "Unable to");
+        migrateSchemaWithDataExpectFail("FOO (A:INTEGER-N, B:TINYINT-N) PK(A,B) P(B)", "FOO (A:INTEGER-N, B:TINYINT-N) PK(B) P(B)", "Unable to");
     }
 
     public void testFixedSchemasNoData() throws Exception {
@@ -343,8 +343,8 @@ public class TestLiveTableSchemaMigration extends TestCase {
         migrateSchema("FOO (A:INTEGER-N, B:DECIMAL) P(A)", "FOO (A:INTEGER-N, B:FLOAT) P(A)", false);
 
         // shrink a unique index
-        migrateSchema("FOO (A:INTEGER-N, B:TINYINT) PK(A,B)", "FOO (A:INTEGER-N, B:TINYINT) PK(A)", false);
-        migrateSchema("FOO (A:INTEGER-N, B:TINYINT) PK(A,B) P(B)", "FOO (A:INTEGER-N, B:TINYINT) PK(B) P(B)", false);
+        migrateSchema("FOO (A:INTEGER-N, B:TINYINT-N) PK(A,B)", "FOO (A:INTEGER-N, B:TINYINT-N) PK(A)", false);
+        migrateSchema("FOO (A:INTEGER-N, B:TINYINT-N) PK(A,B) P(B)", "FOO (A:INTEGER-N, B:TINYINT-N) PK(B) P(B)", false);
 
         // modify a unique index
         migrateSchema("FOO (A:INTEGER-N, B:TINYINT) PK(A,B)", "FOO (A:INTEGER-N, B:TINYINT) PK(B,A)", false);
