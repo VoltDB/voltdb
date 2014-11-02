@@ -27,6 +27,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -75,6 +76,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
+import org.voltdb.common.Permission;
 import org.voltdb.compiler.projectfile.ClassdependenciesType.Classdependency;
 import org.voltdb.compiler.projectfile.DatabaseType;
 import org.voltdb.compiler.projectfile.ExportType;
@@ -841,7 +843,25 @@ public class VoltCompiler {
     private Database initCatalogDatabase() {
         // create the database in the catalog
         m_catalog.execute("add /clusters[cluster] databases database");
+        addDefaultRoles();
         return getCatalogDatabase();
+    }
+
+    /**
+     * Create default roles. These roles cannot be removed nor overridden in the DDL.
+     * Make sure to omit these roles in the generated DDL in {@link org.voltdb.utils.CatalogSchemaTools}
+     */
+    private void addDefaultRoles()
+    {
+        // admin
+        m_catalog.execute("add /clusters[cluster]/databases[database] groups ADMINISTRATOR");
+        Permission.setPermissionsInGroup(getCatalogDatabase().getGroups().get("ADMINISTRATOR"),
+                                         Permission.getPermissionsFromAliases(Arrays.asList("ADMIN")));
+
+        // user
+        m_catalog.execute("add /clusters[cluster]/databases[database] groups USER");
+        Permission.setPermissionsInGroup(getCatalogDatabase().getGroups().get("USER"),
+                                         Permission.getPermissionsFromAliases(Arrays.asList("SQL", "ALLPROC")));
     }
 
     public static enum DdlProceduresToLoad
