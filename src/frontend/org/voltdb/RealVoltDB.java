@@ -959,6 +959,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         m_myHostId = m_messenger.getHostId();
                         hostLog.info(String.format("Host id of this node is: %d", m_myHostId));
                         hostLog.info("URL of deployment info: " + m_config.m_pathToDeployment);
+                        // log system setting information
+                        logSystemSettingInfo();
                         hostLog.info("Cluster uptime: " + MiscUtils.formatUptime(getClusterUptime()));
                         logDebuggingInfo(m_config.m_adminPort, m_config.m_httpPort, m_httpPortExtraLogMessage, m_jsonEnabled);
                         long nextCheck = nextCheckField.getLong(dailyRollingFileAppender);
@@ -1410,12 +1412,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
 
             // log system setting information
-            SystemSettingsType sysType = m_deployment.getSystemsettings();
-            if (sysType != null && sysType.getQuery() != null) {
-                if (sysType.getQuery().getTimeout() > 0) {
-                    hostLog.info("Host query timeout set to " + sysType.getQuery().getTimeout() + " milliseconds");
-                }
-            }
+            logSystemSettingInfo();
 
             // create a dummy catalog to load deployment info into
             Catalog catalog = new Catalog();
@@ -1803,6 +1800,31 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         m_versionString = buildInfo[0];
         m_buildString = buildInfo[1];
         consoleLog.info(String.format("Build: %s %s %s", m_versionString, m_buildString, editionTag));
+    }
+
+    void logSystemSettingInfo() {
+        if (m_deployment == null) {
+            return;
+        }
+
+        SystemSettingsType sysType = m_deployment.getSystemsettings();
+
+        if (sysType == null) {
+            return;
+        }
+        if (sysType.getElastic() != null) {
+            hostLog.info("Host elastic duration set to " + sysType.getElastic().getDuration() + " milliseconds");
+            hostLog.info("Host elastic throughput set to " + sysType.getElastic().getThroughput() + " mb/s");
+        }
+        if (sysType.getTemptables() != null) {
+            hostLog.info("Host query max temptable size set to " + sysType.getTemptables().getMaxsize() + " mb");
+        }
+        if (sysType.getSnapshot() != null) {
+            hostLog.info("Host snapshot priority set to " + sysType.getSnapshot().getPriority() + " [0 - 10]");
+        }
+        if (sysType.getQuery() != null && sysType.getQuery().getTimeout() > 0) {
+            hostLog.info("Host query timeout set to " + sysType.getQuery().getTimeout() + " milliseconds");
+        }
     }
 
     /**
