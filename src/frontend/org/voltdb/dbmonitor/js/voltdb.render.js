@@ -1377,7 +1377,7 @@ function alertNodeClicked(obj) {
 
 
                 $.each(lTableData, function (id, val) {
-                    if (currentAction == VoltDbUI.ACTION_STATES.NEXT && (vfoltDbRenderer.isTableSearch == false || voltDbRenderer.isTableSearch == undefined)) {
+                    if (currentAction == VoltDbUI.ACTION_STATES.NEXT && (voltDbRenderer.isTableSearch == false || voltDbRenderer.isTableSearch == undefined)) {
                         if (counter >= tablePageStartIndex && counter <= (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1) {
                             setTableTupleDataHtml(val, id, table_type);
                             if (counter == (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1 || counter == voltDbRenderer.tableDataSize - 1) {
