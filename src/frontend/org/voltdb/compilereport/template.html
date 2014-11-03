@@ -108,6 +108,11 @@
         <div id='s' class='reportpage' style='display: none;'>
           <a name='s'></a><h1>Schema</h1><br/>
 
+          <div class="checkbox">
+           <label>
+            <input type="checkbox" class="cb"> Expand All
+           </label>
+          </div>
           <table class="table tableL1 tablesorter" id='schematable'>
                 <thead>
                 <tr>
@@ -136,6 +141,11 @@
         <div id='p' class='reportpage' style='display: none;'>
           <a name='p'></a><h1>Procedures &amp; SQL</h1><br/>
 
+           <div class="checkbox">
+            <label>
+             <input type="checkbox" class="cb"> Expand All
+            </label>
+          </div>
           <table class="table tableL1 tablesorter" id='proctable'>
                 <thead>
                 <tr>
@@ -324,12 +334,29 @@
                 cssChildRow: "tablesorter-childRow"
             });
 
+            $(".cb").click(function(){
+               if($(this).is(":checked"))
+                {
+                   var elementList = $(".tableL1").find(".togglex");
+                   for ( var i = 0; i < elementList.length; i++ )
+                   {
+                    var item = elementList[i];
+                    var id = item["id"];
+                    var hash = "#"+id;
+                    var dropdownid = "#" + id + "--dropdown";
+                    $(dropdownid).show();
+                   }
+                }else {
+                    location.reload();
+                }
+            });
+
             $('.tableL1').delegate('.togglex', 'click' ,function(){
                 var id = $(this).attr('id');
                 var toppage = id.split('-')[0];
                 var dropdownid = "#" + id + "--dropdown";
-
                 var hash = "#" + id;
+
                 if ($(dropdownid).is(":visible")) {
                     hash = "#" + toppage;
                 }
