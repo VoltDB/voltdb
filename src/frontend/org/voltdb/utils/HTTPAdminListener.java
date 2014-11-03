@@ -57,6 +57,81 @@ public class HTTPAdminListener {
     final boolean m_jsonEnabled;
     Map<String, String> m_htmlTemplates = new HashMap<String, String>();
 
+    class DBMonitorHandler extends AbstractHandler {
+
+        @Override
+        public void handle(String target, Request baseRequest,
+                           HttpServletRequest request, HttpServletResponse response)
+                            throws IOException, ServletException {
+            VoltLogger logger = new VoltLogger("HOST");
+            try{
+
+                // redirect the base dir
+                if (target.equals("/")) target = "/index.htm";
+                // check if a file exists
+                URL url = VoltDB.class.getResource("dbmonitor" + target);
+                if (url == null) {
+                    logger.error("Can't find file"+target);
+                    // write 404
+                    String msg = "404: Resource not found.\n"+url.toString();
+                    response.setContentType("text/plain;charset=utf-8");
+                    response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                    baseRequest.setHandled(true);
+                    response.getWriter().print(msg);
+                    return;
+                }
+
+                // read the template
+                InputStream is = VoltDB.class.getResourceAsStream("dbmonitor" + target);
+
+                if (target.endsWith("/index.htm")) {
+
+                    // set the headers
+                    response.setContentType("text/html;charset=utf-8");
+                    response.setStatus(HttpServletResponse.SC_OK);
+                    baseRequest.setHandled(true);
+
+                    OutputStream os = response.getOutputStream();
+                    BufferedInputStream bis = new BufferedInputStream(is);
+
+                    int c = -1;
+                    while ((c = bis.read()) != -1) {
+                        os.write(c);
+                    }
+                }
+                else {
+                    // set the mime type in a giant hack
+                    String mime = "text/html;charset=utf-8";
+                    if (target.endsWith(".js"))
+                        mime = "application/x-javascript;charset=utf-8";
+                    if (target.endsWith(".css"))
+                        mime = "text/css;charset=utf-8";
+                    if (target.endsWith(".gif"))
+                        mime = "image/gif";
+                    if (target.endsWith(".png"))
+                        mime = "image/png";
+                    if ((target.endsWith(".jpg")) || (target.endsWith(".jpeg")))
+                        mime = "image/jpeg";
+
+                    // set the headers
+                    response.setContentType(mime);
+                    response.setStatus(HttpServletResponse.SC_OK);
+                    baseRequest.setHandled(true);
+
+                    // write the file out
+                    BufferedInputStream bis = new BufferedInputStream(is);
+                    OutputStream os = response.getOutputStream();
+                    int c = -1;
+                    while ((c = bis.read()) != -1) {
+                        os.write(c);
+                    }
+                }
+            }catch(Exception ex){
+                logger.error(ex.getMessage());
+                logger.error(ex);
+            }
+        }
+    }
     class StudioHander extends AbstractHandler {
 
         @Override
@@ -326,12 +401,17 @@ public class HTTPAdminListener {
             ContextHandler studioHander = new ContextHandler("/studio");
             studioHander.setHandler(new StudioHander());
 
+
+            ContextHandler dbMonitorHandler = new ContextHandler("/dbmonitor");
+            dbMonitorHandler.setHandler(new DBMonitorHandler());
+
             ContextHandler baseHander = new ContextHandler("/");
             baseHander.setHandler(new RequestHandler());
 
             ContextHandlerCollection handlers = new ContextHandlerCollection();
             handlers.setHandlers(new Handler[] {
                     studioHander,
+		    dbMonitorHandler,
                     baseHander
             });
 
