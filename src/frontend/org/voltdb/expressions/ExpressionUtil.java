@@ -261,6 +261,18 @@ public abstract class ExpressionUtil {
     }
 
     /**
+     * A convenience wrapper around AbstractExpression.findAllExpressionsOfClass
+     * Recursively walk an expression and return a list of all the expressions
+     * of a given type it contains.
+     */
+    public static List<AbstractExpression> findAllExpressionsOfClass(AbstractExpression input, Class< ? extends AbstractExpression> aeClass) {
+        if (input == null) {
+            return new ArrayList<AbstractExpression>();
+        }
+        return input.findAllSubexpressionsOfClass(aeClass);
+    }
+
+    /**
      * Method to simplify an expression by eliminating identical subexpressions (same id)
      * If the expression is a logical conjunction of the form e1 AND e2 AND e3 AND e4,
      * and subexpression e1 is identical to the subexpression e2 the simplified expression is

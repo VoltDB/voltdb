@@ -124,6 +124,11 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
     public int overrideId(int newId) {
         m_id = newId++;
+        // Override subqueries ids
+        Collection<AbstractExpression> subqueries = findAllExpressionsOfClass(SubqueryExpression.class);
+        for (AbstractExpression subquery : subqueries) {
+            newId = overrideSubqueryIds(newId, subquery);
+        }
         return newId;
     }
 
@@ -743,6 +748,39 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
         for (AbstractPlanNode inlined : m_inlineNodes.values())
             inlined.findAllNodesOfType_recurse(type, collected, visited);
+    }
+
+    /**
+     * Collect a unique list of expressions of a given type that this node has including its inlined nodes
+     * @param type expression type to search for
+     * @return a collection(set) of expressions that this node has
+     */
+    public Collection<AbstractExpression> findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        Set<AbstractExpression> collected = new HashSet<AbstractExpression>();
+        findAllExpressionsOfClass(aeClass, collected);
+        return collected;
+    }
+
+    protected void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass, Set<AbstractExpression> collected) {
+        // Check the inlined plan nodes
+        for (AbstractPlanNode inlineNode: getInlinePlanNodes().values()) {
+            // For inline node we MUST go recursive to its children!!!!!
+            Collection<AbstractExpression> exprs = inlineNode.findAllExpressionsOfClass(aeClass);
+            collected.addAll(exprs);
+        }
+
+        // and the output column expressions if there were no projection
+        NodeSchema schema = getOutputSchema();
+        if (schema != null) {
+            for (SchemaColumn col : schema.getColumns()) {
+                AbstractExpression expr = col.getExpression();
+                if (expr != null) {
+                    List<AbstractExpression> exprs = expr.findAllSubexpressionsOfClass(
+                            aeClass);
+                    collected.addAll(exprs);
+                }
+            }
+        }
     }
 
     /**

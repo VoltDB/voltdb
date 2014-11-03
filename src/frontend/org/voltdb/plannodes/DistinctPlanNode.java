@@ -17,6 +17,7 @@
 
 package org.voltdb.plannodes;
 
+import java.util.Collection;
 import java.util.List;
 
 import org.json_voltpatches.JSONException;
@@ -126,4 +127,13 @@ public class DistinctPlanNode extends AbstractPlanNode {
     protected String explainPlanForNode(String indent) {
         return "DISTINCT";
     }
+
+    @Override
+    public Collection<AbstractExpression> findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        Collection<AbstractExpression> collected = super.findAllExpressionsOfClass(aeClass);
+
+        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_distinctExpression, aeClass));
+        return collected;
+    }
+
 }

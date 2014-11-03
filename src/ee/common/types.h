@@ -323,10 +323,10 @@ enum ExpressionType {
     // -----------------------------
     // Subquery IN/EXISTS
     // -----------------------------
-    EXPRESSION_TYPE_IN_SUBQUERY                        = 401,
-    EXPRESSION_TYPE_EXISTS_SUBQUERY                    = 402,
-    EXPRESSION_TYPE_SCALAR_SUBQUERY                    = 403,
-    EXPRESSION_TYPE_ROW_SUBQUERY                       = 404
+    EXPRESSION_TYPE_IN_SUBQUERY                        = 400,
+    EXPRESSION_TYPE_EXISTS_SUBQUERY                    = 401,
+    EXPRESSION_TYPE_SCALAR_SUBQUERY                    = 402,
+    EXPRESSION_TYPE_ROW_SUBQUERY                       = 403
 
 };
 

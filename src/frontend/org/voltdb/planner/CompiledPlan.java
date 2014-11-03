@@ -111,7 +111,7 @@ public class CompiledPlan {
         for (AbstractPlanNode inNode : node.getInlinePlanNodes().values()) {
             // Inline nodes also need their ids to be overridden to make sure
             // the subquery node ids are also globaly unique
-            nextId = inNode.overrideId(nextId);
+            nextId = resetPlanNodeIds(inNode, nextId);
         }
 
         for (int i = 0; i < node.getChildCount(); i++) {

@@ -25,31 +25,18 @@ package org.voltdb.planner;
 
 import java.util.List;
 
-import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.SubqueryExpression;
-import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
-import org.voltdb.plannodes.LimitPlanNode;
-import org.voltdb.plannodes.NestLoopIndexPlanNode;
-import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.NodeSchema;
-import org.voltdb.plannodes.OrderByPlanNode;
-import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
 
 public class TestPlansScalarSubQueries extends PlannerTestCase {
-
-//    public void testInToExist() {
-//        AbstractPlanNode pn = compile("select r2.c from r2 where r2.c in (select c from r1)");
-//        AbstractPlanNode pn = compile("select r2.c from r2 where r2.c in (1,2)");
-//    }
 
     public void testSelectScalar() {
         AbstractPlanNode pn = compile("select r2.c, (select d from r1) scalar from r2");
@@ -101,11 +88,99 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
     }
 
     public void testMultiColumnSelect() {
-        failToCompile("select r2.c, (select d, c from r1) from r2", "warning");
+        failToCompile("select r2.c, (select d, c from r1) from r2",
+                "Scalar subquery can have only one output column");
     }
 
-    public void testWhereScalar() {
-        AbstractPlanNode pn = compile("select r2.c from r2 where r2.a = (select r1.a from r1 where a = 3);");
+    public void testWhereEqualScalar() {
+        AbstractPlanNode pn = compile("select r2.c from r2 where (select r1.a from r1) = r2.c;");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof AbstractScanPlanNode);
+        AbstractExpression pred = ((AbstractScanPlanNode) pn).getPredicate();
+        assertEquals(ExpressionType.COMPARE_EQUAL, pred.getExpressionType());
+        assertEquals(ExpressionType.VALUE_TUPLE, pred.getLeft().getExpressionType());
+        assertEquals(ExpressionType.SCALAR_SUBQUERY, pred.getRight().getExpressionType());
+    }
+
+    public void testWhereGreaterScalar() {
+        AbstractPlanNode pn = compile("select r2.c from r2 where (select r1.a from r1) > r2.c;");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof AbstractScanPlanNode);
+        AbstractExpression pred = ((AbstractScanPlanNode) pn).getPredicate();
+        assertEquals(ExpressionType.COMPARE_LESSTHAN, pred.getExpressionType());
+        assertEquals(ExpressionType.VALUE_TUPLE, pred.getLeft().getExpressionType());
+        assertEquals(ExpressionType.SCALAR_SUBQUERY, pred.getRight().getExpressionType());
+    }
+
+    public void testWhereParamScalar() {
+        AbstractPlanNode pn = compile("select r2.c from r2 where r2.c = (select r1.a from r1 where r1.a = r2.c);");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof AbstractScanPlanNode);
+        AbstractExpression pred = ((AbstractScanPlanNode) pn).getPredicate();
+        assertEquals(ExpressionType.COMPARE_EQUAL, pred.getExpressionType());
+        assertEquals(ExpressionType.VALUE_TUPLE, pred.getLeft().getExpressionType());
+        assertEquals(ExpressionType.SCALAR_SUBQUERY, pred.getRight().getExpressionType());
+        assertEquals(1, pred.getRight().getArgs().size());
+    }
+
+    public void testWhereUserParamScalar() {
+        AbstractPlanNode pn = compile("select r2.c from r2 where r2.c = (select r1.a from r1 where r1.a = ?);");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof AbstractScanPlanNode);
+        AbstractExpression pred = ((AbstractScanPlanNode) pn).getPredicate();
+        assertEquals(ExpressionType.COMPARE_EQUAL, pred.getExpressionType());
+        assertEquals(ExpressionType.VALUE_TUPLE, pred.getLeft().getExpressionType());
+        assertEquals(ExpressionType.SCALAR_SUBQUERY, pred.getRight().getExpressionType());
+        assertEquals(0, pred.getRight().getArgs().size());
+    }
+
+    public void testWhereGreaterRow() {
+        AbstractPlanNode pn = compile("select r2.c from r2 where (a,c) > (select r1.a, r1.c from r1);");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof AbstractScanPlanNode);
+        AbstractExpression pred = ((AbstractScanPlanNode) pn).getPredicate();
+        assertEquals(ExpressionType.COMPARE_GREATERTHAN, pred.getExpressionType());
+        assertEquals(ExpressionType.VALUE_VECTOR, pred.getLeft().getExpressionType());
+        assertEquals(ExpressionType.ROW_SUBQUERY, pred.getRight().getExpressionType());
+    }
+
+    public void testWhereEqualRow() {
+        AbstractPlanNode pn = compile("select r2.c from r2 where (a,c) = (select r1.a, r1.c from r1 where r1.c = r2.c);");
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof AbstractScanPlanNode);
+        AbstractExpression pred = ((AbstractScanPlanNode) pn).getPredicate();
+        assertEquals(ExpressionType.COMPARE_EQUAL, pred.getExpressionType());
+        assertEquals(ExpressionType.VALUE_VECTOR, pred.getLeft().getExpressionType());
+        assertEquals(ExpressionType.ROW_SUBQUERY, pred.getRight().getExpressionType());
+        assertEquals(1, pred.getRight().getArgs().size());
+    }
+
+    public void testWhereRowMismatch() {
+        failToCompile("select r2.c from r2 where (a,c) = (select a, a , 5 from r1);",
+                "row column count mismatch");
+    }
+
+    public void testHavingScalar() {
+        AbstractPlanNode pn = compile("select max(r2.c) from r2 group by r2.c having count(*) = (select a from r1);");
+        pn = pn.getChild(0).getChild(0);
+        assertEquals(PlanNodeType.SEQSCAN, pn.getPlanNodeType());
+        AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(pn);
+        AbstractExpression aggExpr = aggNode.getPostPredicate();
+        assertEquals(ExpressionType.SCALAR_SUBQUERY, aggExpr.getRight().getExpressionType());
+    }
+
+    public void testHavingRow() {
+        AbstractPlanNode pn = compile("select max(r2.c) from r2 group by r2.c having (count(*), max(r2.c)) = (select a,c from r1);");
+        pn = pn.getChild(0).getChild(0);
+        assertEquals(PlanNodeType.SEQSCAN, pn.getPlanNodeType());
+        AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(pn);
+        AbstractExpression aggExpr = aggNode.getPostPredicate();
+        assertEquals(ExpressionType.ROW_SUBQUERY, aggExpr.getRight().getExpressionType());
+    }
+
+    public void testHavingRowMismatch() {
+        failToCompile("select max(r2.c) from r2 group by r2.c having (count(*), max(r2.c)) = (select a,c, 5 from r1);",
+                "row column count mismatch");
     }
 
     @Override

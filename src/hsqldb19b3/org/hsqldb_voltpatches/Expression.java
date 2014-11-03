@@ -1753,6 +1753,10 @@ public class Expression {
             exp.attributes.put("valuetype", dataType.getNameString());
             return exp;
 
+        case OpTypes.EQUAL:
+            if (exprSubType == OpTypes.ANY_QUANTIFIED) {
+                exp.attributes.put("opsubtype", "anyquantified");
+            }
         default:
             return exp;
         }

@@ -434,7 +434,7 @@ public abstract class AbstractParsedStmt {
     }
 
     /**
-     * Parse a subquery for SQL-IN(SELECT...)
+     * Parse an expression subquery
      */
     private SubqueryExpression parseSubqueryExpression(VoltXMLElement exprNode) {
         assert(exprNode.children.size() == 1);
@@ -444,6 +444,7 @@ public abstract class AbstractParsedStmt {
         // add table to the query cache
         StmtTableScan tableCache = addTableToStmtCache(tableName, tableName, subqueryStmt);
         assert(tableCache instanceof StmtSubqueryScan);
+        // Set to the default SCALAR_SUBQUERY. May be overriden dependin gon the context
         return new SubqueryExpression((StmtSubqueryScan)tableCache);
     }
 

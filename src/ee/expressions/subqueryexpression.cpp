@@ -158,7 +158,7 @@ NValue SubqueryExpression::eval(const TableTuple *tuple1, const TableTuple *tupl
             } else if (outputTable->activeTupleCount() > 1) {
                 // throw runtime exception
                 char message[256];
-                snprintf(message, 256, "More than one row returned by a subquery used as an expression");
+                snprintf(message, 256, "More than one row returned by a scalar or row subquery");
                 throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
             }
         } else {

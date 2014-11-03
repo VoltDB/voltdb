@@ -64,11 +64,6 @@ public class SubqueryExpression extends AbstractExpression {
      * @param subquey The parsed statement
      */
     public SubqueryExpression(StmtSubqueryScan subquery) {
-        this(ExpressionType.SUBQUERY, subquery);
-    }
-
-    public SubqueryExpression(ExpressionType subqueryType, StmtSubqueryScan subquery) {
-        super(subqueryType);
         // subquery is null if loaded from JSON
         if (subquery != null) {
             m_subquery = subquery;
@@ -76,9 +71,11 @@ public class SubqueryExpression extends AbstractExpression {
             m_subqueryId = m_subquery.getSubqueryStmt().m_stmtId;
             // Scalar subquery can have only a single output column
             if (subquery.getOutputSchema().size() == 1) {
+                m_type = ExpressionType.SCALAR_SUBQUERY;
                 m_valueType = subquery.getOutputSchema().get(0).getType();
                 m_valueSize = subquery.getOutputSchema().get(0).getSize();
             } else {
+                m_type = ExpressionType.ROW_SUBQUERY;
                 m_valueType = VoltType.BIGINT;
                 m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
             }
@@ -92,11 +89,23 @@ public class SubqueryExpression extends AbstractExpression {
     }
 
     /**
+     * Create a new SubqueryExpression
+     * @param subquey The parsed statement
+     * @param subqueryType
+     */
+    public SubqueryExpression(ExpressionType subqueryType, StmtSubqueryScan subquery) {
+        this(subquery);
+        assert(ExpressionType.IN_SUBQUERY == subqueryType || ExpressionType.EXISTS_SUBQUERY == subqueryType
+                || ExpressionType.SCALAR_SUBQUERY == subqueryType || ExpressionType.ROW_SUBQUERY == subqueryType);
+        setExpressionType(subqueryType);
+    }
+
+    /**
      * Create a new empty SubqueryExpression for loading from JSON
      * @param subquey The parsed statement
      */
     public SubqueryExpression() {
-        super(ExpressionType.SUBQUERY);
+        super(ExpressionType.SCALAR_SUBQUERY);
     }
 
     public StmtSubqueryScan getTable() {

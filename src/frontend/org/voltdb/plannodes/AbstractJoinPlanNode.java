@@ -17,6 +17,7 @@
 
 package org.voltdb.plannodes;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.TreeMap;
 
@@ -141,15 +142,6 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         } else {
             m_joinPredicate = null;
         }
-    }
-
-    @Override
-    public int overrideId(int newId) {
-        m_id = newId++;
-        newId = overrideSubqueryIds(newId, m_preJoinPredicate);
-        newId = overrideSubqueryIds(newId, m_joinPredicate);
-        newId = overrideSubqueryIds(newId, m_wherePredicate);
-        return newId;
     }
 
     @Override
@@ -384,6 +376,16 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
             }
         }
         return result;
+    }
+
+    @Override
+    public Collection<AbstractExpression> findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        Collection<AbstractExpression> collected = super.findAllExpressionsOfClass(aeClass);
+
+        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_preJoinPredicate, aeClass));
+        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_joinPredicate, aeClass));
+        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_wherePredicate, aeClass));
+        return collected;
     }
 
 }

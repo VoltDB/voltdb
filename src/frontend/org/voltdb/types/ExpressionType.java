@@ -133,11 +133,10 @@ public enum ExpressionType {
     // -----------------------------
     // Subquery
     // -----------------------------
-    SUBQUERY                    (SubqueryExpression.class, 400, "<subquery>"),
-    IN_SUBQUERY                 (SubqueryExpression.class, 401, "<in subquery>"),
-    EXISTS_SUBQUERY             (SubqueryExpression.class, 402, "<exists subquery>"),
-    SCALAR_SUBQUERY             (SubqueryExpression.class, 403, "<scalar subquery>"),
-    ROW_SUBQUERY                (SubqueryExpression.class, 404, "<row subquery>"),
+    IN_SUBQUERY                 (SubqueryExpression.class, 400, "<in subquery>"),
+    EXISTS_SUBQUERY             (SubqueryExpression.class, 401, "<exists subquery>"),
+    SCALAR_SUBQUERY             (SubqueryExpression.class, 402, "<scalar subquery>"),
+    ROW_SUBQUERY                (SubqueryExpression.class, 403, "<row subquery>"),
 ;
 
     private final int m_value;

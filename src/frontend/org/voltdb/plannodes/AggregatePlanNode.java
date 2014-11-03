@@ -18,6 +18,7 @@
 package org.voltdb.plannodes;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 import org.json_voltpatches.JSONArray;
@@ -435,14 +436,6 @@ public class AggregatePlanNode extends AbstractPlanNode {
         m_postPredicate = AbstractExpression.fromJSONChild(jobj, Members.POST_PREDICATE.name());
     }
 
-    @Override
-    public int overrideId(int newId) {
-        m_id = newId++;
-        newId = overrideSubqueryIds(newId, m_prePredicate);
-        newId = overrideSubqueryIds(newId, m_postPredicate);
-        return newId;
-
-    }
     public static AggregatePlanNode getInlineAggregationNode(AbstractPlanNode node) {
         AggregatePlanNode aggNode =
                 (AggregatePlanNode) (node.getInlinePlanNode(PlanNodeType.AGGREGATE));
@@ -455,4 +448,20 @@ public class AggregatePlanNode extends AbstractPlanNode {
 
         return aggNode;
     }
+
+    @Override
+    public Collection<AbstractExpression> findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        Collection<AbstractExpression> collected = super.findAllExpressionsOfClass(aeClass);
+
+        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_prePredicate, aeClass));
+        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_postPredicate, aeClass));
+        for (AbstractExpression ae : m_aggregateExpressions) {
+            collected.addAll(ExpressionUtil.findAllExpressionsOfClass(ae, aeClass));
+        }
+        for (AbstractExpression ae : m_groupByExpressions) {
+            collected.addAll(ExpressionUtil.findAllExpressionsOfClass(ae, aeClass));
+        }
+        return collected;
+    }
+
 }

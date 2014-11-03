@@ -26,7 +26,6 @@ import java.util.Map;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
@@ -117,18 +116,6 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                                     " table: " + col.getTableName());
             }
         }
-    }
-
-    @Override
-    public int overrideId(int newId) {
-        m_id = newId++;
-        newId = overrideSubqueryIds(newId, m_predicate);
-        if (m_outputSchema != null) {
-            for (SchemaColumn col : m_outputSchema.getColumns()) {
-                newId = overrideSubqueryIds(newId, col.getExpression());
-            }
-        }
-        return newId;
     }
 
     /**
@@ -459,4 +446,12 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     protected String getTableNameForExplain() {
         return (m_targetTableAlias != null) ? m_targetTableAlias : m_targetTableName;
     }
+
+    @Override
+    public Collection<AbstractExpression> findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
+        Collection<AbstractExpression> collected = super.findAllExpressionsOfClass(aeClass);
+        collected.addAll(ExpressionUtil.findAllExpressionsOfClass(m_predicate, aeClass));
+        return collected;
+    }
+
 }

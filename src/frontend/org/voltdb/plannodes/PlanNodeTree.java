@@ -18,6 +18,7 @@
 package org.voltdb.plannodes;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -315,44 +316,16 @@ public class PlanNodeTree implements JSONString {
      *  - NestLoopInPlan
      *  - AbstractScanPlanNode predicate
      *  - AbstractJoinPlanNode predicates
+     *  - IndexScan search keys and predicates
+     *  - IndexJoin inline inner scan
      *  - Aggregate post-predicate(HAVING clause)
+     *  - Projection, output schema (scalar subquery)
      * @param node
      * @throws Exception
      */
     private void extractSubqueries(AbstractPlanNode node)  throws Exception {
-        if (node instanceof AbstractScanPlanNode) {
-            AbstractScanPlanNode scanNode = (AbstractScanPlanNode) node;
-            extractSubqueriesFromExpression(scanNode.getPredicate());
-        } else if (node instanceof AbstractJoinPlanNode) {
-            AbstractJoinPlanNode joinNode = (AbstractJoinPlanNode) node;
-            extractSubqueriesFromExpression(joinNode.getPreJoinPredicate());
-            extractSubqueriesFromExpression(joinNode.getJoinPredicate());
-            extractSubqueriesFromExpression(joinNode.getWherePredicate());
-        } else if (node instanceof AggregatePlanNode) {
-            AggregatePlanNode aggNode = (AggregatePlanNode) node;
-            extractSubqueriesFromExpression(aggNode.getPostPredicate());
-        }
-
-        // also check the inlined plan nodes
-        for (AbstractPlanNode inlineNode: node.getInlinePlanNodes().values()) {
-            extractSubqueries(inlineNode);
-        }
-
-        // and the output column expressions
-        NodeSchema schema = node.getOutputSchema();
-        if (schema != null) {
-            for (SchemaColumn col : schema.getColumns()) {
-                extractSubqueriesFromExpression(col.getExpression());
-            }
-        }
-    }
-
-    private void extractSubqueriesFromExpression(AbstractExpression expr)  throws Exception {
-        if (expr == null) {
-            return;
-        }
-        List<AbstractExpression> subexprs = expr.findAllSubexpressionsOfClass(
-                SubqueryExpression.class);
+        assert(node != null);
+        Collection<AbstractExpression> subexprs = node.findAllExpressionsOfClass(SubqueryExpression.class);
 
         for(AbstractExpression nextexpr : subexprs) {
             assert(nextexpr instanceof SubqueryExpression);

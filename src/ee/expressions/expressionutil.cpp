@@ -520,6 +520,7 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
     case (EXPRESSION_TYPE_IN_SUBQUERY):
     case (EXPRESSION_TYPE_EXISTS_SUBQUERY):
     case (EXPRESSION_TYPE_SCALAR_SUBQUERY):
+    case (EXPRESSION_TYPE_ROW_SUBQUERY):
         ret = subqueryFactory(et, obj, args);
         break;
 

@@ -248,6 +248,9 @@ public class HSQLInterface {
             return false;
         }
 
+        String opSubType = expr.attributes.get("opsubtype");
+        boolean anyQuantified = (opSubType != null && opSubType.equals("anyquantified"));
+
         // see if the children are "row" and "table" or "tablesubquery".
         int rowCount = 0;
         int tableCount = 0;
@@ -267,8 +270,12 @@ public class HSQLInterface {
                 valueCount++;
             }
         }
+        //  T.C     IN (SELECT ...) => row       equal                  tablesubquery
+        //  T.C     =  (SELECT ...) => columnref equal                  tablesubquery
+        //  C1,C2)  IN (SELECT ...) => row       equal/anyqunatified    tablesubquery
+        //  C1, C2) =  (SELECT ...) => row       equal                  tablesubquery
         if ((tableCount + rowCount > 0) && (tableCount + valueCount > 0) ||
-                (subqueryCount + rowCount) > 1) {
+                ((subqueryCount + rowCount) > 1 && anyQuantified)) {
             assert rowCount == 1;
             assert tableCount + subqueryCount + valueCount == 1;
             return true;
