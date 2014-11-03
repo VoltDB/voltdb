@@ -26,7 +26,9 @@ package schemachange;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.HashSet;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -66,9 +68,10 @@ public class SchemaChangeClient {
     private final boolean useCatalogUpdate = false;
     SchemaChanger schemaChanger = useCatalogUpdate ? new CatalogSchemaChanger() : new DDLSchemaChanger();
 
-    // Current active view and verification proc. Supports dropping before re-creating.
-    TableHelper.ViewRep viewRep = null;
-    Class<?> verifyProc = null;
+    // Current active tables, view and verification proc. Supports dropping before re-creating.
+    Set<String> activeTableNames = new HashSet<String>();
+    TableHelper.ViewRep activeViewRep = null;
+    Class<?> activeVerifyProc = null;
 
     private int schemaVersionNo = 0;
 
@@ -230,40 +233,57 @@ public class SchemaChangeClient {
             log.info("New View: NULL");
         }
 
-        schemaChanger.beginUpdate();
-
+        // Do the drops as a separate batch. It's a NOP for the catalog update method.
+        schemaChanger.beginBatch();
         try {
             schemaChanger.dropTables(_F("V%d", schemaVersionNo));
-            if (viewRep != null) {
-                schemaChanger.dropViews(viewRep.viewName);
-                viewRep = null;
+            if (activeViewRep != null) {
+                schemaChanger.dropViews(activeViewRep.viewName);
+                activeViewRep = null;
             }
-            viewRep = newViewRep;
-            if (verifyProc != null) {
-                schemaChanger.dropProcedures(verifyProc.getName());
-                verifyProc = null;
+            activeViewRep = newViewRep;
+            if (activeVerifyProc != null) {
+                schemaChanger.dropProcedures(activeVerifyProc.getName());
+                activeVerifyProc = null;
             }
+            if (newTable) {
+                if (activeTableNames.contains(newName)) {
+                    schemaChanger.dropTables(newName);
+                    activeTableNames.remove(newName);
+                }
+            }
+        }
+        catch (IOException e) {
+            return null;
+        }
+        if (!schemaChanger.executeBatch(this.client)) {
+            return null;
+        }
+
+        // Now do the creates and alters.
+        schemaChanger.beginBatch();
+        try {
             schemaChanger.createTable(versionT);
             // make tables name A partitioned and tables named B replicated
             boolean partitioned = newName.equalsIgnoreCase("A");
             if (newTable) {
                 schemaChanger.createTable(t2);
+                activeTableNames.add(newName);
             }
             else {
                 schemaChanger.updateTable(t1, t2);
             }
             if (partitioned) {
                 schemaChanger.addTablePartitionInfo(t2, newName);
-                verifyProc = VerifySchemaChangedA.class;
+                activeVerifyProc = VerifySchemaChangedA.class;
             }
             else {
-                verifyProc = VerifySchemaChangedB.class;
+                activeVerifyProc = VerifySchemaChangedB.class;
             }
-            schemaChanger.createProcedures(client, verifyProc);
-            if (viewRep != null) {
-                schemaChanger.createView(viewRep);
+            schemaChanger.createProcedures(client, activeVerifyProc);
+            if (activeViewRep != null) {
+                schemaChanger.createView(activeViewRep);
             }
-            schemaChanger.prepare();
         }
         catch (IOException e) {
             return null;
@@ -279,11 +299,9 @@ public class SchemaChangeClient {
             log.info(_F("Starting %s to change schema.", schemaChanger.getActionName()));
         }
 
-        if (!schemaChanger.perform(this.client)) {
+        if (!schemaChanger.executeBatch(this.client)) {
             return null;
         }
-
-        schemaChanger.endUpdate();
 
         // don't actually trust the call... manually verify
         int obsCatVersion = verifyAndGetSchemaVersion();
@@ -320,8 +338,7 @@ public class SchemaChangeClient {
 
     interface SchemaChanger {
         void addProcedureClasses(Client client, Class<?>... procedures) throws IOException;
-        void beginUpdate();
-        void endUpdate();
+        void beginBatch();
         void createTable(VoltTable table) throws IOException;
         void createView(ViewRep view) throws IOException;
         void createProcedures(Client client, Class<?>... procedures) throws IOException;
@@ -330,8 +347,7 @@ public class SchemaChangeClient {
         void dropProcedures(String... names) throws IOException;
         void updateTable(VoltTable t1, VoltTable t2) throws IOException;
         void addTablePartitionInfo(VoltTable table, String name) throws IOException;
-        void prepare() throws IOException;
-        boolean perform(Client client) throws IOException;
+        boolean executeBatch(Client client) throws IOException;
         String getActionName();
     }
 
@@ -342,6 +358,7 @@ public class SchemaChangeClient {
 
         CatalogBuilder builder = null;
         byte[] catalogData = null;
+        boolean isNOP = true;   // Set to false with the first real action of a batch
 
         CatalogSchemaChanger() {
         }
@@ -351,27 +368,26 @@ public class SchemaChangeClient {
         }
 
         @Override
-        public void beginUpdate() {
+        public void beginBatch() {
+            this.isNOP = true;
             this.builder = new CatalogBuilder();
         }
 
         @Override
-        public void endUpdate() {
-            this.builder = null;
-        }
-
-        @Override
         public void createTable(VoltTable table) throws IOException {
+            this.isNOP = false;
             this.builder.addLiteralSchema(TableHelper.ddlForTable(table));
         }
 
         @Override
         public void createView(ViewRep view) throws IOException {
+            this.isNOP = false;
             this.builder.addLiteralSchema(view.ddlForView());
         }
 
         @Override
         public void createProcedures(Client client, Class<?>... procedures) throws IOException {
+            this.isNOP = false;
             this.builder.addProcedures(procedures);
         }
 
@@ -389,6 +405,7 @@ public class SchemaChangeClient {
 
         @Override
         public void updateTable(VoltTable t1, VoltTable t2) throws IOException {
+            this.isNOP = false;
             this.createTable(t2);
         }
 
@@ -399,14 +416,20 @@ public class SchemaChangeClient {
         }
 
         @Override
-        public void prepare() throws IOException {
-            this.catalogData = this.builder.compileToBytes();
-        }
-
-        @Override
-        public boolean perform(Client client) throws IOException {
-            assert(this.catalogData != null);
-            return execUpdate(client, "@UpdateApplicationCatalog", catalogData, false);
+        public boolean executeBatch(Client client) throws IOException {
+            boolean success = true;
+            try {
+                if (!this.isNOP) {
+                    this.catalogData = this.builder.compileToBytes();
+                    assert(this.catalogData != null);
+                    success = execUpdate(client, "@UpdateApplicationCatalog", catalogData, false);
+                }
+            }
+            finally {
+                this.builder = null;
+                this.isNOP = true;  // belt and suspenders
+            }
+            return success;
         }
 
         @Override
@@ -435,13 +458,8 @@ public class SchemaChangeClient {
         }
 
         @Override
-        public void beginUpdate() {
+        public void beginBatch() {
             this.ddl = new StringBuilder();
-        }
-
-        @Override
-        public void endUpdate() {
-            this.ddl = null;
         }
 
        @Override
@@ -493,21 +511,25 @@ public class SchemaChangeClient {
         }
 
         @Override
-        public void prepare() throws IOException {
-            // No final preparation needed. The DDL string is ready to use.
-        }
-
-        @Override
-        public boolean perform(Client client) throws IOException {
+        public boolean executeBatch(Client client) throws IOException {
             String ddlString = this.ddl.toString();
-            log.info(_F("DDL:\n%s", ddlString));
+            boolean success = true;
             try {
-                ClientResponse cr = client.callProcedure("@AdHoc", ddlString);
-                return (cr.getStatus() == ClientResponse.SUCCESS);
+                if (ddl.length() > 0) {
+                    log.info(_F("DDL:\n%s", ddlString));
+                    try {
+                        ClientResponse cr = client.callProcedure("@AdHoc", ddlString);
+                        success = (cr.getStatus() == ClientResponse.SUCCESS);
+                    }
+                    catch (ProcCallException e) {
+                        throw new IOException(e);
+                    }
+                }
             }
-            catch (ProcCallException e) {
-                throw new IOException(e);
+            finally {
+                this.ddl = null;
             }
+            return success;
         }
 
         @Override
