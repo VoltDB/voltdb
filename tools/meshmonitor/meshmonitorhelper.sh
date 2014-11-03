@@ -11,12 +11,12 @@ HOSTSLIST=
 
 # display syntax and exit
 syntax() {
+	echo "Usage: $0 NODESFILE <HICCUPSIZE> <LOGINTERVAL> <NETWORKPORT>"
+	echo "   NODESFILE - required parameter         - file with list of nodes on each line"
+	echo "   <HICCUPSIZE>  - optional               - mininum latency in milliseconds to report, default value = 20"
+	echo "   <LOGINTERVAL> - optional               - interval of logging in seconds, default value = 10"
+	echo "   <NETWORKPORT> - optional               - network port used, default value = 12222"
 	echo "Please see README for more details."
-	echo "Usage: $0 <LISTOFNODES> <HICCUPSIZE> <LOGINTERVAL> <NETWORKPORT>"
-	echo "   <LISTOFNODES> - required parameter 	- file with list of nodes on each line"
-	echo "   <HICCUPSIZE>  - optional		- mininum latency in milliseconds to report, default value = 20"
-	echo "   <LOGINTERVAL> - optional 		- interval of logging in seconds, default value = 10"
-	echo "   <NETWORKPORT> - optional		- network port used, default value = 12222"
 	exit 0
 
 }
@@ -44,7 +44,7 @@ LISTOFHOSTS=$1
 if [ -f $LISTOFHOSTS ];	then
 	echo "Using list of hosts file: $LISTOFHOSTS"
 else
-	exitprogram "file '$LISTOFHOSTS' does not exist"
+	exitprogram "ERROR: file '$LISTOFHOSTS' does not exist"
 fi
 
 
@@ -99,10 +99,11 @@ fi
 
 # print commands to execute
 echo
-echo "Generate the commands needed to run on all other nodes"
+echo "Generating the commands needed to run on all other nodes:"
+echo
 for f in $(cat $LISTOFHOSTS); do
 	export HOSTSLIST="$f:$NETWORKPORT $HOSTSLIST"
-	echo "On $f's meshmonitor directory, run the following command:"
+	echo "#$f: In <VOLTDB_HOME>/tools/meshmonitor directory, run the following command:"
 	echo "nohup java -jar meshmonitor.jar $MINHICCUPSIZE $LOGINTERVAL $HOSTSLIST> $f-mesh.log &"
 	echo
 done
