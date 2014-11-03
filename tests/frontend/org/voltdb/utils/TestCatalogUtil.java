@@ -214,6 +214,17 @@ public class TestCatalogUtil extends TestCase {
             "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
             "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
             "   <security enabled=\"true\"/>" +
+            "   <users>" +
+            "      <user name=\"joe\" password=\"aaa\"/>" +
+            "   </users>" +
+            "</deployment>";
+
+        final String secOnNoUsrs =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+            "<deployment>" +
+            "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
+            "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
+            "   <security enabled=\"true\"/>" +
             "</deployment>";
 
         final File tmpSecOff = VoltProjectBuilder.writeStringToTempFile(secOff);
@@ -226,6 +237,11 @@ public class TestCatalogUtil extends TestCase {
         CatalogUtil.compileDeployment(catalog, tmpSecOn.getPath(), true, false);
         cluster =  catalog.getClusters().get("cluster");
         assertTrue(cluster.getSecurityenabled());
+
+        setUp();
+        final File tmpSecOnNoUsrs = VoltProjectBuilder.writeStringToTempFile(secOnNoUsrs);
+        long crcDep = CatalogUtil.compileDeployment(catalog, tmpSecOnNoUsrs.getPath(), true, false);
+        assertEquals(-1, crcDep);
     }
 
     public void testSecurityProvider() throws Exception
@@ -236,6 +252,9 @@ public class TestCatalogUtil extends TestCase {
             "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
             "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
             "   <security enabled=\"true\"/>" +
+            "   <users>" +
+            "      <user name=\"joe\" password=\"aaa\"/>" +
+            "   </users>" +
             "</deployment>";
 
         final String secOn =
@@ -244,6 +263,9 @@ public class TestCatalogUtil extends TestCase {
             "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
             "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
             "   <security enabled=\"true\" provider=\"kerberos\"/>" +
+            "   <users>" +
+            "      <user name=\"joe\" password=\"aaa\"/>" +
+            "   </users>" +
             "</deployment>";
 
         final File tmpSecOff = VoltProjectBuilder.writeStringToTempFile(secOff);
