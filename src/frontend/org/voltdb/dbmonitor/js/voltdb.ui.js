@@ -796,29 +796,6 @@ var loadPage = function (serverName, portid) {
     $("#graphView").val($.cookie("graph-view"));
     MonitorGraphUI.AddGraph($.cookie("graph-view"), $('#chartServerCPU'), $('#chartServerRAM'), $('#chartClusterLatency'), $('#chartClusterTransactions'));
 
-    var graphInterval = null;
-    var refreshTime = 5000; //In milli seconds (i.e, 5 sec)
-    var refreshGraphAndDataInLoop = function (seconds, graphView) {
-        if (graphInterval != null)
-            window.clearInterval(graphInterval);
-
-        refreshGraphAndData(graphView, VoltDbUI.CurrentTab);
-        graphInterval = window.setInterval(function () { refreshGraphAndData(graphView, VoltDbUI.CurrentTab); }, seconds);
-    };
-
-    var getRefreshTime = function () {
-        var graphViewValue = $.cookie("graph-view").toLowerCase();
-
-        if (graphViewValue == "seconds")
-            refreshTime = 5000;
-        else if (graphViewValue == "minutes")
-            refreshTime = 60000;
-        else if (graphViewValue == "days")
-            refreshTime = 86400000;
-
-        return refreshTime;
-    };
-
     $('#PROCEDURE,#INVOCATIONS,#MIN_LATENCY,#MAX_LATENCY,#AVG_LATENCY,#AVG_LATENCY,#PERC_EXECUTION').unbind('click');
     $('#PROCEDURE,#INVOCATIONS,#MIN_LATENCY,#MAX_LATENCY,#AVG_LATENCY,#PERC_EXECUTION').on('click', function () {
 
