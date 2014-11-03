@@ -3,7 +3,7 @@
 
     var procedures = {};
     var tips = $(".validateTips");
-    var server = "184.73.30.156";
+    var server = VoltDBConfig.GetDefaultServerIP();
     var port = "8080";
     var user = "";
     var password = "";

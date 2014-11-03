@@ -393,6 +393,21 @@
             changeAxisTimeFormat(view);
         };
 
+        this.UpdateCharts = function() {
+
+            if (ramChart.is(":visible"))
+                MonitorGraphUI.ChartRam.update();
+
+            if (cpuChart.is(":visible"))
+                MonitorGraphUI.ChartCpu.update();
+
+            if (latencyChart.is(":visible"))
+                MonitorGraphUI.ChartLatency.update();
+
+            if (transactionChart.is(":visible"))
+                MonitorGraphUI.ChartTransactions.update();
+        };
+
         var changeAxisTimeFormat = function (view) {
             var dateFormat = '%X';
             if (view == 'Days')

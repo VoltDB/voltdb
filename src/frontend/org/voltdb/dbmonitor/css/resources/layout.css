@@ -14,12 +14,7 @@ a:focus, input:focus{ outline:none;}
 a, a:hover { text-decoration:none; }
 .clear { clear:both;}
 .headText {text-indent:30px; position:relative; top:2px}
-@font-face {
-	font-family: 'MYRIADPROREGULAR';
-	src: url('fonts/MYRIADPROREGULAR.eot');
-	src: local('MYRIADPROREGULAR'), url('fonts/MYRIADPROREGULAR.woff') format('woff'), url('fonts/MYRIADPROREGULAR.ttf') format('truetype');
-}
-h1 {font:16px 'MYRIADPROREGULAR'}
+h1 {font:16px Arial, Helvetica, sans-serif;}
 
 .btn { background-color:#aa1f2f; cursor:pointer; padding:8px 10px; text-align:center; color:#FFFFFF; font:14px Arial, Helvetica, sans-serif; text-shadow:none; text-decoration:none; border-radius:0; border:none;} 
 .btn:hover{background-color:#76bd1d; color:#fff;}
@@ -230,13 +225,13 @@ font-size: 14px;
 		  
 .clusterDetailsContLeft h1{float:left;}
 .clusterStat { float:left; line-height:28px; margin-left:15px; background-position:left -456px; padding-left:8px;}	  
-.clusterStat li{float:left; margin-left:10px;padding-left:27px; color:#3e3a3a;font-family:'MYRIADPROREGULAR'; font-size:15px;}
+.clusterStat li{float:left; margin-left:10px;padding-left:27px; color:#3e3a3a;font-family: Arial, Helvetica, sans-serif; font-size:15px;}
 .clusterStat li span{color:#111;}
 .clusterStat li.alertIcon a{color:#ea151d;}
 .clusterStat li.alertIcon a:hover{color:#111;}
 
 .serverStat{ float:left; height:28px; line-height:30px;}
-.serverStat li{float:left; height:100%; margin-left:10px;font-family:'MYRIADPROREGULAR'; font-size:15px;}
+.serverStat li{float:left; height:100%; margin-left:10px;font-family: Arial, Helvetica, sans-serif; font-size:15px;}
 .serverStat li.activeServerName{ background-position:left -456px; padding-left:15px; color:#76bd1d;}
 li#activeServerName{max-width:150px;white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
 
@@ -440,7 +435,7 @@ ul.servers-list li a.alertIcon{display:inline-block; padding-left:20px;}
 #rendersCatalogUrl .container{ margin:0; width:100%;}
 .catalogMenu { background:#FFFFFF; margin:0 0 20px 0;}
 ul.catalogNav { margin:0; padding:0; background:#FFFFFF; margin-bottom:20px;}
-ul.catalogNav li { float:left; margin:0; padding:0; line-height:50px; font-family:'MYRIADPROREGULAR'; font-size:16px; border-right:1px solid #CCCCCC;}
+ul.catalogNav li { float:left; margin:0; padding:0; line-height:50px; font-family: Arial, Helvetica, sans-serif; font-size:16px; border-right:1px solid #CCCCCC;}
 ul.catalogNav li a { margin:0; padding:0 10px; color:#32323a; display:block; text-decoration:none;}
 ul.catalogNav li a:hover { background:#AA1F2F; display:block; color:#FFFFFF; }
 ul.catalogNav li.active a, ul.catalogNav li.active a:hover{background:#76bd1d; display:block; color:#FFFFFF!important;}
@@ -449,7 +444,7 @@ ul.catalogNav li.active a, ul.catalogNav li.active a:hover{background:#76bd1d; d
 .dataBlock { margin:0 0 20px 0; padding:0; background:#fff; }
 .dataBlock h1{font-weight:bold;}
 /*.dataBlock table td:nth-child(1) { width: 30%; }*/
-#rendersCatalogUrl h3, #rendersCatalogUrl h4 {font:14px 'MYRIADPROREGULAR'; font-weight:bold;}
+#rendersCatalogUrl h3, #rendersCatalogUrl h4 {font:14px Arial, Helvetica, sans-serif; font-weight:bold;}
 #catalogContainer h3 { font-weight: bold; font-size:14px;}
 #rendersCatalogUrl h4{ background:#fbfbfb; padding:20px;}
 #catalogContainer .container {
@@ -560,7 +555,7 @@ table.storeTbl .sorttable_sorted {
 
 /* Overlay Popup */
 .popup_back {height: 100%;left: 0;position: fixed;top: 0;width: 100%;z-index: 1000;}
-.popup_cont {position: fixed;z-index: 1002;}
+.popup_cont {position: fixed;z-index: 1002; margin:0 10px}
 .preloader {z-index: 101;}
 .popup_close {color: #888;cursor: pointer;position: absolute;padding: 5px;right: 0;top: 0; background-position:3px -796px; height:15px; line-height:15px; width:15px; text-indent:-999em;}
 .popup_close:hover {background-position:3px -834px;}
@@ -718,20 +713,20 @@ right: -31px!important;
    font-family: sans-serif;
    font-size: 95%;
 }
-h2.help {font: bold 15px 'MYRIADPROREGULAR';
+h2.help {font: bold 15px Arial, Helvetica, sans-serif;
 	padding-bottom: 10px;
 	border-bottom: 1px dashed #ddd;
 	}
-.VDBMonitorHelp p { line-height:20px;font:15px 'MYRIADPROREGULAR';}
+.VDBMonitorHelp p { line-height:20px;font:15px  Arial, Helvetica, sans-serif;}
 .helpStyleTitle { font-weight:bold;}
 ul.helpList {}
-ul.helpList li { list-style:disc; line-height:20px!important; padding:0; margin:0 0 0 20px; font:15px 'MYRIADPROREGULAR'}
-.VDBSchemaHel {height:500px; overflow:auto;}
-.VDBSchemaHelp p { line-height:20px;font:15px 'MYRIADPROREGULAR';}
+ul.helpList li { list-style:disc; line-height:20px!important; padding:0; margin:0 0 0 20px; font:15px  Arial, Helvetica, sans-serif}
+.VDBSchemaHelp {}
+.VDBSchemaHelp p { line-height:20px;font:15px  Arial, Helvetica, sans-serif;}
 ul.helpSchemaList {}
-ul.helpSchemaList li { list-style:disc; line-height:25px!important; padding:0; margin:0 0 0 20px; font:15px 'MYRIADPROREGULAR'} 
+ul.helpSchemaList li { list-style:disc; line-height:25px!important; padding:0; margin:0 0 0 20px; font:15px  Arial, Helvetica, sans-serif} 
 .VDBQueryHelp {}
-.VDBQueryHelp p { line-height:20px;font:15px 'MYRIADPROREGULAR';}
+.VDBQueryHelp p { line-height:20px;font:15px  Arial, Helvetica, sans-serif;}
 
 
 /*********************************************media Qu********************/
@@ -784,14 +779,14 @@ ul.topRightList li.responsiveMenuPlaceHolder{display:block;}
   #nav ul li a:hover {background:#AA1F2F}
   
   .clusterStat { background-image:none!important; float:left; width:100%; line-height:28px; margin-left:15px; background-position:left 87px; padding-left:8px;}	
-  .clusterStat li{ color:#3e3a3a;font-family:'MYRIADPROREGULAR'; font-size:15px;}
+  .clusterStat li{ color:#3e3a3a;font-family: Arial, Helvetica, sans-serif; font-size:15px;}
   
   .tabs-filter-wrapper .filter { float:right; width:auto;} 
   .tabs-filter-wrapper .pagination {clear:left; float:left; margin-top:15px;}
   
   
 ul.catalogNav { margin:0 0 20px 0; }  
-ul.catalogNav li { float:none; background:#FFFFFF; margin:0; padding:0; line-height:50px;  font-family:'MYRIADPROREGULAR'; font-size:16px; border-bottom:1px solid #CCCCCC;}
+ul.catalogNav li { float:none; background:#FFFFFF; margin:0; padding:0; line-height:50px;  font-family: Arial, Helvetica, sans-serif; font-size:16px; border-bottom:1px solid #CCCCCC;}
 ul.catalogNav li a { margin:0; padding:0 10px; color:#32323a; display:block; text-decoration: none;}
 ul.catalogNav li a:hover { background:#AA1F2F; display:block; color:#FFFFFF; }
 ul.catalogNav li.active a, ul.catalogNav li.active a:hover{background:#76bd1d; display:block; color:#FFFFFF!important;}
@@ -829,7 +824,9 @@ h3.systemHeader{}
  .popup_cont {margin: 0 0 0 9px; width: 305px;}
  #loginBox { width:305px;}
  #loginBox input[type=text], #loginBox input[type=password]{ width:160px;}
-	
+ .VDBMonitorHelp { height:250px; overflow:auto; }
+ .VDBSchemaHelp { height:250px; overflow:auto;}
+ .VDBQueryHelp { height:250px; overflow:auto;}	
 	 }
 
 @media (width: 320px) {
@@ -844,5 +841,18 @@ h3.systemHeader{}
 	 
 	 @media screen and (orientation:landscape) {
 		 
-		.overlay-content {height: 150px;}
+		.overlay-content {height: 150px;}t
+		
 		 }
+
+
+@media only screen 
+and (min-device-width : 320px) 
+and (max-device-width : 479px) 
+and (orientation : landscape) {
+	
+	.VDBMonitorHelp { height:150px; overflow:auto; }
+		.VDBSchemaHelp { height:150px; overflow:auto;}
+		.VDBQueryHelp { height:150px; overflow:auto;}	
+
+}
