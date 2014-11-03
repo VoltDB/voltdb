@@ -3186,7 +3186,7 @@ public class TestVoltCompiler extends TestCase {
         // Check default roles: ADMINISTRATOR, USER
         goodRoleDDL("",
                     new TestRole("ADMINISTRATOR", true, true, true, true, true, true),
-                    new TestRole("USER", true, false, false, false, false, true));
+                    new TestRole("USER", true, true, false, true, true, true));
     }
 
     public void testBadRoleDDL() throws Exception {
