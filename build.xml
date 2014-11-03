@@ -981,7 +981,7 @@ JAVA COMPILATION
         </fileset>
     </copy>
     
-<copy todir='${build.prod.dir}/org/voltdb/dbmonitor'>
+    <copy todir='${build.prod.dir}/org/voltdb/dbmonitor'>
         <fileset dir="${src.gpl.dir}/org/voltdb/dbmonitor">
             <include name="**"/>
         </fileset>
