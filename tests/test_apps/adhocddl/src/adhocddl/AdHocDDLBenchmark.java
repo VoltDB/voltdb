@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-
+package adhocddl;
 
 import java.io.FileWriter;
 import java.io.IOException;
@@ -189,7 +189,7 @@ public class AdHocDDLBenchmark {
      * @param sqlstmt
      * @return exec time
      */
-    public long runTest(String sqlstmt) {
+    public long runTest(String sqlstmt) throws Exception {
         // synchronously call the "AdHoc" procedure
         try
         {
@@ -211,15 +211,15 @@ public class AdHocDDLBenchmark {
         catch (Exception e)
         {
             e.printStackTrace();
+            throw e;
         }
-        return 0;
     }
 
     /**
      * Run the config.numOfTests times CREATE and Drop
      * @return avg exec time for CREATE and DROP in total
      */
-    public float averageLatencyTest()
+    public float averageLatencyTest() throws Exception
     {
         String createStmt = DDLGen.CreateTable(0, config.table);
         String dropStmt = DDLGen.DropTable(0, config.table);
@@ -249,7 +249,7 @@ public class AdHocDDLBenchmark {
      * @param startNo
      * @param endNo
      */
-    public void updateServer(int startNo, int endNo)
+    public void updateServer(int startNo, int endNo) throws Exception
     {
         StringBuffer sqlstmt = new StringBuffer();
         for(int i = startNo; i < endNo; i++)
@@ -269,7 +269,7 @@ public class AdHocDDLBenchmark {
      * @param startNo
      * @param endNo
      */
-    public void clearServer(int startNo, int endNo)
+    public void clearServer(int startNo, int endNo) throws Exception
     {
         StringBuffer sqlstmt = new StringBuffer();
         for(int i = startNo; i < endNo; i++)
@@ -290,7 +290,7 @@ public class AdHocDDLBenchmark {
      * @param label
      * @throws IOException
      */
-    public void bunchTest(int col, FileWriter fw, String label) throws IOException
+    public void bunchTest(int col, FileWriter fw, String label) throws Exception
     {
         fullStatsContext.fetchAndResetBaseline();
         DDLGen = new DDLGenerator(col, config.idxPercent);

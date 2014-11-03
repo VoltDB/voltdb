@@ -62,7 +62,6 @@ import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import java.util.EnumSet;
-import org.voltdb.catalog.Group;
 import org.voltdb.common.Permission;
 
 
@@ -183,7 +182,7 @@ public class AuthSystem {
      * clear text password.
      *
      */
-    class AuthUser {
+    public static class AuthUser {
         /**
          * SHA-1 double hashed copy of the users clear text password
          */
@@ -244,7 +243,7 @@ public class AuthSystem {
             if (proc == null) {
                 return false;
             }
-            return hasPermission(Permission.ADMIN) || m_authorizedProcedures.contains(proc);
+            return hasPermission(Permission.ADMIN, Permission.ALLPROC) || m_authorizedProcedures.contains(proc);
         }
 
         /**
@@ -515,7 +514,11 @@ public class AuthSystem {
         }
     }
 
-    private final AuthUser m_authDisabledUser = new AuthUser(null, null, null) {
+    public static class AuthDisabledUser extends AuthUser {
+        public AuthDisabledUser() {
+            super(null, null, null);
+        }
+
         @Override
         public boolean hasUserDefinedProcedurePermission(Procedure proc) {
             return true;
@@ -530,7 +533,9 @@ public class AuthSystem {
         public boolean authorizeConnector(String connectorName) {
             return true;
         }
-    };
+    }
+
+    private final AuthUser m_authDisabledUser = new AuthDisabledUser();
 
     AuthUser getUser(String name) {
         if (!m_enabled) {
