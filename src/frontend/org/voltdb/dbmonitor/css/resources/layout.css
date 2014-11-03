@@ -847,4 +847,7 @@ h3.systemHeader{}
 	 @media screen and (orientation:landscape) {
 		 
 		.overlay-content {height: 150px;}
+		.VDBMonitorHelp { height:250px; overflow:auto; }
+		.VDBSchemaHelp { height:250px; overflow:auto;}
+		.VDBQueryHelp { height:250px; overflow:auto;}	
 		 }
