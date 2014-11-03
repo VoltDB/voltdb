@@ -10,7 +10,6 @@ $(document).ready(function () {
         var savedData = getParameterByName("data");
 
         if (savedData != undefined && savedData != "") {
-            f
             var json = jQuery.parseJSON(decodeURIComponent(savedData));
 
             if (json["DisplayPreferences"] != undefined && json["DisplayPreferences"] != "")
@@ -90,22 +89,22 @@ $(document).ready(function () {
 
             //Refresh the charts if the current tab is "DB Monitor"
             if (VoltDbUI.CurrentTab == NavigationTabs.DBMonitor) {
-                
+
                 $("#VDBMonHelp").show();
                 $("#VDBSchHelp").hide();
                 $("#VDBQHelp").hide();
-                
+
                 MonitorGraphUI.ChartRam.update();
                 MonitorGraphUI.ChartCpu.update();
                 MonitorGraphUI.ChartLatency.update();
                 MonitorGraphUI.ChartTransactions.update();
             }
             else if (VoltDbUI.CurrentTab == NavigationTabs.Schema) {
-                
+
                 $("#VDBMonHelp").hide();
                 $("#VDBSchHelp").show();
                 $("#VDBQHelp").hide();
-                
+
                 setTimeout(function () {
                     window.scrollTo(0, 0);
                 }, 10);
@@ -313,7 +312,6 @@ var loadPage = function (serverName, portid) {
                         priorProcedureAction = currentProcedureAction;
                     }
 
-
                     currentProcedureAction = VoltDbUI.ACTION_STATES.REFRESH;
                     VoltDbUI.CurrentProcedureDataProgress = VoltDbUI.DASHBOARD_PROGRESS_STATES.REFRESH_PROCEDUREDATA_NONE;
 
@@ -324,18 +322,14 @@ var loadPage = function (serverName, portid) {
                 lblTotalPages.innerHTML = " ".concat(0);
                 $('#storeProcedureBody').html("<tr><td colspan=6> No Data to be displayed</td></tr>");
 
-
                 if (currentProcedureAction == VoltDbUI.ACTION_STATES.SEARCH) {
                     priorProcedureAction = currentProcedureAction;
                 }
-
 
                 currentProcedureAction = VoltDbUI.ACTION_STATES.REFRESH;
                 VoltDbUI.CurrentProcedureDataProgress = VoltDbUI.DASHBOARD_PROGRESS_STATES.REFRESH_PROCEDUREDATA_NONE;
 
             }
-
-
 
             if (tableMetadata != "" && tableMetadata != undefined) {
                 voltDbRenderer.mapTableInformation(currentTableAction, priorTableAction, voltDbRenderer.isTableSearch, function (htmlData) {
@@ -345,7 +339,6 @@ var loadPage = function (serverName, portid) {
                             lblTotalPagesofTables.innerHTML = voltDbRenderer.tableDataSize < voltDbRenderer.maxVisibleRows ? " ".concat(1) : " ".concat(Math.ceil(voltDbRenderer.tableDataSize / voltDbRenderer.maxVisibleRows));
                         }
 
-                      
                         if (htmlData != "") {
                             if (currentTableAction == VoltDbUI.ACTION_STATES.NONE && currentTableAction == VoltDbUI.ACTION_STATES.NONE) //only during initial load
                             {
@@ -376,8 +369,6 @@ var loadPage = function (serverName, portid) {
             }
 
         });
-
-
 
         $("#previousProcedures").unbind("click");
         $('#previousProcedures').on('click', function () {
@@ -479,6 +470,9 @@ var loadPage = function (serverName, portid) {
                     currentProcedureAction = VoltDbUI.ACTION_STATES.SEARCH;
 
                     if (searchResult) {
+                        if (voltDbRenderer.isSortProcedures)
+                            voltDbRenderer.sortProceduresByColumnsSync(true);
+
                         voltDbRenderer.mapProcedureInformation(currentProcedureAction, priorProcedureAction, voltDbRenderer.isProcedureSearch, function (traverse, htmlSearchData) {
                             if (htmlSearchData != "")
                                 $('#storeProcedureBody').html(htmlSearchData);
@@ -890,7 +884,7 @@ var loadPage = function (serverName, portid) {
                     priorProcedureAction = currentProcedureAction;
                     currentProcedureAction = VoltDbUI.ACTION_STATES.SEARCH;
                     voltDbRenderer.formatSearchDataToJsonArray();
-                    voltDbRenderer.sortProceduresByColumnsAsync();
+                    voltDbRenderer.sortProceduresByColumnsSync(false);
                     voltDbRenderer.mapProcedureInformationAsync(currentProcedureAction, priorProcedureAction);
 
                     //set pagination
@@ -901,7 +895,7 @@ var loadPage = function (serverName, portid) {
                 });
             } else {
                 VoltDbUI.sortStatus = VoltDbUI.SORT_STATES.SORTING;
-                voltDbRenderer.sortProceduresByColumnsAsync();
+                voltDbRenderer.sortProceduresByColumnsSync(false);
                 voltDbRenderer.mapProcedureInformationAsync(currentProcedureAction, priorProcedureAction);
                 setPaginationIndicesOfProcedures(voltDbRenderer.isProcedureSearch);
                 VoltDbUI.sortStatus = VoltDbUI.SORT_STATES.SORTED;
@@ -920,15 +914,15 @@ var loadPage = function (serverName, portid) {
         if (VoltDbUI.tableSortStatus == VoltDbUI.SORT_STATES.NONE || VoltDbUI.tableSortStatus == VoltDbUI.SORT_STATES.SORTED) {
             if ($(this).data('name') == "none") {
                 $(this).data('name', 'ascending');
-                voltDbRenderer.sortOrder = "ascending";
+                voltDbRenderer.sortTableOrder = "ascending";
 
             }
             else if ($(this).data('name') == "ascending") {
-                voltDbRenderer.sortOrder = "descending";
+                voltDbRenderer.sortTableOrder = "descending";
                 $(this).data('name', 'descending');
 
             } else if ($(this).data('name') == "descending") {
-                voltDbRenderer.sortOrder = "ascending";
+                voltDbRenderer.sortTableOrder = "ascending";
                 $(this).data('name', 'ascending');
 
             }
@@ -989,7 +983,7 @@ var loadPage = function (serverName, portid) {
 
                 //});
 
-            } else {                
+            } else {
                 VoltDbUI.tableSortStatus = VoltDbUI.SORT_STATES.SORTING;
                 voltDbRenderer.sortTablesByColumns();
                 voltDbRenderer.mapTableInformation(currentTableAction, priorTableAction, voltDbRenderer.isTableSearch, null);
