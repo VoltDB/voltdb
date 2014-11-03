@@ -560,7 +560,7 @@ table.storeTbl .sorttable_sorted {
 
 /* Overlay Popup */
 .popup_back {height: 100%;left: 0;position: fixed;top: 0;width: 100%;z-index: 1000;}
-.popup_cont {position: fixed;z-index: 1002;}
+.popup_cont {position: fixed;z-index: 1002; margin:0 10px}
 .preloader {z-index: 101;}
 .popup_close {color: #888;cursor: pointer;position: absolute;padding: 5px;right: 0;top: 0; background-position:3px -796px; height:15px; line-height:15px; width:15px; text-indent:-999em;}
 .popup_close:hover {background-position:3px -834px;}
@@ -726,7 +726,7 @@ h2.help {font: bold 15px 'MYRIADPROREGULAR';
 .helpStyleTitle { font-weight:bold;}
 ul.helpList {}
 ul.helpList li { list-style:disc; line-height:20px!important; padding:0; margin:0 0 0 20px; font:15px 'MYRIADPROREGULAR'}
-.VDBSchemaHel {height:500px; overflow:auto;}
+.VDBSchemaHelp {}
 .VDBSchemaHelp p { line-height:20px;font:15px 'MYRIADPROREGULAR';}
 ul.helpSchemaList {}
 ul.helpSchemaList li { list-style:disc; line-height:25px!important; padding:0; margin:0 0 0 20px; font:15px 'MYRIADPROREGULAR'} 
@@ -829,7 +829,9 @@ h3.systemHeader{}
  .popup_cont {margin: 0 0 0 9px; width: 305px;}
  #loginBox { width:305px;}
  #loginBox input[type=text], #loginBox input[type=password]{ width:160px;}
-	
+ .VDBMonitorHelp { height:250px; overflow:auto; }
+ .VDBSchemaHelp { height:250px; overflow:auto;}
+ .VDBQueryHelp { height:250px; overflow:auto;}	
 	 }
 
 @media (width: 320px) {

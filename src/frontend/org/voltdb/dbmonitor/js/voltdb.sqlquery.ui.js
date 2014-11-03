@@ -121,7 +121,7 @@
 function loadSQLQueryPage(serverName, portid, userName, password, admin) {
     
     function saveConnectionKey() {
-        var server = serverName == null ? '184_73_30_156' : $.trim(serverName);
+        var server = serverName == null ? VoltDBConfig.GetDefaultServerNameForKey() : $.trim(serverName);
         var port = portid == null ? '8080' : $.trim(portid);
         var user = userName == '' ? null : userName;
         var processName = 'TABLE_INFORMATION';
