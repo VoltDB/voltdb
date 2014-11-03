@@ -120,7 +120,7 @@ $(document).ready(function () {
     $("body").append(voltDbRenderer.GetLoginPopup());
 
     var serverName = window.location.hostname == "localhost" ? null : window.location.hostname;
-    var portid = window.location.hostname == "localhost" ? null : window.location.port;
+    var portid = VoltDBConfig.GetPortId();
 
     //If security is enabled, then it displays login popup. After user is verified, it calls loadPage().
     //If security is not enabled, then it simply calls loadPage().
