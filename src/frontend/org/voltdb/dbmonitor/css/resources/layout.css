@@ -856,8 +856,8 @@ and (min-device-width : 320px)
 and (max-device-width : 479px) 
 and (orientation : landscape) {
 	
-	.VDBMonitorHelp { height:200px; overflow:auto; }
-		.VDBSchemaHelp { height:200px; overflow:auto;}
-		.VDBQueryHelp { height:200px; overflow:auto;}	
+	.VDBMonitorHelp { height:150px; overflow:auto; }
+		.VDBSchemaHelp { height:150px; overflow:auto;}
+		.VDBQueryHelp { height:150px; overflow:auto;}	
 
 }
