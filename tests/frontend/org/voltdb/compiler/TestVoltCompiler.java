@@ -3183,10 +3183,6 @@ public class TestVoltCompiler extends TestCase {
         goodRoleDDL("create role r1 with AdHoc,Admin,DefaultProc,DefaultProcRead;", new TestRole("r1", true, true, true, true, true, true));
         goodRoleDDL("create role r1 with allproc;", new TestRole("r1", false, false, false, false, false, true));
 
-        // Check default roles: ADMINISTRATOR, USER
-        goodRoleDDL("",
-                    new TestRole("ADMINISTRATOR", true, true, true, true, true, true),
-                    new TestRole("USER", true, false, false, false, false, true));
     }
 
     public void testBadRoleDDL() throws Exception {
