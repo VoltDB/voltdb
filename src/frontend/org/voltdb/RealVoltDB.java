@@ -1806,24 +1806,23 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         if (m_deployment == null) {
             return;
         }
-
         SystemSettingsType sysType = m_deployment.getSystemsettings();
 
         if (sysType == null) {
             return;
         }
         if (sysType.getElastic() != null) {
-            hostLog.info("Host elastic duration set to " + sysType.getElastic().getDuration() + " milliseconds");
-            hostLog.info("Host elastic throughput set to " + sysType.getElastic().getThroughput() + " mb/s");
+            hostLog.info("Elastic duration set to " + sysType.getElastic().getDuration() + " milliseconds");
+            hostLog.info("Elastic throughput set to " + sysType.getElastic().getThroughput() + " mb/s");
         }
         if (sysType.getTemptables() != null) {
-            hostLog.info("Host query max temptable size set to " + sysType.getTemptables().getMaxsize() + " mb");
+            hostLog.info("Max temptable size set to " + sysType.getTemptables().getMaxsize() + " mb");
         }
         if (sysType.getSnapshot() != null) {
-            hostLog.info("Host snapshot priority set to " + sysType.getSnapshot().getPriority() + " [0 - 10]");
+            hostLog.info("Snapshot priority set to " + sysType.getSnapshot().getPriority() + " [0 - 10]");
         }
         if (sysType.getQuery() != null && sysType.getQuery().getTimeout() > 0) {
-            hostLog.info("Host query timeout set to " + sysType.getQuery().getTimeout() + " milliseconds");
+            hostLog.info("Query timeout set to " + sysType.getQuery().getTimeout() + " milliseconds");
         }
     }
 
