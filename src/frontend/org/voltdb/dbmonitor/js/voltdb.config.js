@@ -3,8 +3,8 @@
 
     var iVoltDBConfig = (function () {
 
-        //var CONFIG_MODE = "release"; //Enable this for production release.
-        var CONFIG_MODE = "debug"; //Enable this for debug mode.
+        var CONFIG_MODE = "release"; //Enable this for production release.
+        //var CONFIG_MODE = "debug"; //Enable this for debug mode.
 
         //This JSON object should only used for debug purpose.
         this.PrivateToPublicIP = {
