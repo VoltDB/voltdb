@@ -49,11 +49,13 @@ public class TestPermission {
     public void testPermissionsFromAliases()
     {
         verify(Permission.getPermissionsFromAliases(Lists.<String>newArrayList()),
-                Permission.getPermissionsFromAliases(Arrays.asList("SQL")),
-                Permission.getPermissionsFromAliases(Arrays.asList("SYSPROC")),
-                Permission.getPermissionsFromAliases(Arrays.asList("ADMIN")),
-                Permission.getPermissionsFromAliases(Arrays.asList("SQL", "DEFAULTPROC", "DEFAULTPROCREAD")),
-                Permission.getPermissionsFromAliases(Arrays.asList("SQL", "DEFAULTPROC", "ADMIN")));
+               Permission.getPermissionsFromAliases(Arrays.asList("SQL")),
+               Permission.getPermissionsFromAliases(Arrays.asList("SQLREAD")),
+               Permission.getPermissionsFromAliases(Arrays.asList("DEFAULTPROC")),
+               Permission.getPermissionsFromAliases(Arrays.asList("SYSPROC")),
+               Permission.getPermissionsFromAliases(Arrays.asList("ADMIN")),
+               Permission.getPermissionsFromAliases(Arrays.asList("SQL", "DEFAULTPROC", "DEFAULTPROCREAD")),
+               Permission.getPermissionsFromAliases(Arrays.asList("SQL", "DEFAULTPROC", "ADMIN")));
     }
 
     @Test
@@ -65,6 +67,14 @@ public class TestPermission {
         group = new Group();
         group.setSql(true);
         final EnumSet<Permission> sql = Permission.getPermissionSetForGroup(group);
+
+        group = new Group();
+        group.setSqlread(true);
+        final EnumSet<Permission> sqlread = Permission.getPermissionSetForGroup(group);
+
+        group = new Group();
+        group.setDefaultproc(true);
+        final EnumSet<Permission> defaultproc = Permission.getPermissionSetForGroup(group);
 
         group = new Group();
         group.setAdmin(true);
@@ -82,22 +92,26 @@ public class TestPermission {
         group.setAdmin(true);
         final EnumSet<Permission> mixed = Permission.getPermissionSetForGroup(group);
 
-        verify(none, sql, admin, admin, allthree, mixed);
+        verify(none, sql, sqlread, defaultproc, admin, admin, allthree, mixed);
     }
 
     private void verify(EnumSet<Permission> none,
                         EnumSet<Permission> sql,
+                        EnumSet<Permission> sqlread,
+                        EnumSet<Permission> defaultproc,
                         EnumSet<Permission> sysproc,
                         EnumSet<Permission> admin,
                         EnumSet<Permission> allthree,
                         EnumSet<Permission> mixed)
     {
         assertEquals(EnumSet.noneOf(Permission.class), none);
-        assertEquals(EnumSet.of(Permission.SQL),     sql);
+        assertEquals(EnumSet.of(Permission.SQL, Permission.SQLREAD, Permission.DEFAULTPROC, Permission.DEFAULTPROCREAD), sql);
+        assertEquals(EnumSet.of(Permission.SQLREAD, Permission.DEFAULTPROCREAD), sqlread);
+        assertEquals(EnumSet.of(Permission.DEFAULTPROC, Permission.DEFAULTPROCREAD), defaultproc);
         assertEquals(EnumSet.allOf(Permission.class),  sysproc);
         assertEquals(EnumSet.allOf(Permission.class),  admin);
 
-        assertEquals(EnumSet.of(Permission.SQL, Permission.DEFAULTPROC, Permission.DEFAULTPROCREAD), allthree);
+        assertEquals(EnumSet.of(Permission.SQL, Permission.SQLREAD, Permission.DEFAULTPROC, Permission.DEFAULTPROCREAD), allthree);
         assertEquals(EnumSet.allOf(Permission.class), mixed);
     }
 
