@@ -41,7 +41,7 @@ public class TestAdhocExportTable extends AdhocDDLTestBase {
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("--dont care");
         builder.addExport(true, null, null);
-        builder.setUseAdhocSchema(true);
+        builder.setUseDDLSchema(true);
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
@@ -94,7 +94,7 @@ public class TestAdhocExportTable extends AdhocDDLTestBase {
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("--dont care");
         builder.addExport(true, null, null);
-        builder.setUseAdhocSchema(true);
+        builder.setUseDDLSchema(true);
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
