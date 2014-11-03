@@ -498,7 +498,7 @@ function alertNodeClicked(obj) {
         var populateProceduresInformation = function (connection) {
             var counter = 0;
             if (connection != null) {
-                connection.Metadata['@Statistics_PROCEDUREPROFILE'] = GetTestProcedureData(connection);
+                //connection.Metadata['@Statistics_PROCEDUREPROFILE'] = GetTestProcedureData(connection);
 
                 connection.Metadata['@Statistics_PROCEDUREPROFILE'].schema.forEach(function (columnInfo) {
                     if (columnInfo["name"] == "PROCEDURE")
@@ -1531,23 +1531,8 @@ function alertNodeClicked(obj) {
             }
 
         };
-
-        this.sortProceduresByColumns = function () {
-            var procedureCount = 0;
-            var lConnection = VoltDBService.getProcedureContextForSorting();
-            populateProcedureJsonArrayForSorting(lConnection);
-
-            if (voltDbRenderer.sortOrder == "descending") {
-                procedureJsonArray = descendingSortJSON(procedureJsonArray, this.sortColumn);
-            }
-
-            else if (voltDbRenderer.sortOrder == "ascending") {
-                procedureJsonArray = ascendingSortJSON(procedureJsonArray, this.sortColumn);
-            }
-            mapJsonArrayToProcedures();
-        };
-
-        this.sortProceduresByColumnsSync = function (isSearched) {
+        
+        this.sortProceduresByColumns = function (isSearched) {
             var procedureCount = 0;
            
             if (!voltDbRenderer.isProcedureSearch) {

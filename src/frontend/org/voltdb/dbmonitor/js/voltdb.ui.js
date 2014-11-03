@@ -472,7 +472,7 @@ var loadPage = function (serverName, portid) {
 
                     if (searchResult) {
                         if (voltDbRenderer.isSortProcedures)
-                            voltDbRenderer.sortProceduresByColumnsSync(true);
+                            voltDbRenderer.sortProceduresByColumns(true);
 
                         voltDbRenderer.mapProcedureInformation(currentProcedureAction, priorProcedureAction, voltDbRenderer.isProcedureSearch, function (traverse, htmlSearchData) {
                             if (htmlSearchData != "")
@@ -885,7 +885,7 @@ var loadPage = function (serverName, portid) {
                     priorProcedureAction = currentProcedureAction;
                     currentProcedureAction = VoltDbUI.ACTION_STATES.SEARCH;
                     voltDbRenderer.formatSearchDataToJsonArray();
-                    voltDbRenderer.sortProceduresByColumnsSync(false);
+                    voltDbRenderer.sortProceduresByColumns(false);
                     voltDbRenderer.mapProcedureInformationAsync(currentProcedureAction, priorProcedureAction);
 
                     //set pagination
@@ -896,7 +896,7 @@ var loadPage = function (serverName, portid) {
                 });
             } else {
                 VoltDbUI.sortStatus = VoltDbUI.SORT_STATES.SORTING;
-                voltDbRenderer.sortProceduresByColumnsSync(false);
+                voltDbRenderer.sortProceduresByColumns(false);
                 voltDbRenderer.mapProcedureInformationAsync(currentProcedureAction, priorProcedureAction);
                 setPaginationIndicesOfProcedures(voltDbRenderer.isProcedureSearch);
                 VoltDbUI.sortStatus = VoltDbUI.SORT_STATES.SORTED;
