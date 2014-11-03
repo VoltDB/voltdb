@@ -411,7 +411,7 @@ public class HTTPAdminListener {
             ContextHandlerCollection handlers = new ContextHandlerCollection();
             handlers.setHandlers(new Handler[] {
                     studioHander,
-		    dbMonitorHandler,
+                    dbMonitorHandler,
                     baseHander
             });
 
