@@ -442,8 +442,8 @@ public class CatalogDiffEngine {
 
             retval[0] = table.getTypeName();
             retval[1] = String.format(
-                    "Unable to restrict unique index %s because table %s is not empty.",
-                    idx.getTypeName(), retval[0]);
+                    "Unable to remove column %s from unique index %s because table %s is not empty.",
+                    suspect.getTypeName(), idx.getTypeName(), retval[0]);
             return retval;
         }
 
