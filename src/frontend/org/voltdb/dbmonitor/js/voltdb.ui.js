@@ -102,10 +102,7 @@ $(document).ready(function () {
                 }
                 $('#graphBlock').slideToggle();
 
-                MonitorGraphUI.ChartRam.update();
-                MonitorGraphUI.ChartCpu.update();
-                MonitorGraphUI.ChartLatency.update();
-                MonitorGraphUI.ChartTransactions.update();
+                MonitorGraphUI.UpdateCharts();
             }
         }
     });
@@ -206,10 +203,7 @@ $(document).ready(function () {
                 $("#VDBSchHelp").hide();
                 $("#VDBQHelp").hide();
 
-                MonitorGraphUI.ChartRam.update();
-                MonitorGraphUI.ChartCpu.update();
-                MonitorGraphUI.ChartLatency.update();
-                MonitorGraphUI.ChartTransactions.update();
+                MonitorGraphUI.UpdateCharts();
             }
             else if (VoltDbUI.CurrentTab == NavigationTabs.Schema) {
 
@@ -1094,12 +1088,7 @@ var loadPage = function (serverName, portid) {
         var graphView = $("#graphView").val();
         saveCookie("graph-view", graphView);
         MonitorGraphUI.RefreshGraph(graphView);
-        MonitorGraphUI.ChartRam.update();
-        MonitorGraphUI.ChartCpu.update();
-        MonitorGraphUI.ChartLatency.update();
-        MonitorGraphUI.ChartTransactions.update();
-
-        //refreshGraphAndDataInLoop(getRefreshTime(), graphView);
+        MonitorGraphUI.UpdateCharts();
     });
 
     //slides the element with class "menu_body" when paragraph with class "menu_head" is clicked 
@@ -1210,15 +1199,8 @@ var configureUserPreferences = function () {
                 });
                 saveUserPreferences(userPreference);
 
-                MonitorGraphUI.ChartRam.update();
-                MonitorGraphUI.ChartCpu.update();
-                MonitorGraphUI.ChartLatency.update();
-                MonitorGraphUI.ChartTransactions.update();
+                MonitorGraphUI.UpdateCharts();
             }
-
-
-
-
 
         });
 
