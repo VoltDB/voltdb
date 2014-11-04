@@ -252,15 +252,6 @@ svg .title {
 }
 
 
-/*Custom Css*/
-/*
-.nvd3 .nv-axis path {
-    fill: #ff0000;
-    stroke: #ff0000;
-    stroke-opacity: .75;
-    shape-rendering: crispEdges;
-}*/
-/*Custom Css*/
 
 
 /**********
@@ -374,20 +365,7 @@ svg .title {
 .nvd3 .nv-groups path.nv-line {
   fill: none;
   stroke-width: 1.5px;
-  /*
-  stroke-linecap: round;
-  shape-rendering: geometricPrecision;
-
-  transition: stroke-width 250ms linear;
-  -moz-transition: stroke-width 250ms linear;
-  -webkit-transition: stroke-width 250ms linear;
-
-  transition-delay: 250ms
-  -moz-transition-delay: 250ms;
-  -webkit-transition-delay: 250ms;
-  */
-}
-
+  
 .nvd3 .nv-groups path.nv-line.nv-thin-line {
   stroke-width: 1px;
 }
@@ -395,31 +373,13 @@ svg .title {
 
 .nvd3 .nv-groups path.nv-area {
   stroke: none;
-  /*
-  stroke-linecap: round;
-  shape-rendering: geometricPrecision;
 
-  stroke-width: 2.5px;
-  transition: stroke-width 250ms linear;
-  -moz-transition: stroke-width 250ms linear;
-  -webkit-transition: stroke-width 250ms linear;
-
-  transition-delay: 250ms
-  -moz-transition-delay: 250ms;
-  -webkit-transition-delay: 250ms;
-  */
-}
 
 .nvd3 .nv-line.hover path {
   stroke-width: 6px;
 }
 
-/*
-.nvd3.scatter .groups .point {
-  fill-opacity: 0.1;
-  stroke-opacity: 0.1;
-}
-  */
+
 
 .nvd3.nv-line .nvd3.nv-scatter .nv-groups .nv-point {
   fill-opacity: 0;
@@ -461,9 +421,6 @@ svg .title {
 }
 
 
-/**********
-* Distribution
-*/
 
 .nvd3 .nv-distribution {
   pointer-events: none;
@@ -471,15 +428,7 @@ svg .title {
 
 
 
-/**********
-*  Scatter
-*/
 
-/* **Attempting to remove this for useVoronoi(false), need to see if it's required anywhere
-.nvd3 .nv-groups .nv-point {
-  pointer-events: none;
-}
-*/
 
 .nvd3 .nv-groups .nv-point.hover {
   stroke-width: 20px;
@@ -490,11 +439,6 @@ svg .title {
   fill-opacity: 1;
 }
 
-/*
-.nv-group.hover .nv-point {
-  fill-opacity: 1;
-}
-*/
 
 
 /**********
@@ -503,35 +447,21 @@ svg .title {
 
 .nvd3.nv-stackedarea path.nv-area {
   fill-opacity: .7;
-  /*
-  stroke-opacity: .65;
-  fill-opacity: 1;
-  */
+ 
   stroke-opacity: 0;
 
   transition: fill-opacity 250ms linear, stroke-opacity 250ms linear;
   -moz-transition: fill-opacity 250ms linear, stroke-opacity 250ms linear;
   -webkit-transition: fill-opacity 250ms linear, stroke-opacity 250ms linear;
 
-  /*
-  transition-delay: 500ms;
-  -moz-transition-delay: 500ms;
-  -webkit-transition-delay: 500ms;
-  */
-
+ 
 }
 
 .nvd3.nv-stackedarea path.nv-area.hover {
   fill-opacity: .9;
-  /*
-  stroke-opacity: .85;
-  */
+  
 }
-/*
-.d3stackedarea .groups path {
-  stroke-opacity: 0;
-}
-  */
+
 
 
 
@@ -540,12 +470,7 @@ svg .title {
   fill-opacity: 0;
 }
 
-/*
-.nvd3.nv-stackedarea .nv-groups .nv-point.hover {
-  stroke-width: 20px;
-  stroke-opacity: .75;
-  fill-opacity: 1;
-}*/
+
 
 
 
@@ -618,9 +543,7 @@ svg .title {
 
 .nvd3.nv-sparklineplus .nv-xValue,
 .nvd3.nv-sparklineplus .nv-yValue {
-  /*
-  stroke: #666;
-  */
+  
   stroke-width: 0;
   font-size: .9em;
   font-weight: normal;
@@ -641,10 +564,7 @@ svg .title {
 }
 
 .nvd3.nv-sparklineplus .nv-currentValue {
-  /*
-  stroke: #444;
-  fill: #000;
-  */
+  
   font-weight: bold;
   font-size: 1.1em;
 }
@@ -680,9 +600,7 @@ svg .title {
 }
 
 .nvd3 .nv-brush .extent {
-  /*
-  cursor: ew-resize !important;
-  */
+ 
   fill-opacity: 0 !important;
 }
 
@@ -725,16 +643,12 @@ svg .title {
 
 .nvd3.nv-indentedtree .nv-treeicon {
   cursor: pointer;
-  /*
-  cursor: n-resize;
-  */
+  
 }
 
 .nvd3.nv-indentedtree .nv-treeicon.nv-folded {
   cursor: pointer;
-  /*
-  cursor: s-resize;
-  */
+  
 }
 
 /**********
