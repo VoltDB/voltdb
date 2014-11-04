@@ -588,6 +588,12 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
                     " having exists (select c from r2 where r2.c = max(r1.a))",
                     "subquery with WHERE expression with aggregates on parent columns are not supported");
         }
+        {
+            // parent correlated TVE in the aggregate expression. NulPointerExpression
+            failToCompile("select max(c) from r1 group by a " +
+                    " having count(*) = (select c from r2 where r2.c = r1.a)",
+                    "");
+        }
     }
 
     // Disabled for now
