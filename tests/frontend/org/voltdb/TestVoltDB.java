@@ -233,42 +233,4 @@ public class TestVoltDB extends TestCase {
         assertTrue("Deployment file shouldn't have been able to validate",
                 CatalogUtil.compileDeployment(catalog, project.getPathToDeployment(), true, true) < 0);
     }
-
-    /**
-     * ENG-720: NullPointerException when trying to start server with no users
-     *
-     * This test makes sure deployment validation passes when there are no users.
-     * @throws IOException
-     */
-    public void testCompileDeploymentNoUsers() throws IOException {
-        TPCCProjectBuilder project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
-        project.addDefaultProcedures();
-
-        project.setSecurityEnabled(false);
-        GroupInfo groups[] = new GroupInfo[] {
-                new GroupInfo("foo", false, false, false, false, false, false),
-                new GroupInfo("blah", false, false, false, false, false, false)
-        };
-        project.addGroups(groups);
-        UserInfo users[] = new UserInfo[] {};
-        project.addUsers(users);
-
-        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
-        String jarName = "compile-deployment.jar";
-        String catalogJar = testDir + File.separator + jarName;
-        assertTrue("Project failed to compile", project.compile(catalogJar));
-
-        byte[] bytes = MiscUtils.fileToBytes(new File(catalogJar));
-        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes).getFirst());
-        assertNotNull("Error loading catalog from jar", serializedCatalog);
-
-        Catalog catalog = new Catalog();
-        catalog.execute(serializedCatalog);
-
-        assertTrue("Deployment file should have been able to validate",
-                CatalogUtil.compileDeployment(catalog, project.getPathToDeployment(), true, true) >= 0);
-    }
-
 }
