@@ -632,9 +632,8 @@ public abstract class CatalogUtil {
             if (deployment.getSecurity() != null && deployment.getSecurity().isEnabled()) {
                 hostLog.error("Cannot enable security without defining users in the deployment file.");
                 return false;
-            } else {
-                return true;
             }
+            return true;
         }
 
         Cluster cluster = catalog.getClusters().get("cluster");
