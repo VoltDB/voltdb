@@ -643,14 +643,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             final CatalogSpecificPlanner csp = new CatalogSpecificPlanner(m_asyncCompilerAgent, m_catalogContext);
 
             // DR overflow directory
-            File drOverflowDir = new File(m_catalogContext.cluster.getVoltroot(), "dr_overflow");
             boolean useDRV2 = Boolean.getBoolean("USE_DR_V2");
             if (m_config.m_isEnterprise) {
                 try {
                     Class<?> ndrgwClass = null;
+                    File drOverflowDir;
                     if (useDRV2) {
+                        drOverflowDir = new File(m_deployment.getPaths().getVoltdbroot().getPath(), "dr_overflow");
                         ndrgwClass = Class.forName("org.voltdb.dr2.InvocationBufferServer");
                     } else {
+                        drOverflowDir = new File(m_catalogContext.cluster.getVoltroot(), "dr_overflow");
                         ndrgwClass = Class.forName("org.voltdb.dr.InvocationBufferServer");
                     }
                     Constructor<?> ndrgwConstructor = ndrgwClass.getConstructor(File.class, boolean.class, int.class);

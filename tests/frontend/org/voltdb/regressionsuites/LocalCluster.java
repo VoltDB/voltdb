@@ -374,15 +374,18 @@ public class LocalCluster implements VoltServerConfig {
     void startLocalServer(int hostId, boolean clearLocalDataDirectories) {
         // Generate a new root for the in-process server if clearing directories.
         File subroot = null;
+        try {
         if (clearLocalDataDirectories) {
-            try {
                 subroot = VoltFile.initNewSubrootForThisProcess();
                 m_subRoots.add(subroot);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
         } else {
-            subroot = m_subRoots.get(0);
+            if (m_subRoots.size() <= hostId) {
+                m_subRoots.add(VoltFile.initNewSubrootForThisProcess());
+            }
+            subroot = m_subRoots.get(hostId);
+        }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
 
         // Make the local Configuration object...
@@ -405,18 +408,18 @@ public class LocalCluster implements VoltServerConfig {
         portGenerator.nextReplicationPort();
         portGenerator.nextReplicationPort();
         if (m_target == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
-            EEProcess proc = m_eeProcs.get(0);
+            EEProcess proc = m_eeProcs.get(hostId);
             assert(proc != null);
             cmdln.m_ipcPort = proc.port();
         }
         if (m_target == BackendTarget.NATIVE_EE_IPC) {
             cmdln.m_ipcPort = portGenerator.next();
         }
-        if ((m_versionOverrides != null) && (m_versionOverrides.length > 0)) {
-            assert(m_versionOverrides[0] != null);
-            assert(m_versionCheckRegexOverrides[0] != null);
-            cmdln.m_versionStringOverrideForTest = m_versionOverrides[0];
-            cmdln.m_versionCompatibilityRegexOverrideForTest = m_versionCheckRegexOverrides[0];
+        if ((m_versionOverrides != null) && (m_versionOverrides.length > hostId)) {
+            assert(m_versionOverrides[hostId] != null);
+            assert(m_versionCheckRegexOverrides[hostId] != null);
+            cmdln.m_versionStringOverrideForTest = m_versionOverrides[hostId];
+            cmdln.m_versionCompatibilityRegexOverrideForTest = m_versionCheckRegexOverrides[hostId];
         }
 
         // for debug, dump the command line to a unique file.
