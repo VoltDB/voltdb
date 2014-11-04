@@ -647,12 +647,11 @@ public class TestSubQueriesSuite extends RegressionSuite {
         System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] {{201}, {202}});
 
-        // HSQL parsing error - unexpected token NULL
-        //   vt = client.callProcedure("@AdHoc",
-        //           "select ID from R2 where WAGE in " +
-        //                   "( select WAGE from R1 limit 4 offset 1) is null;").getResults()[0];
-        //   System.out.println(vt.toString());
-        //   validateTableOfLongs(vt, new long[][] {{200}});
+         vt = client.callProcedure("@AdHoc",
+                 "select ID from R2 where (WAGE in " +
+                 "( select WAGE from R1 limit 4 offset 1)) is null;").getResults()[0];
+         System.out.println(vt.toString());
+         validateTableOfLongs(vt, new long[][] {{200}, {203}});
 
     }
 
