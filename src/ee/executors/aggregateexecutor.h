@@ -94,7 +94,7 @@ protected:
     NValue m_value;
     bool m_inlineCopiedToOutline;
 
-    virtual NValue& finalizeInternal(ValueType type, NValue& val)
+    NValue& finalizeInternal(ValueType type, NValue& val)
     {
         val.castAs(type);
         if (m_inlineCopiedToOutline) {
