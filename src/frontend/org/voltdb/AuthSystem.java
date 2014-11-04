@@ -411,11 +411,7 @@ public class AuthSystem {
                     group = m_groups.get(catalogGroup.getTypeName());
                 }
 
-                for (Permission perm : group.m_permissions) {
-                    if (!user.m_permissions.contains(perm)) {
-                        user.m_permissions.add(perm);
-                    }
-                }
+                user.m_permissions.addAll(group.m_permissions);
 
                 group.m_users.add(user);
                 user.m_groups.add(group);
