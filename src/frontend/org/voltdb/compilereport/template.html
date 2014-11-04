@@ -108,6 +108,11 @@
         <div id='s' class='reportpage' style='display: none;'>
           <a name='s'></a><h1>Schema</h1><br/>
 
+          <div class="checkbox">
+           <label>
+            <input type="checkbox" class="cb"> Expand All
+           </label>
+          </div>
           <table class="table tableL1 tablesorter" id='schematable'>
                 <thead>
                 <tr>
@@ -136,6 +141,11 @@
         <div id='p' class='reportpage' style='display: none;'>
           <a name='p'></a><h1>Procedures &amp; SQL</h1><br/>
 
+           <div class="checkbox">
+            <label>
+             <input type="checkbox" class="cb"> Expand All
+            </label>
+          </div>
           <table class="table tableL1 tablesorter" id='proctable'>
                 <thead>
                 <tr>
@@ -324,17 +334,52 @@
                 cssChildRow: "tablesorter-childRow"
             });
 
+            $(".cb").click(function(){
+               if($(this).is(":checked"))
+                {
+                   var elementList = $(".tableL1").find(".togglex");
+                   for ( var i = 0; i < elementList.length; i++ ){
+                       var item = elementList[i];
+                       var id = item["id"];
+
+                       var hash = "#"+id;
+                       hash = hash.toLowerCase();
+                       var anchor = hash.substring(1);
+                       var parts = anchor.split('-');
+                       var toppage = parts[0];
+
+                       if (parts.length > 1) {
+                           var primary = parts[1];
+                           var iconid = "#" + toppage + "-" + primary + "--icon";
+                           var dropdownid = "#" + id + "--dropdown";
+                           $(iconid).removeClass('icon-chevron-right').addClass('icon-chevron-down');
+                           $(dropdownid).show();
+                           if (parts.length > 2) {
+                               var secondary = parts[2];
+                               var iconid2 = "#" + toppage + "-" + primary + "-" + secondary + "--icon";
+                               var dropdownid2 = "#" + toppage + "-" + primary + "-" + secondary + "--dropdown";
+                               $(iconid2).removeClass('icon-chevron-right').addClass('icon-chevron-down');
+                               $(dropdownid2).show();
+                            }
+                       }
+                    }
+                }else {
+                    location.reload();
+                }
+            });
+
             $('.tableL1').delegate('.togglex', 'click' ,function(){
                 var id = $(this).attr('id');
                 var toppage = id.split('-')[0];
                 var dropdownid = "#" + id + "--dropdown";
-
                 var hash = "#" + id;
+
                 if ($(dropdownid).is(":visible")) {
                     hash = "#" + toppage;
                 }
                 history.replaceState(null, null, hash);
                 navigate(hash);
+                $('.cb').prop('checked',false);
                 return false;
             });
 
@@ -358,6 +403,7 @@
                 }
                 history.replaceState(null, null, hash);
                 navigate(hash);
+                $('.cb').prop('checked',false);
                 return false;
             });
 
@@ -385,6 +431,10 @@
                 history.replaceState(null, null, hash);
                 navigate(hash);
                 return false;
+            });
+
+            $('#s-nav, #p-nav').click(function(){
+                $('.cb').prop('checked',false);
             });
 
             navigate($(location).attr('hash'));
