@@ -847,9 +847,9 @@ h3.systemHeader{}
 		 }
 		 
 @media (min-width: 480px) and (max-width: 1024px) and (orientation:landscape)   {		 
-	.VDBMonitorHelp { height:160px;  }
-		.VDBSchemaHelp { height:160px; overflow:auto;}
-		.VDBQueryHelp { height:160px; overflow:auto;}	
+	.VDBMonitorHelp { height:150px;  }
+		.VDBSchemaHelp { height:150px; overflow:auto;}
+		.VDBQueryHelp { height:150px; overflow:auto;}	
 
 }		 
 
