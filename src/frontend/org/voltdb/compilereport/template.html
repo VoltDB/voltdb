@@ -338,14 +338,31 @@
                if($(this).is(":checked"))
                 {
                    var elementList = $(".tableL1").find(".togglex");
-                   for ( var i = 0; i < elementList.length; i++ )
-                   {
-                    var item = elementList[i];
-                    var id = item["id"];
-                    var hash = "#"+id;
-                    var dropdownid = "#" + id + "--dropdown";
-                    $(dropdownid).show();
-                   }
+                   for ( var i = 0; i < elementList.length; i++ ){
+                       var item = elementList[i];
+                       var id = item["id"];
+
+                       var hash = "#"+id;
+                       hash = hash.toLowerCase();
+                       var anchor = hash.substring(1);
+                       var parts = anchor.split('-');
+                       var toppage = parts[0];
+
+                       if (parts.length > 1) {
+                           var primary = parts[1];
+                           var iconid = "#" + toppage + "-" + primary + "--icon";
+                           var dropdownid = "#" + id + "--dropdown";
+                           $(iconid).removeClass('icon-chevron-right').addClass('icon-chevron-down');
+                           $(dropdownid).show();
+                           if (parts.length > 2) {
+                               var secondary = parts[2];
+                               var iconid2 = "#" + toppage + "-" + primary + "-" + secondary + "--icon";
+                               var dropdownid2 = "#" + toppage + "-" + primary + "-" + secondary + "--dropdown";
+                               $(iconid2).removeClass('icon-chevron-right').addClass('icon-chevron-down');
+                               $(dropdownid2).show();
+                            }
+                       }
+                    }
                 }else {
                     location.reload();
                 }
@@ -362,6 +379,7 @@
                 }
                 history.replaceState(null, null, hash);
                 navigate(hash);
+                $('.cb').prop('checked',false);
                 return false;
             });
 
@@ -385,6 +403,7 @@
                 }
                 history.replaceState(null, null, hash);
                 navigate(hash);
+                $('.cb').prop('checked',false);
                 return false;
             });
 
