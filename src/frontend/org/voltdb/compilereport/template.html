@@ -433,6 +433,10 @@
                 return false;
             });
 
+            $('#s-nav, #p-nav').click(function(){
+                $('.cb').prop('checked',false);
+            });
+
             navigate($(location).attr('hash'));
 
             $(window).bind('hashchange', function () { //detect hash change
