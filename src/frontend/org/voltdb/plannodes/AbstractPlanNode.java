@@ -224,9 +224,6 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             return;
         }
         List<AbstractExpression> subqueryExpressions = expr.findAllSubexpressionsOfClass(SubqueryExpression.class);
-        if (subqueryExpressions.isEmpty()) {
-            return;
-        }
         for (AbstractExpression subqueryExpression : subqueryExpressions) {
             assert(subqueryExpression instanceof SubqueryExpression);
             AbstractPlanNode subqueryPlan = ((SubqueryExpression) subqueryExpression).getSubqueryNode();

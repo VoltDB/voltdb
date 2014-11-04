@@ -174,9 +174,9 @@ public class TestCollector {
            Calendar cal, cal2;
            cal = Calendar.getInstance();
            cal2 = Calendar.getInstance();
-           for(int i=0; i < 3; i++) {
+           for(int i=-1; i < 2; i++) {
                cal.add(Calendar.DATE, -i-1);
-               fileDates[i] = formatter.format(cal.getTime());
+               fileDates[i+1] = formatter.format(cal.getTime());
            }
            cal = Calendar.getInstance();
            cal.add(Calendar.YEAR, -1);

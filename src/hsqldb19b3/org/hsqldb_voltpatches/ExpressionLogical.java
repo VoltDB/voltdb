@@ -803,6 +803,21 @@ public class ExpressionLogical extends Expression {
             if (type == null) {
                 type = nodes[RIGHT].nodeDataTypes[i];
             }
+            // A VoltDB extension to support "IN ?"
+            else if (i == 0 && degree == 1 &&
+                    nodes[RIGHT].opType == OpTypes.DYNAMIC_PARAM &&
+                    nodes[RIGHT].nodeDataTypes != null &&
+                    nodes[RIGHT].nodeDataTypes.length == 1 &&
+                    nodes[RIGHT].nodeDataTypes[0] == null) {
+                if (type.isIntegralType()) {
+                    // promote parameter type to vector of BIGINT regardless of exact LHS integer scale.
+                    nodes[RIGHT].nodeDataTypes[0] = Type.SQL_BIGINT;
+                }
+                else {
+                    nodes[RIGHT].nodeDataTypes[0] = type;
+                }
+            }
+            // End of VoltDB extension to support "IN ?"
 
             if (type == null) {
                 throw Error.error(ErrorCode.X_42567);

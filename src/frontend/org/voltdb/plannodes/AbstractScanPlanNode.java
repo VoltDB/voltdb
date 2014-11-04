@@ -445,8 +445,12 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
 
     protected String explainPredicate(String prefix) {
         if (m_predicate != null) {
-            return prefix + m_predicate.explain(m_targetTableName);
+            return prefix + m_predicate.explain(getTableNameForExplain());
         }
         return "";
+    }
+
+    protected String getTableNameForExplain() {
+        return (m_targetTableAlias != null) ? m_targetTableAlias : m_targetTableName;
     }
 }

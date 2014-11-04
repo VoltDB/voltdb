@@ -56,7 +56,7 @@ public class PlannerTestCase extends TestCase {
             m_aide.compile(sql, paramCount, m_byDefaultInferPartitioning, m_byDefaultPlanForSinglePartition, null);
             fail();
         }
-        catch (PlanningErrorException ex) {
+        catch (Exception ex) {
             String result = ex.toString();
             for (String pattern : patterns) {
                 if ( ! result.contains(pattern)) {
@@ -219,6 +219,14 @@ public class PlannerTestCase extends TestCase {
         for (AbstractPlanNode apn: planNodes) {
             System.out.println(apn.toExplainPlanString());
         }
+    }
+
+    protected String buildExplainPlan(List<AbstractPlanNode> planNodes) {
+        String explain = "";
+        for (AbstractPlanNode apn: planNodes) {
+            explain += apn.toExplainPlanString() + '\n';
+        }
+        return explain;
     }
 
 }

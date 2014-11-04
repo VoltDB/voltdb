@@ -96,6 +96,7 @@ public abstract class AbstractParsedStmt {
 
     // Parent statement if any
     public AbstractParsedStmt m_parentStmt = null;
+    boolean m_isUpsert = false;
 
     static final String INSERT_NODE_NAME = "insert";
     static final String UPDATE_NODE_NAME = "update";
@@ -138,6 +139,9 @@ public abstract class AbstractParsedStmt {
        // create non-abstract instances
        if (stmtTypeElement.name.equalsIgnoreCase(INSERT_NODE_NAME)) {
            retval = new ParsedInsertStmt(paramValues, db);
+           if (stmtTypeElement.attributes.containsKey(QueryPlanner.UPSERT_TAG)) {
+               retval.m_isUpsert = true;
+           }
        }
        else if (stmtTypeElement.name.equalsIgnoreCase(UPDATE_NODE_NAME)) {
            retval = new ParsedUpdateStmt(paramValues, db);
@@ -308,7 +312,7 @@ public abstract class AbstractParsedStmt {
         else {
             throw new PlanningErrorException("Unsupported expression node '" + elementName + "'");
         }
-
+        assert(retval != null);
         return retval;
     }
 
@@ -372,6 +376,7 @@ public abstract class AbstractParsedStmt {
         if (needParameter) {
             long id = Long.parseLong(exprNode.attributes.get("id"));
             ParameterValueExpression expr = m_paramsById.get(id);
+            assert(expr != null);
             if (needConstant) {
                 expr.setOriginalValue(cve);
                 cve.setValue(m_paramValues[expr.getParameterIndex()]);
@@ -422,6 +427,7 @@ public abstract class AbstractParsedStmt {
             pve.setParameterIndex(paramIdx);
             pve.setValueSize(expr.getValueSize());
             pve.setValueType(expr.getValueType());
+            pve.setCorrelatedExpression(expr);
             m_parameterTveMap.put(paramIdx, expr);
             return pve;
         }
@@ -578,7 +584,6 @@ public abstract class AbstractParsedStmt {
             }
             assert(subqueryExpr != null);
 
-            // weed of IN (values) expression
             // Break up UNION/INTERSECT (ALL) set ops into individual selects connected by
             // AND/OR operator
             // col IN ( queryA UNION queryB ) - > col IN (queryA) OR col IN (queryB)
@@ -689,7 +694,7 @@ public abstract class AbstractParsedStmt {
         } else {
             // Need to replace TVE from the IN list with the corresponding PVE
             // to be passed as parameters to the subquery similar to the correlated TVE
-            inColumns = ParsedSelectStmt.replaceExpressionsWithPve(subquery, inColumns, false);
+            inColumns = ParsedSelectStmt.replaceExpressionsWithPve(subquery, inColumns);
             subqueryExpr.moveUpTVE();
             inExpr.setLeft(inColumns);
             return inExpr;

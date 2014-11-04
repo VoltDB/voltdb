@@ -174,6 +174,10 @@ public:
      */
     virtual void p_execute_finish();
 
+    virtual void cleanupMemoryPool() {
+        AggregateExecutorBase::p_execute_finish();
+    }
+
 protected:
     virtual bool p_init(AbstractPlanNode*, TempTableLimits*);
 

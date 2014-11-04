@@ -68,8 +68,6 @@ namespace voltdb
                     TempTableLimits* limits);
         bool p_execute(const NValueArray& params);
 
-        bool needsOutputTableClear();
-
     private:
         AggregateExecutorBase* m_aggExec;
 

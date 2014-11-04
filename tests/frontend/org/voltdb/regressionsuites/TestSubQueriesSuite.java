@@ -309,7 +309,20 @@ public class TestSubQueriesSuite extends RegressionSuite {
 
         }
 
-        // Nested
+        // Subquery with a user parameter - HSQL fails to parse
+        vt = client.callProcedure("@AdHoc",
+                "select ID from R1 T1 where exists " +
+                        "(SELECT 1 FROM R2 T2 where T1.ID * T2.ID  = ?) "
+                        , 9).getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{3}});
+
+      // Subquery with a parent parameter TVE
+      vt = client.callProcedure("@AdHoc",
+              "select ID from R1 T1 where exists " +
+                      "(SELECT 1 FROM R2 T2 where T1.ID * T2.ID  = 9) ").getResults()[0];
+      validateTableOfLongs(vt, new long[][] {{3}});
+
+        // Subquery with a grand-parent parameter TVE
         vt = client.callProcedure("@AdHoc",
                 "select ID from " + tbs[0] + " T1 where exists " +
                         "(SELECT 1 FROM " + tbs[1] + " T2 where exists " +
@@ -337,6 +350,12 @@ public class TestSubQueriesSuite extends RegressionSuite {
                             "T1.id = T2.id and exists ( " +
                     " select 1 from R1 where R1.dept * 2 = T2.dept)").getResults()[0];
             validateTableOfLongs(vt, new long[][] {{4}, {5}});
+
+            vt = client.callProcedure("@AdHoc",
+                    "select t1.id, t2.id  from r1 t1, " + tb + " t2 where " +
+                            "t1.id IN (select id from r2 where t2.id = r2.id * 2)"
+                    ).getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{1,2}, {2,4}});
 
             // Core dump
             if (!isHSQL()) {
@@ -387,6 +406,12 @@ public class TestSubQueriesSuite extends RegressionSuite {
             vt = client.callProcedure("@Explain", sql).getResults()[0];
             assertFalse(vt.toString().toLowerCase().contains("subquery: null"));
 
+          sql = "select dept from " + tb + " group by dept " +
+                  " having max(wage) in (select wage from R1) order by dept desc";
+          vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+          System.out.println(vt.toString());
+          validateTableOfLongs(vt, new long[][] {{2} ,{1}});
+
             // having with subquery
             vt = client.callProcedure("@AdHoc", sql).getResults()[0];
             validateTableOfLongs(vt, new long[][] {{2}, {1}});
@@ -397,6 +422,18 @@ public class TestSubQueriesSuite extends RegressionSuite {
                             " (select dept from R1  group by dept having max(wage) = TBA.wage or " +
                     " min(wage) = TBA.wage)").getResults()[0];
             validateTableOfLongs(vt, new long[][] {{1}, {3}, {5}, {6}});
+
+            // subquery with having and grand parent parameter TVE
+            vt = client.callProcedure("@AdHoc",
+                    "select id from " + tb + " TBA where exists " +
+                            " (select 1 from R2 where exists " +
+                            " (select dept from R1  group by dept having max(wage) = TBA.wage))").getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{3}, {5}});
+
+          vt = client.callProcedure("@AdHoc",
+                  "select id from " + tb + " TBA where exists " +
+                          " (select dept from R1  group by dept having max(wage) = ?)", 3).getResults()[0];
+          validateTableOfLongs(vt, new long[][] {});
 
             // having with subquery with having
             vt = client.callProcedure("@AdHoc",
@@ -519,6 +556,15 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "( select WAGE, DEPT from R2 );").getResults()[0];
         validateTableOfLongs(vt, new long[][] {});
 
+        // The NULL from R2 is eliminated by the offset
+        // HSQL gets it wrong
+        if (!isHSQL()) {
+            vt = client.callProcedure("@AdHoc",
+                "select ID from R1 where R1.WAGE NOT IN " +
+                "(select WAGE from R2 where ID < 104 order by WAGE desc limit 1 offset 1);").getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{100}});
+        }
+
     }
 
     /**
@@ -601,12 +647,11 @@ public class TestSubQueriesSuite extends RegressionSuite {
         System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] {{201}, {202}});
 
-        // HSQL parsing error - unexpected token NULL
-        //   vt = client.callProcedure("@AdHoc",
-        //           "select ID from R2 where WAGE in " +
-        //                   "( select WAGE from R1 limit 4 offset 1) is null;").getResults()[0];
-        //   System.out.println(vt.toString());
-        //   validateTableOfLongs(vt, new long[][] {{200}});
+         vt = client.callProcedure("@AdHoc",
+                 "select ID from R2 where (WAGE in " +
+                 "( select WAGE from R1 limit 4 offset 1)) is null;").getResults()[0];
+         System.out.println(vt.toString());
+         validateTableOfLongs(vt, new long[][] {{200}, {203}});
 
     }
 

@@ -65,6 +65,8 @@ public:
 
     bool isMultiPartition() { return m_multiPartition; }
 
+    bool isUpsert() { return m_isUpsert; }
+
     void initTupleWithDefaultValues(VoltDBEngine* engine,
                                     Pool* pool,
                                     const std::set<int>& fieldsExplicitlySet,
@@ -79,6 +81,7 @@ protected:
 private:
     bool m_multiPartition;
     std::vector<int> m_fieldMap;
+    bool m_isUpsert;
 };
 
 } // namespace voltdb

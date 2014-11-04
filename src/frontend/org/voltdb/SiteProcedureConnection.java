@@ -99,6 +99,7 @@ public interface SiteProcedureConnection {
             long[] planFragmentIds,
             long[] inputDepIds,
             Object[] parameterSets,
+            String[] sqlTexts,
             long txnId,
             long spHandle,
             long uniqueId,

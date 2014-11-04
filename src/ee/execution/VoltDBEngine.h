@@ -371,9 +371,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // Initialization Functions
         // -------------------------------------------------
         bool initCluster();
-
-        void initPlanNode(const int64_t fragId, AbstractPlanNode* node, TempTableLimits* limits);
-
+        AbstractExecutor* initPlanNode(AbstractPlanNode* node, TempTableLimits* limits, int64_t fragId);
         void processCatalogDeletes(int64_t timestamp);
         void initMaterializedViews();
         bool updateCatalogDatabaseReference();
@@ -381,7 +379,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /**
          * Call into the topend with information about how executing a plan fragment is going.
          */
-        void reportProgessToTopend();
+        void reportProgressToTopend();
 
         /**
          * Execute a single plan fragment.
@@ -401,9 +399,10 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * If not, get a plan from the Java topend and load it up,
          * putting it in the cache and possibly bumping something else.
          */
-        ExecutorVector *getExecutorVectorForFragmentId(const int64_t fragId);
+        void setExecutorVectorForFragmentId(const int64_t fragId);
 
         bool checkTempTableCleanup(ExecutorVector * execsForFrag);
+
         void resetCurrentExecutorVec();
 
         void cleanupExecutors();
@@ -592,7 +591,7 @@ inline int64_t VoltDBEngine::pushTuplesProcessedForProgressMonitoring(int64_t tu
 {
     m_tuplesProcessedSinceReport += tuplesProcessed;
     if (m_tuplesProcessedSinceReport >= m_tupleReportThreshold) {
-        reportProgessToTopend();
+        reportProgressToTopend();
     }
     return m_tupleReportThreshold; // size of next batch
 }

@@ -68,6 +68,7 @@ public class ByteBufferOutputStream extends OutputStream {
     @Override
     public void close() throws IOException {
         m_bb.clear();
+        DBBPool.wrapBB(m_bb).discard();
         super.close();
     }
 
@@ -118,6 +119,7 @@ public class ByteBufferOutputStream extends OutputStream {
             ByteBuffer newbb = ByteBuffer.allocateDirect(newCapacity);
             newbb.put(oldbb);
 
+            DBBPool.wrapBB(m_bb).discard();
             m_bb = newbb;
         }
     }

@@ -38,7 +38,7 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 
-public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuite {
+public class TestGroupByComplexMaterializedViewSuite extends RegressionSuite {
 
     public static String longStr = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
@@ -1436,14 +1436,14 @@ public class TestPlansGroupByComplexMaterializedViewSuite extends RegressionSuit
     // Suite builder boilerplate
     //
 
-    public TestPlansGroupByComplexMaterializedViewSuite(String name) {
+    public TestGroupByComplexMaterializedViewSuite(String name) {
         super(name);
     }
 
     static public junit.framework.Test suite() throws Exception {
         LocalCluster config = null;
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(
-                TestPlansGroupByComplexMaterializedViewSuite.class);
+                TestGroupByComplexMaterializedViewSuite.class);
         String literalSchema = null;
         boolean success = true;
         ByteArrayOutputStream capturer = new ByteArrayOutputStream();

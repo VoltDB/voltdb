@@ -323,8 +323,6 @@ public class TupleValueExpression extends AbstractValueExpression {
      * expressions.
      */
     public int resolveColumnIndexesUsingSchema(NodeSchema inputSchema) {
-        // TODO if this a TVE from a parent schema?
-        // need an access to the parent schema somehow.
         int index = inputSchema.getIndexOfTve(this);
         if (getValueType() == null && index != -1) {
             // In case of sub-queries the TVE may not have its value type and size
@@ -367,7 +365,7 @@ public class TupleValueExpression extends AbstractValueExpression {
 
     @Override
     public String explain(String impliedTableName) {
-        String tableName = m_tableName;
+        String tableName = (m_tableAlias != null) ? m_tableAlias : m_tableName;
         String columnName = m_columnName;
         if (columnName == null || columnName.equals("")) {
             columnName = "column#" + m_columnIndex;
