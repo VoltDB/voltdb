@@ -203,6 +203,8 @@ public class AuthSystem {
          */
         private List<AuthGroup> m_groups = new ArrayList<AuthGroup>();
 
+        private EnumSet<Permission> m_permissions = EnumSet.noneOf(Permission.class);
+
         /**
          * Fast membership check set of stored procedures this user has permission to invoke.
          * This is generated when the catalog is parsed and it includes procedures the user has permission
@@ -252,10 +254,8 @@ public class AuthSystem {
          */
         public boolean hasPermission(Permission... perms) {
             for (int i = 0; i < perms.length;i++) {
-                for (AuthGroup group : m_groups) {
-                    if (group.m_permissions.contains(perms[i])) {
-                        return true;
-                    }
+                if (m_permissions.contains(perms[i])) {
+                    return true;
                 }
             }
             return false;
@@ -410,6 +410,9 @@ public class AuthSystem {
                 } else {
                     group = m_groups.get(catalogGroup.getTypeName());
                 }
+
+                user.m_permissions.addAll(group.m_permissions);
+
                 group.m_users.add(user);
                 user.m_groups.add(group);
             }
