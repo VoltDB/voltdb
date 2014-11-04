@@ -323,7 +323,7 @@ class NValue {
     // the pool, use the temp string pool.
     void allocateObjectFromInlinedValue(Pool* pool);
 
-    void allocateObjectFromOutlineValue(Pool* pool);
+    void allocateObjectFromOutlinedValue(Pool* pool);
 
     /* Check if the value represents SQL NULL */
     bool isNull() const;
@@ -3092,7 +3092,6 @@ inline void NValue::allocateObjectFromInlinedValue(Pool* pool = NULL)
     if (m_valueType == VALUE_TYPE_NULL || m_valueType == VALUE_TYPE_INVALID) {
         return;
     }
-
     assert(m_valueType == VALUE_TYPE_VARCHAR || m_valueType == VALUE_TYPE_VARBINARY);
     assert(m_sourceInlined);
 
@@ -3123,19 +3122,22 @@ inline void NValue::allocateObjectFromInlinedValue(Pool* pool = NULL)
     setSourceInlined(false);
 }
 
-inline void NValue::allocateObjectFromOutlineValue(Pool* pool = NULL)
+/** Deep copy an outline object-typed value from its current allocated pool to
+ *  another new passed in pool. If no parameters are passed in, this function
+ *  will use the global temp string pool to allocate the new outline object.
+ *  The caller needs to deallocate the original outline space for the object.
+ *  This function is used in the aggregate function for MIN/MAX functions.
+ *  **/
+inline void NValue::allocateObjectFromOutlinedValue(Pool* pool = NULL)
 {
     if (m_valueType == VALUE_TYPE_NULL || m_valueType == VALUE_TYPE_INVALID) {
         return;
     }
-
     assert(m_valueType == VALUE_TYPE_VARCHAR || m_valueType == VALUE_TYPE_VARBINARY);
     assert(!m_sourceInlined);
 
     if (isNull()) {
         *reinterpret_cast<void**>(m_data) = NULL;
-        // serializeToTupleStorage fusses about this inline flag being set, even for NULLs
-        setSourceInlined(false);
         return;
     }
 

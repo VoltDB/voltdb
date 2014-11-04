@@ -77,7 +77,11 @@ public:
         /* do nothing */
     }
     virtual void advance(const NValue& val) = 0;
-    virtual NValue finalize() { return m_value; }
+    virtual NValue finalize(ValueType type)
+    {
+        return finalizeInternal(type, m_value);
+    }
+
     virtual void resetAgg()
     {
         m_haveAdvanced = false;
@@ -85,13 +89,19 @@ public:
         m_inlineCopiedToOutline = false;
     }
 
-    virtual bool isOutlineDataInAggTempPool() {
-        return m_inlineCopiedToOutline;
-    }
 protected:
     bool m_haveAdvanced;
     NValue m_value;
     bool m_inlineCopiedToOutline;
+
+    virtual NValue& finalizeInternal(ValueType type, NValue& val)
+    {
+        val.castAs(type);
+        if (m_inlineCopiedToOutline) {
+            val.allocateObjectFromOutlinedValue();
+        }
+        return val;
+    }
 };
 
 /**

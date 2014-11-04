@@ -127,10 +127,10 @@ class SumAgg : public Agg
         }
     }
 
-    virtual NValue finalize()
+    virtual NValue finalize(ValueType type)
     {
         ifDistinct.clear();
-        return m_value;
+        return Agg::finalize(type);
     }
 
 private:
@@ -159,15 +159,16 @@ public:
         ++m_count;
     }
 
-    virtual NValue finalize()
+    virtual NValue finalize(ValueType type)
     {
         if (m_count == 0)
         {
             return ValueFactory::getNullValue();
         }
         ifDistinct.clear();
-        const NValue finalizeResult = m_value.op_divide(ValueFactory::getBigIntValue(m_count));
-        return finalizeResult;
+        NValue finalizeResult = m_value.op_divide(ValueFactory::getBigIntValue(m_count));
+
+        return finalizeInternal(type, finalizeResult);
     }
 
     virtual void resetAgg()
@@ -197,10 +198,12 @@ public:
         m_count++;
     }
 
-    virtual NValue finalize()
+    virtual NValue finalize(ValueType type)
     {
         ifDistinct.clear();
-        return ValueFactory::getBigIntValue(m_count);
+        NValue finalizeResult = ValueFactory::getBigIntValue(m_count);
+
+        return finalizeInternal(type, finalizeResult);
     }
 
     virtual void resetAgg()
@@ -224,9 +227,10 @@ public:
         ++m_count;
     }
 
-    virtual NValue finalize()
+    virtual NValue finalize(ValueType type)
     {
-        return ValueFactory::getBigIntValue(m_count);
+        NValue finalizeResult = ValueFactory::getBigIntValue(m_count);
+        return finalizeInternal(type, finalizeResult);
     }
 
     virtual void resetAgg()
@@ -483,10 +487,7 @@ inline bool AggregateExecutorBase::insertOutputTuple(AggregateRow* aggregateRow)
     Agg** aggs = aggregateRow->m_aggregates;
     for (int ii = 0; ii < m_aggregateOutputColumns.size(); ii++) {
         const int columnIndex = m_aggregateOutputColumns[ii];
-        NValue result = aggs[ii]->finalize().castAs(tempTuple.getSchema()->columnType(columnIndex));
-        if (aggs[ii]->isOutlineDataInAggTempPool()) {
-            result.allocateObjectFromOutlineValue();
-        }
+        NValue result = aggs[ii]->finalize(tempTuple.getSchema()->columnType(columnIndex));
         tempTuple.setNValue(columnIndex, result);
     }
 
