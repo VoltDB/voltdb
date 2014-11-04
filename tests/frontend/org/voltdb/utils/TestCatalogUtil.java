@@ -214,6 +214,9 @@ public class TestCatalogUtil extends TestCase {
             "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
             "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
             "   <security enabled=\"true\"/>" +
+            "   <users>" +
+            "      <user name=\"joe\" password=\"aaa\"/>" +
+            "   </users>" +
             "</deployment>";
 
         final File tmpSecOff = VoltProjectBuilder.writeStringToTempFile(secOff);
@@ -236,6 +239,9 @@ public class TestCatalogUtil extends TestCase {
             "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
             "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
             "   <security enabled=\"true\"/>" +
+            "   <users>" +
+            "      <user name=\"joe\" password=\"aaa\"/>" +
+            "   </users>" +
             "</deployment>";
 
         final String secOn =
@@ -244,6 +250,9 @@ public class TestCatalogUtil extends TestCase {
             "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
             "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
             "   <security enabled=\"true\" provider=\"kerberos\"/>" +
+            "   <users>" +
+            "      <user name=\"joe\" password=\"aaa\"/>" +
+            "   </users>" +
             "</deployment>";
 
         final File tmpSecOff = VoltProjectBuilder.writeStringToTempFile(secOff);
