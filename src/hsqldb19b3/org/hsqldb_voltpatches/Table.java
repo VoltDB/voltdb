@@ -2743,6 +2743,20 @@ public class Table extends TableBase implements SchemaObject {
         return newExprIndex;
     } /* createAndAddExprIndexStructure */
 
+    // A VoltDB extension to support LIMIT PARTITION ROWS
+    Constraint getLimitConstraint() {
+        Constraint result = null;
+        for (Constraint constraint : getConstraints()) {
+            if (constraint.getConstraintType() == Constraint.LIMIT) {
+                // We're assuming only one LIMIT constraint at the moment
+                result = constraint;
+                break;
+            }
+        }
+        return result;
+    }
+    // End of VoltDB extension
+
     /* (non-Javadoc)
      * @see java.lang.Object#toString()
      */

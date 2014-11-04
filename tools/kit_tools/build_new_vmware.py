@@ -1,3 +1,15 @@
+#!/usr/bin/env python
+#
+# This script contains fabric tasks for making a new VMWare image for VoltDB.
+# The main task is make_new_vmimage, but many of the tasks are separately callable.
+#
+# fab -f build_new_vmware.py --list #to list all tasks
+#
+# To make a new vmware image from an existing image:
+# fab -f build_new_vmware.py make_new_vmimage:4.8,~/vmware/downloads/VoltDB-Ubuntu-x64-14.04-LTS-v4.7-Demo
+#
+# Note: vmware workstation must be installed and DISPLAY must be set for this to work
+#
 from fabric.api import hide, local, task
 import fnmatch
 import os
@@ -203,12 +215,17 @@ def zip_read(path, chdir=''):
     local('%s unzip -o %s' % (cdcmd, path))
     return
 
-@task
-def do_it(version,oldvmdir=None):
+@task(default=True)
+def make_new_vmimage(version,oldvmdir=None):
+    """
+    Run all the steps to make a new vmware image from an old one.  Usage: make_new_vmimage:version,oldvmdirectory
+    """
+
 
     #get and unpack a vm from voltdb website, if necessary
     if not oldvmdir:
-        #TODO: I'm not sure if this works right now
+        exit("Usage: make_new_vmimage:version,oldvmdir")
+        #TODO: Make this work some day.
         import urllib
         import zipfile
         tmpdir = tempfile.mkdtemp();

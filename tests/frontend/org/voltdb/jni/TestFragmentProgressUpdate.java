@@ -50,6 +50,9 @@ import org.voltdb.utils.Encoder;
 
 public class TestFragmentProgressUpdate extends TestCase {
 
+    private long READ_ONLY_TOKEN = Long.MAX_VALUE;
+    private long WRITE_TOKEN = 0;
+
     public void testFragmentProgressUpdate() throws Exception {
         m_ee.loadCatalog( 0, m_catalog.serialize());
 
@@ -61,7 +64,7 @@ public class TestFragmentProgressUpdate extends TestCase {
             m_warehousedata.addRow(i, "name" + i, "st1", "st2", "city", "ST", "zip", 0, 0);
         }
 
-        m_ee.loadTable(WAREHOUSE_TABLEID, m_warehousedata, 0, 0, 0, false, false, Long.MAX_VALUE);
+        m_ee.loadTable(WAREHOUSE_TABLEID, m_warehousedata, 0, 0, 0, false, false, WRITE_TOKEN);
         assertEquals(m_tableSize, m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
         System.out.println("Rows loaded to table "+m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
 
@@ -151,7 +154,6 @@ public class TestFragmentProgressUpdate extends TestCase {
         assertTrue(900000 < m_ee.m_peakMemoryInBytes);
         assertTrue(1100000 > m_ee.m_peakMemoryInBytes);
         assertTrue(m_ee.m_peakMemoryInBytes >= m_ee.m_currMemoryInBytes);
-        long previousMemoryInBytes = m_ee.m_currMemoryInBytes;
         long previousPeakMemory = m_ee.m_peakMemoryInBytes;
 
         Statement deleteStmt = m_testProc.getStatements().getIgnoreCase("warehouse_del_half");
@@ -177,7 +179,7 @@ public class TestFragmentProgressUpdate extends TestCase {
                 null,
                 new ParameterSet[] { params },
                 new String[] { deleteStmt.getSqltext() },
-                3, 3, 2, 42, Long.MAX_VALUE);
+                3, 3, 2, 42, WRITE_TOKEN);
 
         // populate plan cache
         ActivePlanRepository.clear();
@@ -217,7 +219,7 @@ public class TestFragmentProgressUpdate extends TestCase {
             m_warehousedata.addRow(i, "name" + i, "st1", "st2", "city", "ST", "zip", 0, 0);
         }
 
-        m_ee.loadTable(WAREHOUSE_TABLEID, m_warehousedata, 0, 0, 0, false, false, Long.MAX_VALUE);
+        m_ee.loadTable(WAREHOUSE_TABLEID, m_warehousedata, 0, 0, 0, false, false, WRITE_TOKEN);
         assertEquals(m_tableSize, m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
         System.out.println("Rows loaded to table "+m_ee.serializeTable(WAREHOUSE_TABLEID).getRowCount());
 
@@ -257,48 +259,100 @@ public class TestFragmentProgressUpdate extends TestCase {
 
     @SuppressWarnings("deprecation")
     public void testProgressUpdateLogSqlStmt() throws Exception {
+        // Set the log duration to be very short, to ensure that a message will be logged.
+        m_ee.setInitialLogDurationForTest(1);
+
+        verifyLongRunningQueries(50, 0, "item_crazy_join", true);
+    }
+
+    private void verifyLongRunningQueries(int scale, int timeout, String query, boolean readOnly) {
+        m_tableSize = scale;
+
         m_ee.loadCatalog( 0, m_catalog.serialize());
 
-        m_tableSize = 50;
         m_itemData.clearRowData();
-
         for (int i = 0; i < m_tableSize; ++i) {
             m_itemData.addRow(i, i + 50, "item" + i, (double)i / 2, "data" + i);
         }
 
-        m_ee.loadTable(ITEM_TABLEID, m_itemData, 0, 0, 0, false, false, Long.MAX_VALUE);
+        m_ee.loadTable(ITEM_TABLEID, m_itemData, 0, 0, 0, false, false, WRITE_TOKEN);
         assertEquals(m_tableSize, m_ee.serializeTable(ITEM_TABLEID).getRowCount());
-        System.out.println("Rows loaded to table "+m_ee.serializeTable(ITEM_TABLEID).getRowCount());
+        System.out.println("Rows loaded to table " + m_ee.serializeTable(ITEM_TABLEID).getRowCount());
 
-        Statement selectStmt = m_testProc.getStatements().getIgnoreCase("item_crazy_join");
+        Statement queryStmt = m_testProc.getStatements().getIgnoreCase(query);
+        String sqlText = queryStmt.getSqltext();
 
-        assertEquals(1, selectStmt.getFragments().size());
-        PlanFragment frag = selectStmt.getFragments().iterator().next();
+        PlanFragment frag = null;
+        for (PlanFragment f : queryStmt.getFragments()) {
+            frag = f;
+        }
 
         // populate plan cache
         ActivePlanRepository.clear();
         ActivePlanRepository.addFragmentForTest(
                 CatalogUtil.getUniqueIdForFragment(frag),
                 Encoder.decodeBase64AndDecompressToBytes(frag.getPlannodetree()),
-                selectStmt.getSqltext());
+                sqlText);
         ParameterSet params = ParameterSet.emptyParameterSet();
 
         // Replace the normal logger with a mocked one, so we can verify the message
         VoltLogger mockedLogger = Mockito.mock(VoltLogger.class);
         ExecutionEngine.setVoltLoggerForTest(mockedLogger);
 
-        // Set the log duration to be very short, to ensure that a message will be logged.
+        m_ee.setTimeoutLatency(timeout);
+
+        try {
+            m_ee.executePlanFragments(
+                    1,
+                    new long[] { CatalogUtil.getUniqueIdForFragment(frag) },
+                    null,
+                    new ParameterSet[] { params },
+                    new String[] { sqlText },
+                    3, 3, 2, 42,
+                    readOnly ? READ_ONLY_TOKEN : WRITE_TOKEN);
+            if (readOnly && timeout > 0) {
+                // only time out read queries
+                fail();
+            }
+        } catch (Exception ex) {
+            String msg = String.format("A SQL query was terminated after %.2f seconds "
+                    + "because it exceeded the query timeout period.",
+                    timeout/1000.0);
+            assertEquals(msg, ex.getMessage());
+        }
+
+        verify(mockedLogger, atLeastOnce()).info(contains(
+            String.format("Executing SQL statement is \"%s\".", sqlText)));
+    }
+
+    public void testTimingoutQueries() throws Exception {
+        //
+        // ReadOnly query
+        //
+        String procName = "item_crazy_join";
+
+        verifyLongRunningQueries(200, 0, procName, true);
+        tearDown(); setUp();
+
+        verifyLongRunningQueries(200, 0, procName, true);
+        tearDown(); setUp();
+
+        verifyLongRunningQueries(300, 0, procName, true);
+        tearDown(); setUp();
+
+
+        //
+        // Write query (negative)
+        //
+        procName = "item_big_del";
         m_ee.setInitialLogDurationForTest(1);
 
-        m_ee.executePlanFragments(
-                1,
-                new long[] { CatalogUtil.getUniqueIdForFragment(frag) },
-                null,
-                new ParameterSet[] { params },
-                new String[] { selectStmt.getSqltext() },
-                3, 3, 2, 42, Long.MAX_VALUE);
-        verify(mockedLogger, atLeastOnce()).info(
-                contains("Executing SQL statement is \"SELECT COUNT(*) FROM ITEM i1, ITEM i2, ITEM i3;\"."));
+        verifyLongRunningQueries(50000, 0, procName, false);
+        tearDown(); setUp();
+        m_ee.setInitialLogDurationForTest(1);
+
+        verifyLongRunningQueries(50000, 100, procName, false);
+        tearDown(); setUp();
     }
 
     private ExecutionEngine m_ee;

@@ -17,6 +17,7 @@
 
 package org.voltdb.compiler;
 
+import org.voltdb.AuthSystem;
 import org.voltdb.client.ProcedureInvocationType;
 
 public class CatalogChangeWork extends AsyncCompilerWork {
@@ -41,13 +42,14 @@ public class CatalogChangeWork extends AsyncCompilerWork {
             String invocationName, ProcedureInvocationType type,
             long originalTxnId, long originalUniqueId,
             boolean onReplica, boolean useAdhocDDL,
-            AsyncCompilerWorkCompletionHandler completionHandler)
+            AsyncCompilerWorkCompletionHandler completionHandler,
+            AuthSystem.AuthUser user)
     {
         super(replySiteId, false, clientHandle, connectionId, hostname,
               adminConnection, clientData, invocationName, type,
               originalTxnId, originalUniqueId,
               onReplica, useAdhocDDL,
-              completionHandler);
+              completionHandler, user);
         if (operationBytes != null) {
             this.operationBytes = operationBytes.clone();
         }
@@ -78,7 +80,8 @@ public class CatalogChangeWork extends AsyncCompilerWork {
               adhocDDL.originalUniqueId,
               adhocDDL.onReplica,
               adhocDDL.useAdhocDDL,
-              adhocDDL.completionHandler);
+              adhocDDL.completionHandler,
+              adhocDDL.user);
         // AsyncCompilerAgentHelper will fill in the current catalog bytes later.
         this.operationBytes = null;
         // Ditto for deployment string

@@ -49,7 +49,7 @@ public class TestAdhocCreateDropJavaProc extends AdhocDDLTestBase {
         String pathToDeployment = Configuration.getPathToCatalogForTest("updateclasses.xml");
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("-- Don't care");
-        builder.setUseAdhocSchema(true);
+        builder.setUseDDLSchema(true);
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
@@ -175,7 +175,7 @@ public class TestAdhocCreateDropJavaProc extends AdhocDDLTestBase {
         VoltProjectBuilder builder = new VoltProjectBuilder();
         // Start off with the dependency imported
         builder.addLiteralSchema("import class org.voltdb_testprocs.updateclasses.NoMeaningClass;");
-        builder.setUseAdhocSchema(true);
+        builder.setUseDDLSchema(true);
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);

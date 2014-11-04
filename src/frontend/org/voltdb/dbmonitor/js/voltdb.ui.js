@@ -252,7 +252,7 @@ var loadPage = function (serverName, portid) {
     loadSQLQueryPage(serverName, portid, userName, password, false);
 
     var loadSchemaTab = function () {
-        var templateUrl = window.location.protocol + '//' + window.location.host;
+        var templateUrl = window.location.protocol + '//' + window.location.host + '/catalog';
         var templateJavascript = "js/template.js";
 
         $.get(templateUrl, function (result) {
