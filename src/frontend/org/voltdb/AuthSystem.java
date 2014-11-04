@@ -203,7 +203,7 @@ public class AuthSystem {
          */
         private List<AuthGroup> m_groups = new ArrayList<AuthGroup>();
 
-        private List<Permission> m_permissions = new ArrayList<Permission>();
+        private EnumSet<Permission> m_permissions = EnumSet.noneOf(Permission.class);
 
         /**
          * Fast membership check set of stored procedures this user has permission to invoke.
