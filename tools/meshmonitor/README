@@ -45,6 +45,6 @@ On hostd's meshmonitor directory, run the following command:
 nohup java -jar meshmonitor/meshmonitor.jar 20 10 hostd:12222 hostc:12222 hostb:12222 hosta:12222 > hostd-mesh.log &
 
 Log terminalogy
-delta heartbeats - delta between receiving heartbeats
-delta sent|receive - delta between remotely recorded sent time and locally recorded receive time
-delta send - delta between sends times
+delta send - delta between sending heartbeats
+delta receive - delta between receiving heartbeats
+delta timestamp - delta between remotely recorded sent time and locally recorded receive time
