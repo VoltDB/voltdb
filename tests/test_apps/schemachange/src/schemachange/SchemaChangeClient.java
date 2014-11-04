@@ -263,11 +263,11 @@ public class SchemaChangeClient {
         // Now do the creates and alters.
         schemaChanger.beginBatch();
         try {
-            schemaChanger.createTable(versionT);
+            schemaChanger.createTables(versionT);
             // make tables name A partitioned and tables named B replicated
             boolean partitioned = newName.equalsIgnoreCase("A");
             if (newTable) {
-                schemaChanger.createTable(t2);
+                schemaChanger.createTables(t2);
                 activeTableNames.add(newName);
             }
             else {
@@ -282,7 +282,7 @@ public class SchemaChangeClient {
             }
             schemaChanger.createProcedures(client, activeVerifyProc);
             if (activeViewRep != null) {
-                schemaChanger.createView(activeViewRep);
+                schemaChanger.createViews(activeViewRep);
             }
         }
         catch (IOException e) {
@@ -339,8 +339,8 @@ public class SchemaChangeClient {
     interface SchemaChanger {
         void addProcedureClasses(Client client, Class<?>... procedures) throws IOException;
         void beginBatch();
-        void createTable(VoltTable table) throws IOException;
-        void createView(ViewRep view) throws IOException;
+        void createTables(VoltTable... tables) throws IOException;
+        void createViews(ViewRep... views) throws IOException;
         void createProcedures(Client client, Class<?>... procedures) throws IOException;
         void dropTables(String... names) throws IOException;
         void dropViews(String... names) throws IOException;
@@ -374,15 +374,19 @@ public class SchemaChangeClient {
         }
 
         @Override
-        public void createTable(VoltTable table) throws IOException {
+        public void createTables(VoltTable... tables) throws IOException {
             this.isNOP = false;
-            this.builder.addLiteralSchema(TableHelper.ddlForTable(table));
+            for (VoltTable table : tables) {
+                this.builder.addLiteralSchema(TableHelper.ddlForTable(table));
+            }
         }
 
         @Override
-        public void createView(ViewRep view) throws IOException {
+        public void createViews(ViewRep... views) throws IOException {
             this.isNOP = false;
-            this.builder.addLiteralSchema(view.ddlForView());
+            for (ViewRep view : views) {
+                this.builder.addLiteralSchema(view.ddlForView());
+            }
         }
 
         @Override
@@ -406,7 +410,7 @@ public class SchemaChangeClient {
         @Override
         public void updateTable(VoltTable t1, VoltTable t2) throws IOException {
             this.isNOP = false;
-            this.createTable(t2);
+            this.createTables(t2);
         }
 
         @Override
@@ -462,15 +466,19 @@ public class SchemaChangeClient {
             this.ddl = new StringBuilder();
         }
 
-       @Override
-        public void createTable(VoltTable table) throws IOException {
-            this.add(TableHelper.ddlForTable(table));
+        @Override
+        public void createTables(VoltTable... tables) throws IOException {
+            for (VoltTable table : tables) {
+                this.add(TableHelper.ddlForTable(table));
+            }
         }
 
-       @Override
-       public void createView(ViewRep view) throws IOException {
-           this.add(view.ddlForView());
-       }
+        @Override
+        public void createViews(ViewRep... views) throws IOException {
+            for (ViewRep view : views) {
+                this.add(view.ddlForView());
+            }
+        }
 
        @Override
        public void createProcedures(Client client, Class<?>... procedures) throws IOException {
