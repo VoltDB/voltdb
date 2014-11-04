@@ -3128,7 +3128,7 @@ public class TestVoltCompiler extends TestCase {
             }
 
             assertNotNull(groups);
-            assertEquals(roles.length, groups.size());
+            assertTrue(roles.length <= groups.size());
 
             for (TestRole role : roles) {
                 Group group = groups.get(role.name);
@@ -3169,11 +3169,11 @@ public class TestVoltCompiler extends TestCase {
     public void testRoleDDL() throws Exception {
         goodRoleDDL("create role r1;", new TestRole("r1"));
         goodRoleDDL("create role r1;create role r2;", new TestRole("r1"), new TestRole("r2"));
-        goodRoleDDL("create role r1 with adhoc;", new TestRole("r1", true, false, false, false, false, false));
-        goodRoleDDL("create role r1 with sql;", new TestRole("r1", true, false, false, false, false, false));
-        goodRoleDDL("create role r1 with sqlread;", new TestRole("r1", false, true, false, false, false, false));
+        goodRoleDDL("create role r1 with adhoc;", new TestRole("r1", true, true, false, true, true, false));
+        goodRoleDDL("create role r1 with sql;", new TestRole("r1", true, true, false, true, true, false));
+        goodRoleDDL("create role r1 with sqlread;", new TestRole("r1", false, true, false, false, true, false));
         goodRoleDDL("create role r1 with sysproc;", new TestRole("r1", true, true, true, true, true, true));
-        goodRoleDDL("create role r1 with defaultproc;", new TestRole("r1", false, false, false, true, false, false));
+        goodRoleDDL("create role r1 with defaultproc;", new TestRole("r1", false, false, false, true, true, false));
         goodRoleDDL("create role r1 with adhoc,sysproc,defaultproc;", new TestRole("r1", true, true, true, true, true, true));
         goodRoleDDL("create role r1 with adhoc,sysproc,sysproc;", new TestRole("r1", true, true, true, true, true, true));
         goodRoleDDL("create role r1 with AdHoc,SysProc,DefaultProc;", new TestRole("r1", true, true, true, true, true, true));
@@ -3182,6 +3182,11 @@ public class TestVoltCompiler extends TestCase {
         goodRoleDDL("create role r1 with AdHoc,SysProc,DefaultProc,DefaultProcRead;", new TestRole("r1", true, true, true, true, true, true));
         goodRoleDDL("create role r1 with AdHoc,Admin,DefaultProc,DefaultProcRead;", new TestRole("r1", true, true, true, true, true, true));
         goodRoleDDL("create role r1 with allproc;", new TestRole("r1", false, false, false, false, false, true));
+
+        // Check default roles: ADMINISTRATOR, USER
+        goodRoleDDL("",
+                    new TestRole("ADMINISTRATOR", true, true, true, true, true, true),
+                    new TestRole("USER", true, true, false, true, true, true));
     }
 
     public void testBadRoleDDL() throws Exception {
@@ -3191,6 +3196,10 @@ public class TestVoltCompiler extends TestCase {
         badRoleDDL("create role r1 with blah;", ".*Invalid permission \"BLAH\".*");
         badRoleDDL("create role r1 with adhoc sysproc;", ".*Invalid CREATE ROLE statement.*");
         badRoleDDL("create role r1 with adhoc, blah;", ".*Invalid permission \"BLAH\".*");
+
+        // cannot override default roles
+        badRoleDDL("create role ADMINISTRATOR;", ".*already exists.*");
+        badRoleDDL("create role USER;", ".*already exists.*");
     }
 
     private Database checkDDLAgainstSimpleSchema(String errorRegex, String... ddl) throws Exception {

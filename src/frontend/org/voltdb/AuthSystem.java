@@ -243,7 +243,7 @@ public class AuthSystem {
             if (proc == null) {
                 return false;
             }
-            return hasPermission(Permission.ADMIN, Permission.ALLPROC) || m_authorizedProcedures.contains(proc);
+            return hasPermission(Permission.ALLPROC) || m_authorizedProcedures.contains(proc);
         }
 
         /**

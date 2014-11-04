@@ -61,17 +61,13 @@ public enum Permission {
      * @return permissions as <code>EnumSet&ltPermission&gt</code>
      */
     public static final EnumSet<Permission> getPermissionSetForGroup(Group catGroup) {
-        EnumSet<Permission> perms;
-        if (catGroup.getAdmin()) {
-            perms = EnumSet.allOf(Permission.class);
-        } else {
-            perms = EnumSet.noneOf(Permission.class);
-            if (catGroup.getSql()) perms.add(Permission.SQL);
-            if (catGroup.getSqlread()) perms.add(Permission.SQLREAD);
-            if (catGroup.getDefaultproc()) perms.add(Permission.DEFAULTPROC);
-            if (catGroup.getDefaultprocread()) perms.add(Permission.DEFAULTPROCREAD);
-            if (catGroup.getAllproc()) perms.add(Permission.ALLPROC);
-        }
+        EnumSet<Permission> perms = EnumSet.noneOf(Permission.class);
+        if (catGroup.getAdmin()) addPermission(perms, ADMIN);
+        if (catGroup.getSql()) addPermission(perms, Permission.SQL);
+        if (catGroup.getSqlread()) addPermission(perms, Permission.SQLREAD);
+        if (catGroup.getDefaultproc()) addPermission(perms, Permission.DEFAULTPROC);
+        if (catGroup.getDefaultprocread()) addPermission(perms, Permission.DEFAULTPROCREAD);
+        if (catGroup.getAllproc()) addPermission(perms, Permission.ALLPROC);
         return perms;
     }
 
@@ -84,15 +80,45 @@ public enum Permission {
         EnumSet<Permission> permissions = EnumSet.noneOf(Permission.class);
         for (String alias : aliases) {
             try {
-                final Permission perm = Permission.valueOfFromAlias(alias.trim().toUpperCase());
-                if (perm == ADMIN) {
-                    permissions = EnumSet.allOf(Permission.class);
-                    break;
-                } else {
-                    permissions.add(perm);
-                }
+                addPermission(permissions, Permission.valueOfFromAlias(alias.trim().toUpperCase()));
             } catch (IllegalArgumentException e) {
                 throw new IllegalArgumentException(alias.trim().toUpperCase());
+            }
+        }
+        return permissions;
+    }
+
+    /**
+     * Add the given permission to the permission set.
+     * @param permissions    The permission set
+     * @param toAdd          The permissions to add
+     * @return The same permission set as passed in
+     */
+    private static EnumSet<Permission> addPermission(EnumSet<Permission> permissions, Permission...toAdd)
+    {
+        for (Permission onePerm : toAdd) {
+            // Permissions that infer other permissions need to be listed here and
+            // set the inferred permissions as well as itself.
+            //
+            // Always add the permission itself and then call this method to add
+            // the inferred permissions.
+            switch (onePerm) {
+            case ADMIN:
+                permissions.addAll(EnumSet.allOf(Permission.class));
+                break;
+            case SQL:
+                permissions.add(SQL);
+                addPermission(permissions, SQLREAD, DEFAULTPROC);
+                break;
+            case SQLREAD:
+                permissions.add(SQLREAD);
+                addPermission(permissions, DEFAULTPROCREAD);
+                break;
+            case DEFAULTPROC:
+                permissions.add(DEFAULTPROC);
+                addPermission(permissions, DEFAULTPROCREAD);
+            default:
+                permissions.add(onePerm);
             }
         }
         return permissions;

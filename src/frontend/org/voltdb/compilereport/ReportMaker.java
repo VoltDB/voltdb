@@ -585,7 +585,7 @@ public class ReportMaker {
 
     static String generateSizeTable(DatabaseSizes sizes) {
         StringBuilder sb = new StringBuilder();
-        sb.append("<!--##SIZES##>\n");
+        sb.append("<!--##SIZES##-->\n");
         int nrow = 0;
         for (TableSize tsize: sizes.tableSizes) {
             sb.append(generateSizeRow(tsize, ++nrow));

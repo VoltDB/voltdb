@@ -57,82 +57,140 @@ public class HTTPAdminListener {
     final boolean m_jsonEnabled;
     Map<String, String> m_htmlTemplates = new HashMap<String, String>();
 
-    class StudioHander extends AbstractHandler {
+    class DBMonitorHandler extends AbstractHandler {
 
         @Override
         public void handle(String target, Request baseRequest,
-                HttpServletRequest request, HttpServletResponse response)
-                throws IOException, ServletException {
+                           HttpServletRequest request, HttpServletResponse response)
+                            throws IOException, ServletException {
+            VoltLogger logger = new VoltLogger("HOST");
+            try{
 
-            // redirect the base dir
-            if (target.equals("/")) target = "/index.htm";
-
-            // check if a file exists
-            URL url = VoltDB.class.getResource("studio" + target);
-            if (url == null) {
-                // write 404
-                String msg = "404: Resource not found.\n";
-                response.setContentType("text/plain;charset=utf-8");
-                response.setStatus(HttpServletResponse.SC_NOT_FOUND);
-                baseRequest.setHandled(true);
-                response.getWriter().print(msg);
-            }
-
-            // read the template
-            InputStream is = VoltDB.class.getResourceAsStream("studio" + target);
-
-            if (target.endsWith("/index.htm")) {
-                // load the file as text
-                BufferedReader r = new BufferedReader(new InputStreamReader(is));
-                StringBuilder sb = new StringBuilder();
-                String line = null;
-                while ((line = r.readLine()) != null) {
-                    sb.append(line + "\n");
+                // if this is an internal jetty retry, then just tell
+                // jetty we're still working on it. There is a risk of
+                // masking other errors in doing this, but it's probably
+                // low compared with the default policy of retrys.
+                AsyncContinuation cont = baseRequest.getAsyncContinuation();
+                // this is set to false on internal jetty retrys
+                if (!cont.isInitial()) {
+                    // The continuation object has been woken up by the
+                    // retry. Tell it to go back to sleep.
+                    cont.suspend();
+                    return;
                 }
-                r.close(); is.close();
-                String template = sb.toString();
 
-                // fill in missing values in the template
-                Cluster cluster = VoltDB.instance().getCatalogContext().cluster;
-                template = template.replace("${hostname}", "localhost");
-                template = template.replace("${portnumber}", String.valueOf(cluster.getHttpdportno()));
-                template = template.replace("${requires-authentication}", cluster.getSecurityenabled() ? "true" : "false");
+                // kick over to the HTTP/JSON interface
+                if (baseRequest.getRequestURI().contains("/api/1.0/")) {
+                    // http://www.ietf.org/rfc/rfc4627.txt dictates this mime type
+                    response.setContentType("application/json;charset=utf-8");
+                    if (m_jsonEnabled) {
+                        httpClientInterface.process(baseRequest, response);
 
-                // set the headers
-                response.setContentType("text/html;charset=utf-8");
-                response.setStatus(HttpServletResponse.SC_OK);
-                baseRequest.setHandled(true);
-
-                // write the response
-                assert(template != null);
-                response.getWriter().print(template);
-            }
-            else {
-                // set the mime type in a giant hack
-                String mime = "text/html;charset=utf-8";
-                if (target.endsWith(".js"))
-                    mime = "application/x-javascript;charset=utf-8";
-                if (target.endsWith(".css"))
-                    mime = "text/css;charset=utf-8";
-                if (target.endsWith(".gif"))
-                    mime = "image/gif";
-                if (target.endsWith(".png"))
-                    mime = "image/png";
-                if ((target.endsWith(".jpg")) || (target.endsWith(".jpeg")))
-                    mime = "image/jpeg";
-
-                // set the headers
-                response.setContentType(mime);
-                response.setStatus(HttpServletResponse.SC_OK);
-                baseRequest.setHandled(true);
-
-                // write the file out
-                BufferedInputStream bis = new BufferedInputStream(is);
-                OutputStream os = response.getOutputStream();
-                int c = -1;
-                while ((c = bis.read()) != -1) {
-                    os.write(c);
+                        // used for perf testing of the http interface
+                        /*String msg = "{\"status\":1,\"appstatus\":-128,\"statusstring\":null,\"appstatusstring\":null,\"exception\":null,\"results\":[{\"status\":-128,\"schema\":[{\"name\":\"SVAL1\",\"type\":9},{\"name\":\"SVAL2\",\"type\":9},{\"name\":\"SVAL3\",\"type\":9}],\"data\":[[\"FOO\",\"BAR\",\"BOO\"]]}]}";
+                        response.setStatus(HttpServletResponse.SC_OK);
+                        baseRequest.setHandled(true);
+                        response.getWriter().print(msg);*/
+                    }
+                    else {
+                        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                        baseRequest.setHandled(true);
+                        response.getWriter().println("JSON API IS CURRENTLY DISABLED");
+                    }
+                    return;
                 }
+
+                // handle the CSV request for memory stats
+                if (baseRequest.getRequestURI().contains("/memorycsv/")) {
+                    String msg = SystemStatsCollector.getCSV();
+                    response.setContentType("text/plain;charset=utf-8");
+                    response.setStatus(HttpServletResponse.SC_OK);
+                    baseRequest.setHandled(true);
+                    response.getWriter().print(msg);
+                    return;
+                }
+
+                if (baseRequest.getRequestURI().contains("/memory/")) {
+                    handleMemoryPage(baseRequest, response);
+                    return;
+                }
+
+                if (baseRequest.getRequestURI().contains("/ddl/")) {
+                    byte[] reportbytes = VoltDB.instance().getCatalogContext().getFileInJar("autogen-ddl.sql");
+                    String ddl = new String(reportbytes, Charsets.UTF_8);
+                    response.setContentType("text/plain;charset=utf-8");
+                    response.setStatus(HttpServletResponse.SC_OK);
+                    baseRequest.setHandled(true);
+                    response.getWriter().print(ddl);
+                    return;
+                }
+                if (baseRequest.getRequestURI().contains("/catalog/")) {
+                   handleReportPage(baseRequest, response);
+                }
+
+                // redirect the base dir
+                if (target.equals("/")) target = "/index.htm";
+                // check if a file exists
+                URL url = VoltDB.class.getResource("dbmonitor" + target);
+                if (url == null) {
+                    logger.error("Can't find file"+target);
+                    // write 404
+                    String msg = "404: Resource not found.\n"+url.toString();
+                    response.setContentType("text/plain;charset=utf-8");
+                    response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                    baseRequest.setHandled(true);
+                    response.getWriter().print(msg);
+                    return;
+                }
+
+                // read the template
+                InputStream is = VoltDB.class.getResourceAsStream("dbmonitor" + target);
+
+                if (target.endsWith("/index.htm")) {
+
+                    // set the headers
+                    response.setContentType("text/html;charset=utf-8");
+                    response.setStatus(HttpServletResponse.SC_OK);
+                    baseRequest.setHandled(true);
+
+                    OutputStream os = response.getOutputStream();
+                    BufferedInputStream bis = new BufferedInputStream(is);
+
+                    int c = -1;
+                    while ((c = bis.read()) != -1) {
+                        os.write(c);
+                    }
+                }
+                else {
+                    // set the mime type in a giant hack
+                    String mime = "text/html;charset=utf-8";
+                    if (target.endsWith(".js"))
+                        mime = "application/x-javascript;charset=utf-8";
+                    if (target.endsWith(".css"))
+                        mime = "text/css;charset=utf-8";
+                    if (target.endsWith(".gif"))
+                        mime = "image/gif";
+                    if (target.endsWith(".png"))
+                        mime = "image/png";
+                    if ((target.endsWith(".jpg")) || (target.endsWith(".jpeg")))
+                        mime = "image/jpeg";
+
+                    // set the headers
+                    response.setContentType(mime);
+                    response.setStatus(HttpServletResponse.SC_OK);
+                    baseRequest.setHandled(true);
+
+                    // write the file out
+                    BufferedInputStream bis = new BufferedInputStream(is);
+                    OutputStream os = response.getOutputStream();
+                    int c = -1;
+                    while ((c = bis.read()) != -1) {
+                        os.write(c);
+                    }
+                }
+            }catch(Exception ex){
+                logger.error(ex.getMessage());
+                logger.error(ex);
             }
         }
     }
@@ -204,7 +262,6 @@ public class HTTPAdminListener {
                 response.getWriter().print(ddl);
                 return;
             }
-
             handleReportPage(baseRequest, response);
         }
 
@@ -323,15 +380,15 @@ public class HTTPAdminListener {
             connector.setName("VoltDB-HTTPD");
             m_server.addConnector(connector);
 
-            ContextHandler studioHander = new ContextHandler("/studio");
-            studioHander.setHandler(new StudioHander());
+            ContextHandler dbMonitorHandler = new ContextHandler("/");
+            dbMonitorHandler.setHandler(new DBMonitorHandler());
 
-            ContextHandler baseHander = new ContextHandler("/");
+            ContextHandler baseHander = new ContextHandler("/catalog");
             baseHander.setHandler(new RequestHandler());
 
             ContextHandlerCollection handlers = new ContextHandlerCollection();
             handlers.setHandlers(new Handler[] {
-                    studioHander,
+                    dbMonitorHandler,
                     baseHander
             });
 
