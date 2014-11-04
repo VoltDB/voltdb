@@ -628,12 +628,13 @@ public abstract class CatalogUtil {
      * @return Returns true if the deployment file is valid.
      */
     private static boolean validateDeployment(Catalog catalog, DeploymentType deployment) {
-        if (deployment.getUsers() == null && deployment.getSecurity() != null && deployment.getSecurity().isEnabled()) {
-            hostLog.error("Cannot enable security without defining users in the deployment file.");
-            return false;
-        }
         if (deployment.getUsers() == null) {
-            return true;
+            if (deployment.getSecurity() != null && deployment.getSecurity().isEnabled()) {
+                hostLog.error("Cannot enable security without defining users in the deployment file.");
+                return false;
+            } else {
+                return true;
+            }
         }
 
         Cluster cluster = catalog.getClusters().get("cluster");
