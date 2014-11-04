@@ -841,18 +841,11 @@ h3.systemHeader{}
 	 
 	 @media screen and (orientation:landscape) {
 		 
-		.overlay-content {height: 150px;}t
+		.overlay-content {height: 150px;}
+		.VDBMonitorHelp { height:180px; overflow:auto; }
+		.VDBSchemaHelp { height:180px; overflow:auto;}
+		.VDBQueryHelp { height:180px; overflow:auto;}	
 		
 		 }
 
 
-@media only screen 
-and (min-device-width : 320px) 
-and (max-device-width : 479px) 
-and (orientation : landscape) {
-	
-	.VDBMonitorHelp { height:150px; overflow:auto; }
-		.VDBSchemaHelp { height:150px; overflow:auto;}
-		.VDBQueryHelp { height:150px; overflow:auto;}	
-
-}
