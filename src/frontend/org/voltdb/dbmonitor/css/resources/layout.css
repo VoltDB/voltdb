@@ -21,6 +21,7 @@ h1 {font:16px Arial, Helvetica, sans-serif;}
 .graphOpacity {opacity: 0.5}
 h1, h2, h3, h4, h5, h6 {margin:0!important;}
 
+
 /*****Global Ends******/
 /******sprite*************/
 .user,
@@ -360,7 +361,21 @@ html ul.tabs li.active, html ul.tabs li.active a:hover  {
 .storeTbl th, .dbTbl th { margin:0; padding:0; background:#3f5364; color:#FFFFFF;}
 .storeTbl th, td, .dbTbl th,td { padding:10px 10px; border-right:1px solid #CCCCCC;border-bottom:1px solid #CCCCCC;}
 td.txt-center{text-align:center;}
-.storeTbl tr:hover, .dbTbl tr:hover {cursor: pointer}
+.storeTbl tr th:hover, .dbTbl tr th:hover {cursor: pointer;}
+
+.storeTbl tr th {
+-webkit-user-select: none; /* webkit (safari, chrome) browsers */
+-moz-user-select: none; /* mozilla browsers */
+-khtml-user-select: none; /* webkit (konqueror) browsers */
+-ms-user-select: none; /* IE10+ */
+}
+.dbTbl  tr th {
+-webkit-user-select: none; /* webkit (safari, chrome) browsers */
+-moz-user-select: none; /* mozilla browsers */
+-khtml-user-select: none; /* webkit (konqueror) browsers */
+-ms-user-select: none; /* IE10+ */	
+	
+}
  
 
 
