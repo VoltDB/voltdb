@@ -68,6 +68,9 @@ public class FragmentUpdateTestProcedure extends VoltProcedure {
     // but should take a decent amount of time to run with just a few rows in ITEM.
     public final SQLStmt item_crazy_join = new SQLStmt("SELECT COUNT(*) FROM ITEM i1, ITEM i2, ITEM i3");
 
+    // Not meaningful, but should take long.
+    public final SQLStmt item_big_del = new SQLStmt("DELETE FROM ITEM WHERE I_NAME <> 'NULL_NULL';");
+
     public VoltTable[] run() {
         voltQueueSQL(warehouse_select);
         voltQueueSQL(warehouse_del_half);

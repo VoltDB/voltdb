@@ -1579,7 +1579,7 @@ function alertNodeClicked(obj) {
 
                         //If the value of TotalMemory is passed, then totalMemoryIndex will be greater than -1.
                         //TODO: Remove the condition "totalMemoryIndex > -1" and just set it to "memoryInfo[totalMemoryIndex]" after it has been implemented in the API.
-                        sysMemory[hostName]["TOTALMEMORY"] = totalMemoryIndex > -1 ? memoryInfo[totalMemoryIndex] : 0;
+                        sysMemory[hostName]["TOTALMEMORY"] = totalMemoryIndex > -1 ? memoryInfo[totalMemoryIndex] : -1;
 
                         //TODO: Use TotalMemory after it has been implemented in the API.
                         //sysMemory[hostName]["MEMORYUSAGE"] = (sysMemory[hostName]["RSS"] / sysMemory[hostName]["TOTALMEMORY"]) * 100;

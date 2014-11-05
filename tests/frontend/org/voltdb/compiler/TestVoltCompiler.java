@@ -2130,6 +2130,7 @@ public class TestVoltCompiler extends TestCase {
     {
         String ddl;
 
+        // Test CREATE
         // test failed cases
         ddl = "create table t(id integer not null, num integer," +
                 "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 6xx);";
@@ -2145,7 +2146,7 @@ public class TestVoltCompiler extends TestCase {
 
         ddl = "create table t(id integer not null, num integer," +
                 "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 5, CONSTRAINT tblimit2 LIMIT PARTITION ROWS 7);";
-        checkDDLErrorMessage(ddl, "Too many table limit constraints for table T");
+        checkDDLErrorMessage(ddl, "Multiple LIMIT PARTITION ROWS constraints on table T are forbidden");
 
         ddl = "create table t(id integer not null, num integer," +
                 "CONSTRAINT tblimit1 LIMIT PARTITION Row 6);";
@@ -2163,6 +2164,104 @@ public class TestVoltCompiler extends TestCase {
 
         ddl = "create table t(id integer not null, num integer," +
                 "LIMIT PARTITION ROWS 6);";
+        checkDDLErrorMessage(ddl, null);
+
+        // Test alter
+        // Test failed cases
+        ddl = "create table t(id integer not null, num integer);" +
+              "alter table t add constraint foo LIMIT PARTITION ROWS 6XX;";
+        checkDDLErrorMessage(ddl, "unexpected token: XX");
+
+        ddl = "create table t(id integer not null, num integer);" +
+              "alter table t add constraint foo LIMIT PARTITION ROWS 66666666666666666666666;";
+        checkDDLErrorMessage(ddl, "incompatible data type in operation");
+
+        ddl = "create table t(id integer not null, num integer);" +
+              "alter table t add constraint foo LIMIT PARTITION ROWS -10;";
+        checkDDLErrorMessage(ddl, "Invalid constraint limit number '-10'");
+
+        ddl = "create table t(id integer not null, num integer);" +
+              "alter table t add constraint foo LIMIT PARTITION ROW 6;";
+        checkDDLErrorMessage(ddl, "unexpected token: ROW required: ROWS");
+
+        ddl = "create table t(id integer not null, num integer);" +
+              "alter table t add constraint foo LIMIT ROWS 6;";
+        checkDDLErrorMessage(ddl, "unexpected token: ROWS required: PARTITION");
+
+        ddl = "create table t(id integer not null, num integer);" +
+              "alter table t2 add constraint foo LIMIT PARTITION ROWS 6;";
+        checkDDLErrorMessage(ddl, "object not found: T2");
+
+        // Test alter successes
+        ddl = "create table t(id integer not null, num integer);" +
+              "alter table t add constraint foo LIMIT PARTITION ROWS 6;";
+        checkDDLErrorMessage(ddl, null);
+
+        ddl = "create table t(id integer not null, num integer);" +
+              "alter table t add LIMIT PARTITION ROWS 6;";
+        checkDDLErrorMessage(ddl, null);
+
+        // Successive alter statements are okay
+        ddl = "create table t(id integer not null, num integer);" +
+              "alter table t add LIMIT PARTITION ROWS 6;" +
+              "alter table t add LIMIT PARTITION ROWS 7;";
+        checkDDLErrorMessage(ddl, null);
+
+        // Alter after constraint set in create is okay
+        ddl = "create table t(id integer not null, num integer," +
+                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 6);" +
+              "alter table t add LIMIT PARTITION ROWS 7;";
+        checkDDLErrorMessage(ddl, null);
+
+        // Test drop
+        // Test failed cases
+        ddl = "create table t(id integer not null, num integer);" +
+              "alter table t drop constraint tblimit2;";
+        checkDDLErrorMessage(ddl, "object not found: TBLIMIT2");
+
+        ddl = "create table t(id integer not null, num integer," +
+                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 6);" +
+              "alter table t drop constraint tblimit2;";
+        checkDDLErrorMessage(ddl, "object not found: TBLIMIT2");
+
+        ddl = "create table t(id integer not null, num integer);" +
+              "alter table t add LIMIT PARTITION ROWS 6;" +
+              "alter table t drop constraint tblimit2;";
+        checkDDLErrorMessage(ddl, "object not found: TBLIMIT2");
+
+        ddl = "create table t(id integer not null, num integer);" +
+              "alter table t drop LIMIT PARTITION ROWS;";
+        checkDDLErrorMessage(ddl, "object not found");
+
+        ddl = "create table t(id integer not null, num integer);" +
+              "alter table t drop LIMIT PARTITIONS ROWS;";
+        checkDDLErrorMessage(ddl, "unexpected token: PARTITIONS required: PARTITION");
+
+        ddl = "create table t(id integer not null, num integer);" +
+              "alter table t drop LIMIT PARTITION ROW;";
+        checkDDLErrorMessage(ddl, "unexpected token: ROW required: ROWS");
+
+        ddl = "create table t(id integer not null, num integer);" +
+              "alter table t drop PARTITION ROWS;";
+        checkDDLErrorMessage(ddl, "unexpected token: PARTITION");
+
+        // Test successes
+        // named drop
+        ddl = "create table t(id integer not null, num integer," +
+                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 6);" +
+              "alter table t drop constraint tblimit1;";
+        checkDDLErrorMessage(ddl, null);
+
+        // magic drop
+        ddl = "create table t(id integer not null, num integer);" +
+              "alter table t add LIMIT PARTITION ROWS 6;" +
+              "alter table t drop LIMIT PARTITION ROWS;";
+        checkDDLErrorMessage(ddl, null);
+
+        // magic drop of named constraint
+        ddl = "create table t(id integer not null, num integer," +
+                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 6);" +
+              "alter table t drop LIMIT PARTITION ROWS;";
         checkDDLErrorMessage(ddl, null);
     }
 
@@ -2969,19 +3068,26 @@ public class TestVoltCompiler extends TestCase {
 
     class TestRole {
         final String name;
-        boolean adhoc = false;
+        boolean sql = false;
+        boolean sqlread = false;
         boolean sysproc = false;
         boolean defaultproc = false;
+        boolean defaultprocread = false;
+        boolean allproc = false;
 
         public TestRole(String name) {
             this.name = name;
         }
 
-        public TestRole(String name, boolean adhoc, boolean sysproc, boolean defaultproc) {
+        public TestRole(String name, boolean sql, boolean sqlread, boolean sysproc,
+                        boolean defaultproc, boolean defaultprocread, boolean allproc) {
             this.name = name;
-            this.adhoc = adhoc;
+            this.sql = sql;
+            this.sqlread = sqlread;
             this.sysproc = sysproc;
             this.defaultproc = defaultproc;
+            this.defaultprocread = defaultprocread;
+            this.allproc = allproc;
         }
     }
 
@@ -3022,14 +3128,17 @@ public class TestVoltCompiler extends TestCase {
             }
 
             assertNotNull(groups);
-            assertEquals(roles.length, groups.size());
+            assertTrue(roles.length <= groups.size());
 
             for (TestRole role : roles) {
                 Group group = groups.get(role.name);
                 assertNotNull(String.format("Missing role \"%s\"", role.name), group);
-                assertEquals(String.format("Role \"%s\" adhoc flag mismatch:", role.name), role.adhoc, group.getAdhoc());
-                assertEquals(String.format("Role \"%s\" sysproc flag mismatch:", role.name), role.sysproc, group.getSysproc());
+                assertEquals(String.format("Role \"%s\" sql flag mismatch:", role.name), role.sql, group.getSql());
+                assertEquals(String.format("Role \"%s\" sqlread flag mismatch:", role.name), role.sqlread, group.getSqlread());
+                assertEquals(String.format("Role \"%s\" admin flag mismatch:", role.name), role.sysproc, group.getAdmin());
                 assertEquals(String.format("Role \"%s\" defaultproc flag mismatch:", role.name), role.defaultproc, group.getDefaultproc());
+                assertEquals(String.format("Role \"%s\" defaultprocread flag mismatch:", role.name), role.defaultprocread, group.getDefaultprocread());
+                assertEquals(String.format("Role \"%s\" allproc flag mismatch:", role.name), role.allproc, group.getAllproc());
             }
         }
         else {
@@ -3060,21 +3169,37 @@ public class TestVoltCompiler extends TestCase {
     public void testRoleDDL() throws Exception {
         goodRoleDDL("create role r1;", new TestRole("r1"));
         goodRoleDDL("create role r1;create role r2;", new TestRole("r1"), new TestRole("r2"));
-        goodRoleDDL("create role r1 with adhoc;", new TestRole("r1", true, false, false));
-        goodRoleDDL("create role r1 with sysproc;", new TestRole("r1", false, true, false));
-        goodRoleDDL("create role r1 with defaultproc;", new TestRole("r1", false, false, true));
-        goodRoleDDL("create role r1 with adhoc,sysproc,defaultproc;", new TestRole("r1", true, true, true));
-        goodRoleDDL("create role r1 with adhoc,sysproc,sysproc;", new TestRole("r1", true, true, false));
-        goodRoleDDL("create role r1 with AdHoc,SysProc,DefaultProc;", new TestRole("r1", true, true, true));
+        goodRoleDDL("create role r1 with adhoc;", new TestRole("r1", true, true, false, true, true, false));
+        goodRoleDDL("create role r1 with sql;", new TestRole("r1", true, true, false, true, true, false));
+        goodRoleDDL("create role r1 with sqlread;", new TestRole("r1", false, true, false, false, true, false));
+        goodRoleDDL("create role r1 with sysproc;", new TestRole("r1", true, true, true, true, true, true));
+        goodRoleDDL("create role r1 with defaultproc;", new TestRole("r1", false, false, false, true, true, false));
+        goodRoleDDL("create role r1 with adhoc,sysproc,defaultproc;", new TestRole("r1", true, true, true, true, true, true));
+        goodRoleDDL("create role r1 with adhoc,sysproc,sysproc;", new TestRole("r1", true, true, true, true, true, true));
+        goodRoleDDL("create role r1 with AdHoc,SysProc,DefaultProc;", new TestRole("r1", true, true, true, true, true, true));
+        //Defaultprocread.
+        goodRoleDDL("create role r1 with defaultprocread;", new TestRole("r1", false, false, false, false, true, false));
+        goodRoleDDL("create role r1 with AdHoc,SysProc,DefaultProc,DefaultProcRead;", new TestRole("r1", true, true, true, true, true, true));
+        goodRoleDDL("create role r1 with AdHoc,Admin,DefaultProc,DefaultProcRead;", new TestRole("r1", true, true, true, true, true, true));
+        goodRoleDDL("create role r1 with allproc;", new TestRole("r1", false, false, false, false, false, true));
+
+        // Check default roles: ADMINISTRATOR, USER
+        goodRoleDDL("",
+                    new TestRole("ADMINISTRATOR", true, true, true, true, true, true),
+                    new TestRole("USER", true, true, false, true, true, true));
     }
 
     public void testBadRoleDDL() throws Exception {
         badRoleDDL("create role r1", ".*no semicolon.*");
         badRoleDDL("create role r1;create role r1;", ".*already exists.*");
         badRoleDDL("create role r1 with ;", ".*Invalid CREATE ROLE statement.*");
-        badRoleDDL("create role r1 with blah;", ".*Invalid permission \"blah\".*");
+        badRoleDDL("create role r1 with blah;", ".*Invalid permission \"BLAH\".*");
         badRoleDDL("create role r1 with adhoc sysproc;", ".*Invalid CREATE ROLE statement.*");
-        badRoleDDL("create role r1 with adhoc, blah;", ".*Invalid permission \"blah\".*");
+        badRoleDDL("create role r1 with adhoc, blah;", ".*Invalid permission \"BLAH\".*");
+
+        // cannot override default roles
+        badRoleDDL("create role ADMINISTRATOR;", ".*already exists.*");
+        badRoleDDL("create role USER;", ".*already exists.*");
     }
 
     private Database checkDDLAgainstSimpleSchema(String errorRegex, String... ddl) throws Exception {

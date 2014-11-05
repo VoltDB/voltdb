@@ -17,18 +17,17 @@
 package org.voltdb;
 
 import org.voltdb.AuthSystem.AuthUser;
-import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.Procedure;
 
 /**
  * Policy on whether or not to accept a type of stored procedure invocations. It
  * is used by the ClientInterface to determine whether or not to process an
- * invocation when it comes in from client.
+ * invocation when it comes in from client. This is used for non-permission policies.
  *
  * Policy can be turned on or off. If a policy is off, it should always accept
  * all invocations.
  */
-public abstract class InvocationAcceptancePolicy {
+public abstract class InvocationValidationPolicy {
     protected volatile boolean isOn;
 
     /**
@@ -43,7 +42,7 @@ public abstract class InvocationAcceptancePolicy {
      * Constructor
      * @param isOn Whether this policy should be on by default
      */
-    public InvocationAcceptancePolicy(boolean isOn) {
+    public InvocationValidationPolicy(boolean isOn) {
         this.isOn = isOn;
     }
 
@@ -56,7 +55,6 @@ public abstract class InvocationAcceptancePolicy {
      * @param user Current user
      * @param invocation The invocation
      * @param proc The procedure catalog object
-     * @param s Write stream to queue error responses
      * @return ClientResponseImpl with error or null if accepted
      */
     public ClientResponseImpl shouldAccept(AuthUser user, StoredProcedureInvocation invocation,

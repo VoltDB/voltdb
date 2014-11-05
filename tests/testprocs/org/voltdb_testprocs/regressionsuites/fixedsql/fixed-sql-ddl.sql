@@ -198,3 +198,59 @@ PARTITION TABLE ENG6870 ON COLUMN C0;
 CREATE INDEX SIX_TreeIdx ON ENG6870 (C5);
 CREATE INDEX FOURTEEN_TreeIdx ON ENG6870 (C14);
 
+-- ENG-6926
+CREATE TABLE ENG6926_IPUSER (
+   IP VARCHAR(128) NOT NULL UNIQUE,
+   COUNTRYCODE VARCHAR(4),
+   COUNTRY VARCHAR(128),
+   PROVINCECODE VARCHAR(4),
+   PROVINCE VARCHAR(128),
+   CITY VARCHAR(128),
+   CITYCODE VARCHAR(8),
+   LATITUDE FLOAT,
+   LONGITUDE FLOAT,
+   UPDATED TIMESTAMP DEFAULT NOW,
+   PRIMARY KEY (IP)
+);
+
+CREATE TABLE ENG6926_HITS (
+   IP VARCHAR(128) NOT NULL,
+   HITCOUNT BIGINT,
+   WEEK BIGINT NOT NULL,
+   PRIMARY KEY (WEEK, IP)
+);
+PARTITION TABLE ENG6926_HITS ON COLUMN WEEK;
+
+-- ************************* --
+-- Begin tables for ENG-7041 --
+CREATE TABLE transaction(
+  txn_id BIGINT NOT NULL,
+  acc_no BIGINT  NOT NULL,
+  txn_amt FLOAT NOT NULL,
+  txn_state VARCHAR(5) NOT NULL,
+  txn_city VARCHAR(50) NOT NULL,
+  txn_ts TIMESTAMP  NOT NULL,
+  vendor_id INTEGER,
+  PRIMARY KEY (acc_no, txn_ts, txn_id)
+);
+PARTITION TABLE transaction ON COLUMN acc_no;
+
+CREATE TABLE offers_given_exp(
+  acc_no BIGINT NOT NULL,
+  vendor_id INTEGER,
+  offer_ts TIMESTAMP NOT NULL,
+  offer_text VARCHAR(200)
+);
+PARTITION TABLE offers_given_exp ON COLUMN acc_no;
+EXPORT TABLE offers_given_exp;
+
+CREATE VIEW acct_vendor_totals AS
+SELECT
+  acc_no,
+  vendor_id,
+  COUNT(*) as total_visits,
+  SUM(txn_amt) as total_spend
+FROM transaction
+GROUP BY acc_no, vendor_id;
+-- End tables for ENG-7041   --
+-- ************************* --

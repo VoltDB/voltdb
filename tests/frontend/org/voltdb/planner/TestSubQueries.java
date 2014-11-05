@@ -273,7 +273,6 @@ public class TestSubQueries extends PlannerTestCase {
                 "       from (select C, COUNT(*) A from P1 GROUP BY C ORDER BY A LIMIT 6) T1 group by A) T2 " +
                 "group by A_count order by A_count";
         planNodes = compileToFragments(sql);
-        printExplainPlan(planNodes);
         // send node
         pn = planNodes.get(1).getChild(0);
         checkPrimaryKeyIndexScan(pn, "P1");

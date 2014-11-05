@@ -56,7 +56,7 @@
         <level value="INFO"/>
     </logger -->
 
-    <!-- logger name="ADHOCPLANNERTHREAD">
+    <!-- logger name="ADHOC">
         <level value="INFO"/>
     </logger -->
 
@@ -102,6 +102,12 @@
 
     <!-- Always let CSVLoader and its ilk to write to the console. -->
     <logger name="CSVLOADER">
+        <level value="INFO"/>
+        <appender-ref ref="console"/>
+    </logger>
+
+    <!-- Always let the bulk loader and its ilk to write to the console. -->
+    <logger name="LOADER">
         <level value="INFO"/>
         <appender-ref ref="console"/>
     </logger>

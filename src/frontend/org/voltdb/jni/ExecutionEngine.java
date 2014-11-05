@@ -327,6 +327,11 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     }
 
     static final long LONG_OP_THRESHOLD = 10000;
+    private static int TIME_OUT_MILLIS = 0; // No time out
+
+    public void setTimeoutLatency(int newLatency) {
+        TIME_OUT_MILLIS = newLatency;
+    }
 
     public long fragmentProgressUpdate(int batchIndex,
             String planNodeName,
@@ -346,6 +351,16 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             m_startTime = m_lastMsgTime = currentTime;
             return LONG_OP_THRESHOLD;
         }
+        long latency = currentTime - m_startTime;
+
+        if (m_readOnly && TIME_OUT_MILLIS > 0 && latency > TIME_OUT_MILLIS) {
+            String msg = getLongRunningQueriesMessage(latency, planNodeName, true);
+            log.info(msg);
+
+            // timing out the long running queries
+            return -1 * latency;
+        }
+
         if (currentTime <= (m_logDuration + m_lastMsgTime)) {
             // The callback was triggered earlier than we were ready to log.
             // If this keeps happening, it might makes sense to ramp up the threshold
@@ -364,26 +379,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             // future callbacks per log entry, ideally so that one callback arrives just in time to log.
             return LONG_OP_THRESHOLD;
         }
-        String msg = String.format(
-                "Procedure %s is taking a long time to execute -- at least " +
-                        "%.1f seconds spent accessing " +
-                        "%d tuples. Current plan fragment " +
-                        "%s in call " +
-                        "%d to voltExecuteSQL on site " +
-                        "%s. Current temp table uses " +
-                        "%d bytes memory, and the peak usage of memory for temp table is " +
-                        "%d bytes.",
-                        m_currentProcedureName,
-                        (currentTime - m_startTime) / 1000.0,
-                        tuplesProcessed,
-                        planNodeName,
-                        m_currentBatchIndex,
-                        CoreUtils.hsIdToString(m_siteId),
-                        currMemoryInBytes,
-                        peakMemoryInBytes);
-        if (m_sqlTexts != null) {
-            msg += "  Executing SQL statement is \"" + m_sqlTexts[m_currentBatchIndex] + "\".";
-        }
+        String msg = getLongRunningQueriesMessage(latency, planNodeName, false);
         log.info(msg);
 
         m_logDuration = (m_logDuration < 30000) ? (2 * m_logDuration) : 30000;
@@ -392,6 +388,33 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         // pass before the next call. For now, this is a fixed number. Ideally the threshold would vary
         // to try to get one callback to arrive just after the log duration interval expires.
         return LONG_OP_THRESHOLD;
+    }
+
+    private String getLongRunningQueriesMessage(long latency, String planNodeName, boolean timeout) {
+        String status = timeout ? "timed out at" : "taking a long time to execute -- at least";
+        String msg = String.format(
+                "Procedure %s is %s " +
+                        "%.2f seconds spent accessing " +
+                        "%d tuples. Current plan fragment " +
+                        "%s in call " +
+                        "%d to voltExecuteSQL on site " +
+                        "%s. Current temp table uses " +
+                        "%d bytes memory, and the peak usage of memory for temp table is " +
+                        "%d bytes.",
+                        m_currentProcedureName,
+                        status,
+                        latency / 1000.0,
+                        m_lastTuplesAccessed,
+                        planNodeName,
+                        m_currentBatchIndex,
+                        CoreUtils.hsIdToString(m_siteId),
+                        m_currMemoryInBytes,
+                        m_peakMemoryInBytes);
+        if (m_sqlTexts != null) {
+            msg += "  Executing SQL statement is \"" + m_sqlTexts[m_currentBatchIndex] + "\".";
+        }
+
+        return msg;
     }
 
     /**

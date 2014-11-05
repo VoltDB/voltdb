@@ -50,9 +50,10 @@ import org.voltdb.utils.MiscUtils;
 
 public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
 
-    String firstCanonicalDDL = null;
+    private String firstCanonicalDDL = null;
+    private boolean triedSqlcmdDryRun = false;
 
-    public String getFirstCanonicalDDL() throws Exception {
+    private String getFirstCanonicalDDL() throws Exception {
         String pathToCatalog = Configuration.getPathToCatalogForTest("fullDDL.jar");
 
         VoltCompiler compiler = new VoltCompiler();
@@ -63,14 +64,14 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
         return compiler.getCanonicalDDL();
     }
 
-    public void secondCanonicalDDLFromAdhoc() throws Exception {
+    private void secondCanonicalDDLFromAdhoc() throws Exception {
         String pathToCatalog = Configuration.getPathToCatalogForTest("emptyDDL.jar");
         String pathToDeployment = Configuration.getPathToCatalogForTest("emptyDDL.xml");
 
         VoltCompiler compiler = new VoltCompiler();
         VoltProjectBuilder builder = new VoltProjectBuilder();
 
-        builder.setUseAdhocSchema(true);
+        builder.setUseDDLSchema(true);
         boolean success = builder.compile(pathToCatalog);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
@@ -88,13 +89,13 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
         teardownSystem();
     }
 
-    public void secondCanonicalDDLFromSQLcmd() throws Exception {
+    private void secondCanonicalDDLFromSQLcmd() throws Exception {
         String pathToCatalog = Configuration.getPathToCatalogForTest("emptyDDL.jar");
         String pathToDeployment = Configuration.getPathToCatalogForTest("emptyDDL.xml");
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
 
-        builder.setUseAdhocSchema(true);
+        builder.setUseDDLSchema(true);
         PortGenerator pg = new PortGenerator();
         int httpdPort = pg.next();
         builder.setHTTPDPort(httpdPort);
@@ -111,19 +112,25 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
         String roundtripDDL;
 
         assert(firstCanonicalDDL != null);
-        assertTrue(callSQLcmd(firstCanonicalDDL));
+
+        if ( ! triedSqlcmdDryRun) {
+            assertEquals("sqlcmd dry run failed -- maybe sqlcmd needs to be rebuilt.", 0, callSQLcmd("\n"));
+            triedSqlcmdDryRun = true;
+        }
+
+        assertEquals("sqlcmd failed or timed out", 0, callSQLcmd(firstCanonicalDDL));
         roundtripDDL = getDDLFromHTTP(httpdPort);
         // IZZY: we force single statement SQL keywords to lower case, it seems
         assertTrue(firstCanonicalDDL.equalsIgnoreCase(roundtripDDL));
 
-        assertTrue(callSQLcmd("CREATE TABLE NONSENSE (id INTEGER);\n"));
+        assertEquals("sqlcmd failed or timed out on last call", 0, callSQLcmd("CREATE TABLE NONSENSE (id INTEGER);\n"));
         roundtripDDL = getDDLFromHTTP(httpdPort);
         assertFalse(firstCanonicalDDL.equals(roundtripDDL));
 
         teardownSystem();
     }
 
-    public boolean callSQLcmd(String ddl) throws Exception {
+    private int callSQLcmd(String ddl) throws Exception {
         File f = new File("ddl.sql");
         f.deleteOnExit();
         FileOutputStream fos = new FileOutputStream(f);
@@ -158,10 +165,10 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
             }
         }
 
-        return (exitValue == 0);
+        return exitValue;
     }
 
-    public String getDDLFromHTTP(int httpdPort) throws Exception {
+    private String getDDLFromHTTP(int httpdPort) throws Exception {
         URL ddlURL = new URL(String.format("http://localhost:%d/ddl/", httpdPort));
 
         HttpURLConnection conn = (HttpURLConnection) ddlURL.openConnection();
