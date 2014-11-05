@@ -133,6 +133,7 @@ function loadSQLQueryPage(serverName, portid, userName, password, admin) {
     saveConnectionKey();
 
     var queryString = '';
+    var tablesArray = [];
 
     // Export Type Change	 
     $('#exportType').change(function () {
@@ -166,6 +167,7 @@ function loadSQLQueryPage(serverName, portid, userName, password, admin) {
         var count = 0;
         var src = "";
         for (var k in tables) {
+            tablesArray.push(k);
             src += '<h3>' + k + '</h3>';
             var item = tables[k];
             src += '<div id="column_' + count + '" class="listView">';
@@ -256,7 +258,7 @@ function loadSQLQueryPage(serverName, portid, userName, password, admin) {
             }
 
             var procArray = procName.split('.');
-            if (procArray.length > 1) {
+            if (procArray.length > 1 && jQuery.inArray(procArray[0], tablesArray) != -1) {
                 defSrc += '<h3>' + procName + '</h3>';
                 defSrc += '<div class="listView">';
                 defSrc += '<ul>';
