@@ -214,8 +214,6 @@ public class SchemaChangeClient {
             t2 = TableHelper.mutateTable(t1, true, rand);
         }
 
-        log.info(_F("New Schema:\n%s", TableHelper.ddlForTable(t2)));
-
         // handle views
         TableHelper.ViewRep newViewRep = viewIn;
         if (newViewRep == null) {
@@ -225,12 +223,6 @@ public class SchemaChangeClient {
             if (!newViewRep.compatibleWithTable(t2)) {
                 newViewRep = null;
             }
-        }
-        if (newViewRep != null) {
-            log.info(_F("New View:\n%s", newViewRep.ddlForView()));
-        }
-        else {
-            log.info("New View: NULL");
         }
 
         // Do the drops as a separate batch. It's a NOP for the catalog update method.
@@ -293,10 +285,10 @@ public class SchemaChangeClient {
         long start = System.nanoTime();
 
         if (newTable) {
-            log.info(_F("Starting %s to swap tables.", schemaChanger.getActionName()));
+            log.info("Starting to swap tables.");
         }
         else {
-            log.info(_F("Starting %s to change schema.", schemaChanger.getActionName()));
+            log.info("Starting to change schema.");
         }
 
         if (!schemaChanger.executeBatch(this.client)) {
@@ -326,12 +318,11 @@ public class SchemaChangeClient {
         double seconds = (end - start) / 1000000000.0;
 
         if (newTable) {
-            log.info(_F("Completed %s that swapped tables in %.4f seconds",
-                        schemaChanger.getActionName(), seconds));
+            log.info(_F("Completed table swap in %.4f seconds", seconds));
         }
         else {
-            log.info(_F("Completed %s of %d tuples in %.4f seconds (%d tuples/sec)",
-                        schemaChanger.getActionName(), count, seconds, (long) (count / seconds)));
+            log.info(_F("Completed %d tuples in %.4f seconds (%d tuples/sec)",
+                        count, seconds, (long) (count / seconds)));
         }
         return new Pair<VoltTable,TableHelper.ViewRep>(t2, newViewRep, false);
     }
@@ -348,7 +339,6 @@ public class SchemaChangeClient {
         void updateTable(VoltTable t1, VoltTable t2) throws IOException;
         void addTablePartitionInfo(VoltTable table, String name) throws IOException;
         boolean executeBatch(Client client) throws IOException;
-        String getActionName();
     }
 
     /**
@@ -377,6 +367,7 @@ public class SchemaChangeClient {
         public void createTables(VoltTable... tables) throws IOException {
             this.isNOP = false;
             for (VoltTable table : tables) {
+                log.info(_F("New Table:\n%s", TableHelper.ddlForTable(table)));
                 this.builder.addLiteralSchema(TableHelper.ddlForTable(table));
             }
         }
@@ -385,6 +376,7 @@ public class SchemaChangeClient {
         public void createViews(ViewRep... views) throws IOException {
             this.isNOP = false;
             for (ViewRep view : views) {
+                log.info(_F("New View:\n%s", view.ddlForView()));
                 this.builder.addLiteralSchema(view.ddlForView());
             }
         }
@@ -410,6 +402,7 @@ public class SchemaChangeClient {
         @Override
         public void updateTable(VoltTable t1, VoltTable t2) throws IOException {
             this.isNOP = false;
+            log.info(_F("Update Table:\n%s", TableHelper.ddlForTable(t2)));
             this.createTables(t2);
         }
 
@@ -434,12 +427,6 @@ public class SchemaChangeClient {
                 this.isNOP = true;  // belt and suspenders
             }
             return success;
-        }
-
-        @Override
-        public String getActionName()
-        {
-            return "catalog update";
         }
     }
 
@@ -524,7 +511,7 @@ public class SchemaChangeClient {
             boolean success = true;
             try {
                 if (ddl.length() > 0) {
-                    log.info(_F("DDL:\n%s", ddlString));
+                    log.info(_F("::: DDL Batch (BEGIN) :::\n%s\n::: DDL Batch (END) :::", ddlString));
                     try {
                         ClientResponse cr = client.callProcedure("@AdHoc", ddlString);
                         success = (cr.getStatus() == ClientResponse.SUCCESS);
@@ -538,12 +525,6 @@ public class SchemaChangeClient {
                 this.ddl = null;
             }
             return success;
-        }
-
-        @Override
-        public String getActionName()
-        {
-            return "ad hoc DDL";
         }
 
         void add(String query) {
