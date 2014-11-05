@@ -108,7 +108,7 @@ public class MeshMonitor {
         }
 
         public void printResults(int minHiccupSize) throws Exception {
-        	SimpleDateFormat formatUTC = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
+        	SimpleDateFormat formatUTC = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss,SSS");
     		formatUTC.setTimeZone(TimeZone.getTimeZone("UTC"));
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             PrintStream ps = new PrintStream(baos);
@@ -127,7 +127,7 @@ public class MeshMonitor {
             synchronized (receiveLock) {
                 if (m_receiveHistogram.getHistogramData().getMaxValue() > minHiccupSize) {
                     haveOutliers = true;
-                    ps.printf( formatUTC.format(new Date()) + " %-22s %-33s  delta heartbeats   - MaxLat: %4d Avg: %6.2f 99th-Pct: %2d %2d %2d %2d \n" 
+                    ps.printf( formatUTC.format(new Date()) + " %-22s %-33s  delta heartbeats   - MaxLat: %4d Avg: %6.2f 99th-Pct: %3d %3d %3d %3d \n" 
                     	, m_sc.socket().getLocalSocketAddress(), m_sc.socket().getRemoteSocketAddress() 
                     	, m_receiveHistogram.getHistogramData().getMaxValue(), m_receiveHistogram.getHistogramData().getMean()
                     	, m_receiveHistogram.getHistogramData().getValueAtPercentile(99.0), m_receiveHistogram.getHistogramData().getValueAtPercentile(99.9)
@@ -139,7 +139,7 @@ public class MeshMonitor {
             synchronized (deltaLock) {
                 if (m_deltaHistogram.getHistogramData().getMaxValue() > minHiccupSize) {
                     haveOutliers = true;
-                    ps.printf( formatUTC.format(new Date()) + " %-22s %-33s  delta timestamp    - MaxLat: %4d Avg: %6.2f 99th-Pct: %2d %2d %2d %2d \n" 
+                    ps.printf( formatUTC.format(new Date()) + " %-22s %-33s  delta timestamp    - MaxLat: %4d Avg: %6.2f 99th-Pct: %3d %3d %3d %3d \n" 
                     	, m_sc.socket().getLocalSocketAddress(), m_sc.socket().getRemoteSocketAddress()
                     	, m_deltaHistogram.getHistogramData().getMaxValue(), m_deltaHistogram.getHistogramData().getMean()
                     	, m_deltaHistogram.getHistogramData().getValueAtPercentile(99.0), m_deltaHistogram.getHistogramData().getValueAtPercentile(99.9)
@@ -151,7 +151,7 @@ public class MeshMonitor {
             synchronized(sendLock) {
                 if (m_sendHistogram.getHistogramData().getMaxValue() > minHiccupSize) {
                     haveOutliers = true;
-                    ps.printf( formatUTC.format(new Date()) + " %-22s %-33s  delta send         - MaxLat: %4d Avg: %6.2f 99th-Pct: %2d %2d %2d %2d \n" 
+                    ps.printf( formatUTC.format(new Date()) + " %-22s %-33s  delta send         - MaxLat: %4d Avg: %6.2f 99th-Pct: %3d %3d %3d %3d \n" 
                     	, m_sc.socket().getLocalSocketAddress(), m_sc.socket().getRemoteSocketAddress() 
                     	, m_sendHistogram.getHistogramData().getMaxValue(), m_sendHistogram.getHistogramData().getMean()
                     	, m_sendHistogram.getHistogramData().getValueAtPercentile(99.0), m_sendHistogram.getHistogramData().getValueAtPercentile(99.9)
