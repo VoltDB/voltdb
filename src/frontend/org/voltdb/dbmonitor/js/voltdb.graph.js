@@ -16,6 +16,7 @@
         var ramChart;
         var latencyChart;
         var transactionChart;
+        var totalMemory = -1;
         this.Monitors = {};
         this.ChartCpu = nv.models.lineChart();
         this.ChartRam = nv.models.lineChart();
@@ -27,7 +28,7 @@
             var theDate = new Date();
 
             for (var i = 121; i >= 0; i--) {
-                arr[i] = { x: new Date(theDate.getTime()), y:null };
+                arr[i] = { x: new Date(theDate.getTime()), y: null };
                 theDate.setSeconds(theDate.getSeconds() - 5);
             }
 
@@ -105,8 +106,9 @@
                     + '<p>' + e + '% at ' + y + '</p>';
             });
 
-
             MonitorGraphUI.ChartCpu.margin({ left: 80 });
+            MonitorGraphUI.ChartCpu.yAxis.scale().domain([0, 100]);
+            MonitorGraphUI.ChartCpu.lines.forceY([0, 100]);
 
             d3.select('#visualisationCpu')
                 .datum(dataCpu)
@@ -134,6 +136,7 @@
                 .axisLabelDistance(10);
             
             MonitorGraphUI.ChartRam.margin({ left: 80 });
+            MonitorGraphUI.ChartRam.lines.forceY([0, 0.1]);
             
             MonitorGraphUI.ChartRam.tooltipContent(function (key, y, e, graph) {
                 return '<h3> RAM </h3>'
@@ -167,6 +170,7 @@
                 .axisLabelDistance(10);
 
             MonitorGraphUI.ChartLatency.margin({ left: 80 });
+            MonitorGraphUI.ChartLatency.lines.forceY([0, 1]);
             
             MonitorGraphUI.ChartLatency.tooltipContent(function (key, y, e, graph) {
                 return '<h3> Latency </h3>'
@@ -200,6 +204,7 @@
                 .axisLabelDistance(10);
 
             MonitorGraphUI.ChartTransactions.margin({ left: 80 });
+            MonitorGraphUI.ChartTransactions.lines.forceY([0, 1]);
 
             MonitorGraphUI.ChartTransactions.tooltipContent(function (key, y, e, graph) {
                 return '<h3> Transactions </h3>'
@@ -384,10 +389,6 @@
                 dataRam[0]["values"] = MonitorGraphUI.Monitors.memData;
                 dataLatency[0]["values"] = MonitorGraphUI.Monitors.latData;
             }
-            d3.select('#visualisationCpu')
-                .datum(dataCpu)
-                .transition().duration(500)
-                .call(MonitorGraphUI.ChartCpu);
 
             nv.utils.windowResize(MonitorGraphUI.ChartCpu.update);
             changeAxisTimeFormat(view);
@@ -453,6 +454,10 @@
             else
                 lat = monitor.latHistogram.diff(latStats).getValueAtPercentile(99);
             lat = parseFloat(lat).toFixed(1) * 1;
+
+            if (lat < 0)
+                lat = 0;
+
             monitor.latHistogram = latStats;
 
             if (latSecCount == 6 || monitor.latFirstData) {
@@ -499,6 +504,19 @@
             var memDetails = memoryDetails;
             var memRss = parseFloat(memDetails[currentServer].RSS * 1.0 / 1048576.0).toFixed(3) * 1;
             var memTimeStamp = new Date(memDetails[currentServer].TIMESTAMP);
+            
+            //TODO: Check this once we have the value for total memory from API.
+            if (memDetails[currentServer].TOTALMEMORY != -1 && totalMemory != memDetails[currentServer].TOTALMEMORY) {
+                totalMemory = memDetails[currentServer].TOTALMEMORY * 1;
+                
+                MonitorGraphUI.ChartRam.yAxis.scale().domain([0, totalMemory]);
+                MonitorGraphUI.ChartRam.lines.forceY([0, totalMemory]);
+            }
+
+            if (memRss < 0)
+                memRss = 0;
+            else if (totalMemory != -1 && memRss > totalMemory)
+                memRss = totalMemory;
 
             if (memSecCount == 6 || monitor.memFirstData) {
                 dataMemMin = dataMemMin.slice(1);
@@ -547,20 +565,25 @@
 
             if (monitor.lastTimedTransactionCount > 0 && monitor.lastTimerTick > 0 && monitor.lastTimerTick != currentTimerTick) {
                 var delta = currentTimedTransactionCount - monitor.lastTimedTransactionCount;
+                var calculatedValue = parseFloat(delta * 1000.0 / (currentTimerTick - monitor.lastTimerTick)).toFixed(1) * 1;
+
+                if (calculatedValue < 0)
+                    calculatedValue = 0;
+
                 if (tpsSecCount == 6 || monitor.tpsFirstData) {
                     datatransMin = datatransMin.slice(1);
-                    datatransMin.push({ "x": new Date(transacDetail["TimeStamp"]), "y": parseFloat(delta * 1000.0 / (currentTimerTick - monitor.lastTimerTick)).toFixed(1) * 1 });
+                    datatransMin.push({ "x": new Date(transacDetail["TimeStamp"]), "y": calculatedValue });
                     MonitorGraphUI.Monitors.tpsDataMin = datatransMin;
                     tpsSecCount = 0;
                 }
                 if (tpsMinCount == 120 || monitor.tpsFirstData) {
                     datatransDay = datatransDay.slice(1);
-                    datatransDay.push({ "x": new Date(transacDetail["TimeStamp"]), "y": parseFloat(delta * 1000.0 / (currentTimerTick - monitor.lastTimerTick)).toFixed(1) * 1 });
+                    datatransDay.push({ "x": new Date(transacDetail["TimeStamp"]), "y": calculatedValue });
                     MonitorGraphUI.Monitors.tpsDataDay = datatransDay;
                     tpsMinCount = 0;
                 }
                 datatrans = datatrans.slice(1);
-                datatrans.push({ "x": new Date(transacDetail["TimeStamp"]), "y": parseFloat(delta * 1000.0 / (currentTimerTick - monitor.lastTimerTick)).toFixed(1) * 1 });
+                datatrans.push({ "x": new Date(transacDetail["TimeStamp"]), "y": calculatedValue });
                 MonitorGraphUI.Monitors.tpsData = datatrans;
             }
 
@@ -594,6 +617,11 @@
             var cpuDetail = cpuDetails;
             var percentageUsage = parseFloat(cpuDetail[currentServer].PERCENT_USED).toFixed(1) * 1;
             var timeStamp = cpuDetail[currentServer].TIMESTAMP;
+
+            if (percentageUsage < 0)
+                percentageUsage = 0;
+            else if (percentageUsage > 100)
+                percentageUsage = 100;
 
             if (cpuSecCount == 6 || monitor.cpuFirstData) {
                 cpuDataMin = cpuDataMin.slice(1);
