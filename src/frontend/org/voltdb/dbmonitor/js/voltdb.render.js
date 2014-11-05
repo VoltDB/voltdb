@@ -1489,11 +1489,23 @@ function alertNodeClicked(obj) {
 
         };
 
+        this.getVersion = function(serverName) {
+            var version;
+            $.each(systemOverview, function (key, val) {
+                if (val["HOSTNAME"] == serverName) {
+                    version = val["VERSION"];
+                    return false;
+                }
+            });
+            return version;
+        };
+
         this.getServerIP = function (hostId) {
             var serverAddress;
             $.each(systemOverview, function (key, val) {
                 if (key == hostId) {
                     serverAddress = val["IPADDRESS"];
+                    return false;
                 }
 
             });

@@ -1,5 +1,6 @@
 ﻿
 $(document).ready(function () {
+     
     if ($.cookie("username") != undefined && $.cookie("username") != 'null') {
         $("#logOut").css('display', 'block');
     } else {
@@ -295,6 +296,14 @@ var loadPage = function (serverName, portid) {
 
     RefreshServerUI();
 
+    var version = "";
+    var setVersionCheckUrl = function (currentServer) {
+        if (version == "") {
+            version = voltDbRenderer.getVersion(currentServer);
+            $('#versioncheck').attr('src', 'http://community.voltdb.com/versioncheck?app=dbmonitor&ver=' + version);
+        }
+    };
+
     var refreshClusterHealth = function () {
         //loads cluster health and other details on the top banner
         voltDbRenderer.GetSystemInformation(function () {
@@ -311,6 +320,7 @@ var loadPage = function (serverName, portid) {
 
                 $(".activeServerName").html(htmlData.ServerInformation[1].CurrentServer).attr('title', htmlData.ServerInformation[1].CurrentServer);
                 $("#serversList").html(htmlData.ServerInformation[0].ServersList);
+                setVersionCheckUrl(htmlData.ServerInformation[1].CurrentServer);
 
                 //Trigger search on the newly loaded list. This is required to 
                 //search server since we are refreshing the server list.
