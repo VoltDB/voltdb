@@ -16,7 +16,7 @@
             if (CONFIG_MODE == "debug")
                 return "184.73.30.156";
 
-            return null;
+            return "localhost";
         };
 
         this.GetDefaultServerNameForKey = function () {

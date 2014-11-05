@@ -90,7 +90,8 @@
                 if (this.password != null)
                     s[s.length] = encodeURIComponent('Password') + '=' + encodeURIComponent(this.password);
                 if (this.isHashedPassword != null)
-                    s[s.length] = encodeURIComponent('Hashedpassword') + '=' + encodeURIComponent(this.isHashedPassword);
+                    if (this.HashedPassword != null)
+                        s[s.length] = encodeURIComponent('Hashedpassword') + '=' + encodeURIComponent(this.HashedPassword);
                 if (this.admin)
                     s[s.length] = 'admin=true';
                 var paramSet = s.join('&') + '&jsonp=?';

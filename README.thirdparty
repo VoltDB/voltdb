@@ -1442,13 +1442,13 @@ VoltDB Studio | Web uses the following open source components:
  * http://jquery.com/
  *
  * Copyright 2011, John Resig
- * Dual licensed under the MIT or GPL Version 2 licenses.
+ * licensed under the MIT
  * http://jquery.org/license
  *
  * Includes Sizzle.js
  * http://sizzlejs.com/
  * Copyright 2011, The Dojo Foundation
- * Released under the MIT, BSD, and GPL Licenses.
+ * Released under the MIT License.
  *
  * Date: Thu May 12 15:04:36 2011 -0400
  */
@@ -1461,7 +1461,7 @@ VoltDB Studio | Web uses the following open source components:
  * jQuery UI 1.8.13
  *
  * Copyright 2011, AUTHORS.txt (http://jqueryui.com/about)
- * Dual licensed under the MIT or GPL Version 2 licenses.
+ * licensed under the MIT license.
  * http://jquery.org/license
  *
  * http://docs.jquery.com/UI
@@ -1534,9 +1534,8 @@ VoltDB Studio | Web uses the following open source components:
  *
  * Copyright (c) 2007 Jörn Zaefferer
  *
- * Dual licensed under the MIT and GPL licenses:
+ * Licensed under the MIT:
  *   http://www.opensource.org/licenses/mit-license.php
- *   http://www.gnu.org/licenses/gpl.html
  *
  * Revision: $Id: jquery.treeview.js 5759 2008-07-01 07:50:28Z joern.zaefferer $
  *
@@ -1558,8 +1557,7 @@ VoltDB Studio | Web uses the following open source components:
 //
 // Terms of Use
 //
-// This plugin is dual-licensed under the GNU General Public License
-//   and the MIT License and is copyright A Beautiful Site, LLC.
+// This plugin is licensed under the MIT License and is copyright A Beautiful Site, LLC.
 //
 
 --------------------------------------------------------------------------------
@@ -2414,7 +2412,7 @@ Site: https://github.com/carhartl/jquery-cookie
 License Name: MIT license
 ================================================================================
 jQuery Context Menu Plugin
-License Name: dual-licensed under the GNU General Public License and the MIT License
+License Name: MIT License
 Site: http://abeautifulsite.net/2008/09/jquery-context-menu-plugin/
 ================================================================================
 Simple Popup plugin for jQuery
@@ -2424,9 +2422,8 @@ License Url: https://github.com/Toddish/Popup/blob/master/LICENSE.md
 ================================================================================
 Slim scroll plugin for jQuery
 Site: http://rocha.la 
-License Name: Dual-licensed under MIT and GPL
-License Url: http://www.opensource.org/licenses/mit-license.php ,
-http://www.opensource.org/licenses/gpl-license.php
+License Name: MIT
+License Url: http://www.opensource.org/licenses/mit-license.php
 ================================================================================
 Custom tooltip jQuery plugin
 License Name: MIT License
@@ -2435,7 +2432,7 @@ License Url: http://opensource.org/licenses/MIT
 jQuery Crypt
 Site url: http://www.itsyndicate.ca/jquery/ 
 http://www.jquery-plugins.info/jquery-crypt-00013584.htm
-License url: Dual MIT GPL
+License Url: http://www.opensource.org/licenses/mit-license.php
 ===============================================================================
 Eric Meyer's Reset CSS v2.0
 Site: http://meyerweb.com/eric/tools/css/reset/
