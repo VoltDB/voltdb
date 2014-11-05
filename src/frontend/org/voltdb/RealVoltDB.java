@@ -2138,6 +2138,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             new ConfigLogging().logCatalogAndDeployment();
 
+            // log system setting information
+            logSystemSettingInfo();
+
             return Pair.of(m_catalogContext, csp);
         }
     }
