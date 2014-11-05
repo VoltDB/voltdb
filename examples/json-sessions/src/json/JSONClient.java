@@ -408,6 +408,9 @@ public class JSONClient {
                  + "WHERE cast(field(json_data,'download_count') AS INTEGER) > 1 ORDER BY username LIMIT 10");
 
         runQuery("User pattern matching (SQL LIKE) to look for records of (VoltDB Forum) logins who have downloaded version v2.x:",
+                 "SELECT username, field(field(json_data,'props'), 'download_version') AS download_version, json_data FROM user_session_table "
+                 + "WHERE field(field(json_data,'props'), 'download_version') LIKE 'v2%' ORDER BY username LIMIT 10");
+        runQuery("Identical query (logins who have downloaded version v2.x) using dot notation, rather than 'field' twice:",
                  "SELECT username, field(json_data,'props.download_version') AS download_version, json_data FROM user_session_table "
                  + "WHERE field(json_data, 'props.download_version') LIKE 'v2%' ORDER BY username LIMIT 10");
         runQuery("Change several users to set 'props.download_version' to 'v2.9':",
@@ -418,6 +421,9 @@ public class JSONClient {
                  + "WHERE field(json_data, 'props.download_version') LIKE 'v2%' ORDER BY username LIMIT 10");
 
         runQuery("Select records of (VoltDB Blog) logins whose first role is 'writer':",
+                 "SELECT username, array_element(field(json_data,'roles'), 0) AS first_role, json_data FROM user_session_table "
+                 + "WHERE array_element(field(json_data,'roles'), 0)='writer' ORDER BY username LIMIT 10");
+        runQuery("Identical query (logins whose first role is 'writer') using bracket notation, rather than 'array_element':",
                  "SELECT username, field(json_data,'roles[0]') AS first_role, json_data FROM user_session_table "
                  + "WHERE field(json_data,'roles[0]')='writer' ORDER BY username LIMIT 10");
 
@@ -441,7 +447,7 @@ public class JSONClient {
                  + "WHERE field(json_data,'roles[-1]')='administrator' ORDER BY username LIMIT 10");
 
         runQuery("Look deep into the JSON data for records of (VoltDB Forum) logins who have downloaded version v3.0 and "
-                 + "have specified a (first) client language of Java:",
+                 + "have specified a (first) client language of Java (combines dot and bracket notation):",
                  "SELECT username, json_data FROM user_session_table "
                  + "WHERE field(json_data, 'props.download_version')='v3.0' and field(json_data, 'props.client_languages[0]')='Java' "
                  + "ORDER BY username LIMIT 10");
@@ -476,7 +482,6 @@ public class JSONClient {
         // Display the whole query results as a JSON String
         String SQL = "SELECT json_data FROM user_session_table WHERE username='voltdb' OR username='voltdb2' ORDER BY username";
         VoltTable table = runQuery("Retrieve the JSON data for two particular logins. Treat the whole result set as JSON:", SQL);
-        table.advanceRow();
         System.out.println("The whole result set as JSON:");
         System.out.println(table.toJSONString());
         System.out.println();
