@@ -512,17 +512,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         assertFalse(callbackSuccess);
         callbackSuccess = true;
 
-        boolean found = false;
-        int timeout = -1;
-        VoltTable result = client3.callProcedure("@SystemInformation", "DEPLOYMENT").getResults()[0];
-        while (result.advanceRow()) {
-            if (result.getString("PROPERTY").equalsIgnoreCase("heartbeattimeout")) {
-                found = true;
-                timeout = Integer.valueOf(result.getString("VALUE"));
-            }
-        }
-        assertTrue(found);
-        assertEquals(6000, timeout);
+        checkDeploymentPropertyValue(client3, "heartbeattimeout", "6000");
     }
 
     private void loadSomeData(Client client, int start, int count) throws IOException, ProcCallException {
@@ -904,29 +894,50 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         System.out.println("-----\n\n");
     }
 
+    private void checkDeploymentPropertyValue(Client client, String key, String value)
+            throws IOException, ProcCallException, InterruptedException {
+        boolean found = false;
+
+        VoltTable result = client.callProcedure("@SystemInformation", "DEPLOYMENT").getResults()[0];
+        while (result.advanceRow()) {
+            if (result.getString("PROPERTY").equalsIgnoreCase(key)) {
+                found = true;
+                assertEquals(value, result.getString("VALUE"));
+                break;
+            }
+        }
+        assertTrue(found);
+    }
+
     public void testSystemSettingsUpdateTimeout() throws IOException, ProcCallException, InterruptedException  {
         Client client = getClient();
         String newCatalogURL, deploymentURL;
         VoltTable[] results;
+
+        String key = "querytimeout";
+        checkDeploymentPropertyValue(client, key, "0"); // check default value
+
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-timeout.jar");
-
-
         deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-timeout-1000.xml");
         results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
         assertTrue(results.length == 1);
+        checkDeploymentPropertyValue(client, key, "1000");
 
         deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-timeout-5000.xml");
         results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
         assertTrue(results.length == 1);
+        checkDeploymentPropertyValue(client, key, "5000");
 
         deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-timeout-600.xml");
         results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
         assertTrue(results.length == 1);
+        checkDeploymentPropertyValue(client, key, "600");
 
         newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.jar");
         deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.xml");
         results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
         assertTrue(results.length == 1);
+        checkDeploymentPropertyValue(client, key, "0"); // check default value
     }
 
     private void deleteDirectory(File dir) {
