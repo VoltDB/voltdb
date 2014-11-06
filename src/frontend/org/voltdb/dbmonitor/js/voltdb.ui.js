@@ -1,6 +1,6 @@
 ﻿
 $(document).ready(function () {
-     
+
     if ($.cookie("username") != undefined && $.cookie("username") != 'null') {
         $("#logOut").css('display', 'block');
     } else {
@@ -242,6 +242,7 @@ function logout() {
 };
 
 var loadPage = function (serverName, portid) {
+    
     var userName = $.cookie('username') != undefined ? $.cookie('username') : "";
     var password = $.cookie('password') != undefined ? $.cookie('password') : "";
     var isConnectionChecked = false;
@@ -1278,7 +1279,7 @@ var saveCookie = function (name, value) {
 };
 
 var saveSessionCookie = function (name, value) {
-    $.cookie(name, value, { path: '/', domain: window.location.hostname });
+    $.cookie(name, value);
 };
 
 var saveUserPreferences = function (preferences) {
