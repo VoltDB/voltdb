@@ -4,12 +4,11 @@
     var iVoltDBConfig = (function () {
 
         this.GetDefaultServerIP = function() {
-            return "localhost";
+            return window.location.hostname;
         };
 
         this.GetDefaultServerNameForKey = function () {
-
-            return "localhost";
+            return window.location.hostname;
         };
 
         this.GetPortId = function () {
