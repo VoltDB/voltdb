@@ -38,14 +38,17 @@ import org.eclipse.jetty.server.bio.SocketConnector;
 import org.eclipse.jetty.server.handler.AbstractHandler;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
-import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.HTTPClientInterface;
 import org.voltdb.VoltDB;
 import org.voltdb.compilereport.ReportMaker;
 
 import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.io.Resources;
+import java.util.concurrent.ExecutorService;
+import org.eclipse.jetty.util.thread.QueuedThreadPool;
+import org.voltcore.utils.CoreUtils;
 
 public class HTTPAdminListener {
 
@@ -81,7 +84,12 @@ public class HTTPAdminListener {
                     baseRequest.setHandled(false);
                     return;
                 }
-
+                //Send old /studio back to "/"
+                if (baseRequest.getRequestURI().contains("/studio")) {
+                    response.sendRedirect("/");
+                    baseRequest.setHandled(true);
+                    return;
+                }
                 // redirect the base dir
                 if (target.equals("/")) target = "/index.htm";
                 // check if a file exists
@@ -257,7 +265,8 @@ public class HTTPAdminListener {
         m_htmlTemplates.put(name, contents);
     }
 
-    public HTTPAdminListener(boolean jsonEnabled, String intf, int port) throws Exception {
+    final ExecutorService m_es = CoreUtils.getSingleThreadExecutor("http-starter");
+    public HTTPAdminListener(boolean jsonEnabled, final String intf, final int port) throws Exception {
         // PRE-LOAD ALL HTML TEMPLATES (one for now)
         try {
             loadTemplate(HTTPAdminListener.class, "admintemplate.html");
@@ -268,6 +277,24 @@ public class HTTPAdminListener {
             throw e;
         }
 
+        m_jsonEnabled = jsonEnabled;
+        m_es.submit(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    start(intf, port);
+                } catch (Exception ex) {
+                    Throwables.propagate(ex);
+                }
+            }
+        });
+    }
+
+    public void start(String intf, int port) throws Exception {
+        //Wait for client be ready.
+        while (!VoltDB.instance().isAcceptingConnections()) {
+            Thread.sleep(2000);
+        }
         // NOW START JETTY SERVER
         try {
             // The socket channel connector seems to be faster for our use
@@ -284,19 +311,19 @@ public class HTTPAdminListener {
 
             //"/"
             ContextHandler dbMonitorHandler = new ContextHandler("/");
-            dbMonitorHandler.setHandler(new DBMonitorHandler());
+            dbMonitorHandler.setHandler(new HTTPAdminListener.DBMonitorHandler());
 
             ///api/1.0/
             ContextHandler apiRequestHandler = new ContextHandler("/api/1.0");
-            apiRequestHandler.setHandler(new APIRequestHandler());
+            apiRequestHandler.setHandler(new HTTPAdminListener.APIRequestHandler());
 
             ///catalog
             ContextHandler catalogRequestHandler = new ContextHandler("/catalog");
-            catalogRequestHandler.setHandler(new CatalogRequestHandler());
+            catalogRequestHandler.setHandler(new HTTPAdminListener.CatalogRequestHandler());
 
             ///catalog
             ContextHandler ddlRequestHandler = new ContextHandler("/ddl");
-            ddlRequestHandler.setHandler(new DDLRequestHandler());
+            ddlRequestHandler.setHandler(new HTTPAdminListener.DDLRequestHandler());
 
             ContextHandlerCollection handlers = new ContextHandlerCollection();
             handlers.setHandlers(new Handler[] {
@@ -305,7 +332,6 @@ public class HTTPAdminListener {
                     ddlRequestHandler,
                     dbMonitorHandler
             });
-
             m_server.setHandler(handlers);
 
             /*
@@ -316,14 +342,12 @@ public class HTTPAdminListener {
             qtp.setMinThreads(1);
             m_server.setThreadPool(qtp);
 
-            m_jsonEnabled = jsonEnabled;
             m_server.start();
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             // double try to make sure the port doesn't get eaten
             try { m_server.stop(); } catch (Exception e2) {}
             try { m_server.destroy(); } catch (Exception e2) {}
-            throw new Exception(e);
+            Throwables.propagate(e);
         }
     }
 
