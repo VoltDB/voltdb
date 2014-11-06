@@ -225,7 +225,7 @@ $(document).ready(function () {
     //Attach the login popup to the page.
     $("body").append(voltDbRenderer.GetLoginPopup());
 
-    var serverName = window.location.hostname;
+    var serverName = VoltDBConfig.GetDefaultServerIP();
     var portid = VoltDBConfig.GetPortId();
 
     //If security is enabled, then it displays login popup. After user is verified, it calls loadPage().
