@@ -18,10 +18,8 @@
 package org.voltdb.utils;
 
 import java.io.BufferedInputStream;
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.URL;
 import java.util.HashMap;
@@ -44,7 +42,6 @@ import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.HTTPClientInterface;
 import org.voltdb.VoltDB;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.compilereport.ReportMaker;
 
 import com.google_voltpatches.common.base.Charsets;
@@ -79,53 +76,10 @@ public class HTTPAdminListener {
                     return;
                 }
 
-                // kick over to the HTTP/JSON interface
+                //Special handling for API as they continue and setHandled differently
                 if (baseRequest.getRequestURI().contains("/api/1.0/")) {
-                    // http://www.ietf.org/rfc/rfc4627.txt dictates this mime type
-                    response.setContentType("application/json;charset=utf-8");
-                    if (m_jsonEnabled) {
-                        httpClientInterface.process(baseRequest, response);
-
-                        // used for perf testing of the http interface
-                        /*String msg = "{\"status\":1,\"appstatus\":-128,\"statusstring\":null,\"appstatusstring\":null,\"exception\":null,\"results\":[{\"status\":-128,\"schema\":[{\"name\":\"SVAL1\",\"type\":9},{\"name\":\"SVAL2\",\"type\":9},{\"name\":\"SVAL3\",\"type\":9}],\"data\":[[\"FOO\",\"BAR\",\"BOO\"]]}]}";
-                        response.setStatus(HttpServletResponse.SC_OK);
-                        baseRequest.setHandled(true);
-                        response.getWriter().print(msg);*/
-                    }
-                    else {
-                        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                        baseRequest.setHandled(true);
-                        response.getWriter().println("JSON API IS CURRENTLY DISABLED");
-                    }
+                    baseRequest.setHandled(false);
                     return;
-                }
-
-                // handle the CSV request for memory stats
-                if (baseRequest.getRequestURI().contains("/memorycsv/")) {
-                    String msg = SystemStatsCollector.getCSV();
-                    response.setContentType("text/plain;charset=utf-8");
-                    response.setStatus(HttpServletResponse.SC_OK);
-                    baseRequest.setHandled(true);
-                    response.getWriter().print(msg);
-                    return;
-                }
-
-                if (baseRequest.getRequestURI().contains("/memory/")) {
-                    handleMemoryPage(baseRequest, response);
-                    return;
-                }
-
-                if (baseRequest.getRequestURI().contains("/ddl/")) {
-                    byte[] reportbytes = VoltDB.instance().getCatalogContext().getFileInJar("autogen-ddl.sql");
-                    String ddl = new String(reportbytes, Charsets.UTF_8);
-                    response.setContentType("text/plain;charset=utf-8");
-                    response.setStatus(HttpServletResponse.SC_OK);
-                    baseRequest.setHandled(true);
-                    response.getWriter().print(ddl);
-                    return;
-                }
-                if (baseRequest.getRequestURI().contains("/catalog/")) {
-                   handleReportPage(baseRequest, response);
                 }
 
                 // redirect the base dir
@@ -133,7 +87,6 @@ public class HTTPAdminListener {
                 // check if a file exists
                 URL url = VoltDB.class.getResource("dbmonitor" + target);
                 if (url == null) {
-                    logger.error("Can't find file"+target);
                     // write 404
                     String msg = "404: Resource not found.\n"+url.toString();
                     response.setContentType("text/plain;charset=utf-8");
@@ -189,13 +142,12 @@ public class HTTPAdminListener {
                     }
                 }
             }catch(Exception ex){
-                logger.error(ex.getMessage());
-                logger.error(ex);
+                logger.error("Error servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage());
             }
         }
     }
 
-    class RequestHandler extends AbstractHandler {
+    class CatalogRequestHandler extends AbstractHandler {
 
         @Override
         public void handle(String target,
@@ -204,21 +156,38 @@ public class HTTPAdminListener {
                            HttpServletResponse response)
                            throws IOException, ServletException {
 
-            // if this is an internal jetty retry, then just tell
-            // jetty we're still working on it. There is a risk of
-            // masking other errors in doing this, but it's probably
-            // low compared with the default policy of retrys.
-            AsyncContinuation cont = baseRequest.getAsyncContinuation();
-            // this is set to false on internal jetty retrys
-            if (!cont.isInitial()) {
-                // The continuation object has been woken up by the
-                // retry. Tell it to go back to sleep.
-                cont.suspend();
-                return;
-            }
+            handleReportPage(baseRequest, response);
+        }
 
-            // kick over to the HTTP/JSON interface
-            if (baseRequest.getRequestURI().contains("/api/1.0/")) {
+    }
+
+    class DDLRequestHandler extends AbstractHandler {
+
+        @Override
+        public void handle(String target,
+                           Request baseRequest,
+                           HttpServletRequest request,
+                           HttpServletResponse response)
+                           throws IOException, ServletException {
+
+            byte[] reportbytes = VoltDB.instance().getCatalogContext().getFileInJar("autogen-ddl.sql");
+            String ddl = new String(reportbytes, Charsets.UTF_8);
+            response.setContentType("text/plain;charset=utf-8");
+            response.setStatus(HttpServletResponse.SC_OK);
+            baseRequest.setHandled(true);
+            response.getWriter().print(ddl);
+        }
+
+    }
+
+    class APIRequestHandler extends AbstractHandler {
+
+        @Override
+        public void handle(String target, Request baseRequest,
+                           HttpServletRequest request, HttpServletResponse response)
+                            throws IOException, ServletException {
+            VoltLogger logger = new VoltLogger("HOST");
+            try {
                 // http://www.ietf.org/rfc/rfc4627.txt dictates this mime type
                 response.setContentType("application/json;charset=utf-8");
                 if (m_jsonEnabled) {
@@ -229,42 +198,16 @@ public class HTTPAdminListener {
                     response.setStatus(HttpServletResponse.SC_OK);
                     baseRequest.setHandled(true);
                     response.getWriter().print(msg);*/
-                }
-                else {
+                } else {
                     response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                     baseRequest.setHandled(true);
                     response.getWriter().println("JSON API IS CURRENTLY DISABLED");
                 }
-                return;
-            }
 
-            // handle the CSV request for memory stats
-            if (baseRequest.getRequestURI().contains("/memorycsv/")) {
-                String msg = SystemStatsCollector.getCSV();
-                response.setContentType("text/plain;charset=utf-8");
-                response.setStatus(HttpServletResponse.SC_OK);
-                baseRequest.setHandled(true);
-                response.getWriter().print(msg);
-                return;
+            } catch(Exception ex){
+                logger.error("Error servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage());
             }
-
-            if (baseRequest.getRequestURI().contains("/memory/")) {
-                handleMemoryPage(baseRequest, response);
-                return;
-            }
-
-            if (baseRequest.getRequestURI().contains("/ddl/")) {
-                byte[] reportbytes = VoltDB.instance().getCatalogContext().getFileInJar("autogen-ddl.sql");
-                String ddl = new String(reportbytes, Charsets.UTF_8);
-                response.setContentType("text/plain;charset=utf-8");
-                response.setStatus(HttpServletResponse.SC_OK);
-                baseRequest.setHandled(true);
-                response.getWriter().print(ddl);
-                return;
-            }
-            handleReportPage(baseRequest, response);
         }
-
     }
 
     /**
@@ -282,47 +225,6 @@ public class HTTPAdminListener {
         } catch (IOException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
-        }
-    }
-
-    /**
-     * Draw the memory page.
-     */
-    void handleMemoryPage(Request baseRequest, HttpServletResponse response) {
-        try {
-            // get memory usage
-            SystemStatsCollector.Datum d = SystemStatsCollector.getRecentSample();
-            double totalmemory = SystemStatsCollector.memorysize;
-            double used = d.rss / (double) (SystemStatsCollector.memorysize * 1024 * 1024);
-            double javaclaimed = d.javatotalheapmem + d.javatotalsysmem;
-            double javaused = d.javausedheapmem + d.javausedsysmem;
-            double javaunused = SystemStatsCollector.javamaxheapmem - d.javatotalheapmem;
-            double risk = (d.rss + javaunused) / (SystemStatsCollector.memorysize * 1024 * 1024);
-
-            Map<String,String> params = new HashMap<String,String>();
-
-            params.put("2mincharturl", SystemStatsCollector.getGoogleChartURL(2, 640, 240, "-2min"));
-            params.put("30mincharturl", SystemStatsCollector.getGoogleChartURL(30, 640, 240, "-30min"));
-            params.put("24hrcharturl", SystemStatsCollector.getGoogleChartURL(1440, 640, 240, "-24hrs"));
-
-            params.put("totalmemory", String.format("%.1f", totalmemory));
-            params.put("used", String.format("%.1f", used * 100.0));
-            params.put("risk", String.format("%.1f", risk * 100.0));
-            params.put("rss", String.format("%.1f", d.rss / 1024.0 / 1024.0));
-            params.put("usedjava", String.format("%.1f", javaused / 1024.0 / 1024.0));
-            params.put("claimedjava", String.format("%.1f", javaclaimed / 1024.0 / 1024.0));
-            params.put("javamaxheap", String.format("%.1f", SystemStatsCollector.javamaxheapmem / 1024.0 / 1024.0));
-
-            String msg = getHTMLForAdminPage(params);
-
-            response.setContentType("text/html;charset=utf-8");
-            response.setStatus(HttpServletResponse.SC_OK);
-            baseRequest.setHandled(true);
-            response.getWriter().print(msg);
-        }
-        catch (IOException e) {
-            e.printStackTrace();
-            throw new RuntimeException(e);
         }
     }
 
@@ -380,16 +282,28 @@ public class HTTPAdminListener {
             connector.setName("VoltDB-HTTPD");
             m_server.addConnector(connector);
 
+            //"/"
             ContextHandler dbMonitorHandler = new ContextHandler("/");
             dbMonitorHandler.setHandler(new DBMonitorHandler());
 
-            ContextHandler baseHander = new ContextHandler("/catalog");
-            baseHander.setHandler(new RequestHandler());
+            ///api/1.0/
+            ContextHandler apiRequestHandler = new ContextHandler("/api/1.0");
+            apiRequestHandler.setHandler(new APIRequestHandler());
+
+            ///catalog
+            ContextHandler catalogRequestHandler = new ContextHandler("/catalog");
+            catalogRequestHandler.setHandler(new CatalogRequestHandler());
+
+            ///catalog
+            ContextHandler ddlRequestHandler = new ContextHandler("/ddl");
+            ddlRequestHandler.setHandler(new DDLRequestHandler());
 
             ContextHandlerCollection handlers = new ContextHandlerCollection();
             handlers.setHandlers(new Handler[] {
-                    dbMonitorHandler,
-                    baseHander
+                    apiRequestHandler,
+                    catalogRequestHandler,
+                    ddlRequestHandler,
+                    dbMonitorHandler
             });
 
             m_server.setHandler(handlers);
@@ -402,8 +316,8 @@ public class HTTPAdminListener {
             qtp.setMinThreads(1);
             m_server.setThreadPool(qtp);
 
-            m_server.start();
             m_jsonEnabled = jsonEnabled;
+            m_server.start();
         }
         catch (Exception e) {
             // double try to make sure the port doesn't get eaten
