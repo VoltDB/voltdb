@@ -244,16 +244,18 @@ public class SchemaChangeClient {
                     activeTableNames.remove(newName);
                 }
             }
+            if (!schemaChanger.executeBatch(this.client)) {
+                return null;
+            }
         }
         catch (IOException e) {
-            return null;
-        }
-        if (!schemaChanger.executeBatch(this.client)) {
             return null;
         }
 
         // Now do the creates and alters.
         schemaChanger.beginBatch();
+        long count = 0;
+        long start = 0;
         try {
             schemaChanger.createTables(versionT);
             // make tables name A partitioned and tables named B replicated
@@ -276,22 +278,22 @@ public class SchemaChangeClient {
             if (activeViewRep != null) {
                 schemaChanger.createViews(activeViewRep);
             }
+
+            count = tupleCount(t1);
+            start = System.nanoTime();
+
+            if (newTable) {
+                log.info("Starting to swap tables.");
+            }
+            else {
+                log.info("Starting to change schema.");
+            }
+
+            if (!schemaChanger.executeBatch(this.client)) {
+                return null;
+            }
         }
         catch (IOException e) {
-            return null;
-        }
-
-        long count = tupleCount(t1);
-        long start = System.nanoTime();
-
-        if (newTable) {
-            log.info("Starting to swap tables.");
-        }
-        else {
-            log.info("Starting to change schema.");
-        }
-
-        if (!schemaChanger.executeBatch(this.client)) {
             return null;
         }
 
