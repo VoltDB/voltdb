@@ -629,6 +629,10 @@ public abstract class CatalogUtil {
      */
     private static boolean validateDeployment(Catalog catalog, DeploymentType deployment) {
         if (deployment.getUsers() == null) {
+            if (deployment.getSecurity() != null && deployment.getSecurity().isEnabled()) {
+                hostLog.error("Cannot enable security without defining users in the deployment file.");
+                return false;
+            }
             return true;
         }
 

@@ -1,5 +1,6 @@
 ﻿
 $(document).ready(function () {
+
     if ($.cookie("username") != undefined && $.cookie("username") != 'null') {
         $("#logOut").css('display', 'block');
     } else {
@@ -224,7 +225,7 @@ $(document).ready(function () {
     //Attach the login popup to the page.
     $("body").append(voltDbRenderer.GetLoginPopup());
 
-    var serverName = window.location.hostname == "localhost" ? null : window.location.hostname;
+    var serverName = VoltDBConfig.GetDefaultServerIP();
     var portid = VoltDBConfig.GetPortId();
 
     //If security is enabled, then it displays login popup. After user is verified, it calls loadPage().
@@ -241,6 +242,7 @@ function logout() {
 };
 
 var loadPage = function (serverName, portid) {
+    
     var userName = $.cookie('username') != undefined ? $.cookie('username') : "";
     var password = $.cookie('password') != undefined ? $.cookie('password') : "";
     var isConnectionChecked = false;
@@ -295,6 +297,14 @@ var loadPage = function (serverName, portid) {
 
     RefreshServerUI();
 
+    var version = "";
+    var setVersionCheckUrl = function (currentServer) {
+        if (version == "") {
+            version = voltDbRenderer.getVersion(currentServer);
+            $('#versioncheck').attr('src', 'http://community.voltdb.com/versioncheck?app=vmc&ver=' + version);
+        }
+    };
+
     var refreshClusterHealth = function () {
         //loads cluster health and other details on the top banner
         voltDbRenderer.GetSystemInformation(function () {
@@ -311,6 +321,7 @@ var loadPage = function (serverName, portid) {
 
                 $(".activeServerName").html(htmlData.ServerInformation[1].CurrentServer).attr('title', htmlData.ServerInformation[1].CurrentServer);
                 $("#serversList").html(htmlData.ServerInformation[0].ServersList);
+                setVersionCheckUrl(htmlData.ServerInformation[1].CurrentServer);
 
                 //Trigger search on the newly loaded list. This is required to 
                 //search server since we are refreshing the server list.
@@ -1218,7 +1229,7 @@ var saveCookie = function (name, value) {
 };
 
 var saveSessionCookie = function (name, value) {
-    $.cookie(name, value, { path: '/', domain: window.location.hostname });
+    $.cookie(name, value);
 };
 
 var saveUserPreferences = function (preferences) {

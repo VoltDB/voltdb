@@ -159,7 +159,7 @@ function alertNodeClicked(obj) {
                     $("#overlay").show();
                     $("#UnableToLoginMsg").hide();
                     var usernameVal = $("#username").val();
-                    var passwordVal = $().crypt({ method: "sha1", source: $("#password").val() });
+                    var passwordVal = $("#password").val() != '' ? $().crypt({ method: "sha1", source: $("#password").val() }) : $("#password").val();
 
                     testConnection($("#username").data("servername"), $("#username").data("portid"), usernameVal, passwordVal, true, function (result) {
                         $("#overlay").hide();
@@ -1378,11 +1378,23 @@ function alertNodeClicked(obj) {
 
         };
 
+        this.getVersion = function(serverName) {
+            var version;
+            $.each(systemOverview, function (key, val) {
+                if (val["HOSTNAME"] == serverName) {
+                    version = val["VERSION"];
+                    return false;
+                }
+            });
+            return version;
+        };
+
         this.getServerIP = function (hostId) {
             var serverAddress;
             $.each(systemOverview, function (key, val) {
                 if (key == hostId) {
                     serverAddress = val["IPADDRESS"];
+                    return false;
                 }
 
             });

@@ -133,6 +133,7 @@ function loadSQLQueryPage(serverName, portid, userName, password, admin) {
     saveConnectionKey();
 
     var queryString = '';
+    var tablesArray = [];
 
     // Export Type Change	 
     $('#exportType').change(function () {
@@ -166,6 +167,7 @@ function loadSQLQueryPage(serverName, portid, userName, password, admin) {
         var count = 0;
         var src = "";
         for (var k in tables) {
+            tablesArray.push(k);
             src += '<h3>' + k + '</h3>';
             var item = tables[k];
             src += '<div id="column_' + count + '" class="listView">';
@@ -214,26 +216,28 @@ function loadSQLQueryPage(serverName, portid, userName, password, admin) {
         }
     };
 
-    var populateStoredProcedure = function(proceduresData, procedureColumnData,sysProcedure) {
+    var populateStoredProcedure = function (proceduresData, procedureColumnData, sysProcedure) {
         // Stored Procedures
+        var sysScr = "";
         var src = "";
-        src += '<h3 class="systemHeader">System Stored Procedures</h3>';
-        src += '<div id="systemProcedure" class="listView">';
+        var defSrc = "";
+        sysScr += '<h3 class="systemHeader">System Stored Procedures</h3>';
+        sysScr += '<div id="systemProcedure" class="listView">';
         for (var k in sysProcedure) {
             for (var paramCount in sysProcedure[k]) {
-                src += '<h3>' + k + '(' + paramCount + ')</h3>';
-                src += '<div class="listView">';
-                src += '<ul>';
+                sysScr += '<h3>' + k + '(' + paramCount + ')</h3>';
+                sysScr += '<div class="listView">';
+                sysScr += '<ul>';
                 for (var i = 0; i < sysProcedure[k][paramCount].length - 1; i++) {
-                    src += '<li class="parameterValue">' + sysProcedure[k][paramCount][i] + '</li>';
+                    sysScr += '<li class="parameterValue">' + sysProcedure[k][paramCount][i] + '</li>';
                 }
-                src += '<li class="returnValue">' + sysProcedure[k][paramCount][i] + '</li>';
-                src += '</ul>';
-                src += '</div>';
+                sysScr += '<li class="returnValue">' + sysProcedure[k][paramCount][i] + '</li>';
+                sysScr += '</ul>';
+                sysScr += '</div>';
             }
         }
-        
-        src += '</div>';
+
+        sysScr += '</div>';
         for (var i = 0; i < proceduresData.length; ++i) {
             var connTypeParams = [];
             var procParams = [];
@@ -252,22 +256,69 @@ function loadSQLQueryPage(serverName, portid, userName, password, admin) {
                     procParams[paramOrder] = { 'name': paramName, 'type': paramType.toLowerCase() };
                 }
             }
-            src += '<h3>' + procName + '</h3>';
-            src += '<div class="listView">';
-            src += '<ul>';
-            for (var p = 0; p < procParams.length; ++p) {
-                src += '<li class="parameterValue">Param' + (p) + ' (' + procParams[p].type + ')</li>';
+
+            var procArray = procName.split('.');
+            if (procArray.length > 1 && jQuery.inArray(procArray[0], tablesArray) != -1) {
+                defSrc += '<h3>' + procName + '</h3>';
+                defSrc += '<div class="listView">';
+                defSrc += '<ul>';
+                for (var p = 0; p < procParams.length; ++p) {
+                    defSrc += '<li class="parameterValue">Param' + (p) + ' (' + procParams[p].type + ')</li>';
+                }
+                defSrc += '<li class="returnValue">Return Table[]</li>';
+                defSrc += '</ul>';
+                defSrc += '</div>';
+            } else {
+                src += '<h3>' + procName + '</h3>';
+                src += '<div class="listView">';
+                src += '<ul>';
+                for (var p = 0; p < procParams.length; ++p) {
+                    src += '<li class="parameterValue">Param' + (p) + ' (' + procParams[p].type + ')</li>';
+                }
+                src += '<li class="returnValue">Return Table[]</li>';
+                src += '</ul>';
+                src += '</div>';
+
             }
-            src += '<li class="returnValue">Return Table[]</li>';
-            src += '</ul>';
-            src += '</div>';
-
-
 
         }
-        $('#accordionProcedures').html(src);
+        var defSrcHeader = "";
+        defSrcHeader += '<h3 class="systemHeader">Default Stored Procedures</h3>';
+        defSrcHeader += '<div id="defaultProcedure" class="listView">';
+        var defSrcFooter = '</div>';
+        defSrc = defSrcHeader + defSrc + defSrcFooter;
+        $('#accordionProcedures').html(sysScr + defSrc + src);
         $('#accordionProcedures').accordion("refresh");
         $('#systemProcedure').accordion({
+            collapsible: true,
+            active: false,
+            beforeActivate: function (event, ui) {
+                // The accordion believes a panel is being opened
+                if (ui.newHeader[0]) {
+                    var currHeader = ui.newHeader;
+                    var currContent = currHeader.next('.ui-accordion-content');
+                    // The accordion believes a panel is being closed
+                } else {
+                    var currHeader = ui.oldHeader;
+                    var currContent = currHeader.next('.ui-accordion-content');
+                }
+                // Since we've changed the default behavior, this detects the actual status
+                var isPanelSelected = currHeader.attr('aria-selected') == 'true';
+
+                // Toggle the panel's header
+                currHeader.toggleClass('ui-corner-all', isPanelSelected).toggleClass('accordion-header-active ui-state-active ui-corner-top', !isPanelSelected).attr('aria-selected', ((!isPanelSelected).toString()));
+
+                // Toggle the panel's icon
+                currHeader.children('.ui-icon').toggleClass('ui-icon-triangle-1-e', isPanelSelected).toggleClass('ui-icon-triangle-1-s', !isPanelSelected);
+
+                // Toggle the panel's content
+                currContent.toggleClass('accordion-content-active', !isPanelSelected)
+                if (isPanelSelected) { currContent.slideUp(50); } else { currContent.slideDown(50); }
+
+                return false; // Cancels the default action
+            }
+        });
+        $('#defaultProcedure').accordion({
             collapsible: true,
             active: false,
             beforeActivate: function (event, ui) {
