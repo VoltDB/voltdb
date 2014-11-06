@@ -914,20 +914,23 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         String newCatalogURL, deploymentURL;
         VoltTable[] results;
 
+        // check the catalog update with query timeout
         String key = "querytimeout";
         checkDeploymentPropertyValue(client, key, "0"); // check default value
 
-        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-timeout.jar");
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-timeout-1000.jar");
         deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-timeout-1000.xml");
         results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
         assertTrue(results.length == 1);
         checkDeploymentPropertyValue(client, key, "1000");
 
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-timeout-5000.jar");
         deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-timeout-5000.xml");
         results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
         assertTrue(results.length == 1);
         checkDeploymentPropertyValue(client, key, "5000");
 
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-timeout-600.jar");
         deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-timeout-600.xml");
         results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
         assertTrue(results.length == 1);
@@ -938,6 +941,18 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
         assertTrue(results.length == 1);
         checkDeploymentPropertyValue(client, key, "0"); // check default value
+
+        // check the catalog update with elastic duration and throughput
+        String duration = "elasticduration", throughput = "elasticthroughput";
+        checkDeploymentPropertyValue(client, duration, "50"); // check default value
+        checkDeploymentPropertyValue(client, throughput, "2"); // check default value
+
+        newCatalogURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-elastic-100-5.jar");
+        deploymentURL = Configuration.getPathToCatalogForTest("catalogupdate-cluster-elastic-100-5.xml");
+        results = client.updateApplicationCatalog(new File(newCatalogURL), new File(deploymentURL)).getResults();
+        assertTrue(results.length == 1);
+        checkDeploymentPropertyValue(client, duration, "100");
+        checkDeploymentPropertyValue(client, throughput, "5");
     }
 
     private void deleteDirectory(File dir) {
@@ -1185,7 +1200,6 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         hugeCatalogJarPath = Configuration.getPathToCatalogForTest("catalogupdate-cluster-huge.jar");
         MiscUtils.copyFile(project.getPathToDeployment(), hugeCatalogXMLPath);
 
-        // a catalog with different system settings on query time out
         config = new LocalCluster("catalogupdate-cluster-change_snapshot_dir_not_exist.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
@@ -1197,26 +1211,42 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         assertTrue(compile);
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot_dir_not_exist.xml"));
 
-        config = new LocalCluster("catalogupdate-cluster-timeout.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        // Catalogs with different system settings on query time out
+        config = new LocalCluster("catalogupdate-cluster-timeout-1000.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
-        project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
-        // build the jarfile
         project.setQueryTimeout(1000);
         compile = config.compile(project);
         assertTrue(compile);
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-timeout-1000.xml"));
 
+        config = new LocalCluster("catalogupdate-cluster-timeout-5000.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
         project.setQueryTimeout(5000);
         compile = config.compile(project);
         assertTrue(compile);
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-timeout-5000.xml"));
 
+        config = new LocalCluster("catalogupdate-cluster-timeout-600.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
         project.setQueryTimeout(600);
         compile = config.compile(project);
         assertTrue(compile);
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-timeout-600.xml"));
+
+        // elastic duration and throughput catalog update tests
+        config = new LocalCluster("catalogupdate-cluster-elastic-100-5.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        project = new TPCCProjectBuilder();
+        project.addDefaultSchema();
+        // build the jarfile
+        project.setElasticDuration(100);
+        project.setElasticThroughput(5);
+        compile = config.compile(project);
+        assertTrue(compile);
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-elastic-100-5.xml"));
+
 
         return builder;
     }
