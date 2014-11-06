@@ -32,6 +32,8 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.sql.Timestamp;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.After;
 import org.junit.AfterClass;
@@ -767,6 +769,54 @@ public class TestCSVLoader {
             }
         }
 
+    }
+
+    @Test
+    public void testTimeZone() throws Exception {
+        String []myOptions = {
+                "-f" + path_csv,
+                "--reportdir=" + reportDir,
+                "--maxerrors=50",
+                "--user=",
+                "--password=",
+                "--port=",
+                "--separator=,",
+                "--quotechar=\"",
+                "--escape=\\",
+                "--skip=1",
+                "--limitrows=100",
+                "--timezone=PST",
+                "BlAh"
+        };
+        Timestamp currentTimeStamp = Timestamp.valueOf("2007-09-23 10:10:10.0");
+        String currentTime = currentTimeStamp.toString();
+        String[] myData = {
+            "1 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "2 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "3 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "4 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "1 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "2 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "5 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "6 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "1 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "2 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "7 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "1 ,1,1,11111111,first,1.10,1.11," + currentTime,
+            "12 ,1,1,11111111,first,1.10,1.11," + currentTime
+        };
+        int invalidLineCnt = 4;
+        int validLineCnt = 8;
+        test_Interface(myOptions, myData, invalidLineCnt, validLineCnt);
+        VoltTable ts_table = client.callProcedure("@AdHoc", "SELECT * FROM BLAH ORDER BY clm_integer;").getResults()[0];
+        while (ts_table.advanceRow()) {
+            Timestamp ts1 = ts_table.getTimestampAsTimestamp(7).asJavaTimestamp();
+            long currentDate = currentTimeStamp.getTime();
+            long time = ts1.getTime();
+            long diff = time - currentDate;
+            System.out.println(TimeUnit.MILLISECONDS.toHours(diff));
+            assertEquals(TimeUnit.MILLISECONDS.toHours(diff), 7);
+        }
     }
 
     public void test_Interface(String[] my_options, String[] my_data, int invalidLineCnt,
