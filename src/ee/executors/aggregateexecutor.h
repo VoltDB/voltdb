@@ -90,8 +90,11 @@ public:
     }
 
 protected:
-    bool m_haveAdvanced;
     NValue m_value;
+    /**
+     * Potentially, putting these two bool member variables will save memory.
+     */
+    bool m_haveAdvanced;
     bool m_inlineCopiedToOutline;
 
     NValue& finalizeInternal(ValueType type, NValue& val)
