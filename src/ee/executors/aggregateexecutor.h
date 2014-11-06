@@ -79,7 +79,8 @@ public:
     virtual void advance(const NValue& val) = 0;
     virtual NValue finalize(ValueType type)
     {
-        return finalizeInternal(type, m_value);
+        m_value.castAs(type);
+        return m_value;
     }
 
     virtual void resetAgg()
@@ -96,15 +97,6 @@ protected:
      */
     bool m_haveAdvanced;
     bool m_inlineCopiedToOutline;
-
-    NValue& finalizeInternal(ValueType type, NValue& val)
-    {
-        val.castAs(type);
-        if (m_inlineCopiedToOutline) {
-            val.allocateObjectFromOutlinedValue();
-        }
-        return val;
-    }
 };
 
 /**

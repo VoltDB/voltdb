@@ -323,7 +323,7 @@ class NValue {
     // the pool, use the temp string pool.
     void allocateObjectFromInlinedValue(Pool* pool);
 
-    void allocateObjectFromOutlinedValue(Pool* pool);
+    void allocateObjectFromOutlinedValue();
 
     /* Check if the value represents SQL NULL */
     bool isNull() const;
@@ -3122,13 +3122,13 @@ inline void NValue::allocateObjectFromInlinedValue(Pool* pool = NULL)
     setSourceInlined(false);
 }
 
-/** Deep copy an outline object-typed value from its current allocated pool to
- *  another new passed in pool. If no parameters are passed in, this function
- *  will use the global temp string pool to allocate the new outline object.
- *  The caller needs to deallocate the original outline space for the object.
+/** Deep copy an outline object-typed value from its current allocated pool,
+ *  allocate the new outline object in the global temp string pool instead.
+ *  The caller needs to deallocate the original outline space for the object,
+ *  probably by purging the pool that contains it.
  *  This function is used in the aggregate function for MIN/MAX functions.
  *  **/
-inline void NValue::allocateObjectFromOutlinedValue(Pool* pool = NULL)
+inline void NValue::allocateObjectFromOutlinedValue()
 {
     if (m_valueType == VALUE_TYPE_NULL || m_valueType == VALUE_TYPE_INVALID) {
         return;
@@ -3140,10 +3140,7 @@ inline void NValue::allocateObjectFromOutlinedValue(Pool* pool = NULL)
         *reinterpret_cast<void**>(m_data) = NULL;
         return;
     }
-
-    if (pool == NULL) {
-        pool = getTempStringPool();
-    }
+    Pool* pool = getTempStringPool();
 
     // get the outline data
     const char* source = (*reinterpret_cast<StringRef* const*>(m_data))->get();

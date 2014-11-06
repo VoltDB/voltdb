@@ -163,12 +163,11 @@ public:
     {
         if (m_count == 0)
         {
-            return ValueFactory::getNullValue();
+            return ValueFactory::getNullValue().castAs(type);;
         }
         ifDistinct.clear();
-        NValue finalizeResult = m_value.op_divide(ValueFactory::getBigIntValue(m_count));
 
-        return finalizeInternal(type, finalizeResult);
+        return m_value.op_divide(ValueFactory::getBigIntValue(m_count)).castAs(type);
     }
 
     virtual void resetAgg()
@@ -201,9 +200,7 @@ public:
     virtual NValue finalize(ValueType type)
     {
         ifDistinct.clear();
-        NValue finalizeResult = ValueFactory::getBigIntValue(m_count);
-
-        return finalizeInternal(type, finalizeResult);
+        return ValueFactory::getBigIntValue(m_count).castAs(type);
     }
 
     virtual void resetAgg()
@@ -229,8 +226,7 @@ public:
 
     virtual NValue finalize(ValueType type)
     {
-        NValue finalizeResult = ValueFactory::getBigIntValue(m_count);
-        return finalizeInternal(type, finalizeResult);
+        return ValueFactory::getBigIntValue(m_count).castAs(type);
     }
 
     virtual void resetAgg()
@@ -284,6 +280,15 @@ public:
         }
     }
 
+    virtual NValue finalize(ValueType type)
+    {
+        m_value.castAs(type);
+        if (m_inlineCopiedToOutline) {
+            m_value.allocateObjectFromOutlinedValue();
+        }
+        return m_value;
+    }
+
 private:
     Pool* m_memoryPool;
 };
@@ -320,6 +325,15 @@ public:
                 m_value.allocateObjectFromInlinedValue(m_memoryPool);
             }
         }
+    }
+
+    virtual NValue finalize(ValueType type)
+    {
+        m_value.castAs(type);
+        if (m_inlineCopiedToOutline) {
+            m_value.allocateObjectFromOutlinedValue();
+        }
+        return m_value;
     }
 
 private:
