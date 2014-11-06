@@ -301,7 +301,7 @@ var loadPage = function (serverName, portid) {
     var setVersionCheckUrl = function (currentServer) {
         if (version == "") {
             version = voltDbRenderer.getVersion(currentServer);
-            $('#versioncheck').attr('src', 'http://community.voltdb.com/versioncheck?app=dbmonitor&ver=' + version);
+            $('#versioncheck').attr('src', 'http://community.voltdb.com/versioncheck?app=vmc&ver=' + version);
         }
     };
 
