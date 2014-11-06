@@ -119,24 +119,20 @@ for f in $VOLTDB_LIB/*.jar; do
   CLASSPATH=${CLASSPATH}:$f;
 done
 
-# look for additional java opts that are prefixed with the -J command option
-OPTERR=0
-while getopts ":J:" optname; do
-  case "$optname" in
-    "J")
-      if [ -n "${CMD_OPTS}" ]; then
-      	CMD_OPTS="${CMD_OPTS} ${OPTARG}"
-      else 
-      	CMD_OPTS="${OPTARG}"
-      fi
-      shift
-      OPTIND=$((OPTIND - 1))
-    ;;
-  esac
+# Look for additional java opts that are prefixed with the -J command option
+jvmOPTS=()
+programOPTS=()
+for s in "$@"; do
+  jvmOPT=${s#-J-}
+  if [[ "${jvmOPT}" != "${s}" ]]; then
+    jvmOPTS+=("-${jvmOPT}")
+  else
+    programOPTS+=("${s}")
+  fi
 done
 
+jvmOPTS+=("-Xmx512m" "-Dlog4j.configuration=file://${LOG4J_CONFIG_PATH}")
+jvmOPTS+=("-classpath" "${CLASSPATH}" "org.voltdb.utils.SQLCommand")
+
 # run it
-export CMDVAL="$JAVA -Xmx512m -Dlog4j.configuration=file://${LOG4J_CONFIG_PATH} ${CMD_OPTS} "
-export CMDVAL=$CMDVAL"-classpath $CLASSPATH org.voltdb.utils.SQLCommand"
-#echo $CMDVAL "$@"
-exec $CMDVAL "$@"
+exec $JAVA "${jvmOPTS[@]}" "${programOPTS[@]}"
