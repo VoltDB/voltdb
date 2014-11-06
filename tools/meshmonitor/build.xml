@@ -3,7 +3,7 @@
     <!-- make environment var foo available as env.foo -->
     <property environment="env"/>
     <!-- VOLTCORE env variable points to voltdb checkout -->
-    <condition property="voltcore" value="${env.VOLTCORE}" else="../../../voltdb">
+    <condition property="voltcore" value="${env.VOLTCORE}" else="../..">
       <isset property="env.VOLTCORE"/>
     </condition>
 

@@ -547,7 +547,6 @@ DISTRIBUTION
     </copy>
 
     <!-- copy meshmonitor -->
-    <!-- peter was here    -->
     <mkdir dir="${dist.dir}/tools/meshmonitor" />
     <ant antfile="${base.dir}/tools/meshmonitor/build.xml" target="dist" inheritAll="false">
         <property name="build" value="${build}"/>
