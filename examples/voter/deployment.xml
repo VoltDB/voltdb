@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <deployment>
     <cluster hostcount="1" kfactor="0" />
-    <httpd enabled="true">
+    <httpd enabled="true" port="0">
         <jsonapi enabled="true" />
     </httpd>
 </deployment>

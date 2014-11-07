@@ -38,6 +38,7 @@ import org.eclipse.jetty.server.bio.SocketConnector;
 import org.eclipse.jetty.server.handler.AbstractHandler;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
+import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.HTTPClientInterface;
 import org.voltdb.VoltDB;
@@ -45,7 +46,6 @@ import org.voltdb.compilereport.ReportMaker;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.io.Resources;
-import org.eclipse.jetty.util.thread.QueuedThreadPool;
 
 public class HTTPAdminListener {
 
@@ -53,6 +53,7 @@ public class HTTPAdminListener {
     HTTPClientInterface httpClientInterface = new HTTPClientInterface();
     final boolean m_jsonEnabled;
     Map<String, String> m_htmlTemplates = new HashMap<String, String>();
+    final boolean m_mustListen;
 
     class DBMonitorHandler extends AbstractHandler {
 
@@ -262,7 +263,8 @@ public class HTTPAdminListener {
         m_htmlTemplates.put(name, contents);
     }
 
-    public HTTPAdminListener(boolean jsonEnabled, final String intf, final int port) throws Exception {
+    public HTTPAdminListener(boolean jsonEnabled, String intf, int port, boolean mustListen) throws Exception {
+        m_mustListen = mustListen;
         // PRE-LOAD ALL HTML TEMPLATES (one for now)
         try {
             loadTemplate(HTTPAdminListener.class, "admintemplate.html");
@@ -282,26 +284,29 @@ public class HTTPAdminListener {
             if (intf != null && intf.length() > 0) {
                 connector.setHost(intf);
             }
-
             connector.setPort(port);
+            connector.statsReset();
             connector.setName("VoltDB-HTTPD");
+            //open the connector here so we know if port is available and Init work can retry with next port.
+            connector.open();
+
             m_server.addConnector(connector);
 
             //"/"
             ContextHandler dbMonitorHandler = new ContextHandler("/");
-            dbMonitorHandler.setHandler(new HTTPAdminListener.DBMonitorHandler());
+            dbMonitorHandler.setHandler(new DBMonitorHandler());
 
             ///api/1.0/
             ContextHandler apiRequestHandler = new ContextHandler("/api/1.0");
-            apiRequestHandler.setHandler(new HTTPAdminListener.APIRequestHandler());
+            apiRequestHandler.setHandler(new APIRequestHandler());
 
             ///catalog
             ContextHandler catalogRequestHandler = new ContextHandler("/catalog");
-            catalogRequestHandler.setHandler(new HTTPAdminListener.CatalogRequestHandler());
+            catalogRequestHandler.setHandler(new CatalogRequestHandler());
 
             ///catalog
             ContextHandler ddlRequestHandler = new ContextHandler("/ddl");
-            ddlRequestHandler.setHandler(new HTTPAdminListener.DDLRequestHandler());
+            ddlRequestHandler.setHandler(new DDLRequestHandler());
 
             ContextHandlerCollection handlers = new ContextHandlerCollection();
             handlers.setHandlers(new Handler[] {
@@ -310,6 +315,7 @@ public class HTTPAdminListener {
                     ddlRequestHandler,
                     dbMonitorHandler
             });
+
             m_server.setHandler(handlers);
 
             /*
@@ -321,12 +327,22 @@ public class HTTPAdminListener {
             m_server.setThreadPool(qtp);
 
             m_jsonEnabled = jsonEnabled;
+        } catch (Exception e) {
+            throw new Exception(e);
+        }
+    }
+
+    public void start() throws Exception {
+        try {
             m_server.start();
         } catch (Exception e) {
             // double try to make sure the port doesn't get eaten
             try { m_server.stop(); } catch (Exception e2) {}
             try { m_server.destroy(); } catch (Exception e2) {}
-            throw e;
+            //We only throw exception to halt and we expect to mustListen;
+            if (m_mustListen) {
+                throw new Exception(e);
+            }
         }
     }
 

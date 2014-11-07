@@ -404,11 +404,6 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public boolean isAcceptingConnections() {
-        return true;
-    }
-
-    @Override
     public void readBuildInfo(String editionTag)
     {
     }
