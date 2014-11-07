@@ -49,6 +49,6 @@
         <mkdir dir="${dist}"/>
         <copy file="meshmonitorhelper.sh" tofile="${dist}/meshmonitorhelper.sh"/>
         <copy file="build/jar/MeshMonitor.jar" tofile="${dist}/meshmonitor.jar"/>
-        <copy file="README" tofile="${dist}/README"/>
+        <copy file="README.md" tofile="${dist}/README"/>
     </target>
 </project>
