@@ -1248,26 +1248,25 @@ function alertNodeClicked(obj) {
                 voltDbRenderer.isTableSortClicked) {
                 if (currentAction == VoltDbUI.ACTION_STATES.NEXT) {
                     tablePageStartIndex = (voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows;
-                    voltDbRenderer.hint = "next";
-
+                    
                 }
 
                 else if (currentAction == VoltDbUI.ACTION_STATES.PREVIOUS) { // pageStartIndex need not be initialized if isNext is undefined(when page loads intially or during reload operation)
                     tablePageStartIndex = (voltDbRenderer.tableIndex - 1) * voltDbRenderer.maxVisibleRows;
-                    voltDbRenderer.hint = "previous";
+                    
                 }
 
                 else if (((currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.NEXT) ||
                     (currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.PREVIOUS)) && !voltDbRenderer.isTableSortClicked) {
                     tablePageStartIndex = (voltDbRenderer.tableIndex) * voltDbRenderer.maxVisibleRows;
-                    voltDbRenderer.hint = "refresh next";
+                    //console.log("refresh next");
                 }
 
                 else if (currentAction == VoltDbUI.ACTION_STATES.SEARCH || currentAction == VoltDbUI.ACTION_STATES.NONE || voltDbRenderer.isTableSortClicked == true) {
                     tablePageStartIndex = 0;
-                    voltDbRenderer.tableIndex = 0;                    
-                    voltDbRenderer.hint = "search || none || table sort";
-                } 
+                    voltDbRenderer.tableIndex = 0;
+                    //console.log("search || none || table sort");
+                }
 
                 var lTableData = this.isTableSearch ? this.searchData.tables : tableData;
                 if (this.isTableSearch == false) voltDbRenderer.tableDataSize = Object.keys(tableData).length;
@@ -1336,7 +1335,10 @@ function alertNodeClicked(obj) {
                         }
 
                         if ((counter == (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1 || counter == voltDbRenderer.tableSearchDataSize - 1) && htmlTableMarkup != "") {
+                            //var today = new Date();                          
+                            
                             voltDbRenderer.tableIndex++;
+                            //console.log("index increased: " + voltDbRenderer.tableIndex + "Time:" + today.getTime());
                             return false;
                         }
 
@@ -1361,8 +1363,8 @@ function alertNodeClicked(obj) {
                 });
 
 
-                if (voltDbRenderer.isSortTables) {                    
-                        callback(htmlTableMarkup);
+                if (voltDbRenderer.isSortTables) {
+                    callback(htmlTableMarkup);
                 }
                 else {
                     htmlTableMarkups.SystemInformation.push(htmlTableMarkup);
@@ -1378,7 +1380,7 @@ function alertNodeClicked(obj) {
 
         };
 
-        this.getVersion = function(serverName) {
+        this.getVersion = function (serverName) {
             var version;
             $.each(systemOverview, function (key, val) {
                 if (val["HOSTNAME"] == serverName) {
@@ -1403,6 +1405,7 @@ function alertNodeClicked(obj) {
 
         this.sortTablesByColumns = function (isSearched) {
             var lConnection = VoltDBService.getTablesContextForSorting();
+
             if (voltDbRenderer.isTableSearch) {
                 voltDbRenderer.formatSearchTablesDataToJsonArray(lConnection, $('#filterDatabaseTable')[0].value, isSearched);
 
@@ -2099,9 +2102,8 @@ function alertNodeClicked(obj) {
             if (tableData == null || tableData == undefined) {
                 return;
             }
-            //formatTableData(connection);
             lSearchData.tables = {};
-            
+
             $.each(tableData, function (nestKey, tupleData) {
                 if (tupleData != undefined) {
                     if (nestKey.toLowerCase().indexOf(searchKey.toLowerCase()) >= 0) {
