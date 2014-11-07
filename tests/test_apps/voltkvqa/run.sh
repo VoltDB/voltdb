@@ -32,7 +32,7 @@ HOST="localhost"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar voltdbroot voltdbroot
+    rm -rf obj debugoutput $APPNAME*.jar voltdbroot voltdbroot
 }
 
 # compile the source code for procedures and the client
@@ -51,6 +51,7 @@ function catalog() {
     srccompile
     $VOLTDB compile --classpath obj -o $APPNAME.jar -p project.xml || exit 1
     $VOLTDB compile --classpath obj -o ${APPNAME}_withexport.jar -p project_withexport.xml || exit 1
+    $VOLTDB compile --classpath obj -o ${APPNAME}-security.jar -p project-security.xml || exit 1
 }
 
 # run the voltdb server locally
