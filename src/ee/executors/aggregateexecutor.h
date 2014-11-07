@@ -68,7 +68,7 @@ public:
     void operator delete(void*, Pool& memoryPool) { /* NOOP -- on alloc error unroll nothing */ }
     void operator delete(void*) { /* NOOP -- deallocate wholesale with pool */ }
 
-    Agg() : m_haveAdvanced(false)
+    Agg() : m_haveAdvanced(false), m_inlineCopiedToOutline(false)
     {
         m_value.setNull();
     }
@@ -77,15 +77,26 @@ public:
         /* do nothing */
     }
     virtual void advance(const NValue& val) = 0;
-    virtual NValue finalize() { return m_value; }
+    virtual NValue finalize(ValueType type)
+    {
+        m_value.castAs(type);
+        return m_value;
+    }
+
     virtual void resetAgg()
     {
         m_haveAdvanced = false;
         m_value.setNull();
+        m_inlineCopiedToOutline = false;
     }
+
 protected:
-    bool m_haveAdvanced;
     NValue m_value;
+    /**
+     * Potentially, putting these two bool member variables will save memory.
+     */
+    bool m_haveAdvanced;
+    bool m_inlineCopiedToOutline;
 };
 
 /**

@@ -323,6 +323,8 @@ class NValue {
     // the pool, use the temp string pool.
     void allocateObjectFromInlinedValue(Pool* pool);
 
+    void allocateObjectFromOutlinedValue();
+
     /* Check if the value represents SQL NULL */
     bool isNull() const;
 
@@ -3090,7 +3092,6 @@ inline void NValue::allocateObjectFromInlinedValue(Pool* pool = NULL)
     if (m_valueType == VALUE_TYPE_NULL || m_valueType == VALUE_TYPE_INVALID) {
         return;
     }
-
     assert(m_valueType == VALUE_TYPE_VARCHAR || m_valueType == VALUE_TYPE_VARBINARY);
     assert(m_sourceInlined);
 
@@ -3117,6 +3118,38 @@ inline void NValue::allocateObjectFromInlinedValue(Pool* pool = NULL)
     char* storage = sref->get();
     // Copy length and value into the allocated out-of-line storage
     ::memcpy(storage, source, length + SHORT_OBJECT_LENGTHLENGTH);
+    setObjectValue(sref);
+    setSourceInlined(false);
+}
+
+/** Deep copy an outline object-typed value from its current allocated pool,
+ *  allocate the new outline object in the global temp string pool instead.
+ *  The caller needs to deallocate the original outline space for the object,
+ *  probably by purging the pool that contains it.
+ *  This function is used in the aggregate function for MIN/MAX functions.
+ *  **/
+inline void NValue::allocateObjectFromOutlinedValue()
+{
+    if (m_valueType == VALUE_TYPE_NULL || m_valueType == VALUE_TYPE_INVALID) {
+        return;
+    }
+    assert(m_valueType == VALUE_TYPE_VARCHAR || m_valueType == VALUE_TYPE_VARBINARY);
+    assert(!m_sourceInlined);
+
+    if (isNull()) {
+        *reinterpret_cast<void**>(m_data) = NULL;
+        return;
+    }
+    Pool* pool = getTempStringPool();
+
+    // get the outline data
+    const char* source = (*reinterpret_cast<StringRef* const*>(m_data))->get();
+
+    const int32_t length = getObjectLength_withoutNull() + getObjectLengthLength();
+    StringRef* sref = StringRef::create(length, pool);
+    char* storage = sref->get();
+    // Copy the value into the allocated out-of-line storage
+    ::memcpy(storage, source, length);
     setObjectValue(sref);
     setSourceInlined(false);
 }
