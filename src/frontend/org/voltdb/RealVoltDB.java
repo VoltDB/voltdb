@@ -2429,14 +2429,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     @Override
-    public boolean isAcceptingConnections() {
-        if (m_clientInterface != null) {
-            return m_clientInterface.isAcceptingConnections();
-        }
-        return false;
-    }
-    
-    @Override
     public SnapshotCompletionMonitor getSnapshotCompletionMonitor() {
         return m_snapshotCompletionMonitor;
     }

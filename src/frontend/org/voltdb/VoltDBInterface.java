@@ -117,8 +117,6 @@ public interface VoltDBInterface
      */
     public boolean isRunning();
 
-    public boolean isAcceptingConnections();
-    
     /**
      * Halt a node used by @StopNode
      */

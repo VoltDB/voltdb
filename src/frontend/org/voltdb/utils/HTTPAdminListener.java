@@ -44,11 +44,8 @@ import org.voltdb.VoltDB;
 import org.voltdb.compilereport.ReportMaker;
 
 import com.google_voltpatches.common.base.Charsets;
-import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.io.Resources;
-import java.util.concurrent.ExecutorService;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
-import org.voltcore.utils.CoreUtils;
 
 public class HTTPAdminListener {
 
@@ -265,7 +262,6 @@ public class HTTPAdminListener {
         m_htmlTemplates.put(name, contents);
     }
 
-    final ExecutorService m_es = CoreUtils.getSingleThreadExecutor("http-starter");
     public HTTPAdminListener(boolean jsonEnabled, final String intf, final int port) throws Exception {
         // PRE-LOAD ALL HTML TEMPLATES (one for now)
         try {
@@ -277,24 +273,6 @@ public class HTTPAdminListener {
             throw e;
         }
 
-        m_jsonEnabled = jsonEnabled;
-        m_es.submit(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    start(intf, port);
-                } catch (Exception ex) {
-                    Throwables.propagate(ex);
-                }
-            }
-        });
-    }
-
-    public void start(String intf, int port) throws Exception {
-        //Wait for client be ready.
-        while (!VoltDB.instance().isAcceptingConnections()) {
-            Thread.sleep(2000);
-        }
         // NOW START JETTY SERVER
         try {
             // The socket channel connector seems to be faster for our use
@@ -342,12 +320,13 @@ public class HTTPAdminListener {
             qtp.setMinThreads(1);
             m_server.setThreadPool(qtp);
 
+            m_jsonEnabled = jsonEnabled;
             m_server.start();
         } catch (Exception e) {
             // double try to make sure the port doesn't get eaten
             try { m_server.stop(); } catch (Exception e2) {}
             try { m_server.destroy(); } catch (Exception e2) {}
-            Throwables.propagate(e);
+            throw e;
         }
     }
 

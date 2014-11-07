@@ -191,7 +191,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     //This validator will verify params or per procedure invocation vaidation.
     private final InvocationValidator m_invocationValidator;
 
-    private boolean isReady = false;
     /*
      * Allow the async compiler thread to immediately process completed planning tasks
      * without waiting for the periodic work thread to poll the mailbox.
@@ -2536,12 +2535,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
         mayActivateSnapshotDaemon();
         m_notifier.start();
-        isReady = true;
     }
 
-    public boolean isAcceptingConnections() {
-        return isReady;
-    }
     /**
      * Identify the partition for an execution site task.
      * @return The partition best set up to execute the procedure.
