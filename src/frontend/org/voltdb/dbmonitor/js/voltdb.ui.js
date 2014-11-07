@@ -826,6 +826,9 @@ var loadPage = function (serverName, portid) {
                     lblPreviousTable.innerHTML = " ".concat(1, ' ');
                     
                 }
+                else if (voltDbRenderer.isTableSortClicked) {
+                    lblPreviousTable.innerHTML = " ".concat(1, ' ');
+                }
                 lblTotalPagesofTables.innerHTML = voltDbRenderer.tableDataSize < voltDbRenderer.maxVisibleRows ? " ".concat(1) : " ".concat(Math.ceil(voltDbRenderer.tableDataSize / voltDbRenderer.maxVisibleRows));
 
 
