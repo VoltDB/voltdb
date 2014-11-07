@@ -309,10 +309,13 @@ TEST_F(CompactionTest, BasicCompaction) {
     TableTuple key(pkeyIndex->getKeySchema());
     boost::scoped_array<char> backingStore(new char[pkeyIndex->getKeySchema()->tupleLength()]);
     key.moveNoHeader(backingStore.get());
+
+    IndexCursor indexCursor(pkeyIndex->getTupleSchema());
+
     for (std::vector<int32_t>::iterator ii = pkeysToDelete.begin(); ii != pkeysToDelete.end(); ii++) {
         key.setNValue(0, ValueFactory::getIntegerValue(*ii));
-        ASSERT_TRUE(pkeyIndex->moveToKey(&key));
-        TableTuple tuple = pkeyIndex->nextValueAtKey();
+        ASSERT_TRUE(pkeyIndex->moveToKey(&key, indexCursor));
+        TableTuple tuple = pkeyIndex->nextValueAtKey(indexCursor);
         m_table->deleteTuple(tuple, true);
     }
 
@@ -325,8 +328,8 @@ TEST_F(CompactionTest, BasicCompaction) {
         int32_t pkey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
         key.setNValue(0, ValueFactory::getIntegerValue(pkey));
         for (int ii = 0; ii < 4; ii++) {
-            ASSERT_TRUE(m_table->m_indexes[ii]->moveToKey(&key));
-            TableTuple indexTuple = m_table->m_indexes[ii]->nextValueAtKey();
+            ASSERT_TRUE(m_table->m_indexes[ii]->moveToKey(&key, indexCursor));
+            TableTuple indexTuple = m_table->m_indexes[ii]->nextValueAtKey(indexCursor);
             ASSERT_EQ(indexTuple.address(), tuple.address());
         }
         pkeysFoundAfterDelete.insert(pkey);
@@ -357,8 +360,8 @@ TEST_F(CompactionTest, BasicCompaction) {
 
     for (stx::btree_set<int32_t>::iterator ii = pkeysNotDeleted.begin(); ii != pkeysNotDeleted.end(); ii++) {
         key.setNValue(0, ValueFactory::getIntegerValue(*ii));
-        ASSERT_TRUE(pkeyIndex->moveToKey(&key));
-        TableTuple tuple = pkeyIndex->nextValueAtKey();
+        ASSERT_TRUE(pkeyIndex->moveToKey(&key, indexCursor));
+        TableTuple tuple = pkeyIndex->nextValueAtKey(indexCursor);
         m_table->deleteTuple(tuple, true);
     }
     m_table->doForcedCompaction();
@@ -448,10 +451,12 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
         TableTuple key(pkeyIndex->getKeySchema());
         boost::scoped_array<char> backingStore(new char[pkeyIndex->getKeySchema()->tupleLength()]);
         key.moveNoHeader(backingStore.get());
+
+        IndexCursor indexCursor(pkeyIndex->getTupleSchema());
         for (std::vector<int32_t>::iterator ii = pkeysToDelete[qq].begin(); ii != pkeysToDelete[qq].end(); ii++) {
             key.setNValue(0, ValueFactory::getIntegerValue(*ii));
-            ASSERT_TRUE(pkeyIndex->moveToKey(&key));
-            TableTuple tuple = pkeyIndex->nextValueAtKey();
+            ASSERT_TRUE(pkeyIndex->moveToKey(&key, indexCursor));
+            TableTuple tuple = pkeyIndex->nextValueAtKey(indexCursor);
             m_table->deleteTuple(tuple, true);
         }
 
@@ -468,8 +473,8 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
             int32_t pkey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
             key.setNValue(0, ValueFactory::getIntegerValue(pkey));
             for (int ii = 0; ii < 4; ii++) {
-                ASSERT_TRUE(m_table->m_indexes[ii]->moveToKey(&key));
-                TableTuple indexTuple = m_table->m_indexes[ii]->nextValueAtKey();
+                ASSERT_TRUE(m_table->m_indexes[ii]->moveToKey(&key, indexCursor));
+                TableTuple indexTuple = m_table->m_indexes[ii]->nextValueAtKey(indexCursor);
                 ASSERT_EQ(indexTuple.address(), tuple.address());
             }
             pkeysFoundAfterDelete.insert(pkey);
@@ -526,11 +531,14 @@ TEST_F(CompactionTest, TestENG897) {
     TableTuple key(pkeyIndex->getKeySchema());
     boost::scoped_array<char> backingStore(new char[pkeyIndex->getKeySchema()->tupleLength()]);
     key.moveNoHeader(backingStore.get());
+
+    IndexCursor indexCursor(pkeyIndex->getTupleSchema());
+
     for (int ii = 0; ii < 32263 * 5; ii++) {
         if (ii % 2 == 0) {
             key.setNValue(0, ValueFactory::getIntegerValue(ii));
-            ASSERT_TRUE(pkeyIndex->moveToKey(&key));
-            TableTuple tuple = pkeyIndex->nextValueAtKey();
+            ASSERT_TRUE(pkeyIndex->moveToKey(&key, indexCursor));
+            TableTuple tuple = pkeyIndex->nextValueAtKey(indexCursor);
             m_table->deleteTuple(tuple, true);
         }
     }
@@ -550,8 +558,8 @@ TEST_F(CompactionTest, TestENG897) {
             continue;
         }
         key.setNValue(0, ValueFactory::getIntegerValue(ii));
-        ASSERT_TRUE(pkeyIndex->moveToKey(&key));
-        TableTuple tuple = pkeyIndex->nextValueAtKey();
+        ASSERT_TRUE(pkeyIndex->moveToKey(&key, indexCursor));
+        TableTuple tuple = pkeyIndex->nextValueAtKey(indexCursor);
         m_table->deleteTuple(tuple, true);
     }
 
@@ -577,8 +585,8 @@ TEST_F(CompactionTest, TestENG897) {
             continue;
         }
         key.setNValue(0, ValueFactory::getIntegerValue(ii));
-        ASSERT_TRUE(pkeyIndex->moveToKey(&key));
-        TableTuple tuple = pkeyIndex->nextValueAtKey();
+        ASSERT_TRUE(pkeyIndex->moveToKey(&key, indexCursor));
+        TableTuple tuple = pkeyIndex->nextValueAtKey(indexCursor);
         m_table->deleteTuple(tuple, true);
     }
 

@@ -103,7 +103,7 @@ ENABLE_BOOST_FOREACH_ON_CONST_MAP(Index);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(MaterializedViewInfo);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Table);
 
-static const size_t PLAN_CACHE_SIZE = 1024 * 10;
+static const size_t PLAN_CACHE_SIZE = 1000;
 // how many initial tuples to scan before calling into java
 const int64_t LONG_OP_THRESHOLD = 10000;
 
@@ -123,22 +123,164 @@ typedef std::pair<std::string, catalog::MaterializedViewInfo*> LabeledView;
  */
 class ExecutorVector {
 public:
+    /**
+     * Construct an ExecutorVector instance.  Object will not be
+     * initialized until its init method is called.  (Initialization
+     * has been placed there to avoid throwing an exception in the
+     * constructor.)
+     *
+     * Note: This constructed instance of ExecutorVector takes
+     * ownership of the PlanNodeFragment here; it will be released
+     * (automatically via boost::scoped_ptr) when this instance goes
+     * away.
+     */
     ExecutorVector(int64_t fragmentId,
                    int64_t logThreshold,
                    int64_t memoryLimit,
-                   PlanNodeFragment *fragment)
-        : fragId(fragmentId)
-        , planFragment(fragment)
-        , limits(memoryLimit, logThreshold)
-    { }
+                   PlanNodeFragment* fragment)
+        : m_fragId(fragmentId)
+        , m_list()
+        , m_limits(memoryLimit, logThreshold)
+        , m_fragment(fragment)
+    {
+    }
 
-    // Accessor function to satisfy boost::multi_index::const_mem_fun template.
-    int64_t getFragId() const { return fragId; }
+    /** Build the list of executors from its plan node fragment */
+    void init(VoltDBEngine* engine) {
+        BOOST_FOREACH(AbstractPlanNode* planNode, m_fragment->getExecuteList()) {
+            initPlanNode(engine, planNode);
+            m_list.push_back(planNode->getExecutor());
+        }
+    }
 
-    const int64_t fragId;
-    boost::shared_ptr<PlanNodeFragment> planFragment;
-    std::vector<AbstractExecutor*> list;
-    TempTableLimits limits;
+    /** Accessor function to satisfy boost::multi_index::const_mem_fun template. */
+    int64_t getFragId() const { return m_fragId; }
+
+    const TempTableLimits& limits() const { return m_limits; }
+
+    /** Return a string with helpful info about this object. */
+    std::string debug() const {
+        std::ostringstream oss;
+
+        oss << "Fragment ID: " << m_fragId << ", "
+            << "Executor list size: " << m_list.size() << ", "
+            << "Temp table memory in bytes: "
+            << m_limits.getAllocated() << endl;
+
+        BOOST_FOREACH (AbstractExecutor* ae, m_list) {
+            oss << ae->getPlanNode()->debug(" ") << "\n";
+        }
+
+        return oss.str();
+    }
+
+    /** Execute each executor, in order. */
+    int execute(VoltDBEngine* engine) {
+        // Walk through the queue and execute each plannode.  The
+        // query planner guarantees that for a given plannode, all of
+        // its children are positioned before it in this list,
+        // therefore dependency tracking is not needed here.
+        const NValueArray& params = engine->getParameterContainer();
+        int ctr = 0;
+        BOOST_FOREACH(AbstractExecutor *executor, m_list) {
+            assert (executor);
+
+            try {
+                // Now call the execute method to actually perform
+                // whatever action it is that the node is supposed to
+                // do...
+                if (!executor->execute(params)) {
+                    VOLT_TRACE("The Executor's execution at position '%d'"
+                               " failed for PlanFragment '%jd'",
+                               ctr, (intmax_t)m_fragId);
+                    cleanup(true);
+
+                    return ENGINE_ERRORCODE_ERROR;
+                }
+            } catch (const SerializableEEException &e) {
+                VOLT_TRACE("The Executor's execution at position '%d'"
+                           " failed for PlanFragment '%jd'",
+                           ctr, (intmax_t)m_fragId);
+                cleanup(true);
+                engine->serializeException(e);
+                return ENGINE_ERRORCODE_ERROR;
+            }
+
+            ++ctr;
+        }
+        // Clean up all the tempTable when each plan finishes and
+        // reset current InputDepId
+        cleanup(false);
+        return ENGINE_ERRORCODE_SUCCESS;
+    }
+
+    /** Clean up resources assocated with each executor and plan node. */
+    void cleanup(bool hasException) {
+        // Clean up all the tempTables when each plan finishes
+        BOOST_FOREACH (AbstractExecutor *executor, m_list) {
+            assert (executor);
+            executor->cleanupTempOutputTable();
+
+            if (hasException) {
+                AbstractPlanNode * node = executor->getPlanNode();
+                std::map<PlanNodeType, AbstractPlanNode*>::iterator it;
+                std::map<PlanNodeType, AbstractPlanNode*> inlineNodes = node->getInlinePlanNodes();
+                for (it = inlineNodes.begin(); it != inlineNodes.end(); it++ ) {
+                    AbstractPlanNode *inlineNode = it->second;
+                    inlineNode->getExecutor()->cleanupMemoryPool();
+                }
+            }
+        }
+
+        m_limits.resetPeakMemory();
+    }
+
+private:
+
+    void initPlanNode(VoltDBEngine* engine, AbstractPlanNode* node)
+    {
+        assert(node);
+        assert(node->getExecutor() == NULL);
+
+        // Executor is created here. An executor is *devoted* to this
+        // plannode so that it can cache anything for the plannode
+        AbstractExecutor* executor = getNewExecutor(engine, node);
+        if (executor == NULL) {
+            char message[256];
+            snprintf(message, sizeof(message), "Unexpected error. "
+                     "Invalid statement plan. A fragment (%jd) has an unknown plan node type (%d)",
+                     (intmax_t)m_fragId, (int)node->getPlanNodeType());
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+        }
+        node->setExecutor(executor);
+
+        // If this PlanNode has an internal PlanNode (e.g.,
+        // AbstractScanPlanNode can have internal Projections), set
+        // that internal node's executor as well.
+        map<PlanNodeType, AbstractPlanNode*>::const_iterator internal_it;
+        for (internal_it = node->getInlinePlanNodes().begin();
+             internal_it != node->getInlinePlanNodes().end(); internal_it++) {
+            AbstractPlanNode* inline_node = internal_it->second;
+            initPlanNode(engine, inline_node);
+        }
+
+        // Now use the plannode to initialize the executor for execution later on
+        if (executor->init(engine, &m_limits)) {
+            return;
+        }
+
+        char msg[1024 * 10];
+        snprintf(msg, sizeof(msg),
+                 "The executor failed to initialize for PlanNode '%s' for PlanFragment '%jd'",
+                 node->debug().c_str(), (intmax_t)m_fragId);
+        VOLT_ERROR("%s", msg);
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
+    }
+
+    const int64_t m_fragId;
+    std::vector<AbstractExecutor*> m_list;
+    TempTableLimits m_limits;
+    boost::scoped_ptr<PlanNodeFragment> m_fragment;
 };
 
 /**
@@ -406,9 +548,9 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
         m_tuplesProcessedInBatch += m_tuplesProcessedInFragment;
         m_tuplesProcessedInFragment = 0;
         m_tuplesProcessedSinceReport = 0;
-    }
 
-    m_stringPool.purge();
+        m_stringPool.purge();
+    }
 
     return failures;
 }
@@ -468,8 +610,7 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
         execsForFrag = getExecutorVectorForFragmentId(planfragmentId);
     }
     catch (const SerializableEEException &e) {
-        resetReusedResultOutputBuffer();
-        e.serialize(getExceptionOutputSerializer());
+        serializeException(e);
 
         // set this back to -1 for error handling
         m_currentInputDepId = -1;
@@ -480,40 +621,11 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
     assert(execsForFrag);
     m_currExecutorVec = execsForFrag;
 
-    // Walk through the queue and execute each plannode.  The query
-    // planner guarantees that for a given plannode, all of its
-    // children are positioned before it in this list, therefore
-    // dependency tracking is not needed here.
-    size_t ttl = execsForFrag->list.size();
-
-    for (int ctr = 0; ctr < ttl; ++ctr) {
-        AbstractExecutor *executor = execsForFrag->list[ctr];
-        assert (executor);
-
-        try {
-            // Now call the execute method to actually perform whatever action
-            // it is that the node is supposed to do...
-            if (!executor->execute(m_staticParams)) {
-                VOLT_TRACE("The Executor's execution at position '%d'"
-                           " failed for PlanFragment '%jd'",
-                           ctr, (intmax_t)planfragmentId);
-                cleanupExecutors(execsForFrag);
-
-                return ENGINE_ERRORCODE_ERROR;
-            }
-        } catch (const SerializableEEException &e) {
-            VOLT_TRACE("The Executor's execution at position '%d'"
-                       " failed for PlanFragment '%jd'",
-                       ctr, (intmax_t)planfragmentId);
-            cleanupExecutors(execsForFrag);
-            resetReusedResultOutputBuffer();
-            e.serialize(getExceptionOutputSerializer());
-
-            return ENGINE_ERRORCODE_ERROR;
-        }
+    int rc = execsForFrag->execute(this);
+    resetExecutionMetadata();
+    if (rc != 0) {
+        return rc;
     }
-    // Clean up all the tempTable when each plan finishes and reset current InputDepId
-    cleanupExecutors(execsForFrag);
 
     // assume this is sendless dml
     if (m_numResultDependencies == 0) {
@@ -544,21 +656,15 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
     return ENGINE_ERRORCODE_SUCCESS;
 }
 
-/**
- * Function that clean up the temp table the executors used and reset other metadata.
- */
-void VoltDBEngine::cleanupExecutors(ExecutorVector * execsForFrag) {
-    // Clean up all the tempTable when each plan finishes
-    BOOST_FOREACH (AbstractExecutor *executor, execsForFrag->list) {
-        assert (executor);
-        executor->cleanupTempOutputTable();
-    }
+void VoltDBEngine::resetExecutionMetadata() {
     // set this back to -1 for error handling
     m_currentInputDepId = -1;
     m_currExecutorVec = NULL;
-    if (execsForFrag != NULL) {
-        execsForFrag->limits.resetPeakMemory();
-    }
+}
+
+void VoltDBEngine::serializeException(const SerializableEEException& e) {
+    resetReusedResultOutputBuffer();
+    e.serialize(getExceptionOutputSerializer());
 }
 
 // -------------------------------------------------
@@ -629,14 +735,14 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const string &catalogPay
     }
 
     // load up all the tables, adding all tables
-    if (processCatalogAdditions(true, timestamp) == false) {
+    if (processCatalogAdditions(timestamp) == false) {
         return false;
     }
 
     rebuildTableCollections();
 
     // load up all the materialized views
-    initMaterializedViews(true);
+    initMaterializedViews();
 
     VOLT_DEBUG("Loaded catalog...");
     return true;
@@ -656,9 +762,31 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const string &catalogPay
 void
 VoltDBEngine::processCatalogDeletes(int64_t timestamp )
 {
-    vector<string> deletions;
-    m_catalog->getDeletedPaths(deletions);
+    vector<string> deletion_vector;
+    m_catalog->getDeletedPaths(deletion_vector);
+    set<string> deletions(deletion_vector.begin(), deletion_vector.end());
 
+    // delete any empty persistent tables, forcing them to be rebuilt
+    // (Unless the are actually being deleted -- then this does nothing)
+
+    BOOST_FOREACH(LabeledCD delegatePair, m_catalogDelegates) {
+        CatalogDelegate *delegate = delegatePair.second;
+        TableCatalogDelegate *tcd = dynamic_cast<TableCatalogDelegate*>(delegate);
+        Table* table = tcd->getTable();
+
+        // skip export tables for now
+        StreamedTable *streamedtable = dynamic_cast<StreamedTable*>(table);
+        if (streamedtable) {
+            continue;
+        }
+
+        // identify empty tables and mark for deletion
+        if (table->activeTupleCount() == 0) {
+            deletions.insert(delegatePair.first);
+        }
+    }
+
+    // delete tables in the set
     BOOST_FOREACH (string path, deletions) {
         VOLT_TRACE("delete path:");
 
@@ -752,23 +880,28 @@ static bool haveDifferentSchema(catalog::Table *t1, voltdb::PersistentTable *t2)
  * data.
  */
 bool
-VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
+VoltDBEngine::processCatalogAdditions(int64_t timestamp)
 {
     // iterate over all of the tables in the new catalog
     BOOST_FOREACH (LabeledTable labeledTable, m_database->tables()) {
         // get the catalog's table object
         catalog::Table *catalogTable = labeledTable.second;
-        if (addAll || catalogTable->wasAdded()) {
-            VOLT_TRACE("add a completely new table...");
+
+        // get the delegate for the table... add the table if it's null
+        CatalogDelegate* delegate = findInMapOrNull(catalogTable->path(), m_catalogDelegates);
+        TableCatalogDelegate *tcd = dynamic_cast<TableCatalogDelegate*>(delegate);
+
+        if (!tcd) {
+            VOLT_TRACE("add a completely new table or rebuild an empty table...");
 
             //////////////////////////////////////////
             // add a completely new table
             //////////////////////////////////////////
 
-            TableCatalogDelegate *tcd = new TableCatalogDelegate(catalogTable->relativeIndex(),
-                                                                 catalogTable->path(),
-                                                                 catalogTable->signature(),
-                                                                 m_compactionThreshold);
+            tcd = new TableCatalogDelegate(catalogTable->relativeIndex(),
+                                           catalogTable->path(),
+                                           catalogTable->signature(),
+                                           m_compactionThreshold);
 
             // use the delegate to init the table and create indexes n' stuff
             if (tcd->init(*m_database, *catalogTable) != 0) {
@@ -793,14 +926,6 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
             // add/modify/remove indexes that have changed
             //  in the catalog
             //////////////////////////////////////////////
-
-            // get the delegate and bail if it's not here
-            // - JHH: I'm not sure why not finding a delegate is safe to ignore
-            CatalogDelegate* delegate = findInMapOrNull(catalogTable->path(), m_catalogDelegates);
-            TableCatalogDelegate *tcd = dynamic_cast<TableCatalogDelegate*>(delegate);
-            if (!tcd) {
-                continue;
-            }
 
             Table *table = tcd->getTable();
 
@@ -1014,14 +1139,14 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const string &catalogPayloa
 
     processCatalogDeletes(timestamp);
 
-    if (processCatalogAdditions(false, timestamp) == false) {
+    if (processCatalogAdditions(timestamp) == false) {
         VOLT_ERROR("Error processing catalog additions.");
         return false;
     }
 
     rebuildTableCollections();
 
-    initMaterializedViews(false);
+    initMaterializedViews();
 
     m_catalog->purgeDeletions();
     VOLT_DEBUG("Updated catalog...");
@@ -1113,6 +1238,18 @@ void VoltDBEngine::rebuildTableCollections()
     }
 }
 
+//
+// The following only exists for testing purposes until DDL support
+// for "LIMIT PARTITION ROWS <n> EXECUTE DELETE ..." in the frontend
+// arrives.  This is the JSON for a plan generated by the statement:
+//
+//   DELETE FROM CAPPED3_LIMIT_ROWS_EXEC WHERE PURGE_ME <> 0;
+//
+// It makes the assumption that PURGE_ME is the first column in the
+// table.
+static const std::string PURGE_FRAGMENT_JSON =
+    "{\"PLAN_NODES\":[{\"ID\":5,\"PLAN_NODE_TYPE\":\"DELETE\",\"CHILDREN_IDS\":[6],\"TARGET_TABLE_NAME\":\"CAPPED3_LIMIT_ROWS_EXEC\",\"TRUNCATE\":false},{\"ID\":6,\"PLAN_NODE_TYPE\":\"SEQSCAN\",\"INLINE_NODES\":[{\"ID\":0,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"tuple_address\",\"EXPRESSION\":{\"TYPE\":33,\"VALUE_TYPE\":6}}]}],\"PREDICATE\":{\"TYPE\":20,\"VALUE_TYPE\":6,\"LEFT\":{\"TYPE\":11,\"VALUE_TYPE\":6,\"LEFT\":{\"TYPE\":32,\"VALUE_TYPE\":3,\"COLUMN_IDX\":0},\"RIGHT\":{\"TYPE\":30,\"VALUE_TYPE\":5,\"ISNULL\":false,\"VALUE\":0}},\"RIGHT\":{\"TYPE\":11,\"VALUE_TYPE\":6,\"LEFT\":{\"TYPE\":32,\"VALUE_TYPE\":3,\"COLUMN_IDX\":0},\"RIGHT\":{\"TYPE\":30,\"VALUE_TYPE\":5,\"ISNULL\":false,\"VALUE\":0}}},\"TARGET_TABLE_NAME\":\"CAPPED3_LIMIT_ROWS_EXEC\",\"TARGET_TABLE_ALIAS\":\"CAPPED3_LIMIT_ROWS_EXEC\"}],\"EXECUTE_LIST\":[6,5]}";
+
 ExecutorVector *VoltDBEngine::getExecutorVectorForFragmentId(const int64_t fragId)
 {
     if (m_plans) {
@@ -1134,7 +1271,16 @@ ExecutorVector *VoltDBEngine::getExecutorVectorForFragmentId(const int64_t fragI
 
     PlanSet& plans = *m_plans;
     //TODO -- properly re-indent the section below
-        std::string plan = m_topend->planForFragmentId(fragId);
+        std::string plan;
+        if (fragId == MAGIC_PURGE_FRAGMENT_ID) {
+            // Temporary hack for testing purposes.  This should go
+            // away when there is DDL support for DELETE actions for
+            // row limits in the front end.
+            plan = PURGE_FRAGMENT_JSON;
+        }
+        else {
+            plan = m_topend->planForFragmentId(fragId);
+        }
 
         if (plan.length() == 0) {
             char msg[1024];
@@ -1178,20 +1324,12 @@ ExecutorVector *VoltDBEngine::getExecutorVectorForFragmentId(const int64_t fragI
             frag_temptable_limit = -1;
         }
 
+        // Note: the executor vector takes ownership of the plan node
+        // fragment here.
         ExecutorVector* ev =
-            new ExecutorVector(fragId, frag_temptable_log_limit, frag_temptable_limit, pnf);
+          new ExecutorVector(fragId, frag_temptable_log_limit, frag_temptable_limit, pnf);
         boost::shared_ptr<ExecutorVector> ev_guard(ev);
-
-        // Initialize each node!
-        TempTableLimits* limits = &(ev->limits);
-        for (int ctr = 0, cnt = (int)pnf->getExecuteList().size(); ctr < cnt; ctr++) {
-            initPlanNode(fragId, pnf->getExecuteList()[ctr], limits);
-        }
-
-        // Initialize the vector of executors for this planfragment, used at runtime.
-        for (int ctr = 0, cnt = (int)pnf->getExecuteList().size(); ctr < cnt; ctr++) {
-            ev->list.push_back(pnf->getExecuteList()[ctr]->getExecutor());
-        }
+        ev->init(this);
 
         // add the plan to the back
         plans.get<0>().push_back(ev_guard);
@@ -1209,47 +1347,6 @@ ExecutorVector *VoltDBEngine::getExecutorVectorForFragmentId(const int64_t fragI
 // Initialization Functions
 // -------------------------------------------------
 
-void VoltDBEngine::initPlanNode(const int64_t fragId,
-                                AbstractPlanNode* node,
-                                TempTableLimits* limits)
-{
-    assert(node);
-    assert(node->getExecutor() == NULL);
-
-    // Executor is created here. An executor is *devoted* to this plannode
-    // so that it can cache anything for the plannode
-    AbstractExecutor* executor = getNewExecutor(this, node);
-    if (executor == NULL) {
-        char message[256];
-        snprintf(message, sizeof(message), "Unexpected error. "
-            "Invalid statement plan. A fragment (%jd) has an unknown plan node type (%d)",
-            (intmax_t)fragId, (int)node->getPlanNodeType());
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
-    }
-    node->setExecutor(executor);
-
-    // If this PlanNode has an internal PlanNode (e.g., AbstractScanPlanNode can
-    // have internal Projections), set that internal node's executor as well.
-    map<PlanNodeType, AbstractPlanNode*>::const_iterator internal_it;
-    for (internal_it = node->getInlinePlanNodes().begin();
-         internal_it != node->getInlinePlanNodes().end(); internal_it++) {
-        AbstractPlanNode* inline_node = internal_it->second;
-        initPlanNode(fragId, inline_node, limits);
-    }
-
-    // Now use the plannode to initialize the executor for execution later on
-    if (executor->init(this, limits)) {
-        return;
-    }
-
-    char msg[1024 * 10];
-    snprintf(msg, sizeof(msg),
-             "The executor failed to initialize for PlanNode '%s' for PlanFragment '%jd'",
-             node->debug().c_str(), (intmax_t)fragId);
-    VOLT_ERROR("%s", msg);
-    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
-}
-
 /*
  * Iterate catalog tables looking for tables that are materialized
  * view sources.  When found, construct a materialized view metadata
@@ -1257,30 +1354,24 @@ void VoltDBEngine::initPlanNode(const int64_t fragId,
  * that object to the source table.
  *
  * Assumes all tables (sources and destinations) have been constructed.
- * @param addAll Pass true to add all views. Pass false to only add new views.
  */
-void VoltDBEngine::initMaterializedViews(bool addAll) {
+void VoltDBEngine::initMaterializedViews() {
     // walk tables
     BOOST_FOREACH (LabeledTable labeledTable, m_database->tables()) {
         catalog::Table *srcCatalogTable = labeledTable.second;
         Table *srcTable = m_tables[srcCatalogTable->relativeIndex()];
+
+        // Only persistent tables can have views.
         PersistentTable *srcPTable = dynamic_cast<PersistentTable*>(srcTable);
-        if ( ! srcPTable) {
-            // Streamed tables don't have views.
-            return;
-        }
-        // walk views
-        BOOST_FOREACH (LabeledView labeledView, srcCatalogTable->views()) {
-            catalog::MaterializedViewInfo *catalogView = labeledView.second;
-            const catalog::Table *destCatalogTable = catalogView->dest();
-            PersistentTable *destTable = dynamic_cast<PersistentTable*>(m_tables[destCatalogTable->relativeIndex()]);
-            assert(destTable);
-            // connect source and destination tables
-            if (addAll || catalogView->wasAdded()) {
-                // This is not a leak -- the materialized view is self-installing into srcTable.
-                new MaterializedViewMetadata(srcPTable, destTable, catalogView);
-            } else {
-                // Ensure that the materialized view is using the latest version of the target table.
+        if (srcPTable != NULL) {
+            // walk views
+            BOOST_FOREACH (LabeledView labeledView, srcCatalogTable->views()) {
+                catalog::MaterializedViewInfo *catalogView = labeledView.second;
+                const catalog::Table *destCatalogTable = catalogView->dest();
+                PersistentTable *destTable = dynamic_cast<PersistentTable*>(m_tables[destCatalogTable->relativeIndex()]);
+                assert(destTable);
+                // Either connect source and destination tables with a new link...
+                // Or Ensure that the materialized view is using the latest version of the target table.
                 srcPTable->updateMaterializedViewTargetTable(destTable, catalogView);
             }
         }
@@ -1343,16 +1434,7 @@ string VoltDBEngine::debug(void) const
     ostringstream output;
 
     BOOST_FOREACH (boost::shared_ptr<ExecutorVector> ev_guard, plans) {
-        ExecutorVector* ev = ev_guard.get();
-
-        output << "Fragment ID: " << ev->fragId << ", "
-               << "Executor list size: " << ev->list.size() << ", "
-               << "Temp table memory in bytes: "
-               << ev->limits.getAllocated() << endl;
-
-        BOOST_FOREACH (AbstractExecutor* ae, ev->list) {
-            output << ae->getPlanNode()->debug(" ") << "\n";
-        }
+        ev_guard->debug();
     }
 
     return output.str();
@@ -1430,8 +1512,7 @@ int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
                                           message);
         }
     } catch (const SerializableEEException &e) {
-        resetReusedResultOutputBuffer();
-        e.serialize(getExceptionOutputSerializer());
+        serializeException(e);
         return -1;
     }
 
@@ -1541,8 +1622,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(const CatalogId tableId,
                    (int)positions.size(), (long)remaining);
     }
     catch (SerializableEEException &e) {
-        resetReusedResultOutputBuffer();
-        e.serialize(getExceptionOutputSerializer());
+        serializeException(e);
         remaining = TABLE_STREAM_SERIALIZATION_ERROR;
     }
 
@@ -1783,9 +1863,14 @@ void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
     }
 }
 
+int VoltDBEngine::executePurgeFragment(PersistentTable* table) {
+    ExecutorVector *pev = getExecutorVectorForFragmentId(table->getPurgeFragmentId());
+    return pev->execute(this);
+}
+
 static std::string dummy_last_accessed_plan_node_name("no plan node in progress");
 
-void VoltDBEngine::reportProgessToTopend() {
+void VoltDBEngine::reportProgressToTopend() {
     std::string tableName;
     int64_t tableSize;
 
@@ -1808,12 +1893,17 @@ void VoltDBEngine::reportProgessToTopend() {
                                         tableName,
                                         tableSize,
                                         m_tuplesProcessedInBatch + m_tuplesProcessedInFragment,
-                                        m_currExecutorVec->limits.getAllocated(),
-                                        m_currExecutorVec->limits.getPeakMemoryInBytes());
+                                        m_currExecutorVec->limits().getAllocated(),
+                                        m_currExecutorVec->limits().getPeakMemoryInBytes());
     m_tuplesProcessedSinceReport = 0;
-    if (m_tupleReportThreshold == 0) {
+    if (m_tupleReportThreshold < 0) {
         VOLT_DEBUG("Interrupt query.");
-        throw InterruptException("Query interrupted.");
+        char buff[100];
+        snprintf(buff, 100,
+                "A SQL query was terminated after %.2f seconds because it exceeded the query timeout period.",
+                static_cast<double>(m_tupleReportThreshold) / -1000.0);
+
+        throw InterruptException(std::string(buff));
     }
 }
 

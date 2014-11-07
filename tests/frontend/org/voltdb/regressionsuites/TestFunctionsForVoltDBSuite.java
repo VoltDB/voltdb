@@ -39,16 +39,13 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
+import org.voltdb_testprocs.regressionsuites.fixedsql.GotBadParamCountsInJava;
 
 /**
  * Tests for SQL that was recently (early 2012) unsupported.
  */
 
 public class TestFunctionsForVoltDBSuite extends RegressionSuite {
-
-    /** Procedures used by this suite */
-    static final Class<?>[] PROCEDURES = { Insert.class };
 
     public void testExplicitErrorUDF() throws Exception
     {
@@ -406,7 +403,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         VoltTable result;
 
         cr = client.callProcedure("@AdHoc", "Delete from P3_INLINE_DESC;");
-        cr = client.callProcedure("P3_INLINE_DESC.insert", 1, "zheng", 10, 1.1);
+        cr = client.callProcedure("P3_INLINE_DESC.insert", 1, "zheng", "zheng2", 10, 1.1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
         // null case
@@ -418,6 +415,40 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             assertEquals(1, result.getRowCount());
             assertTrue(result.advanceRow());
             assertEquals("zheng",result.getString(0));
+
+            cr = client.callProcedure("@AdHoc",
+                                      "select DECODE(id, 1, desc, 'INVALID') from P3_INLINE_DESC where id > 0");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            assertEquals("zheng",result.getString(0));
+
+            cr = client.callProcedure("@AdHoc",
+                    "update P3_INLINE_DESC set desc = DECODE(id, 1, desc2, 'INVALID'), desc2 = DECODE(id, 1, desc, 'INVALID') where id > 0");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            assertEquals(1, result.getLong(0));
+
+            cr = client.callProcedure("@AdHoc",
+                    "select DECODE(id, 1, desc, 'INVALID') from P3_INLINE_DESC where id > 0");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            assertEquals("zheng2",result.getString(0));
+
+            cr = client.callProcedure("@AdHoc",
+                    "select DECODE(id, 1, desc2, 'INVALID') from P3_INLINE_DESC where id > 0");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            assertEquals("zheng",result.getString(0));
+
+
         } catch (ProcCallException pce) {
             System.out.println(pce);
             fail("Looks like a regression of ENG-5078 inline varchar column pass-through by decode");
@@ -703,6 +734,67 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
     }
 
+    public void testENG6861() throws Exception {
+        System.out.println("STARTING testENG6861");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        // Test user-found anomaly around complex filter using functions
+        try {
+            cr = client.callProcedure("@Explain",
+                    "SELECT TOP ? * FROM PAULTEST WHERE NAME IS NOT NULL AND " +
+                    "    ( LOCK_TIME IS NULL OR " +
+                    "      SINCE_EPOCH(MILLIS,CURRENT_TIMESTAMP)-? < SINCE_EPOCH(MILLIS,LOCK_TIME) );");
+            //* enable for debug */ System.out.println(cr.getResults()[0]);
+        } catch (Exception ex) {
+            fail();
+        }
+
+        try {
+            cr = client.callProcedure("@AdHoc",
+                    "SELECT TOP ? * FROM PAULTEST WHERE NAME IS NOT NULL AND " +
+                    "    ( LOCK_TIME IS NULL OR " +
+                    "      SINCE_EPOCH(MILLIS,CURRENT_TIMESTAMP)-? < SINCE_EPOCH(MILLIS,LOCK_TIME) );",
+                    10, 10000);
+            result = cr.getResults()[0];
+            assertEquals(0, result.getRowCount());
+            //* enable for debug */ System.out.println(result);
+        } catch (Exception ex) {
+            fail();
+        }
+
+        try {
+            cr = client.callProcedure("GOT_BAD_PARAM_COUNTS_INLINE", 10, 10000);
+            result = cr.getResults()[0];
+            assertEquals(0, result.getRowCount());
+            //* enable for debug */ System.out.println(result);
+        } catch (Exception ex) {
+            fail();
+        }
+
+        try {
+            cr = client.callProcedure("GotBadParamCountsInJava", 10, 10000);
+            result = cr.getResults()[0];
+            assertEquals(0, result.getRowCount());
+            //* enable for debug */ System.out.println(result);
+        } catch (Exception ex) {
+            fail();
+        }
+
+        try {
+            // Purposely neglecting to list an select columns or '*'.
+            cr = client.callProcedure("@Explain", "SELECT TOP ? FROM PAULTEST WHERE NAME IS NOT NULL AND (LOCK_TIME IS NULL OR SINCE_EPOCH(MILLIS,CURRENT_TIMESTAMP)-? < SINCE_EPOCH(MILLIS,LOCK_TIME));");
+            //* enable for debug */ System.out.println(cr.getResults()[0]);
+            fail("Expected to detect missing SELECT columns");
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("PlanningErrorException"));
+            assertTrue(ex.getMessage().contains("unexpected token: FROM"));
+            return;
+        }
+        //* enable for debug */ System.out.println(cr.getResults()[0]);
+    }
+
     public void testTO_TIMESTAMP() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING TO_TIMESTAMP");
         Client client = getClient();
@@ -835,8 +927,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             ex = e;
         } finally {
             assertNotNull(ex);
-            assertTrue((ex.getMessage().contains("Error compiling query")));
             assertTrue((ex.getMessage().contains("PlanningErrorException")));
+            assertTrue((ex.getMessage().contains("TRUNCATE")));
         }
 
         // Test date before Gregorian calendar beginning.
@@ -1518,7 +1610,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
                 "CREATE TABLE P3_INLINE_DESC ( " +
                 "ID INTEGER DEFAULT '0' NOT NULL, " +
-                "DESC VARCHAR(30), " +
+                "DESC VARCHAR(15), " +
+                "DESC2 VARCHAR(15), " +
                 "NUM INTEGER, " +
                 "RATIO FLOAT, " +
                 "PRIMARY KEY (ID) ); " +
@@ -1589,6 +1682,15 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 ";\n" +
                 "CREATE PROCEDURE BadIdArrayLengthProc AS\n" +
                 "  SELECT ID FROM JSBAD WHERE ID = ? AND ARRAY_LENGTH(FIELD(DOC, ?)) = ?\n" +
+                ";\n" +
+
+                "CREATE TABLE PAULTEST (ID INTEGER, NAME VARCHAR(12), LOCK_TIME TIMESTAMP, PRIMARY KEY(ID));" +
+                "\n" +
+                "CREATE PROCEDURE GOT_BAD_PARAM_COUNTS_INLINE AS \n" +
+                "    SELECT TOP ? * FROM PAULTEST WHERE NAME IS NOT NULL AND " +
+                "                                       (LOCK_TIME IS NULL OR " +
+                "                                        SINCE_EPOCH(MILLIS,CURRENT_TIMESTAMP)-? < " +
+                "                                        SINCE_EPOCH(MILLIS,LOCK_TIME))\n" +
                 ";\n" +
 
                 "";
@@ -1665,6 +1767,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         project.addStmtProcedure("CONCAT5", "select id, CONCAT(DESC,?,?,?,cast(ID as VARCHAR)) from P1 where id = ?");
         project.addStmtProcedure("ConcatOpt", "select id, DESC || ? from P1 where id = ?");
 
+        project.addProcedures(GotBadParamCountsInJava.class);
         // CONFIG #1: Local Site/Partition running on JNI backend
         config = new LocalCluster("fixedsql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);

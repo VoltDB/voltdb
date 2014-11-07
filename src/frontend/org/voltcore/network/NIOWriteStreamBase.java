@@ -174,11 +174,10 @@ public abstract class NIOWriteStreamBase {
                 System.exit(-1);
             }
             RateLimitedLogger.tryLogForMessage(
-                    "Sloppy serialization size for message class " + ds,
                     System.currentTimeMillis(),
                     1, TimeUnit.HOURS,
                     networkLog,
-                    Level.WARN);
+                    Level.WARN, "Sloppy serialization size for message class %s", ds);
         }
     }
 

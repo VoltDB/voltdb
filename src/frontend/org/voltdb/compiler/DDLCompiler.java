@@ -24,6 +24,7 @@ import java.io.Reader;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -52,6 +53,7 @@ import org.voltdb.catalog.Group;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Table;
+import org.voltdb.common.Permission;
 import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
 import org.voltdb.compiler.VoltCompiler.DdlProceduresToLoad;
 import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
@@ -420,16 +422,6 @@ public class DDLCompiler {
     static final String EXPORT = "EXPORT";
     static final String ROLE = "ROLE";
     static final String DR = "DR";
-
-    enum Permission {
-        adhoc,
-        sysproc,
-        defaultproc;
-
-        static String toListString() {
-            return Arrays.asList(values()).toString();
-        }
-    }
 
     HSQLInterface m_hsql;
     VoltCompiler m_compiler;
@@ -909,30 +901,16 @@ public class DDLCompiler {
             }
             org.voltdb.catalog.Group catGroup = groupMap.add(roleName);
             if (statementMatcher.group(2) != null) {
-                for (String tokenRaw : StringUtils.split(statementMatcher.group(2), ',')) {
-                    String token = tokenRaw.trim().toLowerCase();
-                    Permission permission;
-                    try {
-                        permission = Permission.valueOf(token);
-                    }
-                    catch (IllegalArgumentException iaex) {
-                        throw m_compiler.new VoltCompilerException(String.format(
-                                "Invalid permission \"%s\" in CREATE ROLE statement: \"%s\", " +
-                                "available permissions: %s", token,
-                                statement.substring(0,statement.length()-1), // remove trailing semicolon
-                                Permission.toListString()));
-                    }
-                    switch( permission) {
-                    case adhoc:
-                        catGroup.setAdhoc(true);
-                        break;
-                    case sysproc:
-                        catGroup.setSysproc(true);
-                        break;
-                    case defaultproc:
-                        catGroup.setDefaultproc(true);
-                        break;
-                    }
+                try {
+                    EnumSet<Permission> permset =
+                            Permission.getPermissionsFromAliases(Arrays.asList(StringUtils.split(statementMatcher.group(2), ',')));
+                    Permission.setPermissionsInGroup(catGroup, permset);
+                } catch (IllegalArgumentException iaex) {
+                    throw m_compiler.new VoltCompilerException(String.format(
+                            "Invalid permission \"%s\" in CREATE ROLE statement: \"%s\", " +
+                                    "available permissions: %s", iaex.getMessage(),
+                            statement.substring(0,statement.length()-1), // remove trailing semicolon
+                            Permission.toListString()));
                 }
             }
             return true;

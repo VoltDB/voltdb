@@ -4,7 +4,7 @@ Example Projects
 ================
 The following projects are included in the examples directory:
 
-json
+json-sessions
   This example shows how to use flexible schema and JSON within
   a VoltDB application.
 

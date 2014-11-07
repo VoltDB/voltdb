@@ -41,7 +41,7 @@ import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 public class AsyncCompilerAgent {
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
-    static final VoltLogger ahpLog = new VoltLogger("ADHOCPLANNERTHREAD");
+    private static final VoltLogger adhocLog = new VoltLogger("ADHOC");
 
     // if more than this amount of work is queued, reject new work
     static public final int MAX_QUEUE_DEPTH = 250;
@@ -281,6 +281,44 @@ public class AsyncCompilerAgent {
                                                                            partitionParamValue,
                                                                            errorSummary);
 
+        if (adhocLog.isDebugEnabled()) {
+            logBatch(plannedStmtBatch);
+        }
+
         return plannedStmtBatch;
+    }
+
+    /**
+     * Log ad hoc batch info
+     * @param batch  planned statement batch
+     */
+    private void logBatch(final AdHocPlannedStmtBatch batch)
+    {
+        final int numStmts = batch.work.getStatementCount();
+        final int numParams = batch.work.getParameterCount();
+        final String readOnly = batch.readOnly ? "yes" : "no";
+        final String singlePartition = batch.isSinglePartitionCompatible() ? "yes" : "no";
+        final String user = batch.work.user.m_name;
+        final CatalogContext context = (batch.work.catalogContext != null
+                                            ? batch.work.catalogContext
+                                            : VoltDB.instance().getCatalogContext());
+        final String[] groupNames = context.authSystem.getGroupNamesForUser(user);
+        final String groupList = StringUtils.join(groupNames, ',');
+
+        adhocLog.debug(String.format(
+            "=== statements=%d parameters=%d read-only=%s single-partition=%s user=%s groups=[%s]",
+            numStmts, numParams, readOnly, singlePartition, user, groupList));
+        if (batch.work.sqlStatements != null) {
+            for (int i = 0; i < batch.work.sqlStatements.length; ++i) {
+                adhocLog.debug(String.format("Statement #%d: %s", i + 1, batch.work.sqlStatements[i]));
+            }
+        }
+        if (batch.work.userParamSet != null) {
+            for (int i = 0; i < batch.work.userParamSet.length; ++i) {
+                Object value = batch.work.userParamSet[i];
+                final String valueString = (value != null ? value.toString() : "NULL");
+                adhocLog.debug(String.format("Parameter #%d: %s", i + 1, valueString));
+            }
+        }
     }
 }

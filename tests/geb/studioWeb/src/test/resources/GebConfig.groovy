@@ -23,6 +23,7 @@
 
 import org.openqa.selenium.chrome.ChromeDriver
 import org.openqa.selenium.firefox.FirefoxDriver
+import org.openqa.selenium.safari.SafariDriver
 
 
 waiting {
@@ -38,7 +39,11 @@ environments {
     chrome {
         driver = { new ChromeDriver() }
     }
-    
+
+    safari {
+        driver = { new SafariDriver() }
+    }
+
 }
 
 // To run the tests with all browsers run “./gradlew test”

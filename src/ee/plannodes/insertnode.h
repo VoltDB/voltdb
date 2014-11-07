@@ -63,7 +63,15 @@ public:
     InsertPlanNode() : AbstractOperationPlanNode(), m_multiPartition(false), m_fieldMap() { }
     PlanNodeType getPlanNodeType() const;
 
-    bool isMultiPartition() { return m_multiPartition; }
+    bool isMultiPartition() const { return m_multiPartition; }
+
+    bool isUpsert() const { return m_isUpsert; }
+
+    bool isMultiRowInsert() const {
+        // Materialize nodes correspond to INSERT INTO ... VALUES syntax.
+        // Otherwise this may be a multi-row insert via INSERT INTO ... SELECT.
+        return m_children[0]->getPlanNodeType() != PLAN_NODE_TYPE_MATERIALIZE;
+    }
 
     void initTupleWithDefaultValues(VoltDBEngine* engine,
                                     Pool* pool,
@@ -79,6 +87,7 @@ protected:
 private:
     bool m_multiPartition;
     std::vector<int> m_fieldMap;
+    bool m_isUpsert;
 };
 
 } // namespace voltdb

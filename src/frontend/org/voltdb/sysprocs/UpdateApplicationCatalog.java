@@ -20,7 +20,10 @@ package org.voltdb.sysprocs;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
@@ -30,6 +33,7 @@ import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
+import org.voltdb.StatsSelector;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
@@ -37,7 +41,11 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.VoltZK;
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Table;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.DtxnConstants;
+import org.voltdb.exceptions.SpecifiedException;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.Encoder;
@@ -53,9 +61,9 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
     VoltLogger log = new VoltLogger("HOST");
 
     private static final int DEP_updateCatalogSync = (int)
-            SysProcFragmentId.PF_updateCatalogSync | DtxnConstants.MULTIPARTITION_DEPENDENCY;
+            SysProcFragmentId.PF_updateCatalogPrecheckAndSync | DtxnConstants.MULTIPARTITION_DEPENDENCY;
     private static final int DEP_updateCatalogSyncAggregate = (int)
-            SysProcFragmentId.PF_updateCatalogSyncAggregate;
+            SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate;
     private static final int DEP_updateCatalog = (int)
             SysProcFragmentId.PF_updateCatalog | DtxnConstants.MULTIPARTITION_DEPENDENCY;
     private static final int DEP_updateCatalogAggregate = (int)
@@ -63,10 +71,88 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
 
     @Override
     public void init() {
-        registerPlanFragment(SysProcFragmentId.PF_updateCatalogSync);
-        registerPlanFragment(SysProcFragmentId.PF_updateCatalogSyncAggregate);
+        registerPlanFragment(SysProcFragmentId.PF_updateCatalogPrecheckAndSync);
+        registerPlanFragment(SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate);
         registerPlanFragment(SysProcFragmentId.PF_updateCatalog);
         registerPlanFragment(SysProcFragmentId.PF_updateCatalogAggregate);
+    }
+
+    /**
+     * Use EE stats to get the row counts for all tables in this partition.
+     * Check the provided list of tables that need to be empty against actual
+     * row counts. If any of them aren't empty, stop the catalog update and
+     * return the pre-provided error message that corresponds to the non-empty
+     * tables.
+     *
+     * @param tablesThatMustBeEmpty List of table names that must be empty.
+     * @param reasonsForEmptyTables Error messages to return if that table isn't
+     * empty.
+     * @param context
+     */
+    protected void checkForNonEmptyTables(String[] tablesThatMustBeEmpty,
+                                          String[] reasonsForEmptyTables,
+                                          SystemProcedureExecutionContext context)
+    {
+        assert(tablesThatMustBeEmpty != null);
+        // no work to do if no tables need to be empty
+        if (tablesThatMustBeEmpty.length == 0) {
+            return;
+        }
+        assert(reasonsForEmptyTables != null);
+        assert(reasonsForEmptyTables.length == tablesThatMustBeEmpty.length);
+
+        // fetch the id of the tables that must be empty from the
+        //  current catalog (not the new one).
+        CatalogMap<Table> tables = context.getDatabase().getTables();
+        int[] tableIds = new int[tablesThatMustBeEmpty.length];
+        int i = 0;
+        for (String tableName : tablesThatMustBeEmpty) {
+            Table table = tables.get(tableName);
+            if (table == null) {
+                String msg = String.format("@UpdateApplicationCatalog was checking to see if table %s was empty, " +
+                                           "presumably as part of a schema change, and it failed to find the table " +
+                                           "in the current catalog context.", tableName);
+                throw new SpecifiedException(ClientResponse.UNEXPECTED_FAILURE, msg);
+            }
+            tableIds[i++] = table.getRelativeIndex();
+        }
+
+        // get the table stats for these tables from the EE
+        final VoltTable[] s1 =
+                context.getSiteProcedureConnection().getStats(StatsSelector.TABLE,
+                                                              tableIds,
+                                                              false,
+                                                              getTransactionTime().getTime());
+        if ((s1 == null) || (s1.length == 0)) {
+            String tableNames = StringUtils.join(tablesThatMustBeEmpty, ", ");
+            String msg = String.format("@UpdateApplicationCatalog was checking to see if tables (%s) were empty ," +
+                                       "presumably as part of a schema change, but failed to get the row counts " +
+                                       "from the native storage engine.", tableNames);
+            throw new SpecifiedException(ClientResponse.UNEXPECTED_FAILURE, msg);
+        }
+        VoltTable stats = s1[0];
+        SortedSet<String> nonEmptyTables = new TreeSet<String>();
+
+        // find all empty tables
+        while (stats.advanceRow()) {
+            long tupleCount = stats.getLong("TUPLE_COUNT");
+            String tableName = stats.getString("TABLE_NAME");
+            if (tupleCount > 0) {
+                nonEmptyTables.add(tableName);
+            }
+        }
+
+        // return an error containing the names of all non-empty tables
+        // via the propagated reasons why each needs to be empty
+        if (!nonEmptyTables.isEmpty()) {
+            String msg = "Unable to make requested schema change:\n";
+            for (i = 0; i < tablesThatMustBeEmpty.length; ++i) {
+                if (nonEmptyTables.contains(tablesThatMustBeEmpty[i])) {
+                    msg += reasonsForEmptyTables[i] + "\n";
+                }
+            }
+            throw new SpecifiedException(ClientResponse.GRACEFUL_FAILURE, msg);
+        }
     }
 
     @Override
@@ -74,7 +160,11 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params, SystemProcedureExecutionContext context)
     {
-        if (fragmentId == SysProcFragmentId.PF_updateCatalogSync) {
+        if (fragmentId == SysProcFragmentId.PF_updateCatalogPrecheckAndSync) {
+            String[] tablesThatMustBeEmpty = (String[]) params.getParam(0);
+            String[] reasonsForEmptyTables = (String[]) params.getParam(1);
+            checkForNonEmptyTables(tablesThatMustBeEmpty, reasonsForEmptyTables, context);
+
             // Send out fragments to do the initial round-trip to synchronize
             // all the cluster sites on the start of catalog update, we'll do
             // the actual work on the *next* round-trip below
@@ -112,7 +202,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
             return new DependencyPair(DEP_updateCatalogSync,
                     new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
         }
-        else if (fragmentId == SysProcFragmentId.PF_updateCatalogSyncAggregate) {
+        else if (fragmentId == SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate) {
             // Don't actually care about the returned table, just need to send something
             // back to the MPI scoreboard
             return new DependencyPair(DEP_updateCatalogSyncAggregate,
@@ -190,6 +280,8 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
     private final void performCatalogVerifyWork(
             String catalogDiffCommands,
             int expectedCatalogVersion,
+            String[] tablesThatMustBeEmpty,
+            String[] reasonsForEmptyTables,
             byte requiresSnapshotIsolation)
     {
         SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
@@ -199,13 +291,13 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         // affects global state before transactions expecting the old catalog run
 
         pfs[0] = new SynthesizedPlanFragment();
-        pfs[0].fragmentId = SysProcFragmentId.PF_updateCatalogSync;
+        pfs[0].fragmentId = SysProcFragmentId.PF_updateCatalogPrecheckAndSync;
         pfs[0].outputDepId = DEP_updateCatalogSync;
         pfs[0].multipartition = true;
-        pfs[0].parameters = ParameterSet.emptyParameterSet();
+        pfs[0].parameters = ParameterSet.fromArrayNoCopy(tablesThatMustBeEmpty, reasonsForEmptyTables);
 
         pfs[1] = new SynthesizedPlanFragment();
-        pfs[1].fragmentId = SysProcFragmentId.PF_updateCatalogSyncAggregate;
+        pfs[1].fragmentId = SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate;
         pfs[1].outputDepId = DEP_updateCatalogSyncAggregate;
         pfs[1].inputDepIds  = new int[] { DEP_updateCatalogSync };
         pfs[1].multipartition = false;
@@ -252,11 +344,20 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
      * @return Standard STATUS table.
      */
     public VoltTable[] run(SystemProcedureExecutionContext ctx,
-            String catalogDiffCommands, byte[] catalogHash, byte[] catalogBytes,
-            int expectedCatalogVersion, String deploymentString,
-            byte requiresSnapshotIsolation,
-            byte worksWithElastic, byte[] deploymentHash) throws Exception
+                           String catalogDiffCommands,
+                           byte[] catalogHash,
+                           byte[] catalogBytes,
+                           int expectedCatalogVersion,
+                           String deploymentString,
+                           String[] tablesThatMustBeEmpty,
+                           String[] reasonsForEmptyTables,
+                           byte requiresSnapshotIsolation,
+                           byte worksWithElastic,
+                           byte[] deploymentHash)
+                                   throws Exception
     {
+        assert(tablesThatMustBeEmpty != null);
+
         /*
          * Validate that no elastic join is in progress, blocking this catalog update.
          * If this update works with elastic then do the update anyways
@@ -315,6 +416,8 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
             performCatalogVerifyWork(
                     catalogDiffCommands,
                     expectedCatalogVersion,
+                    tablesThatMustBeEmpty,
+                    reasonsForEmptyTables,
                     requiresSnapshotIsolation);
         }
         catch (VoltAbortException vae) {
@@ -329,6 +432,8 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                     catalogStuff.uniqueId,
                     catalogStuff.catalogBytes,
                     catalogStuff.deploymentBytes);
+
+            // hopefully this will throw a SpecifiedException if the fragment threw one
             throw vae;
             // If there is a cluster failure after this point, we will re-run
             // the transaction with the same input args and the old state,

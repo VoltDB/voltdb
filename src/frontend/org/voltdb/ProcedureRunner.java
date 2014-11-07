@@ -53,6 +53,7 @@ import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
+import org.voltdb.exceptions.SpecifiedException;
 import org.voltdb.groovy.GroovyScriptProcedureDelegate;
 import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -602,11 +603,11 @@ public class ProcedureRunner {
             AdHocPlannedStatement plannedStatement = batch.plannedStatements.get(0);
 
             long aggFragId = ActivePlanRepository.loadOrAddRefPlanFragment(
-                    plannedStatement.core.aggregatorHash, plannedStatement.core.aggregatorFragment);
+                    plannedStatement.core.aggregatorHash, plannedStatement.core.aggregatorFragment, sql);
             long collectorFragId = 0;
             if (plannedStatement.core.collectorFragment != null) {
                 collectorFragId = ActivePlanRepository.loadOrAddRefPlanFragment(
-                        plannedStatement.core.collectorHash, plannedStatement.core.collectorFragment);
+                        plannedStatement.core.collectorHash, plannedStatement.core.collectorFragment, sql);
             }
 
             queuedSQL.stmt = SQLStmtAdHocHelper.createWithPlan(
@@ -840,7 +841,7 @@ public class ProcedureRunner {
         for (PlanFragment frag : catStmt.getFragments()) {
             byte[] planHash = Encoder.hexDecode(frag.getPlanhash());
             byte[] plan = Encoder.decodeBase64AndDecompressToBytes(frag.getPlannodetree());
-            long id = ActivePlanRepository.loadOrAddRefPlanFragment(planHash, plan);
+            long id = ActivePlanRepository.loadOrAddRefPlanFragment(planHash, plan, catStmt.getSqltext());
             boolean transactional = frag.getNontransactional() == false;
 
             SQLStmt.Frag stmtFrag = new SQLStmt.Frag(id, planHash, transactional);
@@ -1026,6 +1027,7 @@ public class ProcedureRunner {
        // use local var to avoid warnings about reassigning method argument
        Throwable e = eIn;
        boolean expected_failure = true;
+       boolean hideStackTrace = false;
        StackTraceElement[] stack = e.getStackTrace();
        ArrayList<StackTraceElement> matches = new ArrayList<StackTraceElement>();
        for (StackTraceElement ste : stack) {
@@ -1065,28 +1067,44 @@ public class ProcedureRunner {
            status = ClientResponse.TXN_RESTART;
            msg.append("TRANSACTION RESTART\n");
        }
+       // SpecifiedException means the dev wants control over status and message
+       else if (e.getClass() == SpecifiedException.class) {
+           SpecifiedException se = (SpecifiedException) e;
+           status = se.getStatus();
+           expected_failure = true;
+           hideStackTrace = true;
+       }
        else {
            msg.append("UNEXPECTED FAILURE:\n");
            expected_failure = false;
        }
 
-       // If the error is something we know can happen as part of normal operation,
-       // reduce the verbosity.
-       // Otherwise, generate more output for debuggability
-       if (expected_failure) {
+       // ensure the message is returned if we're not going to hit the verbose condition below
+       if (expected_failure || hideStackTrace) {
            msg.append("  ").append(e.getMessage());
-           for (StackTraceElement ste : matches) {
-               msg.append("\n    at ");
-               msg.append(ste.getClassName()).append(".").append(ste.getMethodName());
-               msg.append("(").append(ste.getFileName()).append(":");
-               msg.append(ste.getLineNumber()).append(")");
-           }
        }
-       else {
-           Writer result = new StringWriter();
-           PrintWriter pw = new PrintWriter(result);
-           e.printStackTrace(pw);
-           msg.append("  ").append(result.toString());
+
+       // Rarely hide the stack trace.
+       // Right now, just for SpecifiedException, which is usually from sysprocs where the error is totally
+       // known and not helpful to the user.
+       if (!hideStackTrace) {
+           // If the error is something we know can happen as part of normal operation,
+           // reduce the verbosity.
+           // Otherwise, generate more output for debuggability
+           if (expected_failure) {
+               for (StackTraceElement ste : matches) {
+                   msg.append("\n    at ");
+                   msg.append(ste.getClassName()).append(".").append(ste.getMethodName());
+                   msg.append("(").append(ste.getFileName()).append(":");
+                   msg.append(ste.getLineNumber()).append(")");
+               }
+           }
+           else {
+               Writer result = new StringWriter();
+               PrintWriter pw = new PrintWriter(result);
+               e.printStackTrace(pw);
+               msg.append("  ").append(result.toString());
+           }
        }
 
        return getErrorResponse(
@@ -1271,7 +1289,11 @@ public class ProcedureRunner {
                }
                else {
                    byte[] planBytes = ActivePlanRepository.planForFragmentId(stmt.aggregator.id);
-                   m_localTask.addCustomFragment(stmt.aggregator.planHash, m_depsToResume[index], params, planBytes);
+                   m_localTask.addCustomFragment(stmt.aggregator.planHash,
+                           m_depsToResume[index],
+                           params,
+                           planBytes,
+                           stmt.getText());
                }
            }
            // two fragments
@@ -1286,9 +1308,9 @@ public class ProcedureRunner {
                }
                else {
                    byte[] planBytes = ActivePlanRepository.planForFragmentId(stmt.aggregator.id);
-                   m_localTask.addCustomFragment(stmt.aggregator.planHash, m_depsToResume[index], params, planBytes);
+                   m_localTask.addCustomFragment(stmt.aggregator.planHash, m_depsToResume[index], params, planBytes, stmt.getText());
                    planBytes = ActivePlanRepository.planForFragmentId(stmt.collector.id);
-                   m_distributedTask.addCustomFragment(stmt.collector.planHash, outputDepId, params, planBytes);
+                   m_distributedTask.addCustomFragment(stmt.collector.planHash, outputDepId, params, planBytes, stmt.getText());
                }
            }
        }
@@ -1392,6 +1414,7 @@ public class ProcedureRunner {
        final int batchSize = batch.size();
        Object[] params = new Object[batchSize];
        long[] fragmentIds = new long[batchSize];
+       String[] sqlTexts = new String[batchSize];
 
        int i = 0;
        for (final QueuedSQL qs : batch) {
@@ -1404,6 +1427,7 @@ public class ProcedureRunner {
            else {
                params[i] = qs.params;
            }
+           sqlTexts[i] = qs.stmt.getText();
            i++;
        }
        return m_site.executePlanFragments(
@@ -1411,6 +1435,7 @@ public class ProcedureRunner {
            fragmentIds,
            null,
            params,
+           sqlTexts,
            m_txnState.txnId,
            m_txnState.m_spHandle,
            m_txnState.uniqueId,

@@ -1065,6 +1065,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             long[] planFragmentIds,
             long[] inputDepIds,
             Object[] parameterSets,
+            String[] sqlTexts,
             long txnId,
             long spHandle,//txnid is both sphandle and uniqueid pre-iv2
             long txnIdAsUniqueId,
@@ -1076,6 +1077,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             planFragmentIds,
             inputDepIds,
             parameterSets,
+            sqlTexts,
             txnId,
             txnId,
             lastCommittedTxnId,

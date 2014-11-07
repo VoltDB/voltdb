@@ -68,6 +68,10 @@ class CompactingHashUniqueIndex : public TableIndex
 
     ~CompactingHashUniqueIndex() {};
 
+    static MapIterator& castToIter(IndexCursor& cursor) {
+        return *reinterpret_cast<MapIterator*> (cursor.m_keyIter);
+    }
+
     bool addEntry(const TableTuple *tuple) {
         ++m_inserts;
         return m_entries.insert(setKeyFromTuple(tuple), tuple->address());
@@ -102,38 +106,38 @@ class CompactingHashUniqueIndex : public TableIndex
         return true;
     }
 
-    bool keyUsesNonInlinedMemory() { return KeyType::keyUsesNonInlinedMemory(); }
+    bool keyUsesNonInlinedMemory() const { return KeyType::keyUsesNonInlinedMemory(); }
 
-    bool checkForIndexChange(const TableTuple *lhs, const TableTuple *rhs) {
+    bool checkForIndexChange(const TableTuple *lhs, const TableTuple *rhs) const {
         return !(m_eq(setKeyFromTuple(lhs), setKeyFromTuple(rhs)));
     }
 
-    bool exists(const TableTuple *persistentTuple)
+    bool exists(const TableTuple *persistentTuple) const
     {
-        ++m_lookups;
         return ! findTuple(*persistentTuple).isEnd();
     }
 
-    bool moveToKey(const TableTuple *searchKey) {
-        ++m_lookups;
-        m_keyIter = findKey(searchKey);
-        if (m_keyIter.isEnd()) {
-            m_match.move(NULL);
+    bool moveToKey(const TableTuple *searchKey, IndexCursor& cursor) const {
+        MapIterator &mapIter = castToIter(cursor);
+        mapIter = findKey(searchKey);
+
+        if (mapIter.isEnd()) {
+            cursor.m_match.move(NULL);
             return false;
         }
-        m_match.move(const_cast<void*>(m_keyIter.value()));
+        cursor.m_match.move(const_cast<void*>(mapIter.value()));
+
         return true;
     }
 
-    TableTuple nextValueAtKey() {
-        TableTuple retval = m_match;
-        m_match.move(NULL);
+    TableTuple nextValueAtKey(IndexCursor& cursor) const {
+        TableTuple retval = cursor.m_match;
+        cursor.m_match.move(NULL);
         return retval;
     }
 
-    TableTuple uniqueMatchingTuple(const TableTuple &searchTuple)
+    TableTuple uniqueMatchingTuple(const TableTuple &searchTuple) const
     {
-        ++m_lookups;
         TableTuple retval(getTupleSchema());
         const MapIterator keyIter = findTuple(searchTuple);
         if ( ! keyIter.isEnd()) {
@@ -142,7 +146,7 @@ class CompactingHashUniqueIndex : public TableIndex
         return retval;
     }
 
-    bool hasKey(const TableTuple *searchKey) {
+    bool hasKey(const TableTuple *searchKey) const {
         return ! findKey(searchKey).isEnd();
     }
 
@@ -161,27 +165,23 @@ class CompactingHashUniqueIndex : public TableIndex
     }
 
     // Non-virtual (so "really-private") helper methods.
-    MapIterator findKey(const TableTuple *searchKey)
+    MapIterator findKey(const TableTuple *searchKey) const
     {
         return m_entries.find(KeyType(searchKey));
     }
 
-    MapIterator findTuple(const TableTuple &originalTuple)
+    MapIterator findTuple(const TableTuple &originalTuple) const
     {
         return m_entries.find(setKeyFromTuple(&originalTuple));
     }
 
-    const KeyType setKeyFromTuple(const TableTuple *tuple)
+    const KeyType setKeyFromTuple(const TableTuple *tuple) const
     {
         KeyType result(tuple, m_scheme.columnIndices, m_scheme.indexedExpressions, m_keySchema);
         return result;
     }
 
     MapType m_entries;
-
-    // iteration stuff
-    MapIterator m_keyIter;
-    TableTuple m_match;
 
     // comparison stuff
    KeyEqualityChecker m_eq;
@@ -190,7 +190,6 @@ public:
     CompactingHashUniqueIndex(const TupleSchema *keySchema, const TableIndexScheme &scheme) :
         TableIndex(keySchema, scheme),
         m_entries(true, KeyHasher(keySchema), KeyEqualityChecker(keySchema)),
-        m_match(getTupleSchema()),
         m_eq(keySchema)
     {}
 };

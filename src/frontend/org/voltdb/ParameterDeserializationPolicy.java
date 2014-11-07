@@ -21,13 +21,12 @@ import java.io.StringWriter;
 import java.io.Writer;
 
 import org.voltdb.AuthSystem.AuthUser;
-import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.Procedure;
 
 /**
  * Check if the parameters of the sysproc can be deserialized successfully.
  */
-public class ParameterDeserializationPolicy extends InvocationAcceptancePolicy {
+public class ParameterDeserializationPolicy extends InvocationValidationPolicy {
     public ParameterDeserializationPolicy(boolean isOn) {
         super(isOn);
     }

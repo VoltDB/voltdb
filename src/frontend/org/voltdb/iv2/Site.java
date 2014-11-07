@@ -488,7 +488,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         CoreUtils.getHostIdFromHSId(m_siteId),
                         hostname,
                         m_context.cluster.getDeployment().get("deployment").
-                        getSystemsettings().get("systemsettings").getMaxtemptablesize(),
+                        getSystemsettings().get("systemsettings").getTemptablemaxsize(),
                         hashinatorConfig);
             }
             else {
@@ -501,12 +501,14 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             CoreUtils.getHostIdFromHSId(m_siteId),
                             hostname,
                             m_context.cluster.getDeployment().get("deployment").
-                            getSystemsettings().get("systemsettings").getMaxtemptablesize(),
+                            getSystemsettings().get("systemsettings").getTemptablemaxsize(),
                             m_backend,
                             VoltDB.instance().getConfig().m_ipcPort,
                             hashinatorConfig);
             }
             eeTemp.loadCatalog(m_startupConfig.m_timestamp, m_startupConfig.m_serializableCatalog.serialize());
+            eeTemp.setTimeoutLatency(m_context.cluster.getDeployment().get("deployment").
+                            getSystemsettings().get("systemsettings").getQuerytimeout());
         }
         // just print error info an bail if we run into an error here
         catch (final Exception ex) {
@@ -1101,6 +1103,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                                             long[] planFragmentIds,
                                             long[] inputDepIds,
                                             Object[] parameterSets,
+                                            String[] sqlTexts,
                                             long txnId,
                                             long spHandle,
                                             long uniqueId,
@@ -1113,6 +1116,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 planFragmentIds,
                 inputDepIds,
                 parameterSets,
+                sqlTexts,
                 txnId,
                 spHandle,
                 m_lastCommittedSpHandle,
@@ -1133,6 +1137,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             boolean requiresSnapshotIsolationboolean, boolean isMPI)
     {
         m_context = context;
+        m_ee.setTimeoutLatency(m_context.cluster.getDeployment().get("deployment").
+                getSystemsettings().get("systemsettings").getQuerytimeout());
         m_loadedProcedures.loadProcedures(m_context, m_backend, csp);
 
         if (isMPI) {
