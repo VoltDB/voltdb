@@ -6,6 +6,12 @@ $(document).ready(function () {
     } else {
         $("#logOut").css('display', 'none');
     }
+    
+    //Prevent scrolling of page.
+    $('#navSchema').on("click", function (e) {
+        window.location.hash = "#o"; //This is required for IE.
+        e.preventDefault();
+    });
 
     try {
         var savedData = getParameterByName("data");
@@ -211,10 +217,6 @@ $(document).ready(function () {
                 $("#VDBMonHelp").hide();
                 $("#VDBSchHelp").show();
                 $("#VDBQHelp").hide();
-
-                setTimeout(function () {
-                    window.scrollTo(0, 0);
-                }, 10);
             }
 
             shortcut.remove("f5");
