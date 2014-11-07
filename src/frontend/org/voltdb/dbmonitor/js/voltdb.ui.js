@@ -9,7 +9,13 @@ $(document).ready(function () {
     
     //Prevent scrolling of page.
     $('#navSchema').on("click", function (e) {
-        window.location.hash = "#o"; //This is required for IE.
+        
+        if (navigator.userAgent.indexOf('MSIE') >= 0) {
+            window.location.hash = "#o"; //This is required for IE.
+            setTimeout(function () {
+                window.scrollTo(0, 0);
+            }, 10);
+        }
         e.preventDefault();
     });
 
