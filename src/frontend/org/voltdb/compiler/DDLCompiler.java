@@ -2177,6 +2177,16 @@ public class DDLCompiler {
             throw m_compiler.new VoltCompilerException(msg);
         }
 
+        if (stmt.hasLimitOrOffset()) {
+            msg += "with LIMIT or OFFSET clause is not supported.";
+            throw m_compiler.new VoltCompilerException(msg);
+        }
+
+        if (stmt.m_having != null) {
+            msg += "with HAVING clause is not supported.";
+            throw m_compiler.new VoltCompilerException(msg);
+        }
+
         if (displayColCount <= groupColCount) {
             msg += "has too few columns.";
             throw m_compiler.new VoltCompilerException(msg);
