@@ -127,7 +127,7 @@ public class MeshMonitor {
             synchronized (receiveLock) {
                 if (m_receiveHistogram.getHistogramData().getMaxValue() > minHiccupSize) {
                     haveOutliers = true;
-                    ps.printf( formatUTC.format(new Date()) + " %-22s %-33s  delta heartbeats   - MaxLat: %4d Avg: %6.2f 99th-Pct: %3d %3d %3d %3d \n" 
+                    ps.printf( formatUTC.format(new Date()) + " %-22s %-33s  delta receive      - MaxLat: %4d Avg: %6.2f 99th-Pct: %3d %3d %3d %3d \n" 
                     	, m_sc.socket().getLocalSocketAddress(), m_sc.socket().getRemoteSocketAddress() 
                     	, m_receiveHistogram.getHistogramData().getMaxValue(), m_receiveHistogram.getHistogramData().getMean()
                     	, m_receiveHistogram.getHistogramData().getValueAtPercentile(99.0), m_receiveHistogram.getHistogramData().getValueAtPercentile(99.9)
