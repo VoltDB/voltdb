@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.SortedMap;
 import java.util.TreeMap;
 
 /**
@@ -156,6 +157,7 @@ public class VoltXMLElement {
         Map<String, String> m_addedAttributes = new HashMap<String, String>();
         Set<String> m_removedAttributes = new HashSet<String>();
         Map<String, String> m_changedAttributes = new HashMap<String, String>();
+        SortedMap<String, Integer> m_elementOrder = new TreeMap<String, Integer>();
 
         // Takes the VoltXMLElement unique name
         public VoltXMLDiff(String name)
@@ -245,6 +247,13 @@ public class VoltXMLElement {
         if (first.toMinString().equals(second.toMinString())) {
             return result;
         }
+
+        // Store the final desired element order
+        for (int i = 0; i < second.children.size(); i++) {
+            VoltXMLElement child = second.children.get(i);
+            result.m_elementOrder.put(child.toMinString(), i);
+        }
+
         // first, check the attributes
         Set<String> firstKeys = first.attributes.keySet();
         Set<String> secondKeys = new HashSet<String>();
@@ -333,6 +342,20 @@ public class VoltXMLElement {
         // To do the node changes, recursively apply the inner diffs to the children
         for (Entry<String, VoltXMLDiff> e : diff.getChangedNodes().entrySet()) {
             findChild(e.getKey()).applyDiff(e.getValue());
+        }
+
+        // Reorder the children
+        // yes, not efficient.  Revisit on performance pass
+        assert(children.size() == diff.m_elementOrder.size());
+        List<VoltXMLElement> temp = new ArrayList<VoltXMLElement>();
+        temp.addAll(children);
+        for (VoltXMLElement child : temp) {
+            String minstring = child.toMinString();
+            Integer position = diff.m_elementOrder.get(minstring);
+            assert(position != null);
+            if (!minstring.equals(children.get(position).toMinString())) {
+                children.set(position, child);
+            }
         }
 
         return true;

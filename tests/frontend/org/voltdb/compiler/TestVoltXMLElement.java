@@ -46,11 +46,6 @@ public class TestVoltXMLElement extends TestCase {
 
     public void testDiff() {
         VoltXMLElement first = new VoltXMLElement("element");
-        first.attributes.put("deleted", "doesntmatter");
-        first.attributes.put("remains", "doesntmatter");
-        first.attributes.put("changes", "oldvalue");
-        first.children.add(new VoltXMLElement("deletedchild"));
-        first.children.add(new VoltXMLElement("unchangedchild"));
         VoltXMLElement changedChild1 = new VoltXMLElement("changedchild1");
         first.children.add(changedChild1);
         changedChild1.attributes.put("deleteme", "noreally");
@@ -59,6 +54,11 @@ public class TestVoltXMLElement extends TestCase {
         VoltXMLElement changedGrandchild = new VoltXMLElement("changedgrandchild");
         changedChild2.children.add(changedGrandchild);
         changedGrandchild.children.add(new VoltXMLElement("doomeddescendent"));
+        first.attributes.put("deleted", "doesntmatter");
+        first.attributes.put("remains", "doesntmatter");
+        first.attributes.put("changes", "oldvalue");
+        first.children.add(new VoltXMLElement("deletedchild"));
+        first.children.add(new VoltXMLElement("unchangedchild"));
 
         VoltXMLElement second = first.duplicate();
         second.attributes.remove("deleted");
@@ -104,6 +104,61 @@ public class TestVoltXMLElement extends TestCase {
         assertTrue(child2.getChangedNodes().containsKey("changedgrandchilddefault"));
         VoltXMLDiff grandchild = child2.getChangedNodes().get("changedgrandchilddefault");
         assertTrue(findNamedNode(grandchild.getRemovedNodes(), "doomeddescendent") != null);
+
+        VoltXMLElement third = first.duplicate();
+        third.applyDiff(diff);
+        System.out.println(first.toMinString());
+        System.out.println(second.toMinString());
+        System.out.println(third.toMinString());
+        assertEquals(second.toMinString(), third.toMinString());
+    }
+
+    public void testDupeChild()
+    {
+        VoltXMLElement first = new VoltXMLElement("element");
+        VoltXMLElement child1 = new VoltXMLElement("child");
+        child1.attributes.put("value", "3");
+        first.children.add(child1);
+        // Same element name, no attribute "name"
+        VoltXMLElement child2 = new VoltXMLElement("child");
+        child2.attributes.put("value", "4");
+        first.children.add(child2);
+
+        VoltXMLElement second = new VoltXMLElement("element");
+        VoltXMLElement child1s = new VoltXMLElement("child");
+        child1s.attributes.put("value", "5");
+        second.children.add(child1s);
+        // Same element name, no attribute "name"
+        VoltXMLElement child2s = new VoltXMLElement("child");
+        child2s.attributes.put("value", "6");
+        second.children.add(child2s);
+
+        VoltXMLDiff diff = VoltXMLElement.computeDiff(first, second);
+        System.out.println("diff: " + diff.toString());
+
+        VoltXMLElement third = first.duplicate();
+        third.applyDiff(diff);
+        System.out.println(first.toMinString());
+        System.out.println(second.toMinString());
+        System.out.println(third.toMinString());
+        assertEquals(second.toMinString(), third.toMinString());
+    }
+
+    public void testOrderFail()
+    {
+        VoltXMLElement first = new VoltXMLElement("element");
+        first.children.add(new VoltXMLElement("first"));
+        first.children.add(new VoltXMLElement("third"));
+        first.children.add(new VoltXMLElement("fourth"));
+
+        VoltXMLElement second = new VoltXMLElement("element");
+        second.children.add(new VoltXMLElement("first"));
+        second.children.add(new VoltXMLElement("second"));
+        second.children.add(new VoltXMLElement("third"));
+        second.children.add(new VoltXMLElement("fourth"));
+
+        VoltXMLDiff diff = VoltXMLElement.computeDiff(first, second);
+        System.out.println("diff: " + diff.toString());
 
         VoltXMLElement third = first.duplicate();
         third.applyDiff(diff);
