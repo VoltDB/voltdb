@@ -275,11 +275,12 @@ public class HTTPAdminListener {
             throw e;
         }
 
-        // NOW START JETTY SERVER
+        // NOW START SocketConnector and create Jetty server but dont start.
+        SocketConnector connector = null;
         try {
             // The socket channel connector seems to be faster for our use
             //SelectChannelConnector connector = new SelectChannelConnector();
-            SocketConnector connector = new SocketConnector();
+            connector = new SocketConnector();
 
             if (intf != null && intf.length() > 0) {
                 connector.setHost(intf);
@@ -289,7 +290,6 @@ public class HTTPAdminListener {
             connector.setName("VoltDB-HTTPD");
             //open the connector here so we know if port is available and Init work can retry with next port.
             connector.open();
-
             m_server.addConnector(connector);
 
             //"/"
@@ -328,6 +328,9 @@ public class HTTPAdminListener {
 
             m_jsonEnabled = jsonEnabled;
         } catch (Exception e) {
+            // double try to make sure the port doesn't get eaten
+            try { connector.close(); } catch (Exception e2) {}
+            try { m_server.destroy(); } catch (Exception e2) {}
             throw new Exception(e);
         }
     }
