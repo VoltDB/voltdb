@@ -87,7 +87,9 @@ import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Deployment;
 import org.voltdb.catalog.SnapshotSchedule;
+import org.voltdb.catalog.Systemsettings;
 import org.voltdb.compiler.AdHocCompilerCache;
 import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.ClusterConfig;
@@ -959,10 +961,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         m_myHostId = m_messenger.getHostId();
                         hostLog.info(String.format("Host id of this node is: %d", m_myHostId));
                         hostLog.info("URL of deployment info: " + m_config.m_pathToDeployment);
-                        // log system setting information
-                        logSystemSettingInfo();
                         hostLog.info("Cluster uptime: " + MiscUtils.formatUptime(getClusterUptime()));
                         logDebuggingInfo(m_config.m_adminPort, m_config.m_httpPort, m_httpPortExtraLogMessage, m_jsonEnabled);
+                        // log system setting information
+                        logSystemSettingFromCatalogContext();
+
                         long nextCheck = nextCheckField.getLong(dailyRollingFileAppender);
                         scheduleWork(new DailyLogTask(),
                                 nextCheck - System.currentTimeMillis() + 30 * 1000, 0, TimeUnit.MILLISECONDS);
@@ -1412,7 +1415,22 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
 
             // log system setting information
-            logSystemSettingInfo();
+            SystemSettingsType sysType = m_deployment.getSystemsettings();
+            if (sysType != null) {
+                if (sysType.getElastic() != null) {
+                    hostLog.info("Elastic duration set to " + sysType.getElastic().getDuration() + " milliseconds");
+                    hostLog.info("Elastic throughput set to " + sysType.getElastic().getThroughput() + " mb/s");
+                }
+                if (sysType.getTemptables() != null) {
+                    hostLog.info("Max temptable size set to " + sysType.getTemptables().getMaxsize() + " mb");
+                }
+                if (sysType.getSnapshot() != null) {
+                    hostLog.info("Snapshot priority set to " + sysType.getSnapshot().getPriority() + " [0 - 10]");
+                }
+                if (sysType.getQuery() != null && sysType.getQuery().getTimeout() > 0) {
+                    hostLog.info("Query timeout set to " + sysType.getQuery().getTimeout() + " milliseconds");
+                }
+            }
 
             // create a dummy catalog to load deployment info into
             Catalog catalog = new Catalog();
@@ -1802,27 +1820,24 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         consoleLog.info(String.format("Build: %s %s %s", m_versionString, m_buildString, editionTag));
     }
 
-    void logSystemSettingInfo() {
-        if (m_deployment == null) {
+    void logSystemSettingFromCatalogContext() {
+        if (m_catalogContext == null) {
             return;
         }
-        SystemSettingsType sysType = m_deployment.getSystemsettings();
+        Deployment deploy = m_catalogContext.cluster.getDeployment().get("deployment");
+        Systemsettings sysSettings = deploy.getSystemsettings().get("systemsettings");
 
-        if (sysType == null) {
+        if (sysSettings == null) {
             return;
         }
-        if (sysType.getElastic() != null) {
-            hostLog.info("Elastic duration set to " + sysType.getElastic().getDuration() + " milliseconds");
-            hostLog.info("Elastic throughput set to " + sysType.getElastic().getThroughput() + " mb/s");
-        }
-        if (sysType.getTemptables() != null) {
-            hostLog.info("Max temptable size set to " + sysType.getTemptables().getMaxsize() + " mb");
-        }
-        if (sysType.getSnapshot() != null) {
-            hostLog.info("Snapshot priority set to " + sysType.getSnapshot().getPriority() + " [0 - 10]");
-        }
-        if (sysType.getQuery() != null && sysType.getQuery().getTimeout() > 0) {
-            hostLog.info("Query timeout set to " + sysType.getQuery().getTimeout() + " milliseconds");
+
+        hostLog.info("Elastic duration set to " + sysSettings.getElasticduration() + " milliseconds");
+        hostLog.info("Elastic throughput set to " + sysSettings.getElasticthroughput() + " mb/s");
+        hostLog.info("Max temptable size set to " + sysSettings.getTemptablemaxsize() + " mb");
+        hostLog.info("Snapshot priority set to " + sysSettings.getSnapshotpriority() + " [0 - 10]");
+
+        if (sysSettings.getQuerytimeout() > 0) {
+            hostLog.info("Query timeout set to " + sysSettings.getQuerytimeout() + " milliseconds");
         }
     }
 
@@ -2137,6 +2152,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
 
             new ConfigLogging().logCatalogAndDeployment();
+
+            // log system setting information
+            logSystemSettingFromCatalogContext();
 
             return Pair.of(m_catalogContext, csp);
         }
