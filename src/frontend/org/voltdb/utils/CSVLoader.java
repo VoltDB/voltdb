@@ -277,7 +277,7 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         @Option(desc = "port to use when connecting to database (default: 21212)")
         int port = Client.VOLTDB_SERVER_PORT;
 
-        @Option(shortOpt = "z", desc = "timezone for loading the Snapshot")
+        @Option(shortOpt = "z", desc = "timezone for interpreting date and time strings")
         String timezone = "";
 
         /**

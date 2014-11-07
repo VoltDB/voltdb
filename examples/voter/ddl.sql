@@ -1,3 +1,8 @@
+CREATE TABLE towns (
+   town VARCHAR(128),
+   ts TIMESTAMP
+);
+
 -- contestants table holds the contestants numbers (for voting) and names
 CREATE TABLE contestants
 (
