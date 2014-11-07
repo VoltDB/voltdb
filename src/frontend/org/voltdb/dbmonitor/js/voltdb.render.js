@@ -104,7 +104,7 @@ function alertNodeClicked(obj) {
         this.tableSortColumn = "";
         this.isPageAction = false;
 
-
+        this.hint = "";
 
         this.ChangeServerConfiguration = function (serverName, portId, userName, pw, isHashPw, isAdmin) {
             VoltDBService.ChangeServerConfiguration(serverName, portId, userName, pw, isHashPw, isAdmin);
@@ -1248,23 +1248,25 @@ function alertNodeClicked(obj) {
                 voltDbRenderer.isTableSortClicked) {
                 if (currentAction == VoltDbUI.ACTION_STATES.NEXT) {
                     tablePageStartIndex = (voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows;
+                    voltDbRenderer.hint = "next";
 
                 }
 
                 else if (currentAction == VoltDbUI.ACTION_STATES.PREVIOUS) { // pageStartIndex need not be initialized if isNext is undefined(when page loads intially or during reload operation)
                     tablePageStartIndex = (voltDbRenderer.tableIndex - 1) * voltDbRenderer.maxVisibleRows;
-
+                    voltDbRenderer.hint = "previous";
                 }
 
                 else if (((currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.NEXT) ||
                     (currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.PREVIOUS)) && !voltDbRenderer.isTableSortClicked) {
-                    tablePageStartIndex = (voltDbRenderer.tableIndex) * voltDbRenderer.maxVisibleRows;                    
+                    tablePageStartIndex = (voltDbRenderer.tableIndex) * voltDbRenderer.maxVisibleRows;
+                    voltDbRenderer.hint = "refresh next";
                 }
 
                 else if (currentAction == VoltDbUI.ACTION_STATES.SEARCH || currentAction == VoltDbUI.ACTION_STATES.NONE || voltDbRenderer.isTableSortClicked == true) {
                     tablePageStartIndex = 0;
                     voltDbRenderer.tableIndex = 0;                    
-
+                    voltDbRenderer.hint = "search || none || table sort";
                 } 
 
                 var lTableData = this.isTableSearch ? this.searchData.tables : tableData;
@@ -1359,10 +1361,8 @@ function alertNodeClicked(obj) {
                 });
 
 
-                if (voltDbRenderer.isSortTables) {
-                    if (htmlTableMarkup != "") {
+                if (voltDbRenderer.isSortTables) {                    
                         callback(htmlTableMarkup);
-                    }
                 }
                 else {
                     htmlTableMarkups.SystemInformation.push(htmlTableMarkup);
