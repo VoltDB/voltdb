@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<project>
+    <database>
+        <schemas>
+            <schema path='ddl-security.ddl' />
+        </schemas>
+        <procedures>
+            <procedure class='voltkvqa.procedures.Initialize' />
+            <procedure class='voltkvqa.procedures.Get' />
+            <procedure class='voltkvqa.procedures.GetMp' />
+            <procedure class='voltkvqa.procedures.Put' />
+            <procedure class='voltkvqa.procedures.PutMp' />
+            <procedure class='voltkvqa.procedures.Remove' />
+        </procedures>
+    </database>
+</project>
