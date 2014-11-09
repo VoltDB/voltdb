@@ -45,10 +45,20 @@ public class ParameterValueExpression extends AbstractValueExpression {
     // In case of subqueries, TVE from a parent query that is part of a correlated expression
     // is substituted with the PVE within the child. The m_correlatedExpr points back to the
     // original TVE for 'explain' purposes
-    private AbstractExpression m_correlatedExpr = null;
+    private AbstractExpression m_correlatedExpr;
 
     public ParameterValueExpression() {
         super(ExpressionType.VALUE_PARAMETER);
+        m_correlatedExpr = null;
+    }
+
+    public ParameterValueExpression(int nextParamIndex, AbstractExpression expr) {
+        super(ExpressionType.VALUE_PARAMETER);
+        m_paramIndex = nextParamIndex;
+        setValueType(expr.getValueType());
+        setValueSize(expr.getValueSize());
+        setInBytes(expr.getInBytes());
+        m_correlatedExpr = expr;
     }
 
     @Override
@@ -207,15 +217,11 @@ public class ParameterValueExpression extends AbstractValueExpression {
         setValueSize(m_originalValue.getValueSize());
     }
 
-    public void setCorrelatedExpression(AbstractExpression expr) {
-        m_correlatedExpr = expr;
-    }
-
     public ConstantValueExpression getOriginalValue() {
         return m_originalValue;
     }
 
-    public AbstractExpression getCorrealtedExpression() {
+    public AbstractExpression getCorrelatedExpression() {
         return m_correlatedExpr;
     }
 

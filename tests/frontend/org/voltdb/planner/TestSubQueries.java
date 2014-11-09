@@ -1615,28 +1615,28 @@ public class TestSubQueries extends PlannerTestCase {
 
         // T
         failToCompile(
-                "SELECT * FROM (SELECT DISTINCT A, C FROM P1) T1, P2 where T1.A = P2.A",
+                "SELECT * FROM (SELECT DISTINCT A FROM P1) T1, P2 where T1.A = P2.A",
                 joinErrorMsg);
 
 
         failToCompile(
-                "SELECT * FROM (SELECT DISTINCT A, C FROM P1 GROUP BY A, C) T1, P2 " +
+                "SELECT * FROM (SELECT DISTINCT A FROM P1 GROUP BY A, C) T1, P2 " +
                 "where T1.A = P2.A");
 
         failToCompile(
                 "SELECT * FROM (SELECT T0.A, R1.C FROM R1, " +
-                "                (SELECT Distinct P1.A, C FROM P1,R2 where P1.A = R2.A) T0 where R1.A = T0.A ) T1, " +
+                "                (SELECT Distinct P1.A FROM P1,R2 where P1.A = R2.A) T0 where R1.A = T0.A ) T1, " +
                 "              P2 " +
                 "where T1.A = P2.A");
 
         failToCompile(
-                "SELECT * FROM (SELECT DISTINCT T0.A, R1.C FROM R1, " +
+                "SELECT * FROM (SELECT DISTINCT T0.A FROM R1, " +
                 "                (SELECT P1.A, C FROM P1,R2 where P1.A = R2.A) T0 where R1.A = T0.A ) T1, " +
                 "              P2 " +
                 "where T1.A = P2.A");
 
         failToCompile(
-                "SELECT * FROM (SELECT DISTINCT A, C FROM P1 GROUP BY A, C) T1, P2 " +
+                "SELECT * FROM (SELECT DISTINCT A FROM P1 GROUP BY A, C) T1, P2 " +
                 "where T1.A = P2.A");
     }
 

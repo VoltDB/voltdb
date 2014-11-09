@@ -1003,7 +1003,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             // The TVE and the aggregated expressions from the IN clause will be
             // parameters to the child select statement once the IN expression is
             // replaced with the EXISTS one
-            expr = replaceExpressionsWithPve(selectStmt, expr);
+            expr = selectStmt.replaceExpressionsWithPve(expr);
             // Finalize the expression. The subquery's own expressions are already finalized
             // but not the expressions from the IN list
             ExpressionUtil.finalizeValueTypes(expr);
@@ -1058,7 +1058,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      * @param selectStmt
      * @return existsExpr
      */
-    protected void simplifyExistsExpression() {
+    protected void simplifyExistsSubqueryStmt() {
         // Collect having, group by column names
         Set<String> havingColumnNamesSet = new HashSet<String>();
         Set<String> groupByColumnNamesSet = new HashSet<String>();
@@ -1125,57 +1125,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         m_limit = 1;
 
         prepareLimitPlanNode();
-    }
-
-    /**
-     * Helper method to replace all TVEs and aggregated expressions with the corresponding PVEs.
-     * The original expressions are placed into the map to be propagated to the EE.
-     * The key to the map is the parameter index.
-     *
-     *
-     * @param stmt - subquery statement
-     * @param expr - expression with parent TVEs
-     * @return Expression with parent TVE replaced with PVE
-     */
-    public static AbstractExpression replaceExpressionsWithPve(AbstractParsedStmt stmt, AbstractExpression expr) {
-        assert(expr != null);
-        if (expr instanceof AggregateExpression || expr instanceof TupleValueExpression) {
-            int paramIdx = AbstractParsedStmt.NEXT_PARAMETER_ID++;
-            ParameterValueExpression pve = new ParameterValueExpression();
-            pve.setParameterIndex(paramIdx);
-            pve.setValueSize(expr.getValueSize());
-            pve.setValueType(expr.getValueType());
-            pve.setCorrelatedExpression(expr);
-            // Disallow aggregation of parent columns in a subquery.
-            // except the case HAVING AGG(T1.C1) IN (SELECT T2.C2 ...)
-            if (expr instanceof AggregateExpression) {
-                List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(expr);
-                assert(stmt.m_parentStmt != null);
-                for(TupleValueExpression tve : tves) {
-                    if (stmt.m_parentStmt.m_stmtId != tve.getOrigStmtId() &&
-                            stmt.m_stmtId != tve.getOrigStmtId()) {
-                        throw new PlanningErrorException(
-                                "Subquery Expression do not support aggregation of parent columns");
-                    }
-                }
-            }
-            stmt.m_parameterTveMap.put(paramIdx, expr);
-            return pve;
-        }
-        if (expr.getLeft() != null) {
-            expr.setLeft(replaceExpressionsWithPve(stmt, expr.getLeft()));
-        }
-        if (expr.getRight() != null) {
-            expr.setRight(replaceExpressionsWithPve(stmt, expr.getRight()));
-        }
-        if (expr.getArgs() != null) {
-            List<AbstractExpression> newArgs = new ArrayList<AbstractExpression>();
-            for (AbstractExpression argument : expr.getArgs()) {
-                newArgs.add(replaceExpressionsWithPve(stmt, argument));
-            }
-            expr.setArgs(newArgs);
-        }
-        return expr;
     }
 
     public boolean hasJoinOrder() {

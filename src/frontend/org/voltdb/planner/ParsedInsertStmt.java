@@ -71,9 +71,8 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
         String tableName = stmtNode.attributes.get("table");
         // Need to add the table to the cache. It may be required to resolve the
         // correlated TVE in case of WHERE clause contains IN subquery
-        addTableToStmtCache(tableName, tableName, null);
-
         Table table = getTableFromDB(tableName);
+        addTableToStmtCache(table, tableName);
 
         m_tableList.add(table);
 
@@ -180,19 +179,14 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
         return expr;
     }
 
-    public boolean isInsertWithSubquery() {
-        if (m_subquery != null) {
-            return true;
-        }
-        return false;
-    }
+    public StmtSubqueryScan getSubqueryScan() { return m_subquery; }
 
     /**
      * Return the subqueries for this statement.  For INSERT statements,
      * there can be only one.
      */
     @Override
-    public List<StmtSubqueryScan> getSubqueries() {
+    public List<StmtSubqueryScan> getSubqueryScans() {
         List<StmtSubqueryScan> subqueries = new ArrayList<>();
 
         if (m_subquery != null) {

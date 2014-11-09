@@ -50,8 +50,7 @@ public class ParsedUpdateStmt extends AbstractParsedStmt {
         Table table = m_tableList.get(0);
         // Need to add the table to the cache. It may be required to resolve the
         // correlated TVE in case of WHERE clause contains IN subquery
-        addTableToStmtCache(table.getTypeName(), table.getTypeName(), null);
-
+        addTableToStmtCache(table, table.getTypeName());
 
         for (VoltXMLElement child : stmtNode.children) {
             if (child.name.equalsIgnoreCase("columns")) {

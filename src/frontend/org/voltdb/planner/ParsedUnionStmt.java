@@ -182,7 +182,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
      */
     protected static AbstractExpression breakUpSetOpSubquery(AbstractExpression subqueryExpr) {
         assert (subqueryExpr instanceof SubqueryExpression);
-        AbstractParsedStmt subquery = ((SubqueryExpression) subqueryExpr).getSubquery();
+        AbstractParsedStmt subquery = ((SubqueryExpression) subqueryExpr).getSubqueryStmt();
         if (!(subquery instanceof ParsedUnionStmt)) {
             return subqueryExpr;
         }
@@ -203,12 +203,11 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         // It's a subquery which meant it must have a parent
         assert (parentStmt != null);
         for (AbstractParsedStmt child : setOpStmt.m_children) {
-            String tableName = "VOLT_TEMP_TABLE_" + child.m_stmtId;
             // add table to the query cache
-            StmtTableScan tableCache = parentStmt.addTableToStmtCache(tableName, tableName, child);
-            assert(tableCache instanceof StmtSubqueryScan);
+            String withoutAlias = null;
+            StmtSubqueryScan tableCache = parentStmt.addSubqueryToStmtCache(child, withoutAlias);
             AbstractExpression childSubqueryExpr =
-                    new SubqueryExpression(subqueryExpr.getExpressionType(), (StmtSubqueryScan)tableCache);
+                    new SubqueryExpression(subqueryExpr.getExpressionType(), tableCache);
             if (ExpressionType.IN_SUBQUERY == subqueryExpr.getExpressionType()) {
                 childSubqueryExpr.setLeft(subqueryExpr.getLeft());
             }
