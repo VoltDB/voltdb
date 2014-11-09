@@ -53,6 +53,7 @@ public class HTTPAdminListener {
     HTTPClientInterface httpClientInterface = new HTTPClientInterface();
     final boolean m_jsonEnabled;
     Map<String, String> m_htmlTemplates = new HashMap<String, String>();
+    final boolean m_mustListen;
 
     class DBMonitorHandler extends AbstractHandler {
 
@@ -81,7 +82,12 @@ public class HTTPAdminListener {
                     baseRequest.setHandled(false);
                     return;
                 }
-
+                //Send old /studio back to "/"
+                if (baseRequest.getRequestURI().contains("/studio")) {
+                    response.sendRedirect("/");
+                    baseRequest.setHandled(true);
+                    return;
+                }
                 // redirect the base dir
                 if (target.equals("/")) target = "/index.htm";
                 // check if a file exists
@@ -257,7 +263,8 @@ public class HTTPAdminListener {
         m_htmlTemplates.put(name, contents);
     }
 
-    public HTTPAdminListener(boolean jsonEnabled, String intf, int port) throws Exception {
+    public HTTPAdminListener(boolean jsonEnabled, String intf, int port, boolean mustListen) throws Exception {
+        m_mustListen = mustListen;
         // PRE-LOAD ALL HTML TEMPLATES (one for now)
         try {
             loadTemplate(HTTPAdminListener.class, "admintemplate.html");
@@ -268,18 +275,21 @@ public class HTTPAdminListener {
             throw e;
         }
 
-        // NOW START JETTY SERVER
+        // NOW START SocketConnector and create Jetty server but dont start.
+        SocketConnector connector = null;
         try {
             // The socket channel connector seems to be faster for our use
             //SelectChannelConnector connector = new SelectChannelConnector();
-            SocketConnector connector = new SocketConnector();
+            connector = new SocketConnector();
 
             if (intf != null && intf.length() > 0) {
                 connector.setHost(intf);
             }
-
             connector.setPort(port);
+            connector.statsReset();
             connector.setName("VoltDB-HTTPD");
+            //open the connector here so we know if port is available and Init work can retry with next port.
+            connector.open();
             m_server.addConnector(connector);
 
             //"/"
@@ -317,13 +327,25 @@ public class HTTPAdminListener {
             m_server.setThreadPool(qtp);
 
             m_jsonEnabled = jsonEnabled;
-            m_server.start();
+        } catch (Exception e) {
+            // double try to make sure the port doesn't get eaten
+            try { connector.close(); } catch (Exception e2) {}
+            try { m_server.destroy(); } catch (Exception e2) {}
+            throw new Exception(e);
         }
-        catch (Exception e) {
+    }
+
+    public void start() throws Exception {
+        try {
+            m_server.start();
+        } catch (Exception e) {
             // double try to make sure the port doesn't get eaten
             try { m_server.stop(); } catch (Exception e2) {}
             try { m_server.destroy(); } catch (Exception e2) {}
-            throw new Exception(e);
+            //We only throw exception to halt and we expect to mustListen;
+            if (m_mustListen) {
+                throw new Exception(e);
+            }
         }
     }
 
