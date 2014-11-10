@@ -708,6 +708,8 @@ public class TestGroupByComplexSuite extends RegressionSuite {
 
         supportedCases();
         unsupportedCases();
+
+        ENG7046();
     }
 
     private void ENG4285() throws IOException, ProcCallException {
@@ -835,6 +837,21 @@ public class TestGroupByComplexSuite extends RegressionSuite {
             expected = new long[][] { {1, 3, 59} , {2, 2, 89}};
             validateTableOfLongs(vt, expected);
 
+        }
+    }
+
+    private void ENG7046() throws IOException, ProcCallException {
+        Client client = this.getClient();
+        VoltTable vt;
+        client.callProcedure("TB_STRING.insert", 1,  "MA");
+
+        if (!isHSQL()) {
+            // Hsql does not support DECODE function
+            vt = client.callProcedure("@AdHoc",
+                    "select min(decode(state, upper(state), state, "
+                    + "state || ' with this kind of rambling string added to it may not be inlinable')) "
+                    + "from tb_string").getResults()[0];
+            validateTableColumnOfScalarVarchar(vt, new String[] {"MA"});
         }
     }
 
@@ -1138,6 +1155,11 @@ public class TestGroupByComplexSuite extends RegressionSuite {
                 "TM TIMESTAMP DEFAULT NULL, " +
                 "PRIMARY KEY (ID, WAGE) );" +
                 "PARTITION TABLE P3 ON COLUMN WAGE;" +
+
+                "CREATE TABLE TB_STRING ( " +
+                "ID INTEGER DEFAULT 0 NOT NULL, " +
+                "STATE VARCHAR(2), " +
+                "PRIMARY KEY (ID) );" +
 
                 addProcs
                 ;

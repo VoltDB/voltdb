@@ -26,17 +26,25 @@ import java.util.Random;
 
 public class BlogSession extends SessionBase {
     static final Random random = new Random();
-    static final String role_list[] = {"reader", "author"};
-    String role;
+    static final String role_lists[][] = {{"reader"}, {"author"}, {"author", "reader"}};
+    String roles[];
+
+    public BlogSession(String... roles)
+    {
+        super("VoltDB Blog");
+        this.roles = roles;
+    }
 
     public BlogSession()
     {
         super("VoltDB Blog");
-        switch (random.nextInt(100)) {
-            case 0:  role = role_list[1];  // favor readers, only make 1 out of a hundred authors.
-                 break;
-            default: role = role_list[0];
-                 break;
+        int randInt = random.nextInt(5000);
+        if (randInt == 0) {
+            roles = role_lists[2];  // only 1 in five thousand are both author and reader
+        } else if (randInt < 50) {
+            roles = role_lists[1];  // favor readers: only 1 out of a hundred are authors
+        } else {
+            roles = role_lists[0];  // the rest (99%) are readers (only)
         }
     }
 }

@@ -38,7 +38,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -181,6 +180,21 @@ public class SQLCommand
                     ")" +                  // end capturing group
                     "select",
                     Pattern.MULTILINE + Pattern.CASE_INSENSITIVE + Pattern.DOTALL);
+
+    // the common prefix for both ALTER TABLE <table> DROP
+    // and ALTER TABLE <table> ALTER
+    private static String alterTableCommonPrefix =
+            "\\s*alter\\s*table" + followedBySpaceOrQuote + "\\s*" +
+            idPattern + "\\s*";
+    private static final Pattern AlterTableAlter =
+            Pattern.compile(
+                    "(" + alterTableCommonPrefix + ")alter",
+                    Pattern.MULTILINE + Pattern.CASE_INSENSITIVE + Pattern.DOTALL);
+    private static final Pattern AlterTableDrop =
+            Pattern.compile(
+                    "(" + alterTableCommonPrefix + ")drop",
+                    Pattern.MULTILINE + Pattern.CASE_INSENSITIVE + Pattern.DOTALL);
+
     private static final Pattern AutoSplitParameters = Pattern.compile("[\\s,]+", Pattern.MULTILINE);
     /**
      * Matches a command followed by and SQL CRUD statement verb
@@ -243,8 +257,7 @@ public class SQLCommand
         Matcher stringFragmentMatcher = Extract.matcher(query);
         ArrayList<String> stringFragments = new ArrayList<String>();
         int i = 0;
-        while(stringFragmentMatcher.find())
-        {
+        while (stringFragmentMatcher.find()) {
             stringFragments.add(stringFragmentMatcher.group());
             query = stringFragmentMatcher.replaceFirst("#(SQL_PARSER_STRING_FRAGMENT#" + i + ")");
             stringFragmentMatcher = Extract.matcher(query);
@@ -262,6 +275,8 @@ public class SQLCommand
         query = CreateProcedureUpdate.matcher(query).replaceAll("$1$2SQL_PARSER_SAME_CREATEUPDATE");
         query = CreateProcedureDelete.matcher(query).replaceAll("$1$2SQL_PARSER_SAME_CREATEDELETE");
         query = InsertIntoSelect.matcher(query).replaceAll("$1SQL_PARSER_SAME_INSERTINTOSELECT");
+        query = AlterTableAlter.matcher(query).replaceAll("$1SQL_PARSER_SAME_ALTERTABLEALTER");
+        query = AlterTableDrop.matcher(query).replaceAll("$1SQL_PARSER_SAME_ALTERTABLEDROP");
         query = AutoSplit.matcher(query).replaceAll(";$2$4 "); // there be dragons here
         query = query.replaceAll("SQL_PARSER_SAME_SELECT", "select");
         query = query.replaceAll("SQL_PARSER_SAME_CREATEVIEW", "select");
@@ -270,23 +285,26 @@ public class SQLCommand
         query = query.replaceAll("SQL_PARSER_SAME_CREATEUPDATE", "update");
         query = query.replaceAll("SQL_PARSER_SAME_CREATEDELETE", "delete");
         query = query.replaceAll("SQL_PARSER_SAME_INSERTINTOSELECT", "select");
+        query = query.replaceAll("SQL_PARSER_SAME_ALTERTABLEALTER", "alter");
+        query = query.replaceAll("SQL_PARSER_SAME_ALTERTABLEDROP", "drop");
         String[] sqlFragments = query.split("\\s*;+\\s*");
 
         ArrayList<String> queries = new ArrayList<String>();
-        for(int j = 0;j<sqlFragments.length;j++)
-        {
-            sqlFragments[j] = sqlFragments[j].trim();
-            if (sqlFragments[j].length() != 0)
-            {
-                if(sqlFragments[j].indexOf("#(SQL_PARSER_STRING_FRAGMENT#") > -1) {
-                    for(int k = 0;k<stringFragments.size();k++) {
-                        sqlFragments[j] = sqlFragments[j].replace("#(SQL_PARSER_STRING_FRAGMENT#" + k + ")", stringFragments.get(k));
-                    }
-                }
-                sqlFragments[j] = sqlFragments[j].replace("#(SQL_PARSER_ESCAPE_SINGLE_QUOTE)", "''");
-                sqlFragments[j] = sqlFragments[j].replace("#SQL_PARSER_STRING_KEYWORD#","");
-                queries.add(sqlFragments[j]);
+        for (String fragment : sqlFragments) {
+            fragment = fragment.trim();
+            if (fragment.isEmpty()) {
+                continue;
             }
+            if (fragment.indexOf("#(SQL_PARSER_STRING_FRAGMENT#") > -1) {
+                int k = 0;
+                for (String strFrag : stringFragments) {
+                    fragment = fragment.replace("#(SQL_PARSER_STRING_FRAGMENT#" + k + ")", strFrag);
+                    k++;
+                }
+            }
+            fragment = fragment.replace("#(SQL_PARSER_ESCAPE_SINGLE_QUOTE)", "''");
+            fragment = fragment.replace("#SQL_PARSER_STRING_KEYWORD#","");
+            queries.add(fragment);
         }
         return queries;
     }
@@ -302,8 +320,7 @@ public class SQLCommand
         Matcher stringFragmentMatcher = Extract.matcher(query);
         ArrayList<String> stringFragments = new ArrayList<String>();
         int i = 0;
-        while(stringFragmentMatcher.find())
-        {
+        while (stringFragmentMatcher.find()) {
             stringFragments.add(stringFragmentMatcher.group());
             query = stringFragmentMatcher.replaceFirst("#(SQL_PARSER_STRING_FRAGMENT#" + i + ")");
             stringFragmentMatcher = Extract.matcher(query);
@@ -624,63 +641,53 @@ public class SQLCommand
     private static void printTables(final String name, final Collection<String> tables)
     {
         System.out.printf("\n--- %s --------------------------------------------\n", name);
-        Iterator<String> list = tables.iterator();
-        while(list.hasNext()) {
-            System.out.println(list.next());
+        for (String table : tables) {
+            System.out.println(table);
         }
         System.out.print("\n");
     }
 
     public static String readScriptFile(String filePath)
     {
-        try
-        {
+        BufferedReader script = null;
+        try {
             StringBuilder query = new StringBuilder();
-            BufferedReader script = new BufferedReader(new FileReader(filePath));
+            script = new BufferedReader(new FileReader(filePath));
             String line;
-            while ((line = script.readLine()) != null)
-            {
+            while ((line = script.readLine()) != null) {
                 // Strip out RECALL, EXIT and GO commands
-                if (!(RecallToken.matcher(line).matches() || ExitToken.matcher(line).matches() || GoToken.matcher(line).matches()))
-                {
-                    // Recursively process FILE commands, any failure will cause a recursive failure
-                    if (FileToken.matcher(line).matches())
-                    {
-                        Matcher m = FileToken.matcher(line);
-                        if (m.find())
-                        {
-                            line = readScriptFile(m.group(1));
-                            if (line == null) {
-                                return null;
-                            }
-                            query.append(line);
-                            query.append("\n");
-                        }
-                        else
-                        {
-                            System.err.print("Invalid FILE command: '" + line + "'.");
-                            return null;
-                        }
-                    }
-                    else
-                    {
-                        query.append(line);
-                        query.append("\n");
+                if (RecallToken.matcher(line).matches() ||
+                      ExitToken.matcher(line).matches() ||
+                      GoToken.matcher(line).matches()) {
+                    continue;
+                }
+                // Recursively process FILE commands, any failure will cause a recursive failure
+                Matcher m = FileToken.matcher(line);
+                if (m.matches()) {
+                    line = readScriptFile(m.group(1));
+                    if (line == null) {
+                        return null;
                     }
                 }
+                query.append(line);
+                query.append("\n");
             }
-            script.close();
             return query.toString().trim();
         }
-        catch(FileNotFoundException e)
-        {
+        catch (FileNotFoundException e) {
             System.err.println("Script file '" + filePath + "' could not be found.");
             return null;
         }
-        catch(Exception x)
-        {
+        catch (Exception x) {
             System.err.println(x.getMessage());
             return null;
+        }
+        finally {
+            if (script != null) {
+                try {
+                    script.close();
+                } catch (IOException e) { }
+            }
         }
     }
 
@@ -699,164 +706,135 @@ public class SQLCommand
     private static void executeQuery(String query) throws Exception
     {
         m_startTime = System.nanoTime();
-
-        if (ExecuteCall.matcher(query).find())
-        {
-            query = ExecuteCall.matcher(query).replaceFirst("");
+        Matcher matcher = ExecuteCall.matcher(query);
+        if (matcher.find()) {
+            query = matcher.replaceFirst("");
             List<String> params = parseQueryProcedureCallParameters(query);
             String procedure = params.remove(0);
-            if (!Procedures.containsKey(procedure)) {
+            Map<Integer, List<String>> signature = Procedures.get(procedure);
+            if (signature == null) {
                 throw new Exception("Undefined procedure: " + procedure);
             }
 
-            List<String> paramTypes = Procedures.get(procedure).get(params.size());
+            List<String> paramTypes = signature.get(params.size());
             if (paramTypes == null || params.size() != paramTypes.size()) {
                 String expectedSizes = "";
-                for (Integer expectedSize : Procedures.get(procedure).keySet()) {
+                for (Integer expectedSize : signature.keySet()) {
                     expectedSizes += expectedSize + ", ";
                 }
                 throw new Exception("Invalid parameter count for procedure: " + procedure + "(expected: " + expectedSizes + " received: " + params.size() + ")");
             }
             Object[] objectParams = new Object[params.size()];
-            if (procedure.equals("@SnapshotDelete"))
-            {
+            if (procedure.equals("@SnapshotDelete")) {
                 objectParams[0] = new String[] { Unquote.matcher(params.get(0)).replaceAll("").replace("''","'") };
                 objectParams[1] = new String[] { Unquote.matcher(params.get(1)).replaceAll("").replace("''","'") };
             }
-            else
-            {
-                for(int i = 0;i<params.size();i++)
-                {
+            else {
+                for (int i = 0; i < params.size(); i++) {
                     String paramType = paramTypes.get(i);
                     String param = params.get(i);
-                    if (paramType.equals("bit"))
-                    {
-                        if(param.equals("yes") || param.equals("true") || param.equals("1")) {
+                    if (paramType.equals("bit")) {
+                        if (param.equals("yes") || param.equals("true") || param.equals("1")) {
                             objectParams[i] = (byte)1;
                         } else {
                             objectParams[i] = (byte)0;
                         }
                     }
-                    else if (paramType.equals("tinyint"))
-                    {
+                    else if (paramType.equals("tinyint")) {
                         if (IsNull.matcher(param).matches()) {
                             objectParams[i] = null;
                         } else {
-                            try
-                            {
+                            try {
                                 objectParams[i] = Byte.parseByte(param);
                             }
-                            catch (NumberFormatException nfe)
-                            {
+                            catch (NumberFormatException nfe) {
                                 throw new Exception("Invalid parameter:  Expected a byte numeric value, got '" + param + "' (param " + (i+1) + ").");
                             }
                         }
                     }
-                    else if (paramType.equals("smallint"))
-                    {
+                    else if (paramType.equals("smallint")) {
                         if (IsNull.matcher(param).matches()) {
                             objectParams[i] = null;
                         } else {
-                            try
-                            {
+                            try {
                                 objectParams[i] = Short.parseShort(param);
                             }
-                            catch (NumberFormatException nfe)
-                            {
+                            catch (NumberFormatException nfe) {
                                 throw new Exception("Invalid parameter:  Expected a short numeric value, got '" + param + "' (param " + (i+1) + ").");
                             }
                         }
                     }
-                    else if (paramType.equals("int") || paramType.equals("integer"))
-                    {
+                    else if (paramType.equals("int") || paramType.equals("integer")) {
                         if (IsNull.matcher(param).matches()) {
                             objectParams[i] = null;
                         } else {
-                            try
-                            {
+                            try {
                                 objectParams[i] = Integer.parseInt(param);
                             }
-                            catch (NumberFormatException nfe)
-                            {
+                            catch (NumberFormatException nfe) {
                                 throw new Exception("Invalid parameter:  Expected a numeric value, got '" + param + "' (param " + (i+1) + ").");
                             }
                         }
                     }
-                    else if (paramType.equals("bigint"))
-                    {
+                    else if (paramType.equals("bigint")) {
                         if (IsNull.matcher(param).matches()) {
                             objectParams[i] = null;
                         } else {
-                            try
-                            {
+                            try {
                                 objectParams[i] = Long.parseLong(param);
                             }
-                            catch (NumberFormatException nfe)
-                            {
+                            catch (NumberFormatException nfe) {
                                 throw new Exception("Invalid parameter:  Expected a numeric value, got '" + param + "' (param " + (i+1) + ").");
                             }
                         }
                     }
-                    else if (paramType.equals("float"))
-                    {
+                    else if (paramType.equals("float")) {
                         if (IsNull.matcher(param).matches()) {
                             objectParams[i] = null;
                         } else {
-                            try
-                            {
+                            try {
                                 objectParams[i] = Double.parseDouble(param);
                             }
-                            catch (NumberFormatException nfe)
-                            {
+                            catch (NumberFormatException nfe) {
                                 throw new Exception("Invalid parameter:  Expected a float value, got '" + param + "' (param " + (i+1) + ").");
                             }
                         }
                     }
-                    else if (paramType.equals("varchar"))
-                    {
+                    else if (paramType.equals("varchar")) {
                         if (IsNull.matcher(param).matches()) {
                             objectParams[i] = null;
                         } else {
                             objectParams[i] = Unquote.matcher(param).replaceAll("").replace("''","'");
                         }
                     }
-                    else if (paramType.equals("decimal"))
-                    {
+                    else if (paramType.equals("decimal")) {
                         if (IsNull.matcher(param).matches()) {
                             objectParams[i] = null;
                         } else {
                             objectParams[i] = new BigDecimal(param);
                         }
                     }
-                    else if (paramType.equals("timestamp"))
-                    {
-                        if (IsNull.matcher(param).matches())
-                        {
+                    else if (paramType.equals("timestamp")) {
+                        if (IsNull.matcher(param).matches()) {
                             objectParams[i] = null;
-                        }
-                        else
-                        {
+                        } else {
                             // Remove any quotes around the timestamp value.  ENG-2623
                             objectParams[i] = DateParser.parse(param.replaceAll("^\"|\"$", "").replaceAll("^'|'$", ""));
                         }
                     }
-                    else if (paramType.equals("statisticscomponent"))
-                    {
+                    else if (paramType.equals("statisticscomponent")) {
                         String p = preprocessParam(param);
                         objectParams[i] = p;
                     }
-                    else if (paramType.equals("sysinfoselector"))
-                    {
+                    else if (paramType.equals("sysinfoselector")) {
                         String p = preprocessParam(param);
                         objectParams[i] = p;
                     }
-                    else if (paramType.equals("metadataselector"))
-                    {
+                    else if (paramType.equals("metadataselector")) {
                         String p = preprocessParam(param);
                         objectParams[i] = p;
                     }
-                    else if (paramType.equals("varbinary") || paramType.equals("tinyint_array"))
-                    {
+                    else if (paramType.equals("varbinary") || paramType.equals("tinyint_array")) {
                         if (IsNull.matcher(param).matches()) {
                             objectParams[i] = null;
                         } else {
@@ -872,8 +850,7 @@ public class SQLCommand
                     }
                 }
             }
-            if (procedure.equals("@UpdateApplicationCatalog"))
-            {
+            if (procedure.equals("@UpdateApplicationCatalog")) {
                 File catfile = null;
                 if (objectParams[0] != null) {
                     catfile = new File((String)objectParams[0]);
@@ -889,8 +866,7 @@ public class SQLCommand
                 loadSystemProcedures();
                 loadStoredProcedures(Procedures, Classlist);
             }
-            else if (procedure.equals("@UpdateClasses"))
-            {
+            else if (procedure.equals("@UpdateClasses")) {
                 File jarfile = null;
                 if (objectParams[0] != null) {
                     jarfile = new File((String)objectParams[0]);
@@ -901,29 +877,31 @@ public class SQLCommand
                 loadSystemProcedures();
                 loadStoredProcedures(Procedures, Classlist);
             }
-            else
-            {
+            else {
                 printResponse(VoltDB.callProcedure(procedure, objectParams));
             }
         }
-        else if (ExplainCall.matcher(query).find())
-        {
-            // We've got a query that starts with "explain", pre-pend
-            // the @Explain sp invocatino ahead of the query (after stripping "explain").
+        else if (ExplainCall.matcher(query).find()) {
+            // We've got a query that starts with "explain", send the query to
+            // @Explain (after stripping "explain").
+            // This all could probably be done more elegantly via a group extracted
+            // from a more comprehensive regexp.
             query = query.substring("explain ".length());
             query = StripCRLF.matcher(query).replaceAll(" ");
             printResponse(VoltDB.callProcedure("@Explain", query));
         }
-        else if (ExplainProcCall.matcher(query).find())
-        {
-            // We've got a query that starts with "explainplan", pre-pend
-            // the @ExplainPlan sp invocation ahead of the query (after stripping "explainplan").
+        else if (ExplainProcCall.matcher(query).find()) {
+            // We've got a query that starts with "explainproc", send the proc name
+            // to @ExplainPlan (after stripping "explainproc").
+            // This all could probably be done more elegantly via a group extracted
+            // from a more comprehensive regexp.
             query = query.substring("explainProc ".length());
             query = StripCRLF.matcher(query).replaceAll(" ");
+            // Clean up any extra spaces from between explainproc and the proc name.
+            query = query.trim();
             printResponse(VoltDB.callProcedure("@ExplainProc", query));
         }
-        else  // Ad hoc query
-        {
+        else { // All other commands get forwarded to @AdHoc
             query = StripCRLF.matcher(query).replaceAll(" ");
             printResponse(VoltDB.callProcedure("@AdHoc", query));
             // if the query was DDL, reload the stored procedures.
@@ -941,14 +919,14 @@ public class SQLCommand
     // Trim
     private static String preprocessParam(String param)
     {
-        param = param.toUpperCase();
-        if (param.startsWith("'") && param.endsWith("'")) {
-            param = param.substring(1, param.length()-1);
-        }
-        if (param.charAt(0)=='"' && param.charAt(param.length()-1)=='"') {
+        if ((param.charAt(0) == '\'' && param.charAt(param.length()-1) == '\'') ||
+                (param.charAt(0) == '"' && param.charAt(param.length()-1) == '"')) {
+            // The position of the closing quote, param.length()-1 is where to end the substring
+            // to get a result with two fewer characters.
             param = param.substring(1, param.length()-1);
         }
         param = param.trim();
+        param = param.toUpperCase();
         return param;
     }
 
@@ -958,7 +936,8 @@ public class SQLCommand
 
     private static boolean isUpdateResult(VoltTable table)
     {
-        return ((table.getColumnName(0).length() == 0 || table.getColumnName(0).equals("modified_tuples"))&& table.getRowCount() == 1 && table.getColumnCount() == 1 && table.getColumnType(0) == VoltType.BIGINT);
+        return ((table.getColumnName(0).isEmpty() || table.getColumnName(0).equals("modified_tuples")) &&
+                 table.getRowCount() == 1 && table.getColumnCount() == 1 && table.getColumnType(0) == VoltType.BIGINT);
     }
 
     private static void printResponse(ClientResponse response) throws Exception
@@ -1118,17 +1097,15 @@ public class SQLCommand
     // depending on the argument passed in
     public static void printHelp(OutputStream prtStr)
     {
-        try
-        {
+        try {
             InputStream is = SQLCommand.class.getResourceAsStream(readme);
-            while(is.available() > 0) {
+            while (is.available() > 0) {
                 byte[] bytes = new byte[is.available()]; // Fix for ENG-3440
                 is.read(bytes, 0, bytes.length);
                 prtStr.write(bytes); // For JUnit test
             }
         }
-        catch(Exception x)
-        {
+        catch (Exception x) {
             System.err.println(x.getMessage());
             System.exit(-1);
         }
@@ -1145,20 +1122,16 @@ public class SQLCommand
     {
         Tables tables = new Tables();
         VoltTable tableData = VoltDB.callProcedure("@SystemCatalog", "TABLES").getResults()[0];
-        for(int i = 0; i < tableData.getRowCount(); i++)
-        {
-            String tableName = tableData.fetchRow(i).getString("TABLE_NAME");
-            String tableType = tableData.fetchRow(i).getString("TABLE_TYPE");
-            if (tableType.equalsIgnoreCase("EXPORT"))
-            {
+        while (tableData.advanceRow()) {
+            String tableName = tableData.getString("TABLE_NAME");
+            String tableType = tableData.getString("TABLE_TYPE");
+            if (tableType.equalsIgnoreCase("EXPORT")) {
                 tables.exports.add(tableName);
             }
-            else if (tableType.equalsIgnoreCase("VIEW"))
-            {
+            else if (tableType.equalsIgnoreCase("VIEW")) {
                 tables.views.add(tableName);
             }
-            else
-            {
+            else {
                 tables.tables.add(tableName);
             }
         }
@@ -1171,63 +1144,54 @@ public class SQLCommand
         VoltTable procs = null;
         VoltTable params = null;
         VoltTable classes = null;
-        try
-        {
+        try {
             procs = VoltDB.callProcedure("@SystemCatalog", "PROCEDURES").getResults()[0];
             params = VoltDB.callProcedure("@SystemCatalog", "PROCEDURECOLUMNS").getResults()[0];
             classes = VoltDB.callProcedure("@SystemCatalog", "CLASSES").getResults()[0];
         }
-        catch (NoConnectionsException e)
-        {
+        catch (NoConnectionsException e) {
             e.printStackTrace();
             return;
         }
-        catch (IOException e)
-        {
+        catch (IOException e) {
             e.printStackTrace();
             return;
         }
-        catch (ProcCallException e)
-        {
+        catch (ProcCallException e) {
             e.printStackTrace();
             return;
         }
-        Map<String, Integer> proc_param_counts =
-            Collections.synchronizedMap(new HashMap<String, Integer>());
-        while (params.advanceRow())
-        {
+        Map<String, Integer> proc_param_counts = Collections.synchronizedMap(new HashMap<String, Integer>());
+        while (params.advanceRow()) {
             String this_proc = params.getString("PROCEDURE_NAME");
-            if (!proc_param_counts.containsKey(this_proc))
-            {
-                proc_param_counts.put(this_proc, 0);
+            Integer curr_val = proc_param_counts.get(this_proc);
+            if (curr_val == null) {
+                curr_val = 1;
+            } else {
+                ++curr_val;
             }
-            int curr_val = proc_param_counts.get(this_proc);
-            proc_param_counts.put(this_proc, ++curr_val);
+            proc_param_counts.put(this_proc, curr_val);
         }
         params.resetRowPosition();
-        while (procs.advanceRow())
-        {
+        while (procs.advanceRow()) {
             String proc_name = procs.getString("PROCEDURE_NAME");
+            Integer param_count = proc_param_counts.get(proc_name);
             ArrayList<String> this_params = new ArrayList<String>();
             // prepopulate it to make sure the size is right
-            if (proc_param_counts.get(proc_name) != null)
-            {
-                for (int i = 0; i < proc_param_counts.get(procs.getString("PROCEDURE_NAME")); i++) {
+            if (param_count != null) {
+                for (int i = 0; i < param_count; i++) {
                     this_params.add(null);
                 }
             }
-            HashMap<Integer, List<String>> argLists = new HashMap<Integer, List<String>>();
-            if (proc_param_counts.containsKey(proc_name)) {
-                argLists.put(proc_param_counts.get(proc_name), this_params);
-            } else {
-                argLists.put(0, this_params);
-
+            else {
+                param_count = 0;
             }
-            procedures.put(procs.getString("PROCEDURE_NAME"), argLists);
+            HashMap<Integer, List<String>> argLists = new HashMap<Integer, List<String>>();
+            argLists.put(param_count, this_params);
+            procedures.put(proc_name, argLists);
         }
         classlist.clear();
-        while (classes.advanceRow())
-        {
+        while (classes.advanceRow()) {
             String classname = classes.getString("CLASS_NAME");
             boolean isProc = (classes.getLong("VOLT_PROCEDURE") == 1L);
             boolean isActive = (classes.getLong("ACTIVE_PROC") == 1L);
@@ -1242,8 +1206,7 @@ public class SQLCommand
         // Retrieve the parameter types.  Note we have to do some special checking
         // for array types.  ENG-3101
         params.resetRowPosition();
-        while (params.advanceRow())
-        {
+        while (params.advanceRow()) {
             Map<Integer, List<String>> argLists = procedures.get(params.getString("PROCEDURE_NAME"));
             assert(argLists.size() == 1);
             List<String> this_params = argLists.values().iterator().next();
@@ -1252,22 +1215,16 @@ public class SQLCommand
             // Detect if this parameter is supposed to be an array.  It's kind of clunky, we have to
             // look in the remarks column...
             String param_remarks = params.getString("REMARKS");
-            if (null != param_remarks)
-            {
+            if (null != param_remarks) {
                 param_type += (param_remarks.equalsIgnoreCase("ARRAY_PARAMETER") ? "_array" : "");
             }
             this_params.set(idx, param_type);
         }
     }
 
-    static public void mockVoltDBForTest(Client testVoltDB) {
-        VoltDB = testVoltDB;
-    }
+    static public void mockVoltDBForTest(Client testVoltDB) { VoltDB = testVoltDB; }
 
-    static public void mockLineReaderForTest(SQLConsoleReader reader)
-    {
-        lineInputReader = reader;
-    }
+    static public void mockLineReaderForTest(SQLConsoleReader reader) { lineInputReader = reader; }
 
     private static InputStream in = null;
     private static OutputStream out = null;
@@ -1276,8 +1233,7 @@ public class SQLCommand
     {
         TimeZone.setDefault(TimeZone.getTimeZone("GMT+0"));
         boolean debug = false;
-        try
-        {
+        try {
             // Initialize parameter defaults
             String serverList = "localhost";
             int port = 21212;
@@ -1287,8 +1243,7 @@ public class SQLCommand
             List<String> queries = null;
 
             // Parse out parameters
-            for(int i = 0; i < args.length; i++)
-            {
+            for (int i = 0; i < args.length; i++) {
                 String arg = args[i];
                 if (arg.startsWith("--servers=")) {
                     serverList = arg.split("=")[1];
@@ -1302,40 +1257,29 @@ public class SQLCommand
                     kerberos = arg.split("=")[1];
                 } else if (arg.startsWith("--kerberos")) {
                     kerberos = "VoltDBClient";
-                } else if (arg.startsWith("--query="))
-                {
+                } else if (arg.startsWith("--query=")) {
                     List<String> argQueries = parseQuery(arg.substring(8));
                     if (!argQueries.isEmpty()) {
-                        if (queries == null)
-                        {
+                        if (queries == null) {
                             queries = argQueries;
                         }
-                        else
-                        {
+                        else {
                             queries.addAll(argQueries);
                         }
                     }
                 }
-                else if (arg.startsWith("--output-format="))
-                {
-                    if (Pattern.compile("(fixed|csv|tab)", Pattern.CASE_INSENSITIVE).matcher(arg.split("=")[1].toLowerCase()).matches())
-                    {
-                        String formatName = arg.split("=")[1].toLowerCase();
-                        if (formatName.equals("fixed"))
-                        {
-                            m_outputFormatter = new SQLCommandOutputFormatterDefault();
-                        }
-                        else if (formatName.equals("csv"))
-                        {
-                            m_outputFormatter = new SQLCommandOutputFormatterCSV();
-                        }
-                        else
-                        {
-                            m_outputFormatter = new SQLCommandOutputFormatterTabDelimited();
-                        }
+                else if (arg.startsWith("--output-format=")) {
+                    String formatName = arg.split("=")[1].toLowerCase();
+                    if (formatName.equals("fixed")) {
+                        m_outputFormatter = new SQLCommandOutputFormatterDefault();
                     }
-                    else
-                    {
+                    else if (formatName.equals("csv")) {
+                        m_outputFormatter = new SQLCommandOutputFormatterCSV();
+                    }
+                    else if (formatName.equals("tab")) {
+                        m_outputFormatter = new SQLCommandOutputFormatterTabDelimited();
+                    }
+                    else {
                         printUsage("Invalid value for --output-format");
                     }
                 }
@@ -1345,8 +1289,7 @@ public class SQLCommand
                 else if (arg.equals("--debug")) {
                     debug = true;
                 }
-                else if (arg.equals("--help"))
-                {
+                else if (arg.equals("--help")) {
                     printHelp(System.out); // Print readme to the screen
                     System.out.println("\n\n");
                     printUsage(0);
@@ -1421,44 +1364,38 @@ public class SQLCommand
             // in Git history hash 837df236c059b5b4362ffca7e7a5426fba1b7f20.
 
             boolean interactive = true;
-            if (queries != null && !queries.isEmpty())
-            {
+            if (queries != null && !queries.isEmpty()) {
                 // If queries are provided via command line options run them in
                 // non-interactive mode.
                 //TODO: Someday we should honor batching.
                 interactive = false;
-                for(int i = 0;i<queries.size();i++) {
-                    executeQuery(queries.get(i));
+                for (String query : queries) {
+                    executeQuery(query);
                 }
             }
-            if (System.in.available() > 0)
-            {
+            if (System.in.available() > 0) {
                 // If Standard input comes loaded with data, run in non-interactive mode
                 interactive = false;
                 queries = getQuery(false);
                 if (queries == null) {
                     System.exit(0);
                 } else {
-                    for(int i = 0;i<queries.size();i++) {
-                        executeQuery(queries.get(i));
+                    for (String query : queries) {
+                        executeQuery(query);
                     }
                 }
             }
-            if (interactive)
-            {
+            if (interactive) {
                 // Print out welcome message
                 System.out.printf("SQL Command :: %s%s:%d\n", (user == "" ? "" : user + "@"), serverList, port);
 
-                while((queries = getQuery(true)) != null)
-                {
-                    try
-                    {
-                        for(int i = 0;i<queries.size();i++) {
-                            executeQuery(queries.get(i));
+                while ((queries = getQuery(true)) != null) {
+                    try {
+                        for (String query : queries) {
+                            executeQuery(query);
                         }
                     }
-                    catch(Exception x)
-                    {
+                    catch (Exception x) {
                         System.err.println(x.getMessage());
                         if (debug) {
                             x.printStackTrace(System.err);
@@ -1466,18 +1403,16 @@ public class SQLCommand
                     }
                 }
             }
-       }
-        catch (Exception e)
-        {
+        }
+        catch (Exception e) {
             System.err.println(e.getMessage());
             if (debug) {
                 e.printStackTrace(System.err);
             }
             System.exit(-1);
         }
-        finally
-        {
-            try { VoltDB.close(); } catch(Exception _) {}
+        finally {
+            try { VoltDB.close(); } catch (Exception x) { }
             // Flush input history to a file.
             if (historyFile != null) {
                 try {
@@ -1529,8 +1464,7 @@ public class SQLCommand
             BufferedReader br = new BufferedReader(
                                new InputStreamReader(conn.getInputStream()));
 
-            String inputLine;
-            while ((inputLine = br.readLine()) != null) {
+            while (br.readLine() != null) {
                 // At this time do nothing, just drain the stream.
                 // In the future we'll notify the user that a new version of VoltDB is available.
             }

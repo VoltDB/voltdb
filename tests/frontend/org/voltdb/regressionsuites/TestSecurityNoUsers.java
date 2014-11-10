@@ -29,42 +29,31 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.security.SecureRandom;
 
-import static junit.framework.Assert.assertTrue;
+import static junit.framework.Assert.fail;
 import junit.framework.TestCase;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.compiler.VoltProjectBuilder;
 
-public class TestHttpPort extends TestCase {
+public class TestSecurityNoUsers extends TestCase {
 
-    PortListener ncprocess;
     PipeToFile pf;
-    int rport;
 
-    public TestHttpPort(String name) {
+    public TestSecurityNoUsers(String name) {
         super(name);
     }
 
-    /**
-     * JUnit special method called to setup the test. This instance will start
-     * the VoltDB server using the VoltServerConfig instance provided.
-     */
     @Override
     public void setUp() throws Exception {
-        rport = SecureRandom.getInstance("SHA1PRNG").nextInt(2000) + 22000;
-        System.out.println("Random HTTP port is: " + rport);
-        ncprocess = new PortListener(rport);
         try {
             //Build the catalog
             VoltProjectBuilder builder = new VoltProjectBuilder();
             builder.addLiteralSchema("");
+            builder.setSecurityEnabled(true);
             String catalogJar = "dummy.jar";
-            builder.setHTTPDPort(rport);
 
             LocalCluster config = new LocalCluster(catalogJar, 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
 
-            config.portGenerator.enablePortProvider();
-            config.portGenerator.pprovider.setHttp(rport);
             config.setHasLocalServer(false);
             //We expect it to crash
             config.setExpectedToCrash(true);
@@ -81,25 +70,14 @@ public class TestHttpPort extends TestCase {
         }
     }
 
-    /**
-     * JUnit special method called to shutdown the test. This instance will
-     * stop the VoltDB server using the VoltServerConfig instance provided.
-     */
-    @Override
-    public void tearDown() throws Exception {
-        if (ncprocess != null) {
-            ncprocess.close();
-        }
-    }
-
     /*
      *
      */
-    public void testHttpPort() throws Exception {
+    public void testSecurityNoUsers() throws Exception {
         BufferedReader bi = new BufferedReader(new FileReader(new File(pf.m_filename)));
         String line;
         boolean failed = true;
-        final CharSequence cs = "HTTP service unable to bind to port";
+        final CharSequence cs = "Cannot enable security without defining users in the deployment file";
         while ((line = bi.readLine()) != null) {
             System.out.println(line);
             if (line.contains(cs)) {

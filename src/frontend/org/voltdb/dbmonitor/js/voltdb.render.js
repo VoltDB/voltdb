@@ -49,6 +49,7 @@ function alertNodeClicked(obj) {
         this.isTableSearch = false;
         this.isProcedureSortClicked = false;
         this.isTableSortClicked = false;
+        this.isNextClicked = false;
         this.userPreferences = {};
         this.procedureTableIndex = 0;
         this.procedureDataSize = 0;
@@ -103,7 +104,7 @@ function alertNodeClicked(obj) {
         this.tableSortColumn = "";
         this.isPageAction = false;
 
-
+        this.hint = "";
 
         this.ChangeServerConfiguration = function (serverName, portId, userName, pw, isHashPw, isAdmin) {
             VoltDBService.ChangeServerConfiguration(serverName, portId, userName, pw, isHashPw, isAdmin);
@@ -158,7 +159,7 @@ function alertNodeClicked(obj) {
                     $("#overlay").show();
                     $("#UnableToLoginMsg").hide();
                     var usernameVal = $("#username").val();
-                    var passwordVal = $().crypt({ method: "sha1", source: $("#password").val() });
+                    var passwordVal = $("#password").val() != '' ? $().crypt({ method: "sha1", source: $("#password").val() }) : $("#password").val();
 
                     testConnection($("#username").data("servername"), $("#username").data("portid"), usernameVal, passwordVal, true, function (result) {
                         $("#overlay").hide();
@@ -468,7 +469,6 @@ function alertNodeClicked(obj) {
             });
 
             counter = 0;
-            var tableName = "";
 
             if (voltDbRenderer.isSortTables && !voltDbRenderer.isTableSearch) { //is sorting is enabled create json array first to contain sort data on it,
                 //then after sorting add it to a parent json object procedureData
@@ -502,6 +502,7 @@ function alertNodeClicked(obj) {
 
         var populateProceduresInformation = function (connection) {
             var counter = 0;
+
             if (connection != null) {
                 connection.Metadata['@Statistics_PROCEDUREPROFILE'].schema.forEach(function (columnInfo) {
                     if (columnInfo["name"] == "PROCEDURE")
@@ -558,6 +559,7 @@ function alertNodeClicked(obj) {
             var procedureCount = 0;
             var procedure = {};
             procedureData = [];
+
             if (connection.Metadata['@Statistics_PROCEDUREPROFILE'].data != "" &&
                 connection.Metadata['@Statistics_PROCEDUREPROFILE'].data != [] &&
                 connection.Metadata['@Statistics_PROCEDUREPROFILE'].data != undefined) {
@@ -570,20 +572,6 @@ function alertNodeClicked(obj) {
                     minLatency = parseFloat(minLatency.toFixed(2));
                     maxLatency = parseFloat(maxLatency.toFixed(2));
                     avgLatency = parseFloat(avgLatency.toFixed(2));
-
-                    //if (!procedureData.hasOwnProperty(name)) {
-                    //    procedureData[name] = {};
-                    //} else {
-                    //    procedureData[name]['PROCEDURE'] = entry[procedureNameIndex];
-                    //    procedureData[name]['INVOCATIONS'] = entry[invocationsIndex];
-                    //    procedureData[name]['MIN_LATENCY'] = minLatency;
-                    //    procedureData[name]['MAX_LATENCY'] = maxLatency;
-                    //    procedureData[name]['AVG_LATENCY'] = avgLatency;
-                    //    procedureData[name]['PERC_EXECUTION'] = entry[perExecutionIndex];
-                    //    procedureCount++;
-
-                    //}
-
 
                     if (!procedureData.hasOwnProperty(name)) {
                         procedure = {
@@ -598,8 +586,6 @@ function alertNodeClicked(obj) {
 
                         procedureCount++;
                     }
-
-
 
                 });
             } else {
@@ -729,9 +715,7 @@ function alertNodeClicked(obj) {
             formatTableData(connection);
             if (tableData != undefined || tableData != "") {
 
-                //apply search only if column is "TABLENAME"
-                var isPopulateSortData = checkSortColumnSortable();
-                //if (isPopulateSortData) {
+                //apply search only if column is "TABLENAME"                
                 if (!voltDbRenderer.isTableSearch) {
 
                     tableJsonArray = [];
@@ -765,8 +749,6 @@ function alertNodeClicked(obj) {
                     });
                 }
 
-
-                //}
             }
         };
 
@@ -936,8 +918,7 @@ function alertNodeClicked(obj) {
         this.mapProcedureInformation = function (currentAction, priorAction, callback) {
             var counter = 0;
             var pageStartIndex = 0;
-            var traverse = false;
-
+            var isNextButtonClicked = false;
             htmlMarkup = "";
             htmlMarkups.SystemInformation = [];
 
@@ -948,27 +929,34 @@ function alertNodeClicked(obj) {
 
             //if checks if tuple count is greater than 5
             //other no needs for pagination action validation
-            if ((((voltDbRenderer.procedureTableIndex + 1) * this.maxVisibleRows < voltDbRenderer.procedureDataSize) && currentAction == VoltDbUI.ACTION_STATES.NEXT) || (currentAction == VoltDbUI.ACTION_STATES.PREVIOUS && voltDbRenderer.procedureTableIndex > 0) || currentAction == VoltDbUI.ACTION_STATES.REFRESH || currentAction == VoltDbUI.ACTION_STATES.SEARCH || currentAction == VoltDbUI.ACTION_STATES.NONE) {
+            if ((((voltDbRenderer.procedureTableIndex + 1) * this.maxVisibleRows < voltDbRenderer.procedureDataSize) && currentAction == VoltDbUI.ACTION_STATES.NEXT) ||
+                (currentAction == VoltDbUI.ACTION_STATES.PREVIOUS && voltDbRenderer.procedureTableIndex > 0) ||
+                currentAction == VoltDbUI.ACTION_STATES.REFRESH ||
+                currentAction == VoltDbUI.ACTION_STATES.SEARCH ||
+                currentAction == VoltDbUI.ACTION_STATES.NONE) {
+
                 if (currentAction == VoltDbUI.ACTION_STATES.NEXT) {
                     pageStartIndex = (voltDbRenderer.procedureTableIndex + 1) * voltDbRenderer.maxVisibleRows;
 
                 }
 
-                if (currentAction == VoltDbUI.ACTION_STATES.PREVIOUS) { // pageStartIndex need not be initialized if isNext is undefined(when page loads intially or during reload operation)
+                // pageStartIndex need not be initialized if isNext is undefined(when page loads intially or during reload operation)
+                if (currentAction == VoltDbUI.ACTION_STATES.PREVIOUS) {
                     pageStartIndex = (voltDbRenderer.procedureTableIndex - 1) * voltDbRenderer.maxVisibleRows;
                 }
-                if ((currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.NEXT)) {
+                if ((currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.NEXT) ||
+                    (currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.PREVIOUS)) {
                     pageStartIndex = (voltDbRenderer.procedureTableIndex) * voltDbRenderer.maxVisibleRows;
 
                 }
-                if ((currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.PREVIOUS)) {
-                    pageStartIndex = (voltDbRenderer.procedureTableIndex) * voltDbRenderer.maxVisibleRows;
-                }
-                if (currentAction == VoltDbUI.ACTION_STATES.SEARCH || currentAction == VoltDbUI.ACTION_STATES.NONE) {
-                    pageStartIndex = 0;
-                    voltDbRenderer.procedureTableIndex = 0;
-                }
 
+                isNextButtonClicked = voltDbRenderer.isNextClicked;
+                if (isNextButtonClicked == false) {
+                    if (currentAction == VoltDbUI.ACTION_STATES.SEARCH || currentAction == VoltDbUI.ACTION_STATES.NONE) {
+                        pageStartIndex = 0;
+                        voltDbRenderer.procedureTableIndex = 0;
+                    }
+                }
 
                 var lProcedureData = voltDbRenderer.isProcedureSearch ? this.searchData.procedures : procedureData;
                 jQuery.each(lProcedureData, function (id, val) {
@@ -1068,6 +1056,7 @@ function alertNodeClicked(obj) {
                     if (htmlMarkups.SystemInformation[0] != "")
                         callback(currentAction, htmlMarkups);
                 }
+
             }
 
             if (voltDbRenderer.isSortProcedures && VoltDbUI.sortStatus == VoltDbUI.SORT_STATES.SORTED) {
@@ -1075,7 +1064,7 @@ function alertNodeClicked(obj) {
             }
         };
 
-        this.mapProcedureInformationSorting = function (currentAction, priorAction) {
+        this.mapProcedureInformationSorting = function (currentAction, priorAction, callback) {
             var counter = 0;
             var pageStartIndex = 0;
             var traverse = false;
@@ -1173,7 +1162,14 @@ function alertNodeClicked(obj) {
 
             //if checks if tuple count is greater than 5
             //other no needs for pagination action validation
-            if ((((voltDbRenderer.procedureTableIndex + 1) * this.maxVisibleRows < voltDbRenderer.procedureDataSize) && currentAction == VoltDbUI.ACTION_STATES.NEXT) || (currentAction == VoltDbUI.ACTION_STATES.PREVIOUS && voltDbRenderer.procedureTableIndex > 0) || currentAction == VoltDbUI.ACTION_STATES.REFRESH || (currentAction == VoltDbUI.ACTION_STATES.SEARCH && !voltDbRenderer.isProcedureSortClicked) || currentAction == VoltDbUI.ACTION_STATES.NONE) {
+            if ((((voltDbRenderer.procedureTableIndex + 1) * this.maxVisibleRows < voltDbRenderer.procedureDataSize) && currentAction == VoltDbUI.ACTION_STATES.NEXT) ||
+                (currentAction == VoltDbUI.ACTION_STATES.PREVIOUS && voltDbRenderer.procedureTableIndex > 0) ||
+                (currentAction == VoltDbUI.ACTION_STATES.SEARCH && !voltDbRenderer.isProcedureSortClicked) ||
+                (priorAction == VoltDbUI.ACTION_STATES.SEARCH && currentAction == VoltDbUI.ACTION_STATES.SORT) ||
+                currentAction == VoltDbUI.ACTION_STATES.REFRESH ||
+                currentAction == VoltDbUI.ACTION_STATES.SORT ||
+                currentAction == VoltDbUI.ACTION_STATES.NONE) {
+
                 if (currentAction == VoltDbUI.ACTION_STATES.NEXT) {
                     pageStartIndex = (voltDbRenderer.procedureTableIndex + 1) * voltDbRenderer.maxVisibleRows;
 
@@ -1183,41 +1179,21 @@ function alertNodeClicked(obj) {
                     pageStartIndex = (voltDbRenderer.procedureTableIndex - 1) * voltDbRenderer.maxVisibleRows;
                 }
 
-                if ((currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.NEXT)) {
+                if ((currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.NEXT) ||
+                    (currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.PREVIOUS)) {
                     pageStartIndex = (voltDbRenderer.procedureTableIndex) * voltDbRenderer.maxVisibleRows;
 
                 }
-                if ((currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.PREVIOUS)) {
-                    pageStartIndex = (voltDbRenderer.procedureTableIndex) * voltDbRenderer.maxVisibleRows;
-                }
-                if (currentAction == VoltDbUI.ACTION_STATES.SEARCH || currentAction == VoltDbUI.ACTION_STATES.NONE) {
+
+                if (currentAction == VoltDbUI.ACTION_STATES.SEARCH || currentAction == VoltDbUI.ACTION_STATES.NONE ||
+                    (currentAction == VoltDbUI.ACTION_STATES.REFRESH && voltDbRenderer.isSortProcedures == true) ||
+                    (currentAction == VoltDbUI.ACTION_STATES.SORT)) {
                     pageStartIndex = 0;
                     voltDbRenderer.procedureTableIndex = 0;
                 }
-
-                if (currentAction == VoltDbUI.ACTION_STATES.REFRESH && voltDbRenderer.isSortProcedures == true) {
-                    pageStartIndex = 0;
-                    voltDbRenderer.procedureTableIndex = 0;
-                }
-
-
                 iterateProcedureData();
 
-                if (voltDbRenderer.isProcedureSearch) {
-                    if (htmlMarkup != "") {
-                        if ((currentAction == VoltDbUI.ACTION_STATES.SEARCH || currentAction == VoltDbUI.ACTION_STATES.REFRESH) && (priorAction == VoltDbUI.ACTION_STATES.SEARCH || priorAction == VoltDbUI.ACTION_STATES.REFRESH)) {
-                            $('#storeProcedureBody').html(htmlMarkup);
 
-                        }
-
-                    }
-                    priorAction = currentAction;
-
-                } else {
-                    htmlMarkups.SystemInformation.push(htmlMarkup);
-                    htmlMarkup = undefined;
-
-                }
             } else {
                 //if previous is infinitely and sorting is clicked
                 if (currentAction == VoltDbUI.ACTION_STATES.PREVIOUS || voltDbRenderer.isProcedureSortClicked) {
@@ -1231,15 +1207,7 @@ function alertNodeClicked(obj) {
                             counter++;
                         }
                     });
-
-
-                    if (htmlMarkup != "") {
-                        $('#storeProcedureBody').html(htmlMarkup);
-
-                    }
                     priorAction = currentAction;
-                    htmlMarkup = "";
-
 
                 }
 
@@ -1249,33 +1217,14 @@ function alertNodeClicked(obj) {
                 VoltDbUI.sortStatus = VoltDbUI.SORT_STATES.NONE;
             }
 
-            if (!voltDbRenderer.isProcedureSearch) {
-                if ((voltDbRenderer.currentProcedureAction == VoltDbUI.ACTION_STATES.REFRESH && voltDbRenderer.currentProcedureAction != VoltDbUI.ACTION_STATES.NONE) || (voltDbRenderer.currentProcedureAction != VoltDbUI.ACTION_STATES.REFRESH && voltDbRenderer.currentProcedureAction == VoltDbUI.ACTION_STATES.NONE)) {
-                    lblTotalPages.innerHTML = voltDbRenderer.procedureDataSize < voltDbRenderer.maxVisibleRows ? " ".concat(1) : " ".concat(Math.ceil(voltDbRenderer.procedureDataSize / voltDbRenderer.maxVisibleRows));
-
-                }
-
-                if (htmlMarkups.SystemInformation[0] != "") {
-                    if ((voltDbRenderer.currentProcedureAction == VoltDbUI.ACTION_STATES.NONE || voltDbRenderer.currentProcedureAction == VoltDbUI.ACTION_STATES.REFRESH) && voltDbRenderer.priorProcedureAction == VoltDbUI.ACTION_STATES.NONE) //only during initial load
-                        lblPrevious.innerHTML = " ".concat(1, ' ');
-
-                    $('#storeProcedureBody').html(htmlMarkups.SystemInformation[0]);
-
-                } else {
-                    lblPrevious.innerHTML = " ".concat(0, ' ');
-                    lblTotalPages.innerHTML = " ".concat(0);
-
-                }
-
-            }
-
             if (voltDbRenderer.getLatencyGraphInformationcurrentProcedureAction == VoltDbUI.ACTION_STATES.SEARCH) {
                 voltDbRenderer.priorProcedureAction = voltDbRenderer.currentProcedureAction;
             }
 
-
             voltDbRenderer.currentProcedureAction = VoltDbUI.ACTION_STATES.REFRESH;
             VoltDbUI.CurrentProcedureDataProgress = VoltDbUI.DASHBOARD_PROGRESS_STATES.REFRESH_PROCEDUREDATA_NONE;
+
+            callback(htmlMarkup);
 
         };
 
@@ -1293,27 +1242,30 @@ function alertNodeClicked(obj) {
 
             if ((((voltDbRenderer.tableIndex + 1) * this.maxVisibleRows < voltDbRenderer.tableDataSize) && currentAction == VoltDbUI.ACTION_STATES.NEXT) ||
                 (currentAction == VoltDbUI.ACTION_STATES.PREVIOUS && voltDbRenderer.tableIndex > 0) ||
-                currentAction == VoltDbUI.ACTION_STATES.REFRESH || currentAction == VoltDbUI.ACTION_STATES.SEARCH || currentAction == VoltDbUI.ACTION_STATES.NONE || voltDbRenderer.isTableSortClicked) {
+                currentAction == VoltDbUI.ACTION_STATES.REFRESH ||
+                currentAction == VoltDbUI.ACTION_STATES.SEARCH ||
+                currentAction == VoltDbUI.ACTION_STATES.NONE ||
+                voltDbRenderer.isTableSortClicked) {
                 if (currentAction == VoltDbUI.ACTION_STATES.NEXT) {
                     tablePageStartIndex = (voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows;
-
+                    
                 }
 
                 else if (currentAction == VoltDbUI.ACTION_STATES.PREVIOUS) { // pageStartIndex need not be initialized if isNext is undefined(when page loads intially or during reload operation)
                     tablePageStartIndex = (voltDbRenderer.tableIndex - 1) * voltDbRenderer.maxVisibleRows;
-
+                    
                 }
 
                 else if (((currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.NEXT) ||
                     (currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.PREVIOUS)) && !voltDbRenderer.isTableSortClicked) {
                     tablePageStartIndex = (voltDbRenderer.tableIndex) * voltDbRenderer.maxVisibleRows;
-
+                    //console.log("refresh next");
                 }
 
                 else if (currentAction == VoltDbUI.ACTION_STATES.SEARCH || currentAction == VoltDbUI.ACTION_STATES.NONE || voltDbRenderer.isTableSortClicked == true) {
                     tablePageStartIndex = 0;
                     voltDbRenderer.tableIndex = 0;
-
+                    //console.log("search || none || table sort");
                 }
 
                 var lTableData = this.isTableSearch ? this.searchData.tables : tableData;
@@ -1383,7 +1335,10 @@ function alertNodeClicked(obj) {
                         }
 
                         if ((counter == (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1 || counter == voltDbRenderer.tableSearchDataSize - 1) && htmlTableMarkup != "") {
+                            //var today = new Date();                          
+                            
                             voltDbRenderer.tableIndex++;
+                            //console.log("index increased: " + voltDbRenderer.tableIndex + "Time:" + today.getTime());
                             return false;
                         }
 
@@ -1409,9 +1364,7 @@ function alertNodeClicked(obj) {
 
 
                 if (voltDbRenderer.isSortTables) {
-                    if (htmlTableMarkup != "") {
-                        callback(htmlTableMarkup);
-                    }
+                    callback(htmlTableMarkup);
                 }
                 else {
                     htmlTableMarkups.SystemInformation.push(htmlTableMarkup);
@@ -1427,7 +1380,7 @@ function alertNodeClicked(obj) {
 
         };
 
-        this.getVersion = function(serverName) {
+        this.getVersion = function (serverName) {
             var version;
             $.each(systemOverview, function (key, val) {
                 if (val["HOSTNAME"] == serverName) {
@@ -1452,6 +1405,7 @@ function alertNodeClicked(obj) {
 
         this.sortTablesByColumns = function (isSearched) {
             var lConnection = VoltDBService.getTablesContextForSorting();
+
             if (voltDbRenderer.isTableSearch) {
                 voltDbRenderer.formatSearchTablesDataToJsonArray(lConnection, $('#filterDatabaseTable')[0].value, isSearched);
 
@@ -1482,18 +1436,25 @@ function alertNodeClicked(obj) {
         };
 
         this.sortProceduresByColumns = function (isSearched) {
+            var isSorted = false;
             if (!voltDbRenderer.isProcedureSearch) {
                 var lConnection = VoltDBService.getProcedureContextForSorting();
-                populateProcedureJsonArrayForSorting(lConnection);
+                if (lConnection != null) {
+                    populateProcedureJsonArrayForSorting(lConnection);
 
-                if (voltDbRenderer.sortOrder == "descending") {
-                    procedureJsonArray = descendingSortJSON(procedureJsonArray, this.sortColumn);
-                }
+                    if (voltDbRenderer.sortOrder == "descending") {
+                        procedureJsonArray = descendingSortJSON(procedureJsonArray, this.sortColumn);
+                    }
 
-                else if (voltDbRenderer.sortOrder == "ascending") {
-                    procedureJsonArray = ascendingSortJSON(procedureJsonArray, this.sortColumn);
+                    else if (voltDbRenderer.sortOrder == "ascending") {
+                        procedureJsonArray = ascendingSortJSON(procedureJsonArray, this.sortColumn);
+                    }
+                    mapJsonArrayToProcedures();
+                    isSorted = true;
+
+                } else {
+                    isSorted = false;
                 }
-                mapJsonArrayToProcedures();
 
             }
             else if (voltDbRenderer.isProcedureSearch) {
@@ -1507,7 +1468,9 @@ function alertNodeClicked(obj) {
                     procedureSearchJsonArray = ascendingSortJSON(procedureSearchJsonArray, this.sortColumn);
                 }
                 mapJsonArrayToSearchedProcedures();
+                isSorted = true;
             }
+            return isSorted;
         };
 
         var getLatencyDetails = function (connection, latency) {
@@ -1784,10 +1747,10 @@ function alertNodeClicked(obj) {
                 lblTotalPages.innerHTML = " ".concat(0);
                 $('#storeProcedureBody').html("<tr><td colspan=6>No data to be displayed</td></tr>");
 
-            } else if (listName == "TABLES") {
+            } else if (listName == "TABLE") {
                 lblPreviousTable.innerHTML = " ".concat(0, ' ');
                 lblTotalPagesofTables.innerHTML = " ".concat(0);
-                $('#storeProcedureBody').html("<tr><td colspan=6>No data to be displayed</td></tr>");
+                $('#tablesBody').html("<tr><td colspan=6>No data to be displayed</td></tr>");
             }
 
         };
@@ -1863,6 +1826,10 @@ function alertNodeClicked(obj) {
 
                         });
                     }
+                    else {
+                        formatTableNoData("TABLE");
+
+                    }
 
                 }
             }
@@ -1893,31 +1860,6 @@ function alertNodeClicked(obj) {
             }
 
         };
-
-        //        var mapJsonArrayToSearchedProcedures = function () {
-        //            var i = 0;
-        //            var procedureName;
-        //            lSearchData['procedures'] = {};
-        //            var searchTuple = {};
-
-        //            if (procedureSearchJsonArray != undefined) {
-        //                for (i = 0; i < procedureSearchJsonArray.length; i++) {
-        //                    procedureName = procedureSearchJsonArray[i].PROCEDURE;
-        //                    if (!lSearchData.hasOwnProperty(procedureName)) {
-        //                        searchTuple = {};
-        //                        searchTuple['PROCEDURE'] = procedureSearchJsonArray[i].PROCEDURE;
-        //                        searchTuple['INVOCATIONS'] = procedureSearchJsonArray[i].INVOCATIONS;
-        //                        searchTuple['MIN_LATENCY'] = procedureSearchJsonArray[i].MIN_LATENCY;
-        //                        searchTuple['MAX_LATENCY'] = procedureSearchJsonArray[i].MAX_LATENCY;
-        //                        searchTuple['AVG_LATENCY'] = procedureSearchJsonArray[i].AVG_LATENCY;
-        //                        searchTuple['PERC_EXECUTION'] = procedureSearchJsonArray[i].PERC_EXECUTION;
-
-        //                        lSearchData['procedures'][i] = searchTuple;
-
-        //                    }
-        //                }
-        //            }
-        //        };
 
         var mapJsonArrayToSearchedProcedures = function () {
             var i = 0;
@@ -2156,13 +2098,12 @@ function alertNodeClicked(obj) {
 
         this.searchTables = function (connection, searchKey, onTablesSearched) {
             var searchDataCount = 0;
-            var jsonTupleData = {};
 
             if (tableData == null || tableData == undefined) {
                 return;
             }
-            //formatTableData(connection);
             lSearchData.tables = {};
+
             $.each(tableData, function (nestKey, tupleData) {
                 if (tupleData != undefined) {
                     if (nestKey.toLowerCase().indexOf(searchKey.toLowerCase()) >= 0) {
@@ -2222,7 +2163,6 @@ function alertNodeClicked(obj) {
         this.formatSearchTablesDataToJsonArray = function (connection, searchKey, isSearched) {
             var searchTableCount = 0;
             tableSearchJsonArray = [];
-            var i = 0;
 
             function iterateSearchTableData() {
                 $.each(lSearchData.tables, function (nestKey, tupleData) {
