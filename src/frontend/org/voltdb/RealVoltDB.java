@@ -2303,6 +2303,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
         }
 
+        try {
+            if (m_adminListener != null) {
+                m_adminListener.start();
+            }
+        } catch (Exception e) {
+            hostLog.l7dlog(Level.FATAL, LogKeys.host_VoltDB_ErrorStartHTTPListener.name(), e);
+            VoltDB.crashLocalVoltDB("HTTP service unable to bind to port.", true, e);
+        }
+
         if (m_config.m_startAction == StartAction.REJOIN) {
             consoleLog.info(
                     "Node data recovery completed after " + delta + " seconds with " + megabytes +
@@ -2450,6 +2459,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     VoltDB.crashLocalVoltDB("Error starting client interface.", true, e);
                 }
             }
+        }
+
+        try {
+            if (m_adminListener != null) {
+                m_adminListener.start();
+            }
+        } catch (Exception e) {
+            hostLog.l7dlog(Level.FATAL, LogKeys.host_VoltDB_ErrorStartHTTPListener.name(), e);
+            VoltDB.crashLocalVoltDB("HTTP service unable to bind to port.", true, e);
         }
 
         // Start listening on the DR ports
