@@ -791,12 +791,11 @@ public class TestCSVLoader {
         TimeZone.setDefault(timezone);
 
         VoltTable ts_table = client.callProcedure("@AdHoc", "SELECT * FROM BLAH;").getResults()[0];
-        while (ts_table.advanceRow()) {
-            long tableTimeCol = ts_table.getTimestampAsTimestamp(7).getTime();
-            long time = (new TimestampType(currentTime)).getTime();
-            long diff = tableTimeCol - time;
-            assertEquals(TimeUnit.MICROSECONDS.toHours(diff), 7);
-        }
+        ts_table.advanceRow();
+        long tableTimeCol = ts_table.getTimestampAsLong(7);
+        long time = (new TimestampType(currentTime)).getTime();
+        long diff = tableTimeCol - time;
+        assertEquals(TimeUnit.MICROSECONDS.toHours(diff), 7);
     }
 
     public void test_Interface(String[] my_options, String[] my_data, int invalidLineCnt,
