@@ -252,8 +252,11 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
             if (hasPurgeFragment && !isMultiRowInsert) {
                 int tupleLimit = persistentTable->tupleLimit();
                 int numTuples = persistentTable->visibleTupleCount();
-                assert(numTuples <= tupleLimit);
-                if (tupleLimit == numTuples) {
+                // It's possible that the number of tuples is greater
+                // than the limit.  This can happen because snapshot
+                // restore and rebalancing will not enforce the
+                // constraint.
+                if (numTuples >= tupleLimit) {
                     // Next insert will fail: run the purge fragment
                     // before trying to insert.
                     int rc = m_engine->executePurgeFragment(persistentTable);

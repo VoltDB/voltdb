@@ -90,6 +90,7 @@ import org.voltdb.compiler.projectfile.SchemasType;
 import org.voltdb.compilereport.ReportMaker;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.utils.CatalogSchemaTools;
 import org.voltdb.utils.CatalogUtil;
@@ -1133,6 +1134,39 @@ public class VoltCompiler {
         // generated DDL
         m_importLines = voltDdlTracker.m_importLines.toArray(new String[0]);
         addExtraClasses(jarOutput);
+
+        compileRowLimitDeleteStmts(db, hsql);
+    }
+
+    private void compileRowLimitDeleteStmts(Database db, HSQLInterface hsql) throws VoltCompilerException {
+        // This loop will be linear in the number of tables, but we expect the number of tables with a
+        // limit rows delete statement to be much smaller than this.  Is it worth it to try
+        // and do better here?
+        for (Table tbl : db.getTables()) {
+            CatalogMap<Statement> map = tbl.getTuplelimitdeletestmt();
+            assert(map.size() <= 1);
+            if (map.size() == 1) {
+                m_currentFilename = tbl.getTypeName() + " limit rows delete";
+                Statement stmt = map.iterator().next();
+
+                // choose DeterminismMode.FASTER for determinism, and rely on the planner to error out
+                // if we generated a plan that is content-non-deterministic.
+                StatementCompiler.compile(this,
+                        hsql,
+                        db.getCatalog(),
+                        db,
+                        m_estimates,
+                        stmt,
+                        stmt.getSqltext(),
+                        null, // no user-supplied join order
+                        DeterminismMode.FASTER,
+                        StatementPartitioning.partitioningForRowLimitDelete());
+
+                // Temporarily log the plan to demonstrate it's actually getting compiled
+                String explainedPlan = Encoder.hexDecodeToString(stmt.getExplainplan());
+                compilerLog.info("Plan for " + m_currentFilename + ":\n" + explainedPlan);
+            }
+        }
     }
 
     private void checkValidPartitionTableIndex(Index index, Column partitionCol, String tableName)

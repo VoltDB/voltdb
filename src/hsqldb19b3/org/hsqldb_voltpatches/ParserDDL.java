@@ -5032,16 +5032,13 @@ public class ParserDDL extends ParserRoutine {
 
         // The optional EXECUTE (DELETE ...) clause
         if (readIfThis(Tokens.EXECUTE)) {
-            // Record the statement between parentheses following the EXECUTE keyword,
+            // Capture the statement between parentheses following the EXECUTE keyword,
             // as in
             //
             // LIMIT PARTITION ROWS 10 EXECUTE (DELETE FROM tbl WHERE b = 1)
             //
-            // We just record all the tokens (not including the delimiting parentheses).
-            // We'll parse the tokens later once the table definition is complete.
-
             readThis(Tokens.OPENBRACKET);
-            startRecording();
+            int position = getPosition();
             int numOpenBrackets = 1;
             while (numOpenBrackets > 0) {
                 switch(token.tokenType) {
@@ -5053,7 +5050,7 @@ public class ParserDDL extends ParserRoutine {
                 case Tokens.CLOSEBRACKET:
                     numOpenBrackets--;
                     if (numOpenBrackets > 0) {
-                        // don't want to record the final parenthesis
+                        // don't want the final parenthesis
                         read();
                     }
                     break;
@@ -5062,7 +5059,9 @@ public class ParserDDL extends ParserRoutine {
                     read();
                 }
             }
-            c.rowsLimitDeleteStmt = Token.getSQL(getRecordedStatement());
+
+            // This captures the DELETE statement exactly, including embedded whitespace, etc.
+            c.rowsLimitDeleteStmt = getLastPart(position);
             readThis(Tokens.CLOSEBRACKET);
         }
     }

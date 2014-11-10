@@ -1066,7 +1066,7 @@ public final class Constraint implements SchemaObject {
         constraint.attributes.put("assumeunique", assumeUnique ? "true" : "false");
         constraint.attributes.put("rowslimit", String.valueOf(rowsLimit));
         if (rowsLimitDeleteStmt != null) {
-            constraint.attributes.put("rowsLimitDeleteStmt", rowsLimitDeleteStmt);
+            constraint.attributes.put("rowslimitdeletestmt", rowsLimitDeleteStmt);
         }
 
         // VoltDB implements constraints by defining an index, by annotating metadata (such as for NOT NULL columns),
