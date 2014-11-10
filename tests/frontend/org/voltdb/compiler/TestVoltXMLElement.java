@@ -34,10 +34,17 @@ import junit.framework.TestCase;
 
 public class TestVoltXMLElement extends TestCase {
 
+    VoltXMLElement makeNamedElement(String elementName, String attName)
+    {
+        VoltXMLElement e = new VoltXMLElement(elementName);
+        e.attributes.put("name", attName);
+        return e;
+    }
+
     VoltXMLElement findNamedNode(List<VoltXMLElement> list, String name)
     {
         for (VoltXMLElement e : list) {
-            if (name.equals(e.name)) {
+            if (name.equals(e.attributes.get("name"))) {
                 return e;
             }
         }
@@ -45,30 +52,31 @@ public class TestVoltXMLElement extends TestCase {
     }
 
     public void testDiff() {
-        VoltXMLElement first = new VoltXMLElement("element");
-        VoltXMLElement changedChild1 = new VoltXMLElement("changedchild1");
+        VoltXMLElement first = makeNamedElement("element", "element");
+        VoltXMLElement changedChild1 = makeNamedElement("child", "changedchild1");
         first.children.add(changedChild1);
         changedChild1.attributes.put("deleteme", "noreally");
-        VoltXMLElement changedChild2 = new VoltXMLElement("changedchild2");
+        VoltXMLElement changedChild2 = makeNamedElement("child", "changedchild2");
         first.children.add(changedChild2);
-        VoltXMLElement changedGrandchild = new VoltXMLElement("changedgrandchild");
+        VoltXMLElement changedGrandchild = makeNamedElement("child", "changedgrandchild");
         changedChild2.children.add(changedGrandchild);
-        changedGrandchild.children.add(new VoltXMLElement("doomeddescendent"));
+        changedGrandchild.children.add(makeNamedElement("child", "doomeddescendent"));
         first.attributes.put("deleted", "doesntmatter");
         first.attributes.put("remains", "doesntmatter");
         first.attributes.put("changes", "oldvalue");
-        first.children.add(new VoltXMLElement("deletedchild"));
-        first.children.add(new VoltXMLElement("unchangedchild"));
+        first.children.add(makeNamedElement("child", "deletedchild"));
+        first.children.add(makeNamedElement("child", "unchangedchild"));
 
         VoltXMLElement second = first.duplicate();
         second.attributes.remove("deleted");
         second.attributes.put("added", "addedval");
         second.attributes.put("changes", "newvalue");
-        second.children.add(new VoltXMLElement("addedchild"));
-        second.children.remove(second.findChild("deletedchilddefault"));
-        second.findChild("changedchild1default").attributes.remove("deleteme");
-        VoltXMLElement temp = second.findChild("changedchild2default").findChild("changedgrandchilddefault");
-        temp.children.remove(temp.findChild("doomeddescendentdefault"));
+        second.children.add(makeNamedElement("child", "addedchild"));
+        second.children.remove(second.findChild("child", "deletedchild"));
+        second.findChild("child", "changedchild1").attributes.remove("deleteme");
+        VoltXMLElement temp = second.findChild("child", "changedchild2").findChild("child", "changedgrandchild");
+        temp.children.remove(temp.findChild("child", "doomeddescendent"));
+
 
         VoltXMLDiff diff = VoltXMLElement.computeDiff(first, second);
 
@@ -96,13 +104,13 @@ public class TestVoltXMLElement extends TestCase {
 
         Map<String, VoltXMLDiff> changed = diff.getChangedNodes();
         assertEquals(2, changed.size());
-        assertTrue(changed.containsKey("changedchild1default"));
-        VoltXMLDiff child1 = changed.get("changedchild1default");
+        assertTrue(changed.containsKey("childchangedchild1"));
+        VoltXMLDiff child1 = changed.get("childchangedchild1");
         assertTrue(child1.getRemovedAttributes().contains("deleteme"));
-        assertTrue(changed.containsKey("changedchild2default"));
-        VoltXMLDiff child2 = changed.get("changedchild2default");
-        assertTrue(child2.getChangedNodes().containsKey("changedgrandchilddefault"));
-        VoltXMLDiff grandchild = child2.getChangedNodes().get("changedgrandchilddefault");
+        assertTrue(changed.containsKey("childchangedchild2"));
+        VoltXMLDiff child2 = changed.get("childchangedchild2");
+        assertTrue(child2.getChangedNodes().containsKey("childchangedgrandchild"));
+        VoltXMLDiff grandchild = child2.getChangedNodes().get("childchangedgrandchild");
         assertTrue(findNamedNode(grandchild.getRemovedNodes(), "doomeddescendent") != null);
 
         VoltXMLElement third = first.duplicate();
@@ -115,7 +123,7 @@ public class TestVoltXMLElement extends TestCase {
 
     public void testDupeChild()
     {
-        VoltXMLElement first = new VoltXMLElement("element");
+        VoltXMLElement first = makeNamedElement("element", "element");
         VoltXMLElement child1 = new VoltXMLElement("child");
         child1.attributes.put("value", "3");
         first.children.add(child1);
@@ -124,7 +132,7 @@ public class TestVoltXMLElement extends TestCase {
         child2.attributes.put("value", "4");
         first.children.add(child2);
 
-        VoltXMLElement second = new VoltXMLElement("element");
+        VoltXMLElement second = makeNamedElement("element", "element");
         VoltXMLElement child1s = new VoltXMLElement("child");
         child1s.attributes.put("value", "5");
         second.children.add(child1s);
@@ -146,16 +154,46 @@ public class TestVoltXMLElement extends TestCase {
 
     public void testOrderFail()
     {
-        VoltXMLElement first = new VoltXMLElement("element");
-        first.children.add(new VoltXMLElement("first"));
-        first.children.add(new VoltXMLElement("third"));
-        first.children.add(new VoltXMLElement("fourth"));
+        VoltXMLElement first = makeNamedElement("element", "element");
+        first.children.add(makeNamedElement("first", "first"));
+        first.children.add(makeNamedElement("third", "third"));
+        first.children.add(makeNamedElement("fourth", "fourth"));
 
-        VoltXMLElement second = new VoltXMLElement("element");
-        second.children.add(new VoltXMLElement("first"));
-        second.children.add(new VoltXMLElement("second"));
-        second.children.add(new VoltXMLElement("third"));
-        second.children.add(new VoltXMLElement("fourth"));
+        VoltXMLElement second = makeNamedElement("element", "element");
+        second.children.add(makeNamedElement("first", "first"));
+        second.children.add(makeNamedElement("second", "second"));
+        second.children.add(makeNamedElement("third", "third"));
+        second.children.add(makeNamedElement("fourth", "fourth"));
+
+        VoltXMLDiff diff = VoltXMLElement.computeDiff(first, second);
+        System.out.println("diff: " + diff.toString());
+
+        VoltXMLElement third = first.duplicate();
+        third.applyDiff(diff);
+        System.out.println(first.toMinString());
+        System.out.println(second.toMinString());
+        System.out.println(third.toMinString());
+        assertEquals(second.toMinString(), third.toMinString());
+    }
+
+    public void testNoDiff()
+    {
+        VoltXMLElement first = makeNamedElement("element", "element");
+        VoltXMLElement changedChild1 = makeNamedElement("child", "changedchild1");
+        first.children.add(changedChild1);
+        changedChild1.attributes.put("deleteme", "noreally");
+        VoltXMLElement changedChild2 = makeNamedElement("child", "changedchild2");
+        first.children.add(changedChild2);
+        VoltXMLElement changedGrandchild = makeNamedElement("child", "changedgrandchild");
+        changedChild2.children.add(changedGrandchild);
+        changedGrandchild.children.add(makeNamedElement("child", "doomeddescendent"));
+        first.attributes.put("deleted", "doesntmatter");
+        first.attributes.put("remains", "doesntmatter");
+        first.attributes.put("changes", "oldvalue");
+        first.children.add(makeNamedElement("child", "deletedchild"));
+        first.children.add(makeNamedElement("child", "unchangedchild"));
+
+        VoltXMLElement second = first.duplicate();
 
         VoltXMLDiff diff = VoltXMLElement.computeDiff(first, second);
         System.out.println("diff: " + diff.toString());

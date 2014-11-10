@@ -53,11 +53,12 @@ public class VoltXMLElement {
      * it exists.  Needed a way to concisely identify an element as 'table foo'.  Yes, hacky.
      */
     public String getUniqueName() {
-        String nameAttribute = "default";
         if (attributes.containsKey("name")) {
-            nameAttribute = attributes.get("name");
+            return name + attributes.get("name");
         }
-        return name + nameAttribute;
+        else {
+            return toMinString();
+        }
     }
 
     @Override
@@ -251,7 +252,7 @@ public class VoltXMLElement {
         // Store the final desired element order
         for (int i = 0; i < second.children.size(); i++) {
             VoltXMLElement child = second.children.get(i);
-            result.m_elementOrder.put(child.toMinString(), i);
+            result.m_elementOrder.put(child.getUniqueName(), i);
         }
 
         // first, check the attributes
@@ -320,6 +321,8 @@ public class VoltXMLElement {
     public boolean applyDiff(VoltXMLDiff diff)
     {
         // Can only apply a diff to the root at which it was generated
+        // PURGEME System.out.println("UNIQUE NAME: " + getUniqueName());
+        // PURGEME System.out.println("DIFF: " + diff.toString());
         assert(getUniqueName().equals(diff.m_name));
 
         // Do the attribute changes
@@ -346,14 +349,25 @@ public class VoltXMLElement {
 
         // Reorder the children
         // yes, not efficient.  Revisit on performance pass
+        // PURGEME System.out.println("CHILD INFO: CHILD COUNT: " + children.size() + " ORDER SIZE: " + diff.m_elementOrder.size());
+        // PURGEME System.out.println("CHILDREN: " + children);
+        // Hacky, we don't write down the element order if there were no diffs
+        if (diff.m_elementOrder.isEmpty()) {
+            return true;
+        }
         assert(children.size() == diff.m_elementOrder.size());
         List<VoltXMLElement> temp = new ArrayList<VoltXMLElement>();
         temp.addAll(children);
         for (VoltXMLElement child : temp) {
-            String minstring = child.toMinString();
-            Integer position = diff.m_elementOrder.get(minstring);
+            String name = child.getUniqueName();
+            Integer position = diff.m_elementOrder.get(name);
+            if (position == null) {
+                // PURGEME System.out.println("DIFF: " + diff);
+                // PURGEME System.out.println("THIS: " + toMinString());
+                // PURGEME System.out.println("ORDER: "+ diff.m_elementOrder);
+            }
             assert(position != null);
-            if (!minstring.equals(children.get(position).toMinString())) {
+            if (!name.equals(children.get(position).getUniqueName())) {
                 children.set(position, child);
             }
         }

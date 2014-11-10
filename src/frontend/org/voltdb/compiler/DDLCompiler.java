@@ -460,6 +460,7 @@ public class DDLCompiler {
         this.m_compiler = compiler;
         this.m_tracker = tracker;
         this.m_classLoader = classLoader;
+        m_schema.attributes.put("name", HSQLInterface.XML_SCHEMA_NAME);
     }
 
     /**
@@ -558,11 +559,11 @@ public class DDLCompiler {
         VoltXMLDiff tableDiff = tableEntry.getValue();
         // need columns to be changed
         if (tableDiff.getChangedNodes().isEmpty() ||
-            !tableDiff.getChangedNodes().containsKey("columnsdefault"))
+            !tableDiff.getChangedNodes().containsKey("columnscolumns"))
         {
             return;
         }
-        VoltXMLDiff columnsDiff = tableDiff.getChangedNodes().get("columnsdefault");
+        VoltXMLDiff columnsDiff = tableDiff.getChangedNodes().get("columnscolumns");
         assert(columnsDiff != null);
         // Need to have deleted columns
         if (columnsDiff.getRemovedNodes().isEmpty()) {

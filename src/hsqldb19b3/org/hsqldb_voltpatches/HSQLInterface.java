@@ -94,6 +94,7 @@ public class HSQLInterface {
     static int instanceId = 0;
 
     private HSQLInterface(Session sessionProxy) {
+        lastSchema.attributes.put("name", XML_SCHEMA_NAME);
         this.sessionProxy = sessionProxy;
     }
 
@@ -373,7 +374,7 @@ public class HSQLInterface {
      */
     public VoltXMLElement getXMLFromCatalog() throws HSQLParseException {
         VoltXMLElement xml = new VoltXMLElement(XML_SCHEMA_NAME);
-
+        xml.attributes.put("name", XML_SCHEMA_NAME);
         String schemaName = null;
         try {
             schemaName = sessionProxy.getSchemaName(null);
