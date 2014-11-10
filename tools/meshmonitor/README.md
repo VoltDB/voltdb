@@ -80,11 +80,13 @@ program.  Log will be created with the 'hostname-mesh.log' structure.  This
 script will help generate the commands needed to run on all other nodes for
 testing.  Please ensure network port chosen is free on all nodes.
 
+```
 Usage: ./meshmonitorhelper.sh <LISTOFNODES> <HICCUPSIZE> <LOGINTERVAL> <NETWORKPORT>
   <LISTOFNODES> - required parameter	- file with list of nodes on each line
   <HICCUPSIZE>  - optional		- mininum latency in milliseconds to report, default value = 20
   <LOGINTERVAL> - optional 	- interval of logging in seconds, default value = 10
   <NETWORKPORT> - optional		- network port used, default value = 12222
+```
 
 Sample output for a nodes.txt that lists 3 nodes:  
 prod1  
