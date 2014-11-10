@@ -6,15 +6,15 @@ timeouts and hangs and scheduling problems that delay message passing. A
 common use for this tool is when sites are experiencing dead host timeouts
 without any obvious network event.
 
-Meshmonitor has threads that measure and report on 3 things:
+Meshmonitor has threads that measure and report on 3 parameters:
 
 1. Sending heartbeats. A "send" thread wakes up every 5 milliseconds and
 sends heartbeats to all the other servers running meshmonitor. This tracks
 the liveness of the server (i.e. its ability of a thread to get scheduled
 in a timely manner and send a message out.)
-2. Recieving heartbeats. A "receive" thread that is blocked reading the
+2. Receiving heartbeats. A "receive" thread that is blocked reading the
 socket that receives messages sent from the other servers.
-3. Difference between send and recieve times. The "receive" thread also
+3. Difference between send and receive times. The "receive" thread also
 measures the difference in time between the timestamp encoded in the
 heartbeat and when the heartbeat was processed.
 
@@ -37,7 +37,7 @@ Identifying information:
 Date
 Time
 This node address
-Other node address (i.e. who message came
+Other node address (i.e. message sender)
 Message type
 
 Latency Information:
