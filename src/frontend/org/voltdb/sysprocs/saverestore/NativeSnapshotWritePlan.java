@@ -98,7 +98,14 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
             throw new RuntimeException("No hashinator data provided for elastic hashinator type.");
         }
 
-        final List<Table> tables = SnapshotUtil.getTablesToSave(context.getDatabase());
+        final SnapshotRequestConfig config = new SnapshotRequestConfig(jsData, context.getDatabase());
+        final Table[] tableArray;
+        if (config.tables.length == 0) {
+            tableArray = SnapshotUtil.getTablesToSave(context.getDatabase()).toArray(new Table[0]);
+        }
+        else {
+            tableArray = config.tables;
+        }
         m_snapshotRecord =
             SnapshotRegistry.startSnapshot(
                     txnId,
@@ -106,13 +113,13 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                     file_path,
                     file_nonce,
                     SnapshotFormat.NATIVE,
-                    tables.toArray(new Table[0]));
+                    tableArray);
 
         final ArrayList<SnapshotTableTask> partitionedSnapshotTasks =
             new ArrayList<SnapshotTableTask>();
         final ArrayList<SnapshotTableTask> replicatedSnapshotTasks =
             new ArrayList<SnapshotTableTask>();
-        for (final Table table : tables) {
+        for (final Table table : tableArray) {
             final SnapshotTableTask task =
                     new SnapshotTableTask(
                             table,
@@ -135,7 +142,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                     "");
         }
 
-        if (!tables.isEmpty() && replicatedSnapshotTasks.isEmpty() && partitionedSnapshotTasks.isEmpty()) {
+        if (tableArray.length > 0 && replicatedSnapshotTasks.isEmpty() && partitionedSnapshotTasks.isEmpty()) {
             SnapshotRegistry.discardSnapshot(m_snapshotRecord);
         }
 
@@ -148,7 +155,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
         return createDeferredSetup(file_path, file_nonce, txnId, partitionTransactionIds, partitionUniqueIds,
                 remoteDCLastUniqueIds, context,
                 exportSequenceNumbers, tracker, hashinatorData, timestamp,
-                newPartitionCount, tables, m_snapshotRecord, partitionedSnapshotTasks,
+                newPartitionCount, tableArray, m_snapshotRecord, partitionedSnapshotTasks,
                 replicatedSnapshotTasks);
     }
 
@@ -164,7 +171,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                                                   final HashinatorSnapshotData hashinatorData,
                                                   final long timestamp,
                                                   final int newPartitionCount,
-                                                  final List<Table> tables,
+                                                  final Table[] tables,
                                                   final SnapshotRegistry.Snapshot snapshotRecord,
                                                   final ArrayList<SnapshotTableTask> partitionedSnapshotTasks,
                                                   final ArrayList<SnapshotTableTask> replicatedSnapshotTasks)
@@ -175,7 +182,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
             @Override
             public Boolean call() throws Exception
             {
-                final AtomicInteger numTables = new AtomicInteger(tables.size());
+                final AtomicInteger numTables = new AtomicInteger(tables.length);
 
                 NativeSnapshotWritePlan.createFileBasedCompletionTasks(file_path, file_nonce,
                         txnId, partitionTransactionIds, partitionUniqueIds, remoteDCLastUniqueIds, context, exportSequenceNumbers,
