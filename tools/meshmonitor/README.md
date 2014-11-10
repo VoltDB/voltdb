@@ -1,3 +1,5 @@
+Overview
+---------------
 Mesh Monitor is a tool that simulates the VoltDB heartbeat paths. It is
 useful in diagnosing issues such as network delays and instability, mysterious
 timeouts and hangs and scheduling problems that delay message passing. A
@@ -21,7 +23,7 @@ a message is printed out.  Otherwise, the meshmonitor prints a message
 "nothing to report".
 
 Log information
---------------------
+---------------
 There are 3 kinds of messages, for the 3 measurements:
 
 * delta send - delta between sending heartbeats
@@ -46,8 +48,8 @@ Average Latency
 99.99   percentile latency
 99.999  percentile latency
 
-Example:
-2014-11-07 15:53:49,019	/10.10.181.102:41924   volt14a/10.10.181.19:12222  delta receive - MaxLat:   96 Avg:   5.58 99th-Pct:   9  86  96  96
+Example:  
+`2014-11-07 15:53:49,019	/10.10.181.102:41924   volt14a/10.10.181.19:12222  delta receive - MaxLat:   96 Avg:   5.58 99th-Pct:   9  86  96  96`
 
 
 Interpreting Results:
@@ -84,11 +86,12 @@ Usage: ./meshmonitorhelper.sh <LISTOFNODES> <HICCUPSIZE> <LOGINTERVAL> <NETWORKP
    <LOGINTERVAL> - optional 	- interval of logging in seconds, default value = 10
    <NETWORKPORT> - optional		- network port used, default value = 12222 [ "$2" -gt "0" ]
 
-Sample output for a nodes.txt that lists 3 nodes:
-prod1
-prod2
-client1
+Sample output for a nodes.txt that lists 3 nodes:  
+prod1  
+prod2  
+client1  
 
+```
 > ./meshmonitorhelper.sh nodes.txt
 Using list of hosts file: nodes.txt
 Using default minimum hiccup size: 20
@@ -105,3 +108,4 @@ nohup java -jar meshmonitor.jar 20 10 prod2:12222 prod1:12222 > prod2-mesh.log &
 
 #client1: In <VOLTDB_HOME>/tools/meshmonitor directory, run the following command:
 nohup java -jar meshmonitor.jar 20 10 client1:12222 prod2:12222 prod1:12222 > client1-mesh.log &
+```
