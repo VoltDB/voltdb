@@ -505,4 +505,19 @@ public class RegressionSuite extends TestCase {
             }
         }
     }
+
+    static public void checkDeploymentPropertyValue(Client client, String key, String value)
+            throws IOException, ProcCallException, InterruptedException {
+        boolean found = false;
+
+        VoltTable result = client.callProcedure("@SystemInformation", "DEPLOYMENT").getResults()[0];
+        while (result.advanceRow()) {
+            if (result.getString("PROPERTY").equalsIgnoreCase(key)) {
+                found = true;
+                assertEquals(value, result.getString("VALUE"));
+                break;
+            }
+        }
+        assertTrue(found);
+    }
 }
