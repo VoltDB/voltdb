@@ -81,7 +81,7 @@ function alertNodeClicked(obj) {
         var htmlMarkups = { "SystemInformation": [] };
         var htmlMarkup;
         var htmlTableMarkups = { "SystemInformation": [] };
-        var htmlTableMarkup;
+        var htmlTableMarkup="";
         var minLatency = 0;
         var maxLatency = 0;
         var avgLatency = 0;
@@ -111,10 +111,10 @@ function alertNodeClicked(obj) {
         };
 
         var testConnection = function (serverName, portId, username, password, admin, onInformationLoaded) {
-            VoltDBService.TestConnection(serverName, portId, username, password, admin, function (result) {
+            VoltDBService.TestConnection(serverName, portId, username, password, admin, function (result, response) {
 
-                onInformationLoaded(result);
-            });
+                onInformationLoaded(result, response);
+            }, true);
         };
 
         this.CheckServerConnection = function (checkConnection) {
@@ -147,7 +147,7 @@ function alertNodeClicked(obj) {
 
         this.HandleLogin = function (serverName, portId, pageLoadCallback) {
 
-            var popupDisplayed = false;
+            var responseObtained = false;
             $("#username").data("servername", serverName);
             $("#username").data("portid", portId);
             $("#loginBoxDialogue").hide();
@@ -160,8 +160,14 @@ function alertNodeClicked(obj) {
                     $("#UnableToLoginMsg").hide();
                     var usernameVal = $("#username").val();
                     var passwordVal = $("#password").val() != '' ? $().crypt({ method: "sha1", source: $("#password").val() }) : $("#password").val();
+                    responseObtained = false;
+                    
+                    testConnection($("#username").data("servername"), $("#username").data("portid"), usernameVal, passwordVal, true, function (result, response) {
+                        
+                        if (responseObtained)
+                            return;
+                        responseObtained = true;
 
-                    testConnection($("#username").data("servername"), $("#username").data("portid"), usernameVal, passwordVal, true, function (result) {
                         $("#overlay").hide();
                         if (result) {
 
@@ -169,16 +175,26 @@ function alertNodeClicked(obj) {
                             saveSessionCookie("username", usernameVal);
                             saveSessionCookie("password", passwordVal);
                             voltDbRenderer.ShowUsername(usernameVal);
-                            popupDisplayed = true;
 
                             pageLoadCallback();
                             popupCallback();
                             $("#loginBoxDialogue").hide();
-                            $("#username").val("");
-                            $("#password").val("");
+                            setTimeout(function () {
+                                $("#username").val("");
+                                $("#password").val("");
+                            }, 300);
                             $("#logOut").css('display', 'block');
                             $('#logOut').prop('title', $.cookie("username"));
                         } else {
+
+                            //Error: Server is not available(-100) or Connection refused(-5) but is not "Authentication rejected(-3)"
+                            if (response.hasOwnProperty("status") && (response.status == -100 || response.status == -5) && response.status != -3) {
+                                popupCallback();
+                                $("#loginBoxDialogue").hide();
+                                $("#serUnavailablePopup").trigger("click");
+                                return;
+                            }
+
                             $("#UnableToLoginMsg").show();
                             $("#logOut").css('display', 'none');
                             $('#logOut').prop('title', '');
@@ -209,25 +225,60 @@ function alertNodeClicked(obj) {
             var username = ($.cookie("username") != undefined) ? $.cookie("username") : "";
             var password = (username != "" && $.cookie("password") != undefined) ? $.cookie("password") : "";
 
-            $("#overlay").show();
+            $("#serUnavailablePopup").popup({
+                open: function (event, ui, ele) {
+                },
+                autoLogin: function (popupCallback) {
+                    tryAutoLogin();
+                    popupCallback();
+                }
+            });
+            
             //Try to login with saved username/password or no username and password
-            testConnection(serverName, portId, username, password, true, function (result) {
+            var tryAutoLogin = function () {
+                $("#overlay").show();
+                responseObtained = false;
+                serverName = VoltDBConfig.GetDefaultServerIP(true);
+                testConnection(serverName, portId, username, password, true, function(result, response) {
 
-                $("#overlay").hide();
-                if (!popupDisplayed) {
-                    //If security is enabled, then display popup to get username and password.
+                    if (responseObtained)
+                        return;
+                    responseObtained = true;
+
+                    $("#overlay").hide();
+
                     if (!result) {
+                        
+                        if (response.hasOwnProperty("status")) {
+
+                            //Error: Hashedpassword must be a 40-byte hex-encoded SHA-1 hash.
+                            if (response.status == -3 && response.hasOwnProperty("statusstring") && response.statusstring.indexOf("Hashedpassword must be a 40-byte") > -1) {
+                                //Try to auto login after clearing username and password
+                                saveSessionCookie("username", null);
+                                saveSessionCookie("password", null);
+                                tryAutoLogin();
+                                return;
+                            }
+                                //Error: Server is not available(-100) or Connection refused(-5) but is not "Authentication rejected(-3)"
+                            else if ((response.status == -100 || response.status == -5) && response.status != -3) {
+                                $("#serUnavailablePopup").trigger("click");
+                                return;
+                            }
+                        }
+
+                        //If security is enabled, then display popup to get username and password.
                         saveSessionCookie("username", null);
                         saveSessionCookie("password", null);
 
                         $("#loginLink").trigger("click");
                     } else {
-                        popupDisplayed = true;
                         pageLoadCallback();
                     }
-                }
-                popupDisplayed = true;
-            });
+                    
+                });
+            };
+
+            tryAutoLogin();
         };
 
         this.ShowUsername = function (userName) {
@@ -334,23 +385,23 @@ function alertNodeClicked(obj) {
             });
         };
 
-        this.getStoredProceduresAndTableInformation = function (onProcedureAndDataTablesInformationLoaded) {
-            if (this.userPreferences) {
-                if (this.userPreferences['DatabaseTables'] == true) {
-                    VoltDBService.GetDataTablesInformation(function (connection) {
-                        populateTablesInformation(connection);
+        //this.getStoredProceduresAndTableInformation = function (onProcedureAndDataTablesInformationLoaded) {
+        //    if (this.userPreferences) {
+        //        if (this.userPreferences['DatabaseTables'] == true) {
+        //            VoltDBService.GetDataTablesInformation(function (connection) {
+        //                populateTablesInformation(connection);
 
-                    });
-                }
+        //            });
+        //        }
 
-                if (this.userPreferences['StoredProcedures'] == true) {
-                    VoltDBService.GetProceduresInformation(function (connection) {
-                        populateProceduresInformation(connection);
-                    });
-                }
-                onProcedureAndDataTablesInformationLoaded();
-            }
-        };
+        //        if (this.userPreferences['StoredProcedures'] == true) {
+        //            VoltDBService.GetProceduresInformation(function (connection) {
+        //                populateProceduresInformation(connection);
+        //            });
+        //        }
+        //        onProcedureAndDataTablesInformationLoaded();
+        //    }
+        //};
 
         this.getTablesInformationByIndex = function (onDataTablesInformationLoaded) {
             VoltDBService.GetDataTablesInformation(function (connection) {
@@ -367,18 +418,18 @@ function alertNodeClicked(obj) {
 
         };
 
-        this.getProcedureData = function (onProcedureDataTraversed) {
-            VoltDBService.GetProceduresInformation(function (nestConnection) {
-                populateProceduresInformation(nestConnection);
+        //this.getProcedureData = function (onProcedureDataTraversed) {
+        //    VoltDBService.GetProceduresInformation(function (nestConnection) {
+        //        populateProceduresInformation(nestConnection);
 
-            });
+        //    });
 
-            VoltDBService.GetDataTablesInformation(function (nestConnection) {
-                populateTablesInformation(nestConnection);
-                populateTableTypes(nestConnection);
-                onProcedureDataTraversed();
-            });
-        };
+        //    VoltDBService.GetDataTablesInformation(function (nestConnection) {
+        //        populateTablesInformation(nestConnection);
+        //        populateTableTypes(nestConnection);
+        //        onProcedureDataTraversed();
+        //    });
+        //};
 
         this.GetHostNodesHtml = function (callback) {
             try {
@@ -1248,24 +1299,27 @@ function alertNodeClicked(obj) {
                 voltDbRenderer.isTableSortClicked) {
                 if (currentAction == VoltDbUI.ACTION_STATES.NEXT) {
                     tablePageStartIndex = (voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows;
-                    
+
                 }
 
                 else if (currentAction == VoltDbUI.ACTION_STATES.PREVIOUS) { // pageStartIndex need not be initialized if isNext is undefined(when page loads intially or during reload operation)
                     tablePageStartIndex = (voltDbRenderer.tableIndex - 1) * voltDbRenderer.maxVisibleRows;
-                    
+
                 }
 
                 else if (((currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.NEXT) ||
                     (currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.PREVIOUS)) && !voltDbRenderer.isTableSortClicked) {
                     tablePageStartIndex = (voltDbRenderer.tableIndex) * voltDbRenderer.maxVisibleRows;
-                    //console.log("refresh next");
+
                 }
 
                 else if (currentAction == VoltDbUI.ACTION_STATES.SEARCH || currentAction == VoltDbUI.ACTION_STATES.NONE || voltDbRenderer.isTableSortClicked == true) {
-                    tablePageStartIndex = 0;
-                    voltDbRenderer.tableIndex = 0;
-                    //console.log("search || none || table sort");
+                    //if (!(priorAction == VoltDbUI.ACTION_STATES.PREVIOUS || priorAction == VoltDbUI.ACTION_STATES.NEXT)) {
+                        tablePageStartIndex = 0;
+                        voltDbRenderer.tableIndex = 0;
+                        
+                    //}
+                    
                 }
 
                 var lTableData = this.isTableSearch ? this.searchData.tables : tableData;
@@ -1335,10 +1389,7 @@ function alertNodeClicked(obj) {
                         }
 
                         if ((counter == (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1 || counter == voltDbRenderer.tableSearchDataSize - 1) && htmlTableMarkup != "") {
-                            //var today = new Date();                          
-                            
-                            voltDbRenderer.tableIndex++;
-                            //console.log("index increased: " + voltDbRenderer.tableIndex + "Time:" + today.getTime());
+                            voltDbRenderer.tableIndex++;                           
                             return false;
                         }
 
@@ -1365,10 +1416,11 @@ function alertNodeClicked(obj) {
 
                 if (voltDbRenderer.isSortTables) {
                     callback(htmlTableMarkup);
+                    htmlTableMarkup = "";
                 }
                 else {
                     htmlTableMarkups.SystemInformation.push(htmlTableMarkup);
-                    htmlTableMarkup = undefined;
+                    htmlTableMarkup = "";
                     callback(htmlTableMarkups.SystemInformation);
 
                 }
