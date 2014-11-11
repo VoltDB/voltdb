@@ -2668,6 +2668,7 @@ public class Table extends TableBase implements SchemaObject {
         // read all the columns
         VoltXMLElement columns = new VoltXMLElement("columns");
         // Hacky, need a "name" for the diffing stuff to work correctly
+        // See VoltXMLElement.java for further explanation of TEH HORROR
         columns.attributes.put("name", "columns");
         table.children.add(columns);
         int[] columnIndices = getColumnMap();
@@ -2682,6 +2683,7 @@ public class Table extends TableBase implements SchemaObject {
         // read all the indexes
         VoltXMLElement indexes = new VoltXMLElement("indexes");
         // Hacky, need a "name" for the diffing stuff to work correctly
+        // See VoltXMLElement.java for further explanation of TEH HORROR
         indexes.attributes.put("name", "indexes");
         table.children.add(indexes);
         for (Index index : indexList) {
@@ -2693,6 +2695,8 @@ public class Table extends TableBase implements SchemaObject {
 
         // read all the constraints
         VoltXMLElement constraints = new VoltXMLElement("constraints");
+        // Hacky, need a "name" for the diffing stuff to work correctly
+        // See VoltXMLElement.java for further explanation of TEH HORROR
         constraints.attributes.put("name", "constraints");
         table.children.add(constraints);
         List<VoltXMLElement> revisitList = new ArrayList<VoltXMLElement>();
