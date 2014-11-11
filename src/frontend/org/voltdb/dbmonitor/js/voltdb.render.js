@@ -1248,24 +1248,27 @@ function alertNodeClicked(obj) {
                 voltDbRenderer.isTableSortClicked) {
                 if (currentAction == VoltDbUI.ACTION_STATES.NEXT) {
                     tablePageStartIndex = (voltDbRenderer.tableIndex + 1) * voltDbRenderer.maxVisibleRows;
-                    
+
                 }
 
                 else if (currentAction == VoltDbUI.ACTION_STATES.PREVIOUS) { // pageStartIndex need not be initialized if isNext is undefined(when page loads intially or during reload operation)
                     tablePageStartIndex = (voltDbRenderer.tableIndex - 1) * voltDbRenderer.maxVisibleRows;
-                    
+
                 }
 
                 else if (((currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.NEXT) ||
                     (currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.PREVIOUS)) && !voltDbRenderer.isTableSortClicked) {
                     tablePageStartIndex = (voltDbRenderer.tableIndex) * voltDbRenderer.maxVisibleRows;
-                    //console.log("refresh next");
+
                 }
 
                 else if (currentAction == VoltDbUI.ACTION_STATES.SEARCH || currentAction == VoltDbUI.ACTION_STATES.NONE || voltDbRenderer.isTableSortClicked == true) {
-                    tablePageStartIndex = 0;
-                    voltDbRenderer.tableIndex = 0;
-                    //console.log("search || none || table sort");
+                    if (!(priorAction == VoltDbUI.ACTION_STATES.PREVIOUS || priorAction == VoltDbUI.ACTION_STATES.NEXT)) {
+                        tablePageStartIndex = 0;
+                        voltDbRenderer.tableIndex = 0;
+                        
+                    }
+                    
                 }
 
                 var lTableData = this.isTableSearch ? this.searchData.tables : tableData;
@@ -1335,10 +1338,7 @@ function alertNodeClicked(obj) {
                         }
 
                         if ((counter == (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1 || counter == voltDbRenderer.tableSearchDataSize - 1) && htmlTableMarkup != "") {
-                            //var today = new Date();                          
-                            
-                            voltDbRenderer.tableIndex++;
-                            //console.log("index increased: " + voltDbRenderer.tableIndex + "Time:" + today.getTime());
+                            voltDbRenderer.tableIndex++;                           
                             return false;
                         }
 

@@ -6,7 +6,11 @@ $(document).ready(function () {
     } else {
         $("#logOut").css('display', 'none');
     }
-    
+
+    //search text clean up required for mozilla
+    ("#filterDatabaseTable").value = "";
+    ("#filterStoredProc").value = "";
+
     //Prevent scrolling of page.
     $('#navSchema').on("click", function (e) {
         window.location.hash = "#o"; //This is required for IE.
@@ -799,9 +803,11 @@ var loadPage = function (serverName, portid) {
                     lblTotalPagesofTables.innerHTML = voltDbRenderer.tableSearchDataSize < voltDbRenderer.maxVisibleRows ? " ".concat(1) : " ".concat(Math.ceil(voltDbRenderer.tableSearchDataSize / voltDbRenderer.maxVisibleRows));
 
                 }
-                //else if (currentTableAction == VoltDbUI.ACTION_STATES.REFRESH && (priorTableAction == VoltDbUI.ACTION_STATES.PREVIOUS || priorTableAction == VoltDbUI.ACTION_STATES.NEXT)) {
-                //    lblTotalPagesofTables.innerHTML = voltDbRenderer.tableSearchDataSize < voltDbRenderer.maxVisibleRows ? " ".concat(1) : " ".concat(Math.ceil(voltDbRenderer.tableSearchDataSize / voltDbRenderer.maxVisibleRows));
-                //}
+                
+                //else if for 46141                
+                else if (currentTableAction == VoltDbUI.ACTION_STATES.REFRESH && (priorTableAction == VoltDbUI.ACTION_STATES.PREVIOUS || priorTableAction == VoltDbUI.ACTION_STATES.NEXT)) {
+                   lblTotalPagesofTables.innerHTML = voltDbRenderer.tableSearchDataSize < voltDbRenderer.maxVisibleRows ? " ".concat(1) : " ".concat(Math.ceil(voltDbRenderer.tableSearchDataSize / voltDbRenderer.maxVisibleRows));
+                }
                 else {
                     lblPreviousTable.innerHTML = " ".concat(1, ' ');
                     lblTotalPagesofTables.innerHTML = voltDbRenderer.tableSearchDataSize < voltDbRenderer.maxVisibleRows ? " ".concat(1) : " ".concat(Math.ceil(voltDbRenderer.tableSearchDataSize / voltDbRenderer.maxVisibleRows));
@@ -828,7 +834,7 @@ var loadPage = function (serverName, portid) {
                     lblPreviousTable.innerHTML = " ".concat(1, ' ');
                     
                 }
-                else if (voltDbRenderer.isTableSortClicked) {
+                else if (voltDbRenderer.isTableSortClicked || !isTableSearch) {
                     lblPreviousTable.innerHTML = " ".concat(1, ' ');
                 }
                 lblTotalPagesofTables.innerHTML = voltDbRenderer.tableDataSize < voltDbRenderer.maxVisibleRows ? " ".concat(1) : " ".concat(Math.ceil(voltDbRenderer.tableDataSize / voltDbRenderer.maxVisibleRows));
