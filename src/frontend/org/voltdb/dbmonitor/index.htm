@@ -456,6 +456,24 @@
         </div>
     </div>
     <!--Connection popup-->
+    
+    <!--Server not available popup-->
+    <div style="display: none"><a href="#serverUnavailablePopup" id="serUnavailablePopup">Connection Error</a></div>
+
+    <div id="serverUnavailablePopup" style="display: none">
+        <div id="servUnavailablePop">
+            <div class="overlay-title ">
+                <img src="css/resources/images/error.png" class="imgError" />Error</div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorMsg">
+                <p>Could not establish connection to DB Monitor service. The service is either down, very slow to respond or the server refused connection.
+                    Please click ok when the server is back online. </p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="serverUnavailableBtn" title="Ok">Ok</a></div>
+            </div>
+        </div>
+    </div>
+    <!--Server not available popup-->
 
     <!--Help popup-->
     <div id="help" style="display: none">
