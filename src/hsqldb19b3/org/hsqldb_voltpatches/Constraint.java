@@ -1021,6 +1021,7 @@ public final class Constraint implements SchemaObject {
     Expression[] indexExprs; // A VoltDB extension to support indexed expressions
     boolean assumeUnique = false; // For VoltDB
     int rowsLimit = Integer.MAX_VALUE; // For VoltDB
+    String rowsLimitDeleteStmt;
 
     // A VoltDB extension to support indexed expressions
     public Constraint withExpressions(Expression[] exprs) {
@@ -1064,6 +1065,9 @@ public final class Constraint implements SchemaObject {
         constraint.attributes.put("constrainttype", getTypeName());
         constraint.attributes.put("assumeunique", assumeUnique ? "true" : "false");
         constraint.attributes.put("rowslimit", String.valueOf(rowsLimit));
+        if (rowsLimitDeleteStmt != null) {
+            constraint.attributes.put("rowsLimitDeleteStmt", rowsLimitDeleteStmt);
+        }
 
         // VoltDB implements constraints by defining an index, by annotating metadata (such as for NOT NULL columns),
         // or by issuing a "not supported" warning (such as for foreign keys).
@@ -1104,6 +1108,19 @@ public final class Constraint implements SchemaObject {
     public Constraint setAssumeUnique(boolean assumeUnique) {
         this.assumeUnique = assumeUnique;
         return this;
+    }
+
+    @Override
+    public String toString() {
+        String str = "CONSTRAINT " + getName().name + " " + getTypeName();
+        if (constType == LIMIT) {
+            str += " " + rowsLimit;
+            if (rowsLimitDeleteStmt != null) {
+                str += " EXECUTE (" + rowsLimitDeleteStmt + ")";
+            }
+        }
+
+        return str;
     }
     /**********************************************************************/
 }
