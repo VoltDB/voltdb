@@ -42,6 +42,7 @@ public enum LogKeys {
     host_Backend_ErrorOnShutdown,
     host_ClientInterface_checkForAdhocSQL_SerializationException,
     host_VoltDB_ErrorStartAcceptingConnections,
+    host_VoltDB_ErrorStartHTTPListener,
     host_VoltDB_ServerCompletedInitialization,
     host_VoltDB_StartingNetwork,
     host_VoltDB_InternalProfilingDisabledOnMultipartitionHosts,
