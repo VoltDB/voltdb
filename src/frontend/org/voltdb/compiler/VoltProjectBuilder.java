@@ -189,6 +189,15 @@ public class VoltProjectBuilder {
             this.allproc = allproc;
         }
 
+        public static GroupInfo[] fromTemplate(final GroupInfo other, final String... names) {
+            GroupInfo[] groups = new GroupInfo[names.length];
+            for (int i = 0; i < names.length; ++i) {
+                groups[i] = new GroupInfo(names[i], other.sql, other.sqlread, other.admin,
+                                other.defaultproc, other.defaultprocread, other.allproc);
+            }
+            return groups;
+        }
+
         @Override
         public int hashCode() {
             return name.hashCode();
