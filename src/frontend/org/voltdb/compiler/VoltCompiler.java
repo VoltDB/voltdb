@@ -987,7 +987,7 @@ public class VoltCompiler {
         // partitions/table
         if (database.getPartitions() != null) {
             for (PartitionsType.Partition table : database.getPartitions().getPartition()) {
-                voltDdlTracker.put(table.getTable(), table.getColumn());
+                voltDdlTracker.addPartition(table.getTable(), table.getColumn());
             }
         }
 

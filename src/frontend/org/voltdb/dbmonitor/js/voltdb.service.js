@@ -13,14 +13,14 @@
     var iVoltDbService = (function () {
         var _connection = connection;
 
-        this.TestConnection = function (lServerName, lPort, lUsername, lPassword, lAdmin, onConnectionAdded) {
+        this.TestConnection = function (lServerName, lPort, lUsername, lPassword, lAdmin, onConnectionAdded, isLoginTest) {
             try {
                 var serverName = lServerName != null ? lServerName : server;
                 var portId = lPort != null ? lPort : port;
 
-                VoltDBCore.TestConnection(serverName, portId, lAdmin, lUsername, lPassword, isHashedPassword, "DATABASE_LOGIN", function (result) {
-                    onConnectionAdded(result);
-                });
+                VoltDBCore.TestConnection(serverName, portId, lAdmin, lUsername, lPassword, isHashedPassword, "DATABASE_LOGIN", function (result, response) {
+                    onConnectionAdded(result, response);
+                }, isLoginTest);
 
             } catch (e) {
                 console.log(e.message);
@@ -213,17 +213,8 @@
                         }
 
                     });
-                } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, lconnection, function (connection, status) {
-                        lconnection = connection;
-                    });
-
-                }
-
-
-
+                } 
                 return lconnection;
-
 
             } catch (e) {
                 console.log(e.message);

@@ -3352,7 +3352,7 @@ public class TestVoltCompiler extends TestCase {
 
     public void testBadExportTable() throws Exception {
 
-        badDDLAgainstSimpleSchema(".+\\sexport, table non_existant was not present in the catalog.*",
+        badDDLAgainstSimpleSchema(".+\\sEXPORT statement: table non_existant was not present in the catalog.*",
                 "export table non_existant;"
                 );
 
@@ -3386,12 +3386,6 @@ public class TestVoltCompiler extends TestCase {
                 "create table view_source( id integer, f1 varchar(16), f2 varchar(12));",
                 "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;",
                 "export table my_view;"
-                );
-
-        badDDLAgainstSimpleSchema("Table \"E1\" is already exported.*",
-                "create table e1( id integer, f1 varchar(16), f2 varchar(12));",
-                "export table e1;",
-                "export table E1;"
                 );
     }
 
