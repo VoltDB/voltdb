@@ -31,7 +31,7 @@ public class BorrowTransactionState extends ParticipantTransactionState
 {
     BorrowTransactionState(long txnId, TransactionInfoBaseMessage notice)
     {
-        super(txnId, notice, true);
+        super(txnId, notice);
     }
 
     @Override
