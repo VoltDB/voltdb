@@ -34,7 +34,7 @@ import org.voltdb.compiler.VoltProjectBuilder;
 public class TestQueryTimeout extends RegressionSuite {
 
     private void loadData(Client client) throws IOException, ProcCallException {
-        int scale = 10000;
+        int scale = 5000;
 
         for (int i = 0; i < scale; i++) {
             client.callProcedure("VOTES.insert", i, "MA", i % 6);
@@ -61,13 +61,12 @@ public class TestQueryTimeout extends RegressionSuite {
         }
 
         // 'LongRunningReadWriteProc' has the same Read query as 'LongRunningReadOnlyProc'
+        // but it should not be timed out.
         try {
             client.callProcedure("LongRunningReadWriteProc");
-            fail();
         } catch(Exception ex) {
-            assertTrue(ex.getMessage().contains("A SQL query was terminated after 2.00 seconds"));
+            fail("Write procedure should not be timed out");
         }
-
     }
 
     //
