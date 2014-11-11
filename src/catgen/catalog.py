@@ -112,7 +112,7 @@ def genjava( classes, prepath, postpath, package ):
         # setBaseValues
         write( '    void setBaseValues(Catalog catalog, CatalogType parent, String path, String name) {' )
         if cls.annotations != None:
-            if any("ignorecase" in s for s in cls.annotations):
+            if "ignorecase" in cls.annotations:
                 write( '        super.setBaseValues(catalog, parent, path, name.toLowerCase());')
             else:
                 write( '        super.setBaseValues(catalog, parent, path, name);')
