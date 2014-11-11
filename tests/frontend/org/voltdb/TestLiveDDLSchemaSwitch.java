@@ -105,7 +105,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
                 "constraint PK_TREE_R primary key (ID)" +
                 ");\n"
                 );
-        builder.addPartitionInfo("FOO", "ID");
+        builder.addPartitionInfo("BAZ", "ID");
         builder.setUseDDLSchema(useLiveDDL);
         builder.setDeadHostTimeout(6);
         success = builder.compile(m_pathToOtherCatalog, 2, 1, 0);
