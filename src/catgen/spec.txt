@@ -74,7 +74,7 @@ begin Connector                      "Export connector"
   ConnectorProperty* config          "Connector configuration properties"
 end
 
-begin Group
+begin Group(ignorecase) "Groups are case insensitive"
   UserRef* users
   bool admin            "Can perform all database operations"
   bool defaultproc      "Can invoke default procedures"
