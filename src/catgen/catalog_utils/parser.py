@@ -16,6 +16,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 
+import re
 from re import compile, DOTALL, MULTILINE
 from testdata import testspec
 
@@ -37,8 +38,9 @@ class Field:
         return self.comment != None and len(self.comment) > 0
 
 class CatalogDefn:
-    def __init__(self, name, fields, comment):
+    def __init__(self, name, annotations, fields, comment):
         self.name = name
+        self.annotations = annotations
         self.fields = fields
         self.comment = comment
 
@@ -53,7 +55,7 @@ def parse(text):
     text = text.split('\n')
 
     while len(text):
-        line = text.pop(0).split(None, 2)
+        line = text.pop(0).split(None, 3)
         if len(line) == 0:
             continue
         if line.pop(0) != "begin":
@@ -62,6 +64,13 @@ def parse(text):
         comment = None
         if len(line):
             comment = line.pop(0).strip("\"")
+        annotations = None
+        pattern = r'(\w[\w\d_]*)\((.*)\)$'
+        match = re.match(pattern, name)
+        if match:
+            l = list(match.groups())
+            name = l.pop(0)
+            annotations = l
 
         fields = []
         fieldline = text.pop(0).split(None, 2)
@@ -73,7 +82,7 @@ def parse(text):
                 fieldcomment = fieldline.pop(0).strip("\"")
             fields.append(Field(nametoken, typetoken, fieldcomment))
             fieldline = text.pop(0).split(None, 2)
-        retval.append(CatalogDefn(name, fields, comment))
+        retval.append(CatalogDefn(name, annotations, fields, comment))
 
     return retval
 
