@@ -111,10 +111,10 @@ function alertNodeClicked(obj) {
         };
 
         var testConnection = function (serverName, portId, username, password, admin, onInformationLoaded) {
-            VoltDBService.TestConnection(serverName, portId, username, password, admin, function (result) {
+            VoltDBService.TestConnection(serverName, portId, username, password, admin, function (result, response) {
 
-                onInformationLoaded(result);
-            });
+                onInformationLoaded(result, response);
+            }, true);
         };
 
         this.CheckServerConnection = function (checkConnection) {
@@ -147,7 +147,7 @@ function alertNodeClicked(obj) {
 
         this.HandleLogin = function (serverName, portId, pageLoadCallback) {
 
-            var popupDisplayed = false;
+            var responseObtained = false;
             $("#username").data("servername", serverName);
             $("#username").data("portid", portId);
             $("#loginBoxDialogue").hide();
@@ -160,8 +160,14 @@ function alertNodeClicked(obj) {
                     $("#UnableToLoginMsg").hide();
                     var usernameVal = $("#username").val();
                     var passwordVal = $("#password").val() != '' ? $().crypt({ method: "sha1", source: $("#password").val() }) : $("#password").val();
+                    responseObtained = false;
+                    
+                    testConnection($("#username").data("servername"), $("#username").data("portid"), usernameVal, passwordVal, true, function (result, response) {
+                        
+                        if (responseObtained)
+                            return;
+                        responseObtained = true;
 
-                    testConnection($("#username").data("servername"), $("#username").data("portid"), usernameVal, passwordVal, true, function (result) {
                         $("#overlay").hide();
                         if (result) {
 
@@ -169,16 +175,26 @@ function alertNodeClicked(obj) {
                             saveSessionCookie("username", usernameVal);
                             saveSessionCookie("password", passwordVal);
                             voltDbRenderer.ShowUsername(usernameVal);
-                            popupDisplayed = true;
 
                             pageLoadCallback();
                             popupCallback();
                             $("#loginBoxDialogue").hide();
-                            $("#username").val("");
-                            $("#password").val("");
+                            setTimeout(function () {
+                                $("#username").val("");
+                                $("#password").val("");
+                            }, 300);
                             $("#logOut").css('display', 'block');
                             $('#logOut').prop('title', $.cookie("username"));
                         } else {
+
+                            //Error: Server is not available(-100) or Connection refused(-5) but is not "Authentication rejected(-3)"
+                            if (response.hasOwnProperty("status") && (response.status == -100 || response.status == -5) && response.status != -3) {
+                                popupCallback();
+                                $("#loginBoxDialogue").hide();
+                                $("#serUnavailablePopup").trigger("click");
+                                return;
+                            }
+
                             $("#UnableToLoginMsg").show();
                             $("#logOut").css('display', 'none');
                             $('#logOut').prop('title', '');
@@ -209,25 +225,60 @@ function alertNodeClicked(obj) {
             var username = ($.cookie("username") != undefined) ? $.cookie("username") : "";
             var password = (username != "" && $.cookie("password") != undefined) ? $.cookie("password") : "";
 
-            $("#overlay").show();
+            $("#serUnavailablePopup").popup({
+                open: function (event, ui, ele) {
+                },
+                autoLogin: function (popupCallback) {
+                    tryAutoLogin();
+                    popupCallback();
+                }
+            });
+            
             //Try to login with saved username/password or no username and password
-            testConnection(serverName, portId, username, password, true, function (result) {
+            var tryAutoLogin = function () {
+                $("#overlay").show();
+                responseObtained = false;
+                serverName = VoltDBConfig.GetDefaultServerIP(true);
+                testConnection(serverName, portId, username, password, true, function(result, response) {
 
-                $("#overlay").hide();
-                if (!popupDisplayed) {
-                    //If security is enabled, then display popup to get username and password.
+                    if (responseObtained)
+                        return;
+                    responseObtained = true;
+
+                    $("#overlay").hide();
+
                     if (!result) {
+                        
+                        if (response.hasOwnProperty("status")) {
+
+                            //Error: Hashedpassword must be a 40-byte hex-encoded SHA-1 hash.
+                            if (response.status == -3 && response.hasOwnProperty("statusstring") && response.statusstring.indexOf("Hashedpassword must be a 40-byte") > -1) {
+                                //Try to auto login after clearing username and password
+                                saveSessionCookie("username", null);
+                                saveSessionCookie("password", null);
+                                tryAutoLogin();
+                                return;
+                            }
+                                //Error: Server is not available(-100) or Connection refused(-5) but is not "Authentication rejected(-3)"
+                            else if ((response.status == -100 || response.status == -5) && response.status != -3) {
+                                $("#serUnavailablePopup").trigger("click");
+                                return;
+                            }
+                        }
+
+                        //If security is enabled, then display popup to get username and password.
                         saveSessionCookie("username", null);
                         saveSessionCookie("password", null);
 
                         $("#loginLink").trigger("click");
                     } else {
-                        popupDisplayed = true;
                         pageLoadCallback();
                     }
-                }
-                popupDisplayed = true;
-            });
+                    
+                });
+            };
+
+            tryAutoLogin();
         };
 
         this.ShowUsername = function (userName) {

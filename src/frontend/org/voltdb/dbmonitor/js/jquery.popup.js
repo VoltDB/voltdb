@@ -94,6 +94,8 @@
 	            },
 	            login: function() {
 	            },
+	            autoLogin: function() {
+	            },
 	            closeDialog: function() {
 	            },
 				
@@ -272,6 +274,16 @@
 		            });
 		        });
 		    }
+		    
+		    var serverUnavailableBtn = $("a[id='serverUnavailableBtn']");
+		    if (serverUnavailableBtn != undefined) {
+		        serverUnavailableBtn.unbind('click');
+		        serverUnavailableBtn.bind('click', function () {
+		            p.o.autoLogin(function () {
+		                p.close();
+		            });
+		        });
+		    }
 
 		    var errorMsgBtn = $("a[id='btnOk']");
 		    if (errorMsgBtn != undefined) {
@@ -347,7 +359,7 @@
 
                 
 			    // If modal isn't specified, bind click event
-				if (!p.o.modal && p.ele.id != "loginLink" && p.ele.id != "conPopup") {
+				if (!p.o.modal && p.ele.id != "loginLink" && p.ele.id != "conPopup" && p.ele.id != "serUnavailablePopup") {
 
 					$back.one('click.popup', function(){
 						p.close();
@@ -534,7 +546,7 @@
 					.appendTo($pCont);
 			    
 			    // Add in the close button
-				if (p.ele.id != "loginLink" && p.ele.id != "conPopup") {
+				if (p.ele.id != "loginLink" && p.ele.id != "conPopup" && p.ele.id != "serUnavailablePopup") {
 			        $close = $(p.o.closeContent)
 			            .one('click', function() {
 
