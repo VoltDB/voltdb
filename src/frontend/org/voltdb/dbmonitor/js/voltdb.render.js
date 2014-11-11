@@ -81,7 +81,7 @@ function alertNodeClicked(obj) {
         var htmlMarkups = { "SystemInformation": [] };
         var htmlMarkup;
         var htmlTableMarkups = { "SystemInformation": [] };
-        var htmlTableMarkup;
+        var htmlTableMarkup="";
         var minLatency = 0;
         var maxLatency = 0;
         var avgLatency = 0;
@@ -385,23 +385,23 @@ function alertNodeClicked(obj) {
             });
         };
 
-        this.getStoredProceduresAndTableInformation = function (onProcedureAndDataTablesInformationLoaded) {
-            if (this.userPreferences) {
-                if (this.userPreferences['DatabaseTables'] == true) {
-                    VoltDBService.GetDataTablesInformation(function (connection) {
-                        populateTablesInformation(connection);
+        //this.getStoredProceduresAndTableInformation = function (onProcedureAndDataTablesInformationLoaded) {
+        //    if (this.userPreferences) {
+        //        if (this.userPreferences['DatabaseTables'] == true) {
+        //            VoltDBService.GetDataTablesInformation(function (connection) {
+        //                populateTablesInformation(connection);
 
-                    });
-                }
+        //            });
+        //        }
 
-                if (this.userPreferences['StoredProcedures'] == true) {
-                    VoltDBService.GetProceduresInformation(function (connection) {
-                        populateProceduresInformation(connection);
-                    });
-                }
-                onProcedureAndDataTablesInformationLoaded();
-            }
-        };
+        //        if (this.userPreferences['StoredProcedures'] == true) {
+        //            VoltDBService.GetProceduresInformation(function (connection) {
+        //                populateProceduresInformation(connection);
+        //            });
+        //        }
+        //        onProcedureAndDataTablesInformationLoaded();
+        //    }
+        //};
 
         this.getTablesInformationByIndex = function (onDataTablesInformationLoaded) {
             VoltDBService.GetDataTablesInformation(function (connection) {
@@ -418,18 +418,18 @@ function alertNodeClicked(obj) {
 
         };
 
-        this.getProcedureData = function (onProcedureDataTraversed) {
-            VoltDBService.GetProceduresInformation(function (nestConnection) {
-                populateProceduresInformation(nestConnection);
+        //this.getProcedureData = function (onProcedureDataTraversed) {
+        //    VoltDBService.GetProceduresInformation(function (nestConnection) {
+        //        populateProceduresInformation(nestConnection);
 
-            });
+        //    });
 
-            VoltDBService.GetDataTablesInformation(function (nestConnection) {
-                populateTablesInformation(nestConnection);
-                populateTableTypes(nestConnection);
-                onProcedureDataTraversed();
-            });
-        };
+        //    VoltDBService.GetDataTablesInformation(function (nestConnection) {
+        //        populateTablesInformation(nestConnection);
+        //        populateTableTypes(nestConnection);
+        //        onProcedureDataTraversed();
+        //    });
+        //};
 
         this.GetHostNodesHtml = function (callback) {
             try {
@@ -1314,11 +1314,11 @@ function alertNodeClicked(obj) {
                 }
 
                 else if (currentAction == VoltDbUI.ACTION_STATES.SEARCH || currentAction == VoltDbUI.ACTION_STATES.NONE || voltDbRenderer.isTableSortClicked == true) {
-                    if (!(priorAction == VoltDbUI.ACTION_STATES.PREVIOUS || priorAction == VoltDbUI.ACTION_STATES.NEXT)) {
+                    //if (!(priorAction == VoltDbUI.ACTION_STATES.PREVIOUS || priorAction == VoltDbUI.ACTION_STATES.NEXT)) {
                         tablePageStartIndex = 0;
                         voltDbRenderer.tableIndex = 0;
                         
-                    }
+                    //}
                     
                 }
 
@@ -1416,10 +1416,11 @@ function alertNodeClicked(obj) {
 
                 if (voltDbRenderer.isSortTables) {
                     callback(htmlTableMarkup);
+                    htmlTableMarkup = "";
                 }
                 else {
                     htmlTableMarkups.SystemInformation.push(htmlTableMarkup);
-                    htmlTableMarkup = undefined;
+                    htmlTableMarkup = "";
                     callback(htmlTableMarkups.SystemInformation);
 
                 }
