@@ -25,11 +25,17 @@ import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
+import org.voltdb.ClientResponseImpl;
+import org.voltdb.VoltTable;
 import org.voltdb.client.HashinatorLite.HashinatorLiteType;
+import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
+import org.voltdb.client.VoltBulkLoader.BulkLoaderState;
+import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
 import org.voltdb.common.Constants;
 import org.voltdb.utils.Encoder;
 
@@ -55,6 +61,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     private String m_createConnectionUsername = null;
     private byte[] m_hashedPassword = null;
     private int m_passwordHashCode = 0;
+    final CSL m_listener = new CSL();
 
     /*
      * Username and password as set by the constructor.
@@ -70,6 +77,8 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
      * a callback.
      */
     private final CopyOnWriteArrayList<Long> m_blessedThreadIds = new CopyOnWriteArrayList<Long>();
+
+    private BulkLoaderState m_vblGlobals = new BulkLoaderState(this);
 
     /****************************************************
                         Public API
@@ -89,11 +98,24 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     ClientImpl(ClientConfig config) {
         m_distributer = new Distributer(
                 config.m_heavyweight,
-                config.m_procedureCallTimeoutMS,
+                config.m_procedureCallTimeoutNanos,
                 config.m_connectionResponseTimeoutMS,
-                config.m_useClientAffinity);
-        m_distributer.addClientStatusListener(new CSL());
-        m_username = config.m_username;
+                config.m_useClientAffinity,
+                config.m_subject);
+        m_distributer.addClientStatusListener(m_listener);
+        String username = config.m_username;
+        if (config.m_subject != null) {
+            username = config.m_subject.getPrincipals().iterator().next().getName();
+        }
+        m_username = username;
+
+        if (config.m_reconnectOnConnectionLoss) {
+            m_reconnectStatusListener = new ReconnectStatusListener(this,
+                    config.m_initialConnectionRetryIntervalMS, config.m_maxConnectionRetryIntervalMS);
+            m_distributer.addClientStatusListener(m_reconnectStatusListener);
+        } else {
+            m_reconnectStatusListener = null;
+        }
 
         if (config.m_cleartext) {
             m_passwordHash = ConnectionUtil.getHashedPassword(config.m_password);
@@ -116,12 +138,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     }
 
     private boolean verifyCredentialsAreAlwaysTheSame(String username, byte[] hashedPassword) {
-        // handle the unauthenticated case
-        if (m_createConnectionUsername == null) {
-            m_createConnectionUsername = "";
-            return true;
-        }
-
+        assert(username != null);
         m_credentialComparisonLock.lock();
         try {
             if (m_credentialsSet == false) {
@@ -184,26 +201,27 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     public final ClientResponse callProcedure(String procName, Object... parameters)
         throws IOException, NoConnectionsException, ProcCallException
     {
-        return callProcedureWithTimeout(procName, Distributer.USE_DEFAULT_TIMEOUT, parameters);
+        return callProcedureWithTimeout(procName, Distributer.USE_DEFAULT_TIMEOUT, TimeUnit.SECONDS, parameters);
     }
 
     /**
      * Synchronously invoke a procedure call blocking until a result is available.
      *
      * @param procName class name (not qualified by package) of the procedure to execute.
-     * @param timeout timeout for the procedure in seconds.
+     * @param timeout timeout for the procedure
+     * @param unit TimeUnit of procedure timeout
      * @param parameters vararg list of procedure's parameter values.
      * @return ClientResponse for execution.
      * @throws org.voltdb.client.ProcCallException
      * @throws NoConnectionsException
      */
-    public ClientResponse callProcedureWithTimeout(String procName, long timeout, Object... parameters)
+    public ClientResponse callProcedureWithTimeout(String procName, long timeout, TimeUnit unit, Object... parameters)
             throws IOException, NoConnectionsException, ProcCallException {
         final SyncCallback cb = new SyncCallback();
         cb.setArgs(parameters);
         final ProcedureInvocation invocation
                 = new ProcedureInvocation(m_handle.getAndIncrement(), procName, parameters);
-        return callProcedure(cb, timeout, invocation);
+        return callProcedure(cb, System.nanoTime(), unit.toNanos(timeout), invocation);
     }
 
     /**
@@ -223,10 +241,10 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             new ProcedureInvocation(originalTxnId, originalUniqueId,
                                     m_handle.getAndIncrement(),
                                     procName, parameters);
-        return callProcedure(cb, Distributer.USE_DEFAULT_TIMEOUT, invocation);
+        return callProcedure(cb, System.nanoTime(), Distributer.USE_DEFAULT_TIMEOUT, invocation);
     }
 
-    private final ClientResponse callProcedure(SyncCallback cb, long timeout, ProcedureInvocation invocation)
+    private final ClientResponse callProcedure(SyncCallback cb, long nowNanos, long timeout, ProcedureInvocation invocation)
             throws IOException, NoConnectionsException, ProcCallException
     {
         if (m_isShutdown) {
@@ -241,7 +259,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         m_distributer.queue(
                 invocation,
                 cb,
-                true, timeout);
+                true, nowNanos, timeout);
 
         try {
             cb.waitForResponse();
@@ -265,7 +283,8 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     @Override
     public final boolean callProcedure(ProcedureCallback callback, String procName, Object... parameters)
     throws IOException, NoConnectionsException {
-        return callProcedureWithTimeout(callback, procName, Distributer.USE_DEFAULT_TIMEOUT, parameters);
+        //Time unit doesn't matter in this case since the timeout isn't being specified
+        return callProcedureWithTimeout(callback, procName, Distributer.USE_DEFAULT_TIMEOUT, TimeUnit.NANOSECONDS, parameters);
     }
 
     /**
@@ -273,12 +292,13 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
      *
      * @param callback TransactionCallback that will be invoked with procedure results.
      * @param procName class name (not qualified by package) of the procedure to execute.
-     * @param timeout timeout for the procedure in seconds.
+     * @param timeout timeout for the procedure
+     * @param unit TimeUnit of procedure timeout
      * @param parameters vararg list of procedure's parameter values.
      * @return True if the procedure was queued and false otherwise
      */
     public boolean callProcedureWithTimeout(ProcedureCallback callback, String procName,
-            long timeout, Object... parameters) throws IOException, NoConnectionsException {
+            long timeout, TimeUnit unit, Object... parameters) throws IOException, NoConnectionsException {
         if (m_isShutdown) {
             return false;
         }
@@ -287,7 +307,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         }
         ProcedureInvocation invocation
                 = new ProcedureInvocation(m_handle.getAndIncrement(), procName, parameters);
-        return private_callProcedure(callback, 0, invocation, timeout);
+        return private_callProcedure(callback, 0, invocation, unit.toNanos(timeout));
     }
 
     /**
@@ -342,13 +362,13 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         }
         ProcedureInvocation invocation =
             new ProcedureInvocation(m_handle.getAndIncrement(), procName, parameters);
-        return private_callProcedure(callback, expectedSerializedSize, invocation, 0);
+        return private_callProcedure(callback, expectedSerializedSize, invocation, Distributer.USE_DEFAULT_TIMEOUT);
     }
 
     private final boolean private_callProcedure(
             ProcedureCallback callback,
             int expectedSerializedSize,
-            ProcedureInvocation invocation, long timeout)
+            ProcedureInvocation invocation, long timeoutNanos)
             throws IOException, NoConnectionsException {
         if (m_isShutdown) {
             return false;
@@ -358,15 +378,36 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             callback = new NullCallback();
         }
 
+        final long nowNanos = System.nanoTime();
+
         //Blessed threads (the ones that invoke callbacks) are not subject to backpressure
         boolean isBlessed = m_blessedThreadIds.contains(Thread.currentThread().getId());
         if (m_blockingQueue) {
             while (!m_distributer.queue(
                     invocation,
                     callback,
-                    isBlessed, timeout)) {
+                    isBlessed, nowNanos, timeoutNanos)) {
+
+                /*
+                 * Wait on backpressure honoring the timeout settings
+                 */
+                final long delta = Math.max(1, System.nanoTime() - nowNanos);
+                final long timeout = timeoutNanos == Distributer.USE_DEFAULT_TIMEOUT ? m_distributer.getProcedureTimeoutNanos() : timeoutNanos;
                 try {
-                    backpressureBarrier();
+                    if (backpressureBarrier(nowNanos, timeout - delta)) {
+                        final ClientResponseImpl r = new ClientResponseImpl(
+                                ClientResponse.CONNECTION_TIMEOUT,
+                                ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
+                                "",
+                                new VoltTable[0],
+                                String.format("No response received in the allotted time (set to %d ms).",
+                                        TimeUnit.NANOSECONDS.toMillis(timeoutNanos)));
+                        try {
+                            callback.clientCallback(r);
+                        } catch (Throwable t) {
+                            m_distributer.uncaughtException(callback, r, t);
+                        }
+                    }
                 } catch (InterruptedException e) {
                     throw new java.io.InterruptedIOException("Interrupted while invoking procedure asynchronously");
                 }
@@ -376,7 +417,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             return m_distributer.queue(
                     invocation,
                     callback,
-                    isBlessed, timeout);
+                    isBlessed, nowNanos, timeoutNanos);
         }
     }
 
@@ -393,7 +434,12 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     private Object[] getUpdateCatalogParams(File catalogPath, File deploymentPath)
     throws IOException {
         Object[] params = new Object[2];
-        params[0] = ClientUtils.fileToBytes(catalogPath);
+        if (catalogPath != null) {
+            params[0] = ClientUtils.fileToBytes(catalogPath);
+        }
+        else {
+            params[0] = null;
+        }
         if (deploymentPath != null) {
             params[1] = new String(ClientUtils.fileToBytes(deploymentPath), Constants.UTF8ENCODING);
         }
@@ -417,6 +463,30 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     throws IOException, NoConnectionsException {
         Object[] params = getUpdateCatalogParams(catalogPath, deploymentPath);
         return callProcedure(callback, "@UpdateApplicationCatalog", params);
+    }
+
+    @Override
+    public ClientResponse updateClasses(File jarPath, String classesToDelete)
+    throws IOException, NoConnectionsException, ProcCallException
+    {
+        byte[] jarbytes = null;
+        if (jarPath != null) {
+            jarbytes = ClientUtils.fileToBytes(jarPath);
+        }
+        return callProcedure("@UpdateClasses", jarbytes, classesToDelete);
+    }
+
+    @Override
+    public boolean updateClasses(ProcedureCallback callback,
+                                 File jarPath,
+                                 String classesToDelete)
+    throws IOException, NoConnectionsException
+    {
+        byte[] jarbytes = null;
+        if (jarPath != null) {
+            jarbytes = ClientUtils.fileToBytes(jarPath);
+        }
+        return callProcedure(callback, "@UpdateClasses", jarbytes, classesToDelete);
     }
 
     @Override
@@ -446,13 +516,27 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         synchronized (m_backpressureLock) {
             m_backpressureLock.notifyAll();
         }
+
+        if (m_reconnectStatusListener != null) {
+            m_distributer.removeClientStatusListener(m_reconnectStatusListener);
+        }
+
         m_distributer.shutdown();
     }
 
     @Override
     public void backpressureBarrier() throws InterruptedException {
+        backpressureBarrier( 0, 0);
+    }
+
+    /**
+     * Wait on backpressure with a timeout. Returns true on timeout, false otherwise.
+     * Timeout nanos is the initial timeout quantity which will be adjusted to reflect remaining
+     * time on spurious wakeups
+     */
+    public boolean backpressureBarrier(final long start, long timeoutNanos) throws InterruptedException {
         if (m_isShutdown) {
-            return;
+            return false;
         }
         if (m_blessedThreadIds.contains(Thread.currentThread().getId())) {
             throw new RuntimeException("Can't invoke backpressureBarrier from within the client callback thread " +
@@ -462,11 +546,30 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             synchronized (m_backpressureLock) {
                 if (m_backpressure) {
                     while (m_backpressure && !m_isShutdown) {
-                            m_backpressureLock.wait();
+                       if (start != 0) {
+                            //Wait on the condition for the specified timeout remaining
+                            m_backpressureLock.wait(timeoutNanos / TimeUnit.MILLISECONDS.toNanos(1), (int)(timeoutNanos % TimeUnit.MILLISECONDS.toNanos(1)));
+
+                            //Condition is true, break and return false
+                            if (!m_backpressure) break;
+
+                            //Calculate whether the timeout should be triggered
+                            final long nowNanos = System.nanoTime();
+                            final long deltaNanos = Math.max(1, nowNanos - start);
+                            if (deltaNanos >= timeoutNanos) {
+                                return true;
+                            }
+
+                            //Reassigning timeout nanos with remainder of timeout
+                            timeoutNanos -= deltaNanos;
+                       } else {
+                           m_backpressureLock.wait();
+                       }
                     }
                 }
             }
         }
+        return false;
     }
 
     class CSL extends ClientStatusListenerExt {
@@ -509,6 +612,8 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     private boolean m_backpressure = false;
 
     private boolean m_blockingQueue = true;
+
+    private final ReconnectStatusListener m_reconnectStatusListener;
 
     @Override
     public void configureBlocking(boolean blocking) {
@@ -604,14 +709,20 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         }
 
         FileWriter fw = new FileWriter(path);
-        fw.append(String.format("%d,%d,%d,%d,%d,%d,%d\n",
+        fw.append(String.format("%d,%d,%d,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%d,%d,%d\n",
                 stats.getStartTimestamp(),
                 stats.getDuration(),
                 stats.getInvocationsCompleted(),
-                stats.kPercentileLatency(0.0),
-                stats.kPercentileLatency(1.0),
-                stats.kPercentileLatency(0.95),
-                stats.kPercentileLatency(0.99)));
+                stats.kPercentileLatencyAsDouble(0.0),
+                stats.kPercentileLatencyAsDouble(1.0),
+                stats.kPercentileLatencyAsDouble(0.95),
+                stats.kPercentileLatencyAsDouble(0.99),
+                stats.kPercentileLatencyAsDouble(0.999),
+                stats.kPercentileLatencyAsDouble(0.9999),
+                stats.kPercentileLatencyAsDouble(0.99999),
+                stats.getInvocationErrors(),
+                stats.getInvocationAborts(),
+                stats.getInvocationTimeouts()));
         fw.close();
     }
 
@@ -628,5 +739,13 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
 
     public HashinatorLiteType getHashinatorType() {
         return m_distributer.getHashinatorType();
+    }
+
+    @Override
+    public VoltBulkLoader getNewBulkLoader(String tableName, int maxBatchSize, BulkLoaderFailureCallBack blfcb) throws Exception
+    {
+        synchronized(m_vblGlobals) {
+            return new VoltBulkLoader(m_vblGlobals, tableName, maxBatchSize, blfcb);
+        }
     }
 }

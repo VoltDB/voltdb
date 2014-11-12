@@ -135,6 +135,12 @@ public class VoltDecimalHelper {
         return replacement;
     }
 
+    static public byte[] serializeBigDecimal(BigDecimal bd) {
+        ByteBuffer buf = ByteBuffer.allocate(16);
+        serializeBigDecimal(bd, buf);
+        return buf.array();
+    }
+
     /**
      * Serialize the {@link java.math.BigDecimal BigDecimal} to Volt's fixed precision and scale 16-byte format.
      * @param bd {@link java.math.BigDecimal BigDecimal} to serialize

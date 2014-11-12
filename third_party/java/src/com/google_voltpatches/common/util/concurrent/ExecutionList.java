@@ -21,7 +21,7 @@ import com.google_voltpatches.common.base.Preconditions;
 
 import java.util.concurrent.Executor;
 import java.util.logging.Level;
-import java.util.logging.Logger;
+import org.voltcore.logging.VoltLogger;
 
 import javax.annotation_voltpatches.Nullable;
 import javax.annotation_voltpatches.concurrent.GuardedBy;
@@ -37,7 +37,7 @@ import javax.annotation_voltpatches.concurrent.GuardedBy;
  * <p>Exceptions thrown by a listener will be propagated up to the executor.
  * Any exception thrown during {@code Executor.execute} (e.g., a {@code
  * RejectedExecutionException} or an exception thrown by {@linkplain
- * MoreExecutors#sameThreadExecutor inline execution}) will be caught and
+ * MoreExecutors#directExecutor direct execution}) will be caught and
  * logged.
  *
  * @author Nishant Thakkar
@@ -46,7 +46,7 @@ import javax.annotation_voltpatches.concurrent.GuardedBy;
  */
 public final class ExecutionList {
   // Logger to log exceptions caught when running runnables.
-  @VisibleForTesting static final Logger log = Logger.getLogger(ExecutionList.class.getName());
+  @VisibleForTesting static final VoltLogger voltLog = new VoltLogger("HOST");
 
   /**
    * The runnable, executor pairs to execute.  This acts as a stack threaded through the 
@@ -66,15 +66,15 @@ public final class ExecutionList {
    * executed immediately.
    *
    * <p>Note: For fast, lightweight listeners that would be safe to execute in
-   * any thread, consider {@link MoreExecutors#sameThreadExecutor}. For heavier
-   * listeners, {@code sameThreadExecutor()} carries some caveats: First, the
+   * any thread, consider {@link MoreExecutors#directExecutor}. For heavier
+   * listeners, {@code directExecutor()} carries some caveats: First, the
    * thread that the listener runs in depends on whether the {@code
    * ExecutionList} has been executed at the time it is added. In particular,
    * listeners may run in the thread that calls {@code add}. Second, the thread
    * that calls {@link #execute} may be an internal implementation thread, such
-   * as an RPC network thread, and {@code sameThreadExecutor()} listeners may
+   * as an RPC network thread, and {@code directExecutor()} listeners may
    * run in this thread. Finally, during the execution of a {@code
-   * sameThreadExecutor} listener, all other registered but unexecuted
+   * directExecutor} listener, all other registered but unexecuted
    * listeners are prevented from running, even if those listeners are to run
    * in other executors.
    */
@@ -158,7 +158,7 @@ public final class ExecutionList {
       // Log it and keep going, bad runnable and/or executor.  Don't
       // punish the other runnables if we're given a bad one.  We only
       // catch RuntimeException because we want Errors to propagate up.
-      log.log(Level.SEVERE, "RuntimeException while executing runnable "
+      voltLog.error("RuntimeException while executing runnable "
           + runnable + " with executor " + executor, e);
     }
   }

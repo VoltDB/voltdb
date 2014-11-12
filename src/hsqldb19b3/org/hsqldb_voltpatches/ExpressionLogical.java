@@ -128,7 +128,7 @@ public class ExpressionLogical extends Expression {
                     isColumnEqual = true;
                 }
 
-            // fall through
+            // $FALL-THROUGH$
             case OpTypes.GREATER_EQUAL :
             case OpTypes.GREATER :
             case OpTypes.SMALLER :
@@ -207,7 +207,6 @@ public class ExpressionLogical extends Expression {
         return new ExpressionLogical(OpTypes.AND, e1, e2);
     }
 
-    @Override
     public String getSQL() {
 
         StringBuffer sb = new StringBuffer(64);
@@ -365,7 +364,6 @@ public class ExpressionLogical extends Expression {
         return sb.toString();
     }
 
-    @Override
     protected String describe(Session session, int blanks) {
 
         StringBuffer sb = new StringBuffer(64);
@@ -471,7 +469,6 @@ public class ExpressionLogical extends Expression {
         return sb.toString();
     }
 
-    @Override
     public void resolveTypes(Session session, Expression parent) {
 
         for (int i = 0; i < nodes.length; i++) {
@@ -806,6 +803,21 @@ public class ExpressionLogical extends Expression {
             if (type == null) {
                 type = nodes[RIGHT].nodeDataTypes[i];
             }
+            // A VoltDB extension to support "IN ?"
+            else if (i == 0 && degree == 1 &&
+                    nodes[RIGHT].opType == OpTypes.DYNAMIC_PARAM &&
+                    nodes[RIGHT].nodeDataTypes != null &&
+                    nodes[RIGHT].nodeDataTypes.length == 1 &&
+                    nodes[RIGHT].nodeDataTypes[0] == null) {
+                if (type.isIntegralType()) {
+                    // promote parameter type to vector of BIGINT regardless of exact LHS integer scale.
+                    nodes[RIGHT].nodeDataTypes[0] = Type.SQL_BIGINT;
+                }
+                else {
+                    nodes[RIGHT].nodeDataTypes[0] = type;
+                }
+            }
+            // End of VoltDB extension to support "IN ?"
 
             if (type == null) {
                 throw Error.error(ErrorCode.X_42567);
@@ -819,7 +831,6 @@ public class ExpressionLogical extends Expression {
         resolveTypesForAllAny(session);
     }
 
-    @Override
     public Object getValue(Session session) {
 
         switch (opType) {
@@ -829,8 +840,8 @@ public class ExpressionLogical extends Expression {
 
             case OpTypes.SIMPLE_COLUMN : {
                 Object[] data =
-                    session.sessionContext
-                    .rangeIterators[rangePosition].getCurrent();
+                    (Object[]) session.sessionContext
+                        .rangeIterators[rangePosition].getCurrent();
 
                 return data[columnIndex];
             }
@@ -928,7 +939,7 @@ public class ExpressionLogical extends Expression {
                 if (exprSubType == OpTypes.ANY_QUANTIFIED
                         || exprSubType == OpTypes.ALL_QUANTIFIED) {
                     return testAllAnyCondition(
-                        session, nodes[LEFT].getRowValue(session));
+                        session, (Object[]) nodes[LEFT].getRowValue(session));
                 }
 
                 Object o1 = nodes[LEFT].getValue(session);
@@ -1005,8 +1016,8 @@ public class ExpressionLogical extends Expression {
             return null;
         }
 
-        Object[] leftList  = left;
-        Object[] rightList = right;
+        Object[] leftList  = (Object[]) left;
+        Object[] rightList = (Object[]) right;
 
         for (int i = 0; i < nodes[LEFT].nodes.length; i++) {
             if (leftList[i] == null) {
@@ -1467,7 +1478,6 @@ public class ExpressionLogical extends Expression {
         ((ExpressionLogical) nodes[RIGHT]).distributeOr();
     }
 
-    @Override
     Expression getIndexableExpression(RangeVariable rangeVar) {
 
         switch (opType) {
@@ -1496,7 +1506,7 @@ public class ExpressionLogical extends Expression {
                                           : null;
                 }
 
-            // fall through
+            // $FALL-THROUGH$
             case OpTypes.GREATER :
             case OpTypes.GREATER_EQUAL :
             case OpTypes.SMALLER :
@@ -1526,7 +1536,7 @@ public class ExpressionLogical extends Expression {
                     return this;
                 }
 
-            // fall through
+            // $FALL-THROUGH$
             default :
                 return null;
         }
@@ -1689,5 +1699,4 @@ public class ExpressionLogical extends Expression {
 
         return true;
     }
-
 }

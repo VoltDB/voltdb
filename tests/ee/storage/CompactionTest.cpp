@@ -36,6 +36,7 @@
 #include "indexes/tableindex.h"
 #include "storage/tableiterator.h"
 #include "storage/CopyOnWriteIterator.h"
+#include "storage/DRTupleStream.h"
 #include "common/DefaultTupleSerializer.h"
 #include "stx/btree_set.h"
 
@@ -120,11 +121,10 @@ public:
         delete m_table;
     }
 
-    void initTable(bool allowInlineStrings) {
-        m_tableSchema = voltdb::TupleSchema::createTupleSchema(m_tableSchemaTypes,
+    void initTable() {
+        m_tableSchema = voltdb::TupleSchema::createTupleSchemaForTest(m_tableSchemaTypes,
                                                                m_tableSchemaColumnSizes,
-                                                               m_tableSchemaAllowNull,
-                                                               allowInlineStrings);
+                                                               m_tableSchemaAllowNull);
 
         voltdb::TableIndexScheme indexScheme("BinaryTreeUniqueIndex",
                                              voltdb::BALANCED_TREE_INDEX,
@@ -155,7 +155,7 @@ public:
 
 
         m_table = dynamic_cast<voltdb::PersistentTable*>(
-                voltdb::TableFactory::getPersistentTable(m_tableId, "Foo", m_tableSchema, m_columnNames, 0));
+                voltdb::TableFactory::getPersistentTable(m_tableId, "Foo", m_tableSchema, m_columnNames, signature, &drStream));
 
         TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(indexScheme);
         assert(pkeyIndex);
@@ -203,7 +203,7 @@ public:
             }
         }
         m_engine->setUndoToken(++m_undoToken);
-        m_engine->getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0, 0);
+        ExecutorContext::getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0, 0, 0);
         m_tuplesDeletedInLastUndo = 0;
         m_tuplesInsertedInLastUndo = 0;
     }
@@ -276,10 +276,12 @@ public:
     int64_t m_undoToken;
 
     CatalogId m_tableId;
+    MockDRTupleStream drStream;
+    char signature[20];
 };
 
 TEST_F(CompactionTest, BasicCompaction) {
-    initTable(true);
+    initTable();
 #ifdef MEMCHECK
     int tupleCount = 1000;
 #else
@@ -307,10 +309,13 @@ TEST_F(CompactionTest, BasicCompaction) {
     TableTuple key(pkeyIndex->getKeySchema());
     boost::scoped_array<char> backingStore(new char[pkeyIndex->getKeySchema()->tupleLength()]);
     key.moveNoHeader(backingStore.get());
+
+    IndexCursor indexCursor(pkeyIndex->getTupleSchema());
+
     for (std::vector<int32_t>::iterator ii = pkeysToDelete.begin(); ii != pkeysToDelete.end(); ii++) {
         key.setNValue(0, ValueFactory::getIntegerValue(*ii));
-        ASSERT_TRUE(pkeyIndex->moveToKey(&key));
-        TableTuple tuple = pkeyIndex->nextValueAtKey();
+        ASSERT_TRUE(pkeyIndex->moveToKey(&key, indexCursor));
+        TableTuple tuple = pkeyIndex->nextValueAtKey(indexCursor);
         m_table->deleteTuple(tuple, true);
     }
 
@@ -323,8 +328,8 @@ TEST_F(CompactionTest, BasicCompaction) {
         int32_t pkey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
         key.setNValue(0, ValueFactory::getIntegerValue(pkey));
         for (int ii = 0; ii < 4; ii++) {
-            ASSERT_TRUE(m_table->m_indexes[ii]->moveToKey(&key));
-            TableTuple indexTuple = m_table->m_indexes[ii]->nextValueAtKey();
+            ASSERT_TRUE(m_table->m_indexes[ii]->moveToKey(&key, indexCursor));
+            TableTuple indexTuple = m_table->m_indexes[ii]->nextValueAtKey(indexCursor);
             ASSERT_EQ(indexTuple.address(), tuple.address());
         }
         pkeysFoundAfterDelete.insert(pkey);
@@ -355,8 +360,8 @@ TEST_F(CompactionTest, BasicCompaction) {
 
     for (stx::btree_set<int32_t>::iterator ii = pkeysNotDeleted.begin(); ii != pkeysNotDeleted.end(); ii++) {
         key.setNValue(0, ValueFactory::getIntegerValue(*ii));
-        ASSERT_TRUE(pkeyIndex->moveToKey(&key));
-        TableTuple tuple = pkeyIndex->nextValueAtKey();
+        ASSERT_TRUE(pkeyIndex->moveToKey(&key, indexCursor));
+        TableTuple tuple = pkeyIndex->nextValueAtKey(indexCursor);
         m_table->deleteTuple(tuple, true);
     }
     m_table->doForcedCompaction();
@@ -365,7 +370,7 @@ TEST_F(CompactionTest, BasicCompaction) {
 }
 
 TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
-    initTable(true);
+    initTable();
 #ifdef MEMCHECK
     int tupleCount = 1000;
 #else
@@ -400,7 +405,7 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
     DefaultTupleSerializer serializer;
     char config[5];
     ::memset(config, 0, 5);
-    ReferenceSerializeInput input(config, 5);
+    ReferenceSerializeInputBE input(config, 5);
     m_table->activateStream(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
 
     for (int qq = 0; qq < 3; qq++) {
@@ -446,10 +451,12 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
         TableTuple key(pkeyIndex->getKeySchema());
         boost::scoped_array<char> backingStore(new char[pkeyIndex->getKeySchema()->tupleLength()]);
         key.moveNoHeader(backingStore.get());
+
+        IndexCursor indexCursor(pkeyIndex->getTupleSchema());
         for (std::vector<int32_t>::iterator ii = pkeysToDelete[qq].begin(); ii != pkeysToDelete[qq].end(); ii++) {
             key.setNValue(0, ValueFactory::getIntegerValue(*ii));
-            ASSERT_TRUE(pkeyIndex->moveToKey(&key));
-            TableTuple tuple = pkeyIndex->nextValueAtKey();
+            ASSERT_TRUE(pkeyIndex->moveToKey(&key, indexCursor));
+            TableTuple tuple = pkeyIndex->nextValueAtKey(indexCursor);
             m_table->deleteTuple(tuple, true);
         }
 
@@ -466,8 +473,8 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
             int32_t pkey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
             key.setNValue(0, ValueFactory::getIntegerValue(pkey));
             for (int ii = 0; ii < 4; ii++) {
-                ASSERT_TRUE(m_table->m_indexes[ii]->moveToKey(&key));
-                TableTuple indexTuple = m_table->m_indexes[ii]->nextValueAtKey();
+                ASSERT_TRUE(m_table->m_indexes[ii]->moveToKey(&key, indexCursor));
+                TableTuple indexTuple = m_table->m_indexes[ii]->nextValueAtKey(indexCursor);
                 ASSERT_EQ(indexTuple.address(), tuple.address());
             }
             pkeysFoundAfterDelete.insert(pkey);
@@ -516,7 +523,7 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
  */
 #ifndef MEMCHECK
 TEST_F(CompactionTest, TestENG897) {
-    initTable(true);
+    initTable();
     addRandomUniqueTuples( m_table, 32263 * 5);
 
     //Delete stuff to put everything in a bucket
@@ -524,11 +531,14 @@ TEST_F(CompactionTest, TestENG897) {
     TableTuple key(pkeyIndex->getKeySchema());
     boost::scoped_array<char> backingStore(new char[pkeyIndex->getKeySchema()->tupleLength()]);
     key.moveNoHeader(backingStore.get());
+
+    IndexCursor indexCursor(pkeyIndex->getTupleSchema());
+
     for (int ii = 0; ii < 32263 * 5; ii++) {
         if (ii % 2 == 0) {
             key.setNValue(0, ValueFactory::getIntegerValue(ii));
-            ASSERT_TRUE(pkeyIndex->moveToKey(&key));
-            TableTuple tuple = pkeyIndex->nextValueAtKey();
+            ASSERT_TRUE(pkeyIndex->moveToKey(&key, indexCursor));
+            TableTuple tuple = pkeyIndex->nextValueAtKey(indexCursor);
             m_table->deleteTuple(tuple, true);
         }
     }
@@ -540,7 +550,7 @@ TEST_F(CompactionTest, TestENG897) {
     DefaultTupleSerializer serializer;
     char config[5];
     ::memset(config, 0, 5);
-    ReferenceSerializeInput input(config, 5);
+    ReferenceSerializeInputBE input(config, 5);
 
     m_table->activateStream(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
     for (int ii = 0; ii < 16130; ii++) {
@@ -548,8 +558,8 @@ TEST_F(CompactionTest, TestENG897) {
             continue;
         }
         key.setNValue(0, ValueFactory::getIntegerValue(ii));
-        ASSERT_TRUE(pkeyIndex->moveToKey(&key));
-        TableTuple tuple = pkeyIndex->nextValueAtKey();
+        ASSERT_TRUE(pkeyIndex->moveToKey(&key, indexCursor));
+        TableTuple tuple = pkeyIndex->nextValueAtKey(indexCursor);
         m_table->deleteTuple(tuple, true);
     }
 
@@ -575,14 +585,14 @@ TEST_F(CompactionTest, TestENG897) {
             continue;
         }
         key.setNValue(0, ValueFactory::getIntegerValue(ii));
-        ASSERT_TRUE(pkeyIndex->moveToKey(&key));
-        TableTuple tuple = pkeyIndex->nextValueAtKey();
+        ASSERT_TRUE(pkeyIndex->moveToKey(&key, indexCursor));
+        TableTuple tuple = pkeyIndex->nextValueAtKey(indexCursor);
         m_table->deleteTuple(tuple, true);
     }
 
     //std::cout << "Before idle compaction" << std::endl;
     //m_table->printBucketInfo();
-    ReferenceSerializeInput input2(config, 5);
+    ReferenceSerializeInputBE input2(config, 5);
     m_table->activateStream(serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input2);
     //std::cout << "Activated COW" << std::endl;
     //m_table->printBucketInfo();

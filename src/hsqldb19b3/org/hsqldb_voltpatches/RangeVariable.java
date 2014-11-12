@@ -500,7 +500,14 @@ final class RangeVariable {
      */
     void addIndexCondition(Expression[] exprList, Index index, int colCount,
                            boolean isJoin) {
-
+// VoltDB extension
+        if (rangeIndex == index && isJoinIndex && (!isJoin) &&
+                (multiColumnCount > 0) && (colCount == 0)) {
+            // This is one particular set of conditions which broke the classification of
+            // ON and WHERE clauses.
+            return;
+        }
+// End of VoltDB extension
         rangeIndex  = index;
         isJoinIndex = isJoin;
 
@@ -1144,8 +1151,7 @@ final class RangeVariable {
         public void reset() {}
     }
 
-
-    /*************** VOLTDB *********************/
+    /************************* Volt DB Extensions *************************/
 
     /**
      * VoltDB added method to get a non-catalog-dependent
@@ -1156,19 +1162,13 @@ final class RangeVariable {
      * @throws HSQLParseException
      */
     VoltXMLElement voltGetRangeVariableXML(Session session)
-    throws HSQLParseException
+    throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
         Index        index;
         Index        primaryIndex;
-        int[]        primaryKey;
 
         index        = rangeIndex;
         primaryIndex = rangeTable.getPrimaryIndex();
-        primaryKey   = rangeTable.getPrimaryKey();
-
-        if (rangeTable.tableType == TableBase.SYSTEM_SUBQUERY) {
-            throw new HSQLParseException("VoltDB does not support subqueries, consider using views instead");
-        }
 
         // get the index for this scan (/filter)
         // note: ignored if scan if full table scan
@@ -1178,10 +1178,24 @@ final class RangeVariable {
         // output open tag
         VoltXMLElement scan = new VoltXMLElement("tablescan");
 
-        scan.attributes.put("table", rangeTable.getName().name);
+        if (rangeTable.tableType == TableBase.SYSTEM_SUBQUERY) {
+            if (rangeTable instanceof TableDerived) {
+                if (tableAlias == null || tableAlias.name == null) {
+                    // VoltDB require derived sub select table with user specified alias
+                    throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
+                            "SQL Syntax error: Every derived table must have its own alias.");
+                }
+                scan.attributes.put("table", tableAlias.name.toUpperCase());
+
+                VoltXMLElement subQuery = ((TableDerived) rangeTable).dataExpression.voltGetXML(session);
+                scan.children.add(subQuery);
+            }
+        } else {
+            scan.attributes.put("table", rangeTable.getName().name.toUpperCase());
+        }
 
         if (tableAlias != null && !rangeTable.getName().name.equals(tableAlias)) {
-            scan.attributes.put("tablealias", tableAlias.name);
+            scan.attributes.put("tablealias", tableAlias.name.toUpperCase());
         }
 
         // note if this is an outer join
@@ -1220,7 +1234,7 @@ final class RangeVariable {
             whereCond = nonIndexWhereCondition;
         } else {
             joinCond = nonIndexJoinCondition;
-            
+
             whereCond = indexCondition;
             if (indexEndCondition != null) {
                 if (whereCond != null) {
@@ -1237,7 +1251,7 @@ final class RangeVariable {
                     whereCond = nonIndexWhereCondition;
                 }
             }
-            
+
         }
         if (joinCond != null) {
             joinCond = joinCond.eliminateDuplicates(session);
@@ -1267,4 +1281,5 @@ final class RangeVariable {
         }
         return super.toString() + name;
     }
+    /**********************************************************************/
 }

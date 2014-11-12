@@ -17,8 +17,9 @@
 
 package org.voltdb.iv2;
 
-import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.Map.Entry;
 import java.util.TreeMap;
 
@@ -46,17 +47,12 @@ import org.voltdb.messaging.MultiPartitionParticipantMessage;
  * code of <code>offer</code>. If offering makes other messages available, they
  * must be retrieved by calling poll() until it returns null.
  *
- * End of log handling: If the local partition reaches end of log first, all MPs
- * blocked waiting for sentinels will be made safe, future MP fragments will
- * also be safe automatically. If the MPI reaches end of log first, and there is
+ * End of log handling: There is no per-partition end of log message any more,
+ * only the MPI will send end of log message. If the MPI reaches end of log, and there is
  * an outstanding sentinel in the sequencer, then all SPs blocked after this
- * sentinel will be made safe (can be polled). There cannot be any fragments in
+ * sentinel will be drained. There cannot be any fragments in
  * the replay sequencer when the MPI EOL arrives, because the MPI will only send
- * EOLs when it has finished all previous MP work. NOTE: Once MPI end of log
- * message is received, NONE of the SPs polled from the sequencer can be
- * executed, the poller must make sure that a failure response is returned
- * appropriately instead. However, SPs rejected by offer() can always be
- * executed.
+ * EOLs when it has finished all previous MP work.
  *
  * NOTE: messages are sequenced according to the transactionId passed in to the
  * offer() method. This transaction id may differ from the value stored in the
@@ -85,16 +81,25 @@ public class ReplaySequencer
     private class ReplayEntry {
         Long m_sentinalTxnId = null;
         FragmentTaskMessage m_firstFragment = null;
+        CompleteTransactionMessage m_lastFragment = null;
 
-        private Deque<VoltMessage> m_blockedMessages = new ArrayDeque<VoltMessage>();
+        /**
+         * Queue up all sp invocations in this queue before the {@link CompleteTransactionMessage} for
+         * this entry's transaction is received
+         */
+        private Deque<VoltMessage> m_blockedMessages = new LinkedList<VoltMessage>();
+
+        /**
+         * If required queue up all this transaction MP fragments in this queue. Move all the
+         * blocked SP invocations here once the {@link CompleteTransactionMessage} for this
+         * entry's transaction is received
+         */
+        private Deque<VoltMessage> m_sequencedMessages = new LinkedList<VoltMessage>();
+
         private boolean m_servedFragment = false;
 
         boolean isReady()
         {
-            // ENG-4218 fix makes this condition go away
-            if (m_eolReached) {
-                return m_firstFragment != null;
-            }
             return m_sentinalTxnId != null && m_firstFragment != null;
         }
 
@@ -103,40 +108,89 @@ public class ReplaySequencer
             return m_sentinalTxnId != null;
         }
 
+        /**
+         * Queue it up in the {@link ReplayEntry#m_blockedMessages} queue
+         * before the {@link CompleteTransactionMessage} for this entry's transaction is received.
+         * Otherwise add it straight to the {@link ReplayEntry#m_sequencedMessages} queue.
+         *
+         * @param m an SP invocation message
+         */
         void addBlockedMessage(VoltMessage m)
         {
-            m_blockedMessages.addLast(m);
+            if (m_lastFragment == null)
+            {
+                m_blockedMessages.addLast(m);
+            }
+            else
+            {
+                m_sequencedMessages.addLast(m);
+            }
+        }
+
+        /**
+         * If not already done, drain all blocked sps in to the sequenced queue
+         * @param msg a {@link CompleteTransactionMessage}
+         */
+        void markLastFragment(CompleteTransactionMessage msg)
+        {
+            if (m_lastFragment == null)
+            {
+                m_lastFragment = msg;
+
+                Iterator<VoltMessage> blocked = m_blockedMessages.iterator();
+                while (blocked.hasNext())
+                {
+                    m_sequencedMessages.addLast(blocked.next());
+                    blocked.remove();
+                }
+            }
+        }
+
+        void addFragmentMessage(VoltMessage m)
+        {
+            m_sequencedMessages.addLast(m);
+        }
+
+        void addCompletedMessage(CompleteTransactionMessage msg)
+        {
+            m_sequencedMessages.addLast(msg);
+            markLastFragment(msg);
         }
 
         VoltMessage poll()
         {
-            if (isReady()) {
-               if(!m_servedFragment && m_firstFragment != null) {
-                   m_servedFragment = true;
-                   return m_firstFragment;
-               }
-               else {
-                   return m_blockedMessages.poll();
-               }
+            if (!isReady()) return null;
+
+            if (!m_servedFragment)
+            {
+                m_servedFragment = true;
+                return m_firstFragment;
             }
-            else {
-                return null;
+            else
+            {
+                return m_sequencedMessages.poll();
             }
         }
 
         VoltMessage drain()
         {
-            if(!m_servedFragment && m_firstFragment != null) {
+            if(!m_servedFragment && m_firstFragment != null)
+            {
                 m_servedFragment = true;
                 return m_firstFragment;
             }
-            else {
+            else if (!m_sequencedMessages.isEmpty())
+            {
+                return m_sequencedMessages.poll();
+            }
+            else
+            {
                 return m_blockedMessages.poll();
             }
         }
 
         boolean isEmpty() {
-            return isReady() && m_servedFragment && m_blockedMessages.isEmpty();
+            return isReady() && m_servedFragment && m_sequencedMessages.isEmpty() && m_blockedMessages.isEmpty();
         }
 
         @Override
@@ -160,10 +214,7 @@ public class ReplaySequencer
     // lastSeenTxnId tracks the last seen txnId for this partition
     long m_lastSeenTxnId = Long.MIN_VALUE;
 
-    // has reached end of log for this partition, release any MP Txns for
-    // replay if this is true.
-    boolean m_eolReached = false;
-    // has reached end of log for the MPI, no more MP fragments will come,
+    // has reached end of log for the MPI, no more fragments or SPs will come,
     // release all txns.
     boolean m_mpiEOLReached = false;
     // some combination of conditions has occurred which will result in no
@@ -288,10 +339,6 @@ public class ReplaySequencer
                 if (head.hasSentinel() && m_mpiEOLReached) {
                     m_mustDrain = true;
                 }
-                else if (!head.hasSentinel() && m_eolReached) {
-                    // We have a fragment and will never get the sentinel
-                    // ENG-4218 will fill this in at some point
-                }
             }
         }
     }
@@ -302,32 +349,8 @@ public class ReplaySequencer
         ReplayEntry found = m_replayEntries.get(inTxnId);
 
         if (in instanceof Iv2EndOfLogMessage) {
-            if (((Iv2EndOfLogMessage) in).isMP()) {
-                m_mpiEOLReached = true;
-            } else {
-                m_eolReached = true;
-            }
+            m_mpiEOLReached = true;
             return true;
-        }
-
-        /*
-         * End-of-log reached. Only FragmentTaskMessage and
-         * CompleteTransactionMessage can arrive at this partition once EOL is
-         * reached.
-         *
-         * If the txn is found, meaning that found is not null, then this might
-         * be the first fragment, it needs to get through in order to free any
-         * txns queued behind it.
-         *
-         * If the txn is not found, then there will be no matching sentinel to
-         * come later, and there will be no SP txns after this MP, so release
-         * the first fragment immediately.
-         *
-         * ENG-4218 will want to change this to queue an MP fragment which we
-         * can't sequence properly so that we can drain() it appropriately later
-         */
-        if (m_eolReached && found == null) {
-            return false;
         }
 
         if (in instanceof MultiPartitionParticipantMessage) {
@@ -370,16 +393,20 @@ public class ReplaySequencer
                 assert(found.isReady());
             }
             else {
-                found.addBlockedMessage(ftm);
+                found.addFragmentMessage(ftm);
             }
         }
         else if (in instanceof CompleteTransactionMessage) {
+            CompleteTransactionMessage ctm = (CompleteTransactionMessage)in;
             // already sequenced
             if (inTxnId <= m_lastPolledFragmentTxnId) {
+                if (found != null && found.m_firstFragment != null) {
+                    found.markLastFragment(ctm);
+                }
                 return false;
             }
             if (found != null && found.m_firstFragment != null) {
-                found.addBlockedMessage(in);
+                found.addCompletedMessage(ctm);
             }
             else {
                 // Always expect to see the fragment first, but there are places in the protocol
@@ -412,11 +439,10 @@ public class ReplaySequencer
     public void dump(long hsId)
     {
         final String who = CoreUtils.hsIdToString(hsId);
-        tmLog.info(String.format("%s: REPLAY SEQUENCER DUMP, LAST POLLED FRAGMENT %d (%s), LAST SEEN TXNID %d (%s), %s%s%s",
+        tmLog.info(String.format("%s: REPLAY SEQUENCER DUMP, LAST POLLED FRAGMENT %d (%s), LAST SEEN TXNID %d (%s), %s%s",
                                  who,
                                  m_lastPolledFragmentTxnId, TxnEgo.txnIdToString(m_lastPolledFragmentTxnId),
                                  m_lastSeenTxnId, TxnEgo.txnIdToString(m_lastSeenTxnId),
-                                 m_eolReached ? "EOL, " : "",
                                  m_mpiEOLReached ? "MPI EOL, " : "",
                                  m_mustDrain ? "MUST DRAIN" : ""));
         for (Entry<Long, ReplayEntry> e : m_replayEntries.entrySet()) {

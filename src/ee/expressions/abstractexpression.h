@@ -48,7 +48,6 @@
 
 #include "boost/shared_ptr.hpp"
 #include "common/types.h"
-#include "common/valuevector.h"
 #include "common/PlannerDomValue.h"
 
 #include <string>
@@ -56,8 +55,6 @@
 
 namespace voltdb {
 
-class SerializeInput;
-class SerializeOutput;
 class NValue;
 class TableTuple;
 
@@ -75,9 +72,6 @@ class AbstractExpression {
     virtual ~AbstractExpression();
 
     virtual NValue eval(const TableTuple *tuple1 = NULL, const TableTuple *tuple2 = NULL) const = 0;
-
-    /** set parameter values for this node and its descendents */
-    virtual void substitute(const NValueArray &params);
 
     /** return true if self or descendent should be substitute()'d */
     virtual bool hasParameter() const;
@@ -111,12 +105,22 @@ class AbstractExpression {
         return m_valueSize;
     }
 
+    bool getInBytes() const
+    {
+        return m_inBytes;
+    }
+
     // These should really be part of the constructor, but plumbing
     // the type and size args through the whole of the expression world is
     // not something I'm doing right now.
     void setValueType(ValueType type)
     {
         m_valueType = type;
+    }
+
+    void setInBytes(bool bytes)
+    {
+        m_inBytes = bytes;
     }
 
     void setValueSize(int size)
@@ -149,6 +153,7 @@ class AbstractExpression {
     bool m_hasParameter;
     ValueType m_valueType;
     int m_valueSize;
+    bool m_inBytes;
 };
 
 }

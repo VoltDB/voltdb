@@ -50,15 +50,15 @@
 
 namespace voltdb
 {
+
 class NestLoopIndexPlanNode : public AbstractJoinPlanNode
 {
 public:
-    NestLoopIndexPlanNode(CatalogId id);
-    NestLoopIndexPlanNode();
+    NestLoopIndexPlanNode() { }
     ~NestLoopIndexPlanNode();
-    virtual PlanNodeType getPlanNodeType() const;
+    PlanNodeType getPlanNodeType() const;
 };
 
-}
+} // namespace voltdb
 
 #endif

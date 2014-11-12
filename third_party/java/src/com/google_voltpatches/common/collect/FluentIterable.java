@@ -22,9 +22,11 @@ import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.annotations.GwtCompatible;
 import com.google_voltpatches.common.annotations.GwtIncompatible;
 import com.google_voltpatches.common.base.Function;
+import com.google_voltpatches.common.base.Joiner;
 import com.google_voltpatches.common.base.Optional;
 import com.google_voltpatches.common.base.Predicate;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.Iterator;
@@ -110,6 +112,16 @@ public abstract class FluentIterable<E> implements Iterable<E> {
   }
 
   /**
+   * Returns a fluent iterable containing {@code elements} in the specified order.
+   *
+   * @since 18.0
+   */
+  @Beta
+  public static <E> FluentIterable<E> of(E[] elements) {
+    return from(Lists.newArrayList(elements));
+  }
+
+  /**
    * Returns a string representation of this fluent iterable, with the format
    * {@code [e1, e2, ..., en]}.
    */
@@ -149,6 +161,33 @@ public abstract class FluentIterable<E> implements Iterable<E> {
   @CheckReturnValue
   public final FluentIterable<E> cycle() {
     return from(Iterables.cycle(iterable));
+  }
+
+  /**
+   * Returns a fluent iterable whose iterators traverse first the elements of this fluent iterable,
+   * followed by those of {@code other}. The iterators are not polled until necessary.
+   *
+   * <p>The returned iterable's {@code Iterator} supports {@code remove()} when the corresponding
+   * {@code Iterator} supports it.
+   *
+   * @since 18.0
+   */
+  @Beta
+  @CheckReturnValue
+  public final FluentIterable<E> append(Iterable<? extends E> other) {
+    return from(Iterables.concat(iterable, other));
+  }
+
+  /**
+   * Returns a fluent iterable whose iterators traverse first the elements of this fluent iterable,
+   * followed by {@code elements}.
+   *
+   * @since 18.0
+   */
+  @Beta
+  @CheckReturnValue
+  public final FluentIterable<E> append(E... elements) {
+    return from(Iterables.concat(iterable, Arrays.asList(elements)));
   }
 
   /**
@@ -343,7 +382,6 @@ public abstract class FluentIterable<E> implements Iterable<E> {
    * @throws NullPointerException if any element is null
    * @since 14.0 (since 13.0 as {@code toSortedImmutableList()}).
    */
-  @Beta
   public final ImmutableList<E> toSortedList(Comparator<? super E> comparator) {
     return Ordering.from(comparator).immutableSortedCopy(iterable);
   }
@@ -454,6 +492,17 @@ public abstract class FluentIterable<E> implements Iterable<E> {
       }
     }
     return collection;
+  }
+
+  /**
+   * Returns a {@link String} containing all of the elements of this fluent iterable joined with
+   * {@code joiner}.
+   *
+   * @since 18.0
+   */
+  @Beta
+  public final String join(Joiner joiner) {
+    return joiner.join(this);
   }
 
   /**

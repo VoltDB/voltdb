@@ -151,6 +151,9 @@ public class TestUnion extends PlannerTestCase {
         failToCompile("select DESC from T1 UNION select TEXT from T5");
         failToCompile("select A from T1 UNION select D from T4");
 
+        // Query hangs from SQL coverage
+        failToCompile("select A from T1 UNION select A from T1 INTERSECT select B from T2");
+
         // If ONE side is single-partitioned, it would theoretically be possible to satisfy
         // the query with a 2-fragment plan IFF the coordinator fragment could be forced to
         // execute on the designated single partition.

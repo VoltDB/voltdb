@@ -31,7 +31,6 @@
 
 package org.hsqldb_voltpatches;
 
-import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
 import org.hsqldb_voltpatches.index.Index;
@@ -71,24 +70,6 @@ public class QueryExpression {
                             EXCEPT_ALL    = 5,
                             EXCEPT        = 6,
                             UNION_TERM    = 7;
-
-    private static final String[] m_setOperatorNames = new String[] {
-        "NOUNION",
-        "UNION",
-        "UNION_ALL",
-        "INTERSECT",
-        "INTERSECT_ALL",
-        "EXCEPT_ALL",
-        "EXCEPT",
-        "UNION_TERM",
-        };
-
-    public final String operatorName() {
-        if (unionType < 0 || unionType >= m_setOperatorNames.length ) {
-            return "INVALID";
-        }
-        return m_setOperatorNames[unionType];
-    }
 
     //
     int                     columnCount;
@@ -806,7 +787,25 @@ public class QueryExpression {
         rightQueryExpression.getBaseTableNames(set);
     }
 
-    /*************** VOLTDB *********************/
+    /************************* Volt DB Extensions *************************/
+
+    private static final String[] m_setOperatorNames = new String[] {
+        "NOUNION",
+        "UNION",
+        "UNION_ALL",
+        "INTERSECT",
+        "INTERSECT_ALL",
+        "EXCEPT_ALL",
+        "EXCEPT",
+        "UNION_TERM",
+        };
+
+    public final String operatorName() {
+        if (unionType < 0 || unionType >= m_setOperatorNames.length ) {
+            return "INVALID";
+        }
+        return m_setOperatorNames[unionType];
+    }
 
     /**
      * VoltDB added method to get a union operation type.
@@ -831,6 +830,5 @@ public class QueryExpression {
     public QueryExpression getRightQueryExpression() {
         return rightQueryExpression;
     }
-
-
+    /**********************************************************************/
 }

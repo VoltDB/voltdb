@@ -31,7 +31,6 @@
 
 package org.hsqldb_voltpatches;
 
-import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
 import org.hsqldb_voltpatches.RangeVariable.RangeIteratorBase;
 import org.hsqldb_voltpatches.navigator.RowSetNavigator;
@@ -97,7 +96,6 @@ public class StatementInsert extends StatementDML {
      *
      * @return the result of executing the statement
      */
-    @Override
     Result getResult(Session session) {
 
         Table           table              = baseTable;
@@ -178,7 +176,7 @@ public class StatementInsert extends StatementDML {
 
         while (nav.hasNext()) {
             Object[] data       = baseTable.getNewRowData(session);
-            Object[] sourceData = nav.getNext();
+            Object[] sourceData = (Object[]) nav.getNext();
 
             for (int i = 0; i < columnMap.length; i++) {
                 int  j          = columnMap[i];

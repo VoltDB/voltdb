@@ -31,7 +31,6 @@
 
 package org.hsqldb_voltpatches;
 
-
 /**
  * Implementation of ORDER BY operations
  *
@@ -80,12 +79,10 @@ public class ExpressionOrderBy extends Expression {
         return isNullsLast;
     }
 
-    @Override
     public Object getValue(Session session) {
         return nodes[LEFT].getValue(session);
     }
 
-    @Override
     public void resolveTypes(Session session, Expression parent) {
 
         nodes[LEFT].resolveTypes(session, parent);
@@ -97,7 +94,6 @@ public class ExpressionOrderBy extends Expression {
         dataType = nodes[LEFT].dataType;
     }
 
-    @Override
     public String getSQL() {
 
         StringBuffer sb = new StringBuffer();
@@ -117,7 +113,6 @@ public class ExpressionOrderBy extends Expression {
         return sb.toString();
     }
 
-    @Override
     protected String describe(Session session, int blanks) {
 
         StringBuffer sb = new StringBuffer();
@@ -137,5 +132,4 @@ public class ExpressionOrderBy extends Expression {
 
         return sb.toString();
     }
-
 }

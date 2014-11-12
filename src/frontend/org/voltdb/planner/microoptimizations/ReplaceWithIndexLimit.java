@@ -28,10 +28,9 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.planner.AbstractParsedStmt;
-import org.voltdb.planner.CompiledPlan;
-import org.voltdb.planner.StmtTableScan;
+import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
@@ -44,20 +43,9 @@ import org.voltdb.utils.CatalogUtil;
 
 public class ReplaceWithIndexLimit extends MicroOptimization {
 
-    @Override
-    public List<CompiledPlan> apply(CompiledPlan plan, AbstractParsedStmt parsedStmt) {
-        ArrayList<CompiledPlan> retval = new ArrayList<CompiledPlan>();
-        this.m_parsedStmt = parsedStmt;
-        AbstractPlanNode planGraph = plan.rootPlanGraph;
-        planGraph = recursivelyApply(planGraph);
-        plan.rootPlanGraph = planGraph;
-        retval.add(plan);
-        return retval;
-    }
-
     // for debug purpose only, this might not be called
     int indent = 0;
-    void recursivelyPrint(AbstractPlanNode node, StringBuilder sb)
+    protected void recursivelyPrint(AbstractPlanNode node, StringBuilder sb)
     {
         for (int i = 0; i < indent; i++) {
             sb.append("\t");
@@ -69,7 +57,8 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
         }
     }
 
-    AbstractPlanNode recursivelyApply(AbstractPlanNode plan)
+    @Override
+    protected AbstractPlanNode recursivelyApply(AbstractPlanNode plan)
     {
         assert(plan != null);
 
@@ -136,6 +125,10 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
                 return plan;
             }
 
+            if (((AbstractScanPlanNode)child).isSubQuery()) {
+                return plan;
+            }
+
             // create an empty bindingExprs list, used for store (possible) bindings for adHoc query
             ArrayList<AbstractExpression> bindings = new ArrayList<AbstractExpression>();
             Index ret = findQualifiedIndex(((SeqScanPlanNode)child), aggExpr, bindings);
@@ -149,6 +142,11 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
                 // specify sorting direction here
                 IndexScanPlanNode ispn = new IndexScanPlanNode((SeqScanPlanNode) child, aggplan, ret, sortDirection);
                 ispn.setBindings(bindings);
+                assert(ispn.getSearchKeyExpressions().size() == 0);
+                if (sortDirection == SortDirectionType.ASC) {
+                    assert(aggplan.isTableMin());
+                    ispn.setSkipNullPredicate(0);
+                }
 
                 LimitPlanNode lpn = new LimitPlanNode();
                 lpn.setLimit(1);
@@ -176,6 +174,11 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
         // we added for reverse scan purpose only
         if (((IndexScanPlanNode)child).getPredicate() != null &&
                 !((IndexScanPlanNode)child).isPredicatesOptimizableForAggregate()) {
+            return plan;
+        }
+
+        // Guard against (possible future?) cases of indexable subquery.
+        if (((AbstractScanPlanNode)child).isSubQuery()) {
             return plan;
         }
 
@@ -245,6 +248,15 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
         } else {
             // we know which end we want to fetch, set the sort direction
             ispn.setSortDirection(sortDirection);
+
+            // for SELECT MIN(X) FROM T WHERE [prefix filters] = ?
+            if (numberOfExprs == numOfSearchKeys && sortDirection == SortDirectionType.ASC) {
+                if (ispn.getLookupType() == IndexLookupType.GTE) {
+                    assert(aggplan.isTableMin());
+                    ispn.setSkipNullPredicate(numOfSearchKeys);
+                }
+            }
+
             // for SELECT MIN(X) FROM T WHERE [...] X < / <= ?
             // reset the IndexLookupType, remove "added" searchKey, add back to endExpression, and clear "added" predicate
             if (sortDirection == SortDirectionType.ASC &&
@@ -325,8 +337,7 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
         } else {
             // either pure expression index or mix of expressions and simple columns
             List<AbstractExpression> indexedExprs = null;
-            int idx = m_parsedStmt.tableAliasIndexMap.get(fromTableAlias);
-            StmtTableScan tableScan = m_parsedStmt.stmtCache.get(idx);
+            StmtTableScan tableScan = m_parsedStmt.m_tableAliasMap.get(fromTableAlias);
 
             try {
                 indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, tableScan);
@@ -343,7 +354,7 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
     // lookup aggCol up to min((filterSize + 1), indexedColIdx.size())
     // aggCol can be one of equality comparison key (then a constant value),
     // or all filters compose the complete set of prefix key components
-    private boolean checkPureColumnIndex(Index index, int aggCol, List<AbstractExpression> filterExprs) {
+    private static boolean checkPureColumnIndex(Index index, int aggCol, List<AbstractExpression> filterExprs) {
 
         boolean found = false;
 
@@ -374,7 +385,7 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
         return false;
     }
 
-    private boolean checkExpressionIndex(List<AbstractExpression> indexedExprs,
+    private static boolean checkExpressionIndex(List<AbstractExpression> indexedExprs,
             AbstractExpression aggExpr,
             List<AbstractExpression> filterExprs,
             List<AbstractExpression> bindingExprs) {

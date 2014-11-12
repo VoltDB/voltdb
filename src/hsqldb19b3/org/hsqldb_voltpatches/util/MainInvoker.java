@@ -69,7 +69,7 @@ public class MainInvoker {
      * popular UNIX shells, this can be accomplished with single or
      * double-quotes:  '' or "".
      *
-     * @param sa Run java org.hsqldb.util.MainInvoker --help for syntax help
+     * @param sa Run java org.hsqldb_voltpatches.util.MainInvoker --help for syntax help
      */
     public static void main(String[] sa) {
 

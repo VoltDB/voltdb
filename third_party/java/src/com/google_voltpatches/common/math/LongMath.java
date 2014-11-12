@@ -61,7 +61,7 @@ public final class LongMath {
   public static boolean isPowerOfTwo(long x) {
     return x > 0 & (x & (x - 1)) == 0;
   }
-  
+
   /**
    * Returns 1 if {@code x < y} as unsigned longs, and 0 otherwise.  Assumes that x - y fits into a
    * signed long.  The implementation is branch-free, and benchmarks suggest it is measurably
@@ -279,9 +279,9 @@ public final class LongMath {
     }
     /*
      * Let k be the true value of floor(sqrt(x)), so that
-     * 
+     *
      *            k * k <= x          <  (k + 1) * (k + 1)
-     * (double) (k * k) <= (double) x <= (double) ((k + 1) * (k + 1)) 
+     * (double) (k * k) <= (double) x <= (double) ((k + 1) * (k + 1))
      *          since casting to double is nondecreasing.
      *          Note that the right-hand inequality is no longer strict.
      * Math.sqrt(k * k) <= Math.sqrt(x) <= Math.sqrt((k + 1) * (k + 1))
@@ -315,14 +315,14 @@ public final class LongMath {
         return guess;
       case HALF_DOWN:
       case HALF_UP:
-      case HALF_EVEN: 
-        long sqrtFloor = guess - ((x < guessSquared) ? 1 : 0); 
+      case HALF_EVEN:
+        long sqrtFloor = guess - ((x < guessSquared) ? 1 : 0);
         long halfSquare = sqrtFloor * sqrtFloor + sqrtFloor;
         /*
          * We wish to test whether or not x <= (sqrtFloor + 0.5)^2 = halfSquare + 0.25. Since both
          * x and halfSquare are integers, this is equivalent to testing whether or not x <=
          * halfSquare. (We have to deal with overflow, though.)
-         * 
+         *
          * If we treat halfSquare as an unsigned long, we know that
          *            sqrtFloor^2 <= x < (sqrtFloor + 1)^2
          * halfSquare - sqrtFloor <= x < halfSquare + sqrtFloor + 1
@@ -398,8 +398,8 @@ public final class LongMath {
   }
 
   /**
-   * Returns {@code x mod m}. This differs from {@code x % m} in that it always returns a
-   * non-negative result.
+   * Returns {@code x mod m}, a non-negative value less than {@code m}.
+   * This differs from {@code x % m}, which might be negative.
    *
    * <p>For example:
    *
@@ -412,6 +412,8 @@ public final class LongMath {
    * mod(8, 4) == 0}</pre>
    *
    * @throws ArithmeticException if {@code m <= 0}
+   * @see <a href="http://docs.oracle.com/javase/specs/jls/se7/html/jls-15.html#jls-15.17.3">
+   *      Remainder Operator</a>
    */
   @GwtIncompatible("TODO")
   public static int mod(long x, int m) {
@@ -420,8 +422,8 @@ public final class LongMath {
   }
 
   /**
-   * Returns {@code x mod m}. This differs from {@code x % m} in that it always returns a
-   * non-negative result.
+   * Returns {@code x mod m}, a non-negative value less than {@code m}.
+   * This differs from {@code x % m}, which might be negative.
    *
    * <p>For example:
    *
@@ -434,6 +436,8 @@ public final class LongMath {
    * mod(8, 4) == 0}</pre>
    *
    * @throws ArithmeticException if {@code m <= 0}
+   * @see <a href="http://docs.oracle.com/javase/specs/jls/se7/html/jls-15.html#jls-15.17.3">
+   *      Remainder Operator</a>
    */
   @GwtIncompatible("TODO")
   public static long mod(long x, long m) {
@@ -668,14 +672,14 @@ public final class LongMath {
           return result;
         } else {
           int nBits = LongMath.log2(n, RoundingMode.CEILING);
-          
+
           long result = 1;
           long numerator = n--;
           long denominator = 1;
-          
+
           int numeratorBits = nBits;
           // This is an upper bound on log2(numerator, ceiling).
-          
+
           /*
            * We want to do this in long math for speed, but want to avoid overflow. We adapt the
            * technique previously used by BigIntegerMath: maintain separate numerator and
@@ -700,7 +704,7 @@ public final class LongMath {
         }
     }
   }
-  
+
   /**
    * Returns (x * numerator / denominator), which is assumed to come out to an integral value.
    */

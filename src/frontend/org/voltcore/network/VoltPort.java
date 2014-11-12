@@ -113,7 +113,7 @@ public class VoltPort implements Connection
                 if (!remoteHost.equals(m_remoteSocketAddress.getAddress().getHostAddress())) {
                     m_remoteHostname = remoteHost;
                     m_remoteHostAndAddressAndPort = remoteHost + m_remoteHostAndAddressAndPort;
-                    m_toString = super.toString() + ":" + m_remoteHostAndAddressAndPort;
+                    m_toString = VoltPort.this.toString() + ":" + m_remoteHostAndAddressAndPort;
                 }
             }
         };
@@ -174,7 +174,7 @@ public class VoltPort implements Connection
                      * and pass them off to the input handler.
                      */
                     try {
-                        while ((message = m_handler.retrieveNextMessage( this )) != null) {
+                        while ((message = m_handler.retrieveNextMessage( readStream() )) != null) {
                             m_handler.handleMessage( message, this);
                             m_messagesRead++;
                         }

@@ -72,12 +72,12 @@ LimitExecutor::p_init(AbstractPlanNode* abstract_node,
         //
         // Just copy the table schema of our input table
         //
-        assert(node->getInputTables().size() == 1);
+        assert(node->getInputTableCount() == 1);
         node->
             setOutputTable(TableFactory::
                            getCopiedTempTable(node->databaseId(),
-                                              node->getInputTables()[0]->name(),
-                                              node->getInputTables()[0],
+                                              node->getInputTable()->name(),
+                                              node->getInputTable(),
                                               limits));
     }
     return true;
@@ -90,7 +90,7 @@ LimitExecutor::p_execute(const NValueArray &params)
     assert(node);
     Table* output_table = node->getOutputTable();
     assert(output_table);
-    Table* input_table = node->getInputTables()[0];
+    Table* input_table = node->getInputTable();
     assert(input_table);
 
     //
@@ -98,7 +98,7 @@ LimitExecutor::p_execute(const NValueArray &params)
     // we have copy enough tuples for the limit specified by the node
     //
     TableTuple tuple(input_table->schema());
-    TableIterator iterator = input_table->iterator();
+    TableIterator iterator = input_table->iteratorDeletingAsWeGo();
 
     int tuple_ctr = 0;
     int tuples_skipped = 0;
@@ -125,6 +125,8 @@ LimitExecutor::p_execute(const NValueArray &params)
             return false;
         }
     }
+
+    cleanupInputTempTable(input_table);
 
     return true;
 }

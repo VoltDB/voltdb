@@ -144,6 +144,7 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
         // ------------------------------------------------------------------
         case (voltdb::PLAN_NODE_TYPE_HASHAGGREGATE):
         case (voltdb::PLAN_NODE_TYPE_AGGREGATE):
+        case (voltdb::PLAN_NODE_TYPE_PARTIALAGGREGATE):
             ret = new voltdb::AggregatePlanNode(type);
             break;
         // ------------------------------------------------------------------

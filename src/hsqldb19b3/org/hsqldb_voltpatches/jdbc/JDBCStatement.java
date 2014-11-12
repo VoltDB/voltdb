@@ -35,7 +35,6 @@ import java.sql.BatchUpdateException;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.SQLFeatureNotSupportedException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
 
@@ -99,7 +98,7 @@ import org.hsqldb_voltpatches.result.Result;
  * version 1.1.x
  * <em>Java Runtime Environment</em><sup><font size="-2">TM</font></sup>.
  * However, in addition to this technique requiring explicit casts to the
- * org.hsqldb.jdbc.* classes, some of these method calls require
+ * org.hsqldb_voltpatches.jdbc.* classes, some of these method calls require
  * <code>int</code> values that are defined only in the JDBC 2 or greater
  * version of the {@link java.sql.ResultSet ResultSet} interface.  For this
  * reason these values are defined in {@link JDBCResultSet JDBCResultSet}.<p>
@@ -1097,7 +1096,7 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
         int[]           updateCounts = new int[navigator.getSize()];
 
         for (int i = 0; i < updateCounts.length; i++) {
-            Object[] data = navigator.getNext();
+            Object[] data = (Object[]) navigator.getNext();
 
             updateCounts[i] = ((Integer) data[0]).intValue();
         }
@@ -1807,6 +1806,8 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
         }
     }
 
+    /************************* Volt DB Extensions *************************/
+
     public void closeOnCompletion() throws SQLException {
         throw new SQLException();
     }
@@ -1814,4 +1815,5 @@ public class JDBCStatement extends JDBCStatementBase implements Statement {
     public boolean isCloseOnCompletion() throws SQLException {
         throw new SQLException();
     }
+    /**********************************************************************/
 }

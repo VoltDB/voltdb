@@ -19,11 +19,12 @@ package org.voltdb.jdbc;
 
 import java.io.Closeable;
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
@@ -48,9 +49,9 @@ import org.voltdb.client.ProcedureCallback;
  * @since 2.0
  */
 public class JDBC4ClientConnection implements Closeable {
-    private final JDBC4PerfCounterMap statistics;
     private final ArrayList<String> servers;
-    private final Client client;
+    private final ClientConfig config;
+    private AtomicReference<Client> client = new AtomicReference<Client>();
 
     /**
      * The base hash/key for this connection, that uniquely identifies its parameters, as defined by
@@ -68,7 +69,7 @@ public class JDBC4ClientConnection implements Closeable {
      * The number of active users on the connection. Used and managed by the pool to determine when
      * a specific {@link Client} wrapper has reached capacity (and a new one should be created).
      */
-    protected short users;
+    protected short users = 0;
 
     /**
      * The default asynchronous operation timeout for Future-based executions (while the operation
@@ -110,9 +111,12 @@ public class JDBC4ClientConnection implements Closeable {
      * @throws IOException
      * @throws UnknownHostException
      */
-    protected JDBC4ClientConnection(String clientConnectionKeyBase, String clientConnectionKey,
+    protected JDBC4ClientConnection(
+            String clientConnectionKeyBase, String clientConnectionKey,
             String[] servers, String user, String password, boolean isHeavyWeight,
-            int maxOutstandingTxns) throws UnknownHostException, IOException {
+            int maxOutstandingTxns)
+                    throws UnknownHostException, IOException
+    {
         // Save the list of trimmed non-empty server names.
         this.servers = new ArrayList<String>(servers.length);
         for (String server : servers) {
@@ -127,20 +131,71 @@ public class JDBC4ClientConnection implements Closeable {
 
         this.keyBase = clientConnectionKeyBase;
         this.key = clientConnectionKey;
-        this.statistics = JDBC4ClientConnectionPool.getStatistics(clientConnectionKeyBase);
 
         // Create configuration
-        final ClientConfig config = new ClientConfig(user, password);
+        this.config = new ClientConfig(user, password);
         config.setHeavyweight(isHeavyWeight);
         if (maxOutstandingTxns > 0)
             config.setMaxOutstandingTxns(maxOutstandingTxns);
 
         // Create client and connect.
-        this.client = ClientFactory.createClient(config);
-        this.users = 0;
+        createClientAndConnect();
+    }
+
+    /**
+     * Private method to (re)initialize a client connection.
+     * @return new ClientImpl
+     * @throws UnknownHostException
+     * @throws IOException
+     */
+    private ClientImpl createClientAndConnect() throws UnknownHostException, IOException
+    {
+        // Make client connections.
+        ClientImpl clientTmp = (ClientImpl) ClientFactory.createClient(this.config);
+        // ENG-6231: Only fail if we can't connect to any of the provided servers.
+        boolean connectedAnything = false;
         for (String server : this.servers) {
-            this.client.createConnection(server);
+            try {
+                clientTmp.createConnection(server);
+                connectedAnything = true;
+            }
+            catch (UnknownHostException e) {
+            }
+            catch (IOException e) {
+            }
         }
+
+        if (!connectedAnything) {
+            try {
+                clientTmp.close();
+            } catch (InterruptedException ie) {}
+            throw new IOException("Unable to connect to VoltDB cluster with servers: " + this.servers);
+        }
+
+        this.client.set(clientTmp);
+        this.users++;
+        return clientTmp;
+    }
+
+    /**
+     * Get current client or reconnect one as needed.
+     * Concurrency strategy: If the connection is lost while providing one the
+     * caller will get a non-null, but ultimately bad connection that will fail.
+     * But it won't cause an NPE. This method is synchronized so that a
+     * reconnection won't happen simultaneously. The client won't get dropped
+     * if a parallel thread comes in later trying to drop the original client
+     * because dropClient() only does it if the request matches the current client.
+     * @return  client
+     * @throws UnknownHostException
+     * @throws IOException
+     */
+    protected synchronized ClientImpl getClient() throws UnknownHostException, IOException
+    {
+        ClientImpl retClient = (ClientImpl) this.client.get() ;
+        if (retClient != null) {
+            return retClient;
+        }
+        return this.createClientAndConnect();
     }
 
     /**
@@ -149,7 +204,7 @@ public class JDBC4ClientConnection implements Closeable {
      *
      * @return the reference to this connection to be returned to the calling user.
      */
-    protected JDBC4ClientConnection use() {
+    protected synchronized JDBC4ClientConnection use() {
         this.users++;
         return this;
     }
@@ -158,15 +213,37 @@ public class JDBC4ClientConnection implements Closeable {
      * Used by the pool to indicate a thread/user has stopped using the connection (and optionally
      * close the underlying client if there are no more users against it).
      */
-    protected void dispose() {
+    protected synchronized void dispose() {
         this.users--;
         if (this.users == 0) {
             try {
-                this.client.close();
+                Client currentClient = this.client.get();
+                if (currentClient != null) {
+                    currentClient.close();
+                }
             } catch (Exception x) {
                 // ignore
             }
         }
+    }
+
+    /**
+     * Drop the client connection, e.g. when a NoConnectionsException is caught.
+     * It will try to reconnect as needed and appropriate.
+     * @param clientToDrop caller-provided client to avoid re-nulling from another thread that comes in later
+     */
+    protected synchronized void dropClient(ClientImpl clientToDrop) {
+        Client currentClient = this.client.get();
+        if (currentClient != null && currentClient == clientToDrop) {
+            try {
+                currentClient.close();
+                this.client.set(null);
+            }
+            catch (Exception x) {
+                // ignore
+            }
+        }
+        this.users = 0;
     }
 
     /**
@@ -196,14 +273,18 @@ public class JDBC4ClientConnection implements Closeable {
     public ClientResponse execute(String procedure, long timeout, Object... parameters)
             throws NoConnectionsException, IOException, ProcCallException {
         long start = System.currentTimeMillis();
+        ClientImpl currentClient = this.getClient();
         try {
             // If connections are lost try reconnecting.
-            ClientResponse response = ((ClientImpl) client).callProcedureWithTimeout(procedure, timeout, parameters);
-            this.statistics.update(procedure, response);
+            ClientResponse response = currentClient.callProcedureWithTimeout(procedure, timeout, TimeUnit.SECONDS, parameters);
             return response;
-        } catch (ProcCallException pce) {
-            this.statistics.update(procedure, System.currentTimeMillis() - start, false);
+        }
+        catch (ProcCallException pce) {
             throw pce;
+        }
+        catch (NoConnectionsException e) {
+            this.dropClient(currentClient);
+            throw e;
         }
     }
 
@@ -241,8 +322,6 @@ public class JDBC4ClientConnection implements Closeable {
          */
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
-
-            this.Owner.getStatistics().update(this.Procedure, response);
             if (this.UserCallback != null)
                 this.UserCallback.clientCallback(response);
         }
@@ -263,9 +342,17 @@ public class JDBC4ClientConnection implements Closeable {
      *         to post the request to the server, true otherwise.
      */
     public boolean executeAsync(ProcedureCallback callback, String procedure, Object... parameters)
-            throws NoConnectionsException, IOException {
-        return this.client.callProcedure(new TrackingCallback(this, procedure, callback),
-                procedure, parameters);
+            throws NoConnectionsException, IOException
+    {
+        ClientImpl currentClient = this.getClient();
+        try {
+            return currentClient.callProcedure(new TrackingCallback(this, procedure, callback),
+                    procedure, parameters);
+        }
+        catch (NoConnectionsException e) {
+            this.dropClient(currentClient);
+            throw e;
+        }
     }
 
     /**
@@ -279,20 +366,28 @@ public class JDBC4ClientConnection implements Closeable {
      * @return the Future created to wrap around the asynchronous process.
      */
     public Future<ClientResponse> executeAsync(String procedure, Object... parameters)
-            throws NoConnectionsException, IOException {
+            throws NoConnectionsException, IOException
+    {
+        ClientImpl currentClient = this.getClient();
         final JDBC4ExecutionFuture future = new JDBC4ExecutionFuture(this.defaultAsyncTimeout);
-        this.client.callProcedure(new TrackingCallback(this, procedure, new ProcedureCallback() {
-            @SuppressWarnings("unused")
-            final JDBC4ExecutionFuture result;
-            {
-                this.result = future;
-            }
+        try {
+            currentClient.callProcedure(new TrackingCallback(this, procedure, new ProcedureCallback() {
+                @SuppressWarnings("unused")
+                final JDBC4ExecutionFuture result;
+                {
+                    this.result = future;
+                }
 
-            @Override
-            public void clientCallback(ClientResponse response) throws Exception {
-                future.set(response);
-            }
-        }), procedure, parameters);
+                @Override
+                public void clientCallback(ClientResponse response) throws Exception {
+                    future.set(response);
+                }
+            }), procedure, parameters);
+        }
+        catch (NoConnectionsException e) {
+            this.dropClient(currentClient);
+            throw e;
+        }
         return future;
     }
 
@@ -302,54 +397,10 @@ public class JDBC4ClientConnection implements Closeable {
      * @return A {@link ClientStatsContext} that correctly represents the client statistics.
      */
     public ClientStatsContext getClientStatsContext() {
-        return this.client.createStatsContext();
-    }
-
-    /**
-     * @deprecated
-     * Gets the global performance statistics for this connection (and all connections with the same
-     * parameters).
-     *
-     * @return the counter map aggregated across all the connections in the pool with the same
-     *         parameters as this connection.
-     */
-    @Deprecated
-    public JDBC4PerfCounterMap getStatistics() {
-        return JDBC4ClientConnectionPool.getStatistics(this);
-    }
-
-    /**
-     * @deprecated
-     * Gets the performance statistics for a specific procedure on this connection (and all
-     * connections with the same parameters).
-     *
-     * @param procedure
-     *            the name of the procedure for which to retrieve the statistics.
-     * @return the counter aggregated across all the connections in the pool with the same
-     *         parameters as this connection.
-     */
-    @Deprecated
-    public JDBC4PerfCounter getStatistics(String procedure) {
-        return JDBC4ClientConnectionPool.getStatistics(this).get(procedure);
-    }
-
-    /**
-     * @deprecated
-     * Gets the aggregated performance statistics for a list of procedures on this connection (and
-     * all connections with the same parameters).
-     *
-     * @param procedures
-     *            the list of procedures for which to retrieve the statistics.
-     * @return the counter aggregated across all the connections in the pool with the same
-     *         parameters as this connection, and across all procedures.
-     */
-    @Deprecated
-    public JDBC4PerfCounter getStatistics(String... procedures) {
-        JDBC4PerfCounterMap map = JDBC4ClientConnectionPool.getStatistics(this);
-        JDBC4PerfCounter result = new JDBC4PerfCounter(false);
-        for (String procedure : procedures)
-            result.merge(map.get(procedure));
-        return result;
+        if (this.client.get() == null) {
+            return null;
+        }
+        return this.client.get().createStatsContext();
     }
 
     /**
@@ -359,29 +410,31 @@ public class JDBC4ClientConnection implements Closeable {
      *            File path
      * @throws IOException
      */
-    public void saveStatistics(String file) throws IOException {
-        if (file != null && !file.trim().isEmpty()) {
-            FileWriter fw = new FileWriter(file);
-            fw.write(getStatistics().toRawString(','));
-            fw.flush();
-            fw.close();
-        }
+    public void saveStatistics(ClientStats stats, String file) throws IOException {
+        this.client.get().writeSummaryCSV(stats, file);
     }
 
     void writeSummaryCSV(ClientStats stats, String path) throws IOException {
-        this.client.writeSummaryCSV(stats, path);
+        if (this.client.get() == null) {
+            throw new IOException("Client is unavailable for writing summary CSV.");
+        }
+        this.client.get().writeSummaryCSV(stats, path);
     }
 
     /**
      * Block the current thread until all queued stored procedure invocations have received
      * responses or there are no more connections to the cluster
      *
-     * @throws NoConnectionsException
      * @throws InterruptedException
+     * @throws IOException
      * @see Client#drain()
      */
-    public void drain() throws NoConnectionsException, InterruptedException {
-        this.client.drain();
+    public void drain() throws InterruptedException, IOException {
+        ClientImpl currentClient = this.getClient();
+        if (currentClient == null) {
+            throw new IOException("Client is unavailable for drain().");
+        }
+        currentClient.drain();
     }
 
     /**
@@ -389,9 +442,14 @@ public class JDBC4ClientConnection implements Closeable {
      * connections to the database
      *
      * @throws InterruptedException
+     * @throws IOException
      */
-    public void backpressureBarrier() throws InterruptedException {
-        this.client.backpressureBarrier();
+    public void backpressureBarrier() throws InterruptedException, IOException {
+        ClientImpl currentClient = this.getClient();
+        if (currentClient == null) {
+            throw new IOException("Client is unavailable for backpressureBarrier().");
+        }
+        currentClient.backpressureBarrier();
     }
 
     /**
@@ -409,7 +467,15 @@ public class JDBC4ClientConnection implements Closeable {
      * @throws ProcCallException
      */
     public ClientResponse updateApplicationCatalog(File catalogPath, File deploymentPath)
-            throws IOException, NoConnectionsException, ProcCallException {
-        return this.client.updateApplicationCatalog(catalogPath, deploymentPath);
+            throws IOException, NoConnectionsException, ProcCallException
+    {
+        ClientImpl currentClient = this.getClient();
+        try {
+            return currentClient.updateApplicationCatalog(catalogPath, deploymentPath);
+        }
+        catch (NoConnectionsException e) {
+            this.dropClient(currentClient);
+            throw e;
+        }
     }
 }

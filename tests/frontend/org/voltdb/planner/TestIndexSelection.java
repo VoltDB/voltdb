@@ -23,10 +23,10 @@
 
 package org.voltdb.planner;
 
+import org.hsqldb_voltpatches.HSQLInterface;
 import org.json_voltpatches.JSONException;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
-import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
@@ -56,7 +56,8 @@ public class TestIndexSelection extends PlannerTestCase {
         assertTrue(pn instanceof NestLoopIndexPlanNode);
         IndexScanPlanNode indexScan = (IndexScanPlanNode)pn.getInlinePlanNode(PlanNodeType.INDEXSCAN);
         assertEquals(IndexLookupType.LT, indexScan.getLookupType());
-        assertTrue(indexScan.toJSONString().contains("\"TARGET_INDEX_NAME\":\"SYS_IDX_ID_"));
+        assertTrue(indexScan.toJSONString().contains("\"TARGET_INDEX_NAME\":\"" +
+                HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "ID"));
         pn = pn.getChild(0);
         assertTrue(pn instanceof SeqScanPlanNode);
 //        System.out.println("DEBUG: " + pn.toJSONString());
@@ -97,9 +98,10 @@ public class TestIndexSelection extends PlannerTestCase {
         // ENG-5066: now Limit is pushed under Projection
         assertTrue(pn instanceof ProjectionPlanNode);
         pn = pn.getChild(0);
-        assertTrue(pn instanceof LimitPlanNode);
-        pn = pn.getChild(0);
+        // inline limit with order by
         assertTrue(pn instanceof OrderByPlanNode);
+        assertNotNull(pn.getInlinePlanNode(PlanNodeType.LIMIT));
+
         pn = pn.getChild(0);
         assertTrue(pn instanceof IndexScanPlanNode);
         assertTrue(pn.toJSONString().contains("\"TARGET_INDEX_NAME\":\"DELETED_SINCE_IDX\""));
@@ -166,7 +168,8 @@ public class TestIndexSelection extends PlannerTestCase {
         assertTrue(pn instanceof NestLoopIndexPlanNode);
         ispn = (IndexScanPlanNode)pn.getInlinePlanNode(PlanNodeType.INDEXSCAN);
         json = ispn.toJSONString();
-        assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"SYS_IDX_PK_"));
+        assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"" +
+                HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "PK_LOG"));
         pn = pn.getChild(0);
         assertTrue(pn instanceof IndexScanPlanNode);
         json = pn.toJSONString();
@@ -278,7 +281,8 @@ public class TestIndexSelection extends PlannerTestCase {
         assertTrue(pn instanceof NestLoopIndexPlanNode);
         ispn = (IndexScanPlanNode)pn.getInlinePlanNode(PlanNodeType.INDEXSCAN);
         json = ispn.toJSONString();
-        assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"SYS_IDX_PK"));
+        assertTrue(json.contains("\"TARGET_INDEX_NAME\":\"" +
+                HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "PK_LOG"));
         pn = pn.getChild(0);
         assertTrue(pn instanceof IndexScanPlanNode);
         json = pn.toJSONString();

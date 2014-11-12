@@ -33,7 +33,7 @@ import org.voltdb.VoltDB.Configuration;
 
 public class TestVoltCompilerErrorMsgs extends TestCase {
 
-    private void statementTest(String statement, String feature, boolean expectError, boolean testStmtIsDdl)
+    private void statementTest(String feature, boolean expectError, boolean testStmtIsDdl, String... statements)
         throws Exception
     {
         String simpleSchema =
@@ -45,7 +45,13 @@ public class TestVoltCompilerErrorMsgs extends TestCase {
             "ival bigint default 0 not null, " +
             "sval varchar(255) not null, " +
             "PRIMARY KEY(ival)" +
-            ");";
+            ");" +
+            "create table partitioned_blah (" +
+            "ival bigint default 0 not null, " +
+            "sval varchar(255) not null" +
+            ");" +
+            "partition table partitioned_blah on column sval;" +
+            "";
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
 
@@ -55,16 +61,27 @@ public class TestVoltCompilerErrorMsgs extends TestCase {
 
         builder.addLiteralSchema(simpleSchema);
 
-        if (testStmtIsDdl) {
-            builder.addLiteralSchema(statement);
-        } else {
-            builder.addStmtProcedure(feature, statement);
+        for (String statement : statements) {
+            if (testStmtIsDdl) {
+                builder.addLiteralSchema(statement);
+            } else {
+                builder.addStmtProcedure(feature, statement);
+            }
         }
+
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("errors.jar"));
-        assertEquals(expectError, ! success);
         String captured = capturer.toString("UTF-8");
         String[] lines = captured.split("\n");
-        assertEquals(expectError, foundLineMatching(lines, ".*[Ee]rror.*" + feature + ".*"));
+
+        if (expectError) {
+            assertFalse("Expected an error containing \"" + feature + "\", but compilation succeeded.", success);
+            String pattern = ".*[Ee]rror.*" + feature + ".*";
+            assertTrue("Expected an error matching pattern \"" + pattern + "\" in output \"" + captured + "\", but no matching line was found",
+                    foundLineMatching(lines, pattern));
+        }
+        else {
+            assertTrue("Expected no errors, but compilation failed with this output: \"" + captured + "\".", success);
+        }
     }
 
     private boolean foundLineMatching(String[] lines, String pattern) {
@@ -76,20 +93,20 @@ public class TestVoltCompilerErrorMsgs extends TestCase {
         return false;
     }
 
-    void statementErrorTest(String feature, String statement) throws Exception {
-        statementTest(statement, feature, true, true);
+    void statementErrorTest(String feature, String... statements) throws Exception {
+        statementTest(feature, true, true, statements);
     }
 
-    void statementNonErrorTest(String feature, String statement) throws Exception {
-        statementTest(statement, feature, false, false);
+    void statementNonErrorTest(String feature, String... statements) throws Exception {
+        statementTest(feature, false, false, statements);
     }
 
-    void ddlErrorTest(String feature, String statement) throws Exception {
-        statementTest(statement, feature, true, true);
+    void ddlErrorTest(String feature, String... statements) throws Exception {
+        statementTest(feature, true, true, statements);
     }
 
-    void ddlNonErrorTest(String feature, String statement) throws Exception {
-        statementTest(statement, feature, false, true);
+    void ddlNonErrorTest(String feature, String... statements) throws Exception {
+        statementTest(feature, false, true, statements);
     }
 
     public void testNoErrorOnParens() throws Exception {
@@ -107,5 +124,67 @@ public class TestVoltCompilerErrorMsgs extends TestCase {
     public void testErrorOnSizedInteger() throws Exception {
         // We do not support sized integers.
         ddlErrorTest("unexpected token", "create table hassizedint (i integer(5));");
+    }
+
+    public void testErrorOnInsertIntoSelect() throws Exception {
+
+        // This should fail.
+        ddlErrorTest("DML statement manipulates data in content non-deterministic way",
+                "create procedure MyInsert as insert into partitioned_blah (sval, ival) select sval, ival from blah where sval = ? limit 1;",
+                "partition procedure MyInsert on table partitioned_blah column sval;");
+
+        // limit with no order by implies non-deterministic content, so we won't compile the statement.
+        ddlErrorTest("DML statement manipulates data in content non-deterministic way",
+                "create procedure MyInsert as insert into partitioned_blah (sval, ival) " +
+                "select sval, ival from blah where sval = ? limit 1;",
+                "partition procedure MyInsert on table partitioned_blah column sval;");
+
+        // Limit with an order by is okay.
+        ddlNonErrorTest("INSERT",
+                "create procedure MyInsert as insert into partitioned_blah (sval, ival) " +
+                "select sval, ival from blah where sval = ? order by 1, 2 limit 1;",
+                "partition procedure MyInsert on table partitioned_blah column sval;");
+
+        // if it's marked as single-partition, it's ok.
+        ddlNonErrorTest("INSERT",
+                "create procedure MyInsert as insert into partitioned_blah (sval) select sval from indexed_blah where sval = ?;",
+                "partition procedure MyInsert on table partitioned_blah column sval;");
+
+        // insert into replicated is fine for MP stored procedure
+        ddlNonErrorTest("INSERT",
+                "create procedure MyInsert as insert into blah (sval) select sval from indexed_blah where sval = ?;");
+
+        // ...but should fail for SP stored procedure
+        ddlErrorTest("Trying to write to replicated table 'BLAH' in a single-partition procedure.",
+                "create procedure MyInsert as insert into blah (sval) select sval from indexed_blah where sval = ?;",
+                "partition procedure MyInsert on table partitioned_blah column sval;");
+
+        // ...and insert into replicated table should fail if the select accesses any partitioned tables
+        ddlErrorTest("Subquery in INSERT INTO ... SELECT statement may not access partitioned data " +
+                "for insertion into replicated table BLAH.",
+                "create procedure MyInsert as insert into blah (sval) select sval from partitioned_blah where sval = ?;");
+
+        // UNION is still unsupported
+        ddlErrorTest("not supported for UNION or other set operations",
+                "create procedure MyInsert as insert into blah (sval) " +
+                    "select sval from indexed_blah where sval = ? union select sval from indexed_blah where sval = ?;");
+
+        // query expression/target column degree mismatch
+        ddlErrorTest("number of target columns does not match that of query expression",
+                "create procedure MyInsert as insert into partitioned_blah (sval) select sval, sval || '!' from indexed_blah where sval = ?;",
+                "partition procedure MyInsert on table partitioned_blah column sval;");
+
+        // parameter in select list needs a cast.
+        ddlErrorTest("data type cast needed for parameter or null literal",
+                "create procedure insert_param_in_select_list as " +
+                    "insert into partitioned_blah (ival, sval) " +
+                        "select ival, ? from blah order by ival, sval;",
+                "partition procedure insert_param_in_select_list on table partitioned_blah column sval;");
+
+        // inserting into replicated table should fail
+        ddlErrorTest("Trying to write to replicated table 'BLAH' in a single-partition procedure.",
+                "create procedure insert_into_replicated_select as " +
+                "insert into blah select * from partitioned_blah;" +
+                "partition procedure insert_into_replicated_select on table partitioned_blah column sval;");
     }
 }

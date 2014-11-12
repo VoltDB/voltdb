@@ -17,7 +17,7 @@
 
 
 #ifndef HSTOREINDEXCOUNTEXECUTOR_H
-#define HSTOREINDEXSCANEXECUTOR_H
+#define HSTOREINDEXCOUNTEXECUTOR_H
 
 #include "common/common.h"
 #include "common/valuevector.h"
@@ -36,6 +36,7 @@ class TempTable;
 class PersistentTable;
 class AbstractExpression;
 class IndexCountPlanNode;
+struct IndexCursor;
 
 class IndexCountExecutor : public AbstractExecutor
 {
@@ -49,8 +50,6 @@ public:
 private:
     bool p_init(AbstractPlanNode*, TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
-
-    long countNulls(TableIndex * tableIndex, AbstractExpression * countNullExpr);
 
     // Data in this class is arranged roughly in the order it is read for
     // p_execute(). Please don't reshuffle it only in the name of beauty.
@@ -83,4 +82,4 @@ private:
 
 }
 
-#endif
+#endif // HSTOREINDEXCOUNTEXECUTOR_H

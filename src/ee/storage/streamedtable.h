@@ -30,12 +30,12 @@ namespace voltdb {
 // forward decl.
 class Topend;
 class ExecutorContext;
-class TupleStreamWrapper;
+class ExportTupleStream;
 
 /**
  * A streamed table does not store data. It may not be read. It may
  * not be updated. Only new appended writes are permitted. All writes
- * are passed through a TupleStreamWrapper to Export. The table exists
+ * are passed through a ExportTupleStream to Export. The table exists
  * only to support Export.
  */
 
@@ -53,6 +53,11 @@ class StreamedTable : public Table {
     // Return a table iterator BY VALUE
     virtual TableIterator& iterator();
     virtual TableIterator* makeIterator();
+
+    virtual TableIterator& iteratorDeletingAsWeGo() {
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "May not iterate a streamed table.");
+    }
 
     // ------------------------------------------------------------------
     // GENERIC TABLE OPERATIONS
@@ -72,7 +77,7 @@ class StreamedTable : public Table {
                                                 bool=true);
 
 
-    virtual void loadTuplesFrom(SerializeInput &serialize_in, Pool *stringPool = NULL);
+    virtual void loadTuplesFrom(SerializeInputBE &serialize_in, Pool *stringPool = NULL);
     virtual void flushOldTuples(int64_t timeInMillis);
     virtual void setSignatureAndGeneration(std::string signature, int64_t generation);
 
@@ -122,7 +127,7 @@ private:
 
     voltdb::StreamedTableStats stats_;
     ExecutorContext *m_executorContext;
-    TupleStreamWrapper *m_wrapper;
+    ExportTupleStream *m_wrapper;
     int64_t m_sequenceNo;
 };
 

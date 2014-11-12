@@ -18,8 +18,6 @@
 package org.voltdb.iv2;
 
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,10 +25,18 @@ import java.util.Map;
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
-import org.voltdb.*;
+import org.voltdb.DependencyPair;
+import org.voltdb.ParameterSet;
+import org.voltdb.SiteProcedureConnection;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltProcedure.VoltAbortException;
+import org.voltdb.VoltSystemProcedure;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.exceptions.SerializableException;
+import org.voltdb.exceptions.SpecifiedException;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.rejoin.TaskLog;
@@ -38,7 +44,6 @@ import org.voltdb.sysprocs.SysProcFragmentId;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltTableUtil;
-import org.voltdb.VoltProcedure.VoltAbortException;
 
 public class SysprocFragmentTask extends TransactionTask
 {
@@ -113,7 +118,7 @@ public class SysprocFragmentTask extends TransactionTask
         // to take place.
         if (m_fragmentMsg.isSysProcTask() &&
             SysProcFragmentId.isSnapshotSaveFragment(m_fragmentMsg.getPlanHash(0)) &&
-            VoltDB.instance().rejoinDataPending()) {
+            !VoltDB.instance().isMpSysprocSafeToExecute(m_txnState.txnId)) {
             respondWithDummy();
             return;
         }
@@ -136,11 +141,12 @@ public class SysprocFragmentTask extends TransactionTask
                     "The rejoining node's VoltDB process will now exit.", false, null);
         }
 
-        //If this is a snapshot save test we have the nonce of the snapshot
+        //If this is a snapshot creation we have the nonce of the snapshot
         //Provide it to the site so it can decide to enable recording in the task log
         //if it is our rejoin snapshot start
-        if (SysProcFragmentId.isSnapshotSaveTestFragment(m_fragmentMsg.getPlanHash(0))) {
-            siteConnection.notifyOfSnapshotNonce((String)m_fragmentMsg.getParameterSetForFragment(0).toArray()[1]);
+        if (SysProcFragmentId.isFirstSnapshotFragment(m_fragmentMsg.getPlanHash(0))) {
+            siteConnection.notifyOfSnapshotNonce((String)m_fragmentMsg.getParameterSetForFragment(0).toArray()[1],
+                    m_fragmentMsg.getSpHandle());
         }
         taskLog.logTask(m_fragmentMsg);
 
@@ -198,7 +204,19 @@ public class SysprocFragmentTask extends TransactionTask
                         new Object[] { Encoder.hexEncode(m_fragmentMsg.getFragmentPlan(frag)) }, e);
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
                 break;
-            } catch (final VoltAbortException e) {
+            }
+            catch (final SpecifiedException e) {
+                // Note that with SpecifiedException, the error code here might get changed before
+                // the client/user sees it. It really just needs to indicate failure.
+                //
+                // Key point here vs the next catch block for VAE is to not wrap the subclass of
+                // SerializableException here to preserve it during the serialization.
+                //
+                currentFragResponse.setStatus(
+                        FragmentResponseMessage.USER_ERROR,
+                        e);
+            }
+            catch (final VoltAbortException e) {
                 currentFragResponse.setStatus(
                         FragmentResponseMessage.USER_ERROR,
                         new SerializableException(CoreUtils.throwableToString(e)));

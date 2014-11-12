@@ -72,17 +72,17 @@ public class QuerySpecification extends QueryExpression {
     private HsqlArrayList rangeVariableList;
     Expression            queryCondition;
     Expression            checkQueryCondition;
-    Expression            havingCondition;
+    private Expression    havingCondition;
     Expression[]          exprColumns;
     private HsqlArrayList exprColumnList;
     public int            indexLimitVisible;
-    int                   indexLimitRowId;
-    int                   groupByColumnCount;    // columns in 'group by'
-    int                   havingColumnCount;     // columns in 'having' (0 or 1)
+    private int           indexLimitRowId;
+    private int           groupByColumnCount;    // columns in 'group by'
+    private int           havingColumnCount;     // columns in 'having' (0 or 1)
     public int            indexStartOrderBy;
-    int                   indexStartAggregates;
-    int                   indexLimitExpressions;
-    int                   indexLimitData;
+    private int           indexStartAggregates;
+    private int           indexLimitExpressions;
+    private int           indexLimitData;
 
     //
     public boolean  isUniqueResultRows;
@@ -194,12 +194,10 @@ public class QuerySpecification extends QueryExpression {
         isGrouped         = true;
     }
 
-    @Override
     void addSortAndSlice(SortAndSlice sortAndSlice) {
         this.sortAndSlice = sortAndSlice;
     }
 
-    @Override
     public void resolveReferences(Session session) {
 
         finaliseRangeVariables();
@@ -248,8 +246,103 @@ public class QuerySpecification extends QueryExpression {
                                                rangeVariables.length, false);
         }
 
+    /************************* Volt DB Extensions *************************/
+        resolveColumnReferencesInGroupBy();
+    /**********************************************************************/
+
         resolveColumnRefernecesInOrderBy(sortAndSlice);
     }
+
+    /************************* Volt DB Extensions *************************/
+    void resolveColumnReferencesInGroupBy() {
+        if (! isAggregated) {
+            return;
+        }
+
+        if (unresolvedExpressions == null || unresolvedExpressions.isEmpty()) {
+            return;
+        }
+
+        /**
+         * Hsql HashSet does not work properly to remove duplicates, I doubt the hash
+         * function or equal function on expression work properly or something else
+         * is wrong. So use list
+         *
+         */
+        // resolve GROUP BY columns/expressions
+        HsqlList newUnresolvedExpressions = new ArrayListIdentity();
+
+        int size = unresolvedExpressions.size();
+        for (int i = 0; i < size; i++) {
+            Object obj = unresolvedExpressions.get(i);
+            newUnresolvedExpressions.add(obj);
+            if (i + 1 < size && obj == unresolvedExpressions.get(i+1)) {
+                // unresolvedExpressions is a public member that can be accessed from anywhere and
+                // I (xin) am 90% percent sure about the hsql adds the unresolved expression twice
+                // together for our targeted GROUP BY alias case.
+                // so we want to skip the repeated expression also.
+                // For other unresolved expression, it may differs.
+                i += 1;
+            }
+            if (obj instanceof ExpressionColumn == false) {
+                continue;
+            }
+            ExpressionColumn element = (ExpressionColumn) obj;
+            if (element.tableName != null) {
+                // this alias does not belong to any table
+                continue;
+            }
+
+            // group by alias which is thought as an column
+            if (element.getType() != OpTypes.COLUMN) {
+                continue;
+            }
+
+            // find the unsolved expression in the groupBy list
+            int k = indexLimitVisible;
+            int endGroupbyIndex = indexLimitVisible + groupByColumnCount;
+            for (; k < endGroupbyIndex; k++) {
+                if (element == exprColumns[k]) {
+                    break;
+                }
+            }
+            if (k == endGroupbyIndex) {
+                // not found in selected list
+                continue;
+            }
+            assert(exprColumns[k].getType() == OpTypes.COLUMN);
+
+            ExpressionColumn exprCol = (ExpressionColumn) exprColumns[k];
+            String alias = exprCol.getColumnName();
+            if (alias == null) {
+                // we should not handle this case (group by constants)
+                continue;
+            }
+
+            // find it in the SELECT list
+            for (int j = 0; j < indexLimitVisible; j++) {
+                Expression selectCol = exprColumns[j];
+                if (selectCol.isAggregate) {
+                    // Group by can not support aggregate expression
+                    continue;
+                }
+                if (selectCol.alias == null) {
+                    // columns referenced by their alias must have an alias
+                    continue;
+                }
+                if (alias.equals(selectCol.alias.name)) {
+                    exprColumns[k] = selectCol;
+                    exprColumnList.set(k, selectCol);
+                    // found it and get the next one
+
+                    newUnresolvedExpressions.remove(element);
+                    break;
+                }
+            }
+        }
+        unresolvedExpressions = newUnresolvedExpressions;
+    }
+    /**********************************************************************/
 
     void resolveColumnRefernecesInOrderBy(SortAndSlice sortAndSlice) {
 
@@ -550,7 +643,6 @@ public class QuerySpecification extends QueryExpression {
         }
     }
 
-    @Override
     public boolean hasReference(RangeVariable range) {
 
         if (unresolvedExpressions == null) {
@@ -637,7 +729,6 @@ public class QuerySpecification extends QueryExpression {
         }
     }
 
-    @Override
     public boolean areColumnsResolved() {
         return unresolvedExpressions == null
                || unresolvedExpressions.isEmpty();
@@ -656,7 +747,6 @@ public class QuerySpecification extends QueryExpression {
 //        queryCondition = null;
     }
 
-    @Override
     public void resolveTypes(Session session) {
 
         if (isResolved) {
@@ -679,7 +769,6 @@ public class QuerySpecification extends QueryExpression {
         return;
     }
 
-    @Override
     void resolveTypesPartOne(Session session) {
 
         resolveExpressionTypes(session);
@@ -692,7 +781,6 @@ public class QuerySpecification extends QueryExpression {
         }
     }
 
-    @Override
     void resolveTypesPartTwo(Session session) {
 
         resolveGroups();
@@ -985,9 +1073,12 @@ public class QuerySpecification extends QueryExpression {
                 (Integer) sortAndSlice.limitCondition.getRightNode().getValue(
                     session);
 
-            // Tweaked by VoltDB to support LIMIT 0
-            // WAS: (limit == null || limit.intValue() <= 0)
+            // A VoltDB extension to support LIMIT 0
             if (limit == null || limit.intValue() < 0) {
+            /* disable 1 line ...
+            if (limit == null || limit.intValue() <= 0) {
+            ... disabled 1 line */
+            // End of VoltDB extension
                 throw Error.error(ErrorCode.X_2201W);
             }
 
@@ -1015,25 +1106,29 @@ public class QuerySpecification extends QueryExpression {
                 rowCount = limitCount;
             }
 
-            // Tweaked by VoltDB to support LIMIT 0
-            // WAS: (rowCount == 0 || ...) which had been testing for a never true case, anyway
+            // A VoltDB extension to support LIMIT 0
             if (rowCount > Integer.MAX_VALUE - limitStart) {
+            /* disable 1 line ...
+            if (rowCount == 0 || rowCount > Integer.MAX_VALUE - limitStart) {
+            ... disabled 1 line */
+            // End of VoltDB extension
                 rowCount = Integer.MAX_VALUE;
             } else {
                 rowCount += limitStart;
             }
-        }
-        // Tweaked by VoltDB to support LIMIT 0
-        // limitCount == 0 can be enforced/optimized as rowCount == 0 regardless of offset
-        // even in non-simpleLimit cases (SELECT DISTINCT, GROUP BY, and/or ORDER BY).
-        // This is an optimal handling of a hard-coded LIMIT 0, but it really shouldn't be the ONLY enforcement
-        // for zero LIMITs -- what about "LIMIT ?" with 0 passed later as a parameter?
-        // The HSQL executor may still be missing some runtime enforcement of zero limits.
-        // The VoltDB executor has such enforcement.
-        else if (limitCount == 0) {
-            rowCount = 0;
         } else {
             rowCount = Integer.MAX_VALUE;
+            // A VoltDB extension to support LIMIT 0
+            // limitCount == 0 can be enforced/optimized as rowCount == 0 regardless of offset
+            // even in non-simpleLimit cases (SELECT DISTINCT, GROUP BY, and/or ORDER BY).
+            // This is an optimal handling of a hard-coded LIMIT 0, but it really shouldn't be the ONLY
+            // enforcement for zero LIMITs -- what about "LIMIT ?" with 0 passed later as a parameter?
+            // The HSQL executor ("HSQL back end") also needs runtime enforcement of zero limits.
+            // The VoltDB executor has such enforcement.
+            if (limitCount == 0) {
+                rowCount = 0;
+            }
+            // End of VoltDB extension
         }
 
         return rowCount;
@@ -1046,7 +1141,6 @@ public class QuerySpecification extends QueryExpression {
      * Positive values limit the size of the result set.
      * @return the result of executing this Select
      */
-    @Override
     Result getResult(Session session, int maxrows) {
 
         Result r;
@@ -1080,18 +1174,19 @@ public class QuerySpecification extends QueryExpression {
     private Result buildResult(Session session, int limitcount) {
 
         RowSetNavigatorData navigator = new RowSetNavigatorData(session,
-            this);
+            (QuerySpecification) this);
         Result result = Result.newResult(navigator);
 
         result.metaData = resultMetaData;
 
         result.setDataResultConcurrency(isUpdatable);
 
+        // A VoltDB extension to support LIMIT 0
         // Test for early return case added by VoltDB to support LIMIT 0 in "HSQL backend".
         if (limitcount == 0) {
             return result;
         }
-
+        // End of VoltDB extension
         int fullJoinIndex = 0;
         RangeIterator[] rangeIterators =
             new RangeIterator[rangeVariables.length];
@@ -1224,7 +1319,7 @@ public class QuerySpecification extends QueryExpression {
 
         if (havingCondition != null) {
             while (navigator.hasNext()) {
-                Object[] data = navigator.getNext();
+                Object[] data = (Object[]) navigator.getNext();
 
                 if (!Boolean.TRUE.equals(
                         data[indexLimitVisible + groupByColumnCount])) {
@@ -1316,7 +1411,6 @@ public class QuerySpecification extends QueryExpression {
         }
     }
 
-    @Override
     void createTable(Session session) {
 
         createResultTable(session);
@@ -1353,7 +1447,6 @@ public class QuerySpecification extends QueryExpression {
         }
     }
 
-    @Override
     void createResultTable(Session session) {
 
         HsqlName       tableName;
@@ -1472,12 +1565,10 @@ public class QuerySpecification extends QueryExpression {
         return sb.toString();
     }
 
-    @Override
     public ResultMetaData getMetaData() {
         return resultMetaData;
     }
 
-    @Override
     public String describe(Session session) {
 
         StringBuffer sb;
@@ -1660,12 +1751,10 @@ public class QuerySpecification extends QueryExpression {
         }
     }
 
-    @Override
     public Table getBaseTable() {
         return baseTable;
     }
 
-    @Override
     public void collectAllExpressions(HsqlList set, OrderedIntHashSet typeSet,
                                       OrderedIntHashSet stopAtTypeSet) {
 
@@ -1680,7 +1769,6 @@ public class QuerySpecification extends QueryExpression {
                                          stopAtTypeSet);
     }
 
-    @Override
     public void collectObjectNames(Set set) {
 
         for (int i = 0; i < indexStartAggregates; i++) {
@@ -1782,7 +1870,6 @@ public class QuerySpecification extends QueryExpression {
     /**
      * Not for views. Only used on root node.
      */
-    @Override
     public void setAsTopLevel() {
 
         setReturningResultSet();
@@ -1791,18 +1878,15 @@ public class QuerySpecification extends QueryExpression {
         isTopLevel       = true;
     }
 
-    @Override
     void setReturningResultSet() {
         persistenceScope = TableBase.SCOPE_SESSION;
         columnMode       = TableBase.COLUMNS_UNREFERENCED;
     }
 
-    @Override
     public boolean isSingleColumn() {
         return indexLimitVisible == 1;
     }
 
-    @Override
     public String[] getColumnNames() {
 
         String[] names = new String[indexLimitVisible];
@@ -1814,7 +1898,6 @@ public class QuerySpecification extends QueryExpression {
         return names;
     }
 
-    @Override
     public Type[] getColumnTypes() {
 
         if (columnTypes.length == indexLimitVisible) {
@@ -1828,22 +1911,18 @@ public class QuerySpecification extends QueryExpression {
         return types;
     }
 
-    @Override
     public int getColumnCount() {
         return indexLimitVisible;
     }
 
-    @Override
     public int[] getBaseTableColumnMap() {
         return columnMap;
     }
 
-    @Override
     public Expression getCheckCondition() {
         return queryCondition;
     }
 
-    @Override
     void getBaseTableNames(OrderedHashSet set) {
 
         for (int i = 0; i < rangeVariables.length; i++) {
@@ -1861,4 +1940,42 @@ public class QuerySpecification extends QueryExpression {
             set.add(name);
         }
     }
+
+    /************************* Volt DB Extensions *************************/
+    Expression getHavingCondition() { return havingCondition; }
+
+    /**
+     * Dumps the exprColumns list for this query specification.
+     * Writes to stdout.
+     *
+     * This method is useful to understand how the HSQL parser
+     * transforms its data structures during parsing.  For example,
+     * place call to this method at the beginning and end of
+     * resolveGroups() to see what it does.
+     *
+     * @param header    A string to be prepended to output
+     */
+    private void dumpExprColumns(String header){
+        System.out.println("\n\n*********************************************");
+        System.out.println(header);
+        try {
+            System.out.println(getSQL());
+        } catch (Exception e) {
+        }
+        for (int i = 0; i < exprColumns.length; ++i) {
+            if (i == 0)
+                System.out.println("Visible columns:");
+            if (i == indexStartOrderBy)
+                System.out.println("start order by:");
+            if (i == indexStartAggregates)
+                System.out.println("start aggregates:");
+            if (i == indexLimitVisible)
+                System.out.println("After limit of visible columns:");
+
+            System.out.println(i + ": " + exprColumns[i]);
+        }
+
+        System.out.println("\n\n");
+    }
+    /**********************************************************************/
 }

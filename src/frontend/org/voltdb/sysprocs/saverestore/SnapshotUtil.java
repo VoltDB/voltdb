@@ -43,7 +43,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.LinkedTransferQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
@@ -89,6 +89,7 @@ import com.google_voltpatches.common.util.concurrent.SettableFuture;
 public class SnapshotUtil {
 
     public final static String HASH_EXTENSION = ".hash";
+    public final static String COMPLETION_EXTENSION = ".finished";
 
     public static final String JSON_PATH = "path";
     public static final String JSON_NONCE = "nonce";
@@ -432,6 +433,29 @@ public class SnapshotUtil {
             throw new IOException("Unable to write snapshot catalog to file: " +
                                   path + File.separator + filename, ioe);
         }
+    }
+
+    /**
+     * Write the .complete file for finished snapshot
+     */
+    public static Runnable writeSnapshotCompletion(String path, String nonce, int hostId, final VoltLogger logger) throws IOException {
+
+        final File f = new VoltFile(path, constructCompletionFilenameForNonce(nonce, hostId));
+        if (f.exists()) {
+            if (!f.delete()) {
+                throw new IOException("Failed to replace existing " + f.getName());
+            }
+        }
+        return new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    f.createNewFile();
+                } catch (IOException e) {
+                    throw new RuntimeException("Failed to create .complete file for " + f.getName(), e);
+                }
+            }
+        };
     }
 
     /**
@@ -808,7 +832,7 @@ public class SnapshotUtil {
                     }
                 } else {
                     HashSet<Integer> partitionIds = new HashSet<Integer>();
-                    TableSaveFile saveFile = new TableSaveFile(fis.getChannel(), 1, null, true);
+                    TableSaveFile saveFile = new TableSaveFile(fis, 1, null, true);
                     try {
                         for (Integer partitionId : saveFile.getPartitionIds()) {
                             partitionIds.add(partitionId);
@@ -1170,6 +1194,10 @@ public class SnapshotUtil {
         return (nonce + "-host_" + hostId + HASH_EXTENSION);
     }
 
+    public static final String constructCompletionFilenameForNonce(String nonce, int hostId) {
+        return (nonce + "-host_" + hostId + COMPLETION_EXTENSION);
+    }
+
     /**
      * Generates the catalog filename for the given nonce.
      * @param nonce
@@ -1212,22 +1240,33 @@ public class SnapshotUtil {
         return save_files;
     }
 
-    public static boolean didSnapshotRequestSucceed(VoltTable results[]) {
-        if (results.length < 1) return false;
+    public static String didSnapshotRequestFailWithErr(VoltTable results[]) {
+        if (results.length < 1) return "HAD NO RESULT TABLES";
         final VoltTable result = results[0];
         result.resetRowPosition();
+        //Crazy old code would return one column with an error message.
+        //Not sure any of it exists anymore
         if (result.getColumnCount() == 1) {
-            return false;
+            if (result.advanceRow()) {
+                return result.getString(0);
+            } else {
+                return "UNKNOWN ERROR WITH ONE COLUMN NO ROW RESULT TABLE";
+            }
         }
 
         //assert(result.getColumnName(1).equals("TABLE"));
-        boolean success = true;
+        String err = null;
         while (result.advanceRow()) {
             if (!result.getString("RESULT").equals("SUCCESS")) {
-                success = false;
+                err = result.getString("ERR_MSG");
             }
         }
-        return success;
+        result.resetRowPosition();
+        return err;
+    }
+
+    public static boolean didSnapshotRequestSucceed(VoltTable result[]) {
+        return didSnapshotRequestFailWithErr(result) == null;
     }
 
     public static boolean isSnapshotInProgress(VoltTable results[]) {
@@ -1285,6 +1324,10 @@ public class SnapshotUtil {
                 if (resp == null) {
                     VoltDB.crashLocalVoltDB("Failed to initiate snapshot", false, null);
                 } else if (resp.getStatus() != ClientResponseImpl.SUCCESS) {
+                    final String statusString = resp.getStatusString();
+                    if (statusString != null && statusString.contains("Failure while running system procedure @SnapshotSave")) {
+                        VoltDB.crashLocalVoltDB("Failed to initiate snapshot due to node failure, aborting", false, null);
+                    }
                     VoltDB.crashLocalVoltDB("Failed to initiate snapshot: "
                                             + resp.getStatusString(), true, null);
                 }
@@ -1334,7 +1377,7 @@ public class SnapshotUtil {
         final SnapshotInitiationInfo snapInfo = new SnapshotInitiationInfo(path, nonce, blocking, format, data);
         final SimpleClientResponseAdapter adapter =
                 new SimpleClientResponseAdapter(ClientInterface.SNAPSHOT_UTIL_CID, "SnapshotUtilAdapter", true);
-        final LinkedTransferQueue<ClientResponse> responses = new LinkedTransferQueue<ClientResponse>();
+        final LinkedBlockingQueue<ClientResponse> responses = new LinkedBlockingQueue<ClientResponse>();
         adapter.registerCallback(clientHandle, new SimpleClientResponseAdapter.Callback() {
             @Override
             public void handleResponse(ClientResponse response)
@@ -1419,9 +1462,9 @@ public class SnapshotUtil {
 
         buf.putInt(outputContainers.size());
         for (DBBPool.BBContainer container : outputContainers) {
-            buf.putLong(container.address);
-            buf.putInt(container.b.position());
-            buf.putInt(container.b.remaining());
+            buf.putLong(container.address());
+            buf.putInt(container.b().position());
+            buf.putInt(container.b().remaining());
         }
 
         return buf.array();
@@ -1442,7 +1485,7 @@ public class SnapshotUtil {
             @Override
             public CountDownLatch snapshotCompleted(SnapshotCompletionEvent event)
             {
-                if (event.nonce.equals(nonce)) {
+                if (event.nonce.equals(nonce) && event.didSucceed) {
                     VoltDB.instance().getSnapshotCompletionMonitor().removeInterest(this);
                     result.set(event);
                 }

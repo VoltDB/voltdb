@@ -37,8 +37,8 @@ import org.voltdb.LegacyHashinator;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
-import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.TheHashinator.HashinatorConfig;
+import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -99,10 +99,10 @@ public class TestExecutionEngine extends TestCase {
 
         System.out.println(warehousedata.toString());
         // Long.MAX_VALUE is a no-op don't track undo token
-        engine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, false, Long.MAX_VALUE);
+        engine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, 0, false, false, Long.MAX_VALUE);
 
         //Check that we can detect and handle the dups when loading the data twice
-        byte results[] = engine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, true, Long.MAX_VALUE);
+        byte results[] = engine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, 0, true, false, Long.MAX_VALUE);
         System.out.println("Printing dups");
         System.out.println(PrivateVoltTableFactory.createVoltTableFromBuffer(ByteBuffer.wrap(results), true));
 
@@ -132,7 +132,7 @@ public class TestExecutionEngine extends TestCase {
                              "sdist9", "sdist10", 0, 0, 0, "sdata");
         }
         // Long.MAX_VALUE is a no-op don't track undo token
-        engine.loadTable(STOCK_TABLEID, stockdata, 0, 0, false, Long.MAX_VALUE);
+        engine.loadTable(STOCK_TABLEID, stockdata, 0, 0, 0, false, false, Long.MAX_VALUE);
     }
 
     public void testLoadTable() throws Exception {
@@ -182,15 +182,17 @@ public class TestExecutionEngine extends TestCase {
         sourceEngine.activateTableStream( STOCK_TABLEID, TableStreamType.RECOVERY, Long.MAX_VALUE,
                                           new SnapshotPredicates(-1).toBytes());
 
-        BBContainer origin = DBBPool.allocateDirect(1024 * 1024 * 2);
-        try {
-            origin.b.clear();
-            long address = org.voltcore.utils.DBBPool.getBufferAddress(origin.b);
-            BBContainer container = new BBContainer(origin.b, address){
+        final BBContainer origin = DBBPool.allocateDirect(1024 * 1024 * 2);
+        origin.b().clear();
+        final BBContainer container = new BBContainer(origin.b()){
 
-                @Override
-                public void discard() {
-                }};
+            @Override
+            public void discard() {
+                checkDoubleFree();
+                origin.discard();
+            }};
+        try {
+
 
             List<BBContainer> output = new ArrayList<BBContainer>();
             output.add(container);
@@ -198,37 +200,37 @@ public class TestExecutionEngine extends TestCase {
                                                                    TableStreamType.RECOVERY,
                                                                    output).getSecond()[0];
             assertTrue(serialized > 0);
-            container.b.limit(serialized);
-            destinationEngine.get().processRecoveryMessage( container.b, container.address);
+            container.b().limit(serialized);
+            destinationEngine.get().processRecoveryMessage( container.b(), container.address() );
 
 
             serialized = sourceEngine.tableStreamSerializeMore(WAREHOUSE_TABLEID,
                                                                TableStreamType.RECOVERY,
                                                                output).getSecond()[0];
             assertEquals( 5, serialized);
-            assertEquals( RecoveryMessageType.Complete.ordinal(), container.b.get());
+            assertEquals( RecoveryMessageType.Complete.ordinal(), container.b().get());
 
             assertEquals( sourceEngine.tableHashCode(WAREHOUSE_TABLEID), destinationEngine.get().tableHashCode(WAREHOUSE_TABLEID));
 
-            container.b.clear();
+            container.b().clear();
             serialized = sourceEngine.tableStreamSerializeMore(STOCK_TABLEID,
                                                                TableStreamType.RECOVERY,
                                                                output).getSecond()[0];
             assertTrue(serialized > 0);
-            container.b.limit(serialized);
-            destinationEngine.get().processRecoveryMessage( container.b, container.address);
+            container.b().limit(serialized);
+            destinationEngine.get().processRecoveryMessage( container.b(), container.address());
 
 
             serialized = sourceEngine.tableStreamSerializeMore(STOCK_TABLEID,
                                                                TableStreamType.RECOVERY,
                                                                output).getSecond()[0];
             assertEquals( 5, serialized);
-            assertEquals( RecoveryMessageType.Complete.ordinal(), container.b.get());
-            assertEquals( STOCK_TABLEID, container.b.getInt());
+            assertEquals( RecoveryMessageType.Complete.ordinal(), container.b().get());
+            assertEquals( STOCK_TABLEID, container.b().getInt());
 
             assertEquals( sourceEngine.tableHashCode(STOCK_TABLEID), destinationEngine.get().tableHashCode(STOCK_TABLEID));
         } finally {
-            origin.discard();
+            container.discard();
         }
     }
 
@@ -297,19 +299,21 @@ public class TestExecutionEngine extends TestCase {
         sourceEngine.activateTableStream(STOCK_TABLEID, TableStreamType.ELASTIC_INDEX, Long.MAX_VALUE, predicates.toBytes());
 
         // Humor serializeMore() by providing a buffer, even though it's not used.
-        BBContainer origin = DBBPool.allocateDirect(1024 * 1024 * 2);
+        final BBContainer origin = DBBPool.allocateDirect(1024 * 1024 * 2);
+        origin.b().clear();
+        BBContainer container = new BBContainer(origin.b()){
+            @Override
+            public void discard() {
+                checkDoubleFree();
+                origin.discard();
+            }
+        };
         try {
-            origin.b.clear();
-            long address = org.voltcore.utils.DBBPool.getBufferAddress(origin.b);
-            BBContainer container = new BBContainer(origin.b, address){
-                @Override
-                public void discard() {}
-            };
             List<BBContainer> output = new ArrayList<BBContainer>();
             output.add(container);
             assertEquals(0, sourceEngine.tableStreamSerializeMore(STOCK_TABLEID, TableStreamType.ELASTIC_INDEX, output).getSecond()[0]);
         } finally {
-            origin.discard();
+            container.discard();
         }
     }
 
@@ -343,5 +347,7 @@ public class TestExecutionEngine extends TestCase {
         super.tearDown();
         sourceEngine.release();
         sourceEngine = null;
+        System.gc();
+        System.runFinalization();
     }
 }

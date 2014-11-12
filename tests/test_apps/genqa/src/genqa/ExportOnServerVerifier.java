@@ -840,7 +840,7 @@ public class ExportOnServerVerifier {
             FileReader fr = new FileReader(file);
             BufferedReader br = new BufferedReader(fr);
             final String firstLine = br.readLine();
-            if (firstLine.contains("PRIVATE KEY")) {
+            if (firstLine != null && firstLine.contains("PRIVATE KEY")) {
                 m_jsch.addIdentity(file.getAbsolutePath());
             }
         }
@@ -1476,11 +1476,12 @@ public class ExportOnServerVerifier {
         }
     }
 
-    ValidationErr verifyRow(String[] row) throws ValidationErr
+    public static ValidationErr verifyRow(String[] row) throws ValidationErr
     {
         if (row.length < 29)
         {
-            System.err.println("ERROR: Unexpected number of columns for the following row:\n\t" + Arrays.toString(row));
+            System.err.println("ERROR: Unexpected number of columns for the following row:\n\t Expected 29, Found: "
+                    + row.length + "Row:" + Arrays.toString(row));
             return new ValidationErr("number of columns", row.length, 29);
         }
 
@@ -1629,8 +1630,8 @@ public class ExportOnServerVerifier {
         return null;
     }
 
-    private ValidationErr error(String msg, Object val, Object exp) throws ValidationErr {
-        System.err.println("ERROR: " + msg + " " + val + " " + exp);
+    public static ValidationErr error(String msg, Object val, Object exp) throws ValidationErr {
+        System.err.println("ERROR: " + msg + "Value:" + val + "\nExpected:" + exp);
         return new ValidationErr(msg, val, exp);
     }
 

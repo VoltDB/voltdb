@@ -35,6 +35,7 @@
 #include "storage/persistenttable.h"
 #include "storage/tablefactory.h"
 #include "storage/tableutil.h"
+#include "storage/DRTupleStream.h"
 #include "indexes/tableindex.h"
 
 using namespace std;
@@ -76,11 +77,10 @@ public:
         delete m_table;
     }
 
-    void initTable(bool allowInlineStrings) {
-        m_tableSchema = TupleSchema::createTupleSchema(m_tableSchemaTypes,
+    void initTable() {
+        m_tableSchema = TupleSchema::createTupleSchemaForTest(m_tableSchemaTypes,
                                                        m_tableSchemaColumnSizes,
-                                                       m_tableSchemaAllowNull,
-                                                       allowInlineStrings);
+                                                       m_tableSchemaAllowNull);
 
         TableIndexScheme indexScheme("primaryKeyIndex",
                                      BALANCED_TREE_INDEX,
@@ -91,7 +91,7 @@ public:
         vector<TableIndexScheme> indexes;
 
         m_table = dynamic_cast<PersistentTable*>(
-            TableFactory::getPersistentTable(0, "Foo", m_tableSchema, m_columnNames, 0));
+            TableFactory::getPersistentTable(0, "Foo", m_tableSchema, m_columnNames, signature, &drStream, false, 0));
 
         TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(indexScheme);
         assert(pkeyIndex);
@@ -109,15 +109,17 @@ public:
     VoltDBEngine *m_engine;
     TupleSchema *m_tableSchema;
     PersistentTable *m_table;
+    MockDRTupleStream drStream;
     vector<string> m_columnNames;
     vector<ValueType> m_tableSchemaTypes;
     vector<int32_t> m_tableSchemaColumnSizes;
     vector<bool> m_tableSchemaAllowNull;
     vector<int> m_primaryKeyIndexColumns;
+    char signature[20];
 };
 
 TEST_F(PersistentTableMemStatsTest, InsertTest) {
-    initTable(true);
+    initTable();
     tableutil::addRandomTuples(m_table, 10);
     int64_t orig_size = m_table->nonInlinedMemorySize();
     //cout << "Original non-inline size: " << orig_size << endl;
@@ -127,15 +129,15 @@ TEST_F(PersistentTableMemStatsTest, InsertTest) {
     tableutil::setRandomTupleValues(m_table, &tuple);
     //cout << "Created random tuple " << endl << tuple.debugNoHeader() << endl;
     size_t added_bytes =
-        StringRef::computeStringMemoryUsed(ValuePeeker::peekObjectLength(tuple.getNValue(1))) +
-        StringRef::computeStringMemoryUsed(ValuePeeker::peekObjectLength(tuple.getNValue(2)));
+        StringRef::computeStringMemoryUsed(ValuePeeker::peekObjectLength_withoutNull(tuple.getNValue(1))) +
+        StringRef::computeStringMemoryUsed(ValuePeeker::peekObjectLength_withoutNull(tuple.getNValue(2)));
     //cout << "Allocating string mem for bytes: " << ValuePeeker::peekObjectLength(tuple.getNValue(1)) + sizeof(int32_t) << endl;
     //cout << "Adding bytes to table: " << added_bytes << endl;
 
     m_engine->setUndoToken(INT64_MIN + 2);
     // this next line is a testing hack until engine data is
     // de-duplicated with executorcontext data
-    m_engine->getExecutorContext();
+    m_engine->updateExecutorContextUndoQuantumForTest();
 
     m_table->insertTuple(tuple);
 
@@ -148,7 +150,7 @@ TEST_F(PersistentTableMemStatsTest, InsertTest) {
 }
 
 TEST_F(PersistentTableMemStatsTest, InsertThenUndoInsertTest) {
-    initTable(true);
+    initTable();
     tableutil::addRandomTuples(m_table, 10);
     int64_t orig_size = m_table->nonInlinedMemorySize();
     //cout << "Original non-inline size: " << orig_size << endl;
@@ -158,14 +160,14 @@ TEST_F(PersistentTableMemStatsTest, InsertThenUndoInsertTest) {
     tableutil::setRandomTupleValues(m_table, &tuple);
     //cout << "Created random tuple " << endl << tuple.debugNoHeader() << endl;
     size_t added_bytes =
-        StringRef::computeStringMemoryUsed(ValuePeeker::peekObjectLength(tuple.getNValue(1))) +
-        StringRef::computeStringMemoryUsed(ValuePeeker::peekObjectLength(tuple.getNValue(2)));
+        StringRef::computeStringMemoryUsed(ValuePeeker::peekObjectLength_withoutNull(tuple.getNValue(1))) +
+        StringRef::computeStringMemoryUsed(ValuePeeker::peekObjectLength_withoutNull(tuple.getNValue(2)));
     //cout << "Adding bytes to table: " << added_bytes << endl;
 
     m_engine->setUndoToken(INT64_MIN + 2);
     // this next line is a testing hack until engine data is
     // de-duplicated with executorcontext data
-    m_engine->getExecutorContext();
+    m_engine->updateExecutorContextUndoQuantumForTest();
 
     m_table->insertTuple(tuple);
 
@@ -182,7 +184,7 @@ TEST_F(PersistentTableMemStatsTest, InsertThenUndoInsertTest) {
 }
 
 TEST_F(PersistentTableMemStatsTest, UpdateTest) {
-    initTable(true);
+    initTable();
     tableutil::addRandomTuples(m_table, 10);
     int64_t orig_size = m_table->nonInlinedMemorySize();
     //cout << "Original non-inline size: " << orig_size << endl;
@@ -192,8 +194,8 @@ TEST_F(PersistentTableMemStatsTest, UpdateTest) {
     //cout << "Retrieved random tuple " << endl << tuple.debugNoHeader() << endl;
 
     size_t removed_bytes =
-        StringRef::computeStringMemoryUsed(ValuePeeker::peekObjectLength(tuple.getNValue(1))) +
-        StringRef::computeStringMemoryUsed(ValuePeeker::peekObjectLength(tuple.getNValue(2)));
+        StringRef::computeStringMemoryUsed(ValuePeeker::peekObjectLength_withoutNull(tuple.getNValue(1))) +
+        StringRef::computeStringMemoryUsed(ValuePeeker::peekObjectLength_withoutNull(tuple.getNValue(2)));
     //cout << "Removing bytes from table: " << removed_bytes << endl;
 
     /*
@@ -207,14 +209,14 @@ TEST_F(PersistentTableMemStatsTest, UpdateTest) {
     tempTuple.setNValue(1, new_string);
     //cout << "Created updated tuple " << endl << tempTuple.debugNoHeader() << endl;
     size_t added_bytes =
-        StringRef::computeStringMemoryUsed(ValuePeeker::peekObjectLength(tempTuple.getNValue(1))) +
-        StringRef::computeStringMemoryUsed(ValuePeeker::peekObjectLength(tempTuple.getNValue(2)));
+        StringRef::computeStringMemoryUsed(ValuePeeker::peekObjectLength_withoutNull(tempTuple.getNValue(1))) +
+        StringRef::computeStringMemoryUsed(ValuePeeker::peekObjectLength_withoutNull(tempTuple.getNValue(2)));
     //cout << "Adding bytes to table: " << added_bytes << endl;
 
     m_engine->setUndoToken(INT64_MIN + 2);
     // this next line is a testing hack until engine data is
     // de-duplicated with executorcontext data
-    m_engine->getExecutorContext();
+    m_engine->updateExecutorContextUndoQuantumForTest();
 
     m_table->updateTuple(tuple, tempTuple);
 
@@ -231,7 +233,7 @@ TEST_F(PersistentTableMemStatsTest, UpdateTest) {
 }
 
 TEST_F(PersistentTableMemStatsTest, UpdateAndUndoTest) {
-    initTable(true);
+    initTable();
     tableutil::addRandomTuples(m_table, 10);
     int64_t orig_size = m_table->nonInlinedMemorySize();
     //cout << "Original non-inline size: " << orig_size << endl;
@@ -241,8 +243,8 @@ TEST_F(PersistentTableMemStatsTest, UpdateAndUndoTest) {
     //cout << "Retrieved random tuple " << endl << tuple.debugNoHeader() << endl;
 
     size_t removed_bytes =
-        StringRef::computeStringMemoryUsed(ValuePeeker::peekObjectLength(tuple.getNValue(1))) +
-        StringRef::computeStringMemoryUsed(ValuePeeker::peekObjectLength(tuple.getNValue(2)));
+        StringRef::computeStringMemoryUsed(ValuePeeker::peekObjectLength_withoutNull(tuple.getNValue(1))) +
+        StringRef::computeStringMemoryUsed(ValuePeeker::peekObjectLength_withoutNull(tuple.getNValue(2)));
     //cout << "Removing bytes from table: " << removed_bytes << endl;
 
     /*
@@ -256,14 +258,14 @@ TEST_F(PersistentTableMemStatsTest, UpdateAndUndoTest) {
     tempTuple.setNValue(1, new_string);
     //cout << "Created random tuple " << endl << tempTuple.debugNoHeader() << endl;
     size_t added_bytes =
-        StringRef::computeStringMemoryUsed(ValuePeeker::peekObjectLength(tempTuple.getNValue(1))) +
-        StringRef::computeStringMemoryUsed(ValuePeeker::peekObjectLength(tempTuple.getNValue(2)));
+        StringRef::computeStringMemoryUsed(ValuePeeker::peekObjectLength_withoutNull(tempTuple.getNValue(1))) +
+        StringRef::computeStringMemoryUsed(ValuePeeker::peekObjectLength_withoutNull(tempTuple.getNValue(2)));
     //cout << "Adding bytes to table: " << added_bytes << endl;
 
     m_engine->setUndoToken(INT64_MIN + 2);
     // this next line is a testing hack until engine data is
     // de-duplicated with executorcontext data
-    m_engine->getExecutorContext();
+    m_engine->updateExecutorContextUndoQuantumForTest();
 
     m_table->updateTuple(tuple, tempTuple);
 
@@ -281,7 +283,7 @@ TEST_F(PersistentTableMemStatsTest, UpdateAndUndoTest) {
 }
 
 TEST_F(PersistentTableMemStatsTest, DeleteTest) {
-    initTable(true);
+    initTable();
     tableutil::addRandomTuples(m_table, 10);
     int64_t orig_size = m_table->nonInlinedMemorySize();
     //cout << "Original non-inline size: " << orig_size << endl;
@@ -291,14 +293,14 @@ TEST_F(PersistentTableMemStatsTest, DeleteTest) {
     //cout << "Retrieved random tuple " << endl << tuple.debugNoHeader() << endl;
 
     size_t removed_bytes =
-        StringRef::computeStringMemoryUsed(ValuePeeker::peekObjectLength(tuple.getNValue(1))) +
-        StringRef::computeStringMemoryUsed(ValuePeeker::peekObjectLength(tuple.getNValue(2)));
+        StringRef::computeStringMemoryUsed(ValuePeeker::peekObjectLength_withoutNull(tuple.getNValue(1))) +
+        StringRef::computeStringMemoryUsed(ValuePeeker::peekObjectLength_withoutNull(tuple.getNValue(2)));
     //cout << "Removing bytes from table: " << removed_bytes << endl;
 
     m_engine->setUndoToken(INT64_MIN + 2);
     // this next line is a testing hack until engine data is
     // de-duplicated with executorcontext data
-    m_engine->getExecutorContext();
+    m_engine->updateExecutorContextUndoQuantumForTest();
 
     m_table->deleteTuple(tuple, true);
 
@@ -312,7 +314,7 @@ TEST_F(PersistentTableMemStatsTest, DeleteTest) {
 }
 
 TEST_F(PersistentTableMemStatsTest, DeleteAndUndoTest) {
-    initTable(true);
+    initTable();
     tableutil::addRandomTuples(m_table, 10);
     int64_t orig_size = m_table->nonInlinedMemorySize();
     //cout << "Original non-inline size: " << orig_size << endl;
@@ -326,7 +328,7 @@ TEST_F(PersistentTableMemStatsTest, DeleteAndUndoTest) {
     m_engine->setUndoToken(INT64_MIN + 2);
     // this next line is a testing hack until engine data is
     // de-duplicated with executorcontext data
-    m_engine->getExecutorContext();
+    m_engine->updateExecutorContextUndoQuantumForTest();
 
     m_table->deleteTuple(tuple, true);
 

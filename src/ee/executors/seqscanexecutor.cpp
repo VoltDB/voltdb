@@ -49,8 +49,10 @@
 #include "common/common.h"
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
+#include "executors/aggregateexecutor.h"
 #include "execution/ProgressMonitorProxy.h"
 #include "expressions/abstractexpression.h"
+#include "plannodes/aggregatenode.h"
 #include "plannodes/seqscannode.h"
 #include "plannodes/projectionnode.h"
 #include "plannodes/limitnode.h"
@@ -68,7 +70,9 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
 
     SeqScanPlanNode* node = dynamic_cast<SeqScanPlanNode*>(abstract_node);
     assert(node);
-    assert(node->getTargetTable());
+    bool isSubquery = node->isSubQuery();
+    assert(isSubquery || node->getTargetTable());
+    assert((! isSubquery) || (node->getChildren().size() == 1));
 
     //
     // OPTIMIZATION: If there is no predicate for this SeqScan,
@@ -78,30 +82,28 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
     // the tuples. We are guarenteed that no Executor will ever
     // modify an input table, so this operation is safe
     //
-    if (!this->needsOutputTableClear())
-    {
-        node->setOutputTable(node->getTargetTable());
+    if (node->getPredicate() != NULL || node->getInlinePlanNodes().size() > 0) {
+        // Create output table based on output schema from the plan
+        const std::string& temp_name = (node->isSubQuery()) ?
+                node->getChildren()[0]->getOutputTable()->name():
+                node->getTargetTable()->name();
+        setTempOutputTable(limits, temp_name);
     }
     //
     // Otherwise create a new temp table that mirrors the
     // output schema specified in the plan (which should mirror
     // the output schema for any inlined projection)
     //
-    else
-    {
-        // Create output table based on output schema from the plan
-        setTempOutputTable(limits, node->getTargetTable()->name());
+    else {
+        node->setOutputTable(isSubquery ?
+                             node->getChildren()[0]->getOutputTable() :
+                             node->getTargetTable());
     }
-    return true;
-}
 
-bool SeqScanExecutor::needsOutputTableClear() {
-    // clear the temporary output table only when it has a predicate.
-    // if it doesn't have a predicate, it's the original persistent table
-    // and we don't have to (and must not) clear it.
-    SeqScanPlanNode* node = dynamic_cast<SeqScanPlanNode*>(m_abstractNode);
-    assert(node);
-    return node->needsOutputTableClear();
+    // Inline aggregation can be serial, partial or hash
+    m_aggExec = voltdb::getInlineAggregateExecutor(node);
+
+    return true;
 }
 
 bool SeqScanExecutor::p_execute(const NValueArray &params) {
@@ -109,16 +111,23 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     assert(node);
     Table* output_table = node->getOutputTable();
     assert(output_table);
-    Table* target_table = node->getTargetTable();
-    assert(target_table);
-    //cout << "SeqScanExecutor: node id" << node->getPlanNodeId() << endl;
+
+    Table* input_table = (node->isSubQuery()) ?
+            node->getChildren()[0]->getOutputTable():
+            node->getTargetTable();
+
+    assert(input_table);
+
+    //* for debug */std::cout << "SeqScanExecutor: node id " << node->getPlanNodeId() <<
+    //* for debug */    " input table " << (void*)input_table <<
+    //* for debug */    " has " << input_table->activeTupleCount() << " tuples " << std::endl;
     VOLT_TRACE("Sequential Scanning table :\n %s",
-               target_table->debug().c_str());
+               input_table->debug().c_str());
     VOLT_DEBUG("Sequential Scanning table : %s which has %d active, %d"
                " allocated",
-               target_table->name().c_str(),
-               (int)target_table->activeTupleCount(),
-               (int)target_table->allocatedTupleCount());
+               input_table->name().c_str(),
+               (int)input_table->activeTupleCount(),
+               (int)input_table->allocatedTupleCount());
 
     //
     // OPTIMIZATION: NESTED PROJECTION
@@ -127,15 +136,11 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     // change any nodes in our expression tree to be ready for the
     // projection operations in execute
     //
-    int num_of_columns = (int)output_table->columnCount();
+    int num_of_columns = -1;
     ProjectionPlanNode* projection_node = dynamic_cast<ProjectionPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
     if (projection_node != NULL) {
-        for (int ctr = 0; ctr < num_of_columns; ctr++) {
-            assert(projection_node->getOutputColumnExpressions()[ctr]);
-            projection_node->getOutputColumnExpressions()[ctr]->substitute(params);
-        }
+        num_of_columns = static_cast<int> (projection_node->getOutputColumnExpressions().size());
     }
-
     //
     // OPTIMIZATION: NESTED LIMIT
     // How nice! We can also cut off our scanning with a nested limit!
@@ -151,24 +156,20 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     // to do here
     //
     if (node->getPredicate() != NULL || projection_node != NULL ||
-        limit_node != NULL)
+        limit_node != NULL || m_aggExec != NULL)
     {
         //
         // Just walk through the table using our iterator and apply
         // the predicate to each tuple. For each tuple that satisfies
         // our expression, we'll insert them into the output table.
         //
-        TableTuple tuple(target_table->schema());
-        TableIterator iterator = target_table->iterator();
+        TableTuple tuple(input_table->schema());
+        TableIterator iterator = input_table->iteratorDeletingAsWeGo();
         AbstractExpression *predicate = node->getPredicate();
 
         if (predicate)
         {
             VOLT_TRACE("SCAN PREDICATE A:\n%s\n", predicate->debug(true).c_str());
-            predicate->substitute(params);
-            assert(predicate != NULL);
-            VOLT_DEBUG("SCAN PREDICATE B:\n%s\n",
-                       predicate->debug(true).c_str());
         }
 
         int limit = -1;
@@ -180,12 +181,25 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         int tuple_ctr = 0;
         int tuple_skipped = 0;
         TempTable* output_temp_table = dynamic_cast<TempTable*>(output_table);
-        ProgressMonitorProxy pmp(m_engine, target_table);
+
+        ProgressMonitorProxy pmp(m_engine, this, node->isSubQuery() ? NULL : input_table);
+        TableTuple temp_tuple;
+        if (m_aggExec != NULL) {
+            const TupleSchema * inputSchema = input_table->schema();
+            if (projection_node != NULL) {
+                inputSchema = projection_node->getOutputTable()->schema();
+            }
+            temp_tuple = m_aggExec->p_execute_init(params, &pmp,
+                    inputSchema, output_temp_table);
+        } else {
+            temp_tuple = output_temp_table->tempTuple();
+        }
+
         while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple))
         {
             VOLT_TRACE("INPUT TUPLE: %s, %d/%d\n",
-                       tuple.debug(target_table->name()).c_str(), tuple_ctr,
-                       (int)target_table->activeTupleCount());
+                       tuple.debug(input_table->name()).c_str(), tuple_ctr,
+                       (int)input_table->activeTupleCount());
             pmp.countdownProgress();
             //
             // For each tuple we need to evaluate it against our predicate
@@ -205,27 +219,45 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                 //
                 if (projection_node != NULL)
                 {
-                    TableTuple &temp_tuple = output_table->tempTuple();
-                    for (int ctr = 0; ctr < num_of_columns; ctr++)
-                    {
-                        NValue value =
-                            projection_node->
-                          getOutputColumnExpressions()[ctr]->eval(&tuple, NULL);
+                    VOLT_TRACE("inline projection...");
+                    for (int ctr = 0; ctr < num_of_columns; ctr++) {
+                        NValue value = projection_node->getOutputColumnExpressions()[ctr]->eval(&tuple, NULL);
                         temp_tuple.setNValue(ctr, value);
                     }
-                    output_temp_table->insertTupleNonVirtual(temp_tuple);
+
+                    if (m_aggExec != NULL) {
+                        if (m_aggExec->p_execute_tuple(temp_tuple)) {
+                            break;
+                        }
+                    } else {
+                        output_temp_table->insertTupleNonVirtual(temp_tuple);
+                    }
                 }
                 else
                 {
-                    //
-                    // Insert the tuple into our output table
-                    //
-                    output_temp_table->insertTupleNonVirtual(tuple);
+                    if (m_aggExec != NULL) {
+                        if (m_aggExec->p_execute_tuple(tuple)) {
+                            break;
+                        }
+                    } else {
+                        //
+                        // Insert the tuple into our output table
+                        //
+                        output_temp_table->insertTupleNonVirtual(tuple);
+                    }
                 }
                 pmp.countdownProgress();
             }
         }
+
+        if (m_aggExec != NULL) {
+            m_aggExec->p_execute_finish();
+        }
+
     }
+    //* for debug */std::cout << "SeqScanExecutor: node id " << node->getPlanNodeId() <<
+    //* for debug */    " output table " << (void*)output_table <<
+    //* for debug */    " put " << output_table->activeTupleCount() << " tuples " << std::endl;
     VOLT_TRACE("\n%s\n", output_table->debug().c_str());
     VOLT_DEBUG("Finished Seq scanning");
 

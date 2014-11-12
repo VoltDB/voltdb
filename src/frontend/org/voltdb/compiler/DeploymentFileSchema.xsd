@@ -25,10 +25,6 @@
     For more information about jaxb, see:
     http://java.sun.com/developer/technicalArticles/WebServices/jaxb/
 
-
-    ALSO, if you change this, consider updating:
-        CatalogUtil.getDeploymentCRC()
-
   -->
 
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
@@ -55,12 +51,20 @@
     </xs:all>
   </xs:complexType>
 
+  <xs:simpleType name="schemaType">
+      <xs:restriction base="xs:string">
+          <xs:enumeration value="catalog"/>
+          <xs:enumeration value="ddl"/>
+      </xs:restriction>
+  </xs:simpleType>
+
   <!-- <cluster> -->
   <xs:complexType name="clusterType">
     <xs:attribute name="hostcount" type="xs:int" default="1"/>
-    <xs:attribute name="sitesperhost" type="xs:int" default="2"/>
+    <xs:attribute name="sitesperhost" type="xs:int" default="8"/>
     <xs:attribute name="kfactor" type="xs:int" default="0"/>
     <xs:attribute name="elastic" type="xs:string" default="enabled"/>
+    <xs:attribute name="schema" type="schemaType" default="catalog"/>
   </xs:complexType>
 
   <!-- <paths> -->
@@ -87,16 +91,22 @@
       <xs:minInclusive value="1"/>
     </xs:restriction>
   </xs:simpleType>
-  
-    <xs:simpleType name="elasticPauseType">
+
+  <xs:simpleType name="elasticDurationType">
+    <xs:restriction base="xs:int">
+      <xs:minInclusive value="1"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="elasticThroughputType">
     <xs:restriction base="xs:int">
       <xs:minInclusive value="1"/>
     </xs:restriction>
   </xs:simpleType>
   
-      <xs:simpleType name="elasticThroughputType">
+  <xs:simpleType name="latencyType">
     <xs:restriction base="xs:int">
-      <xs:minInclusive value="1"/>
+      <xs:minInclusive value="0"/>
     </xs:restriction>
   </xs:simpleType>
 
@@ -108,24 +118,30 @@
                 <xs:attribute name="maxsize" type="memorySizeType" default="100"/>
             </xs:complexType>
         </xs:element>
-         <xs:element name="snapshot" minOccurs="0" maxOccurs="1">
+        <xs:element name="snapshot" minOccurs="0" maxOccurs="1">
             <xs:complexType>
                 <xs:attribute name="priority" type="snapshotPriorityType" default="6"/>
             </xs:complexType>
         </xs:element>
-            <xs:element name="elastic" minOccurs="0" maxOccurs="1">
+        <xs:element name="elastic" minOccurs="0" maxOccurs="1">
             <xs:complexType>
-                <xs:attribute name="duration" type="elasticPauseType" default="50"/>
+                <xs:attribute name="duration" type="elasticDurationType" default="50"/>
                 <xs:attribute name="throughput" type="elasticThroughputType" default="2"/>
             </xs:complexType>
         </xs:element>
-        
+        <xs:element name="query" minOccurs="0" maxOccurs="1">
+            <xs:complexType>
+                <xs:attribute name="timeout" type="latencyType" default="0"/>
+            </xs:complexType>
+        </xs:element>
+
     </xs:all>
   </xs:complexType>
 
   <!-- <security> -->
   <xs:complexType name="securityType">
     <xs:attribute name="enabled" type="xs:boolean" default="false"/>
+    <xs:attribute name="provider" type="SecurityProviderString" default="hash"/>
   </xs:complexType>
 
   <!-- <admin-mode> (always enabled.) -->
@@ -268,7 +284,7 @@
     <xs:restriction base="xs:normalizedString">
       <xs:maxLength value="256"/>
       <xs:minLength value="1"/>
-      <xs:pattern value="\p{L}[\p{L}\d_-]*(\.[\p{L}\d_-]+)*"/>
+      <xs:pattern value="\??\p{L}[\p{L}\d_-]*(\.[\p{L}\d_-]+)*"/>
     </xs:restriction>
   </xs:simpleType>
 
@@ -276,6 +292,9 @@
     <xs:restriction base="xs:token">
       <xs:enumeration value="file"/>
       <xs:enumeration value="jdbc"/>
+      <xs:enumeration value="kafka"/>
+      <xs:enumeration value="http"/>
+      <xs:enumeration value="rabbitmq"/>
       <xs:enumeration value="custom"/>
     </xs:restriction>
   </xs:simpleType>
@@ -294,5 +313,13 @@
       </xs:element>
     </xs:sequence>
   </xs:complexType>
+
+  <!--  Security provider enumeration -->
+  <xs:simpleType name="SecurityProviderString">
+    <xs:restriction base="xs:string">
+        <xs:enumeration value="hash"/>
+        <xs:enumeration value="kerberos"/>
+    </xs:restriction>
+  </xs:simpleType>
 
 </xs:schema>

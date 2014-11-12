@@ -135,11 +135,6 @@ public final class VoltTable extends VoltTableRow implements JSONString {
     int m_rowCount = -1;
     int m_colCount = -1;
 
-    // kept around if provided for schema enforcement - only really used for test code
-    ColumnInfo[] m_originalColumnInfos = null;
-    // used for test code that generates schema from tables
-    String m_name = null;
-
     // JSON KEYS FOR SERIALIZATION
     static final String JSON_NAME_KEY = "name";
     static final String JSON_TYPE_KEY = "type";
@@ -171,7 +166,42 @@ public final class VoltTable extends VoltTableRow implements JSONString {
          * supported (such as {@link VoltType#INVALID} or {@link VoltType#NUMERIC}.
          */
         public ColumnInfo(String name, VoltType type) {
-            this.name = name; this.type = type;
+            this.name = name;
+            this.type = type;
+            // if you're using this constructor, the values below probably
+            // will never be used, but they *are* final.
+            size = VoltType.MAX_VALUE_LENGTH;
+            nullable = true;
+            unique = false;
+            defaultValue = NO_DEFAULT_VALUE;
+        }
+
+        /**
+         * Construct an immutable <tt>ColumnInfo</tt> instance with extra metadata
+         * for tests.
+         *
+         * @param name The name of the column (ASCII).
+         * @param type The type of the column. Note that not all types are
+         * supported (such as {@link VoltType#INVALID} or {@link VoltType#NUMERIC}.
+         * @param size How big should the column be (for strings or binary)
+         * @param nullable Is the column nullable.
+         * @param unique Is the column unique? (implies index creation)
+         * @param defaultValue Default value for column (non string types will be
+         * converted from strings - varbinary must be hex-encoded).
+         */
+        ColumnInfo(String name,
+                   VoltType type,
+                   int size,
+                   boolean nullable,
+                   boolean unique,
+                   String defaultValue)
+        {
+            this.name = name;
+            this.type = type;
+            this.size = size;
+            this.nullable = nullable;
+            this.unique = unique;
+            this.defaultValue = defaultValue;
         }
 
         /**
@@ -183,16 +213,22 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         ColumnInfo(JSONObject jsonCol) throws JSONException {
             this.name = jsonCol.getString(JSON_NAME_KEY);
             this.type = VoltType.get((byte) jsonCol.getInt(JSON_TYPE_KEY));
+            size = VoltType.MAX_VALUE_LENGTH;
+            nullable = true;
+            unique = false;
+            defaultValue = NO_DEFAULT_VALUE;
         }
 
+        /**
+         * Basically just suppress CloneNotSupportedException.
+         */
         @Override
         public ColumnInfo clone() {
             try {
                 return (ColumnInfo) super.clone();
             } catch (CloneNotSupportedException e) {
-                e.printStackTrace();
                 assert(false);
-                return null;
+                throw new RuntimeException(e);
             }
         }
 
@@ -200,21 +236,106 @@ public final class VoltTable extends VoltTableRow implements JSONString {
         final String name;
         final VoltType type;
 
-        // data below not exposed publicly / not serialized
-        int size = VoltType.MAX_VALUE_LENGTH;
-        boolean nullable = true;
-        boolean unique = false;
-        int pkeyIndex = -1; // -1 when not part of pkey
-        String defaultValue = NO_DEFAULT_VALUE;
+        // data below not exposed publicly / not serialized / used for test
+        final int size;
+        final boolean nullable;
+        final boolean unique;
+        final String defaultValue;
 
         // pick a random string as sigil for no default
         static final String NO_DEFAULT_VALUE = "!@#$%^&*(!@#$%^&*(";
+
+        /* (non-Javadoc)
+         * @see java.lang.Object#hashCode()
+         */
+        @Override
+        public int hashCode() {
+            throw new RuntimeException("Didn't expect you to hash this.");
+        }
+
+        /* (non-Javadoc)
+         * @see java.lang.Object#equals(java.lang.Object)
+         */
+        @Override
+        public boolean equals(Object obj) {
+            if (!(obj instanceof VoltTable.ColumnInfo)) {
+                return false;
+            }
+            VoltTable.ColumnInfo other = (VoltTable.ColumnInfo) obj;
+
+            if (nullable != other.nullable) return false;
+            if (unique != other.unique) return false;
+            if (defaultValue != other.defaultValue) return false;
+            if (size != other.size) return false;
+            if (type != other.type) return false;
+            return name.equals(other.name);
+        }
     }
+
+    /**
+     * Class to hold additional information and constraints for test code.
+     * Basically, a table in a test that has this extra data could re-create
+     * it's own DDL. Or it could be randomly filled with data that would be
+     * safe to insert into a table in a running VoltDB cluster (unique columns,
+     * string size limits, etc...).
+     *
+     */
+    static class ExtraMetadata {
+        // kept around if provided for schema enforcement - only really used for test code
+        final ColumnInfo[] originalColumnInfos;
+        // next two used for test code that generates schema from tables
+        final String name;
+        int partitionColIndex; // -1 means replicated
+        int[] pkeyIndexes;
+
+        ExtraMetadata(String name,
+                      int partitionColIndex,
+                      int[] pkeyIndexes,
+                      ColumnInfo... originalColumnInfos)
+        {
+            this.name = name;
+            this.partitionColIndex = partitionColIndex;
+            this.pkeyIndexes = pkeyIndexes.clone();
+            this.originalColumnInfos = originalColumnInfos.clone();
+        }
+
+        /* (non-Javadoc)
+         * @see java.lang.Object#clone()
+         */
+        @Override
+        protected Object clone() {
+            try {
+                ExtraMetadata cloned = (ExtraMetadata) super.clone();
+                for (int i = 0; i < originalColumnInfos.length; i++) {
+                    cloned.originalColumnInfos[i] = originalColumnInfos[i].clone();
+                }
+                return cloned;
+            }
+            // should never happen
+            catch (CloneNotSupportedException e) {
+                e.printStackTrace();
+                throw new RuntimeException(e);
+            }
+
+        }
+    }
+    final ExtraMetadata m_extraMetadata;
 
     /**
      * Do nothing constructor that does no initialization or allocation.
      */
-    VoltTable() {}
+    VoltTable() {
+        // m_extraMetadata is final and must be set to null
+        this((ExtraMetadata) null);
+    }
+
+    /**
+     * Do nothing constructor that does no initialization or allocation.
+     * Does copy over existing values for m_extraMetadata.
+     */
+    VoltTable(ExtraMetadata extraMetadata) {
+        m_extraMetadata = extraMetadata;
+    }
 
     /**
      * Create a table from an existing backing buffer.
@@ -223,6 +344,9 @@ public final class VoltTable extends VoltTableRow implements JSONString {
      * @param readOnly Can this table be changed?
      */
     VoltTable(ByteBuffer backing, boolean readOnly) {
+        // no test metadata when creating tables from buffers
+        m_extraMetadata = null;
+
         m_buffer = backing;
 
         // rowstart represents and offset to the start of row data,
@@ -249,7 +373,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
      * @param columnCount The number of columns in the array to use.
      */
     public VoltTable(ColumnInfo[] columns, int columnCount) {
-        initializeFromColumns(columns, columnCount);
+        this(null, columns, columnCount);
     }
 
     /**
@@ -259,7 +383,23 @@ public final class VoltTable extends VoltTableRow implements JSONString {
      * in the desired order.
      */
     public VoltTable(ColumnInfo[] columns) {
-        initializeFromColumns(columns, columns.length);
+        this(null, columns, columns.length);
+    }
+
+    /**
+     * Given a column and an array of columns, return a new array of columns with the
+     * single guy prepended onto the others. This function is used in the constructor
+     * below so that one constructor can call another without breaking Java rules about
+     * chained constructors being the first thing called.
+     */
+    private static ColumnInfo[] prependColumn(ColumnInfo firstColumn, ColumnInfo[] columns) {
+        int allLen = 1 + columns.length;
+        ColumnInfo[] allColumns = new ColumnInfo[allLen];
+        allColumns[0] = firstColumn;
+        for (int i = 0; i < columns.length; i++) {
+            allColumns[i+1] = columns[i];
+        }
+        return allColumns;
     }
 
     /**
@@ -272,22 +412,20 @@ public final class VoltTable extends VoltTableRow implements JSONString {
      * in the desired order (can be empty).
      */
     public VoltTable(ColumnInfo firstColumn, ColumnInfo... columns) {
-        int allLen = 1 + columns.length;
-        ColumnInfo[] allColumns = new ColumnInfo[allLen];
-        allColumns[0] = firstColumn;
-        for (int i = 0; i < columns.length; i++) {
-            allColumns[i+1] = columns[i];
-        }
-        initializeFromColumns(allColumns, allLen);
+        this(prependColumn(firstColumn, columns));
     }
 
-    private void initializeFromColumns(ColumnInfo[] columns, int columnCount) {
+    /**
+     * Constructor that allows for setting extra metadata for test purposes.
+     * extraMetadata param can be null.
+     */
+    VoltTable(ExtraMetadata extraMetadata, ColumnInfo[] columns, int columnCount) {
+        // memoize any provided extra metadata for test
+        m_extraMetadata = extraMetadata;
+
         // allocate a 1K table backing for starters
         int allocationSize = 1024;
         m_buffer = ByteBuffer.allocate(allocationSize);
-
-        // save these around for tests that use them for schema checking during addRow
-        m_originalColumnInfos = columns;
 
         // while not successful at initializing,
         //  use a bigger and bigger backing
@@ -473,65 +611,57 @@ public final class VoltTable extends VoltTableRow implements JSONString {
 
     // package-private methods to get constraint for test code
     final boolean getColumnNullable(int index) {
-        if (m_originalColumnInfos != null) {
-            return m_originalColumnInfos[index].nullable;
+        if (m_extraMetadata != null) {
+            return m_extraMetadata.originalColumnInfos[index].nullable;
         }
         return true;
     }
 
     // package-private methods to get constraint for test code
     final int getColumnMaxSize(int index) {
-        if (m_originalColumnInfos != null) {
-            return m_originalColumnInfos[index].size;
+        if (m_extraMetadata != null) {
+            return m_extraMetadata.originalColumnInfos[index].size;
         }
         return VoltType.MAX_VALUE_LENGTH;
     }
 
     // package-private methods to get constraint for test code
     final int getColumnPkeyIndex(int index) {
-        if (m_originalColumnInfos != null) {
-            return m_originalColumnInfos[index].pkeyIndex;
+        if (m_extraMetadata != null) {
+            for (int i = 0; i < m_extraMetadata.pkeyIndexes.length; i++) {
+                if (m_extraMetadata.pkeyIndexes[i] == index) {
+                    return i;
+                }
+            }
         }
         return -1;
     }
 
     // package-private methods to get constraint for test code
     final int[] getPkeyColumnIndexes() {
-        if (m_originalColumnInfos != null) {
-            int pkeyCount = 0;
-            for (ColumnInfo colInfo : m_originalColumnInfos) {
-                if (colInfo.pkeyIndex != -1) {
-                    pkeyCount++;
-                }
+        if (m_extraMetadata != null) {
+            if (m_extraMetadata.pkeyIndexes != null) {
+                return m_extraMetadata.pkeyIndexes;
             }
-            int[] retval = new int[pkeyCount];
-            for (int i = 0; i < m_originalColumnInfos.length; i++) {
-                if (m_originalColumnInfos[i].pkeyIndex != -1) {
-                    retval[m_originalColumnInfos[i].pkeyIndex] = i;
-                }
-            }
-            return retval;
         }
         return new int[0];
     }
 
     // package-private methods to get constraint for test code
     final boolean getColumnUniqueness(int index) {
-        if (m_originalColumnInfos != null) {
-            return m_originalColumnInfos[index].unique;
+        if (m_extraMetadata != null) {
+            return m_extraMetadata.originalColumnInfos[index].unique;
         }
         return false;
     }
 
     // package-private methods to get constraint for test code
     final String getColumnDefaultValue(int index) {
-        if (m_originalColumnInfos != null) {
-            return m_originalColumnInfos[index].defaultValue;
+        if (m_extraMetadata != null) {
+            return m_extraMetadata.originalColumnInfos[index].defaultValue;
         }
         return null;
     }
-
-
 
     @Override
     public final int getColumnIndex(String name) {
@@ -629,9 +759,9 @@ public final class VoltTable extends VoltTableRow implements JSONString {
                 // schema checking code that is used for some tests
                 boolean allowNulls = true;
                 int maxColSize = VoltType.MAX_VALUE_LENGTH;
-                if (m_originalColumnInfos != null) {
-                    allowNulls = m_originalColumnInfos[col].nullable;
-                    maxColSize = m_originalColumnInfos[col].size;
+                if (m_extraMetadata != null) {
+                    allowNulls = m_extraMetadata.originalColumnInfos[col].nullable;
+                    maxColSize = m_extraMetadata.originalColumnInfos[col].size;
                 }
 
                 try
@@ -1334,22 +1464,11 @@ public final class VoltTable extends VoltTableRow implements JSONString {
      */
     public final VoltTable clone(int extraBytes) {
         assert(verifyTableInvariants());
-        final VoltTable cloned = new VoltTable();
+        // share the immutable metadata if it's present for tests
+        final VoltTable cloned = new VoltTable(m_extraMetadata);
         cloned.m_colCount = m_colCount;
         cloned.m_rowCount = 0;
         cloned.m_rowStart = m_rowStart;
-
-        // copy this metadata if it's present for tests
-        // note the nullness of m_name implies nullness of other test-related metadata
-        if (m_name != null) {
-            cloned.m_name = m_name;
-            if (m_originalColumnInfos != null) {
-                cloned.m_originalColumnInfos = new ColumnInfo[m_originalColumnInfos.length];
-                for (int i = 0; i < m_originalColumnInfos.length; i++) {
-                    cloned.m_originalColumnInfos[i] = m_originalColumnInfos[i].clone();
-                }
-            }
-        }
 
         final int pos = m_buffer.position();
         m_buffer.position(0);

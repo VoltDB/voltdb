@@ -36,11 +36,11 @@ import java.io.RandomAccessFile;
 
 import org.hsqldb_voltpatches.Database;
 import org.hsqldb_voltpatches.lib.FileUtil;
-import org.hsqldb_voltpatches.lib.HsqlByteArrayOutputStream;
 import org.hsqldb_voltpatches.lib.SimpleLog;
 import org.hsqldb_voltpatches.lib.Storage;
 import org.hsqldb_voltpatches.lib.java.JavaSystem;
 import org.hsqldb_voltpatches.store.BitMap;
+import org.hsqldb_voltpatches.lib.HsqlByteArrayOutputStream;
 
 /*
  * Wrapper for random access file for incremental backup of the .data file.

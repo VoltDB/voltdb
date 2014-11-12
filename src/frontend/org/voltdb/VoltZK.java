@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -49,7 +50,6 @@ public class VoltZK {
     //now
     public static final String topology = "/db/topology";
     public static final String replicationconfig = "/db/replicationconfig";
-    public static final String deploymentBytes = "/db/deploymentBytes";
     public static final String rejoinLock = "/db/rejoin_lock";
     public static final String restoreMarker = "/db/did_restore";
     public static final String perPartitionTxnIds = "/db/perPartitionTxnIds";
@@ -102,7 +102,15 @@ public class VoltZK {
     public static final String leaders_globalservice = "/db/leaders/globalservice";
     public static final String lastKnownLiveNodes = "/db/lastKnownLiveNodes";
 
+    // flag of initialization process complete
+    public static final String init_completed = "/db/init_completed";
+
+    // start action of node in the current system (ephemeral)
+    public static final String start_action = "/db/start_action";
+    public static final String start_action_node = ZKUtil.joinZKPath(start_action, "node_");
+
     public static final String elasticJoinActiveBlocker = ZKUtil.joinZKPath(elasticJoinActiveBlockers, "join_blocker");
+    public static final String request_truncation_snapshot_node = ZKUtil.joinZKPath(request_truncation_snapshot, "request_");
 
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {
@@ -117,7 +125,8 @@ public class VoltZK {
             leaders_initiators,
             leaders_globalservice,
             lastKnownLiveNodes,
-            elasticJoinActiveBlockers
+            elasticJoinActiveBlockers,
+            request_truncation_snapshot
     };
 
     /**
@@ -214,5 +223,21 @@ public class VoltZK {
             replicas.add(HSId);
         }
         return replicas;
+    }
+
+    public static void createStartActionNode(ZooKeeper zk, final int hostId, StartAction action) {
+        byte [] startActionBytes = null;
+        try {
+            startActionBytes = action.toString().getBytes("UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            VoltDB.crashLocalVoltDB("Utf-8 encoding is not supported in current platform", false, e);
+        }
+
+        zk.create(VoltZK.start_action_node + hostId, startActionBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL,
+                new ZKUtil.StringCallback(), null);
+    }
+
+    public static int getHostIDFromChildName(String childName) {
+        return Integer.parseInt(childName.split("_")[1]);
     }
 }

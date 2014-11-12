@@ -66,11 +66,11 @@
 
 package org.hsqldb_voltpatches;
 
-import org.hsqldb_voltpatches.lib.HsqlByteArrayOutputStream;
 import org.hsqldb_voltpatches.lib.StringUtil;
-import org.hsqldb_voltpatches.types.BinaryData;
-import org.hsqldb_voltpatches.types.CharacterType;
 import org.hsqldb_voltpatches.types.Type;
+import org.hsqldb_voltpatches.types.CharacterType;
+import org.hsqldb_voltpatches.types.BinaryData;
+import org.hsqldb_voltpatches.lib.HsqlByteArrayOutputStream;
 
 /**
  * Reusable object for processing LIKE queries.

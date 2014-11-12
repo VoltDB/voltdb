@@ -17,7 +17,6 @@
 
 package org.voltdb.compiler;
 
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.RejectedExecutionException;
@@ -34,20 +33,25 @@ import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.messaging.LocalMailbox;
-import org.voltdb.planner.PartitioningForStatement;
+import org.voltdb.planner.StatementPartitioning;
+import org.voltdb.utils.SQLLexer;
 
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
 public class AsyncCompilerAgent {
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
-    static final VoltLogger ahpLog = new VoltLogger("ADHOCPLANNERTHREAD");
+    private static final VoltLogger adhocLog = new VoltLogger("ADHOC");
 
     // if more than this amount of work is queued, reject new work
     static public final int MAX_QUEUE_DEPTH = 250;
 
     // accept work via this mailbox
     Mailbox m_mailbox;
+
+    // The helper for catalog updates, back after its exclusive three year tour
+    // of Europe, Scandinavia, and the sub-continent.
+    AsyncCompilerAgentHelper m_helper = new AsyncCompilerAgentHelper();
 
     // do work in this executor service
     final ListeningExecutorService m_es =
@@ -105,29 +109,91 @@ public class AsyncCompilerAgent {
         final LocalObjectMessage wrapper = (LocalObjectMessage)message;
         if (wrapper.payload instanceof AdHocPlannerWork) {
             final AdHocPlannerWork w = (AdHocPlannerWork)(wrapper.payload);
-            final AsyncCompilerResult result = compileAdHocPlan(w);
-            w.completionHandler.onCompletion(result);
+            // do initial naive scan of statements for DDL, forbid mixed DDL and (DML|DQL)
+            // This is not currently robust to comment, multi-line statments,
+            // multiple statements on a line, etc.
+            Boolean hasDDL = null;
+            for (String stmt : w.sqlStatements) {
+                String ddlToken = SQLLexer.extractDDLToken(stmt);
+                if (hasDDL == null) {
+                    hasDDL = (ddlToken != null) ? true : false;
+                }
+                else if ((hasDDL && ddlToken == null) || (!hasDDL && ddlToken != null))
+                {
+                    AsyncCompilerResult errResult =
+                        AsyncCompilerResult.makeErrorResult(w,
+                                "DDL mixed with DML and queries is unsupported.");
+                    // No mixing DDL and DML/DQL.  Turn this into an error returned to client.
+                    w.completionHandler.onCompletion(errResult);
+                    return;
+                }
+                // if it's DDL, check to see if it's allowed
+                if (hasDDL && !SQLLexer.isPermitted(stmt)) {
+                    AsyncCompilerResult errResult =
+                        AsyncCompilerResult.makeErrorResult(w,
+                                "AdHoc DDL contains an unsupported DDL statement: " + stmt);
+                    w.completionHandler.onCompletion(errResult);
+                    return;
+                }
+            }
+            if (!hasDDL) {
+                final AsyncCompilerResult result = compileAdHocPlan(w);
+                w.completionHandler.onCompletion(result);
+            }
+            else {
+                // We have adhoc DDL.  Is it okay to run it?
+                // Is it forbidden by the replication role and configured schema change method?
+                // master and UAC method chosen:
+                if (!w.onReplica && !w.useAdhocDDL) {
+                    AsyncCompilerResult errResult =
+                        AsyncCompilerResult.makeErrorResult(w,
+                                "Cluster is configured to use @UpdateApplicationCatalog " +
+                                "to change application schema.  AdHoc DDL is forbidden.");
+                    w.completionHandler.onCompletion(errResult);
+                    return;
+                }
+                // Any adhoc DDL on the replica is forbidden (master changes appear as UAC
+                else if (w.onReplica) {
+                    AsyncCompilerResult errResult =
+                        AsyncCompilerResult.makeErrorResult(w,
+                                "AdHoc DDL is forbidden on a DR replica cluster. " +
+                                "Apply schema changes to the master and they will propogate to replicas.");
+                    w.completionHandler.onCompletion(errResult);
+                    return;
+                }
+                final CatalogChangeWork ccw = new CatalogChangeWork(w);
+                dispatchCatalogChangeWork(ccw);
+            }
         }
         else if (wrapper.payload instanceof CatalogChangeWork) {
             final CatalogChangeWork w = (CatalogChangeWork)(wrapper.payload);
-            if (VoltDB.instance().getConfig().m_isEnterprise) {
-                try {
-                    Class<?> acahClz = getClass().getClassLoader().loadClass("org.voltdb.compiler.AsyncCompilerAgentHelper");
-                    Object acah = acahClz.newInstance();
-                    Method acahPrepareMethod = acahClz.getMethod(
-                            "prepareApplicationCatalogDiff", new Class<?>[] { CatalogChangeWork.class });
-                    hostLog.info("Asynchronously preparing to update the application catalog and/or deployment settings.");
-                    final AsyncCompilerResult result = (AsyncCompilerResult) acahPrepareMethod.invoke(acah, w);
-                    if (result.errorMsg != null) {
-                        hostLog.info("A request to update the application catalog and/or deployment settings has been rejected. More info returned to client.");
-                    }
-                    w.completionHandler.onCompletion(result);
-                }
-                catch (Exception e) {
-                    VoltDB.crashLocalVoltDB("Error preparing catalog diff.", true, e);
-                }
+            // We have an @UAC.  Is it okay to run it?
+            // If we weren't provided operationBytes, it's a deployment-only change and okay to take
+            // master and adhoc DDL method chosen
+            if (w.invocationName.equals("@UpdateApplicationCatalog") &&
+                w.operationBytes != null && !w.onReplica && w.useAdhocDDL)
+            {
+                AsyncCompilerResult errResult =
+                    AsyncCompilerResult.makeErrorResult(w,
+                            "Cluster is configured to use AdHoc DDL to change application " +
+                            "schema.  Use of @UpdateApplicationCatalog is forbidden.");
+                w.completionHandler.onCompletion(errResult);
+                return;
             }
-            assert(false); // shouldn't get here in community edition
+            else if (w.invocationName.equals("@UpdateClasses") && !w.onReplica && !w.useAdhocDDL) {
+                AsyncCompilerResult errResult =
+                    AsyncCompilerResult.makeErrorResult(w,
+                            "Cluster is configured to use @UpdateApplicationCatalog " +
+                            "to change application schema.  Use of @UpdateClasses is forbidden.");
+                w.completionHandler.onCompletion(errResult);
+                return;
+            }
+            dispatchCatalogChangeWork(w);
+        }
+        else {
+            hostLog.warn("Unexpected message received by AsyncCompilerAgent.  " +
+                    "Please contact VoltDB support with this message and the contents: " +
+                    message.toString());
         }
     }
 
@@ -138,6 +204,25 @@ public class AsyncCompilerAgent {
                 apw.completionHandler.onCompletion(compileAdHocPlan(apw));
             }
         });
+    }
+
+    private void dispatchCatalogChangeWork(CatalogChangeWork work)
+    {
+        final AsyncCompilerResult result = m_helper.prepareApplicationCatalogDiff(work);
+        if (result.errorMsg != null) {
+            hostLog.info("A request to update the database catalog and/or deployment settings has been rejected. More info returned to client.");
+        }
+        // Log something useful about catalog upgrades when they occur.
+        if (result instanceof CatalogChangeResult) {
+            CatalogChangeResult ccr = (CatalogChangeResult)result;
+            if (ccr.upgradedFromVersion != null) {
+                hostLog.info(String.format(
+                            "In order to update the application catalog it was "
+                            + "automatically upgraded from version %s.",
+                            ccr.upgradedFromVersion));
+            }
+        }
+        work.completionHandler.onCompletion(result);
     }
 
     AdHocPlannedStmtBatch compileAdHocPlan(AdHocPlannerWork work) {
@@ -159,16 +244,16 @@ public class AsyncCompilerAgent {
         assert(work.sqlStatements != null);
         // Take advantage of the planner optimization for inferring single partition work
         // when the batch has one statement.
-        PartitioningForStatement partitioning = null;
+        StatementPartitioning partitioning = null;
         boolean inferSP = (work.sqlStatements.length == 1) && work.inferPartitioning;
         for (final String sqlStatement : work.sqlStatements) {
             if (inferSP) {
-                partitioning = PartitioningForStatement.inferPartitioning();
+                partitioning = StatementPartitioning.inferPartitioning();
             }
             else if (work.userPartitionKey == null) {
-                partitioning = PartitioningForStatement.forceMP();
+                partitioning = StatementPartitioning.forceMP();
             } else {
-                partitioning = PartitioningForStatement.forceSP();
+                partitioning = StatementPartitioning.forceSP();
             }
             try {
                 AdHocPlannedStatement result = ptool.planSql(sqlStatement, partitioning);
@@ -196,6 +281,44 @@ public class AsyncCompilerAgent {
                                                                            partitionParamValue,
                                                                            errorSummary);
 
+        if (adhocLog.isDebugEnabled()) {
+            logBatch(plannedStmtBatch);
+        }
+
         return plannedStmtBatch;
+    }
+
+    /**
+     * Log ad hoc batch info
+     * @param batch  planned statement batch
+     */
+    private void logBatch(final AdHocPlannedStmtBatch batch)
+    {
+        final int numStmts = batch.work.getStatementCount();
+        final int numParams = batch.work.getParameterCount();
+        final String readOnly = batch.readOnly ? "yes" : "no";
+        final String singlePartition = batch.isSinglePartitionCompatible() ? "yes" : "no";
+        final String user = batch.work.user.m_name;
+        final CatalogContext context = (batch.work.catalogContext != null
+                                            ? batch.work.catalogContext
+                                            : VoltDB.instance().getCatalogContext());
+        final String[] groupNames = context.authSystem.getGroupNamesForUser(user);
+        final String groupList = StringUtils.join(groupNames, ',');
+
+        adhocLog.debug(String.format(
+            "=== statements=%d parameters=%d read-only=%s single-partition=%s user=%s groups=[%s]",
+            numStmts, numParams, readOnly, singlePartition, user, groupList));
+        if (batch.work.sqlStatements != null) {
+            for (int i = 0; i < batch.work.sqlStatements.length; ++i) {
+                adhocLog.debug(String.format("Statement #%d: %s", i + 1, batch.work.sqlStatements[i]));
+            }
+        }
+        if (batch.work.userParamSet != null) {
+            for (int i = 0; i < batch.work.userParamSet.length; ++i) {
+                Object value = batch.work.userParamSet[i];
+                final String valueString = (value != null ? value.toString() : "NULL");
+                adhocLog.debug(String.format("Parameter #%d: %s", i + 1, valueString));
+            }
+        }
     }
 }

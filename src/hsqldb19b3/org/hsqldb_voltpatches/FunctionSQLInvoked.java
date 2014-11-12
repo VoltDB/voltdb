@@ -31,9 +31,9 @@
 
 package org.hsqldb_voltpatches;
 
+import org.hsqldb_voltpatches.types.Type;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.store.ValuePool;
-import org.hsqldb_voltpatches.types.Type;
 
 import java.lang.reflect.InvocationTargetException;
 

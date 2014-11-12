@@ -23,6 +23,7 @@ import java.lang.reflect.Array;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Date;
+import java.util.regex.Pattern;
 
 import org.voltdb.common.Constants;
 import org.voltdb.types.TimestampType;
@@ -105,6 +106,7 @@ public class ParameterConverter {
         return true;
     }
 
+    private static final Pattern thousandSeparator = Pattern.compile("\\,");
     /**
      * Given a string, covert it to a primitive type or return null.
      */
@@ -115,7 +117,7 @@ public class ParameterConverter {
         // detect CSV null
         if (value.equals(Constants.CSV_NULL)) return nullValueForType(expectedClz);
         // remove commas and escape chars
-        value = value.replaceAll("\\,","");
+        value = thousandSeparator.matcher(value).replaceAll("");
 
         try {
             if (expectedClz == long.class) {
@@ -290,12 +292,11 @@ public class ParameterConverter {
                 else return value;
             }
         }
-        // null sigil
-        else if (param == VoltType.NULL_STRING_OR_VARBINARY) {
-            return nullValueForType(expectedClz);
-        }
-        // null sigil
-        else if (param == VoltType.NULL_DECIMAL) {
+        // null sigils. (ning - if we're not checking if the sigil matches the expected type,
+        // why do we have three sigils for three types??)
+        else if (param == VoltType.NULL_TIMESTAMP ||
+                 param == VoltType.NULL_STRING_OR_VARBINARY ||
+                 param == VoltType.NULL_DECIMAL) {
             return nullValueForType(expectedClz);
         }
 
@@ -453,6 +454,11 @@ public class ParameterConverter {
             }
         } else if (expectedClz == VoltTable.class && inputClz == VoltTable.class) {
             return param;
+        } else if (expectedClz == String.class) {
+            //For VARCHAR columns if not null or not an array send toString value.
+            if (!param.getClass().isArray()) {
+                return String.valueOf(param);
+            }
         }
 
         // handle SystemProcedureExecutionContext without linking to it

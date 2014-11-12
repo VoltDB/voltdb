@@ -178,9 +178,9 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
             fs.writeInt(numPartitions);
         }
         final BBContainer container = fs.getBBContainer();
-        container.b.position(4);
-        container.b.putInt(container.b.remaining() - 4);
-        container.b.position(0);
+        container.b().position(4);
+        container.b().putInt(container.b().remaining() - 4);
+        container.b().position(0);
 
         FastSerializer schemaSerializer = new FastSerializer();
         int schemaTableLen = schemaTable.getSerializedSize();
@@ -189,13 +189,15 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
         serializedSchemaTable.flip();
         schemaSerializer.write(serializedSchemaTable);
         final BBContainer schemaContainer = schemaSerializer.getBBContainer();
-        schemaContainer.b.limit(schemaContainer.b.limit() - 4);//Don't want the row count
-        schemaContainer.b.position(schemaContainer.b.position() + 4);//Don't want total table length
+        schemaContainer.b().limit(schemaContainer.b().limit() - 4);//Don't want the row count
+        schemaContainer.b().position(schemaContainer.b().position() + 4);//Don't want total table length
 
         final PureJavaCrc32 crc = new PureJavaCrc32();
-        ByteBuffer aggregateBuffer = ByteBuffer.allocate(container.b.remaining() + schemaContainer.b.remaining());
-        aggregateBuffer.put(container.b);
-        aggregateBuffer.put(schemaContainer.b);
+        ByteBuffer aggregateBuffer = ByteBuffer.allocate(container.b().remaining() + schemaContainer.b().remaining());
+        aggregateBuffer.put(container.b());
+        container.discard();
+        aggregateBuffer.put(schemaContainer.b());
+        schemaContainer.discard();
         aggregateBuffer.flip();
         crc.update(aggregateBuffer.array(), 4, aggregateBuffer.capacity() - 4);
 
@@ -216,7 +218,7 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
          */
         m_acceptOneWrite = true;
         ListenableFuture<?> writeFuture =
-                write(Callables.returning((BBContainer)DBBPool.wrapBB(aggregateBuffer)), false);
+                write(Callables.returning(DBBPool.wrapBB(aggregateBuffer)), false);
         try {
             writeFuture.get();
         } catch (InterruptedException e) {
@@ -310,8 +312,8 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
         }
 
         if (prependLength) {
-            tupleData.b.putInt(tupleData.b.remaining() - 4);
-            tupleData.b.position(0);
+            tupleData.b().putInt(tupleData.b().remaining() - 4);
+            tupleData.b().position(0);
         }
 
         m_outstandingWriteTasks.incrementAndGet();
@@ -327,11 +329,11 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
                         }
                     }
 
-                    m_bytesAllowedBeforeSync.acquire(tupleData.b.remaining());
+                    m_bytesAllowedBeforeSync.acquire(tupleData.b().remaining());
 
                     int totalWritten = 0;
-                    while (tupleData.b.hasRemaining()) {
-                        totalWritten += m_channel.write(tupleData.b);
+                    while (tupleData.b().hasRemaining()) {
+                        totalWritten += m_channel.write(tupleData.b());
                     }
                     m_bytesWritten += totalWritten;
                     m_bytesWrittenSinceLastSync.addAndGet(totalWritten);

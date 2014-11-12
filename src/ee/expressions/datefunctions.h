@@ -23,6 +23,7 @@
 #include <ctime>
 #include "common/SQLException.h"
 #include "common/executorcontext.hpp"
+#include "common/NValue.hpp"
 
 static const boost::posix_time::ptime EPOCH(boost::gregorian::date(1970,1,1));
 static const int64_t GREGORIAN_EPOCH = -12212553600000000;  // 1583-01-01 00:00:00
@@ -125,6 +126,19 @@ template<> inline NValue NValue::callUnary<FUNC_EXTRACT_DAY_OF_WEEK>() const {
     boost::gregorian::date as_date;
     micros_to_date(epoch_micros, as_date);
     return getTinyIntValue((int8_t)(as_date.day_of_week() + 1)); // Have 0-based, want 1-based.
+}
+
+/** implement the timestamp WEEKDAY extract function **/
+// It is almost the same as FUNC_EXTRACT_DAY_OF_WEEK
+// Monday-0, ..., Saturday-5, Sunday-6
+template<> inline NValue NValue::callUnary<FUNC_EXTRACT_WEEKDAY>() const {
+    if (isNull()) {
+        return *this;
+    }
+    int64_t epoch_micros = getTimestamp();
+    boost::gregorian::date as_date;
+    micros_to_date(epoch_micros, as_date);
+    return getTinyIntValue((int8_t)((as_date.day_of_week() + 6) % 7));
 }
 
 /** implement the timestamp WEEK OF YEAR extract function **/

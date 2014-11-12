@@ -17,8 +17,6 @@
 
 package org.voltdb.plannodes;
 
-import java.util.Collection;
-
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -40,11 +38,10 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public final void getTablesAndIndexes(Collection<String> tablesRead, Collection<String> tableUpdated,
-                                          Collection<String> indexes)
+    public String getUpdatedTable()
     {
         assert(m_targetTableName.length() > 0);
-        tableUpdated.add(m_targetTableName);
+        return m_targetTableName;
     }
 
     protected String debugInfo(String spacer) {
@@ -64,12 +61,10 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
     /**
      * Accessor for flag marking the plan as guaranteeing an identical result/effect
      * when "replayed" against the same database state, such as during replication or CL recovery.
-     * @return true, since statement does not produce a query result
+     * @return Force subclasses to assess determinism (INSERT INTO ... SELECT may be nondeterministic)
      */
     @Override
-    public boolean isOrderDeterministic() {
-        return true;
-    }
+    public abstract boolean isOrderDeterministic();
 
     /**
      * @return the target_table_name

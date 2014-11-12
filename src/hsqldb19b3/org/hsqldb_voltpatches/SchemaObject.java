@@ -32,8 +32,8 @@
 package org.hsqldb_voltpatches;
 
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
-import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.rights.Grantee;
+import org.hsqldb_voltpatches.lib.OrderedHashSet;
 
 /**
  * SQL schema object interface

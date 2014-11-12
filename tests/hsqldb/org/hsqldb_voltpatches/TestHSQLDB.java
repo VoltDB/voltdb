@@ -179,7 +179,7 @@ public class TestHSQLDB extends TestCase {
 
     }*/
 
-    private void expectFailStmt(HSQLInterface hsql, String stmt, String errorPart) {
+    private static void expectFailStmt(HSQLInterface hsql, String stmt, String errorPart) {
         try {
             VoltXMLElement xml = hsql.getXMLCompiledStatement(stmt);
             System.out.println(xml.toString());
@@ -221,19 +221,19 @@ public class TestHSQLDB extends TestCase {
         stmt = hsql.getXMLCompiledStatement("select * from new_order where no_w_id in (abs(17761776), ?, 17761776) and no_d_id in (abs(-1), ?, 17761776);");
         assertTrue(stmt.toString().contains("vector"));
 
-        // not supported yet
+        stmt = hsql.getXMLCompiledStatement("select * from new_order where no_w_id in (select w_id from warehouse);");
+        //???assertTrue(stmt.toString().contains("vector"));
+       // not supported yet
         //stmt = hsql.getXMLCompiledStatement("select * from new_order where no_w_id in ?;");
         //assertTrue(stmt.toString().contains("vector"));
 
         // The ones below here should continue to give sensible errors
-        expectFailStmt(hsql, "select * from new_order where no_w_id in (select w_id from warehouse);",
-                "VoltDB does not support subqueries");
         expectFailStmt(hsql, "select * from new_order where no_w_id <> (5, 7, 8);",
                 "row column count mismatch");
         expectFailStmt(hsql, "select * from new_order where exists (select w_id from warehouse);",
-                "VoltDB does not support subqueries");
+                "Unsupported subquery");
         expectFailStmt(hsql, "select * from new_order where not exists (select w_id from warehouse);",
-                "VoltDB does not support subqueries");
+                "Unsupported subquery");
     }
 
     public void testVarbinary() {
@@ -266,6 +266,20 @@ public class TestHSQLDB extends TestCase {
         }
         assertFalse(xml == null);
         System.out.println(xml);
+    }
+
+    public void testInsertIntoSelectFrom() {
+        HSQLInterface hsql = setupTPCCDDL();
+        assertNotNull(hsql);
+
+        String sql = "INSERT INTO new_order (NO_O_ID, NO_D_ID, NO_W_ID) SELECT O_ID, O_D_ID+1, CAST(? AS INTEGER) FROM ORDERS;";
+        VoltXMLElement xml = null;
+        try {
+            xml = hsql.getXMLCompiledStatement(sql);
+        } catch (HSQLParseException e1) {
+            e1.printStackTrace();
+        }
+        assertNotNull(xml);
     }
 
     /*public void testSimpleSQL() {

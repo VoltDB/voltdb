@@ -62,7 +62,7 @@ public final class IntMath {
   public static boolean isPowerOfTwo(int x) {
     return x > 0 & (x & (x - 1)) == 0;
   }
-  
+
   /**
    * Returns 1 if {@code x < y} as unsigned integers, and 0 otherwise. Assumes that x - y fits into
    * a signed int. The implementation is branch-free, and benchmarks suggest it is measurably (if
@@ -248,7 +248,7 @@ public final class IntMath {
          * We wish to test whether or not x <= (sqrtFloor + 0.5)^2 = halfSquare + 0.25. Since both
          * x and halfSquare are integers, this is equivalent to testing whether or not x <=
          * halfSquare. (We have to deal with overflow, though.)
-         * 
+         *
          * If we treat halfSquare as an unsigned int, we know that
          *            sqrtFloor^2 <= x < (sqrtFloor + 1)^2
          * halfSquare - sqrtFloor <= x < halfSquare + sqrtFloor + 1
@@ -332,8 +332,8 @@ public final class IntMath {
   }
 
   /**
-   * Returns {@code x mod m}. This differs from {@code x % m} in that it always returns a
-   * non-negative result.
+   * Returns {@code x mod m}, a non-negative value less than {@code m}.
+   * This differs from {@code x % m}, which might be negative.
    *
    * <p>For example:<pre> {@code
    *
@@ -344,6 +344,8 @@ public final class IntMath {
    * mod(8, 4) == 0}</pre>
    *
    * @throws ArithmeticException if {@code m <= 0}
+   * @see <a href="http://docs.oracle.com/javase/specs/jls/se7/html/jls-15.html#jls-15.17.3">
+   *      Remainder Operator</a>
    */
   public static int mod(int x, int m) {
     if (m <= 0) {

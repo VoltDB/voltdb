@@ -116,7 +116,8 @@ public final class Constraint implements SchemaObject {
                             UNIQUE         = 2,
                             CHECK          = 3,
                             PRIMARY_KEY    = 4,
-                            TEMP           = 5;
+                            TEMP           = 5,
+                            LIMIT          = 6;
     ConstraintCore          core;
     private HsqlName        name;
     int                     constType;
@@ -133,9 +134,6 @@ public final class Constraint implements SchemaObject {
     // for temp constraints only
     OrderedHashSet mainColSet;
     OrderedHashSet refColSet;
-    // Is this for temp constraints only? What's a temp constraint?
-    Expression[] indexExprs; // A VoltDB extension to support indexed expressions
-    boolean assumeUnique = false; // For VoltDB
 
     //
     final public static Constraint[] emptyArray = new Constraint[]{};
@@ -219,12 +217,6 @@ public final class Constraint implements SchemaObject {
         mainColSet = mainCols;
     }
 
-    // A VoltDB extension to support indexed expressions
-    public Constraint(HsqlName name, OrderedHashSet baseCols, Expression[] exprs) {
-        this(name, baseCols, Constraint.UNIQUE);
-        indexExprs = exprs;
-    }
-
     void setColumnsIndexes(Table table) {
 
         if (constType == Constraint.FOREIGN_KEY) {
@@ -248,7 +240,6 @@ public final class Constraint implements SchemaObject {
 
     private Constraint() {}
 
-    @Override
     public int getType() {
         return SchemaObject.CONSTRAINT;
     }
@@ -256,27 +247,22 @@ public final class Constraint implements SchemaObject {
     /**
      * Returns the HsqlName.
      */
-    @Override
     public HsqlName getName() {
         return name;
     }
 
-    @Override
     public HsqlName getCatalogName() {
         return name.schema.schema;
     }
 
-    @Override
     public HsqlName getSchemaName() {
         return name.schema;
     }
 
-    @Override
     public Grantee getOwner() {
         return name.schema.owner;
     }
 
-    @Override
     public OrderedHashSet getReferences() {
 
         switch (constType) {
@@ -295,15 +281,12 @@ public final class Constraint implements SchemaObject {
         return null;
     }
 
-    @Override
     public OrderedHashSet getComponents() {
         return null;
     }
 
-    @Override
     public void compile(Session session) {}
 
-    @Override
     public String getSQL() {
 
         StringBuffer sb = new StringBuffer();
@@ -339,7 +322,7 @@ public final class Constraint implements SchemaObject {
                 if (indexExprs != null) {
                     return getExprList(sb);
                 }
-
+                // End of VoltDB extension
                 int[] col = getMainColumns();
 
                 getColumnList(getMain(), col, col.length, sb);
@@ -1034,7 +1017,17 @@ public final class Constraint implements SchemaObject {
         }
     }
 
-    /*************** VOLTDB *********************/
+    /************************* Volt DB Extensions *************************/
+
+    Expression[] indexExprs; // A VoltDB extension to support indexed expressions
+    boolean assumeUnique = false; // For VoltDB
+    int rowsLimit = Integer.MAX_VALUE; // For VoltDB
+
+    // A VoltDB extension to support indexed expressions
+    public Constraint withExpressions(Expression[] exprs) {
+        indexExprs = exprs;
+        return this;
+    }
 
     /**
      * @return The name of this constraint instance's type.
@@ -1046,6 +1039,7 @@ public final class Constraint implements SchemaObject {
             case UNIQUE: return "UNIQUE";
             case CHECK: return isNotNull ? "NOT_NULL" : "CHECK";
             case PRIMARY_KEY: return "PRIMARY_KEY";
+            case LIMIT: return "LIMIT";
         }
         return "UNKNOWN";
     }
@@ -1065,15 +1059,20 @@ public final class Constraint implements SchemaObject {
         }
 
         VoltXMLElement constraint = new VoltXMLElement("constraint");
+        // WARNING: the name attribute setting is tentative, subject to reset in the
+        // calling function, Table.voltGetTableXML.
         constraint.attributes.put("name", getName().name);
         constraint.attributes.put("constrainttype", getTypeName());
         constraint.attributes.put("assumeunique", assumeUnique ? "true" : "false");
+        constraint.attributes.put("rowslimit", String.valueOf(rowsLimit));
 
         // VoltDB implements constraints by defining an index, by annotating metadata (such as for NOT NULL columns),
         // or by issuing a "not supported" warning (such as for foreign keys).
         // Any constraint implemented as an index must have an index name attribute.
         // No other constraint details are currently used by VoltDB.
         if (this.constType != FOREIGN_KEY && core.mainIndex != null) {
+            // WARNING: the index attribute setting is tentative, subject to reset in
+            // the calling function, Table.voltGetTableXML.
             constraint.attributes.put("index", core.mainIndex.getName().name);
         }
 
@@ -1094,7 +1093,7 @@ public final class Constraint implements SchemaObject {
 
     // A VoltDB extension to support indexed expressions
     public boolean isUniqueWithExprs(Expression[] indexExprs2) {
-        if (constType != UNIQUE || ! indexExprs.equals(indexExprs2)) {
+        if (constType != UNIQUE || (indexExprs == null) || ! indexExprs.equals(indexExprs2)) {
             return false;
         }
         return true;
@@ -1120,5 +1119,5 @@ public final class Constraint implements SchemaObject {
         this.assumeUnique = assumeUnique;
         return this;
     }
-
+    /**********************************************************************/
 }

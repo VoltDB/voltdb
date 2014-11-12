@@ -18,50 +18,40 @@
 #ifndef MATERIALIZEDSCANPLANNODE_H
 #define MATERIALIZEDSCANPLANNODE_H
 
-#include "common/common.h"
-#include "abstractscannode.h"
+#include "abstractplannode.h"
 
 namespace voltdb {
 
-    class AbstractExpression;
+class AbstractExpression;
 
-    /**
-     * Used for SQL-IN that are accelerated with indexes.
-     * See MaterializedScanExecutor for more/eventual use.
-     */
-    class MaterializedScanPlanNode : public AbstractPlanNode {
-    public:
-        MaterializedScanPlanNode(CatalogId id) : AbstractPlanNode(id) {
-            m_tableRowsExpression = NULL;
-            m_sortDirection = SORT_DIRECTION_TYPE_INVALID;
-        }
-        MaterializedScanPlanNode() : AbstractPlanNode() {
-            m_tableRowsExpression = NULL;
-            m_sortDirection = SORT_DIRECTION_TYPE_INVALID;
-        }
+/**
+ * Used for SQL-IN that are accelerated with indexes.
+ * See MaterializedScanExecutor for more/eventual use.
+ */
+class MaterializedScanPlanNode : public AbstractPlanNode {
+public:
+    MaterializedScanPlanNode()
+        : m_tableRowsExpression(NULL)
+        , m_sortDirection(SORT_DIRECTION_TYPE_INVALID)
+    { }
+    ~MaterializedScanPlanNode();
+    PlanNodeType getPlanNodeType() const;
+    std::string debugInfo(const std::string &spacer) const;
 
-        ~MaterializedScanPlanNode();
+    AbstractExpression* getTableRowsExpression() const { return m_tableRowsExpression; }
 
-        virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_MATERIALIZEDSCAN); }
+    SortDirectionType getSortDirection() const { return m_sortDirection; }
 
-        AbstractExpression* getTableRowsExpression() const
-        { return m_tableRowsExpression; }
+protected:
+    void loadFromJSONObject(PlannerDomValue obj);
 
-        SortDirectionType getSortDirection() const
-        { return m_sortDirection; }
+    // It doesn't matter what kind of expression this is,
+    // so long as eval() returns an NValue array as opposed
+    // to the usual scalar NValues.
+    AbstractExpression* m_tableRowsExpression;
+    SortDirectionType m_sortDirection;
+};
 
-        std::string debugInfo(const std::string &spacer) const;
-
-    protected:
-        virtual void loadFromJSONObject(PlannerDomValue obj);
-
-        // It doesn't matter what kind of expression this is,
-        // so long as eval() returns an NValue array as opposed
-        // to the usual scalar NValues.
-        AbstractExpression* m_tableRowsExpression;
-        SortDirectionType m_sortDirection;
-    };
-
-}
+} // namespace voltdb
 
 #endif // MATERIALIZEDSCANPLANNODE_H

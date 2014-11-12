@@ -58,16 +58,18 @@ ElasticIndexReadContext::handleActivation(TableStreamType streamType)
     }
 
     if (!m_surgeon.hasIndex()) {
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, "Activation of elastic index for read did not occur because the table reports no index exists yet.");
         return ACTIVATION_FAILED;
     }
 
     if (!m_surgeon.isIndexingComplete()) {
-        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, "Index generation has not completed.");
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, "Activation of elastic index for read failed because index generation is not complete yet.");
         return ACTIVATION_FAILED;
     }
 
     ElasticIndexHashRange range;
     if (!parseHashRange(m_predicateStrings, range)) {
+        LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, "Activation failed because parsing the hash range showed a conflict.");
         return ACTIVATION_FAILED;
     }
 
@@ -214,6 +216,8 @@ bool ElasticIndexReadContext::parseHashRange(
                          predicateStrings.at(0).c_str());
                 LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, errMsg);
             }
+        } else {
+            LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_ERROR, "Hash range did not have two entries");
         }
     }
     return success;
@@ -227,6 +231,14 @@ void ElasticIndexReadContext::deleteStreamedTuples()
     // Delete the indexed tuples that were streamed.
     // Undo token release will cause the index to delete the corresponding items
     // via notifications.
+    ExecutorContext::getExecutorContext()->drStream()->m_enabled = false;
+    //Not unused, but GCC doesn't think a destructor counts as use
+    class DisableDRGuard {
+    public:
+        ~DisableDRGuard() {
+            ExecutorContext::getExecutorContext()->drStream()->m_enabled = true;
+        }
+    } __attribute__((unused)) guard;
     m_iter->reset();
     TableTuple tuple;
     while (m_iter->next(tuple)) {

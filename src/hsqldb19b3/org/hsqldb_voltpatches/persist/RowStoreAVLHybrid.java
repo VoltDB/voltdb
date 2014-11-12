@@ -41,13 +41,13 @@ import org.hsqldb_voltpatches.RowAVL;
 import org.hsqldb_voltpatches.RowAVLDisk;
 import org.hsqldb_voltpatches.RowAction;
 import org.hsqldb_voltpatches.Session;
-import org.hsqldb_voltpatches.Table;
 import org.hsqldb_voltpatches.TableBase;
 import org.hsqldb_voltpatches.index.Index;
 import org.hsqldb_voltpatches.lib.ArrayUtil;
 import org.hsqldb_voltpatches.lib.IntKeyHashMapConcurrent;
 import org.hsqldb_voltpatches.navigator.RowIterator;
 import org.hsqldb_voltpatches.rowio.RowInputInterface;
+import org.hsqldb_voltpatches.Table;
 
 /*
  * Implementation of PersistentStore for result set and temporary tables.

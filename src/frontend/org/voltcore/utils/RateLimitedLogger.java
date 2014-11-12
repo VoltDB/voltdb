@@ -17,31 +17,34 @@
 
 package org.voltcore.utils;
 
-import com.google_voltpatches.common.base.Throwables;
-import com.google_voltpatches.common.cache.Cache;
-import com.google_voltpatches.common.cache.CacheBuilder;
-import org.voltcore.logging.Level;
-import org.voltcore.logging.VoltLogger;
-
 import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
+import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
+
+import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.common.cache.Cache;
+import com.google_voltpatches.common.cache.CacheBuilder;
+import java.util.IllegalFormatConversionException;
+import java.util.MissingFormatArgumentException;
+
 /*
  * Log a message to the specified logger, but limit the rate at which the message is logged.
+ *
+ * You can technically feed this thing nanoseconds and it will work
  */
 public class RateLimitedLogger {
 
     private volatile long m_lastLogTime = 0;
 
-    private final int m_maxLogIntervalMillis;
+    private final long m_maxLogIntervalMillis;
 
     private final VoltLogger m_logger;
     private final Level m_level;
 
-    public RateLimitedLogger(int maxLogIntervalMillis, VoltLogger logger, Level level) {
+    public RateLimitedLogger(long maxLogIntervalMillis, VoltLogger logger, Level level) {
         m_maxLogIntervalMillis = maxLogIntervalMillis;
         m_logger = logger;
         m_level = level;
@@ -82,26 +85,28 @@ public class RateLimitedLogger {
      * It is a very bad idea to use this when the message changes all the time.
      * It's also a cache and only makes a best effort to enforce the rate limit.
      */
-    public static void tryLogForMessage(
-            String message,
-            long now,
+    public static void tryLogForMessage(long now,
             final long maxLogInterval,
             final TimeUnit maxLogIntervalUnit,
             final VoltLogger logger,
-            final Level level) {
+            final Level level, String format, Object... parameters) {
         Callable<RateLimitedLogger> builder = new Callable<RateLimitedLogger>() {
             @Override
             public RateLimitedLogger call() throws Exception {
-                return new RateLimitedLogger((int)maxLogIntervalUnit.toMillis(maxLogInterval), logger, level);
+                return new RateLimitedLogger(maxLogIntervalUnit.toMillis(maxLogInterval), logger, level);
             }
         };
 
         final RateLimitedLogger rll;
         try {
-            rll = m_loggersCached.get(message, builder);
-            rll.log(message, now, level);
-        } catch (ExecutionException e) {
-            Throwables.propagate(Throwables.getRootCause(e));
+            rll = m_loggersCached.get(format, builder);
+            rll.log(String.format(format, parameters), now, level);
+        } catch (MissingFormatArgumentException ex) {
+            Throwables.propagate(Throwables.getRootCause(ex));
+        } catch (IllegalFormatConversionException ex) {
+            Throwables.propagate(Throwables.getRootCause(ex));
+        } catch (ExecutionException ex) {
+            Throwables.propagate(Throwables.getRootCause(ex));
         }
     }
 }

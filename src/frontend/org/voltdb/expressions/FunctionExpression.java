@@ -17,11 +17,11 @@
 
 package org.voltdb.expressions;
 
+import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
-import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.types.ExpressionType;
 
@@ -278,19 +278,6 @@ public class FunctionExpression extends AbstractExpression {
 
 
     @Override
-    public void resolveForDB(Database db) {
-        resolveChildrenForDB(db);
-        if (m_parameterArg == NOT_PARAMETERIZED) {
-            // Non-parameterized functions should have a fixed SPECIFIC type.
-            // Further refinement should be useless/un-possible.
-            return;
-        }
-        // resolving a child column has type implications for parameterized functions
-        negotiateInitialValueTypes();
-    }
-
-
-    @Override
     public void resolveForTable(Table table) {
         resolveChildrenForTable(table);
         if (m_parameterArg == NOT_PARAMETERIZED) {
@@ -304,13 +291,20 @@ public class FunctionExpression extends AbstractExpression {
 
     @Override
     public String explain(String impliedTableName) {
-        String result = m_name + "(";
-        String connector = "";
-        for (AbstractExpression arg : m_args) {
-            result += connector + arg.explain(impliedTableName);
+        String result = m_name;
+        String connector = "(";
+        // This is temporary and will be replaced once the Unit Attribute is in the XML
+        if (FunctionForVoltDB.isUnitFunction(m_functionId)) {
+            result += connector + m_alias.substring(m_name.length()+1);
             connector = ", ";
         }
-        result += ")";
+        if (m_args != null) {
+            for (AbstractExpression arg : m_args) {
+                result += connector + arg.explain(impliedTableName);
+                connector = ", ";
+            }
+            result += ")";
+        }
         return result;
     }
 

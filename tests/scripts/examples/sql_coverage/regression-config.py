@@ -68,6 +68,15 @@
                     "ddl": "DDL.sql",
                     "template": "basic-joins.sql",
                     "normalizer": "normalizer.py"},
+    "basic-int-joins": {"schema": "int-schema.py",
+                    "ddl": "int-DDL.sql",
+                    "template": "basic-int-joins.sql",
+                    "normalizer": "normalizer.py"},
+    "basic-index-joins": {"schema": "index-join-schema.py",
+                    "ddl": "index-DDL.sql",
+                    "template": "basic-index-joins.sql",
+                    "normalizer": "normalizer.py"},
+
 # THESE ALL SUCCEED, USE THE TEMPLATE INPUT
     "basic-unions": {"schema": "union-schema.py",
                      "ddl": "DDL.sql",
@@ -121,6 +130,10 @@
                         "ddl": "DDL.sql",
                         "template": "basic-timestamp.sql",
                         "normalizer": "normalizer.py"},
+    "advanced-timestamp": {"schema": "timestamp-schema.py",
+                           "ddl": "DDL.sql",
+                           "template": "advanced-timestamp.sql",
+                           "normalizer": "normalizer.py"},
 # BIGINT OVERFLOW CAUSES FAILURES IN THIS SUITE, USE REGRESSION INPUT
     "regression-basic-matview": {"schema": "matview-basic-schema.py",
                                  "ddl": "matview-DDL.sql",

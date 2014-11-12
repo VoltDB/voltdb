@@ -118,6 +118,9 @@ TTInt NValue::s_minDecimalValue("-9999999999"   //10 digits
 const double NValue::s_gtMaxDecimalAsDouble = 1E26;
 const double NValue::s_ltMinDecimalAsDouble = -1E26;
 
+TTInt NValue::s_maxInt64AsDecimal(TTInt(INT64_MAX) * kMaxScaleFactor);
+TTInt NValue::s_minInt64AsDecimal(TTInt(-INT64_MAX) * kMaxScaleFactor);
+
 /*
  * Produce a debugging string describing an NValue.
  */
@@ -132,44 +135,45 @@ std::string NValue::debug() const {
     int64_t addr;
     buffer << getTypeName(type) << "::";
     switch (type) {
-      case VALUE_TYPE_BOOLEAN:
+    case VALUE_TYPE_BOOLEAN:
         buffer << (getBoolean() ? "true" : "false");
         break;
-      case VALUE_TYPE_TINYINT:
+    case VALUE_TYPE_TINYINT:
         buffer << static_cast<int32_t>(getTinyInt());
         break;
-      case VALUE_TYPE_SMALLINT:
+    case VALUE_TYPE_SMALLINT:
         buffer << getSmallInt();
         break;
-      case VALUE_TYPE_INTEGER:
+    case VALUE_TYPE_INTEGER:
         buffer << getInteger();
         break;
-      case VALUE_TYPE_BIGINT:
-      case VALUE_TYPE_TIMESTAMP:
+    case VALUE_TYPE_BIGINT:
+    case VALUE_TYPE_TIMESTAMP:
         buffer << getBigInt();
         break;
-      case VALUE_TYPE_DOUBLE:
+    case VALUE_TYPE_DOUBLE:
         buffer << getDouble();
         break;
-      case VALUE_TYPE_VARCHAR:
-        ptr = reinterpret_cast<const char*>(getObjectValue());
+    case VALUE_TYPE_VARCHAR:
+        ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
         addr = reinterpret_cast<int64_t>(ptr);
-        out_val = std::string(ptr, getObjectLength());
-        buffer << "[" << getObjectLength() << "]";
+        out_val = std::string(ptr, getObjectLength_withoutNull());
+        buffer << "[" << getObjectLength_withoutNull() << "]";
         buffer << "\"" << out_val << "\"[@" << addr << "]";
         break;
-      case VALUE_TYPE_VARBINARY:
-        ptr = reinterpret_cast<const char*>(getObjectValue());
+    case VALUE_TYPE_VARBINARY:
+        ptr = reinterpret_cast<const char*>(getObjectValue_withoutNull());
         addr = reinterpret_cast<int64_t>(ptr);
-        out_val = std::string(ptr, getObjectLength());
-        buffer << "[" << getObjectLength() << "]";
+        out_val = std::string(ptr, getObjectLength_withoutNull());
+        buffer << "[" << getObjectLength_withoutNull() << "]";
         buffer << "-bin[@" << addr << "]";
         break;
-      case VALUE_TYPE_DECIMAL:
+    case VALUE_TYPE_DECIMAL:
         buffer << createStringFromDecimal();
         break;
-      default:
-          buffer << "(no details)";
+    default:
+        buffer << "(no details)";
+        break;
     }
     std::string ret(buffer.str());
     return (ret);
@@ -285,127 +289,6 @@ void NValue::createDecimalFromString(const std::string &txt) {
     getDecimal() = whole;
 }
 
-
-/*
- * Avoid scaling both sides if possible. E.g, don't turn dec * 2 into
- * (dec * 2*kMaxScale*E-12). Then the result of simple multiplication
- * is a*b*E-24 and have to further multiply to get back to the assumed
- * E-12, which can overflow unnecessarily at the middle step.
- */
-NValue NValue::opMultiplyDecimals(const NValue &lhs, const NValue &rhs) const {
-    if ((lhs.getValueType() != VALUE_TYPE_DECIMAL) &&
-        (rhs.getValueType() != VALUE_TYPE_DECIMAL))
-    {
-        throw SQLException(SQLException::dynamic_sql_error, "Non-decimal NValue in decimal multiply");
-    }
-
-    if (lhs.isNull() || rhs.isNull()) {
-        TTInt retval;
-        retval.SetMin();
-        return getDecimalValue( retval );
-    }
-
-    if ((lhs.getValueType() == VALUE_TYPE_DECIMAL) &&
-        (rhs.getValueType() == VALUE_TYPE_DECIMAL))
-    {
-        TTLInt calc;
-        calc.FromInt(lhs.getDecimal());
-        calc *= rhs.getDecimal();
-        calc /= NValue::kMaxScaleFactor;
-        TTInt retval;
-        if (retval.FromInt(calc)  || retval > s_maxDecimalValue || retval < s_minDecimalValue) {
-            char message[4096];
-            snprintf(message, 4096, "Attempted to multiply %s by %s causing overflow/underflow. Unscaled result was %s",
-                    lhs.createStringFromDecimal().c_str(), rhs.createStringFromDecimal().c_str(),
-                    calc.ToString(10).c_str());
-            throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                               message);
-        }
-        return getDecimalValue(retval);
-    } else if  (lhs.getValueType() != VALUE_TYPE_DECIMAL)
-    {
-        TTLInt calc;
-        calc.FromInt(rhs.getDecimal());
-        calc *= lhs.castAsDecimalAndGetValue();
-        calc /= NValue::kMaxScaleFactor;
-        TTInt retval;
-        if (retval.FromInt(calc)  || retval > s_maxDecimalValue || retval < s_minDecimalValue) {
-            char message[4096];
-            snprintf(message, 4096, "Attempted to multiply %s by %s causing overflow/underflow. Unscaled result was %s",
-                    lhs.createStringFromDecimal().c_str(), rhs.createStringFromDecimal().c_str(),
-                    calc.ToString(10).c_str());
-            throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                               message);
-        }
-        return getDecimalValue(retval);
-    }
-    else
-    {
-        TTLInt calc;
-        calc.FromInt(lhs.getDecimal());
-        calc *= rhs.castAsDecimalAndGetValue();
-        calc /= NValue::kMaxScaleFactor;
-        TTInt retval;
-        if (retval.FromInt(calc)  || retval > s_maxDecimalValue || retval < s_minDecimalValue) {
-            char message[4096];
-            snprintf(message, 4096, "Attempted to multiply %s by %s causing overflow/underflow. Unscaled result was %s",
-                    lhs.createStringFromDecimal().c_str(), rhs.createStringFromDecimal().c_str(),
-                    calc.ToString(10).c_str());
-            throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                               message);
-        }
-        return getDecimalValue(retval);
-   }
-}
-
-
-/*
- * Divide two decimals and return a correctly scaled decimal.
- * A little cumbersome. Better algorithms welcome.
- *   (1) calculate the quotient and the remainder.
- *   (2) temporarily scale the remainder to 19 digits
- *   (3) divide out remainder to calculate digits after the radix point.
- *   (4) scale remainder to 12 digits (that's the default scale)
- *   (5) scale the quotient back to 19,12.
- *   (6) sum the scaled quotient and remainder.
- *   (7) construct the final decimal.
- */
-
-NValue NValue::opDivideDecimals(const NValue lhs, const NValue rhs) const {
-    if ((lhs.getValueType() != VALUE_TYPE_DECIMAL) ||
-        (rhs.getValueType() != VALUE_TYPE_DECIMAL))
-    {
-        throw SQLException(SQLException::dynamic_sql_error, "No decimal NValue in decimal subtract");
-    }
-
-    if (lhs.isNull() || rhs.isNull()) {
-        TTInt retval;
-        retval.SetMin();
-        return getDecimalValue( retval );
-    }
-
-    TTLInt calc;
-    calc.FromInt(lhs.getDecimal());
-    calc *= NValue::kMaxScaleFactor;
-    if (calc.Div(rhs.getDecimal())) {
-        char message[4096];
-        snprintf( message, 4096, "Attempted to divide %s by %s causing overflow/underflow (or divide by zero)",
-                lhs.createStringFromDecimal().c_str(), rhs.createStringFromDecimal().c_str());
-        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                           message);
-    }
-    TTInt retval;
-    if (retval.FromInt(calc)  || retval > s_maxDecimalValue || retval < s_minDecimalValue) {
-        char message[4096];
-        snprintf( message, 4096, "Attempted to divide %s by %s causing overflow. Unscaled result was %s",
-                lhs.createStringFromDecimal().c_str(), rhs.createStringFromDecimal().c_str(),
-                calc.ToString(10).c_str());
-        throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                           message);
-    }
-    return getDecimalValue(retval);
-}
-
 struct NValueList {
     static int allocationSizeForLength(size_t length)
     {
@@ -425,7 +308,7 @@ struct NValueList {
     NValueList(size_t length, ValueType elementType) : m_length(length), m_elementType(elementType)
     { }
 
-    void deserializeNValues(SerializeInput &input, Pool *dataPool)
+    void deserializeNValues(SerializeInputBE &input, Pool *dataPool)
     {
         for (int ii = 0; ii < m_length; ++ii) {
             m_values[ii].deserializeFromAllocateForStorage(m_elementType, input, dataPool);
@@ -462,7 +345,7 @@ bool NValue::inList(const NValue& rhs) const
     if (rhsType != VALUE_TYPE_ARRAY) {
         throwDynamicSQLException("rhs of IN expression is of a non-list type %s", rhs.getValueTypeString().c_str());
     }
-    const NValueList* listOfNValues = (NValueList*)rhs.getObjectValue();
+    const NValueList* listOfNValues = (NValueList*)rhs.getObjectValue_withoutNull();
     const StlFriendlyNValue& value = *static_cast<const StlFriendlyNValue*>(this);
     //TODO: An O(ln(length)) implementation vs. the current O(length) implementation
     // such as binary search would likely require some kind of sorting/re-org of values
@@ -471,7 +354,7 @@ bool NValue::inList(const NValue& rhs) const
     return std::find(listOfNValues->begin(), listOfNValues->end(), value) != listOfNValues->end();
 }
 
-void NValue::deserializeIntoANewNValueList(SerializeInput &input, Pool *dataPool)
+void NValue::deserializeIntoANewNValueList(SerializeInputBE &input, Pool *dataPool)
 {
     ValueType elementType = (ValueType)input.readByte();
     size_t length = input.readShort();
@@ -579,160 +462,171 @@ inline static void throwTimestampFormatError(const std::string &str)
 {
     char message[4096];
     // No space separator for between the date and time
-    snprintf(message, 4096, "Attempted to cast \'%s\' to type %s failed. Supported format: \'YYYY-MM-DD HH:MM:SS.UUUUUU\'",
+    snprintf(message, 4096, "Attempted to cast \'%s\' to type %s failed. Supported format: \'YYYY-MM-DD HH:MM:SS.UUUUUU\'"
+             "or \'YYYY-MM-DD\'",
              str.c_str(), valueToString(VALUE_TYPE_TIMESTAMP).c_str());
     throw SQLException(SQLException::dynamic_sql_error, message);
 }
-
 
 int64_t NValue::parseTimestampString(const std::string &str)
 {
     // date_str
     std::string date_str(str);
-    // This is the std:string API for "ltrim".
+    // This is the std:string API for "ltrim" and "rtrim".
     date_str.erase(date_str.begin(), std::find_if(date_str.begin(), date_str.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
-    std::size_t sep_pos = date_str.find(' ');
-    if (sep_pos != 10) {
-        throwTimestampFormatError(str);
-    }
+    date_str.erase(std::find_if(date_str.rbegin(), date_str.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(), date_str.end());
+    std::size_t sep_pos;
 
-    // time_str
-    std::string time_str = date_str.substr(sep_pos + 1);
-    // This is the std:string API for "ltrim" and "rtrim"
-    time_str.erase(time_str.begin(), std::find_if(time_str.begin(), time_str.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
-    time_str.erase(std::find_if(time_str.rbegin(), time_str.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(), time_str.end());
-    if (time_str.length() != 15) {
-        throwTimestampFormatError(str);
-    }
 
-    std::string number_string;
-    const char * pch;
-
-    if (date_str.at(4) != '-' || date_str.at(7) != '-') {
-        throwTimestampFormatError(str);
-    }
-
-    number_string = date_str.substr(0,4);
-    pch = number_string.c_str();
     int year = 0;
     int month = 0;
     int day = 0;
     int hour = 0;
     int minute = 0;
     int second = 0;
+    int micro = 1000000;
+    // time_str
+    std::string time_str;
+    std::string number_string;
+    const char * pch;
 
-    // YYYY
-    year = atoi(pch);
-    // new years day 10000 is likely to cause problems.
-    // There's a boost library limitation against years before 1400.
-    if (year > 9999 || year < 1400) {
+    switch (date_str.size()) {
+    case 26:
+        sep_pos  = date_str.find(' ');
+        if (sep_pos != 10) {
+            throwTimestampFormatError(str);
+        }
+
+        time_str = date_str.substr(sep_pos + 1);
+        // This is the std:string API for "ltrim"
+        time_str.erase(time_str.begin(), std::find_if(time_str.begin(), time_str.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
+        if (time_str.length() != 15) {
+            throwTimestampFormatError(str);
+        }
+
+        // tokenize time_str: HH:MM:SS.mmmmmm
+        if (time_str.at(2) != ':' || time_str.at(5) != ':' || time_str.at(8) != '.') {
+            throwTimestampFormatError(str);
+        }
+
+        // HH
+        number_string = time_str.substr(0,2);
+        pch = number_string.c_str();
+        if (pch[0] == '0') {
+            hour = 0;
+        } else if (pch[0] == '1') {
+            hour = 10;
+        } else if (pch[0] == '2') {
+            hour = 20;
+        } else {
+            throwTimestampFormatError(str);
+        }
+        if (pch[1] > '9' || pch[1] < '0') {
+            throwTimestampFormatError(str);
+        }
+        hour += pch[1] - '0';
+        if (hour > 23 || hour < 0) {
+            throwTimestampFormatError(str);
+        }
+
+        // MM
+        number_string = time_str.substr(3,2);
+        pch = number_string.c_str();
+        if (pch[0] > '5' || pch[0] < '0') {
+            throwTimestampFormatError(str);
+        }
+        minute = 10*(pch[0] - '0');
+        if (pch[1] > '9' || pch[1] < '0') {
+            throwTimestampFormatError(str);
+        }
+        minute += pch[1] - '0';
+        if (minute > 59 || minute < 0) {
+            throwTimestampFormatError(str);
+        }
+
+        // SS
+        number_string = time_str.substr(6,2);
+        pch = number_string.c_str();
+        if (pch[0] > '5' || pch[0] < '0') {
+            throwTimestampFormatError(str);
+        }
+        second = 10*(pch[0] - '0');
+        if (pch[1] > '9' || pch[1] < '0') {
+            throwTimestampFormatError(str);
+        }
+        second += pch[1] - '0';
+        if (second > 59 || second < 0) {
+            throwTimestampFormatError(str);
+        }
+        // hack a '1' in the place if the decimal and use atoi to get a value that
+        // MUST be between 1 and 2 million if all 6 digits of micros were included.
+        number_string = time_str.substr(8,7);
+        number_string.at(0) = '1';
+        pch = number_string.c_str();
+        micro = atoi(pch);
+        if (micro >= 2000000 || micro < 1000000) {
+            throwTimestampFormatError(str);
+        }
+    case 10:
+        if (date_str.at(4) != '-' || date_str.at(7) != '-') {
+            throwTimestampFormatError(str);
+        }
+
+        number_string = date_str.substr(0,4);
+        pch = number_string.c_str();
+
+        // YYYY
+        year = atoi(pch);
+        // new years day 10000 is likely to cause problems.
+        // There's a boost library limitation against years before 1400.
+        if (year > 9999 || year < 1400) {
+            throwTimestampFormatError(str);
+        }
+
+        // MM
+        number_string = date_str.substr(5,2);
+        pch = number_string.c_str();
+        if (pch[0] == '0') {
+            month = 0;
+        } else if (pch[0] == '1') {
+            month = 10;
+        } else {
+            throwTimestampFormatError(str);
+        }
+        if (pch[1] > '9' || pch[1] < '0') {
+            throwTimestampFormatError(str);
+        }
+        month += pch[1] - '0';
+        if (month > 12 || month < 1) {
+            throwTimestampFormatError(str);
+        }
+
+        // DD
+        number_string = date_str.substr(8,2);
+        pch = number_string.c_str();
+        if (pch[0] == '0') {
+            day = 0;
+        } else if (pch[0] == '1') {
+            day = 10;
+        } else if (pch[0] == '2') {
+            day = 20;
+        } else if (pch[0] == '3') {
+            day = 30;
+        } else {
+            throwTimestampFormatError(str);
+        }
+        if (pch[1] > '9' || pch[1] < '0') {
+            throwTimestampFormatError(str);
+        }
+        day += pch[1] - '0';
+        if (day > 31 || day < 1) {
+            throwTimestampFormatError(str);
+        }
+        break;
+    default:
         throwTimestampFormatError(str);
     }
 
-    // MM
-    number_string = date_str.substr(5,2);
-    pch = number_string.c_str();
-    if (pch[0] == '0') {
-        month = 0;
-    } else if (pch[0] == '1') {
-        month = 10;
-    } else {
-        throwTimestampFormatError(str);
-    }
-    if (pch[1] > '9' || pch[1] < '0') {
-        throwTimestampFormatError(str);
-    }
-    month += pch[1] - '0';
-    if (month > 12 || month < 1) {
-        throwTimestampFormatError(str);
-    }
-
-    // DD
-    number_string = date_str.substr(8,2);
-    pch = number_string.c_str();
-    if (pch[0] == '0') {
-        day = 0;
-    } else if (pch[0] == '1') {
-        day = 10;
-    } else if (pch[0] == '2') {
-        day = 20;
-    } else if (pch[0] == '3') {
-        day = 30;
-    } else {
-        throwTimestampFormatError(str);
-    }
-    if (pch[1] > '9' || pch[1] < '0') {
-        throwTimestampFormatError(str);
-    }
-    day += pch[1] - '0';
-    if (day > 31 || day < 1) {
-        throwTimestampFormatError(str);
-    }
-
-    // tokenize time_str: HH:MM:SS.mmmmmm
-    if (time_str.at(2) != ':' || time_str.at(5) != ':' || time_str.at(8) != '.') {
-        throwTimestampFormatError(str);
-    }
-
-    // HH
-    number_string = time_str.substr(0,2);
-    pch = number_string.c_str();
-    if (pch[0] == '0') {
-        hour = 0;
-    } else if (pch[0] == '1') {
-        hour = 10;
-    } else if (pch[0] == '2') {
-        hour = 20;
-    } else {
-        throwTimestampFormatError(str);
-    }
-    if (pch[1] > '9' || pch[1] < '0') {
-        throwTimestampFormatError(str);
-    }
-    hour += pch[1] - '0';
-    if (hour > 23 || hour < 0) {
-        throwTimestampFormatError(str);
-    }
-
-    // MM
-    number_string = time_str.substr(3,2);
-    pch = number_string.c_str();
-    if (pch[0] > '5' || pch[0] < '0') {
-        throwTimestampFormatError(str);
-    }
-    minute = 10*(pch[0] - '0');
-    if (pch[1] > '9' || pch[1] < '0') {
-        throwTimestampFormatError(str);
-    }
-    minute += pch[1] - '0';
-    if (minute > 59 || minute < 0) {
-        throwTimestampFormatError(str);
-    }
-
-    // SS
-    number_string = time_str.substr(6,2);
-    pch = number_string.c_str();
-    if (pch[0] > '5' || pch[0] < '0') {
-        throwTimestampFormatError(str);
-    }
-    second = 10*(pch[0] - '0');
-    if (pch[1] > '9' || pch[1] < '0') {
-        throwTimestampFormatError(str);
-    }
-    second += pch[1] - '0';
-    if (second > 59 || second < 0) {
-        throwTimestampFormatError(str);
-    }
-
-    // hack a '1' in the place if the decimal and use atoi to get a value that
-    // MUST be between 1 and 2 million if all 6 digits of micros were included.
-    number_string = time_str.substr(8,7);
-    number_string.at(0) = '1';
-    pch = number_string.c_str();
-    int micro = atoi(pch);
-    if (micro >= 2000000 || micro < 1000000) {
-        throwTimestampFormatError(str);
-    }
     int64_t result = 0;
     try {
         result = epoch_microseconds_from_components(

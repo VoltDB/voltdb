@@ -38,7 +38,7 @@ namespace voltdb
 class SchemaColumn
 {
 public:
-    SchemaColumn(PlannerDomValue colObject);
+    SchemaColumn(PlannerDomValue colObject, int idx);
     ~SchemaColumn();
 
     std::string getColumnName() const;

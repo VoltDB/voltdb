@@ -58,8 +58,7 @@ public class TestSqlCmdInterface
     private static int numOfQueries = -1;
     private static String qryFrmFile = "";
     private final static String[] firstKeyQryWord =
-            //new String[]{"select", "insert", "delete", "update", "exec", "execute", "create", "alter"};
-            new String[]{"select", "insert", "delete", "update", "exec", "execute"};
+            new String[]{"select", "insert", "delete", "update", "exec", "execute", "create", "alter", "drop"};
 
 
     @BeforeClass
@@ -226,15 +225,13 @@ public class TestSqlCmdInterface
     // 12) To test 2 sql statements starting with different key words
     //     which are separated by one or more white spaces.
     //     This test case is derived from case 2 & 11.
-    //     However, this is a negative test 'cause we have not supported
-    //     create feature at sqlcmd prompt, yet.
     @Test
     public void testParseQuery12() {
         String raw = " select * From dummy   create tAble xxx  (col1_name type(), col2_name type()) ;  ";
         ID = 2;
         String expected = raw.replaceAll("\\;+", " ");
         expected = trimKeyWordsLeadingSpaces(expected);
-        notAssertThis(raw, expected, 2, ID);
+        assertThis(raw, expected, 2, ID);
     }
 
     // 13) To test 2 sql statements starting with different key words
@@ -246,7 +243,7 @@ public class TestSqlCmdInterface
         ID = 2;
         String expected = raw.replaceAll("\\;+", " ");
         expected = trimKeyWordsLeadingSpaces(expected);
-        //assertThis(raw, expected, 2, ID); // Uncomment this line when Test 12 is failed
+        assertThis(raw, expected, 2, ID);
     }
 
     // 14) To test a bogus string containing semicolon(s).
@@ -298,7 +295,7 @@ public class TestSqlCmdInterface
         expected = trimKeyWordsLeadingSpaces(expected);
         // Since 'alter table' is not supported, yet. We expect only three valid queries
         // returned, although they will not be processed by the VoltDB engine.
-        notAssertThis(raw, expected, 4, ID);
+        assertThis(raw, expected, 4, ID);
     }
 
     // This is derived from test case 16.
@@ -454,6 +451,30 @@ public class TestSqlCmdInterface
         expected = expected.replaceAll(",", "");
         expected = expected.replaceAll("\\s+", "");
         assertThis2(query, expected, 3, ID);
+    }
+
+    @Test
+    public void testParseCreateView()
+    {
+        ID = 28;
+        String create = "create view foo (bas, as) as select bar, count(*) from foo group by val";
+        assertThis(create, create, 1, ID);
+    }
+
+    @Test
+    public void testParseCreateStmtProcedure()
+    {
+        ID = 29;
+        String create = "create procedure foo as select * from blat";
+        assertThis(create, create, 1, ID);
+        create = "create procedure foo as insert into blat values (?, ?)";
+        assertThis(create, create, 1, ID);
+        create = "create procedure foo as update into blat values (?, ?)";
+        assertThis(create, create, 1, ID);
+        create = "create procedure foo as delete into blat values (?, ?)";
+        assertThis(create, create, 1, ID);
+        create = "create procedure foo as SELECT * FROM table UNION SELECT * FROM table2";
+        assertThis(create, create, 1, ID);
     }
 
     private static void setQryString(File QryFileHandle) throws FileNotFoundException {

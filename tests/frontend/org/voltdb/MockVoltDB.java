@@ -29,17 +29,24 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Executors;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.WatchedEvent;
+import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
+import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.Catalog;
@@ -51,11 +58,13 @@ import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.licensetool.LicenseApi;
 
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 
 public class MockVoltDB implements VoltDBInterface
 {
+    private static final VoltLogger logger = new VoltLogger("MockVoltDB");
     private Catalog m_catalog;
     private CatalogContext m_context;
     final String m_clusterName = "cluster";
@@ -69,7 +78,7 @@ public class MockVoltDB implements VoltDBInterface
     OperationMode m_startMode = OperationMode.RUNNING;
     ReplicationRole m_replicationRole = ReplicationRole.NONE;
     VoltDB.Configuration voltconfig = null;
-    private final ListeningExecutorService m_es = MoreExecutors.listeningDecorator(Executors.newSingleThreadExecutor());
+    private final ListeningExecutorService m_es = MoreExecutors.listeningDecorator(CoreUtils.getSingleThreadExecutor("Mock Computation Service"));
     public int m_hostId = 0;
     private SiteTracker m_siteTracker;
     private final Map<MailboxType, List<MailboxNodeContent>> m_mailboxMap =
@@ -123,7 +132,14 @@ public class MockVoltDB implements VoltDBInterface
                     Ids.OPEN_ACL_UNSAFE,
                     CreateMode.EPHEMERAL);
 
-            m_hostMessenger.generateMailboxId(m_hostMessenger.getHSIdForLocalSite(HostMessenger.STATS_SITE_ID));
+            m_hostMessenger.getZK().create(
+                    VoltZK.start_action,
+                    null,
+                    Ids.OPEN_ACL_UNSAFE,
+                    CreateMode.PERSISTENT,
+                    new ZKUtil.StringCallback(),
+                    null);
+
             m_statsAgent = new StatsAgent();
             m_statsAgent.registerMailbox(m_hostMessenger,
                     m_hostMessenger.getHSIdForLocalSite(HostMessenger.STATS_SITE_ID));
@@ -239,7 +255,7 @@ public class MockVoltDB implements VoltDBInterface
     public CatalogContext getCatalogContext()
     {
         long now = System.currentTimeMillis();
-        m_context = new CatalogContext( now, now, m_catalog, null, 0, 0, 0) {
+        m_context = new CatalogContext( now, now, m_catalog, null, null, 0, 0) {
             @Override
             public long getCatalogCRC() {
                 return 13;
@@ -312,10 +328,73 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public String getEELibraryVersionString() {
+        return getVersionString();
+    }
+
+    @Override
+    public boolean isCompatibleVersionString(String versionString) {
+        return true;
+    }
+
+    @Override
     public void initialize(Configuration config)
     {
         m_noLoadLib = config.m_noLoadLibVOLTDB;
         voltconfig = config;
+    }
+
+    public void createStartActionNode(int index, StartAction action) {
+        VoltZK.createStartActionNode(m_hostMessenger.getZK(), m_hostMessenger.getHostId() + index, action);
+    }
+
+    class StartActionWatcher implements Watcher {
+        @Override
+        public void process(WatchedEvent event) {
+            m_es.submit(new Runnable() {
+                @Override
+                public void run() {
+                    validateStartAction();
+                }
+            });
+        }
+    }
+
+    public void validateStartAction() {
+        try {
+            ZooKeeper zk = m_hostMessenger.getZK();
+            boolean initCompleted = zk.exists(VoltZK.init_completed, false) != null;
+            List<String> children = zk.getChildren(VoltZK.start_action, new StartActionWatcher(), null);
+            if (!children.isEmpty()) {
+                for (String child : children) {
+                    byte[] data = zk.getData(VoltZK.start_action + "/" + child, false, null);
+                    if (data == null) {
+                        VoltDB.crashLocalVoltDB("Couldn't find " + VoltZK.start_action + "/" + child);
+                    }
+                    String startAction = new String(data);
+                    if ((startAction.equals(StartAction.JOIN.toString()) ||
+                            startAction.equals(StartAction.REJOIN.toString()) ||
+                            startAction.equals(StartAction.LIVE_REJOIN.toString())) &&
+                            !initCompleted) {
+                        int nodeId = VoltZK.getHostIDFromChildName(child);
+                        if (nodeId == m_hostMessenger.getHostId()) {
+                            VoltDB.crashLocalVoltDB("This node was started with start action " + startAction +
+                                    " during cluster creation. All nodes should be started with matching "
+                                    + "create or recover actions when bring up a cluster. Join and Rejoin "
+                                    + "are for adding nodes to an already running cluster.");
+                        } else {
+                            logger.warn("Node " + nodeId + " tried to " + startAction + " cluster but it is not allowed during cluster creation. "
+                                    + "All nodes should be started with matching create or recover actions when bring up a cluster. "
+                                    + "Join and rejoin are for adding nodes to an already running cluster.");
+                        }
+                    }
+                }
+            }
+        } catch (KeeperException e) {
+            logger.error("Failed to validate the start actions:" + e.getMessage());
+        } catch (InterruptedException e) {
+            VoltDB.crashLocalVoltDB("Interrupted during start action validation:" + e.getMessage(), true, e);
+        }
     }
 
     @Override
@@ -348,6 +427,12 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public boolean isMpSysprocSafeToExecute(long txnId)
+    {
+        return true;
+    }
+
+    @Override
     public void startSampler()
     {
     }
@@ -355,7 +440,7 @@ public class MockVoltDB implements VoltDBInterface
     @Override
     public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(String diffCommands,
             byte[] catalogBytes, byte[] catalogHash, int expectedCatalogVersion,
-            long currentTxnId, long currentTxnTimestamp, long deploymentCRC)
+            long currentTxnId, long currentTxnTimestamp, byte[] deploymentHash)
     {
         throw new UnsupportedOperationException("unimplemented");
     }
@@ -519,8 +604,24 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public <T> ListenableFuture<T> submitSnapshotIOWork(Callable<T> work)
+    {
+        return null;
+    }
+
+    @Override
     public ScheduledFuture<?> schedulePriorityWork(Runnable work,
             long initialDelay, long delay, TimeUnit unit) {
         return null;
+    }
+
+    @Override
+    public long getClusterUptime() {
+        return 0;
+    }
+
+    @Override
+    public void halt() {
+        assert (true);
     }
 }

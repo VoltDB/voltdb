@@ -19,9 +19,8 @@ package org.voltdb;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.network.Connection;
-
-import org.voltdb.sysprocs.SystemInformation;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.sysprocs.SystemInformation;
 
 /**
  * Agent responsible for collecting SystemInformation on this host.
@@ -52,26 +51,20 @@ public class SystemInformationAgent extends OpsAgent
         }
         String subselector = obj.getString("subselector");
 
-        // Some selectors can provide a single answer based on global data.
-        // Intercept them and respond before doing the distributed stuff.
-        if (subselector.equalsIgnoreCase("DEPLOYMENT")) {
-            PendingOpsRequest psr = new PendingOpsRequest(
+        PendingOpsRequest psr = new PendingOpsRequest(
                 selector,
                 subselector,
                 c,
                 clientHandle,
-                System.currentTimeMillis());
+                System.currentTimeMillis(),
+                obj);
+
+        // Some selectors can provide a single answer based on global data.
+        // Intercept them and respond before doing the distributed stuff.
+        if (subselector.equalsIgnoreCase("DEPLOYMENT")) {
             collectSystemInformationDeployment(psr);
             return;
         }
-
-        PendingOpsRequest psr =
-            new PendingOpsRequest(
-                    selector,
-                    subselector,
-                    c,
-                    clientHandle,
-                    System.currentTimeMillis());
         distributeOpsWork(psr, obj);
     }
 

@@ -31,12 +31,12 @@
 
 package org.hsqldb_voltpatches;
 
-import org.hsqldb_voltpatches.index.Index;
 import org.hsqldb_voltpatches.lib.FileUtil;
 import org.hsqldb_voltpatches.lib.StringConverter;
-import org.hsqldb_voltpatches.persist.DataFileCache;
-import org.hsqldb_voltpatches.persist.PersistentStore;
 import org.hsqldb_voltpatches.persist.TextCache;
+import org.hsqldb_voltpatches.persist.DataFileCache;
+import org.hsqldb_voltpatches.index.Index;
+import org.hsqldb_voltpatches.persist.PersistentStore;
 
 // tony_lai@users 20020820 - patch 595099 - user define PK name
 

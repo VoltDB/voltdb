@@ -36,7 +36,7 @@ public class ParsedDeleteStmt extends AbstractParsedStmt {
 
     @Override
     void parse(VoltXMLElement stmtNode) {
-        assert(tableList.size() == 1);
+        assert(m_tableList.size() == 1);
     }
 
 }

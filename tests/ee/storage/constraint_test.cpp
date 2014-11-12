@@ -61,6 +61,7 @@
 #include "common/tabletuple.h"
 #include "storage/tablefactory.h"
 #include "storage/persistenttable.h"
+#include "storage/DRTupleStream.h"
 #include "indexes/tableindex.h"
 #include "execution/VoltDBEngine.h"
 
@@ -91,6 +92,8 @@ protected:
     voltdb::Table* table;
     voltdb::CatalogId database_id;
     voltdb::VoltDBEngine m_engine;
+    voltdb::MockDRTupleStream drStream;
+    char signature[20];
 
     char *m_exceptionBuffer;
 
@@ -110,11 +113,11 @@ protected:
         assert (columnNames.size() == columnTypes.size());
         assert (columnTypes.size() == columnSizes.size());
         assert (columnSizes.size() == columnNullables.size());
-        TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnSizes, columnNullables, true);
+        TupleSchema *schema = TupleSchema::createTupleSchemaForTest(columnTypes, columnSizes, columnNullables);
         if (pkey != NULL) {
             pkey->tupleSchema = schema;
         }
-        table = TableFactory::getPersistentTable(this->database_id, "test_table", schema, columnNames);
+        table = TableFactory::getPersistentTable(this->database_id, "test_table", schema, columnNames, signature, &drStream, false);
         if (pkey) {
             TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(*pkey);
             assert(pkeyIndex);

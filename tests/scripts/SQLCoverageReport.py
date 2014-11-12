@@ -27,52 +27,41 @@ import cgi
 import os
 import cPickle
 import decimal
+import datetime
 from distutils.util import strtobool
 from optparse import OptionParser
 from voltdbclient import VoltColumn, VoltTable, FastSerializer
 
 __quiet = True
 
-def highlight(s, flag = True):
+def highlight(s, flag):
     if not isinstance(s, basestring):
         s = str(s)
     return flag and "<span style=\"color: red\">%s</span>" % (s) or s
 
-def generate_table_str(res):
-    tablestr = {"jni": "", "hsqldb": ""}
+def generate_table_str(res, key):
 
-    for k in tablestr.iterkeys():
-        tmp = []
-        if "Result" in res[k] and res[k]["Result"] != None:
-            for i in xrange(len(res[k]["Result"])):
-                result = []
+    highlights = res.get("highlight")
+    source = res[key].get("Result")
+    if not source:
+        return ""
 
-                result.append("column count: %d" %
-                              (len(res[k]["Result"][i].columns)))
-                result.append("row count: %d" %
-                              (len(res[k]["Result"][i].tuples)))
-                result.append("cols: " +
-                              ", ".join(map(lambda x: str(x),
-                                            res[k]["Result"][i].columns)))
-                result.append("rows -")
-                result.extend(map(lambda x: str(x), res[k]["Result"][i].tuples))
-
-                for j in xrange(len(result)):
-                    if "highlight" in res and \
-                            isinstance(res["highlight"][i], list) and \
-                            j in res["highlight"][i]:
-                        result[j] = highlight(result[j])
-                tmp.append("<br />".join(result))
-            tablestr[k] = "<br />".join(tmp)
-
+    result = []
+    result.append(highlight("column count: %d" % (len(source.columns)), "columns" == highlights))
+    result.append(highlight("row count: %d" % (len(source.tuples)), "tuples" == highlights))
+    result.append("cols: " + ", ".join(map(lambda x: str(x), source.columns)))
+    result.append("rows -")
+    if isinstance(highlights, list):
+        for j in xrange(len(source.tuples)):
+            result.append(highlight(source.tuples[j], j in highlights))
+    else:
+        result.extend(map(lambda x: str(x), source.tuples))
+    tablestr = "<br />".join(result)
     return tablestr
 
 def generate_detail(name, item, output_dir):
-    filename = "%s.html" % (item["id"])
     if output_dir == None:
         return
-
-    tablestr = generate_table_str(item)
 
     details = """
 <html>
@@ -108,15 +97,14 @@ td {width: 50%%}
 </html>
 """ % (cgi.escape(item["SQL"]),
        cgi.escape(item["SQL"]),
-       highlight(item["jni"]["Status"],
-                 "highlight" in item and "Status" in item["highlight"]),
-       highlight(item["hsqldb"]["Status"],
-                 "highlight" in item and "Status" in item["highlight"]),
-       "Info" in item["jni"] and item["jni"]["Info"] or "",
-       "Info" in item["hsqldb"] and item["hsqldb"]["Info"] or "",
-       tablestr["jni"],
-       tablestr["hsqldb"])
+       highlight(item["jni"]["Status"], "Status" == item.get("highlight")),
+       highlight(item["hsqldb"]["Status"], "Status" == item.get("highlight")),
+       item["jni"].get("Info") or "",
+       item["hsqldb"].get("Info") or "",
+       generate_table_str(item, "jni"),
+       generate_table_str(item, "hsqldb"))
 
+    filename = "%s.html" % (item["id"])
     fd = open(os.path.join(output_dir, filename), "w")
     fd.write(details.encode("utf-8"))
     fd.close()
@@ -139,6 +127,7 @@ def print_section(name, mismatches, output_dir):
 </tr>
 """ % (name, len(mismatches))
 
+    temp = []
     for i in mismatches:
         safe_print(i["SQL"])
         detail_page = generate_detail(name, i, output_dir)
@@ -148,7 +137,7 @@ def print_section(name, mismatches, output_dir):
         hsqldbStatus = i["hsqldb"]["Status"]
         if hsqldbStatus < 0:
             hsqldbStatus = "Error: " + `hsqldbStatus`
-        result += """
+        temp.append("""
 <tr>
 <td>%s</td>
 <td><a href="%s">%s</a></td>
@@ -158,7 +147,9 @@ def print_section(name, mismatches, output_dir):
             detail_page,
             cgi.escape(i["SQL"]),
             jniStatus,
-            hsqldbStatus)
+            hsqldbStatus))
+
+    result += ''.join(temp)
 
     result += """
 </table>
@@ -167,61 +158,96 @@ def print_section(name, mismatches, output_dir):
     return result
 
 def is_different(x, cntonly):
-    """Marks the attributes that are different. Since the whole table will be
+    """Notes the attributes that are different. Since the whole table will be
     printed out as a single string.
     the first line is column count,
     the second line is row count,
     the third line is column names and types,
-    and then followed by rows.
+    followed by rows.
     """
 
+    jni = x["jni"]
+    hsql = x["hsqldb"]
     # JNI returns a variety of negative error result values that we
     # can't easily match with the HSQL backend.  Reject only pairs of
     # status values where one of them wasn't an error
-    if x["jni"]["Status"] != x["hsqldb"]["Status"]:
-        if int(x["jni"]["Status"]) > 0 or int(x["hsqldb"]["Status"]) > 0:
-            x["highlight"] = ["Status"]
-            # print "DEBUG is_different -- just different errors (0 or less)"
+    if jni["Status"] != hsql["Status"]:
+        if int(jni["Status"]) > 0 or int(hsql["Status"]) > 0:
+            x["highlight"] = "Status"
+            # print "DEBUG is_different -- one error (0 or less)"
             return True
+        # print "DEBUG is_different -- just different errors (0 or less)"
+        return False;
+    if int(jni["Status"]) <= 0:
+        # print "DEBUG is_different -- same error (0 or less)"
+        return False;
 
-    if "Result" in x["jni"] and "Result" in x["hsqldb"]:
-        x["highlight"] = []
-        jniResult = x["jni"]["Result"]
-        hsqldbResult = x["hsqldb"]["Result"]
-        if jniResult == None or hsqldbResult == None:
-            # print "DEBUG is_different -- got a Result of None"
-            return True
-        if len(jniResult) != len(hsqldbResult):
-            # print "DEBUG is_different -- got different result lengths"
-            return True
-        for i in xrange(len(jniResult)):
-            x["highlight"].append([])
-            # Disable column type checking for now because Volt and HSQL don't
-            # promote int types in the same way.
-            # if jniResult[i].columns != hsqldbResult[i].columns:
-            #     x["highlight"][i].append(2) # Column names and types
-            if len(jniResult[i].tuples) != len(hsqldbResult[i].tuples):
-                x["highlight"][i].append(1) # Tuple count
-                # print "DEBUG is_different -- got different numbers of tuples?"
-                return True
-            if cntonly != True:
-                # print "DEBUG is_different -- count only got FALSE return"
-                return False # The results are close enough to pass a count-only check
-                for j in xrange(len(jniResult[i].tuples)):
-                    # print "DEBUG is_different -- comparing highlight? ", i, j, jniResult[i].tuples[j], hsqldbResult[i].tuples[j]
-                    if jniResult[i].tuples[j] != hsqldbResult[i].tuples[j]:
-                        # Work around any false value differences caused by default type differences.
-                        # These differences are "properly" ignored by the Decimal/float != implementation post-python 2.6.
-                        if (jniResult[i].columns[j].type == FastSerializer.VOLTTYPE_FLOAT and
-                            hsqldbResult[i].columns[j].type == FastSerializer.VOLTTYPE_DECIMAL and
-                            decimal.Decimal(str(jniResult[i].tuples[j])) == hsqldbResult[i].tuples[j]):
-                            continue
-                        # print "DEBUG is_different -- appending highlight? ", i, j
-                        x["highlight"][i].append(j + 4) # Offset the mismatched row to skip the hard-coded values used above.
-        if cntonly != True:
-            for i in x["highlight"]:
-                # print "DEBUG is_different -- different highlight: ", i
-                return True
+    # print "DEBUG is_different -- same non-error Status? : ", jni["Status"]
+
+    jniResult = jni["Result"]
+    hsqlResult = hsql["Result"]
+    if (not jniResult) or (not hsqlResult):
+        x["highlight"] = "Result"
+        # print "DEBUG is_different -- lacked expected result(s)"
+        return True
+
+    # Disable column type checking for now because Volt and HSQL don't
+    # promote int types in the same way.
+    # if jniResult.columns != hsqlResult.columns:
+    #     x["highlight"] = "Columns"
+    #     return True
+
+    jniColumns= jniResult.columns
+    hsqlColumns = hsqlResult.columns
+    nColumns = len(jniColumns)
+    if nColumns != len(hsqlColumns):
+        x["highlight"] = "Columns"
+        return True;
+    # print "DEBUG is_different -- got same column lengths? ", nColumns
+
+    jniTuples = jniResult.tuples
+    hsqlTuples = hsqlResult.tuples
+
+    if len(jniTuples) != len(hsqlTuples):
+        x["highlight"] = "Tuples"
+        # print "DEBUG is_different -- got different numbers of tuples?"
+        return True
+    # print "DEBUG is_different -- got same numbers of tuples?", len(jniTuples), "namely ", jniTuples
+
+    if cntonly:
+        # print "DEBUG is_different -- count only got FALSE return"
+        return False # The results are close enough to pass a count-only check
+
+    for ii in xrange(len(jniTuples)):
+        if jniTuples[ii] == hsqlTuples[ii]:
+            continue
+        # Work around any false value differences caused by default type differences.
+        # These differences are "properly" ignored by the
+        # Decimal/float != implementation post-python 2.6.
+        column_problem = False # hope for the best.
+        for jj in xrange(nColumns):
+            if jniTuples[ii][jj] == hsqlTuples[ii][jj]:
+                continue
+            if (jniColumns[jj].type == FastSerializer.VOLTTYPE_FLOAT and
+                    hsqlColumns[jj].type == FastSerializer.VOLTTYPE_DECIMAL):
+                if decimal.Decimal(str(jniTuples[ii][jj])) == hsqlTuples[ii][jj]:
+                    ### print "INFO is_different -- Needed float-to-decimal help"
+                    continue
+                print "INFO is_different -- float-to-decimal conversion did not help convert between values:" , \
+                        "jni:(" , jniTuples[ii][jj] , ") and hsql:(" , hsqlTuples[ii][jj] , ")."
+                print "INFO is_different -- float-to-decimal conversion stages:" , \
+                        " from jniTuples[ii][jj] of type:" , type(jniTuples[ii][jj]) , \
+                        " to hsqlTuples[ii][jj] of type:" , type(hsqlTuples[ii][jj]) , \
+                        " via str(jniTuples[ii][jj]):" , str(jniTuples[ii][jj]) , " of type: " , type(str(jniTuples[ii][jj])) , \
+                        " via decimal.Decimal(str(jniTuples[ii][jj])):" , decimal.Decimal(str(jniTuples[ii][jj])) , " of type: " , type(decimal.Decimal(str(jniTuples[ii][jj])))
+            column_problem = True
+        if column_problem:
+            # print "DEBUG is_different -- appending difference highlight? ", ii
+            if not x.get("highlight"):
+                x["highlight"] = []
+            x["highlight"].append(ii)
+    if x.get("highlight"):
+        return True
     # print "DEBUG is_different -- got FALSE return"
     return False
 
@@ -235,7 +261,7 @@ contain the SQL statements which caused different responses on both backends.
 """ % (prog_name)
 
 def generate_html_reports(suite, seed, statements_path, hsql_path, jni_path,
-                          output_dir, report_all, cntonly = False, is_matching = False):
+                          output_dir, report_all, cntonly = False):
     if output_dir != None and not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
@@ -247,40 +273,37 @@ def generate_html_reports(suite, seed, statements_path, hsql_path, jni_path,
     mismatches = []
     all_results = []
 
-    while True:
-        try:
-            statement = cPickle.load(statements_file)
-            # print "DEBUG loaded statement ", statement
-        except EOFError:
-            break
+    try:
+        while True:
+            try:
+                statement = cPickle.load(statements_file)
+                # print "DEBUG loaded statement ", statement
+            except EOFError:
+                break
 
-        try:
             jni = cPickle.load(jni_file)
             hsql = cPickle.load(hsql_file)
-        except EOFError as e:
-            raise IOError("Not enough results for generated statements: %s" %
-                          (str(e)))
 
-        count += 1
-        if int(jni["Status"]) != 1:
-            failures += 1
+            count += 1
+            if int(jni["Status"]) != 1:
+                failures += 1
 
-        statement["hsqldb"] = hsql
-        statement["jni"] = jni
-        if is_matching:
-            if not is_different(statement, cntonly):
-                mismatches.append(statement)
-        else:
+            statement["jni"] = jni
+            statement["hsqldb"] = hsql
             if is_different(statement, cntonly):
                 mismatches.append(statement)
-        if report_all:
-            all_results.append(statement)
+            if report_all:
+                all_results.append(statement)
+
+    except EOFError as e:
+        raise IOError("Not enough results for generated statements: %s" % str(e))
 
     statements_file.close()
     hsql_file.close()
     jni_file.close()
 
     topLine = getTopSummaryLine()
+    currentTime = datetime.datetime.now().strftime("%A, %B %d, %I:%M:%S %p")
     keyStats = createSummaryInHTML(count, failures, len(mismatches), seed)
     report = """
 <html>
@@ -294,8 +317,9 @@ h2 {text-transform: uppercase}
 <body>
     <h2>Test Suite Name: %s</h2>
     <h4>Random Seed: <b>%d</b></h4>
+    <p>This report was generated on <b>%s</b></p>
     <table border=1><tr>%s</tr>
-""" % (suite, seed, topLine)
+""" % (suite, seed, currentTime, topLine)
 
     report += """
 <tr>%s</tr>

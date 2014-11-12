@@ -225,6 +225,9 @@ def abort(*msgs, **kwargs):
         warning('Bad keyword(s) passed to abort(): %s' % ' '.join(bad_keywords))
     return_code = kwargs.get('return_code', 1)
     error(*msgs)
+    # Return code must be 0-255 for shell.
+    if return_code != 0:
+        return_code = 1
     sys.exit(return_code)
 
 #===============================================================================
@@ -457,6 +460,24 @@ def pipe_cmd(*args):
         proc.stdout.close()
     except Exception, e:
         warning('Exception running command: %s' % ' '.join(args), e)
+
+#===============================================================================
+def daemon_file_name(base_name=None, host=None, instance=None):
+#===============================================================================
+    """
+    Build a daemon output file name using optional base name, host, and instance.
+    """
+    names = []
+    if not base_name is None:
+        names.append(base_name)
+    if not host is None:
+        names.append(host.replace(':', '_'))
+    if not names:
+        names.append('server')
+    if not instance is None:
+        names.append('_%d' % instance)
+    daemon_name = ''.join(names)
+    return daemon_name
 
 #===============================================================================
 class Daemonizer(daemon.Daemon):

@@ -69,15 +69,15 @@ bool DistinctExecutor::p_init(AbstractPlanNode*,
     // Create a duplicate of input table
     //
     if (!node->isInline()) {
-        assert(node->getInputTables().size() == 1);
-        assert(node->getInputTables()[0]->columnCount() > 0);
+        assert(node->getInputTableCount() == 1);
+        assert(node->getInputTable()->columnCount() > 0);
         assert(node->getChildren()[0] != NULL);
 
         node->
             setOutputTable(TableFactory::
                            getCopiedTempTable(node->databaseId(),
-                                              node->getInputTables()[0]->name(),
-                                              node->getInputTables()[0],
+                                              node->getInputTable()->name(),
+                                              node->getInputTable(),
                                               limits));
     }
     return (true);
@@ -88,16 +88,13 @@ bool DistinctExecutor::p_execute(const NValueArray &params) {
     assert(node);
     Table* output_table = node->getOutputTable();
     assert(output_table);
-    Table* input_table = node->getInputTables()[0];
+    Table* input_table = node->getInputTable();
     assert(input_table);
 
-    TableIterator iterator = input_table->iterator();
+    TableIterator iterator = input_table->iteratorDeletingAsWeGo();
     TableTuple tuple(input_table->schema());
 
-    // substitute params for distinct expression
     AbstractExpression *distinctExpression = node->getDistinctExpression();
-    distinctExpression->substitute(params);
-
     std::set<NValue, NValue::ltNValue> found_values;
     while (iterator.next(tuple)) {
         //
@@ -116,6 +113,7 @@ bool DistinctExecutor::p_execute(const NValueArray &params) {
         }
     }
 
+    cleanupInputTempTable(input_table);
     return true;
 }
 

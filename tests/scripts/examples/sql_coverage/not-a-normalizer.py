@@ -31,4 +31,4 @@ def normalize(table, sql):
 
 def compare_results(suite, seed, statements_path, hsql_path, jni_path, output_dir, report_all):
     return generate_html_reports(suite, seed, statements_path, hsql_path,
-            jni_path, output_dir, report_all, cntonly = True)
+            jni_path, output_dir, report_all, True)

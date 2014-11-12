@@ -20,7 +20,9 @@ package org.voltdb.plannodes;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
+import org.hsqldb_voltpatches.HSQLInterface;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
@@ -40,6 +42,7 @@ import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.PlanNodeType;
@@ -88,10 +91,15 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         super();
     }
 
+    public IndexCountPlanNode(String tableName, String tableAlias) {
+        super(tableName, tableAlias);
+        assert(tableName != null && tableAlias != null);
+    }
+
     private IndexCountPlanNode(IndexScanPlanNode isp, AggregatePlanNode apn,
                                IndexLookupType endType, List<AbstractExpression> endKeys)
     {
-        super();
+        super(isp.m_targetTableName, isp.m_targetTableAlias);
 
         m_catalogIndex = isp.m_catalogIndex;
 
@@ -99,8 +107,6 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         m_tableSchema = isp.m_tableSchema;
         m_tableScanSchema = isp.m_tableScanSchema.clone();
 
-        m_targetTableAlias = isp.m_targetTableAlias;
-        m_targetTableName = isp.m_targetTableName;
         m_targetIndexName = isp.m_targetIndexName;
 
         m_tableScan = isp.getTableScan();
@@ -168,8 +174,9 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
                 Column col = colRef.getColumn();
                 TupleValueExpression tve = new TupleValueExpression(m_targetTableName, m_targetTableAlias,
                         col.getTypeName(), col.getTypeName());
-                tve.setValueType(VoltType.get((byte)col.getType()));
-                tve.setValueSize(col.getSize());
+
+                tve.setTypeSizeBytes(col.getType(), col.getSize(), col.getInbytes());
+
                 tve.resolveForTable((Table)m_catalogIndex.getParent());
                 indexedExprs.add(tve);
             }
@@ -320,10 +327,10 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    public void getTablesAndIndexes(Collection<String> tablesRead, Collection<String> tableUpdated,
-                                    Collection<String> indexes)
+    public void getTablesAndIndexes(Map<String, StmtTargetTableScan> tablesRead,
+            Collection<String> indexes)
     {
-        super.getTablesAndIndexes(tablesRead, tableUpdated, indexes);
+        super.getTablesAndIndexes(tablesRead, indexes);
         if (indexes != null) {
             assert(m_targetIndexName.length() > 0);
             indexes.add(m_targetIndexName);
@@ -487,9 +494,9 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         String retval = "INDEX COUNT of \"" + m_targetTableName + "\"";
         String indexDescription = " using \"" + m_targetIndexName + "\"";
         // Replace ugly system-generated index name with a description of its user-specified role.
-        if (m_targetIndexName.startsWith("SYS_IDX_PK_") ||
-            m_targetIndexName.startsWith("SYS_IDX_SYS_PK_") ||
-            m_targetIndexName.startsWith("MATVIEW_PK_INDEX") ) {
+        if (m_targetIndexName.startsWith(HSQLInterface.AUTO_GEN_PRIMARY_KEY_PREFIX) ||
+                m_targetIndexName.startsWith(HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX) ||
+                m_targetIndexName.equals(HSQLInterface.AUTO_GEN_MATVIEW_IDX) ) {
             indexDescription = " using its primary key index";
         }
         // Bring all the pieces together describing the index, how it is scanned,

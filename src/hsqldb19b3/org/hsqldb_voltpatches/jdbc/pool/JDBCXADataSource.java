@@ -35,14 +35,14 @@ import javax.sql.XADataSource;
 
 import java.sql.SQLException;
 
+import org.hsqldb_voltpatches.lib.HashMap;
+import org.hsqldb_voltpatches.lib.HashSet;
+import org.hsqldb_voltpatches.lib.Iterator;
 
 import javax.transaction.xa.Xid;
 import javax.sql.PooledConnection;
 
 import org.hsqldb_voltpatches.jdbc.JDBCConnection;
-import org.hsqldb_voltpatches.lib.HashMap;
-import org.hsqldb_voltpatches.lib.HashSet;
-import org.hsqldb_voltpatches.lib.Iterator;
 
 import java.sql.DriverManager;
 

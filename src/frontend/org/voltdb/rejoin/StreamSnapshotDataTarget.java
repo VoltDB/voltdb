@@ -62,7 +62,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     final long m_targetId;
 
     // shortened when in test mode
-    final static long DEFAULT_WRITE_TIMEOUT_MS = m_rejoinDeathTestMode ? 10000 : 60000;
+    public final static long DEFAULT_WRITE_TIMEOUT_MS = m_rejoinDeathTestMode ? 10000 : Long.getLong("REJOIN_WRITE_TIMEOUT_MS", 60000);
     final static long WATCHDOG_PERIOS_S = 5;
 
     // schemas for all the tables on this partition
@@ -74,12 +74,15 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     private final StreamSnapshotAckReceiver m_ackReceiver;
 
     // Skip all subsequent writes if one fails
-    private final AtomicReference<Exception> m_writeFailed = new AtomicReference<Exception>();
+    private final AtomicReference<IOException> m_writeFailed = new AtomicReference<IOException>();
+    // true if the failure is already reported to the SnapshotSiteProcessor, prevent throwing
+    // the same exception multiple times.
+    private boolean m_failureReported = false;
 
     // number of sent, but un-acked buffers
     final AtomicInteger m_outstandingWorkCount = new AtomicInteger(0);
     // map of sent, but un-acked buffers, packaged up a bit
-    private final Map<Integer, SendWork> m_outstandingWork = (new TreeMap<Integer, SendWork>());
+    private final TreeMap<Integer, SendWork> m_outstandingWork = new TreeMap<Integer, SendWork>();
 
     int m_blockIndex = 0;
     private final AtomicReference<Runnable> m_onCloseHandler = new AtomicReference<Runnable>(null);
@@ -172,8 +175,9 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
          * subsystem.
          */
         protected int send(Mailbox mb, MessageFactory msgFactory, BBContainer message) throws IOException {
-            if (message.b.isDirect()) {
-                byte[] data = CompressionService.compressBuffer(message.b);
+            final ByteBuffer messageBuffer = message.b();
+            if (messageBuffer.isDirect()) {
+                byte[] data = CompressionService.compressBuffer(messageBuffer);
                 mb.send(m_destHSId, msgFactory.makeDataMessage(m_targetId, data));
 
                 if (rejoinLog.isTraceEnabled()) {
@@ -184,8 +188,8 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             } else {
                 byte compressedBytes[] =
                     CompressionService.compressBytes(
-                        message.b.array(), message.b.position(),
-                        message.b.remaining());
+                            messageBuffer.array(), messageBuffer.position(),
+                            messageBuffer.remaining());
 
                 mb.send(m_destHSId, msgFactory.makeDataMessage(m_targetId, compressedBytes));
 
@@ -213,6 +217,12 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         }
     }
 
+    public static class StreamSnapshotTimeoutException extends IOException {
+        public StreamSnapshotTimeoutException(String message) {
+            super(message);
+        }
+    }
+
     /**
      * Task run every so often to look for writes that haven't been acked
      * in writeTimeout time.
@@ -228,34 +238,48 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         }
 
         @Override
-        public synchronized void run() {
+        public void run() {
             if (m_closed.get()) {
                 return;
             }
 
-            long bytesWritten = m_sender.m_bytesSent.get(m_targetId).get();
-            rejoinLog.info(String.format("While sending rejoin data to site %s, %d bytes have been sent in the past %s seconds.",
-                    CoreUtils.hsIdToString(m_destHSId), bytesWritten - m_bytesWrittenSinceConstruction, WATCHDOG_PERIOS_S));
+            long bytesWritten = 0;
+            try {
+                bytesWritten = m_sender.m_bytesSent.get(m_targetId).get();
+                rejoinLog.info(String.format("While sending rejoin data to site %s, %d bytes have been sent in the past %s seconds.",
+                        CoreUtils.hsIdToString(m_destHSId), bytesWritten - m_bytesWrittenSinceConstruction, WATCHDOG_PERIOS_S));
 
-            long now = System.currentTimeMillis();
-            for (Entry<Integer, SendWork> e : m_outstandingWork.entrySet()) {
-                SendWork work = e.getValue();
-                if ((now - work.m_ts) > m_writeTimeout) {
-                    RuntimeException exception =
-                        new RuntimeException(String.format(
-                            "A snapshot write task failed after a timeout (currently %d seconds outstanding).",
-                            (now - work.m_ts) / 1000));
-                    rejoinLog.error(exception.getMessage());
-                    m_writeFailed.compareAndSet(null, exception);
-                    break;
+                checkTimeout(m_writeTimeout);
+                if (m_writeFailed.get() != null) {
+                    clearOutstanding(); // idempotent
                 }
+            } catch (Throwable t) {
+                rejoinLog.error("Stream snapshot watchdog thread threw an exception", t);
+            } finally {
+                // schedule to run again
+                VoltDB.instance().scheduleWork(new Watchdog(bytesWritten, m_writeTimeout), WATCHDOG_PERIOS_S, -1, TimeUnit.SECONDS);
             }
-            if (m_writeFailed.get() != null) {
-                clearOutstanding(); // idempotent
-            }
+        }
+    }
 
-            // schedule to run again
-            VoltDB.instance().scheduleWork(new Watchdog(bytesWritten, m_writeTimeout), WATCHDOG_PERIOS_S, -1, TimeUnit.SECONDS);
+    /**
+     * Called by the watchdog from the periodic work thread to check if the
+     * oldest unacked block is older than the timeout interval.
+     */
+    private synchronized void checkTimeout(final long timeoutMs) {
+        final Entry<Integer, SendWork> oldest = m_outstandingWork.firstEntry();
+        if (oldest != null) {
+            final long now = System.currentTimeMillis();
+            SendWork work = oldest.getValue();
+            if ((now - work.m_ts) > timeoutMs) {
+                StreamSnapshotTimeoutException exception =
+                        new StreamSnapshotTimeoutException(String.format(
+                                "A snapshot write task failed after a timeout (currently %d seconds outstanding). " +
+                                        "Node rejoin may need to be retried",
+                                (now - work.m_ts) / 1000));
+                rejoinLog.error(exception.getMessage());
+                m_writeFailed.compareAndSet(null, exception);
+            }
         }
     }
 
@@ -367,7 +391,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                     rejoinLog.error("Error sending a recovery stream message", e);
                 }
             }
-
+            CompressionService.releaseThreadLocal();
             rejoinLog.trace("Stream sender thread exiting");
         }
     }
@@ -382,26 +406,34 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         rejoinLog.trace("Starting write");
 
         try {
-            BBContainer chunk;
+            BBContainer chunkC;
+            ByteBuffer chunk;
             try {
-                chunk = tupleData.call();
+                chunkC = tupleData.call();
+                chunk = chunkC.b();
             } catch (Exception e) {
                 return Futures.immediateFailedFuture(e);
             }
 
             // cleanup and exit immediately if in failure mode
             // or on null imput
-            if (m_writeFailed.get() != null || (chunk == null)) {
-                if (chunk != null) {
-                    chunk.discard();
+            if (m_writeFailed.get() != null || (chunkC == null)) {
+                if (chunkC != null) {
+                    chunkC.discard();
                 }
-                return null;
+
+                if (m_failureReported) {
+                    return null;
+                } else {
+                    m_failureReported = true;
+                    return Futures.immediateFailedFuture(m_writeFailed.get());
+                }
             }
 
             // cleanup and exit immediately if in failure mode
             // but here, throw an exception because this isn't supposed to happen
             if (m_closed.get()) {
-                chunk.discard();
+                chunkC.discard();
 
                 IOException e = new IOException("Trying to write snapshot data " +
                         "after the stream is closed");
@@ -419,13 +451,13 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                 send(StreamSnapshotMessageType.SCHEMA, tableId, schema);
             }
 
-            chunk.b.put((byte) StreamSnapshotMessageType.DATA.ordinal());
-            chunk.b.putInt(m_blockIndex); // put chunk index
-            chunk.b.putInt(tableId); // put table ID
+            chunk.put((byte) StreamSnapshotMessageType.DATA.ordinal());
+            chunk.putInt(m_blockIndex); // put chunk index
+            chunk.putInt(tableId); // put table ID
 
-            chunk.b.position(0);
+            chunk.position(0);
 
-            return send(m_blockIndex++, chunk);
+            return send(m_blockIndex++, chunkC);
         } finally {
             rejoinLog.trace("Finished call to write");
         }
@@ -471,7 +503,9 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     }
 
     @Override
-    public void close() {
+    public void close() throws IOException, InterruptedException {
+        boolean hadFailureBeforeClose = m_writeFailed.get() != null;
+
         /*
          * could be called multiple times, because all tables share one stream
          * target
@@ -502,6 +536,12 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         Runnable closeHandle = m_onCloseHandler.get();
         if (closeHandle != null) {
             closeHandle.run();
+        }
+
+        // If there was an error during close(), throw it so that the snapshot
+        // can be marked as failed.
+        if (!hadFailureBeforeClose && m_writeFailed.get() != null) {
+            throw m_writeFailed.get();
         }
     }
 
@@ -577,7 +617,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     public int getInContainerRowCount(BBContainer tupleData) {
         // according to TableOutputStream.cpp:TupleOutputStream::endRows() the row count is
         // at offset 4 (second integer)
-        ByteBuffer bb = tupleData.b.duplicate();
+        ByteBuffer bb = tupleData.b().duplicate();
         bb.position(getHeaderSize());
         bb.getInt(); // skip first four (partition id)
 

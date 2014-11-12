@@ -32,6 +32,15 @@
 package org.hsqldb_voltpatches.util;
 
 import java.applet.Applet;
+import java.io.File;
+import java.io.IOException;
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.Vector;
 import java.awt.BorderLayout;
 import java.awt.Button;
 import java.awt.Color;
@@ -54,18 +63,9 @@ import java.awt.event.KeyListener;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
 import java.awt.image.MemoryImageSource;
-import java.io.File;
-import java.io.IOException;
-import java.sql.Connection;
-import java.sql.DatabaseMetaData;
-import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.Vector;
 
-import org.hsqldb_voltpatches.lib.RCData;
 import org.hsqldb_voltpatches.lib.java.JavaSystem;
+import org.hsqldb_voltpatches.lib.RCData;
 
 // sqlbob@users 20020401 - patch 1.7.0 by sqlbob (RMP) - enhancements
 // sqlbob@users 20020401 - patch 537501 by ulrivo - command line arguments
@@ -191,7 +191,6 @@ implements ActionListener, WindowListener, KeyListener {
         }
     }
 
-    @Override
     public void init() {
 
         DatabaseManager m = new DatabaseManager();

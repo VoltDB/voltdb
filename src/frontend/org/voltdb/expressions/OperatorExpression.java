@@ -21,6 +21,20 @@ import org.voltdb.VoltType;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.utils.VoltTypeUtil;
 
+/**
+ * An instance of OperatorExpression is one of the following:
+ *   - + (add)
+ *   - - (subtract)
+ *   - * (multiply)
+ *   - / (divide)
+ *   - % (modulus)
+ *   - || (concat)
+ *   - is null
+ *   - not
+ *   - cast(... as type)
+ *   - case when
+ *   - alternative (unsupported?)
+ */
 public class OperatorExpression extends AbstractExpression {
     public OperatorExpression(ExpressionType type) {
         super(type);
@@ -75,8 +89,7 @@ public class OperatorExpression extends AbstractExpression {
     @Override
     public void refineValueType(VoltType neededType, int neededSize)
     {
-        ExpressionType type = getExpressionType();
-        if (type == ExpressionType.OPERATOR_IS_NULL || type == ExpressionType.OPERATOR_NOT) {
+        if (! needsRightExpression()) {
             return;
         }
         // The intent here is to allow operands to have the maximum flexibility given the
@@ -151,6 +164,11 @@ public class OperatorExpression extends AbstractExpression {
         }
         if (type == ExpressionType.OPERATOR_CAST) {
             return "(CAST " + m_left.explain(impliedTableName) + " AS " + m_valueType.toSQLString() + ")";
+        }
+        if (type == ExpressionType.OPERATOR_CASE_WHEN) {
+            return "CASE WHEN " + m_left.explain(impliedTableName) + " THEN " +
+                    m_right.m_left.explain(impliedTableName) + " ELSE " +
+                    m_right.m_right.explain(impliedTableName) + " END";
         }
         return "(" + m_left.explain(impliedTableName) +
             " " + type.symbol() + " " +

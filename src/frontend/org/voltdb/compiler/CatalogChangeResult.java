@@ -26,10 +26,14 @@ public class CatalogChangeResult extends AsyncCompilerResult {
     public byte[] catalogBytes;
     public String deploymentString;
     public String encodedDiffCommands;
-    public long deploymentCRC;
+    public String[] tablesThatMustBeEmpty;
+    public String[] reasonsForEmptyTables;
     public boolean requiresSnapshotIsolation;
     public boolean worksWithElastic;
     public ProcedureInvocationType invocationType;
     public long originalTxnId;
     public long originalUniqueId;
+    // null or source version string if an automatic upgrade was done.
+    public String upgradedFromVersion;
+    public byte[] deploymentHash;
 }

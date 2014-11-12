@@ -18,9 +18,7 @@
 package org.voltdb.planner.microoptimizations;
 
 import java.util.ArrayList;
-import java.util.List;
 
-import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.CompiledPlan;
 
@@ -29,43 +27,20 @@ public class MicroOptimizationRunner {
     // list all of the micro optimizations here
     static ArrayList<MicroOptimization> optimizations = new ArrayList<MicroOptimization>();
     static {
+        // The orders here is important
         optimizations.add(new PushdownLimits());
         optimizations.add(new ReplaceWithIndexCounter());
-        optimizations.add(new SeqScansToUniqueTreeScans());
         optimizations.add(new ReplaceWithIndexLimit());
+
+        // Inline aggregation has to be applied after Index counter and Index Limit with MIN/MAX.
+        optimizations.add(new InlineAggregation());
     }
 
-    public static List<CompiledPlan> applyAll(CompiledPlan plan,
-                                              DeterminismMode detMode,
-                                              AbstractParsedStmt parsedStmt)
+    public static void applyAll(CompiledPlan plan, AbstractParsedStmt parsedStmt)
     {
-        ArrayList<CompiledPlan> input = new ArrayList<CompiledPlan>();
-        ArrayList<CompiledPlan> retval = new ArrayList<CompiledPlan>();
-
-        retval.add(plan);
-
-        for (MicroOptimization opt : optimizations) {
-            // skip optimizations that don't apply at this determinism level
-            if (!opt.shouldRun(detMode, plan.hasDeterministicStatement())) {
-                continue;
-            }
-
-            // swap input and return lists
-            ArrayList<CompiledPlan> temp = input;
-            input = retval;
-            retval = temp;
-            // empty the retval list
-            retval.clear();
-
-            for (CompiledPlan inPlan : input) {
-                List<CompiledPlan> newPlans = opt.apply(inPlan, parsedStmt);
-                assert(newPlans != null);
-                assert(newPlans.size() >= 1);
-                retval.addAll(newPlans);
-            }
+        for (int i = 0; i < optimizations.size(); i++) {
+            MicroOptimization opt = optimizations.get(i);
+            opt.apply(plan, parsedStmt);
         }
-
-        return retval;
     }
-
 }

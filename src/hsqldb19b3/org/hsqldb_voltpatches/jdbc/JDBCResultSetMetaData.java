@@ -39,8 +39,8 @@ import org.hsqldb_voltpatches.ErrorCode;
 import org.hsqldb_voltpatches.Types;
 import org.hsqldb_voltpatches.persist.HsqlProperties;
 import org.hsqldb_voltpatches.result.ResultMetaData;
-import org.hsqldb_voltpatches.types.CharacterType;
 import org.hsqldb_voltpatches.types.Type;
+import org.hsqldb_voltpatches.types.CharacterType;
 
 /* $Id: JDBCResultSetMetaData.java 2980 2009-05-02 14:38:05Z fredt $ */
 

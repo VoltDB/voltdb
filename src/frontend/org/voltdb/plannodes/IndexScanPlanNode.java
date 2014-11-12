@@ -21,7 +21,9 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
+import org.hsqldb_voltpatches.HSQLInterface;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
@@ -32,7 +34,6 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
-import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
@@ -40,6 +41,8 @@ import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.parseinfo.StmtTableScan;
+import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.IndexType;
@@ -83,12 +86,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     // for reverse scan LTE only.
     // The initial expression is needed to control a (short?) forward scan to adjust the start of a reverse
     // iteration after it had to initially settle for starting at "greater than a prefix key".
-    protected AbstractExpression m_initialExpression;
+    private AbstractExpression m_initialExpression;
 
+    // The predicate for underflow case using the index
     private AbstractExpression m_skip_null_predicate;
-
-    // ???
-    protected Boolean m_keyIterate = false;
 
     // The overall index lookup operation type
     protected IndexLookupType m_lookupType = IndexLookupType.EQ;
@@ -112,12 +113,16 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         super();
     }
 
-    public IndexScanPlanNode(AbstractScanPlanNode srcNode, AggregatePlanNode apn, Index index, SortDirectionType sortDirection) {
+    public IndexScanPlanNode(StmtTableScan tableScan, Index index) {
         super();
+        setTableScan(tableScan);
+        setCatalogIndex(index);
+    }
+
+    public IndexScanPlanNode(AbstractScanPlanNode srcNode, AggregatePlanNode apn, Index index, SortDirectionType sortDirection) {
+        super(srcNode.m_targetTableName, srcNode.m_targetTableAlias);
         m_tableSchema = srcNode.m_tableSchema;
         m_predicate = srcNode.m_predicate;
-        m_targetTableAlias = srcNode.m_targetTableAlias;
-        m_targetTableName = srcNode.m_targetTableName;
         m_tableScanSchema = srcNode.m_tableScanSchema.clone();
         for (AbstractPlanNode inlineChild : srcNode.getInlinePlanNodes().values()) {
             addInlinePlanNode(inlineChild);
@@ -133,6 +138,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     }
 
     public void setSkipNullPredicate() {
+        // prepare position of non null key
         int searchKeySize = m_searchkeyExpressions.size();
         if (m_lookupType == IndexLookupType.EQ || searchKeySize == 0 || isReverseScan()) {
             m_skip_null_predicate = null;
@@ -147,7 +153,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             nextKeyIndex = searchKeySize - 1;
         }
 
-        List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
+        setSkipNullPredicate(nextKeyIndex);
+    }
+
+    public void setSkipNullPredicate(int nextKeyIndex) {
 
         String exprsjson = m_catalogIndex.getExpressionsjson();
         List<AbstractExpression> indexedExprs = null;
@@ -155,34 +164,37 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             indexedExprs = new ArrayList<AbstractExpression>();
 
             List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(m_catalogIndex.getColumns(), "index");
+            assert(nextKeyIndex < indexedColRefs.size());
             for (int i = 0; i <= nextKeyIndex; i++) {
                 ColumnRef colRef = indexedColRefs.get(i);
                 Column col = colRef.getColumn();
                 TupleValueExpression tve = new TupleValueExpression(m_targetTableName, m_targetTableAlias,
                         col.getTypeName(), col.getTypeName());
-                tve.setValueType(VoltType.get((byte)col.getType()));
-                tve.setValueSize(col.getSize());
+                tve.setTypeSizeBytes(col.getType(), col.getSize(), col.getInbytes());
+
                 indexedExprs.add(tve);
             }
         } else {
             try {
                 indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, m_tableScan);
+                assert(nextKeyIndex < indexedExprs.size());
             } catch (JSONException e) {
                 e.printStackTrace();
                 assert(false);
             }
-
         }
-        AbstractExpression expr;
+
+        List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
         for (int i = 0; i < nextKeyIndex; i++) {
             AbstractExpression idxExpr = indexedExprs.get(i);
-            expr = new ComparisonExpression(ExpressionType.COMPARE_EQUAL,
+            AbstractExpression expr = new ComparisonExpression(ExpressionType.COMPARE_EQUAL,
                     idxExpr, (AbstractExpression) m_searchkeyExpressions.get(i).clone());
             exprs.add(expr);
         }
         AbstractExpression nullExpr = indexedExprs.get(nextKeyIndex);
-        expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, nullExpr, null);
+        AbstractExpression expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, nullExpr, null);
         exprs.add(expr);
+
         m_skip_null_predicate = ExpressionUtil.combine(exprs);
         m_skip_null_predicate.finalizeValueTypes();
     }
@@ -193,10 +205,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    public void getTablesAndIndexes(Collection<String> tablesRead, Collection<String> tableUpdated,
-                                    Collection<String> indexes)
+    public void getTablesAndIndexes(Map<String, StmtTargetTableScan> tablesRead,
+            Collection<String> indexes)
     {
-        super.getTablesAndIndexes(tablesRead, tableUpdated, indexes);
+        super.getTablesAndIndexes(tablesRead, indexes);
         assert(m_targetIndexName.length() > 0);
         if (indexes != null) {
             assert(m_targetIndexName.length() > 0);
@@ -247,30 +259,15 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         return false;
     }
 
-    public void setCatalogIndex(Index index)
+    private void setCatalogIndex(Index index)
     {
         m_catalogIndex = index;
+        m_targetIndexName = index.getTypeName();
     }
 
     public Index getCatalogIndex()
     {
         return m_catalogIndex;
-    }
-
-    /**
-     *
-     * @param keyIterate
-     */
-    public void setKeyIterate(Boolean keyIterate) {
-        m_keyIterate = keyIterate;
-    }
-
-    /**
-     *
-     * @return Does this scan iterate over values in the index.
-     */
-    public Boolean getKeyIterate() {
-        return m_keyIterate;
     }
 
     /**
@@ -309,13 +306,6 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
      */
     public String getTargetIndexName() {
         return m_targetIndexName;
-    }
-
-    /**
-     * @param targetIndexName the target_index_name to set
-     */
-    public void setTargetIndexName(String targetIndexName) {
-        m_targetIndexName = targetIndexName;
     }
 
     /**
@@ -449,9 +439,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
         // FYI: Index scores should range between 2 and 800003 (I think)
 
-        Table target = db.getTables().getIgnoreCase(m_targetTableName);
-        assert(target != null);
-        DatabaseEstimates.TableEstimates tableEstimates = estimates.getEstimatesForTable(target.getTypeName());
+        DatabaseEstimates.TableEstimates tableEstimates = estimates.getEstimatesForTable(m_targetTableName);
 
         // get the width of the index and number of columns used
         // need doubles for math
@@ -559,16 +547,24 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        stringer.key(Members.KEY_ITERATE.name()).value(m_keyIterate);
         stringer.key(Members.LOOKUP_TYPE.name()).value(m_lookupType.toString());
         stringer.key(Members.SORT_DIRECTION.name()).value(m_sortDirection.toString());
         if (m_purpose != FOR_SCANNING_PERFORMANCE_OR_ORDERING) {
             stringer.key(Members.PURPOSE.name()).value(m_purpose);
         }
         stringer.key(Members.TARGET_INDEX_NAME.name()).value(m_targetIndexName);
-        stringer.key(Members.END_EXPRESSION.name());
-        stringer.value(m_endExpression);
-
+        if (m_searchkeyExpressions.size() > 0) {
+            stringer.key(Members.SEARCHKEY_EXPRESSIONS.name()).array();
+            for (AbstractExpression ae : m_searchkeyExpressions) {
+                assert (ae instanceof JSONString);
+                stringer.value(ae);
+            }
+            stringer.endArray();
+        }
+        if (m_endExpression != null) {
+            stringer.key(Members.END_EXPRESSION.name());
+            stringer.value(m_endExpression);
+        }
         if (m_initialExpression != null) {
             stringer.key(Members.INITIAL_EXPRESSION.name()).value(m_initialExpression);
         }
@@ -576,20 +572,12 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         if (m_skip_null_predicate != null) {
             stringer.key(Members.SKIP_NULL_PREDICATE.name()).value(m_skip_null_predicate);
         }
-
-        stringer.key(Members.SEARCHKEY_EXPRESSIONS.name()).array();
-        for (AbstractExpression ae : m_searchkeyExpressions) {
-            assert (ae instanceof JSONString);
-            stringer.value(ae);
-        }
-        stringer.endArray();
     }
 
     //all members loaded
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         super.loadFromJSONObject(jobj, db);
-        m_keyIterate = jobj.getBoolean( Members.KEY_ITERATE.name() );
         m_lookupType = IndexLookupType.get( jobj.getString( Members.LOOKUP_TYPE.name() ) );
         m_sortDirection = SortDirectionType.get( jobj.getString( Members.SORT_DIRECTION.name() ) );
         m_purpose = jobj.has(Members.PURPOSE.name()) ?
@@ -714,9 +702,9 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         String retval = "INDEX SCAN of \"" + m_targetTableName + "\"";
         String indexDescription = " using \"" + m_targetIndexName + "\"";
         // Replace ugly system-generated index name with a description of its user-specified role.
-        if (m_targetIndexName.startsWith("SYS_IDX_PK_") ||
-            m_targetIndexName.startsWith("SYS_IDX_SYS_PK_") ||
-            m_targetIndexName.startsWith("MATVIEW_PK_INDEX") ) {
+        if (m_targetIndexName.startsWith(HSQLInterface.AUTO_GEN_PRIMARY_KEY_PREFIX) ||
+                m_targetIndexName.startsWith(HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX) ||
+                m_targetIndexName.equals(HSQLInterface.AUTO_GEN_MATVIEW_IDX) ) {
             indexDescription = " using its primary key index";
         }
         // Bring all the pieces together describing the index, how it is scanned,
@@ -738,13 +726,13 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         String result = "(";
         int prefixSize = nCovered - 1;
         for (int ii = 0; ii < prefixSize; ++ii) {
-            result += conjunction +
-                asIndexed[ii] + " = " + m_searchkeyExpressions.get(ii).explain(m_targetTableName);
+            result += conjunction + asIndexed[ii] + " = " +
+                    m_searchkeyExpressions.get(ii).explain(m_targetTableName);
             conjunction = ") AND (";
         }
         // last element
         result += conjunction +
-            asIndexed[prefixSize] + " " + m_lookupType.getSymbol() + " " +
+                asIndexed[prefixSize] + " " + m_lookupType.getSymbol() + " " +
                 m_searchkeyExpressions.get(prefixSize).explain(m_targetTableName) + ")";
         return result;
     }

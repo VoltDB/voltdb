@@ -22,9 +22,10 @@
 #ifndef CATALOG_CATALOG_MAP_H_
 #define CATALOG_CATALOG_MAP_H_
 
+#include <boost/algorithm/string.hpp> // for boost::to_upper(std::string)
+
 #include <map>
 #include <string>
-#include <boost/algorithm/string.hpp> // for boost::to_lower(std::string)
 
 namespace catalog {
 
@@ -64,11 +65,6 @@ public:
     T * get(const std::string &name) const;
 
     /**
-     * Get the nth item in the map in lexographical (en/us for now) order
-     */
-    T * getAtRelativeIndex(int32_t relativeIndex) const;
-
-    /**
      * How many items are in the map?
      * @return The number of items in the map
      */
@@ -106,7 +102,7 @@ T * CatalogMap<T>::add(const std::string &name) {
     std::string childPath = m_path + "[" + name + "]";
     T *retval = new T(m_catalog, m_parent, childPath, name);
     std::string mapKey = name;
-    boost::to_lower(mapKey);
+    boost::to_upper(mapKey);
     m_items[mapKey] = retval;
 
     // assign all the children of this map a relative index
@@ -121,7 +117,7 @@ T * CatalogMap<T>::add(const std::string &name) {
 template <class T>
 bool CatalogMap<T>::remove(const std::string &name) {
     std::string mapKey = name;
-    boost::to_lower(mapKey);
+    boost::to_upper(mapKey);
     typename std::map<std::string, T*>::iterator iter = m_items.find(mapKey);
     if (iter == m_items.end()) {
         return false;
@@ -141,18 +137,9 @@ bool CatalogMap<T>::remove(const std::string &name) {
 template <class T>
 T * CatalogMap<T>::get(const std::string &name) const {
     std::string mapKey = name;
-    boost::to_lower(mapKey);
+    boost::to_upper(mapKey);
     const typename std::map<std::string, T*>::const_iterator found = m_items.find(mapKey);
     return (found == m_items.end()) ? NULL : found->second;
-}
-
-template <class T>
-T * CatalogMap<T>::getAtRelativeIndex(int32_t relativeIndex) const {
-    typename std::map<std::string, T*>::const_iterator iter;
-    for (iter = m_items.begin(); iter != m_items.end(); iter++)
-        if (iter->second->m_relativeIndex == relativeIndex)
-            return iter->second;
-    return NULL;
 }
 
 template <class T>
@@ -176,7 +163,14 @@ void CatalogMap<T>::clear() {
     m_items.clear();
 }
 
-
 } // namespace catalog
+
+// Workaround for type inference when applying BOOST_FOREACH to const CatalogMaps.
+// @See http://www.boost.org/doc/libs/1_35_0/doc/html/foreach/extensibility.html
+#define ENABLE_BOOST_FOREACH_ON_CONST_MAP(CatalogClass)                                  \
+namespace boost {                                                                        \
+    template<> struct range_const_iterator< catalog::CatalogMap<catalog::CatalogClass> > \
+    { typedef catalog::CatalogMap<catalog::CatalogClass>::field_map_iter type; };        \
+}
 
 #endif // CATALOG_CATALOG_MAP_H_

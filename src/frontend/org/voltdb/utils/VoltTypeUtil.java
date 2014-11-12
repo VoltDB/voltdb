@@ -20,9 +20,10 @@ package org.voltdb.utils;
 import java.math.BigDecimal;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.Random;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.logging.Logger;
 
 import org.voltdb.VoltType;
@@ -285,18 +286,16 @@ public abstract class VoltTypeUtil {
         return (ret);
     }
 
-    public static String getSignatureForTable(String name, ArrayList<VoltType> schema) {
+    /**
+     * Get a string signature for the table represented by the args
+     * @param name The name of the table
+     * @param schema A sorted map of the columns in the table, keyed by column index
+     * @return The table signature string.
+     */
+    public static String getSignatureForTable(String name, SortedMap<Integer, VoltType> schema) {
         StringBuilder sb = new StringBuilder();
         sb.append(name);
-        for (VoltType t : schema) {
-            sb.append(t.getSignatureChar());
-        }
-        return sb.toString();
-    }
-
-    public static String getSignatureForTable(ArrayList<VoltType> schema) {
-        StringBuilder sb = new StringBuilder();
-        for (VoltType t : schema) {
+        for (VoltType t : schema.values()) {
             sb.append(t.getSignatureChar());
         }
         return sb.toString();
@@ -316,5 +315,23 @@ public abstract class VoltTypeUtil {
         } else {
             throw new RuntimeException(obj + " cannot be casted to a long");
         }
+    }
+
+    public static java.sql.Timestamp getSqlTimestampFromMicrosSinceEpoch(long timestamp) {
+        java.sql.Timestamp result;
+
+        // The lower 6 digits of the microsecond timestamp (including the "double-counted" millisecond digits)
+        // must be scaled up to get the 9-digit (rounded) nanosecond value.
+        if (timestamp >= 0) {
+            result = new java.sql.Timestamp(timestamp/1000);
+            result.setNanos(((int) (timestamp % 1000000))*1000);
+        } else {
+            result = new java.sql.Timestamp((timestamp/1000000 - 1) * 1000);
+
+            int remaining = (int) (timestamp % 1000000);
+            result.setNanos((remaining+1000000) * 1000 );
+        }
+
+        return result;
     }
 }

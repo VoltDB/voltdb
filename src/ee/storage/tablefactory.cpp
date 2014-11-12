@@ -62,10 +62,14 @@ Table* TableFactory::getPersistentTable(
             const std::string &name,
             TupleSchema* schema,
             const std::vector<std::string> &columnNames,
+            char *signature,
+            bool tableIsMaterialized,
             int partitionColumn,
             bool exportEnabled,
             bool exportOnly,
-            int tableAllocationTargetSize)
+            int tableAllocationTargetSize,
+            int tupleLimit,
+            int32_t compactionThreshold)
 {
     Table *table = NULL;
 
@@ -73,10 +77,10 @@ Table* TableFactory::getPersistentTable(
         table = new StreamedTable(exportEnabled);
     }
     else {
-        table = new PersistentTable(partitionColumn, tableAllocationTargetSize);
+        table = new PersistentTable(partitionColumn, signature, tableIsMaterialized, tableAllocationTargetSize, tupleLimit);
     }
 
-    initCommon(databaseId, table, name, schema, columnNames, true);
+    initCommon(databaseId, table, name, schema, columnNames, true, compactionThreshold);
 
     // initialize stats for the table
     configureStats(databaseId, name, table);
@@ -118,7 +122,8 @@ void TableFactory::initCommon(
             const std::string &name,
             TupleSchema *schema,
             const std::vector<std::string> &columnNames,
-            const bool ownsTupleSchema) {
+            const bool ownsTupleSchema,
+            const int32_t compactionThreshold) {
 
     assert(table != NULL);
     assert(schema != NULL);
@@ -126,7 +131,7 @@ void TableFactory::initCommon(
 
     table->m_databaseId = databaseId;
     table->m_name = name;
-    table->initializeWithColumns(schema, columnNames, ownsTupleSchema);
+    table->initializeWithColumns(schema, columnNames, ownsTupleSchema, compactionThreshold);
     assert (table->columnCount() == schema->columnCount());
 }
 

@@ -468,4 +468,28 @@ public abstract class BaseConnectionWrapper implements java.sql.Connection {
     }
 
 //#endif JAVA6
+
+    /************************* Volt DB Extensions *************************/
+
+    public void setSchema(String schema) throws SQLException {
+        throw new SQLException();
+    }
+
+    public String getSchema() throws SQLException {
+        throw new SQLException();
+    }
+
+    public void abort(java.util.concurrent.Executor executor) throws SQLException {
+        throw new SQLException();
+    }
+
+    public void setNetworkTimeout(java.util.concurrent.Executor executor, int milliseconds)
+            throws SQLException {
+        throw new SQLException();
+    }
+
+    public int getNetworkTimeout() throws SQLException {
+        throw new SQLException();
+    }
+    /**********************************************************************/
 }

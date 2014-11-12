@@ -49,7 +49,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
 
     Client m_client;
     private final static boolean m_debug = false;
-    public static final boolean retry_on_mismatch = false;
+    public static final boolean retry_on_mismatch = true;
 
     @AfterClass
     public static void tearDownClass()
@@ -348,9 +348,9 @@ public class TestAdHocQueries extends AdHocQueryTester {
         return spResult;
     }
 
-    String m_catalogJar = "adhoc.jar";
-    String m_pathToCatalog = Configuration.getPathToCatalogForTest(m_catalogJar);
-    String m_pathToDeployment = Configuration.getPathToCatalogForTest("adhoc.xml");
+    public static String m_catalogJar = "adhoc.jar";
+    public static String m_pathToCatalog = Configuration.getPathToCatalogForTest(m_catalogJar);
+    public static String m_pathToDeployment = Configuration.getPathToCatalogForTest("adhoc.xml");
 
     @Test
     public void testSimple() throws Exception {
@@ -622,7 +622,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 fail("did not fail on subquery");
             }
             catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("not support subqueries") > 0);
+                assertTrue(pcex.getMessage().indexOf("Unsupported subquery") > 0);
             }
             adHocQuery = "     SELECT 'ZZ', EMPNUM, EMPNAME, -99 \n" +
                     "           FROM STAFF \n" +
@@ -634,7 +634,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 fail("did not fail on exists clause");
             }
             catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("not support subqueries") > 0);
+                assertTrue(pcex.getMessage().indexOf("Unsupported subquery") > 0);
             }
             adHocQuery = "   SELECT STAFF.EMPNAME \n" +
                     "          FROM STAFF \n" +
@@ -651,7 +651,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 fail("did not fail on subquery");
             }
             catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("not support subqueries") > 0);
+                assertTrue(pcex.getMessage().indexOf("Unsupported subquery") > 0);
             }
             adHocQuery = "SELECT PNAME \n" +
                     "         FROM PROJ \n" +
@@ -664,22 +664,6 @@ public class TestAdHocQueries extends AdHocQueryTester {
             catch (ProcCallException pcex) {
                 assertTrue(pcex.getMessage().indexOf("does not support WHERE clauses containing only constants") > 0);
             }
-            adHocQuery = "CREATE TABLE ICAST2 (C1 INT, C2 FLOAT);";
-            try {
-                env.m_client.callProcedure("@AdHoc", adHocQuery);
-                fail("did not fail on invalid ");
-            }
-            catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("Unsupported SQL verb in statement") > 0);
-            }
-            adHocQuery = "CREATE INDEX IDX_PROJ_PNAME ON PROJ(PNAME);";
-            try {
-                env.m_client.callProcedure("@AdHoc", adHocQuery);
-                fail("did not fail on invalid SQL verb");
-            }
-            catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("Unsupported SQL verb in statement") > 0);
-            }
             adHocQuery = "ROLLBACK;";
             try {
                 env.m_client.callProcedure("@AdHoc", adHocQuery);
@@ -687,38 +671,6 @@ public class TestAdHocQueries extends AdHocQueryTester {
             }
             catch (ProcCallException pcex) {
                 assertTrue(pcex.getMessage().indexOf("Unsupported SQL verb in statement") > 0);
-            }
-            adHocQuery = "DROP TABLE PROJ;";
-            try {
-                env.m_client.callProcedure("@AdHoc", adHocQuery);
-                fail("did not fail on invalid SQL verb");
-            }
-            catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("Unsupported SQL verb in statement") > 0);
-            }
-            adHocQuery = "PARTITION TABLE PROJ ON COLUMN PNUM;";
-            try {
-                env.m_client.callProcedure("@AdHoc", adHocQuery);
-                fail("did not fail with unexpected token");
-            }
-            catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("unexpected token: PARTITION") > 0);
-            }
-            adHocQuery = "CREATE PROCEDURE AS SELECT 1 FROM PROJ;";
-            try {
-                env.m_client.callProcedure("@AdHoc", adHocQuery);
-                fail("did not fail with unexpected token");
-            }
-            catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("unexpected token: AS") > 0);
-            }
-            adHocQuery = "CREATE PROCEDURE FROM CLASS bar.Foo;";
-            try {
-                env.m_client.callProcedure("@AdHoc", adHocQuery);
-                fail("did not fail with unexpected token");
-            }
-            catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("unexpected token: FROM") > 0);
             }
         }
         finally {
@@ -816,11 +768,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                                              expectedCount, results[i].asScalarLong());
                             } else {
                                 if (expectedCount != results[i].getRowCount()) {
-                                    System.out.println(results[i]);
-                                    if (retry_on_mismatch) {
-                                        results = m_env.m_client.callProcedure("@AdHoc",
-                                                StringUtils.join(m_queries, "; ")).getResults();
-                                    }
+                                    System.out.println("Mismatched result from statement " + i + " expecting " + expectedCount + " rows and getting:\n" + results[i]);
                                 }
                                 assertEquals(String.format("%s (row count):",query),
                                              expectedCount, results[i].getRowCount());
@@ -843,7 +791,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
     /**
      * Test environment with configured schema and server.
      */
-    private static class TestEnv {
+    public static class TestEnv {
 
         final VoltProjectBuilder m_builder;
         LocalCluster m_cluster;

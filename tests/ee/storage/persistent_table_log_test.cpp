@@ -31,6 +31,7 @@
 #include "storage/persistenttable.h"
 #include "storage/tablefactory.h"
 #include "storage/tableutil.h"
+#include "storage/DRTupleStream.h"
 #include "indexes/tableindex.h"
 #include <vector>
 #include <string>
@@ -75,9 +76,9 @@ public:
         m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_SMALLINT));
         m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_DOUBLE));
         m_tableSchemaColumnSizes.push_back(300);
-        m_tableSchemaColumnSizes.push_back(16);
+        m_tableSchemaColumnSizes.push_back(10);
         m_tableSchemaColumnSizes.push_back(500);
-        m_tableSchemaColumnSizes.push_back(32);
+        m_tableSchemaColumnSizes.push_back(15);
 
         m_tableSchemaAllowNull.push_back(false);
         m_tableSchemaAllowNull.push_back(false);
@@ -103,21 +104,21 @@ public:
         delete m_table;
     }
 
-    void initTable(bool allowInlineStrings) {
-        m_tableSchema = voltdb::TupleSchema::createTupleSchema(m_tableSchemaTypes,
-                                                               m_tableSchemaColumnSizes,
-                                                               m_tableSchemaAllowNull,
-                                                               allowInlineStrings);
+    void initTable(bool withPK = true) {
+        m_tableSchema = TupleSchema::createTupleSchemaForTest(m_tableSchemaTypes,
+                                                              m_tableSchemaColumnSizes,
+                                                              m_tableSchemaAllowNull);
+        m_table = dynamic_cast<PersistentTable*>(
+            TableFactory::getPersistentTable(0, "Foo", m_tableSchema, m_columnNames, signature, &drStream, false, 0));
 
+        if ( ! withPK ) {
+            return;
+        }
         voltdb::TableIndexScheme indexScheme("primaryKeyIndex",
-                                             voltdb::BALANCED_TREE_INDEX,
+                                             BALANCED_TREE_INDEX,
                                              m_primaryKeyIndexColumns,
                                              TableIndex::simplyIndexColumns(),
                                              true, true, m_tableSchema);
-        std::vector<voltdb::TableIndexScheme> indexes;
-
-        m_table = dynamic_cast<voltdb::PersistentTable*>(
-            voltdb::TableFactory::getPersistentTable(0, "Foo", m_tableSchema, m_columnNames, 0));
 
         TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(indexScheme);
         assert(pkeyIndex);
@@ -125,16 +126,16 @@ public:
         m_table->setPrimaryKeyIndex(pkeyIndex);
     }
 
-
-
-    voltdb::VoltDBEngine *m_engine;
-    voltdb::TupleSchema *m_tableSchema;
-    voltdb::PersistentTable *m_table;
+    VoltDBEngine *m_engine;
+    TupleSchema *m_tableSchema;
+    PersistentTable *m_table;
+    MockDRTupleStream drStream;
     std::vector<std::string> m_columnNames;
-    std::vector<voltdb::ValueType> m_tableSchemaTypes;
+    std::vector<ValueType> m_tableSchemaTypes;
     std::vector<int32_t> m_tableSchemaColumnSizes;
     std::vector<bool> m_tableSchemaAllowNull;
     std::vector<int> m_primaryKeyIndexColumns;
+    char signature[20];
 };
 
 class StackCleaner {
@@ -149,7 +150,7 @@ private:
 };
 
 TEST_F(PersistentTableLogTest, InsertDeleteThenUndoOneTest) {
-    initTable(true);
+    initTable();
     tableutil::addRandomTuples(m_table, 1000);
     voltdb::TableTuple tuple(m_tableSchema);
 
@@ -165,7 +166,7 @@ TEST_F(PersistentTableLogTest, InsertDeleteThenUndoOneTest) {
     m_engine->setUndoToken(INT64_MIN + 2);
     // this next line is a testing hack until engine data is
     // de-duplicated with executorcontext data
-    m_engine->getExecutorContext();
+    m_engine->updateExecutorContextUndoQuantumForTest();
 
     m_table->deleteTuple(tuple, true);
 
@@ -177,7 +178,7 @@ TEST_F(PersistentTableLogTest, InsertDeleteThenUndoOneTest) {
 }
 
 TEST_F(PersistentTableLogTest, LoadTableThenUndoTest) {
-    initTable(true);
+    initTable();
     tableutil::addRandomTuples(m_table, 1000);
 
     CopySerializeOutput serialize_out;
@@ -186,21 +187,21 @@ TEST_F(PersistentTableLogTest, LoadTableThenUndoTest) {
     m_engine->setUndoToken(INT64_MIN + 2);
     // this next line is a testing hack until engine data is
     // de-duplicated with executorcontext data
-    m_engine->getExecutorContext();
+    m_engine->updateExecutorContextUndoQuantumForTest();
 
     m_table->deleteAllTuples(true);
     m_engine->releaseUndoToken(INT64_MIN + 2);
 
     delete m_table;
 
-    initTable(true);
+    initTable();
 
-    ReferenceSerializeInput serialize_in(serialize_out.data() + sizeof(int32_t), serialize_out.size() - sizeof(int32_t));
+    ReferenceSerializeInputBE serialize_in(serialize_out.data() + sizeof(int32_t), serialize_out.size() - sizeof(int32_t));
 
     m_engine->setUndoToken(INT64_MIN + 3);
     // this next line is a testing hack until engine data is
     // de-duplicated with executorcontext data
-    m_engine->getExecutorContext();
+    m_engine->updateExecutorContextUndoQuantumForTest();
 
     m_table->loadTuplesFrom(serialize_in, NULL, NULL);
     voltdb::TableTuple tuple(m_tableSchema);
@@ -215,7 +216,7 @@ TEST_F(PersistentTableLogTest, LoadTableThenUndoTest) {
 }
 
 TEST_F(PersistentTableLogTest, LoadTableThenReleaseTest) {
-    initTable(true);
+    initTable();
     tableutil::addRandomTuples(m_table, 1000);
 
     CopySerializeOutput serialize_out;
@@ -224,21 +225,21 @@ TEST_F(PersistentTableLogTest, LoadTableThenReleaseTest) {
     m_engine->setUndoToken(INT64_MIN + 2);
     // this next line is a testing hack until engine data is
     // de-duplicated with executorcontext data
-    m_engine->getExecutorContext();
+    m_engine->updateExecutorContextUndoQuantumForTest();
 
     m_table->deleteAllTuples(true);
     m_engine->releaseUndoToken(INT64_MIN + 2);
 
     delete m_table;
 
-    initTable(true);
+    initTable();
 
-    ReferenceSerializeInput serialize_in(serialize_out.data() + sizeof(int32_t), serialize_out.size() - sizeof(int32_t));
+    ReferenceSerializeInputBE serialize_in(serialize_out.data() + sizeof(int32_t), serialize_out.size() - sizeof(int32_t));
 
     m_engine->setUndoToken(INT64_MIN + 3);
     // this next line is a testing hack until engine data is
     // de-duplicated with executorcontext data
-    m_engine->getExecutorContext();
+    m_engine->updateExecutorContextUndoQuantumForTest();
 
     m_table->loadTuplesFrom(serialize_in, NULL, NULL);
     voltdb::TableTuple tuple(m_tableSchema);
@@ -253,7 +254,7 @@ TEST_F(PersistentTableLogTest, LoadTableThenReleaseTest) {
 }
 
 TEST_F(PersistentTableLogTest, InsertUpdateThenUndoOneTest) {
-    initTable(true);
+    initTable();
     tableutil::addRandomTuples(m_table, 1);
     voltdb::TableTuple tuple(m_tableSchema);
 
@@ -280,7 +281,7 @@ TEST_F(PersistentTableLogTest, InsertUpdateThenUndoOneTest) {
 
     // this next line is a testing hack until engine data is
     // de-duplicated with executorcontext data
-    m_engine->getExecutorContext();
+    m_engine->updateExecutorContextUndoQuantumForTest();
 
     /*
      * Update a few columns
@@ -308,15 +309,24 @@ TEST_F(PersistentTableLogTest, InsertUpdateThenUndoOneTest) {
 }
 
 TEST_F(PersistentTableLogTest, InsertThenUndoInsertsOneTest) {
-    initTable(true);
+    initTable();
     tableutil::addRandomTuples(m_table, 10);
     ASSERT_EQ( m_table->activeTupleCount(), 10);
     m_engine->undoUndoToken(INT64_MIN + 1);
     ASSERT_EQ( m_table->activeTupleCount(), 0);
 }
 
+TEST_F(PersistentTableLogTest, InsertDupsThenUndoWorksTest) {
+    initTable(false);
+    tableutil::addDuplicateRandomTuples(m_table, 2);
+    tableutil::addDuplicateRandomTuples(m_table, 3);
+    ASSERT_EQ(5, m_table->activeTupleCount());
+    m_engine->undoUndoToken(INT64_MIN + 1);
+    ASSERT_EQ(0, m_table->activeTupleCount());
+}
+
 TEST_F(PersistentTableLogTest, FindBlockTest) {
-    initTable(true);
+    initTable();
     const int blockSize = m_table->getTableAllocationSize();
     TBBucketPtr bucket(new TBBucket());
 

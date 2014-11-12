@@ -63,9 +63,6 @@ import org.hsqldb_voltpatches.types.Type;
 // support for MERGE statement by Justin Spadea (jzs9783@users dot sourceforge.net)
 public class StatementDML extends StatementDMQL {
 
-    /**
-     * Instantiate this as an INSERT statement
-     */
     StatementDML(int type, int group, HsqlName schemaName) {
         super(type, group, schemaName);
     }
@@ -172,7 +169,6 @@ public class StatementDML extends StatementDMQL {
               null);
     }
 
-    @Override
     Result getResult(Session session) {
 
         Result result = null;
@@ -205,7 +201,6 @@ public class StatementDML extends StatementDMQL {
     }
 
     // this fk references -> other  :  other read lock
-    @Override
     void getTableNamesForRead(OrderedHashSet set) {
 
         if (!baseTable.isTemp()) {
@@ -239,7 +234,6 @@ public class StatementDML extends StatementDMQL {
     }
 
     // other fk references this :  if constraint trigger action  : other write lock
-    @Override
     void getTableNamesForWrite(OrderedHashSet set) {
 
         if (baseTable.isTemp()) {
@@ -1251,11 +1245,10 @@ public class StatementDML extends StatementDMQL {
         return true;
     }
 
-
-    /*************** VOLTDB *********************/
+    /************************* Volt DB Extensions *************************/
 
     private void voltAppendTargetColumns(Session session, int[] columnMap, Expression[] expressions, VoltXMLElement xml)
-    throws HSQLParseException
+    throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
         VoltXMLElement columns = new VoltXMLElement("columns");
         xml.children.add(columns);
@@ -1265,12 +1258,14 @@ public class StatementDML extends StatementDMQL {
             VoltXMLElement column = new VoltXMLElement("column");
             columns.children.add(column);
             column.attributes.put("name", targetTable.getColumn(columnMap[i]).getName().name);
-            column.children.add(expressions[i].voltGetXML(session));
+            if (expressions != null) {
+                column.children.add(expressions[i].voltGetXML(session));
+            }
         }
     }
 
     private void voltAppendCondition(Session session, VoltXMLElement xml)
-    throws HSQLParseException
+    throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
         assert(targetRangeVariables.length > 0);
         RangeVariable rv = targetRangeVariables[0];
@@ -1290,11 +1285,11 @@ public class StatementDML extends StatementDMQL {
     }
 
     private void voltAppendChildScans(Session session, VoltXMLElement xml)
-    throws HSQLParseException
+    throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
         // Joins in DML statements are not yet supported, so, for now,
         // just represent the one (target) table scan.
-        VoltXMLElement child = targetRangeVariables[0].voltGetRangeVariableXML(session);
+        VoltXMLElement child = rangeVariables[0].voltGetRangeVariableXML(session);
         assert(child != null);
         xml.children.add(child);
     }
@@ -1309,16 +1304,23 @@ public class StatementDML extends StatementDMQL {
      */
     @Override
     VoltXMLElement voltGetStatementXML(Session session)
-    throws HSQLParseException
+    throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
         VoltXMLElement xml;
         switch (type) {
 
         case StatementTypes.INSERT :
             xml = new VoltXMLElement("insert");
-            voltAppendTargetColumns(session, insertColumnMap, insertExpression.nodes[0].nodes, xml);
-            // INSERT has no child node or condition,
-            // UNTIL we support "INSERT INTO <table> SELECT ... FROM ... WHERE..."
+
+            assert(insertExpression != null || queryExpression != null);
+
+            if (queryExpression == null) {
+                voltAppendTargetColumns(session, insertColumnMap, insertExpression.nodes[0].nodes, xml);
+            } else {
+                voltAppendTargetColumns(session, insertColumnMap, null, xml);
+                VoltXMLElement child = voltGetXMLExpression(queryExpression, parameters, session);
+                xml.children.add(child);
+            }
             break;
 
         case StatementTypes.UPDATE_CURSOR :
@@ -1338,12 +1340,13 @@ public class StatementDML extends StatementDMQL {
             break;
 
         default:
-            throw new HSQLParseException("VoltDB does not support DML statements of type " + type);
+            throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
+                "VoltDB does not support DML statements of type " + type);
         }
 
-        voltAppendParameters(session, xml);
+        voltAppendParameters(session, xml, parameters);
         xml.attributes.put("table", targetTable.getName().name);
         return xml;
     }
-
+    /**********************************************************************/
 }

@@ -22,7 +22,6 @@ import java.security.NoSuchAlgorithmException;
 
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.Statement;
@@ -30,16 +29,15 @@ import org.voltdb.catalog.StmtParameter;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compilereport.StatementAnnotation;
 import org.voltdb.planner.CompiledPlan;
-import org.voltdb.planner.PartitioningForStatement;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.QueryPlanner;
+import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.planner.TrivialCostModel;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.DeletePlanNode;
 import org.voltdb.plannodes.InsertPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
-import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.UpdatePlanNode;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.BuildDirectoryUtils;
@@ -60,7 +58,7 @@ public abstract class StatementCompiler {
     static void compile(VoltCompiler compiler, HSQLInterface hsql,
             Catalog catalog, Database db, DatabaseEstimates estimates,
             Statement catalogStmt, String stmt, String joinOrder,
-            DeterminismMode detMode, PartitioningForStatement partitioning)
+            DeterminismMode detMode, StatementPartitioning partitioning)
     throws VoltCompiler.VoltCompilerException {
 
         // Cleanup whitespace newlines for catalog compatibility
@@ -76,6 +74,9 @@ public abstract class StatementCompiler {
         catalogStmt.setQuerytype(qtype.getValue());
 
         // put the data in the catalog that we have
+        if (!stmt.endsWith(";")) {
+            stmt += ";";
+        }
         catalogStmt.setSqltext(stmt);
         catalogStmt.setSinglepartition(partitioning.wasSpecifiedAsSingle());
         catalogStmt.setBatched(false);
@@ -86,12 +87,12 @@ public abstract class StatementCompiler {
         String stmtName = catalogStmt.getTypeName();
         String procName = catalogStmt.getParent().getTypeName();
         TrivialCostModel costModel = new TrivialCostModel();
+
+        CompiledPlan plan = null;
         QueryPlanner planner = new QueryPlanner(
                 sql, stmtName, procName,  catalog.getClusters().get("cluster"), db,
                 partitioning, hsql, estimates, false, DEFAULT_MAX_JOIN_TABLES,
                 costModel, null, joinOrder, detMode);
-
-        CompiledPlan plan = null;
         try {
             planner.parse();
             plan = planner.plan();
@@ -246,4 +247,5 @@ public abstract class StatementCompiler {
         // if nothing found, return false
         return false;
     }
+
 }

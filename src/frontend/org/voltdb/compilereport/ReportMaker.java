@@ -17,6 +17,8 @@
 
 package org.voltdb.compilereport;
 
+import static org.apache.commons.lang3.StringEscapeUtils.escapeHtml4;
+
 import java.io.IOException;
 import java.net.URL;
 import java.text.DateFormat;
@@ -48,6 +50,11 @@ import org.voltdb.compiler.VoltCompiler.Feedback;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
+import org.voltdb.utils.CatalogSizing;
+import org.voltdb.utils.CatalogSizing.CatalogItemSizeList;
+import org.voltdb.utils.CatalogSizing.CatalogItemSizeRollup;
+import org.voltdb.utils.CatalogSizing.DatabaseSizes;
+import org.voltdb.utils.CatalogSizing.TableSize;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.PlatformProperties;
@@ -98,15 +105,21 @@ public class ReportMaker {
         sb.append(StringUtils.join(columnNames, ", "));
         sb.append("</td>");
 
-        // uniqueness column
+        // attribute column
         sb.append("<td>");
         if (index.getAssumeunique()) {
-            tag(sb, "important", "AssumeUnique");
+            tag(sb, "success", "AssumeUnique");
         } else if (index.getUnique()) {
-            tag(sb, "important", "Unique");
+            tag(sb, "success", "Unique");
         } else {
             tag(sb, "info", "Nonunique");
         }
+        IndexAnnotation annotation = (IndexAnnotation) index.getAnnotation();
+        if(annotation == null) {
+            sb.append(" ");
+            tag(sb, "important", "Unused");
+        }
+
         sb.append("</td>");
 
         sb.append("</tr>\n");
@@ -115,7 +128,6 @@ public class ReportMaker {
         sb.append("<tr class='dropdown2'><td colspan='5' id='s-"+ table.getTypeName().toLowerCase() +
                 "-" + index.getTypeName().toLowerCase() + "--dropdown'>\n");
 
-        IndexAnnotation annotation = (IndexAnnotation) index.getAnnotation();
         if (annotation != null) {
             if (annotation.proceduresThatUseThis.size() > 0) {
                 sb.append("<p>Used by procedures: ");
@@ -139,14 +151,14 @@ public class ReportMaker {
                   "<th>Index Name</th>" +
                   "<th>Type</th>" +
                   "<th>Columns</th>" +
-                  "<th>Uniqueness</th>" +
-                  "</tr></thead>\n    <tbody>\n");
+                  "<th>Attributes</th>" +
+                  "</tr>\n");
 
         for (Index index : table.getIndexes()) {
             sb.append(genrateIndexRow(table, index));
         }
 
-        sb.append("    </tbody>\n    </table>\n");
+        sb.append("    </thead>\n    </table>\n");
         return sb.toString();
     }
 
@@ -203,6 +215,18 @@ public class ReportMaker {
         // column 5: index count
         sb.append("<td>");
         sb.append(table.getIndexes().size());
+
+        // computing unused indexes
+        int unusedIndexes = 0;
+        for (Index index : table.getIndexes()) {
+            IndexAnnotation indexAnnotation = (IndexAnnotation) index.getAnnotation();
+               if(indexAnnotation == null) {
+                   unusedIndexes++;
+               }
+        }
+        if(unusedIndexes !=0 ) {
+            sb.append(" (" + unusedIndexes +" unused)");
+        }
         sb.append("</td>");
 
         // column 6: has pkey
@@ -222,11 +246,20 @@ public class ReportMaker {
         }
         sb.append("</td>");
 
+        // column 6: has tuple limit
+        sb.append("<td>");
+        if (table.getTuplelimit() != Integer.MAX_VALUE) {
+            tag(sb, "info", String.valueOf(table.getTuplelimit()));
+        } else {
+            tag(sb, null, "No-limit");
+        }
+        sb.append("</td>");
+
         sb.append("</tr>\n");
 
         // BUILD THE DROPDOWN FOR THE DDL / INDEXES DETAIL
 
-        sb.append("<tr class='tablesorter-childRow'><td class='invert' colspan='6' id='s-"+ table.getTypeName().toLowerCase() + "--dropdown'>\n");
+        sb.append("<tr class='tablesorter-childRow'><td class='invert' colspan='7' id='s-"+ table.getTypeName().toLowerCase() + "--dropdown'>\n");
 
         TableAnnotation annotation = (TableAnnotation) table.getAnnotation();
         if (annotation != null) {
@@ -235,7 +268,7 @@ public class ReportMaker {
                 sb.append("<p>MISSING DDL</p>\n");
             }
             else {
-                String ddl = annotation.ddl;
+                String ddl = escapeHtml4(annotation.ddl);
                 sb.append("<p><pre>" + ddl + "</pre></p>\n");
             }
 
@@ -296,7 +329,7 @@ public class ReportMaker {
 
         // sql column
         sb.append("<td><tt>");
-        sb.append(statement.getSqltext());
+        sb.append(escapeHtml4(statement.getSqltext()));
         sb.append("</td></tt>");
 
         // params column
@@ -344,7 +377,7 @@ public class ReportMaker {
         sb.append("<div class='well well-small'><h4>Explain Plan:</h4>\n");
         StatementAnnotation annotation = (StatementAnnotation) statement.getAnnotation();
         if (annotation != null) {
-            String plan = annotation.explainPlan;
+            String plan = escapeHtml4(annotation.explainPlan);
             plan = plan.replace("\n", "<br/>");
             plan = plan.replace(" ", "&nbsp;");
 
@@ -385,13 +418,13 @@ public class ReportMaker {
                   "<th>Params</th>" +
                   "<th>R/W</th>" +
                   "<th>Attributes</th>" +
-                  "</tr></thead>\n    <tbody>\n");
+                  "</tr>\n");
 
         for (Statement statement : procedure.getStatements()) {
             sb.append(genrateStatementRow(procedure, statement));
         }
 
-        sb.append("    </tbody>\n    </table>\n");
+        sb.append("    </thead>\n    </table>\n");
         return sb.toString();
     }
 
@@ -550,6 +583,180 @@ public class ReportMaker {
         return sb.toString();
     }
 
+    static String generateSizeTable(DatabaseSizes sizes) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("<!--##SIZES##-->\n");
+        int nrow = 0;
+        for (TableSize tsize: sizes.tableSizes) {
+            sb.append(generateSizeRow(tsize, ++nrow));
+        }
+        for (TableSize vsize: sizes.viewSizes) {
+            sb.append(generateSizeRow(vsize, ++nrow));
+        }
+        return sb.toString();
+    }
+
+    static String generateSizeRow(TableSize tsize, int nrow) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("<tr class='primaryrow'>");
+
+        // column 1: table name
+        String anchor = String.format("size-%d", nrow);
+        sb.append(String.format(
+            "<td class='table-view-name' id='s-%s'>", anchor)).append(
+                tsize.name).append(
+            "</td>\n");
+
+        // column 2: type
+        sb.append("<td>");
+        if (tsize.isView) {
+            tag(sb, "info", "Materialized View");
+        }
+        else {
+            tag(sb, null, "Table");
+        }
+        sb.append("</td>\n");
+
+        // column 3: estimated row count
+        final String updateCode = "sizes_update_all();";
+        sb.append(
+            "<td>").append(
+                "<div class='ecount'>").append(
+                    "<input type='text' class='form-control count-input'").append(String.format(
+                            " id='s-%s-count'", anchor)).append(String.format(
+                            " onblur='%s'", updateCode)).append(String.format(
+                            " value='%d'", tsize.cardinality)).append(
+                            " class='form-control'").append(
+                            " placeholder='.ecount'").append(
+                        ">").append(
+                    "</input>\n").append(
+                "</div>").append(
+            "</td>\n");
+
+        // column 4: row min size
+        sb.append(String.format("<td id='s-%s-rmin' class='right-cell'>%d</td>\n", anchor, tsize.widthMin));
+
+        // column 5: row max size
+        sb.append(String.format("<td id='s-%s-rmax' class='right-cell'>%d</td>\n", anchor, tsize.widthMax));
+
+        // Roll up index sizes since a table can have multiple indexes.
+        CatalogItemSizeRollup indexSizeRollup = tsize.indexRollup();
+
+        // column 6: index min size
+        sb.append(String.format("<td id='s-%s-imin' class='right-cell'>%d</td>\n", anchor, indexSizeRollup.widthMin));
+
+        // column 7: index max size
+        sb.append(String.format("<td id='s-%s-imax' class='right-cell'>%d</td>\n", anchor, indexSizeRollup.widthMax));
+
+        // column 8: table min size (including index min size)
+        // Updated by Javascript and this initial number is thrown away.
+        long tmin = (tsize.widthMin + indexSizeRollup.widthMin) * tsize.cardinality;
+        sb.append(String.format("<td id='s-%s-tmin' class='right-cell calculated-cell'>%d</td>\n", anchor, tmin));
+
+        // column 9: table max size (including index max size)
+        // Updated by Javascript and this initial number is thrown away.
+        long tmax = (tsize.widthMax + indexSizeRollup.widthMax) * tsize.cardinality;
+        sb.append(String.format("<td id='s-%s-tmax' class='right-cell calculated-cell'>%d</td>\n", anchor, tmax));
+
+        sb.append("</tr>\n");
+
+        //=== Details drop-down.
+
+        sb.append(
+            "<tr class='tablesorter-childRow'>").append(String.format(
+                "<td class='invert' colspan='6' id='s-%s--dropdown'>\n", anchor));
+
+        TableAnnotation annotation = (TableAnnotation) tsize.table.getAnnotation();
+        if (annotation != null) {
+            // output the DDL
+            if (annotation.ddl == null) {
+                sb.append("<p>MISSING DDL</p>\n");
+            }
+            else {
+                String ddl = escapeHtml4(annotation.ddl);
+                sb.append("<p><pre>" + ddl + "</pre></p>\n");
+            }
+        }
+
+        if (tsize.table.getIndexes().size() > 0) {
+            sb.append(generateIndexesTable(tsize.table));
+        }
+        else {
+            sb.append("<p>No indexes defined on table.</p>\n");
+        }
+
+        sb.append(
+                "</td>").append(
+            "</tr>\n");
+
+        return sb.toString();
+    }
+
+    static String generateSizeSummary(DatabaseSizes dbSizes) {
+        StringBuilder sb = new StringBuilder();
+
+        CatalogItemSizeList<CatalogItemSizeRollup> rollups =
+                new CatalogItemSizeList<CatalogItemSizeRollup>();
+        rollups.add(dbSizes.tableRollup());
+        rollups.add(dbSizes.viewRollup());
+        rollups.add(dbSizes.indexRollup());
+        CatalogItemSizeRollup rollupRollup = rollups.rollup(1);
+
+        sb.append("<table class='table size-summary-table'>\n");
+        generateSizeRollupSummary("tables whose row data ", "table", sb, rollups.get(0));
+        generateSizeRollupSummary("materialized views whose row data ", "view", sb, rollups.get(1));
+        generateSizeRollupSummary("indexes whose key data and overhead ", "index", sb, rollups.get(2));
+
+        sb.append("<tr><td colspan='6'>&nbsp;</td></tr>\n"); // blank row
+
+        // write the totals
+        sb.append("<tr>");
+        if (rollupRollup.widthMin == rollupRollup.widthMax) {
+            sb.append("<td colspan='2'><b>Total user data is expected to use about</b>&nbsp;</td>");
+            sb.append(String.format("<td id='s-size-summary-total-min' class='right-cell calculated-cell'>%d</td>", rollupRollup.widthMin));
+            sb.append("<td colspan='3'>&nbsp;of memory.</td>");
+        }
+        else {
+            sb.append("<td colspan='2'><b>Total user data is expected to use between</b>&nbsp;</td>");
+            sb.append(String.format("<td id='s-size-summary-total-min' class='right-cell calculated-cell'>%d</td>", rollupRollup.widthMin));
+            sb.append("<td>&nbsp;<b>and</b>&nbsp;</td>");
+            sb.append(String.format("<td id='s-size-summary-total-max' class='right-cell calculated-cell'>%d</td>", rollupRollup.widthMax));
+            sb.append("<td>&nbsp<b>of memory.</b></td>");
+        }
+        sb.append("</tr>\n");
+
+        sb.append("</table>\n");
+        return sb.toString();
+    }
+
+    private static void generateSizeRollupSummary(
+            String name,
+            String label,
+            StringBuilder sb,
+            CatalogItemSizeRollup rollup)
+    {
+        String prefix = String.format("s-size-summary-%s", label);
+        sb.append("<tr>");
+        sb.append(String.format("<td id='%s-count' class='right-cell'>%d</td>", prefix, rollup.itemCount));
+        sb.append(String.format("<td>%s is expected to use", name));
+        // different output if the range is 0
+        if (rollup.widthMin == rollup.widthMax) {
+            sb.append(" about&nbsp;</td>");
+            sb.append(String.format("<td id='%s-min' class='right-cell calculated-cell'>%d</td>", prefix, rollup.widthMin));
+            sb.append("<td colspan='3'>");
+        }
+        else {
+            sb.append(" between&nbsp;</td>");
+            sb.append(String.format("<td id='%s-min' class='right-cell calculated-cell'>%d</td>", prefix, rollup.widthMin));
+            sb.append("<td>&nbsp;and&nbsp;</td>");
+            sb.append(String.format("<td id='%s-max' class='right-cell calculated-cell'>%d</td>", prefix, rollup.widthMax));
+            sb.append("<td>");
+        }
+        sb.append("&nbsp; of memory.&nbsp;</td>");
+        sb.append("</tr>\n");
+    }
+
+
     /**
      * Get some embeddable HTML of some generic catalog/application stats
      * that is drawn on the first page of the report.
@@ -653,7 +860,7 @@ public class ReportMaker {
                 } else {
                     nameLink = "<a href='#p-" + procName.toLowerCase() + "'>" + procName + "</a>";
                 }
-                sb.append("<tr><td>").append(nameLink).append("</td><td>").append(warning.getMessage()).append("</td></tr>\n");
+                sb.append("<tr><td>").append(nameLink).append("</td><td>").append(escapeHtml4(warning.getMessage())).append("</td></tr>\n");
             }
             sb.append("").append("</table>\n").append("</td></tr>\n");
         }
@@ -664,7 +871,7 @@ public class ReportMaker {
     /**
      * Generate the HTML catalog report from a newly compiled VoltDB catalog
      */
-    public static String report(Catalog catalog, ArrayList<Feedback> warnings) throws IOException {
+    public static String report(Catalog catalog, ArrayList<Feedback> warnings, String autoGenDDL) throws IOException {
         // asynchronously get platform properties
         new Thread() {
             @Override
@@ -691,10 +898,20 @@ public class ReportMaker {
         String procData = generateProceduresTable(db.getProcedures());
         contents = contents.replace("##PROCS##", procData);
 
+        DatabaseSizes sizes = CatalogSizing.getCatalogSizes(db);
+
+        String sizeData = generateSizeTable(sizes);
+        contents = contents.replace("##SIZES##", sizeData);
+
+        String sizeSummary = generateSizeSummary(sizes);
+        contents = contents.replace("##SIZESUMMARY##", sizeSummary);
+
         String platformData = PlatformProperties.getPlatformProperties().toHTML();
         contents = contents.replace("##PLATFORM##", platformData);
 
         contents = contents.replace("##VERSION##", VoltDB.instance().getVersionString());
+
+        contents = contents.replace("##DDL##", escapeHtml4(autoGenDDL));
 
         DateFormat df = new SimpleDateFormat("d MMM yyyy HH:mm:ss z");
         contents = contents.replace("##TIMESTAMP##", df.format(m_timestamp));

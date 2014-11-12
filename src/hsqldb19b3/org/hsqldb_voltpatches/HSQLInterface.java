@@ -17,10 +17,12 @@
 
 package org.hsqldb_voltpatches;
 
+import java.util.TimeZone;
+
+import org.hsqldb_voltpatches.VoltXMLElement.VoltXMLDiff;
 import org.hsqldb_voltpatches.lib.HashMappedList;
 import org.hsqldb_voltpatches.persist.HsqlProperties;
 import org.hsqldb_voltpatches.result.Result;
-import org.hsqldb_voltpatches.result.ResultConstants;
 
 /**
  * This class is built to create a single in-memory database
@@ -35,6 +37,20 @@ import org.hsqldb_voltpatches.result.ResultConstants;
  * </ul>
  */
 public class HSQLInterface {
+
+    static public String XML_SCHEMA_NAME = "databaseschema";
+    /**
+     * Naming conventions for unnamed indexes and constraints
+     */
+    static public String AUTO_GEN_MATVIEW = "MATVIEW_PK_";
+    static public String AUTO_GEN_MATVIEW_IDX = AUTO_GEN_MATVIEW + "INDEX";
+    static public String AUTO_GEN_MATVIEW_CONST = AUTO_GEN_MATVIEW + "CONSTRAINT";
+    static public String AUTO_GEN_PREFIX = "VOLTDB_AUTOGEN_";
+    static public String AUTO_GEN_IDX_PREFIX = AUTO_GEN_PREFIX + "IDX_";
+    static public String AUTO_GEN_CONSTRAINT_PREFIX = AUTO_GEN_IDX_PREFIX + "CT_";
+    static public String AUTO_GEN_PRIMARY_KEY_PREFIX = AUTO_GEN_IDX_PREFIX + "PK_";
+    static public String AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX = AUTO_GEN_PREFIX + "CONSTRAINT_IDX_";
+
     /**
      * The spacer to use for nested XML elements
      */
@@ -73,9 +89,12 @@ public class HSQLInterface {
     }
 
     Session sessionProxy;
+    // Initialize to an empty schema
+    VoltXMLElement lastSchema = new VoltXMLElement(XML_SCHEMA_NAME);
     static int instanceId = 0;
 
     private HSQLInterface(Session sessionProxy) {
+        lastSchema.attributes.put("name", XML_SCHEMA_NAME);
         this.sessionProxy = sessionProxy;
     }
 
@@ -105,10 +124,31 @@ public class HSQLInterface {
             e.printStackTrace();
         }
 
+        // Specifically set the timezone to UTC to avoid the default usage local timezone in HSQL.
+        // This ensures that all VoltDB data paths use the same timezone for representing time.
+        TimeZone.setDefault(TimeZone.getTimeZone("GMT+0"));
+
         // make HSQL case insensitive
         sessionProxy.executeDirectStatement("SET IGNORECASE TRUE;");
 
         return new HSQLInterface(sessionProxy);
+    }
+
+    /**
+     * Modify the current schema with a SQL DDL command and get the
+     * diff which represents the changes
+     *
+     * @param ddl The SQL DDL statement to be run.
+     * @return the "diff" of the before and after trees
+     * @throws HSQLParseException Throws exception if SQL parse error is
+     * encountered.
+     */
+    public VoltXMLDiff runDDLCommandAndDiff(String ddl) throws HSQLParseException {
+        runDDLCommand(ddl);
+        VoltXMLElement thisSchema = getXMLFromCatalog();
+        VoltXMLDiff diff = VoltXMLElement.computeDiff(lastSchema, thisSchema);
+        lastSchema = thisSchema.duplicate();
+        return diff;
     }
 
     /**
@@ -120,8 +160,9 @@ public class HSQLInterface {
      */
     public void runDDLCommand(String ddl) throws HSQLParseException {
         Result result = sessionProxy.executeDirectStatement(ddl);
-        if (result.mode == ResultConstants.ERROR)
+        if (result.hasError()) {
             throw new HSQLParseException(result.getMainString());
+        }
     }
 
     /**
@@ -177,8 +218,9 @@ public class HSQLInterface {
 
         //Result result = Result.newPrepareResponse(cs.id, cs.type, rmd, pmd);
         Result result = Result.newPrepareResponse(cs);
-        if (result.mode == ResultConstants.ERROR)
+        if (result.hasError()) {
             throw new HSQLParseException(result.getMainString());
+        }
 
         VoltXMLElement xml = null;
         xml = cs.voltGetStatementXML(sessionProxy);
@@ -243,7 +285,7 @@ public class HSQLInterface {
                 valueCount++;
             }
         }
-        if ((tableCount + rowCount) > 0) {
+        if ((tableCount + rowCount > 0) && (tableCount + valueCount > 0)) {
             assert rowCount == 1;
             assert tableCount + valueCount == 1;
             return true;
@@ -331,8 +373,8 @@ public class HSQLInterface {
      * @throws HSQLParseException
      */
     public VoltXMLElement getXMLFromCatalog() throws HSQLParseException {
-        VoltXMLElement xml = new VoltXMLElement("databaseschema");
-
+        VoltXMLElement xml = new VoltXMLElement(XML_SCHEMA_NAME);
+        xml.attributes.put("name", XML_SCHEMA_NAME);
         String schemaName = null;
         try {
             schemaName = sessionProxy.getSchemaName(null);

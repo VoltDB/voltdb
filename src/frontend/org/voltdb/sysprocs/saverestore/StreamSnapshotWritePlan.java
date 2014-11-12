@@ -17,13 +17,19 @@
 
 package org.voltdb.sysprocs.saverestore;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.google_voltpatches.common.base.Preconditions;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
@@ -44,6 +50,7 @@ import org.voltdb.rejoin.StreamSnapshotDataTarget;
 import org.voltdb.sysprocs.SnapshotRegistry;
 import org.voltdb.utils.CatalogUtil;
 
+import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.ArrayListMultimap;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Lists;
@@ -59,15 +66,15 @@ import com.google_voltpatches.common.primitives.Longs;
 public class StreamSnapshotWritePlan extends SnapshotWritePlan
 {
     @Override
-    protected boolean createSetupInternal(
+    public Callable<Boolean> createSetup(
             String file_path, String file_nonce,
             long txnId, Map<Integer, Long> partitionTransactionIds,
             JSONObject jsData, SystemProcedureExecutionContext context,
-            String hostname, final VoltTable result,
+            final VoltTable result,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
             SiteTracker tracker,
             HashinatorSnapshotData hashinatorData,
-            long timestamp) throws IOException
+            long timestamp)
     {
         assert(SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.isEmpty());
 
@@ -94,12 +101,12 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
          * them.
          *
          */
-        final Integer newPartitionCount = partitionsToAdd.isEmpty() ? null : Collections.max(partitionsToAdd) + 1;
+        final int newPartitionCount = partitionsToAdd.isEmpty() ? context.getNumberOfPartitions() : Collections.max(partitionsToAdd) + 1;
+        Callable<Boolean> deferredSetup = null;
         // Coalesce a truncation snapshot if shouldTruncate is true
         if (config.shouldTruncate) {
-            Preconditions.checkNotNull(newPartitionCount);
-            coalesceTruncationSnapshotPlan(file_path, file_nonce, txnId, partitionTransactionIds,
-                                           jsData, context, hostname, result,
+            deferredSetup = coalesceTruncationSnapshotPlan(file_path, file_nonce, txnId, partitionTransactionIds,
+                                           jsData, context, result,
                                            exportSequenceNumbers, tracker,
                                            hashinatorData,
                                            timestamp,
@@ -114,7 +121,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
 
         // Mark snapshot start in registry
         final AtomicInteger numTables = new AtomicInteger(config.tables.length);
-        final SnapshotRegistry.Snapshot snapshotRecord =
+        m_snapshotRecord =
             SnapshotRegistry.startSnapshot(
                     txnId,
                     context.getHostId(),
@@ -137,11 +144,27 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
 
         // For each table, create tasks where each task has a data target.
         for (final Table table : config.tables) {
-            createTasksForTable(table, sdts, numTables, snapshotRecord);
-            result.addRow(context.getHostId(), hostname, table.getTypeName(), "SUCCESS", "");
+            createTasksForTable(table, sdts, numTables, m_snapshotRecord);
+            result.addRow(context.getHostId(), CoreUtils.getHostnameOrAddress(), table.getTypeName(), "SUCCESS", "");
         }
 
-        return false;
+        return deferredSetup;
+    }
+
+    private static boolean haveAnyStreamPairs(List<StreamSnapshotRequestConfig.Stream> localStreams) {
+        boolean haveAny = false;
+        if (localStreams != null && !localStreams.isEmpty()) {
+            int pairCount = 0;
+            Iterator<StreamSnapshotRequestConfig.Stream> itr = localStreams.iterator();
+            while (itr.hasNext() && pairCount == 0) {
+                StreamSnapshotRequestConfig.Stream stream = itr.next();
+                if (stream != null && stream.streamPairs != null) {
+                    pairCount = stream.streamPairs.size();
+                }
+            }
+            haveAny = pairCount > 0;
+        }
+        return haveAny;
     }
 
     private List<DataTargetInfo> createDataTargets(List<StreamSnapshotRequestConfig.Stream> localStreams,
@@ -158,7 +181,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
 
         List<DataTargetInfo> sdts = Lists.newArrayList();
 
-        if (!localStreams.isEmpty() && !schemas.isEmpty()) {
+        if (haveAnyStreamPairs(localStreams) && !schemas.isEmpty()) {
             Mailbox mb = VoltDB.instance().getHostMessenger().createMailbox();
             StreamSnapshotDataTarget.SnapshotSender sender = new StreamSnapshotDataTarget.SnapshotSender(mb);
             StreamSnapshotAckReceiver ackReceiver = new StreamSnapshotAckReceiver(mb);
@@ -200,24 +223,33 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
         };
     }
 
-    private void coalesceTruncationSnapshotPlan(String file_path, String file_nonce, long txnId,
-                                                Map<Integer, Long> partitionTransactionIds,
-                                                JSONObject jsData,
-                                                SystemProcedureExecutionContext context,
-                                                String hostname, VoltTable result,
-                                                Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-                                                SiteTracker tracker,
-                                                HashinatorSnapshotData hashinatorData,
-                                                long timestamp,
-                                                int newPartitionCount)
-        throws IOException
+    private Callable<Boolean> coalesceTruncationSnapshotPlan(String file_path, String file_nonce, long txnId,
+                                                             Map<Integer, Long> partitionTransactionIds,
+                                                             JSONObject jsData,
+                                                             SystemProcedureExecutionContext context,
+                                                             VoltTable result,
+                                                             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+                                                             SiteTracker tracker,
+                                                             HashinatorSnapshotData hashinatorData,
+                                                             long timestamp,
+                                                             int newPartitionCount)
     {
-        NativeSnapshotWritePlan plan = new NativeSnapshotWritePlan();
-        plan.createSetupInternal(file_path, file_nonce, txnId, partitionTransactionIds,
-                                 jsData, context, hostname, result, exportSequenceNumbers,
-                                 tracker, hashinatorData, timestamp, newPartitionCount);
-        m_targets.addAll(plan.m_targets);
+        final NativeSnapshotWritePlan plan = new NativeSnapshotWritePlan();
+        final Callable<Boolean> deferredTruncationSetup =
+                plan.createSetupInternal(file_path, file_nonce, txnId, partitionTransactionIds,
+                        jsData, context, result, exportSequenceNumbers,
+                        tracker, hashinatorData, timestamp, newPartitionCount);
         m_taskListsForHSIds.putAll(plan.m_taskListsForHSIds);
+
+        return new Callable<Boolean>() {
+            @Override
+            public Boolean call() throws Exception
+            {
+                final Boolean retval = deferredTruncationSetup.call();
+                m_targets.addAll(plan.m_targets);
+                return retval;
+            }
+        };
     }
 
     private List<StreamSnapshotRequestConfig.Stream>
@@ -261,10 +293,10 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
 
             final SnapshotTableTask task =
                 new SnapshotTableTask(table,
-                                      targetInfo.dataTarget,
                                       new SnapshotDataFilter[0], // This task no longer needs partition filtering
                                       null,
                                       false);
+            task.setTarget(targetInfo.dataTarget);
 
             tasks.put(targetInfo.srcHSId, task);
             m_targets.add(targetInfo.dataTarget);

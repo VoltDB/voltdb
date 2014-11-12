@@ -28,8 +28,10 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -157,7 +159,14 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
 
             JarEntry entry = new JarEntry(e.getKey());
             entry.setSize(e.getValue().length);
-            entry.setTime(System.currentTimeMillis());
+            // Make the entry time the epoch so that the SHA-1 hash
+            // built by feeding all of the bytes to it returns the same
+            // hash for the same catalog.
+            // Maybe we ought to have a getSHA1() method that does the same
+            // thing as the getCRC() method below?
+            //
+            //entry.setTime(System.currentTimeMillis());
+            entry.setTime(0);
             jarOut.putNextEntry(entry);
             jarOut.write(e.getValue());
             jarOut.flush();
@@ -189,12 +198,39 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
     public byte[] put(String key, File value) throws IOException {
         byte[] bytes = null;
 
+        int bytesRead = 0;
         bytes = new byte[(int) value.length()];
         BufferedInputStream in = new BufferedInputStream(new FileInputStream(value));
-        int bytesRead = in.read(bytes);
+        try {
+            bytesRead = in.read(bytes);
+        }
+        finally {
+            in.close();
+        }
         assert(bytesRead != -1);
 
         return put(key, bytes);
+    }
+
+    private String fileToClassName(String filename)
+    {
+        return filename.replace(File.separatorChar, '.').substring(0, filename.length() - ".class".length());
+    }
+
+    private String classToFileName(String classname)
+    {
+        return classname.replace('.', File.separatorChar) + ".class";
+    }
+
+    /**
+     * Remove the provided classname and all inner classes from the jarfile and the classloader
+     */
+    public void removeClassFromJar(String classname)
+    {
+        for (String innerclass : getLoader().getInnerClassesForClass(classname)) {
+            remove(classToFileName(innerclass));
+        }
+        remove(classToFileName(classname));
     }
 
     ///////////////////////////////////////////////////////
@@ -208,22 +244,25 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
         void noteUpdated(String key) {
             if (!key.endsWith(".class"))
                 return;
-            String javaClassName = key.replace(File.separatorChar, '.');
-            javaClassName = javaClassName.substring(0, javaClassName.length() - 6);
-            m_classNames.add(javaClassName);
+            m_classNames.add(fileToClassName(key));
         }
 
         void noteRemoved(String key) {
             if (!key.endsWith(".class"))
                 return;
-            String javaClassName = key.replace(File.separatorChar, '.');
-            javaClassName = javaClassName.substring(0, javaClassName.length() - 6);
-            m_classNames.remove(javaClassName);
-            m_cache.remove(javaClassName);
+            m_classNames.remove(fileToClassName(key));
+            m_cache.remove(fileToClassName(key));
         }
 
         // prevent this from being publicly called
         JarLoader() {}
+
+        /**
+         * @return The InMemoryJarFile instance owning this loader.
+         */
+        public InMemoryJarfile getInMemoryJarfile() {
+            return InMemoryJarfile.this;
+        }
 
         @Override
         public synchronized Class<?> loadClass(String className) throws ClassNotFoundException {
@@ -236,7 +275,7 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
 
             // now look through the list
             if (m_classNames.contains(className)) {
-                String classPath = className.replace('.', File.separatorChar) + ".class";
+                String classPath = classToFileName(className);
 
                 byte bytes[] = get(classPath);
                 if (bytes == null)
@@ -252,6 +291,23 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
             // default to parent
             //System.out.println("deferring to parent.");
             return getParent().loadClass(className);
+        }
+
+        /**
+         * For a given class, find all
+         */
+        public String[] getInnerClassesForClass(String className) {
+            List<String> matches = new ArrayList<>();
+            for (String potential : m_classNames) {
+                if (potential.startsWith(className + "$")) {
+                    matches.add(potential);
+                }
+            }
+            return matches.toArray(new String[0]);
+        }
+
+        public Set<String> getClassNames() {
+            return m_classNames;
         }
     }
 

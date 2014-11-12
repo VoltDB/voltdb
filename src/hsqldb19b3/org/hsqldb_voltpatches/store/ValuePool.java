@@ -32,7 +32,6 @@
 package org.hsqldb_voltpatches.store;
 
 import java.math.BigDecimal;
-
 import org.hsqldb_voltpatches.types.TimestampData;
 
 /**

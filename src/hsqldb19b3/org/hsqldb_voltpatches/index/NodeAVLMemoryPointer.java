@@ -31,9 +31,9 @@
 
 package org.hsqldb_voltpatches.index;
 
-import org.hsqldb_voltpatches.Row;
-import org.hsqldb_voltpatches.RowAVLDisk;
 import org.hsqldb_voltpatches.RowAVLDiskData;
+import org.hsqldb_voltpatches.RowAVLDisk;
+import org.hsqldb_voltpatches.Row;
 import org.hsqldb_voltpatches.persist.PersistentStore;
 
 // fredt@users 20020221 - patch 513005 by sqlbob@users (RMP)

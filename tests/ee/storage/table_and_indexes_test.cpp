@@ -23,6 +23,7 @@
 
 #include <string>
 #include <boost/foreach.hpp>
+#include <boost/unordered_map.hpp>
 
 #include "harness.h"
 #include "common/executorcontext.hpp"
@@ -32,10 +33,14 @@
 #include "common/NValue.hpp"
 #include "common/ValueFactory.hpp"
 #include "common/tabletuple.h"
+#include "storage/BinaryLogSink.h"
+#include "storage/persistenttable.h"
+#include "storage/tableiterator.h"
 #include "storage/table.h"
 #include "storage/temptable.h"
 #include "storage/tablefactory.h"
 #include "storage/tableiterator.h"
+#include "storage/DRTupleStream.h"
 #include "indexes/tableindex.h"
 
 using namespace voltdb;
@@ -44,8 +49,10 @@ using namespace std;
 class TableAndIndexTest : public Test {
     public:
         TableAndIndexTest() {
-            engine = new ExecutorContext(0, 0, NULL, NULL, NULL, false, "", 0);
+            engine = new ExecutorContext(0, 0, NULL, &topend, &pool, NULL, false, "", 0, &drStream);
             mem = 0;
+            *reinterpret_cast<int64_t*>(signature) = 42;
+            drStream.configure(44);
 
             vector<voltdb::ValueType> districtColumnTypes;
             vector<int32_t> districtColumnLengths;
@@ -54,17 +61,18 @@ class TableAndIndexTest : public Test {
 
             districtColumnTypes.push_back(VALUE_TYPE_TINYINT); districtColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
             districtColumnTypes.push_back(VALUE_TYPE_TINYINT); districtColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
-            districtColumnTypes.push_back(VALUE_TYPE_VARCHAR); districtColumnLengths.push_back(16);
-            districtColumnTypes.push_back(VALUE_TYPE_VARCHAR); districtColumnLengths.push_back(32);
-            districtColumnTypes.push_back(VALUE_TYPE_VARCHAR); districtColumnLengths.push_back(32);
-            districtColumnTypes.push_back(VALUE_TYPE_VARCHAR); districtColumnLengths.push_back(32);
+            districtColumnTypes.push_back(VALUE_TYPE_VARCHAR); districtColumnLengths.push_back(15);
+            districtColumnTypes.push_back(VALUE_TYPE_VARCHAR); districtColumnLengths.push_back(15);
+            districtColumnTypes.push_back(VALUE_TYPE_VARCHAR); districtColumnLengths.push_back(15);
+            districtColumnTypes.push_back(VALUE_TYPE_VARCHAR); districtColumnLengths.push_back(15);
             districtColumnTypes.push_back(VALUE_TYPE_VARCHAR); districtColumnLengths.push_back(2);
             districtColumnTypes.push_back(VALUE_TYPE_VARCHAR); districtColumnLengths.push_back(9);
             districtColumnTypes.push_back(VALUE_TYPE_DOUBLE); districtColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DOUBLE));
             districtColumnTypes.push_back(VALUE_TYPE_DOUBLE); districtColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DOUBLE));
             districtColumnTypes.push_back(VALUE_TYPE_INTEGER); districtColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
 
-            districtTupleSchema = TupleSchema::createTupleSchema(districtColumnTypes, districtColumnLengths, districtColumnAllowNull, true);
+            districtTupleSchema = TupleSchema::createTupleSchemaForTest(districtColumnTypes, districtColumnLengths, districtColumnAllowNull);
+            districtReplicaTupleSchema = TupleSchema::createTupleSchemaForTest(districtColumnTypes, districtColumnLengths, districtColumnAllowNull);
 
             districtIndex1ColumnIndices.push_back(1);
             districtIndex1ColumnIndices.push_back(0);
@@ -79,16 +87,16 @@ class TableAndIndexTest : public Test {
             warehouseColumnAllowNull[0] = false;
 
             warehouseColumnTypes.push_back(VALUE_TYPE_TINYINT); warehouseColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
-            warehouseColumnTypes.push_back(VALUE_TYPE_VARCHAR); warehouseColumnLengths.push_back(16);
-            warehouseColumnTypes.push_back(VALUE_TYPE_VARCHAR); warehouseColumnLengths.push_back(32);
-            warehouseColumnTypes.push_back(VALUE_TYPE_VARCHAR); warehouseColumnLengths.push_back(32);
-            warehouseColumnTypes.push_back(VALUE_TYPE_VARCHAR); warehouseColumnLengths.push_back(32);
+            warehouseColumnTypes.push_back(VALUE_TYPE_VARCHAR); warehouseColumnLengths.push_back(15);
+            warehouseColumnTypes.push_back(VALUE_TYPE_VARCHAR); warehouseColumnLengths.push_back(15);
+            warehouseColumnTypes.push_back(VALUE_TYPE_VARCHAR); warehouseColumnLengths.push_back(15);
+            warehouseColumnTypes.push_back(VALUE_TYPE_VARCHAR); warehouseColumnLengths.push_back(15);
             warehouseColumnTypes.push_back(VALUE_TYPE_VARCHAR); warehouseColumnLengths.push_back(2);
             warehouseColumnTypes.push_back(VALUE_TYPE_VARCHAR); warehouseColumnLengths.push_back(9);
             warehouseColumnTypes.push_back(VALUE_TYPE_DOUBLE); warehouseColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DOUBLE));
             warehouseColumnTypes.push_back(VALUE_TYPE_DOUBLE); warehouseColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DOUBLE));
 
-            warehouseTupleSchema = TupleSchema::createTupleSchema(warehouseColumnTypes, warehouseColumnLengths, warehouseColumnAllowNull, true);
+            warehouseTupleSchema = TupleSchema::createTupleSchemaForTest(warehouseColumnTypes, warehouseColumnLengths, warehouseColumnAllowNull);
 
             warehouseIndex1ColumnIndices.push_back(0);
 
@@ -106,15 +114,15 @@ class TableAndIndexTest : public Test {
             customerColumnTypes.push_back(VALUE_TYPE_INTEGER); customerColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
             customerColumnTypes.push_back(VALUE_TYPE_TINYINT); customerColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
             customerColumnTypes.push_back(VALUE_TYPE_TINYINT); customerColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
-            customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(32);
+            customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(15);
             customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(2);
-            customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(32);
-            customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(32);
-            customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(32);
-            customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(32);
+            customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(15);
+            customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(15);
+            customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(15);
+            customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(15);
             customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(2);
             customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(9);
-            customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(32);
+            customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(15);
             customerColumnTypes.push_back(VALUE_TYPE_TIMESTAMP); customerColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TIMESTAMP));
             customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(2);
             customerColumnTypes.push_back(VALUE_TYPE_DOUBLE); customerColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DOUBLE));
@@ -125,7 +133,7 @@ class TableAndIndexTest : public Test {
             customerColumnTypes.push_back(VALUE_TYPE_INTEGER); customerColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
             customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(500);
 
-            customerTupleSchema = TupleSchema::createTupleSchema(customerColumnTypes, customerColumnLengths, customerColumnAllowNull, true);
+            customerTupleSchema = TupleSchema::createTupleSchemaForTest(customerColumnTypes, customerColumnLengths, customerColumnAllowNull);
 
             customerIndex1ColumnIndices.push_back(2);
             customerIndex1ColumnIndices.push_back(1);
@@ -172,12 +180,17 @@ class TableAndIndexTest : public Test {
                     "C_BALANCE", "C_YTD_PAYMENT", "C_PAYMENT_CNT", "C_DELIVERY_CNT", "C_DATA" };
             const vector<string> customerColumnNames(customerColumnNamesArray, customerColumnNamesArray + 21 );
 
-            districtTable = voltdb::TableFactory::getPersistentTable(0, "DISTRICT", districtTupleSchema, districtColumnNames, 0);
+            districtTable = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "DISTRICT", districtTupleSchema, districtColumnNames, signature, false, 0));
+            districtTableReplica = reinterpret_cast<PersistentTable*>(voltdb::TableFactory::getPersistentTable(0, "DISTRICT", districtReplicaTupleSchema, districtColumnNames, signature, false, 0));
+
 
             TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(districtIndex1Scheme);
+            TableIndex *pkeyIndexReplica = TableIndexFactory::TableIndexFactory::getInstance(districtIndex1Scheme);
             assert(pkeyIndex);
             districtTable->addIndex(pkeyIndex);
             districtTable->setPrimaryKeyIndex(pkeyIndex);
+            districtTableReplica->addIndex(pkeyIndexReplica);
+            districtTableReplica->setPrimaryKeyIndex(pkeyIndexReplica);
 
             // add other indexes
             BOOST_FOREACH(TableIndexScheme &scheme, districtIndexes) {
@@ -192,6 +205,7 @@ class TableAndIndexTest : public Test {
 
             warehouseTable = voltdb::TableFactory::getPersistentTable(0, "WAREHOUSE",
                                                                       warehouseTupleSchema, warehouseColumnNames,
+                                                                      signature, false,
                                                                       0, false, false);
 
             pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(warehouseIndex1Scheme);
@@ -212,6 +226,7 @@ class TableAndIndexTest : public Test {
 
             customerTable = voltdb::TableFactory::getPersistentTable(0, "CUSTOMER",
                                                                      customerTupleSchema, customerColumnNames,
+                                                                     signature, false,
                                                                      0, false, false);
 
             pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(customerIndex1Scheme);
@@ -234,6 +249,7 @@ class TableAndIndexTest : public Test {
         ~TableAndIndexTest() {
             delete engine;
             delete districtTable;
+            delete districtTableReplica;
             delete districtTempTable;
             delete warehouseTable;
             delete warehouseTempTable;
@@ -245,10 +261,16 @@ class TableAndIndexTest : public Test {
         int mem;
         TempTableLimits limits;
         ExecutorContext *engine;
+        DRTupleStream drStream;
+        DummyTopend topend;
+        Pool pool;
+        BinaryLogSink sink;
 
         TupleSchema      *districtTupleSchema;
+        TupleSchema      *districtReplicaTupleSchema;
         vector<TableIndexScheme> districtIndexes;
-        Table            *districtTable;
+        PersistentTable  *districtTable;
+        PersistentTable  *districtTableReplica;
         TempTable        *districtTempTable;
         vector<int>       districtIndex1ColumnIndices;
         TableIndexScheme  districtIndex1Scheme;
@@ -271,7 +293,135 @@ class TableAndIndexTest : public Test {
         TableIndexScheme  customerIndex2Scheme;
         vector<int>       customerIndex3ColumnIndices;
         TableIndexScheme  customerIndex3Scheme;
+        char signature[20];
 };
+
+/*
+ * Check that inserting, deleting and updating works and propagates via DR buffers
+ */
+TEST_F(TableAndIndexTest, DrTest) {
+    drStream.m_enabled = true;
+    vector<NValue> cachedStringValues;//To free at the end of the test
+    TableTuple temp_tuple = districtTempTable->tempTuple();
+    temp_tuple.setNValue(0, ValueFactory::getTinyIntValue(static_cast<int8_t>(7)));
+    temp_tuple.setNValue(1, ValueFactory::getTinyIntValue(static_cast<int8_t>(3)));
+    cachedStringValues.push_back(ValueFactory::getStringValue("A District"));
+    temp_tuple.setNValue(2, cachedStringValues.back());
+    cachedStringValues.push_back(ValueFactory::getStringValue("Street Addy"));
+    temp_tuple.setNValue(3, cachedStringValues.back());
+    cachedStringValues.push_back(ValueFactory::getStringValue("meh"));
+    temp_tuple.setNValue(4, cachedStringValues.back());
+    cachedStringValues.push_back(ValueFactory::getStringValue("westerfield"));
+    temp_tuple.setNValue(5, cachedStringValues.back());
+    cachedStringValues.push_back(ValueFactory::getStringValue("BA"));
+    temp_tuple.setNValue(6, cachedStringValues.back());
+    cachedStringValues.push_back(ValueFactory::getStringValue("99999"));
+    temp_tuple.setNValue(7, cachedStringValues.back());
+    temp_tuple.setNValue(8, ValueFactory::getDoubleValue(static_cast<double>(.0825)));
+    temp_tuple.setNValue(9, ValueFactory::getDoubleValue(static_cast<double>(15241.45)));
+    temp_tuple.setNValue(10, ValueFactory::getIntegerValue(static_cast<int32_t>(21)));
+
+    /*
+     * Test that insert propagates
+     */
+    districtTable->insertTuple(temp_tuple);
+
+    //Flush to generate a buffer
+    drStream.periodicFlush(-1, 42);
+    EXPECT_TRUE( topend.receivedDRBuffer );
+
+    //Buidl the map expected by the binary log sink
+    boost::unordered_map<int64_t, PersistentTable*> tables;
+    tables[42] = districtTableReplica;
+
+    //Fetch the generated block of log data
+    boost::shared_ptr<StreamBlock> sb = topend.blocks[0];
+    topend.blocks.pop_back();
+    boost::shared_array<char> data = topend.data[0];
+    topend.data.pop_back();
+    topend.receivedDRBuffer = false;
+
+    //Add a length prefix for test, then apply it
+    *reinterpret_cast<int32_t*>(&data.get()[4]) = htonl(static_cast<int32_t>(sb->offset()));
+    drStream.m_enabled = false;
+    sink.apply(&data[4], tables, &pool);
+    drStream.m_enabled = true;
+
+    //Should have one row from the insert
+    EXPECT_EQ( 1, districtTableReplica->activeTupleCount());
+
+    TableIterator iterator = districtTableReplica->iterator();
+    ASSERT_TRUE(iterator.hasNext());
+    TableTuple nextTuple(districtTableReplica->schema());
+    iterator.next(nextTuple);
+    EXPECT_EQ(nextTuple.getNValue(7).compare(cachedStringValues.back()), 0);
+
+    //Prepare to insert in a new txn
+    engine->setupForPlanFragments( NULL, 100, 100, 99, 72);
+
+    /*
+     * Test that update propagates
+     */
+    TableTuple toUpdate = districtTable->lookupTuple(temp_tuple);
+
+    //Use a different string value for one column
+    cachedStringValues.push_back(ValueFactory::getStringValue("shoopdewoop"));
+    temp_tuple.setNValue(3, cachedStringValues.back());
+    districtTable->updateTuple( toUpdate, temp_tuple);
+
+    //Flush to generate the log buffer
+    drStream.periodicFlush(-1, 101);
+    EXPECT_TRUE( topend.receivedDRBuffer );
+
+    //Grab the generated block of log data
+    sb = topend.blocks[0];
+    topend.blocks.pop_back();
+    data = topend.data[0];
+    topend.data.pop_back();
+    topend.receivedDRBuffer = false;
+
+    //Add a length prefix for test and apply it
+    *reinterpret_cast<int32_t*>(&data.get()[4]) = htonl(static_cast<int32_t>(sb->offset()));
+    drStream.m_enabled = false;
+    sink.apply(&data[4], tables, &pool);
+    drStream.m_enabled = true;
+
+    //Expect one row with the update
+    EXPECT_EQ( 1, districtTableReplica->activeTupleCount());
+
+    //Validate the update took place
+    TableTuple toDelete = districtTable->lookupTuple(temp_tuple);
+    EXPECT_EQ(0, toDelete.getNValue(3).compare(cachedStringValues.back()));
+
+    //Prep another transaction to test propagating a delete
+    engine->setupForPlanFragments( NULL, 102, 102, 101, 89);
+
+    districtTable->deleteTuple( toDelete, true);
+
+    //Flush to generate the buffer
+    drStream.periodicFlush(-1, 102);
+    EXPECT_TRUE( topend.receivedDRBuffer );
+
+    //Grab the generated blocks of data
+    sb = topend.blocks[0];
+    topend.blocks.pop_back();
+    data = topend.data[0];
+    topend.data.pop_back();
+    topend.receivedDRBuffer = false;
+
+    //Add a length prefix for test, and apply the update
+    *reinterpret_cast<int32_t*>(&data.get()[4]) = htonl(static_cast<int32_t>(sb->offset()));
+    drStream.m_enabled = false;
+    sink.apply(&data[4], tables, &pool);
+    drStream.m_enabled = true;
+
+    //Expect no rows after the delete propagates
+    EXPECT_EQ( 0, districtTableReplica->activeTupleCount());
+
+    for (vector<NValue>::const_iterator i = cachedStringValues.begin(); i != cachedStringValues.end(); i++) {
+        (*i).free();
+    }
+}
 
 TEST_F(TableAndIndexTest, BigTest) {
     vector<NValue> cachedStringValues;//To free at the end of the test
@@ -297,7 +447,7 @@ TEST_F(TableAndIndexTest, BigTest) {
 
     temp_tuple = &warehouseTempTable->tempTuple();
     temp_tuple->setNValue(0, ValueFactory::getTinyIntValue(static_cast<int8_t>(3)));
-    cachedStringValues.push_back(ValueFactory::getStringValue("EZ Street WHouse"));
+    cachedStringValues.push_back(ValueFactory::getStringValue("EZ Street House"));
     temp_tuple->setNValue(1, cachedStringValues.back());
     cachedStringValues.push_back(ValueFactory::getStringValue("Headquarters"));
     temp_tuple->setNValue(2, cachedStringValues.back());
@@ -333,7 +483,7 @@ TEST_F(TableAndIndexTest, BigTest) {
     temp_tuple->setNValue(9, cachedStringValues.back());
     cachedStringValues.push_back(ValueFactory::getStringValue("91083"));
     temp_tuple->setNValue(10, cachedStringValues.back());
-    cachedStringValues.push_back(ValueFactory::getStringValue("(193) 099 - 9082"));
+    cachedStringValues.push_back(ValueFactory::getStringValue("(193) 099-9082"));
     temp_tuple->setNValue(11, cachedStringValues.back());
     temp_tuple->setNValue(12, ValueFactory::getTimestampValue(static_cast<int32_t>(123456789)));
     cachedStringValues.push_back(ValueFactory::getStringValue("BC"));
@@ -386,7 +536,7 @@ TEST_F(TableAndIndexTest, BigTest) {
     temp_tuple->setNValue(4, cachedStringValues.back());
     cachedStringValues.push_back(ValueFactory::getStringValue("Customer"));
     temp_tuple->setNValue(5, cachedStringValues.back());
-    cachedStringValues.push_back(ValueFactory::getStringValue("Random Department"));
+    cachedStringValues.push_back(ValueFactory::getStringValue("Random Depart"));
     temp_tuple->setNValue(6, cachedStringValues.back());
     cachedStringValues.push_back(ValueFactory::getStringValue("Place2"));
     temp_tuple->setNValue(7, cachedStringValues.back());
@@ -396,7 +546,7 @@ TEST_F(TableAndIndexTest, BigTest) {
     temp_tuple->setNValue(9, cachedStringValues.back());
     cachedStringValues.push_back(ValueFactory::getStringValue("13908"));
     temp_tuple->setNValue(10, cachedStringValues.back());
-    cachedStringValues.push_back(ValueFactory::getStringValue("(913) 909 - 0928"));
+    cachedStringValues.push_back(ValueFactory::getStringValue("(913) 909-0928"));
     temp_tuple->setNValue(11, cachedStringValues.back());
     temp_tuple->setNValue(12, ValueFactory::getTimestampValue(static_cast<int64_t>(123456789)));
     cachedStringValues.push_back(ValueFactory::getStringValue("GC"));

@@ -27,7 +27,7 @@ import org.voltdb.client.ProcedureInvocationType;
  * secondary cluster. Secondary cluster only accepts read-only procedures from
  * normal clients, and write procedures from DR agent.
  */
-public class ReplicaInvocationAcceptancePolicy extends InvocationAcceptancePolicy {
+public class ReplicaInvocationAcceptancePolicy extends InvocationValidationPolicy {
     public ReplicaInvocationAcceptancePolicy(boolean isOn) {
         super(isOn);  // isOn == TRUE means this is a Replica cluster.
     }

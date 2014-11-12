@@ -83,6 +83,7 @@ public class SyncBenchmark {
     final ClientStatsContext fullStatsContext;
 
     // voter benchmark state
+    AtomicLong totalVotes = new AtomicLong(0);
     AtomicLong acceptedVotes = new AtomicLong(0);
     AtomicLong badContestantVotes = new AtomicLong(0);
     AtomicLong badVoteCountVotes = new AtomicLong(0);
@@ -246,8 +247,8 @@ public class SyncBenchmark {
         System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
         System.out.printf("Aborts/Failures %d/%d, ",
                 stats.getInvocationAborts(), stats.getInvocationErrors());
-        System.out.printf("Avg/95%% Latency %.2f/%dms\n", stats.getAverageLatency(),
-                stats.kPercentileLatency(0.95));
+        System.out.printf("Avg/95%% Latency %.2f/%.2fms\n", stats.getAverageLatency(),
+                stats.kPercentileLatencyAsDouble(0.95));
     }
 
     /**
@@ -264,12 +265,12 @@ public class SyncBenchmark {
                          HORIZONTAL_RULE +
                          " Voting Results\n" +
                          HORIZONTAL_RULE +
-                         "\nA total of %d votes were received...\n" +
+                         "\nA total of %,9d votes were received during the benchmark...\n" +
                          " - %,9d Accepted\n" +
                          " - %,9d Rejected (Invalid Contestant)\n" +
                          " - %,9d Rejected (Maximum Vote Count Reached)\n" +
                          " - %,9d Failed (Transaction Error)\n\n";
-        System.out.printf(display, stats.getInvocationsCompleted(),
+        System.out.printf(display, totalVotes.get(),
                 acceptedVotes.get(), badContestantVotes.get(),
                 badVoteCountVotes.get(), failedVotes.get());
 
@@ -289,15 +290,15 @@ public class SyncBenchmark {
 
         System.out.printf("Average throughput:            %,9d txns/sec\n", stats.getTxnThroughput());
         System.out.printf("Average latency:               %,9.2f ms\n", stats.getAverageLatency());
-        System.out.printf("10th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.1));
-        System.out.printf("25th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.25));
-        System.out.printf("50th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.5));
-        System.out.printf("75th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.75));
-        System.out.printf("90th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.9));
-        System.out.printf("95th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.95));
-        System.out.printf("99th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.99));
-        System.out.printf("99.5th percentile latency:     %,9d ms\n", stats.kPercentileLatency(.995));
-        System.out.printf("99.9th percentile latency:     %,9d ms\n", stats.kPercentileLatency(.999));
+        System.out.printf("10th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.1));
+        System.out.printf("25th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.25));
+        System.out.printf("50th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.5));
+        System.out.printf("75th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.75));
+        System.out.printf("90th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.9));
+        System.out.printf("95th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.95));
+        System.out.printf("99th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.99));
+        System.out.printf("99.5th percentile latency:     %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.995));
+        System.out.printf("99.9th percentile latency:     %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.999));
 
         System.out.print("\n" + HORIZONTAL_RULE);
         System.out.println(" System Server Statistics");
@@ -347,6 +348,7 @@ public class SyncBenchmark {
                                                                    config.maxvotes);
 
                     long resultCode = response.getResults()[0].asScalarLong();
+                    totalVotes.incrementAndGet();
                     if (resultCode == Vote.ERR_INVALID_CONTESTANT) {
                         badContestantVotes.incrementAndGet();
                     }

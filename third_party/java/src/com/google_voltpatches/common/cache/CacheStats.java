@@ -20,6 +20,7 @@ import static com.google_voltpatches.common.base.Preconditions.checkArgument;
 
 import com.google_voltpatches.common.annotations.Beta;
 import com.google_voltpatches.common.annotations.GwtCompatible;
+import com.google_voltpatches.common.base.MoreObjects;
 import com.google_voltpatches.common.base.Objects;
 
 import java.util.concurrent.Callable;
@@ -264,7 +265,7 @@ public final class CacheStats {
 
   @Override
   public String toString() {
-    return Objects.toStringHelper(this)
+    return MoreObjects.toStringHelper(this)
         .add("hitCount", hitCount)
         .add("missCount", missCount)
         .add("loadSuccessCount", loadSuccessCount)

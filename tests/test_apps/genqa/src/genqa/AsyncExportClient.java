@@ -58,6 +58,7 @@ import java.util.concurrent.atomic.AtomicLongArray;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -245,15 +246,6 @@ public class AsyncExportClient
     // Test startup time
     private static long benchmarkStartTS;
 
-    private static final ExecutorService es = Executors.newCachedThreadPool(new ThreadFactory() {
-        @Override
-        public Thread newThread(Runnable arg0) {
-            Thread thread = new Thread(arg0, "Retry Connection");
-            thread.setDaemon(true);
-            return thread;
-        }
-    });
-
     // Statistics manager objects from the client
     private static ClientStatsContext periodicStatsContext;
     private static ClientStatsContext fullStatsContext;
@@ -372,6 +364,10 @@ public class AsyncExportClient
             clientRef.get().drain();
 
             Thread.sleep(10000);
+            waitForStreamedAllocatedMemoryZero(clientRef.get());
+            System.out.println("Writing export count as: " + TrackingResults.get(0));
+            //Write to export table to get count to be expected on other side.
+            clientRef.get().callProcedure("JiggleExportDoneTable", TrackingResults.get(0));
             writer.close(true);
 
             // Now print application results:
@@ -470,8 +466,8 @@ public class AsyncExportClient
     }
 
     static Client createClient() {
-        StatusListener statusListener = new StatusListener();
-        ClientConfig clientConfig = new ClientConfig("", "", statusListener);
+        ClientConfig clientConfig = new ClientConfig("", "");
+        clientConfig.setReconnectOnConnectionLoss(true);
         if (config.autoTune) {
             clientConfig.enableAutoTune();
             clientConfig.setAutoTuneTargetInternalLatency(config.latencyTarget);
@@ -486,34 +482,6 @@ public class AsyncExportClient
         fullStatsContext = client.createStatsContext();
 
         return client;
-    }
-
-    /**
-     * Remove the client from the list if connection is broken.
-     */
-    static class StatusListener extends ClientStatusListenerExt {
-
-        @Override
-        public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
-            if (shutdown.get()) {
-                return;
-            }
-
-            // if the benchmark is still active
-            if ((System.currentTimeMillis() - benchmarkStartTS) < (config.duration * 1000)) {
-                System.err.printf("Connection to %s:%d was lost.\n", hostname, port);
-            }
-
-            // setup for retry
-            final String server = hostname;
-            final int finalPort = port;
-            es.execute(new Runnable() {
-                @Override
-                public void run() {
-                    connectToOneServerWithRetry(server, finalPort);
-                }
-            });
-        }
     }
 
     /**
@@ -539,7 +507,52 @@ public class AsyncExportClient
         System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
         System.out.printf("Aborts/Failures %d/%d, ",
                 stats.getInvocationAborts(), stats.getInvocationErrors());
-        System.out.printf("Avg/95%% Latency %.2f/%dms\n", stats.getAverageLatency(),
-                stats.kPercentileLatency(0.95));
+        System.out.printf("Avg/95%% Latency %.2f/%.2fms\n", stats.getAverageLatency(),
+                stats.kPercentileLatencyAsDouble(0.95));
     }
+
+    /**
+     * Wait for export processor to catch up and have nothing to be exported.
+     *
+     * @param client
+     * @throws Exception
+     */
+    public static void waitForStreamedAllocatedMemoryZero(Client client) throws Exception {
+        boolean passed = false;
+
+        VoltTable stats = null;
+        try {
+            System.out.println(client.callProcedure("@Quiesce").getResults()[0]);
+        } catch (Exception ex) {
+        }
+        while (true) {
+            try {
+                stats = client.callProcedure("@Statistics", "table", 0).getResults()[0];
+            } catch (Exception ex) {
+            }
+            if (stats == null) {
+                Thread.sleep(5000);
+                continue;
+            }
+            boolean passedThisTime = true;
+            while (stats.advanceRow()) {
+                String ttype = stats.getString("TABLE_TYPE");
+                if (ttype.equals("StreamedTable")) {
+                    if (0 != stats.getLong("TUPLE_ALLOCATED_MEMORY")) {
+                        passedThisTime = false;
+                        System.out.println("Partition Not Zero.");
+                        break;
+                    }
+                }
+            }
+            if (passedThisTime) {
+                passed = true;
+                break;
+            }
+            Thread.sleep(5000);
+        }
+        System.out.println("Passed is: " + passed);
+        System.out.println(stats);
+    }
+
 }

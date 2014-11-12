@@ -366,11 +366,12 @@ class JavaBundle(object):
     def initialize(self, verb):
         verb.add_options(
            cli.StringOption('-l', '--license', 'license', 'specify the location of the license file'),
-           cli.StringOption(None, '--client', 'clientport', 'specify the client port number'),
-           cli.StringOption(None, '--internal', 'internalport', 'specify the internal port number used to communicate between cluster nodes'),
-           cli.StringOption(None, '--zookeeper', 'zkport', 'specify the zookeeper port number'),
-           cli.StringOption(None, '--replication', 'replicationport', 'specify the replication port number (1st of 3 sequential ports)'),
-           cli.StringOption(None, '--admin', 'adminport', 'specify the admin port number'),
+           cli.StringOption(None, '--client', 'clientport', 'specify the client port as [ipaddress:]port-number'),
+           cli.StringOption(None, '--internal', 'internalport', 'specify the internal port as [ipaddress:]port-number used to communicate between cluster nodes'),
+           cli.StringOption(None, '--zookeeper', 'zkport', 'specify the zookeeper port as [ipaddress:]port-number'),
+           cli.StringOption(None, '--replication', 'replicationport', 'specify the replication port as [ipaddress:]port-number (1st of 3 sequential ports)'),
+           cli.StringOption(None, '--admin', 'adminport', 'specify the admin port as [ipaddress:]port-number'),
+           cli.StringOption(None, '--http', 'httpport', 'specify the http port as [ipaddress:]port-number'),
            cli.StringOption(None, '--internalinterface', 'internalinterface', 'specify the network interface to use for internal communication, such as the internal and zookeeper ports'),
            cli.StringOption(None, '--externalinterface', 'externalinterface', 'specify the network interface to use for external ports, such as the admin and client ports'))
 
@@ -403,7 +404,8 @@ class ServerBundle(JavaBundle):
                  supports_daemon=False,
                  daemon_name=None,
                  daemon_description=None,
-                 daemon_output=None):
+                 daemon_output=None,
+                 supports_multiple_daemons=False):
         JavaBundle.__init__(self, 'org.voltdb.VoltDB')
         self.subcommand = subcommand
         self.needs_catalog = needs_catalog
@@ -414,6 +416,7 @@ class ServerBundle(JavaBundle):
         self.daemon_name = daemon_name
         self.daemon_description = daemon_description
         self.daemon_output = daemon_output
+        self.supports_multiple_daemons = supports_multiple_daemons
 
     def initialize(self, verb):
         JavaBundle.initialize(self, verb)
@@ -432,7 +435,8 @@ class ServerBundle(JavaBundle):
            verb.add_options(cli.BooleanOption('-b', '--blocking', 'block', 'perform a blocking rejoin'))
         if self.needs_catalog:
             verb.add_arguments(cli.PathArgument('catalog',
-                               'the application catalog jar file path'))
+                               'the application catalog jar file path',
+                               min_count=0, max_count=1))
         # --safemode only used by recover server action.
         if self.safemode_available:
             verb.add_options(cli.BooleanOption(None, '--safemode', 'safemode', None))
@@ -440,17 +444,15 @@ class ServerBundle(JavaBundle):
             verb.add_options(
                 cli.BooleanOption('-B', '--background', 'daemon',
                                   'run the VoltDB server in the background (as a daemon process)'))
-
-    def start(self, verb, runner):
-        # Add appropriate server-ish Java options.
-        verb.merge_java_options('java_opts_override',
-                '-server',
-                '-XX:+HeapDumpOnOutOfMemoryError',
-                '-XX:HeapDumpPath=/tmp',
-                '-XX:-ReduceInitialCardMarks')
+            if self.supports_multiple_daemons:
+                # Keep the -I/--instance option hidden for now.
+                verb.add_options(
+                    cli.IntegerOption('-I', '--instance', 'instance',
+                                  #'specify an instance number for multiple servers on the same host'))
+                                  None))
 
     def go(self, verb, runner):
-        if self.needs_catalog:
+        if self.subcommand == 'create':
             if runner.opts.replica:
                 self.subcommand = 'replica'
         if self.supports_live:
@@ -468,9 +470,8 @@ class ServerBundle(JavaBundle):
             catalog = runner.opts.catalog
             if not catalog:
                 catalog = runner.config.get('volt.catalog')
-            if catalog is None:
-                utility.abort('A catalog path is required.')
-            final_args.extend(['catalog', catalog])
+            if not catalog is None:
+                final_args.extend(['catalog', catalog])
 
         if runner.opts.deployment:
             final_args.extend(['deployment', runner.opts.deployment])
@@ -480,6 +481,10 @@ class ServerBundle(JavaBundle):
             utility.abort('host is required.')
         if runner.opts.clientport:
             final_args.extend(['port', runner.opts.clientport])
+        if runner.opts.adminport:
+            final_args.extend(['adminport', runner.opts.adminport])
+        if runner.opts.httpport:
+            final_args.extend(['httpport', runner.opts.httpport])
         if runner.opts.license:
             final_args.extend(['license', runner.opts.license])
         if runner.opts.internalinterface:

@@ -35,6 +35,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
@@ -47,10 +48,9 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.EstTime;
+import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
-import org.voltcore.zk.LeaderElector;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
@@ -62,6 +62,8 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil.TableFiles;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
 
+import com.google_voltpatches.common.collect.ImmutableSet;
+
 /**
  * An agent responsible for the whole restore process when the cluster starts
  * up. It performs the following tasks in order,
@@ -72,9 +74,12 @@ import org.voltdb.utils.MiscUtils;
  *
  * Once all of these tasks have finished successfully, it will call RealVoltDB
  * to resume normal operation.
+ *
+ * Making it a Promotable and elected by the GlobalServiceElector so that it's
+ * colocated with the MPI.
  */
 public class RestoreAgent implements CommandLogReinitiator.Callback,
-SnapshotCompletionInterest
+SnapshotCompletionInterest, Promotable
 {
     // Implement this callback to get notified when restore finishes.
     public interface Callback {
@@ -104,7 +109,6 @@ SnapshotCompletionInterest
         @Override
         public void run() {
             //After restore it is safe to initialize partition tracking
-            m_replayAgent.initPartitionTracking();
             changeState();
         }
     };
@@ -122,17 +126,10 @@ SnapshotCompletionInterest
     private final String m_clSnapshotPath;
     private final String m_snapshotPath;
     private final String m_voltdbrootPath;
-    private final int[] m_allPartitions;
     private final Set<Integer> m_liveHosts;
 
     private boolean m_planned = false;
 
-    /*
-     * Don't ask the leader elector if you are the leader
-     * it can give the wrong answer after the first election...
-     * Use the memoized field m_isLeader.
-     */
-    private LeaderElector m_leaderElector = null;
     private boolean m_isLeader = false;
 
     private TransactionCreator m_initiator;
@@ -148,7 +145,13 @@ SnapshotCompletionInterest
     private boolean m_hasRestored = false;
 
     // A string builder to hold all snapshot validation errors, gets printed when no viable snapshot is found
-    private final StringBuilder m_snapshotLogStr = new StringBuilder();
+    private final StringBuilder m_snapshotErrLogStr =
+            new StringBuilder("The restore process can not find a viable snapshot. "
+                              + "Restore requires a complete, uncorrupted "
+                              + "snapshot that is paired with the command log. "
+                              + "All identified errors are listed next."
+                              + "This is an unexpected condition. "
+                              + "Please contact support@voltdb.com\n");
 
     private CommandLogReinitiator m_replayAgent = new DefaultCommandLogReinitiator();
 
@@ -226,6 +229,10 @@ SnapshotCompletionInterest
         // This is not serialized, the name of the ZK node already has the host ID embedded.
         public final int hostId;
         public final InstanceId instanceId;
+        // Track the tables contained in the snapshot digest file
+        public final Set<String> digestTables = new HashSet<String>();
+        // Track the tables for which we found files on the node reporting this SnapshotInfo
+        public final Set<String> fileTables = new HashSet<String>();
 
         public void setPidToTxnIdMap(Map<Integer,Long> map) {
             partitionToTxnId.putAll(map);
@@ -233,7 +240,8 @@ SnapshotCompletionInterest
 
         public SnapshotInfo(long txnId, String path, String nonce,
                             int partitions, int newPartitionCount,
-                            long catalogCrc, int hostId, InstanceId instanceId)
+                            long catalogCrc, int hostId, InstanceId instanceId,
+                            Set<String> digestTables)
         {
             this.txnId = txnId;
             this.path = path;
@@ -243,6 +251,7 @@ SnapshotCompletionInterest
             this.catalogCrc = catalogCrc;
             this.hostId = hostId;
             this.instanceId = instanceId;
+            this.digestTables.addAll(digestTables);
         }
 
         public SnapshotInfo(JSONObject jo) throws JSONException
@@ -278,6 +287,14 @@ SnapshotCompletionInterest
                  Long val = jsonPtoTxnId.getLong(key);
                  partitionToTxnId.put(Integer.valueOf(key), val);
             }
+            JSONArray jdt = jo.getJSONArray("digestTables");
+            for (int i = 0; i < jdt.length(); i++) {
+                digestTables.add(jdt.getString(i));
+            }
+            JSONArray ft = jo.getJSONArray("fileTables");
+            for (int i = 0; i < ft.length(); i++) {
+                fileTables.add(ft.getString(i));
+            }
         }
 
         public JSONObject toJSONObject()
@@ -310,6 +327,16 @@ SnapshotCompletionInterest
                 }
                 stringer.endObject(); // partitionToTxnId
                 stringer.key("instanceId").value(instanceId.serializeToJSONObject());
+                stringer.key("digestTables").array();
+                for (String digestTable : digestTables) {
+                    stringer.value(digestTable);
+                }
+                stringer.endArray();
+                stringer.key("fileTables").array();
+                for (String fileTable : fileTables) {
+                    stringer.value(fileTable);
+                }
+                stringer.endArray();
                 stringer.endObject();
                 return new JSONObject(stringer.toString());
             } catch (JSONException e) {
@@ -415,31 +442,29 @@ SnapshotCompletionInterest
                 }
             };
 
-    public RestoreAgent(ZooKeeper zk, SnapshotCompletionMonitor snapshotMonitor,
-                        Callback callback, int hostId, StartAction action, boolean clEnabled,
+    public RestoreAgent(HostMessenger hostMessenger, SnapshotCompletionMonitor snapshotMonitor,
+                        Callback callback, StartAction action, boolean clEnabled,
                         String clPath, String clSnapshotPath,
                         String snapshotPath, int[] allPartitions,
-                        Set<Integer> liveHosts,
                         String voltdbrootPath)
     throws IOException {
-        m_hostId = hostId;
+        m_hostId = hostMessenger.getHostId();
         m_initiator = null;
         m_snapshotMonitor = snapshotMonitor;
         m_callback = callback;
         m_action = action;
-        m_zk = zk;
+        m_zk = hostMessenger.getZK();
         m_clEnabled = VoltDB.instance().getConfig().m_isEnterprise ? clEnabled : false;
         m_clPath = clPath;
         m_clSnapshotPath = clSnapshotPath;
         m_snapshotPath = snapshotPath;
-        m_allPartitions = allPartitions;
-        m_liveHosts = liveHosts;
+        m_liveHosts = ImmutableSet.copyOf(hostMessenger.getLiveHostIds());
         m_voltdbrootPath = voltdbrootPath;
 
-        initialize();
+        initialize(hostMessenger);
     }
 
-    private void initialize() {
+    private void initialize(HostMessenger hostMessenger) {
         // Load command log reinitiator
         try {
             Class<?> replayClass = MiscUtils.loadProClass("org.voltdb.CommandLogReinitiatorImpl",
@@ -448,14 +473,14 @@ SnapshotCompletionInterest
                 Constructor<?> constructor =
                     replayClass.getConstructor(int.class,
                                                StartAction.class,
-                                               ZooKeeper.class,
+                                               HostMessenger.class,
                                                String.class,
                                                Set.class);
 
                 m_replayAgent =
                     (CommandLogReinitiator) constructor.newInstance(m_hostId,
                                                                     m_action,
-                                                                    m_zk,
+                                                                    hostMessenger,
                                                                     m_clPath,
                                                                     m_liveHosts);
             }
@@ -514,16 +539,6 @@ SnapshotCompletionInterest
      */
     void enterRestore() {
         try {
-            m_leaderElector = new LeaderElector(m_zk, VoltZK.restore_barrier,
-                                                "restore",
-                                                new byte[0], null);
-            m_leaderElector.start(true);
-            m_isLeader = m_leaderElector.isLeader();
-        } catch (Exception e) {
-            VoltDB.crashGlobalVoltDB("Failed to create Zookeeper node: " + e.getMessage(),
-                                     false, e);
-        }
-        try {
             m_generatedRestoreBarrier2 = m_zk.create(VoltZK.restore_barrier2 + "/counter", null,
                         Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
         } catch (Exception e) {
@@ -562,10 +577,6 @@ SnapshotCompletionInterest
                 break;
             }
         }
-
-        try {
-            m_leaderElector.shutdown();
-        } catch (Exception ignore) {}
 
         // Clean up the ZK snapshot ID node so that we're good for next time.
         try
@@ -607,7 +618,7 @@ SnapshotCompletionInterest
             // if the cluster instance IDs in the snapshot and command log don't match, just move along
             if (m_replayAgent.getInstanceId() != null && info != null &&
                 !m_replayAgent.getInstanceId().equals(info.instanceId)) {
-                m_snapshotLogStr.append("\nRejected snapshot ")
+                m_snapshotErrLogStr.append("\nRejected snapshot ")
                                 .append(info.nonce)
                                 .append(" due to mismatching instance IDs.")
                                 .append(" Command log ID: ")
@@ -625,7 +636,7 @@ SnapshotCompletionInterest
                     for (Integer cmdpart : cmdlogmap.keySet()) {
                         Long snaptxnId = snapmap.get(cmdpart);
                         if (snaptxnId == null) {
-                            m_snapshotLogStr.append("\nRejected snapshot ")
+                            m_snapshotErrLogStr.append("\nRejected snapshot ")
                                             .append(info.nonce)
                                             .append(" due to missing partition: ")
                                             .append(cmdpart);
@@ -633,10 +644,10 @@ SnapshotCompletionInterest
                             break;
                         }
                         else if (snaptxnId < cmdlogmap.get(cmdpart)) {
-                            m_snapshotLogStr.append("\nRejected snapshot ")
+                            m_snapshotErrLogStr.append("\nRejected snapshot ")
                                             .append(info.nonce)
                                             .append(" because it does not overlap the command log")
-                                            .append("for partition: ")
+                                            .append(" for partition: ")
                                             .append(cmdpart)
                                             .append(" command log txn ID: ")
                                             .append(cmdlogmap.get(cmdpart))
@@ -660,20 +671,17 @@ SnapshotCompletionInterest
         // Negotiate with other hosts about which snapshot to restore
         SnapshotInfo infoWithMinHostId = getRestorePlan();
 
-        // The expected partition count could be determined by the partition count in the current
-        // cluster or the new partition count recorded in the truncation snapshot,
-        // whichever is larger. Truncation snapshot taken at the end of the join process actually
-        // records the new partition count in the digest.
-        final int newPartitionCount =
-            (infoWithMinHostId == null ? 0 : infoWithMinHostId.newPartitionCount);
-        final int expectedPartitionCount = Math.max(m_allPartitions.length, newPartitionCount);
-
         /*
          * Generate the replay plan here so that we don't have to wait until the
          * snapshot restore finishes.
          */
         if (m_action.doesRecover()) {
-            m_replayAgent.generateReplayPlan(expectedPartitionCount);
+            if (infoWithMinHostId != null) {
+                // The expected partition count could be determined by the new partition count recorded
+                // in the truncation snapshot. Truncation snapshot taken at the end of the join process
+                // actually records the new partition count in the digest.
+                m_replayAgent.generateReplayPlan(infoWithMinHostId.newPartitionCount, m_isLeader);
+            }
         }
 
         m_planned = true;
@@ -690,7 +698,7 @@ SnapshotCompletionInterest
 
             for (boolean completed : tf.m_completed) {
                 if (!completed) {
-                    m_snapshotLogStr.append("\nRejected snapshot ")
+                    m_snapshotErrLogStr.append("\nRejected snapshot ")
                                     .append(s.getNonce())
                                     .append(" because it was not completed.");
                     return null;
@@ -702,7 +710,7 @@ SnapshotCompletionInterest
                 if (partitionCount == -1) {
                     partitionCount = count;
                 } else if (count != partitionCount) {
-                    m_snapshotLogStr.append("\nRejected snapshot ")
+                    m_snapshotErrLogStr.append("\nRejected snapshot ")
                                     .append(s.getNonce())
                                     .append(" because it had the wrong partition count ")
                                     .append(count)
@@ -714,7 +722,7 @@ SnapshotCompletionInterest
         }
 
         if (s.m_digests.isEmpty()) {
-            m_snapshotLogStr.append("\nRejected snapshot ")
+            m_snapshotErrLogStr.append("\nRejected snapshot ")
                             .append(s.getNonce())
                             .append(" because it had no valid digest file.");
             return null;
@@ -722,6 +730,7 @@ SnapshotCompletionInterest
         File digest = s.m_digests.get(0);
         Long catalog_crc = null;
         Map<Integer,Long> pidToTxnMap = new TreeMap<Integer,Long>();
+        Set<String> digestTableNames = new HashSet<String>();
         // Create a valid but meaningless InstanceId to support pre-instanceId checking versions
         InstanceId instanceId = new InstanceId(0, 0);
         int newParitionCount = -1;
@@ -749,10 +758,17 @@ SnapshotCompletionInterest
             if (digest_detail.has("newPartitionCount")) {
                 newParitionCount = digest_detail.getInt("newPartitionCount");
             }
+
+            if (digest_detail.has("tables")) {
+                JSONArray tableObj = digest_detail.getJSONArray("tables");
+                for (int i = 0; i < tableObj.length(); i++) {
+                    digestTableNames.add(tableObj.getString(i));
+                }
+            }
         }
         catch (IOException ioe)
         {
-            m_snapshotLogStr.append("\nUnable to read digest file: ")
+            m_snapshotErrLogStr.append("\nUnable to read digest file: ")
                             .append(digest.getAbsolutePath())
                             .append(" due to: ")
                             .append(ioe.getMessage());
@@ -760,7 +776,7 @@ SnapshotCompletionInterest
         }
         catch (JSONException je)
         {
-            m_snapshotLogStr.append("\nUnable to extract catalog CRC from digest: ")
+            m_snapshotErrLogStr.append("\nUnable to extract catalog CRC from digest: ")
                             .append(digest.getAbsolutePath())
                             .append(" due to: ")
                             .append(je.getMessage());
@@ -768,7 +784,7 @@ SnapshotCompletionInterest
         }
 
         if (s.m_catalogFile == null) {
-            m_snapshotLogStr.append("\nRejected snapshot ")
+            m_snapshotErrLogStr.append("\nRejected snapshot ")
                             .append(s.getNonce())
                             .append(" because it had no catalog.");
             return null;
@@ -792,14 +808,14 @@ SnapshotCompletionInterest
             byte[] catalogBytes = Arrays.copyOf(buffer, totalBytes);
             InMemoryJarfile jarfile = new InMemoryJarfile(catalogBytes);
             if (jarfile.getCRC() != catalog_crc) {
-                m_snapshotLogStr.append("\nRejected snapshot ")
+                m_snapshotErrLogStr.append("\nRejected snapshot ")
                                 .append(s.getNonce())
                                 .append(" because catalog CRC did not match digest.");
                 return null;
             }
         }
         catch (IOException ioe) {
-            m_snapshotLogStr.append("\nRejected snapshot ")
+            m_snapshotErrLogStr.append("\nRejected snapshot ")
                             .append(s.getNonce())
                             .append(" because catalog CRC could not be validated");
             return null;
@@ -816,7 +832,8 @@ SnapshotCompletionInterest
         SnapshotInfo info =
             new SnapshotInfo(key, digest.getParent(),
                     SnapshotUtil.parseNonceFromDigestFilename(digest.getName()),
-                    partitionCount, newParitionCount, catalog_crc, m_hostId, instanceId);
+                    partitionCount, newParitionCount, catalog_crc, m_hostId, instanceId,
+                    digestTableNames);
         // populate table to partition map.
         for (Entry<String, TableFiles> te : s.m_tableFiles.entrySet()) {
             TableFiles tableFile = te.getValue();
@@ -827,6 +844,8 @@ SnapshotCompletionInterest
             if (!tableFile.m_isReplicated) {
                 info.partitions.put(te.getKey(), ids);
             }
+            // keep track of tables for which we've seen files while we're here
+            info.fileTables.add(te.getKey());
         }
         info.setPidToTxnIdMap(pidToTxnMap);
         return info;
@@ -992,6 +1011,8 @@ SnapshotCompletionInterest
         SnapshotInfo newest = null;
         while (it.hasNext()) {
             Entry<String, Set<SnapshotInfo>> e = it.next();
+            Set<String> fileTables = new HashSet<String>();
+            Set<String> digestTables = null;
             String nonce = e.getKey();
             Map<String, Set<Integer>> tablePartitions = snapshotTablePartitions.get(nonce);
             if (tablePartitions == null) {
@@ -1003,10 +1024,26 @@ SnapshotCompletionInterest
             boolean inconsistent = false;
             Set<SnapshotInfo> fragments = e.getValue();
             for (SnapshotInfo s : fragments) {
+                LOG.debug("SnapshotInfo " + s.nonce + " claims digest tables: " + s.digestTables);
+                LOG.debug("SnapshotInfo " + s.nonce + " claims files for tables: " + s.fileTables);
+                if (digestTables == null) {
+                    digestTables = new HashSet<String>(s.digestTables);
+                }
+                else if (!digestTables.equals(s.digestTables)) {
+                    m_snapshotErrLogStr.append("\nRejected snapshot ")
+                                    .append(s.nonce)
+                                    .append(" due to disagreement in digest table list.  Got ")
+                                    .append(s.digestTables)
+                                    .append(", expecting ")
+                                    .append(digestTables);
+                    inconsistent = true;
+                    break;
+                }
+                fileTables.addAll(s.fileTables);
                 if (totalPartitions == -1) {
                     totalPartitions = s.partitionCount;
                 } else if (totalPartitions != s.partitionCount) {
-                    m_snapshotLogStr.append("\nRejected snapshot ")
+                    m_snapshotErrLogStr.append("\nRejected snapshot ")
                                     .append(s.nonce)
                                     .append(" due to partition count mismatch. Got ")
                                     .append(s.partitionCount)
@@ -1030,17 +1067,27 @@ SnapshotCompletionInterest
                 }
             }
 
+            // Check that we have files for all the tables listed in the digest
+            if (!fileTables.equals(digestTables)) {
+                m_snapshotErrLogStr.append("\nRejected snapshot ")
+                    .append(nonce)
+                    .append(" because there were not table files for all tables in the digest.  Expected ")
+                    .append(digestTables)
+                    .append(", but only found table data for ")
+                    .append(fileTables);
+                inconsistent = true;
+            }
+
             // Check if we have all the partitions
             for (Set<Integer> partitions : tablePartitions.values()) {
                 if (partitions.size() != totalPartitions) {
-                    m_snapshotLogStr.append("\nRejected snapshot ")
+                    m_snapshotErrLogStr.append("\nRejected snapshot ")
                                     .append(nonce)
                                     .append(" due to missing partitions. Got ")
                                     .append(partitions.size())
                                     .append(", expecting ")
                                     .append(totalPartitions);
                     inconsistent = true;
-                    break;
                 }
             }
 
@@ -1056,11 +1103,14 @@ SnapshotCompletionInterest
         }
 
         // If we have a command log and it requires a snapshot but no snapshot
-        // fragments were found, simply bail.
-        if (clStartTxnId != null && clStartTxnId != Long.MIN_VALUE &&
-            snapshotFragments.size() == 0) {
-            if (m_snapshotLogStr.length() > 0) {
-                LOG.error(m_snapshotLogStr.toString());
+        // fragments were found, simply bail (or, if we didn't find a viable
+        // snapshot from which to recover)
+        // Reluctant to muck with the first predicate here, even though
+        // the newest == null should cover all of the 'no viable snapshot' possiblities
+        if ((clStartTxnId != null && clStartTxnId != Long.MIN_VALUE &&
+            snapshotFragments.size() == 0) || newest == null) {
+            if (m_snapshotErrLogStr.length() > 0) {
+                LOG.error(m_snapshotErrLogStr.toString());
             }
             throw new RuntimeException("No viable snapshots to restore");
         }
@@ -1180,7 +1230,7 @@ SnapshotCompletionInterest
                                       restoreProc.getEverysite(),
                                       0,//Can provide anything for multi-part
                                       0,
-                                      EstTime.currentTimeMillis());
+                                      System.nanoTime());
     }
 
     /**
@@ -1249,9 +1299,8 @@ SnapshotCompletionInterest
                                     Ids.OPEN_ACL_UNSAFE,
                                     CreateMode.PERSISTENT);
                     } catch (KeeperException.NodeExistsException e) {}
-                    m_zk.create(VoltZK.request_truncation_snapshot, null,
-                                Ids.OPEN_ACL_UNSAFE,
-                                CreateMode.PERSISTENT);
+                    m_zk.create(VoltZK.request_truncation_snapshot_node, null,
+                            Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT_SEQUENTIAL);
                 } catch (Exception e) {
                     VoltDB.crashGlobalVoltDB("Requesting a truncation snapshot " +
                                              "via ZK should always succeed",
@@ -1297,7 +1346,7 @@ SnapshotCompletionInterest
      */
     @Override
     public CountDownLatch snapshotCompleted(SnapshotCompletionEvent event) {
-        if (!event.truncationSnapshot) {
+        if (!event.truncationSnapshot || !event.didSucceed) {
             VoltDB.crashGlobalVoltDB("Failed to truncate command logs by snapshot",
                                      false, null);
         } else {
@@ -1307,5 +1356,11 @@ SnapshotCompletionInterest
             changeState();
         }
         return new CountDownLatch(0);
+    }
+
+    @Override
+    public void acceptPromotion() throws InterruptedException, ExecutionException, KeeperException
+    {
+        m_isLeader = true;
     }
 }

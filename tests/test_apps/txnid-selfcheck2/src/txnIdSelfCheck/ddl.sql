@@ -105,11 +105,37 @@ CREATE TABLE forDroppedProcedure
 );
 PARTITION TABLE forDroppedProcedure ON COLUMN p;
 
-CREATE TABLE export_skinny_partitioned_table
+-- export tables
+CREATE TABLE partitioned_export
 (
-  txnid                     BIGINT        NOT NULL
-, rowid                     BIGINT        NOT NULL
+  txnid      bigint             NOT NULL
+, prevtxnid  bigint             NOT NULL
+, ts         bigint             NOT NULL
+, cid        tinyint            NOT NULL
+, cidallhash bigint             NOT NULL
+, rid        bigint             NOT NULL
+, cnt        bigint             NOT NULL
+, adhocinc   bigint             NOT NULL
+, adhocjmp   bigint             NOT NULL
+, value      varbinary(1048576) NOT NULL
 );
+PARTITION TABLE partitioned_export ON COLUMN cid;
+EXPORT TABLE partitioned_export;
+
+CREATE TABLE replicated_export
+(
+  txnid      bigint             NOT NULL
+, prevtxnid  bigint             NOT NULL
+, ts         bigint             NOT NULL
+, cid        tinyint            NOT NULL
+, cidallhash bigint             NOT NULL
+, rid        bigint             NOT NULL
+, cnt        bigint             NOT NULL
+, adhocinc   bigint             NOT NULL
+, adhocjmp   bigint             NOT NULL
+, value      varbinary(1048576) NOT NULL
+);
+EXPORT TABLE replicated_export;
 
 -- For loadsinglepartition
 CREATE TABLE loadp
@@ -142,8 +168,23 @@ CREATE TABLE cploadmp
 , rowid  BIGINT NOT NULL
 );
 
-PARTITION TABLE export_skinny_partitioned_table ON COLUMN rowid;
-EXPORT TABLE export_skinny_partitioned_table;
+CREATE TABLE trur
+(
+  p          bigint             NOT NULL
+, id         bigint             NOT NULL
+, value      varbinary(1048576) NOT NULL
+, CONSTRAINT PK_id_tr PRIMARY KEY (p,id)
+);
+
+CREATE TABLE trup
+(
+  p          bigint             NOT NULL
+, id         bigint             NOT NULL
+, value      varbinary(1048576) NOT NULL
+, CONSTRAINT PK_id_tp PRIMARY KEY (p,id)
+);
+PARTITION TABLE trup ON COLUMN p;
+
 
 -- base procedures you shouldn't call
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateBaseProc;
@@ -183,7 +224,14 @@ CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.DeleteLoadPartitionedMP;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.DeleteOnlyLoadTableSP;
 PARTITION PROCEDURE DeleteOnlyLoadTableSP ON TABLE loadp COLUMN cid;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.DeleteOnlyLoadTableMP;
-CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.BIGPTruncateTableSP;
-PARTITION PROCEDURE BIGPTruncateTableSP ON TABLE bigp COLUMN p;
-CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.BIGPTruncateTableMP;
-CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.BIGRTruncateTable;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPTableInsert;
+PARTITION PROCEDURE TRUPTableInsert ON TABLE bigp COLUMN p;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRURTableInsert;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPTruncateTableSP;
+PARTITION PROCEDURE TRUPTruncateTableSP ON TABLE trup COLUMN p;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPTruncateTableMP;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRURTruncateTable;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPScanAggTableSP;
+PARTITION PROCEDURE TRUPScanAggTableSP ON TABLE trup COLUMN p;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRUPScanAggTableMP;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.TRURScanAggTable;

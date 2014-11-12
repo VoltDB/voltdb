@@ -275,8 +275,8 @@ public class SyncBenchmark {
         System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
         System.out.printf("Aborts/Failures %d/%d, ",
                 stats.getInvocationAborts(), stats.getInvocationErrors());
-        System.out.printf("Avg/95%% Latency %.2f/%dms\n", stats.getAverageLatency(),
-                stats.kPercentileLatency(0.95));
+        System.out.printf("Avg/95%% Latency %.2f/%.2fms\n", stats.getAverageLatency(),
+                stats.kPercentileLatencyAsDouble(0.95));
     }
 
     /**
@@ -332,15 +332,15 @@ public class SyncBenchmark {
 
         System.out.printf("Average throughput:            %,9d txns/sec\n", stats.getTxnThroughput());
         System.out.printf("Average latency:               %,9.2f ms\n", stats.getAverageLatency());
-        System.out.printf("10th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.1));
-        System.out.printf("25th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.25));
-        System.out.printf("50th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.5));
-        System.out.printf("75th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.75));
-        System.out.printf("90th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.9));
-        System.out.printf("95th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.95));
-        System.out.printf("99th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.99));
-        System.out.printf("99.5th percentile latency:     %,9d ms\n", stats.kPercentileLatency(.995));
-        System.out.printf("99.9th percentile latency:     %,9d ms\n", stats.kPercentileLatency(.999));
+        System.out.printf("10th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.1));
+        System.out.printf("25th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.25));
+        System.out.printf("50th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.5));
+        System.out.printf("75th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.75));
+        System.out.printf("90th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.9));
+        System.out.printf("95th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.95));
+        System.out.printf("99th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.99));
+        System.out.printf("99.5th percentile latency:     %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.995));
+        System.out.printf("99.9th percentile latency:     %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.999));
 
         System.out.print("\n" + HORIZONTAL_RULE);
         System.out.println(" System Server Statistics");
@@ -369,17 +369,17 @@ public class SyncBenchmark {
             while (warmupComplete.get() == false) {
                 // Decide whether to perform a GET or PUT operation
                 if (rand.nextDouble() < config.getputratio) {
-                    // Get a key/value pair, synchronously
+                    // Get a key/value pair using inbuilt select procedure, synchronously
                     try {
-                        client.callProcedure("Get", processor.generateRandomKeyForRetrieval());
+                        client.callProcedure("STORE.select", processor.generateRandomKeyForRetrieval());
                     }
                     catch (Exception e) {}
                 }
                 else {
-                    // Put a key/value pair, synchronously
+                    // Put a key/value pair using inbuilt upsert procedure, synchronously
                     final PayloadProcessor.Pair pair = processor.generateForStore();
                     try {
-                        client.callProcedure("Put", pair.Key, pair.getStoreValue());
+                        client.callProcedure("STORE.upsert", pair.Key, pair.getStoreValue());
                     }
                     catch (Exception e) {}
                 }
@@ -388,9 +388,9 @@ public class SyncBenchmark {
             while (benchmarkComplete.get() == false) {
                 // Decide whether to perform a GET or PUT operation
                 if (rand.nextDouble() < config.getputratio) {
-                    // Get a key/value pair, synchronously
+                    // Get a key/value pair using inbuilt select procedure, synchronously
                     try {
-                        ClientResponse response = client.callProcedure("Get",
+                        ClientResponse response = client.callProcedure("STORE.select",
                                 processor.generateRandomKeyForRetrieval());
 
                         final VoltTable pairData = response.getResults()[0];
@@ -411,10 +411,10 @@ public class SyncBenchmark {
                     }
                 }
                 else {
-                    // Put a key/value pair, synchronously
+                    // Put a key/value pair using inbuilt upsert procedure, synchronously
                     final PayloadProcessor.Pair pair = processor.generateForStore();
                     try {
-                        client.callProcedure("Put", pair.Key, pair.getStoreValue());
+                        client.callProcedure("STORE.upsert", pair.Key, pair.getStoreValue());
                         successfulPuts.incrementAndGet();
                     }
                     catch (Exception e) {
@@ -447,7 +447,7 @@ public class SyncBenchmark {
             System.out.println("Preloading data store...");
             for(int i=0; i < config.poolsize; i++) {
                 client.callProcedure(new NullCallback(),
-                                     "Put",
+                                     "STORE.upsert",
                                      String.format(processor.KeyFormat, i),
                                      processor.generateForStore().getStoreValue());
             }

@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 
 import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
@@ -41,7 +42,8 @@ public class VoltDDLElementTracker {
             new HashMap<String, ProcedureDescriptor>();
     final Set<String> m_exports = new HashSet<String>();
     // additional non-procedure classes for the jar
-    String[] m_extraClassses = new String[0];
+    final Set<String> m_extraClassses = new TreeSet<String>();
+    final Set<String> m_importLines = new TreeSet<String>();
 
     /**
      * Constructor needs a compiler instance to throw VoltCompilerException.
@@ -57,28 +59,32 @@ public class VoltDDLElementTracker {
      *
      * @param tableName table name
      * @param colName column name
-     * @throws VoltCompilerException
      */
-    void put(String tableName, String colName) throws VoltCompilerException
+    void addPartition(String tableName, String colName)
     {
-        // where is table and column validity checked?
-        if (tableName.length() == 0) {
-            throw m_compiler.new VoltCompilerException("PARTITION or REPLICATE has no TABLE specified");
-        }
-
         if (m_partitionMap.containsKey(tableName.toLowerCase())) {
-            throw m_compiler.new VoltCompilerException(String.format(
-                    "Partitioning already specified for table \"%s\"", tableName));
+            m_compiler.addInfo(String.format("Replacing partition column %s on table %s with column %s\n",
+                        m_partitionMap.get(tableName.toLowerCase()), tableName,
+                        colName));
         }
 
-        m_partitionMap.put(tableName.toLowerCase(), colName);
+        m_partitionMap.put(tableName.toLowerCase(), colName.toLowerCase());
+    }
+
+    void removePartition(String tableName)
+    {
+        m_partitionMap.remove(tableName);
     }
 
     /**
      * Add additional non-procedure classes for the jar.
      */
-    void addExtraClasses(String[] classNames) {
-        m_extraClassses = classNames;
+    void addExtraClasses(Set<String> classNames) {
+        m_extraClassses.addAll(classNames);
+    }
+
+    void addImportLine(String importLine) {
+        m_importLines.add(importLine);
     }
 
     /**
@@ -101,6 +107,26 @@ public class VoltDDLElementTracker {
         }
 
         m_procedureMap.put(shortName, descriptor);
+    }
+
+    /**
+     * Searches for and removes the Procedure provided in prior DDL statements
+     * @param Name of procedure being removed
+     * @throws VoltCompilerException if the procedure does not exist
+     */
+    void removeProcedure(String procName) throws VoltCompilerException
+    {
+        assert procName != null && ! procName.trim().isEmpty();
+
+        String shortName = deriveShortProcedureName(procName);
+
+        if( m_procedureMap.containsKey(shortName)) {
+            m_procedureMap.remove(shortName);
+        }
+        else {
+            throw m_compiler.new VoltCompilerException(String.format(
+                    "Dropped Procedure \"%s\" is not defined", procName));
+        }
     }
 
     /**
@@ -130,7 +156,8 @@ public class VoltDDLElementTracker {
                     descriptor.m_authGroups,
                     descriptor.m_class,
                     partitionInfo,
-                    descriptor.m_language);
+                    descriptor.m_language,
+                    descriptor.m_scriptImpl);
         }
         else {
             descriptor = m_compiler.new ProcedureDescriptor(
@@ -141,6 +168,7 @@ public class VoltDDLElementTracker {
                     partitionInfo,
                     false,
                     descriptor.m_language,
+                    descriptor.m_scriptImpl,
                     descriptor.m_class);
         }
         m_procedureMap.put(procedureName, descriptor);
@@ -157,20 +185,17 @@ public class VoltDDLElementTracker {
     /**
      * Track an exported table
      * @param tableName a table name
-     * @throws VoltCompilerException when the given table is already exported
      */
-    void addExportedTable( String tableName)
-        throws VoltCompilerException
+    void addExportedTable(String tableName)
     {
         assert tableName != null && ! tableName.trim().isEmpty();
 
-        if( m_exports.contains(tableName)) {
-            throw m_compiler.new VoltCompilerException(String.format(
-                    "Table \"%s\" is already exported", tableName
-                    ));
-        }
-
         m_exports.add(tableName);
+    }
+
+    void removeExportedTable(String tableName)
+    {
+        m_exports.remove(tableName);
     }
 
     /**

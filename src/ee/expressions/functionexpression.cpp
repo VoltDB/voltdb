@@ -28,8 +28,12 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_SQL_ERROR>() const {
     char msg_format_buffer[1024];
     char state_format_buffer[6];
     if (type == VALUE_TYPE_VARCHAR) {
-        const int32_t valueLength = getObjectLength();
-        const char *valueChars = reinterpret_cast<char*>(getObjectValue());
+        if (isNull()) {
+             throw SQLException(SQLException::dynamic_sql_error,
+                                "Must not ask  for object length on sql null object.");
+        }
+        const int32_t valueLength = getObjectLength_withoutNull();
+        const char *valueChars = reinterpret_cast<char*>(getObjectValue_withoutNull());
         std::string valueStr(valueChars, valueLength);
         snprintf(msg_format_buffer, sizeof(msg_format_buffer), "%s", valueStr.c_str());
         sqlstatecode = SQLException::nonspecific_error_code_for_error_forced_by_user;
@@ -72,8 +76,8 @@ template<> inline NValue NValue::call<FUNC_VOLT_SQL_ERROR>(const std::vector<NVa
         if (strValue.getValueType() != VALUE_TYPE_VARCHAR) {
             throwCastSQLException (strValue.getValueType(), VALUE_TYPE_VARCHAR);
         }
-        const int32_t valueLength = strValue.getObjectLength();
-        char *valueChars = reinterpret_cast<char*>(strValue.getObjectValue());
+        const int32_t valueLength = strValue.getObjectLength_withoutNull();
+        char *valueChars = reinterpret_cast<char*>(strValue.getObjectValue_withoutNull());
         std::string valueStr(valueChars, valueLength);
         snprintf(msg_format_buffer, sizeof(msg_format_buffer), "%s", valueStr.c_str());
     }
@@ -124,16 +128,6 @@ public:
         return m_child->hasParameter();
     }
 
-    virtual void substitute(const NValueArray &params) {
-        assert (m_child);
-
-        if (!m_hasParameter)
-            return;
-
-        VOLT_TRACE("Substituting parameters for expression \n%s ...", debug(true).c_str());
-        m_child->substitute(params);
-    }
-
     NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
         assert (m_child);
         return (m_child->eval(tuple1, tuple2)).callUnary<F>();
@@ -171,18 +165,6 @@ public:
             }
         }
         return false;
-    }
-
-    virtual void substitute(const NValueArray &params) {
-        if (!m_hasParameter)
-            return;
-
-        VOLT_TRACE("Substituting parameters for expression \n%s ...", debug(true).c_str());
-        for (size_t i = 0; i < m_args.size(); i++) {
-            assert(m_args[i]);
-            VOLT_TRACE("Substituting parameters for arg at index %d...", static_cast<int>(i));
-            m_args[i]->substitute(params);
-        }
     }
 
     NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
@@ -234,6 +216,9 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_CEILING:
             ret = new UnaryFunctionExpression<FUNC_CEILING>((*arguments)[0]);
             break;
+        case FUNC_CHAR:
+            ret = new UnaryFunctionExpression<FUNC_CHAR>((*arguments)[0]);
+            break;
         case FUNC_CHAR_LENGTH:
             ret = new UnaryFunctionExpression<FUNC_CHAR_LENGTH>((*arguments)[0]);
             break;
@@ -245,6 +230,9 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             break;
         case FUNC_EXTRACT_DAY_OF_WEEK:
             ret = new UnaryFunctionExpression<FUNC_EXTRACT_DAY_OF_WEEK>((*arguments)[0]);
+            break;
+        case FUNC_EXTRACT_WEEKDAY:
+            ret = new UnaryFunctionExpression<FUNC_EXTRACT_WEEKDAY>((*arguments)[0]);
             break;
         case FUNC_EXTRACT_DAY_OF_YEAR:
             ret = new UnaryFunctionExpression<FUNC_EXTRACT_DAY_OF_YEAR>((*arguments)[0]);
@@ -328,6 +316,12 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_SPACE:
             ret = new UnaryFunctionExpression<FUNC_SPACE>((*arguments)[0]);
             break;
+        case FUNC_FOLD_LOWER:
+            ret = new UnaryFunctionExpression<FUNC_FOLD_LOWER>((*arguments)[0]);
+            break;
+        case FUNC_FOLD_UPPER:
+            ret = new UnaryFunctionExpression<FUNC_FOLD_UPPER>((*arguments)[0]);
+            break;
         case FUNC_SQRT:
             ret = new UnaryFunctionExpression<FUNC_SQRT>((*arguments)[0]);
             break;
@@ -368,6 +362,15 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
         case FUNC_SUBSTRING_CHAR:
             ret = new GeneralFunctionExpression<FUNC_SUBSTRING_CHAR>(*arguments);
             break;
+        case FUNC_TRIM_CHAR:
+            ret = new GeneralFunctionExpression<FUNC_TRIM_CHAR>(*arguments);
+            break;
+        case FUNC_REPLACE:
+            ret = new GeneralFunctionExpression<FUNC_REPLACE>(*arguments);
+            break;
+        case FUNC_OVERLAY_CHAR:
+            ret = new GeneralFunctionExpression<FUNC_OVERLAY_CHAR>(*arguments);
+            break;
         case FUNC_VOLT_ARRAY_ELEMENT:
             ret = new GeneralFunctionExpression<FUNC_VOLT_ARRAY_ELEMENT>(*arguments);
             break;
@@ -379,6 +382,12 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             break;
         case FUNC_VOLT_SUBSTRING_CHAR_FROM:
             ret = new GeneralFunctionExpression<FUNC_VOLT_SUBSTRING_CHAR_FROM>(*arguments);
+            break;
+        case FUNC_VOLT_SET_FIELD:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_SET_FIELD>(*arguments);
+            break;
+        case FUNC_VOLT_FORMAT_CURRENCY:
+            ret = new GeneralFunctionExpression<FUNC_VOLT_FORMAT_CURRENCY>(*arguments);
             break;
         default:
             return NULL;

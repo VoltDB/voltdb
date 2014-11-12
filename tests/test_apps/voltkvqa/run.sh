@@ -32,7 +32,7 @@ HOST="localhost"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar voltdbroot voltdbroot
+    rm -rf obj debugoutput $APPNAME*.jar voltdbroot voltdbroot
 }
 
 # compile the source code for procedures and the client
@@ -51,6 +51,7 @@ function catalog() {
     srccompile
     $VOLTDB compile --classpath obj -o $APPNAME.jar -p project.xml || exit 1
     $VOLTDB compile --classpath obj -o ${APPNAME}_withexport.jar -p project_withexport.xml || exit 1
+    $VOLTDB compile --classpath obj -o ${APPNAME}-security.jar -p project-security.xml || exit 1
 }
 
 # run the voltdb server locally
@@ -127,33 +128,9 @@ function sync-benchmark() {
         --threads=40
 }
 
-# JDBC benchmark sample
-# Use this target for argument help
-function jdbc-benchmark-help() {
-    srccompile
-    java -classpath obj:$CLASSPATH:obj voltkvqa.JDBCBenchmark --help
-}
-
-function jdbc-benchmark() {
-    srccompile
-    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
-        voltkvqa.JDBCBenchmark \
-        --displayinterval=5 \
-        --duration=120 \
-        --servers=localhost:21212 \
-        --poolsize=100000 \
-        --preload=true \
-        --getputratio=0.90 \
-        --keysize=32 \
-        --minvaluesize=1024 \
-        --maxvaluesize=1024 \
-        --usecompression=false \
-        --threads=40
-}
-
 function help() {
     echo "Usage: ./run.sh {clean|catalog|server|async-benchmark|aysnc-benchmark-help|...}"
-    echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark|jdbc-benchmark-help}"
+    echo "       {...|sync-benchmark|sync-benchmark-help}"
 }
 
 # Run the target passed as the first arg on the command line

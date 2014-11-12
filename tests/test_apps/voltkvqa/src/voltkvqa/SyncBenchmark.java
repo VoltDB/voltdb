@@ -99,16 +99,6 @@ public class SyncBenchmark {
     final AtomicLong rawPutData = new AtomicLong(0);
     final AtomicLong networkPutData = new AtomicLong(0);
 
-    // For retry connections
-    private final ExecutorService es = Executors.newCachedThreadPool(new ThreadFactory() {
-        @Override
-        public Thread newThread(Runnable arg0) {
-            Thread thread = new Thread(arg0, "Retry Connection");
-            thread.setDaemon(true);
-            return thread;
-        }
-    });
-
     /**
      * Uses included {@link CLIConfig} class to
      * declaratively state command line options with defaults
@@ -160,6 +150,12 @@ public class SyncBenchmark {
         @Option(desc = "disable client affinity.")
         boolean noclientaffinity = false;
 
+        @Option(desc = "user id.")
+        String username = "";
+
+        @Option(desc = "password.")
+        String password = "";
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -181,28 +177,6 @@ public class SyncBenchmark {
     }
 
     /**
-     * Provides a callback to be notified on node failure.
-     * This example only logs the event.
-     */
-    class StatusListener extends ClientStatusListenerExt {
-        @Override
-        public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
-            // if the benchmark is still active
-            if (benchmarkComplete.get() == false) {
-                System.err.printf("Connection to %s:%d was lost.\n", hostname, port);
-                // setup for retry
-                final String server = MiscUtils.getHostnameColonPortString(hostname, port);
-                es.execute(new Runnable() {
-                    @Override
-                    public void run() {
-                        connectToOneServerWithRetry(server);
-                    }
-                });
-            }
-        }
-    }
-
-    /**
      * Constructor for benchmark instance.
      * Configures VoltDB client and prints configuration.
      *
@@ -211,7 +185,8 @@ public class SyncBenchmark {
     public SyncBenchmark(KVConfig config) {
         this.config = config;
 
-        ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
+        ClientConfig clientConfig = new ClientConfig(config.username, config.password);
+        clientConfig.setReconnectOnConnectionLoss(true);
         clientConfig.setClientAffinity(!config.noclientaffinity);
         client = ClientFactory.createClient(clientConfig);
 
@@ -307,8 +282,8 @@ public class SyncBenchmark {
         System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
         System.out.printf("Aborts/Failures %d/%d, ",
                 stats.getInvocationAborts(), stats.getInvocationErrors());
-        System.out.printf("Avg/95%% Latency %.2f/%dms, ", stats.getAverageLatency(),
-                stats.kPercentileLatency(0.95));
+        System.out.printf("Avg/95%% Latency %.2f/%.2fms, ", stats.getAverageLatency(),
+                stats.kPercentileLatencyAsDouble(0.95));
         System.out.printf("%d AW, %d AR, %d RRW, %d RRR\n",
                 affinityStats.getAffinityWrites(),
                 affinityStats.getAffinityReads(),
@@ -369,15 +344,15 @@ public class SyncBenchmark {
 
         System.out.printf("Average throughput:            %,9d txns/sec\n", stats.getTxnThroughput());
         System.out.printf("Average latency:               %,9.2f ms\n", stats.getAverageLatency());
-        System.out.printf("10th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.1));
-        System.out.printf("25th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.25));
-        System.out.printf("50th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.5));
-        System.out.printf("75th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.75));
-        System.out.printf("90th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.9));
-        System.out.printf("95th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.95));
-        System.out.printf("99th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.99));
-        System.out.printf("99.5th percentile latency:     %,9d ms\n", stats.kPercentileLatency(.995));
-        System.out.printf("99.9th percentile latency:     %,9d ms\n", stats.kPercentileLatency(.999));
+        System.out.printf("10th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.1));
+        System.out.printf("25th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.25));
+        System.out.printf("50th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.5));
+        System.out.printf("75th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.75));
+        System.out.printf("90th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.9));
+        System.out.printf("95th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.95));
+        System.out.printf("99th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.99));
+        System.out.printf("99.5th percentile latency:     %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.995));
+        System.out.printf("99.9th percentile latency:     %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.999));
 
         System.out.print("\n" + HORIZONTAL_RULE);
         System.out.println(" System Server Statistics");

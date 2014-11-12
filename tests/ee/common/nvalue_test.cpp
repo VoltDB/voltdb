@@ -66,7 +66,7 @@ public:
         deserDecHelper();
         NValue floatEquivalent = nv.castAs(VALUE_TYPE_DOUBLE);
         double floatValue = ValuePeeker::peekDouble(floatEquivalent);
-        floatValue *= scale;
+        floatValue *= static_cast<double>(scale);
         scaledValue = (int64_t)floatValue;
         double floatDirect = atof(textValue);
         viaDouble = ValueFactory::getDoubleValue(floatDirect).castAs(VALUE_TYPE_DECIMAL);
@@ -767,7 +767,7 @@ TEST_F(NValueTest, TestCastToString) {
     Pool* testPool = new Pool();
     UndoQuantum* wantNoQuantum = NULL;
     Topend* topless = NULL;
-    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, false, "", 0);
+    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0, NULL);
 
     NValue tinyInt = ValueFactory::getTinyIntValue(120);
     NValue smallInt = ValueFactory::getSmallIntValue(120);
@@ -779,31 +779,31 @@ TEST_F(NValueTest, TestCastToString) {
 
 
     NValue bigIntCastToString = ValueFactory::castAsString(bigInt);
-    std::string bigIntPeekedString = ValuePeeker::peekStringCopy(bigIntCastToString);
+    std::string bigIntPeekedString = ValuePeeker::peekStringCopy_withoutNull(bigIntCastToString);
     EXPECT_EQ(strcmp(bigIntPeekedString.c_str(), "-64"), 0);
 
     NValue integerCastToString = ValueFactory::castAsString(integer);
-    std::string integerPeekedString = ValuePeeker::peekStringCopy(integerCastToString);
+    std::string integerPeekedString = ValuePeeker::peekStringCopy_withoutNull(integerCastToString);
     EXPECT_EQ(strcmp(integerPeekedString.c_str(), "120"), 0);
 
     NValue smallIntCastToString = ValueFactory::castAsString(smallInt);
-    std::string smallIntPeekedString = ValuePeeker::peekStringCopy(smallIntCastToString);
+    std::string smallIntPeekedString = ValuePeeker::peekStringCopy_withoutNull(smallIntCastToString);
     EXPECT_EQ(strcmp(smallIntPeekedString.c_str(), "120"), 0);
 
     NValue tinyIntCastToString = ValueFactory::castAsString(tinyInt);
-    std::string tinyIntPeekedString = ValuePeeker::peekStringCopy(tinyIntCastToString);
+    std::string tinyIntPeekedString = ValuePeeker::peekStringCopy_withoutNull(tinyIntCastToString);
     EXPECT_EQ(strcmp(tinyIntPeekedString.c_str(), "120"), 0);
 
     NValue doubleCastToString = ValueFactory::castAsString(doubleValue);
-    std::string doublePeekedString = ValuePeeker::peekStringCopy(doubleCastToString);
+    std::string doublePeekedString = ValuePeeker::peekStringCopy_withoutNull(doubleCastToString);
     EXPECT_EQ(strcmp(doublePeekedString.c_str(), "-3.2E1"), 0);
 
     NValue decimalCastToString = ValueFactory::castAsString(decimalValue);
-    std::string decimalPeekedString = ValuePeeker::peekStringCopy(decimalCastToString);
+    std::string decimalPeekedString = ValuePeeker::peekStringCopy_withoutNull(decimalCastToString);
     EXPECT_EQ(strcmp(decimalPeekedString.c_str(), "10.220000000000"), 0);
 
     NValue stringCastToString = ValueFactory::castAsString(stringValue);
-    std::string stringPeekedString = ValuePeeker::peekStringCopy(stringCastToString);
+    std::string stringPeekedString = ValuePeeker::peekStringCopy_withoutNull(stringCastToString);
     EXPECT_EQ(strcmp(stringPeekedString.c_str(), "dude"), 0);
 
     // Make valgrind happy
@@ -1820,87 +1820,87 @@ TEST_F(NValueTest, SerializeToExport)
 
     // tinyint
     nv = ValueFactory::getTinyIntValue(-50);
-    nv.serializeToExport(out);
-    EXPECT_EQ(8, out.position());
-    EXPECT_EQ(-50, sin.readLong());
+    nv.serializeToExport_withoutNull(out);
+    EXPECT_EQ(1, out.position());
+    EXPECT_EQ(-50, sin.readByte());
     sin.unread(out.position());
     out.position(0);
 
     nv = ValueFactory::getTinyIntValue(0);
-    nv.serializeToExport(out);
-    EXPECT_EQ(8, out.position());
-    EXPECT_EQ(0, sin.readLong());
+    nv.serializeToExport_withoutNull(out);
+    EXPECT_EQ(1, out.position());
+    EXPECT_EQ(0, sin.readByte());
     sin.unread(out.position());
     out.position(0);
 
     nv = ValueFactory::getTinyIntValue(50);
-    nv.serializeToExport(out);
-    EXPECT_EQ(8, out.position());
-    EXPECT_EQ(50, sin.readLong());
+    nv.serializeToExport_withoutNull(out);
+    EXPECT_EQ(1, out.position());
+    EXPECT_EQ(50, sin.readByte());
     sin.unread(out.position());
     out.position(0);
 
     // smallint
     nv = ValueFactory::getSmallIntValue(-128);
-    nv.serializeToExport(out);
-    EXPECT_EQ(8, out.position());
-    EXPECT_EQ(-128, sin.readLong());
+    nv.serializeToExport_withoutNull(out);
+    EXPECT_EQ(2, out.position());
+    EXPECT_EQ(-128, sin.readShort());
     sin.unread(out.position());
     out.position(0);
 
     nv = ValueFactory::getSmallIntValue(0);
-    nv.serializeToExport(out);
-    EXPECT_EQ(8, out.position());
-    EXPECT_EQ(0, sin.readLong());
+    nv.serializeToExport_withoutNull(out);
+    EXPECT_EQ(2, out.position());
+    EXPECT_EQ(0, sin.readShort());
     sin.unread(out.position());
     out.position(0);
 
     nv = ValueFactory::getSmallIntValue(128);
-    nv.serializeToExport(out);
-    EXPECT_EQ(8, out.position());
-    EXPECT_EQ(128, sin.readLong());
+    nv.serializeToExport_withoutNull(out);
+    EXPECT_EQ(2, out.position());
+    EXPECT_EQ(128, sin.readShort());
     sin.unread(out.position());
     out.position(0);
 
     // int
     nv = ValueFactory::getIntegerValue(-4999999);
-    nv.serializeToExport(out);
-    EXPECT_EQ(8, out.position());
-    EXPECT_EQ(-4999999, sin.readLong());
+    nv.serializeToExport_withoutNull(out);
+    EXPECT_EQ(4, out.position());
+    EXPECT_EQ(-4999999, sin.readInt());
     sin.unread(out.position());
     out.position(0);
 
     nv = ValueFactory::getIntegerValue(0);
-    nv.serializeToExport(out);
-    EXPECT_EQ(8, out.position());
-    EXPECT_EQ(0, sin.readLong());
+    nv.serializeToExport_withoutNull(out);
+    EXPECT_EQ(4, out.position());
+    EXPECT_EQ(0, sin.readInt());
     sin.unread(out.position());
     out.position(0);
 
     nv = ValueFactory::getIntegerValue(128);
-    nv.serializeToExport(out);
-    EXPECT_EQ(8, out.position());
-    EXPECT_EQ(128, sin.readLong());
+    nv.serializeToExport_withoutNull(out);
+    EXPECT_EQ(4, out.position());
+    EXPECT_EQ(128, sin.readInt());
     sin.unread(out.position());
     out.position(0);
 
     // bigint
     nv = ValueFactory::getBigIntValue(-4999999);
-    nv.serializeToExport(out);
+    nv.serializeToExport_withoutNull(out);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(-4999999, sin.readLong());
     sin.unread(out.position());
     out.position(0);
 
     nv = ValueFactory::getBigIntValue(0);
-    nv.serializeToExport(out);
+    nv.serializeToExport_withoutNull(out);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(0, sin.readLong());
     sin.unread(out.position());
     out.position(0);
 
     nv = ValueFactory::getBigIntValue(128);
-    nv.serializeToExport(out);
+    nv.serializeToExport_withoutNull(out);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(128, sin.readLong());
     sin.unread(out.position());
@@ -1908,7 +1908,7 @@ TEST_F(NValueTest, SerializeToExport)
 
     // timestamp
     nv = ValueFactory::getTimestampValue(99999999);
-    nv.serializeToExport(out);
+    nv.serializeToExport_withoutNull(out);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(99999999, sin.readLong());
     sin.unread(out.position());
@@ -1916,21 +1916,21 @@ TEST_F(NValueTest, SerializeToExport)
 
     // double
     nv = ValueFactory::getDoubleValue(-5.5555);
-    nv.serializeToExport(out);
+    nv.serializeToExport_withoutNull(out);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(-5.5555, sin.readDouble());
     sin.unread(out.position());
     out.position(0);
 
     nv = ValueFactory::getDoubleValue(0.0);
-    nv.serializeToExport(out);
+    nv.serializeToExport_withoutNull(out);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(0.0, sin.readDouble());
     sin.unread(out.position());
     out.position(0);
 
     nv = ValueFactory::getDoubleValue(128.256);
-    nv.serializeToExport(out);
+    nv.serializeToExport_withoutNull(out);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(128.256, sin.readDouble());
     sin.unread(out.position());
@@ -1938,7 +1938,7 @@ TEST_F(NValueTest, SerializeToExport)
 
     // varchar
     nv = ValueFactory::getStringValue("ABCDEFabcdef");
-    nv.serializeToExport(out);
+    nv.serializeToExport_withoutNull(out);
     nv.free();
     EXPECT_EQ(12 + 4, out.position());         // chardata plus prefix
     EXPECT_EQ(12, sin.readInt()); // 32 bit length prefix
@@ -1959,33 +1959,17 @@ TEST_F(NValueTest, SerializeToExport)
 
     // decimal
     nv = ValueFactory::getDecimalValueFromString("-1234567890.456123000000");
-    nv.serializeToExport(out);
-    EXPECT_EQ(24 + 4, out.position());
-    EXPECT_EQ(24, sin.readInt()); // 32 bit length prefix
-    EXPECT_EQ('-', sin.readChar());
-    EXPECT_EQ('1', sin.readChar());
-    EXPECT_EQ('2', sin.readChar());
-    EXPECT_EQ('3', sin.readChar());
-    EXPECT_EQ('4', sin.readChar());
-    EXPECT_EQ('5', sin.readChar());
-    EXPECT_EQ('6', sin.readChar());
-    EXPECT_EQ('7', sin.readChar());
-    EXPECT_EQ('8', sin.readChar());
-    EXPECT_EQ('9', sin.readChar());
-    EXPECT_EQ('0', sin.readChar());
-    EXPECT_EQ('.', sin.readChar());
-    EXPECT_EQ('4', sin.readChar());
-    EXPECT_EQ('5', sin.readChar());
-    EXPECT_EQ('6', sin.readChar());
-    EXPECT_EQ('1', sin.readChar());
-    EXPECT_EQ('2', sin.readChar());
-    EXPECT_EQ('3', sin.readChar());
-    EXPECT_EQ('0', sin.readChar());
-    EXPECT_EQ('0', sin.readChar());
-    EXPECT_EQ('0', sin.readChar());
-    EXPECT_EQ('0', sin.readChar());
-    EXPECT_EQ('0', sin.readChar());
-    EXPECT_EQ('0', sin.readChar());
+    nv.serializeToExport_withoutNull(out);
+    EXPECT_EQ(18, out.position());
+    EXPECT_EQ(12, sin.readByte());//12 digit scale
+    EXPECT_EQ(16, sin.readByte());//16 bytes of precision
+    int64_t low = sin.readLong();
+    low = ntohll(low);
+    int64_t high = sin.readLong();
+    high = ntohll(high);
+    TTInt val = ValuePeeker::peekDecimal(nv);
+    EXPECT_EQ(low, val.table[1]);
+    EXPECT_EQ(high, val.table[0]);
     sin.unread(out.position());
     out.position(0);
 }
@@ -2068,7 +2052,7 @@ TEST_F(NValueTest, TestSubstring)
     Pool* testPool = new Pool();
     UndoQuantum* wantNoQuantum = NULL;
     Topend* topless = NULL;
-    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, false, "", 0);
+    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0, NULL);
     std::vector<std::string> testData;
     testData.push_back("abcdefg");
     testData.push_back("âbcdéfg");
@@ -2123,9 +2107,9 @@ TEST_F(NValueTest, TestSubstring)
                 EXPECT_TRUE(rightExactStringValue.compare(rightDefaultStringValue) == 0);
                 EXPECT_TRUE(rightSureStringValue.compare(rightDefaultStringValue) == 0);
 
-                std::string leftString = ValuePeeker::peekStringCopy(leftStringValue);
-                std::string midString = ValuePeeker::peekStringCopy(midStringValue);
-                std::string rightString = ValuePeeker::peekStringCopy(rightExactStringValue);
+                std::string leftString = ValuePeeker::peekStringCopy_withoutNull(leftStringValue);
+                std::string midString = ValuePeeker::peekStringCopy_withoutNull(midStringValue);
+                std::string rightString = ValuePeeker::peekStringCopy_withoutNull(rightExactStringValue);
                 std::string recombined = leftString + midString + rightString;
                 EXPECT_TRUE(testDatum.compare(recombined) == 0);
 
@@ -2160,7 +2144,7 @@ TEST_F(NValueTest, TestExtract)
     Pool* testPool = new Pool();
     UndoQuantum* wantNoQuantum = NULL;
     Topend* topless = NULL;
-    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, false, "", 0);
+    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0, NULL);
 
     NValue result;
     NValue midSeptember = ValueFactory::getTimestampValue(1000000000000000);
@@ -2293,7 +2277,7 @@ static NValue streamNValueArrayintoInList(ValueType vt, NValue* nvalue, int leng
     char serial_buffer[1024];
     // This requires intimate knowledge of ARRAY wire protocol
     ReferenceSerializeOutput setup(serial_buffer, sizeof(serial_buffer));
-    ReferenceSerializeInput input(serial_buffer, sizeof(serial_buffer));
+    ReferenceSerializeInputBE input(serial_buffer, sizeof(serial_buffer));
     setup.writeByte(VALUE_TYPE_ARRAY);
     setup.writeByte(vt);
     setup.writeShort((short)length); // number of list elements
@@ -2356,13 +2340,13 @@ TEST_F(NValueTest, TestInList)
     UndoQuantum* wantNoQuantum = NULL;
     Topend* topless = NULL;
     ExecutorContext* poolHolder =
-        new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, false, "", 0);
+        new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0, NULL);
 
     int int_set1[] = { 10, 2, -3 };
     int int_set2[] = { 0, 1, 100, 10000, 1000000 };
 
-    const int int_length1 = SIZE_OF_ARRAY(int_set1);
-    const int int_length2 = SIZE_OF_ARRAY(int_set2);
+    const size_t int_length1 = SIZE_OF_ARRAY(int_set1);
+    const size_t int_length2 = SIZE_OF_ARRAY(int_set2);
     NValue int_NV_set1[int_length1];
     NValue int_NV_set2[int_length2];
     initNValueArray(int_NV_set1, int_set1, int_length1);
@@ -2453,8 +2437,8 @@ TEST_F(NValueTest, TestInList)
     const char* string_set1[] = { "10", "2", "-3" };
     const char* string_set2[] = { "0", "1", "100", "10000", "1000000" };
 
-    const int string_length1 = SIZE_OF_ARRAY(string_set1);
-    const int string_length2 = SIZE_OF_ARRAY(string_set2);
+    const size_t string_length1 = SIZE_OF_ARRAY(string_set1);
+    const size_t string_length2 = SIZE_OF_ARRAY(string_set2);
     NValue string_NV_set1[string_length1];
     NValue string_NV_set2[string_length2];
     initNValueArray(string_NV_set1, string_set1, string_length1);
@@ -2564,7 +2548,7 @@ TEST_F(NValueTest, TestDedupAndSort) {
     UndoQuantum* wantNoQuantum = NULL;
     Topend* topless = NULL;
     ExecutorContext* poolHolder =
-    new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, false, "", 0);
+    new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0, NULL);
 
     std::vector<NValue> vectorValues;
     NValue arrayValue;
@@ -2770,7 +2754,7 @@ TEST_F(NValueTest, TestTimestampStringParse)
     Pool* testPool = new Pool();
     UndoQuantum* wantNoQuantum = NULL;
     Topend* topless = NULL;
-    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, false, "", 0);
+    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0, NULL);
 
     bool failed = false;
     const char* trials[] = {
@@ -2794,6 +2778,7 @@ TEST_F(NValueTest, TestTimestampStringParse)
         "2000-01-01 01:01:0.000000",
         "2000-01-01 01:01:01000000",
         "2000-01-01 01:01:01.00000",
+        "2000-01-01 01:01:01.999 ",
         //Variants of "2000-01-01 01:01:01.000000" with an added character,
         "02000-01-01 01:01:01.000000",
         "20000-01-01 01:01:01.000000",
@@ -2816,8 +2801,42 @@ TEST_F(NValueTest, TestTimestampStringParse)
         "2000-01-01 30:01:01.000000",
         "2000-01-01 25:01:01.000000",
         "2000-01-01 01:60:01.000000",
+        "2000-01-01 01:60:01.-00001",
+        "2000-01-01 01:60:01.-12345",
+        "2000-01-01 01:60:01.-123456",
+        "2000-01-01 01:60:01.-9999999",
+        "2000-01-01 01:60:01.9999999",
+        "2000-01-01 01:01:01.999abc",
+        "2000-01-01 01:01:01.a999bc",
+        "2000-01-01 01:01:01. 999bc",
+        "2000-01-01 01:01:01.aaaaaa",
+        //Variants of "2000-01-01" with a dropped character
+        "200-01-01",
+        "200001-01",
+        "2000-1-01",
+        "2000-0-01",
+        "2000-0101",
+        "2000-01-1",
+        "2000-01-0",
+        //Variants of "2000-01-01" with an added character,
+        "02000-01-01",
+        "20000-01-01",
+        "2000-001-01",
+        "2000-010-01",
+        "2000-01-001",
+        "2000-01-010",
+        //Variants of "2000-01-01" with an out-of-range component,
+        "2000-21-01",
+        "2000-13-01",
+        "2000-01-41",
+        "2000-01-32",
+        "2000-01-2a",
+        "2000-01-a2",
+        "2000-01-aa",
+        "2000-01- 2",
+        "2000-01-2 ",
         };
-    int ii = sizeof(trials) / sizeof(const char*);
+    size_t ii = sizeof(trials) / sizeof(const char*);
     while (ii--) {
         try {
             NValue::parseTimestampString(trials[ii]);
@@ -2847,7 +2866,7 @@ TEST_F(NValueTest, TestTimestampStringParse)
     try {
         NValue ts = ValueFactory::getTimestampValue(base);
         NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
-        peekString = ValuePeeker::peekStringCopy(str);
+        peekString = ValuePeeker::peekStringCopy_withoutNull(str);
         long roundtrip = NValue::parseTimestampString(peekString.c_str());
         EXPECT_EQ(base, roundtrip);
         if (base != roundtrip) {
@@ -2978,7 +2997,7 @@ TEST_F(NValueTest, TestTimestampStringParse)
         try {
             NValue ts = ValueFactory::getTimestampValue(jj);
             NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
-            peekString = ValuePeeker::peekStringCopy(str);
+            peekString = ValuePeeker::peekStringCopy_withoutNull(str);
             long roundtrip = NValue::parseTimestampString(peekString.c_str());
             EXPECT_EQ(jj, roundtrip);
             if (jj != roundtrip) {
@@ -2993,6 +3012,212 @@ TEST_F(NValueTest, TestTimestampStringParse)
             break;
         }
     }
+    delete poolHolder;
+    delete testPool;
+}
+
+TEST_F(NValueTest, TestTimestampStringParseShort)
+{
+    assert(ExecutorContext::getExecutorContext() == NULL);
+    Pool* testPool = new Pool();
+    UndoQuantum* wantNoQuantum = NULL;
+    Topend* topless = NULL;
+    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0, NULL);
+
+    std::string peekString;
+
+    char dateStr[11] = {0};
+    char dateStr2[27] = {0};
+    try {
+        // volt does not support date prior to 1583-01-01
+        // see src/ee/expressions/datefunctions.h
+        for (int century = 16; century <= 90; ++century) {
+            snprintf(dateStr, sizeof(dateStr), "%02d00-12-31", century);
+            snprintf(dateStr2, sizeof(dateStr2), "%02d00-12-31 00:00:00.000000", century);
+            int64_t value = NValue::parseTimestampString(dateStr);
+            NValue ts = ValueFactory::getTimestampValue(value);
+            NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
+            peekString = ValuePeeker::peekStringCopy_withoutNull(str);
+            EXPECT_EQ(peekString, dateStr2);
+            if (peekString.compare(dateStr2) != 0) {
+                cout << "Failing for compare ts string " << peekString << " vs ts string " <<
+                    dateStr2 << endl;
+            }
+            str.free();
+        }
+    } catch(SQLException& exc) {
+        cout << "I have no idea what happen here " << exc.message() << " " << dateStr << endl;
+        EXPECT_FALSE(true);
+    }
+
+    try {
+        // volt does not support date prior to 1583-01-01
+        // see src/ee/expressions/datefunctions.h
+        for (int century = 16; century <= 90; ++century) {
+            snprintf(dateStr, sizeof(dateStr), "%02d00-12-31", century);
+            snprintf(dateStr2, sizeof(dateStr2), "%02d00-12-31 00:00:00.000000", century);
+            int64_t base = NValue::parseTimestampString(dateStr2);
+            NValue str = ValueFactory::getStringValue(dateStr);
+            NValue ts = str.castAs(VALUE_TYPE_TIMESTAMP);
+            int64_t value = ValuePeeker::peekTimestamp(ts);
+            EXPECT_EQ(base, value);
+            if (base != value) {
+                cout << "Failing for converting ts string " << dateStr << " to the same value as " <<
+                    dateStr2 << endl;
+            }
+            str.free();
+        }
+    } catch(SQLException& exc) {
+        cout << "I have no idea what happen here " << exc.message() << " " << dateStr << endl;
+        EXPECT_FALSE(true);
+    }
+
+    delete poolHolder;
+    delete testPool;
+}
+
+TEST_F(NValueTest, TestTimestampStringParseWithLeadingAndTrailingSpaces)
+{
+    assert(ExecutorContext::getExecutorContext() == NULL);
+    Pool* testPool = new Pool();
+    UndoQuantum* wantNoQuantum = NULL;
+    Topend* topless = NULL;
+    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0, NULL);
+
+    std::string peekString;
+
+    char dateStr[32] = {0};
+    char dateStr2[27] = {0};
+
+    // test leading space
+    try {
+        for (int century = 16; century <= 90; ++century) {
+            snprintf(dateStr, sizeof(dateStr), "  %02d00-11-30", century);
+            dateStr[12] = 0;
+            snprintf(dateStr2, sizeof(dateStr2), "%02d00-11-30 00:00:00.000000", century);
+            int64_t value = NValue::parseTimestampString(dateStr);
+            NValue ts = ValueFactory::getTimestampValue(value);
+            NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
+            peekString = ValuePeeker::peekStringCopy_withoutNull(str);
+            EXPECT_EQ(peekString, dateStr2);
+            if (peekString.compare(dateStr2) != 0) {
+                cout << "Failing for compare ts string " << peekString << " vs ts string " <<
+                    dateStr2 << endl;
+            }
+            str.free();
+        }
+    } catch(SQLException& exc) {
+        cout << "I have no idea what happen here " << exc.message() << " " << dateStr << endl;
+        EXPECT_FALSE(true);
+    }
+
+    try {
+        for (int century = 16; century <= 90; ++century) {
+            snprintf(dateStr, sizeof(dateStr), "  %02d00-11-30 00:00:00.000000", century);
+            dateStr[28] = 0;
+            snprintf(dateStr2, sizeof(dateStr2), "%02d00-11-30 00:00:00.000000", century);
+            int64_t value = NValue::parseTimestampString(dateStr);
+            NValue ts = ValueFactory::getTimestampValue(value);
+            NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
+            peekString = ValuePeeker::peekStringCopy_withoutNull(str);
+            EXPECT_EQ(peekString, dateStr2);
+            if (peekString.compare(dateStr2) != 0) {
+                cout << "Failing for compare ts string " << peekString << " vs ts string " <<
+                    dateStr2 << endl;
+            }
+            str.free();
+        }
+    } catch(SQLException& exc) {
+        cout << "I have no idea what happen here " << exc.message() << " " << dateStr << endl;
+        EXPECT_FALSE(true);
+    }
+
+    // test trailing space
+    try {
+        for (int century = 16; century <= 90; ++century) {
+            snprintf(dateStr, sizeof(dateStr), "%02d00-10-29  ", century);
+            dateStr[12] = 0;
+            snprintf(dateStr2, sizeof(dateStr2), "%02d00-10-29 00:00:00.000000", century);
+            int64_t value = NValue::parseTimestampString(dateStr);
+            NValue ts = ValueFactory::getTimestampValue(value);
+            NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
+            peekString = ValuePeeker::peekStringCopy_withoutNull(str);
+            EXPECT_EQ(peekString, dateStr2);
+            if (peekString.compare(dateStr2) != 0) {
+                cout << "Failing for compare ts string " << peekString << " vs ts string " <<
+                    dateStr2 << endl;
+            }
+            str.free();
+        }
+    } catch(SQLException& exc) {
+        cout << "I have no idea what happen here " << exc.message() << " " << dateStr << endl;
+        EXPECT_FALSE(true);
+    }
+
+    try {
+        for (int century = 16; century <= 90; ++century) {
+            snprintf(dateStr, sizeof(dateStr), "%02d00-11-30 00:00:00.000000  ", century);
+            dateStr[28] = 0;
+            snprintf(dateStr2, sizeof(dateStr2), "%02d00-11-30 00:00:00.000000", century);
+            int64_t value = NValue::parseTimestampString(dateStr);
+            NValue ts = ValueFactory::getTimestampValue(value);
+            NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
+            peekString = ValuePeeker::peekStringCopy_withoutNull(str);
+            EXPECT_EQ(peekString, dateStr2);
+            if (peekString.compare(dateStr2) != 0) {
+                cout << "Failing for compare ts string " << peekString << " vs ts string " <<
+                    dateStr2 << endl;
+            }
+            str.free();
+        }
+    } catch(SQLException& exc) {
+        cout << "I have no idea what happen here " << exc.message() << " " << dateStr << endl;
+        EXPECT_FALSE(true);
+    }
+
+    // test leading and trailing space
+    try {
+        for (int century = 16; century <= 90; ++century) {
+            snprintf(dateStr, sizeof(dateStr), " %02d00-12-31 ", century);
+            dateStr[12] = 0;
+            snprintf(dateStr2, sizeof(dateStr2), "%02d00-12-31 00:00:00.000000", century);
+            int64_t value = NValue::parseTimestampString(dateStr);
+            NValue ts = ValueFactory::getTimestampValue(value);
+            NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
+            peekString = ValuePeeker::peekStringCopy_withoutNull(str);
+            EXPECT_EQ(peekString, dateStr2);
+            if (peekString.compare(dateStr2) != 0) {
+                cout << "Failing for compare ts string " << peekString << " vs ts string " <<
+                    dateStr2 << endl;
+            }
+            str.free();
+        }
+    } catch(SQLException& exc) {
+        cout << "I have no idea what happen here " << exc.message() << " " << dateStr << endl;
+        EXPECT_FALSE(true);
+    }
+
+    try {
+        for (int century = 16; century <= 90; ++century) {
+            snprintf(dateStr, sizeof(dateStr), " %02d00-11-30 00:00:00.000000 ", century);
+            dateStr[28] = 0;
+            snprintf(dateStr2, sizeof(dateStr2), "%02d00-11-30 00:00:00.000000", century);
+            int64_t value = NValue::parseTimestampString(dateStr);
+            NValue ts = ValueFactory::getTimestampValue(value);
+            NValue str = ts.castAs(VALUE_TYPE_VARCHAR);
+            peekString = ValuePeeker::peekStringCopy_withoutNull(str);
+            EXPECT_EQ(peekString, dateStr2);
+            if (peekString.compare(dateStr2) != 0) {
+                cout << "Failing for compare ts string " << peekString << " vs ts string " <<
+                    dateStr2 << endl;
+            }
+            str.free();
+        }
+    } catch(SQLException& exc) {
+        cout << "I have no idea what happen here " << exc.message() << " " << dateStr << endl;
+        EXPECT_FALSE(true);
+    }
+
     delete poolHolder;
     delete testPool;
 }

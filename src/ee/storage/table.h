@@ -54,6 +54,7 @@
 #include <list>
 #include <cassert>
 
+#include "common/declarations.h"
 #include "common/ids.h"
 #include "common/types.h"
 #include "common/TupleSchema.h"
@@ -66,25 +67,6 @@
 #include "stx/btree_set.h"
 
 namespace voltdb {
-
-class TableIndex;
-class TableColumn;
-class TableTuple;
-class TableFactory;
-class TableIterator;
-class CopyOnWriteIterator;
-class CopyOnWriteContext;
-class UndoLog;
-class ReadWriteSet;
-class SerializeInput;
-class SerializeOutput;
-class TableStats;
-class StatsSource;
-class StreamBlock;
-class Topend;
-class TupleBlock;
-class PersistentTableUndoDeleteAction;
-class PersistentTableUndoTruncateTableAction;
 
 const size_t COLUMN_DESCRIPTOR_SIZE = 1 + 4 + 4; // type, name offset, name length
 
@@ -139,6 +121,7 @@ class Table {
     // ------------------------------------------------------------------
     virtual TableIterator& iterator() = 0;
     virtual TableIterator *makeIterator() = 0;
+    virtual TableIterator& iteratorDeletingAsWeGo() = 0;
 
     // ------------------------------------------------------------------
     // OPERATIONS
@@ -189,6 +172,10 @@ class Table {
     // Only counts persistent table usage, currently
     int64_t nonInlinedMemorySize() const {
         return m_nonInlinedMemorySize;
+    }
+
+    virtual int tupleLimit() const {
+        return INT_MIN;
     }
 
     // ------------------------------------------------------------------
@@ -274,17 +261,19 @@ class Table {
      * Loads only tuple data and assumes there is no schema present.
      * Used for recovery where the schema is not sent.
      */
-    void loadTuplesFromNoHeader(SerializeInput &serialize_in,
+    void loadTuplesFromNoHeader(SerializeInputBE &serialize_in,
                                 Pool *stringPool = NULL,
-                                ReferenceSerializeOutput *uniqueViolationOutput = NULL);
+                                ReferenceSerializeOutput *uniqueViolationOutput = NULL,
+                                bool shouldDRStreamRows = false);
 
     /**
      * Loads only tuple data, not schema, from the serialized table.
      * Used for initial data loading and receiving dependencies.
      */
-    void loadTuplesFrom(SerializeInput &serialize_in,
+    void loadTuplesFrom(SerializeInputBE &serialize_in,
                         Pool *stringPool = NULL,
-                        ReferenceSerializeOutput *uniqueViolationOutput = NULL);
+                        ReferenceSerializeOutput *uniqueViolationOutput = NULL,
+                        bool shouldDRStreamRows = false);
 
 
     // ------------------------------------------------------------------
@@ -368,7 +357,8 @@ protected:
     virtual void processLoadedTuple(TableTuple &tuple,
                                     ReferenceSerializeOutput *uniqueViolationOutput,
                                     int32_t &serializedTupleCount,
-                                    size_t &tupleCountPosition) {
+                                    size_t &tupleCountPosition,
+                                    bool shouldDRStreamRow) {
     };
 
     virtual void swapTuples(TableTuple &sourceTupleWithNewValues, TableTuple &destinationTuple) {
@@ -383,6 +373,10 @@ public:
 protected:
     // virtual block management functions
     virtual void nextFreeTuple(TableTuple *tuple) = 0;
+    virtual void freeLastScanedBlock(std::vector<TBPtr>::iterator nextBlockIterator) {
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                     "May not use freeLastScanedBlock with streamed tables or persistent tables.");
+    }
 
     Table(int tableAllocationTargetSize);
     void resetTable();
@@ -394,20 +388,14 @@ protected:
         if (m_tuplesPinnedByUndo != 0) {
             return false;
         }
-        return allocatedTupleCount() - activeTupleCount() > (m_tuplesPerBlock * 3) && loadFactor() < .95;
+        return allocatedTupleCount() - activeTupleCount() > std::max(static_cast<int64_t>((m_tuplesPerBlock * 3)), (allocatedTupleCount() * (100 - m_compactionThreshold)) / 100);  /* using the integer percentage */
     }
 
-    void initializeWithColumns(TupleSchema *schema, const std::vector<std::string> &columnNames, bool ownsTupleSchema);
+    void initializeWithColumns(TupleSchema *schema, const std::vector<std::string> &columnNames, bool ownsTupleSchema, int32_t compactionThreshold = 95);
 
     // per table-type initialization
     virtual void onSetColumns() {
     };
-
-    double loadFactor() {
-        return static_cast<double>(activeTupleCount()) /
-            static_cast<double>(allocatedTupleCount());
-    }
-
 
     // ------------------------------------------------------------------
     // DATA
@@ -439,6 +427,7 @@ protected:
     bool m_ownsTupleSchema;
 
     const int m_tableAllocationTargetSize;
+    // This is one block size allocated for this table, equals = m_tuplesPerBlock * m_tupleLength
     int m_tableAllocationSize;
 
     // indexes
@@ -451,6 +440,7 @@ protected:
   private:
     int32_t m_refcount;
     ThreadLocalPool m_tlPool;
+    int m_compactionThreshold;
 };
 
 }

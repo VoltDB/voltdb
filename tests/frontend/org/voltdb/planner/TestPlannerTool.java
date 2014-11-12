@@ -57,10 +57,10 @@ public class TestPlannerTool extends TestCase {
         }*/
 
         byte[] bytes = MiscUtils.fileToBytes(new File("tpcc-oop.jar"));
-        String serializedCatalog = CatalogUtil.loadCatalogFromJar(bytes, null);
+        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes).getFirst());
         Catalog catalog = new Catalog();
         catalog.execute(serializedCatalog);
-        CatalogContext context = new CatalogContext(0, 0, catalog, bytes, 0, 0, 0);
+        CatalogContext context = new CatalogContext(0, 0, catalog, bytes, null, 0, 0);
 
         m_pt = new PlannerTool(context.cluster, context.database, 0);
 
@@ -68,7 +68,7 @@ public class TestPlannerTool extends TestCase {
         result = m_pt.planSqlForTest("select * from warehouse;");
         System.out.println(result);
 
-        // try too many tables
+        // try many tables joins
         try {
             result = m_pt.planSqlForTest("select * from WAREHOUSE, DISTRICT, CUSTOMER, CUSTOMER_NAME, HISTORY, STOCK, ORDERS, NEW_ORDER, ORDER_LINE where " +
                 "WAREHOUSE.W_ID = DISTRICT.D_W_ID and " +
@@ -80,9 +80,11 @@ public class TestPlannerTool extends TestCase {
                 "WAREHOUSE.W_ID = NEW_ORDER.NO_W_ID and " +
                 "WAREHOUSE.W_ID = ORDER_LINE.OL_W_ID and " +
                 "WAREHOUSE.W_ID = 0");
+        }
+        catch (Exception e) {
+            // V4.5 supports multiple table joins
             fail();
         }
-        catch (Exception e) {}
 
         // commented out code put the big stat
         /*int i = 0;
@@ -149,11 +151,11 @@ public class TestPlannerTool extends TestCase {
         jar.deleteOnExit();
         builder.compile("testbadddl-oop.jar");
         byte[] bytes = MiscUtils.fileToBytes(new File("testbadddl-oop.jar"));
-        String serializedCatalog = CatalogUtil.loadCatalogFromJar(bytes, null);
+        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes).getFirst());
         assertNotNull(serializedCatalog);
         Catalog c = new Catalog();
         c.execute(serializedCatalog);
-        CatalogContext context = new CatalogContext(0, 0, c, bytes, 0, 0, 0);
+        CatalogContext context = new CatalogContext(0, 0, c, bytes, null, 0, 0);
 
         m_pt = new PlannerTool(context.cluster, context.database, 0);
 

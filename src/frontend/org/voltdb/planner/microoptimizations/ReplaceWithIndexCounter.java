@@ -23,8 +23,6 @@ import java.util.List;
 import org.voltdb.catalog.Index;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
-import org.voltdb.planner.AbstractParsedStmt;
-import org.voltdb.planner.CompiledPlan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
@@ -37,20 +35,7 @@ import org.voltdb.types.ExpressionType;
 public class ReplaceWithIndexCounter extends MicroOptimization {
 
     @Override
-    public List<CompiledPlan> apply(CompiledPlan plan, AbstractParsedStmt parsedStmt) {
-        this.m_parsedStmt = parsedStmt;
-
-        ArrayList<CompiledPlan> retval = new ArrayList<CompiledPlan>();
-
-        AbstractPlanNode planGraph = plan.rootPlanGraph;
-        planGraph = recursivelyApply(planGraph);
-        plan.rootPlanGraph = planGraph;
-
-        retval.add(plan);
-        return retval;
-    }
-
-    AbstractPlanNode recursivelyApply(AbstractPlanNode plan)
+    protected AbstractPlanNode recursivelyApply(AbstractPlanNode plan)
     {
         assert(plan != null);
 
@@ -92,6 +77,7 @@ public class ReplaceWithIndexCounter extends MicroOptimization {
             if (((SeqScanPlanNode)child).getPredicate() != null) {
                 return plan;
             }
+
             AbstractExpression postPredicate = aggplan.getPostPredicate();
             if (postPredicate != null) {
                 List<AbstractExpression> aggList = postPredicate.findAllSubexpressionsOfClass(AggregateExpression.class);
@@ -115,6 +101,11 @@ public class ReplaceWithIndexCounter extends MicroOptimization {
             return plan;
 
         IndexScanPlanNode isp = (IndexScanPlanNode)child;
+
+        // Guard against (possible future?) cases of indexable subquery.
+        if (((IndexScanPlanNode)child).isSubQuery()) {
+            return plan;
+        }
 
         // An index count or table count can replace an index scan only if it has no (post-)predicates
         // except those (post-)predicates are artifact predicates we added for reverse scan purpose only

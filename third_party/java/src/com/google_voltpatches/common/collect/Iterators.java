@@ -102,7 +102,12 @@ public final class Iterators {
    *
    * <p>The {@link Iterable} equivalent of this method is {@link
    * ImmutableSet#of()}.
+   *
+   * @deprecated Use {@code ImmutableSet.<T>of().iterator()} instead; or for
+   *     Java 7 or later, {@link Collections#emptyIterator}. This method is
+   *     scheduled for removal in May 2016.
    */
+  @Deprecated
   public static <T> UnmodifiableIterator<T> emptyIterator() {
     return emptyListIterator();
   }
@@ -973,12 +978,17 @@ public final class Iterators {
         iterator.remove();
         return next;
       }
+
+      @Override
+      public String toString() {
+        return "Iterators.consumingIterator(...)";
+      }
     };
   }
 
   /**
    * Deletes and returns the next value from the iterator, or returns
-   * {@code defaultValue} if there is no such value.
+   * {@code null} if there is no such value.
    */
   @Nullable
   static <T> T pollNext(Iterator<T> iterator) {

@@ -63,26 +63,23 @@ PlanNodeFragment::PlanNodeFragment()
 PlanNodeFragment::PlanNodeFragment(AbstractPlanNode *root_node)
 {
     m_serializedType = "org.voltdb.plannodes.PlanNodeList";
-    if (constructTree(root_node) != true) {
-        throwFatalException("Failed to construct plan fragment");
-    }
+    constructTree(root_node);
 }
 
-bool PlanNodeFragment::constructTree(AbstractPlanNode* node) {
+void PlanNodeFragment::constructTree(AbstractPlanNode* node)
+{
     if (m_idToNodeMap.find(node->getPlanNodeId()) == m_idToNodeMap.end()) {
         m_planNodes.push_back(node);
         m_idToNodeMap[node->getPlanNodeId()] = node;
         std::vector<AbstractPlanNode*> children = node->getChildren();
         for (int ii = 0; ii < children.size(); ++ii) {
-            if (!constructTree(children[ii])) {
-                return false;
-            }
+            constructTree(children[ii]);
         }
     }
-    return true;
 }
 
-PlanNodeFragment::~PlanNodeFragment() {
+PlanNodeFragment::~PlanNodeFragment()
+{
     for (int ii = 0; ii < m_planNodes.size(); ii++) {
         delete m_planNodes[ii];
     }
@@ -121,15 +118,8 @@ PlanNodeFragment::fromJSONObject(PlannerDomValue obj)
     for (std::vector< AbstractPlanNode* >::const_iterator node = pnf->m_planNodes.begin();
          node != pnf->m_planNodes.end(); ++node) {
         const std::vector<CatalogId> childIds = (*node)->getChildIds();
-        std::vector<AbstractPlanNode*> &children = (*node)->getChildren();
         for (int zz = 0; zz < childIds.size(); zz++) {
-            children.push_back(pnf->m_idToNodeMap[childIds[zz]]);
-        }
-
-        const std::vector<CatalogId> parentIds = (*node)->getParentIds();
-        std::vector<AbstractPlanNode*> &parents = (*node)->getParents();
-        for (int zz = 0; zz < parentIds.size(); zz++) {
-            parents.push_back(pnf->m_idToNodeMap[parentIds[zz]]);
+            (*node)->addChild(pnf->m_idToNodeMap[childIds[zz]]);
         }
     }
     pnf->loadFromJSONObject(obj);
@@ -148,27 +138,26 @@ PlanNodeFragment::loadFromJSONObject(PlannerDomValue obj)
         m_executionList.push_back(m_idToNodeMap[executeListArray.valueAtIndex(i).asInt()]);
     }
 
-    PlannerDomValue parametersArray = obj.valueForKey("PARAMETERS");
-    for (int i = 0; i < parametersArray.arrayLen(); i++) {
-        PlannerDomValue parameterArray = parametersArray.valueAtIndex(i);
-        int index = parameterArray.valueAtIndex(0).asInt();
-        std::string typeString = parameterArray.valueAtIndex(1).asStr();
-        parameters.push_back(std::pair< int, voltdb::ValueType>(index, stringToValue(typeString)));
+    if (obj.hasKey("PARAMETERS")) {
+        PlannerDomValue parametersArray = obj.valueForKey("PARAMETERS");
+        for (int i = 0; i < parametersArray.arrayLen(); i++) {
+            PlannerDomValue parameterArray = parametersArray.valueAtIndex(i);
+            int index = parameterArray.valueAtIndex(0).asInt();
+            std::string typeString = parameterArray.valueAtIndex(1).asStr();
+            parameters.push_back(std::pair< int, voltdb::ValueType>(index, stringToValue(typeString)));
+        }
     }
 }
 
 bool PlanNodeFragment::hasDelete() const
 {
     bool has_delete = false;
-    for (int ii = 0; ii < m_planNodes.size(); ii++)
-    {
-        if (m_planNodes[ii]->getPlanNodeType() == PLAN_NODE_TYPE_DELETE)
-        {
+    for (int ii = 0; ii < m_planNodes.size(); ii++) {
+        if (m_planNodes[ii]->getPlanNodeType() == PLAN_NODE_TYPE_DELETE) {
             has_delete = true;
             break;
         }
-        if (m_planNodes[ii]->getInlinePlanNode(PLAN_NODE_TYPE_DELETE) != NULL)
-        {
+        if (m_planNodes[ii]->getInlinePlanNode(PLAN_NODE_TYPE_DELETE) != NULL) {
             has_delete = true;
             break;
         }
@@ -176,13 +165,15 @@ bool PlanNodeFragment::hasDelete() const
     return has_delete;
 }
 
-std::string PlanNodeFragment::debug() {
+std::string PlanNodeFragment::debug()
+{
     std::ostringstream buffer;
     buffer << "Execute List:\n";
     for (int ctr = 0, cnt = (int)m_executionList.size(); ctr < cnt; ctr++) {
         buffer << "   [" << ctr << "]: " << m_executionList[ctr]->debug() << "\n";
     }
     buffer << "Execute Tree:\n";
-    buffer << getRootNode()->debug(true);
+    static const std::string no_spacer("");
+    buffer << getRootNode()->debug(no_spacer);
     return (buffer.str());
 }

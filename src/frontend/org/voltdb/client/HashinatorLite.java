@@ -24,6 +24,7 @@ import java.nio.ByteOrder;
 import java.util.zip.InflaterOutputStream;
 
 import org.apache.cassandra_voltpatches.MurmurHash3;
+import org.voltcore.utils.Bits;
 import org.voltcore.utils.Pair;
 import org.voltdb.ParameterConverter;
 import org.voltdb.VoltType;
@@ -70,28 +71,6 @@ public class HashinatorLite {
     private long m_etokens = 0;
     private int m_etokenCount;
 
-    private final sun.misc.Unsafe unsafe;
-
-    private sun.misc.Unsafe getUnsafe() {
-        try {
-            return sun.misc.Unsafe.getUnsafe();
-        } catch (SecurityException se) {
-            try {
-                return java.security.AccessController.doPrivileged(new java.security.PrivilegedExceptionAction<sun.misc.Unsafe>() {
-                    @Override
-                    public sun.misc.Unsafe run() throws Exception {
-                        java.lang.reflect.Field f = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
-                        f.setAccessible(true);
-                        return (sun.misc.Unsafe) f.get(null);
-                    }
-                });
-            } catch (java.security.PrivilegedActionException e) {
-                throw new RuntimeException("Could not initialize intrinsics",
-                        e.getCause());
-            }
-        }
-    }
-
     private final HashinatorLiteType m_type;
 
     public HashinatorLiteType getType() {
@@ -104,7 +83,6 @@ public class HashinatorLite {
      */
     public HashinatorLite(HashinatorLiteType type, byte configBytes[], boolean cooked) {
         m_type = type;
-        unsafe = getUnsafe();
 
         if (type == HashinatorLiteType.ELASTIC) {
             Pair<Long, Integer> p = (cooked ? updateCooked(configBytes) : updateRaw(configBytes));
@@ -123,7 +101,7 @@ public class HashinatorLite {
     @Override
     public void finalize() {
         if (m_etokens != 0) {
-            unsafe.freeMemory(m_etokens);
+            Bits.unsafe.freeMemory(m_etokens);
         }
     }
 
@@ -150,7 +128,7 @@ public class HashinatorLite {
         if (numEntries <= 0 || cookedBytes.length != 4 + tokensSize + partitionsSize) {
             throw new RuntimeException("Bad elastic hashinator cooked config size.");
         }
-        long tokens = unsafe.allocateMemory(8 * numEntries);
+        long tokens = Bits.unsafe.allocateMemory(8 * numEntries);
         ByteBuffer tokenBuf = ByteBuffer.wrap(cookedBytes, 4, tokensSize);
         ByteBuffer partitionBuf = ByteBuffer.wrap(cookedBytes, 4 + tokensSize, partitionsSize);
         int tokensArray[] = new int[numEntries];
@@ -168,9 +146,9 @@ public class HashinatorLite {
             Preconditions.checkArgument(token >= lastToken);
             lastToken = token;
             long ptr = tokens + (ii * 8);
-            unsafe.putInt(ptr, token);
+            Bits.unsafe.putInt(ptr, token);
             final int partitionId = partitionBuf.getInt();
-            unsafe.putInt(ptr + 4, partitionId);
+            Bits.unsafe.putInt(ptr + 4, partitionId);
         }
         return Pair.of(tokens, numEntries);
     }
@@ -187,16 +165,16 @@ public class HashinatorLite {
         if (numEntries < 0) {
             throw new RuntimeException("Bad elastic hashinator config");
         }
-        long tokens = unsafe.allocateMemory(8 * numEntries);
+        long tokens = Bits.unsafe.allocateMemory(8 * numEntries);
         int lastToken = Integer.MIN_VALUE;
         for (int ii = 0; ii < numEntries; ii++) {
             long ptr = tokens + (ii * 8);
             final int token = buf.getInt();
             Preconditions.checkArgument(token >= lastToken);
             lastToken = token;
-            unsafe.putInt(ptr, token);
+            Bits.unsafe.putInt(ptr, token);
             final int partitionId = buf.getInt();
-            unsafe.putInt(ptr + 4, partitionId);
+            Bits.unsafe.putInt(ptr + 4, partitionId);
         }
         return Pair.of(tokens, numEntries);
     }
@@ -237,7 +215,7 @@ public class HashinatorLite {
      */
     public int partitionForToken(int hash) {
         long token = getTokenPtr(hash);
-        return unsafe.getInt(token + 4);
+        return Bits.unsafe.getInt(token + 4);
     }
 
     /**
@@ -257,7 +235,7 @@ public class HashinatorLite {
             ByteBuffer buf = ByteBuffer.wrap(bytes);
             final int hash = MurmurHash3.hash3_x64_128(buf, 0, bytes.length, 0);
             long token = getTokenPtr(hash);
-            return unsafe.getInt(token + 4);
+            return Bits.unsafe.getInt(token + 4);
         } else {
             int hashCode = 0;
             int offset = 0;
@@ -275,7 +253,7 @@ public class HashinatorLite {
         while (min <= max) {
             int mid = (min + max) >>> 1;
             final long midPtr = m_etokens + (8 * mid);
-            int midval = unsafe.getInt(midPtr);
+            int midval = Bits.unsafe.getInt(midPtr);
 
             if (midval < hash) {
                 min = mid + 1;

@@ -691,7 +691,7 @@ final class DIProcedureInfo {
             }
         } catch (Exception e) {}
 
-        // VARBINARY : org.hsqldb.Binary is not final
+        // VARBINARY : org.hsqldb_voltpatches.Binary is not final
         if (BinaryData.class.isAssignableFrom(c)) {
             return Types.SQL_VARBINARY;
         }

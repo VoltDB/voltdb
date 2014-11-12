@@ -28,7 +28,11 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -51,6 +55,9 @@ public class TestDistributer extends TestCase {
         volatile boolean gotPing = false;
         AtomicBoolean sendResponses = new AtomicBoolean(true);
         AtomicBoolean sendProcTimeout = new AtomicBoolean(false);
+        volatile Semaphore invokedSubscribe = new Semaphore(0);
+        volatile Semaphore invokedTopology = new Semaphore(0);
+        volatile Semaphore invokedSystemInformation = new Semaphore(0);
 
         @Override
         public int getMaxRead() {
@@ -63,14 +70,25 @@ public class TestDistributer extends TestCase {
                 StoredProcedureInvocation spi = new StoredProcedureInvocation();
                 spi.initFromBuffer(message);
 
+                final String proc = spi.getProcName();
+
                 // record if we got a ping
-                if (spi.getProcName().equals("@Ping"))
+                if (proc.equals("@Ping"))
                     gotPing = true;
 
                 if (sendResponses.get()) {
-                    VoltTable vt[] = new VoltTable[1];
-                    vt[0] = new VoltTable(new VoltTable.ColumnInfo("Foo", VoltType.BIGINT));
-                    vt[0].addRow(1);
+                    VoltTable vt[] = new VoltTable[0];
+                    if (proc.equals("@Subscribe")) {
+                        invokedSubscribe.release();
+                    } else if (proc.equals("@Statistics")) {
+                        invokedTopology.release();
+                    } else if (proc.equals("@SystemCatalog")) {
+                        invokedSystemInformation.release();
+                    } else {
+                        vt = new VoltTable[1];
+                        vt[0] = new VoltTable(new VoltTable.ColumnInfo("Foo", VoltType.BIGINT));
+                        vt[0].addRow(1);
+                    }
                     ClientResponseImpl response;
                     if (sendProcTimeout.get()) {
                         response = new ClientResponseImpl(ClientResponseImpl.CONNECTION_TIMEOUT, vt,
@@ -214,10 +232,12 @@ public class TestDistributer extends TestCase {
                         client.write(responseBuffer);
 
                         client.configureBlocking(false);
+                        channels.add(client);
                         if (handleConnection) {
                             network.registerChannel( client, handler);
                         }
                     }
+                    Thread.yield();
                 }
             } catch (IOException e) {
                 e.printStackTrace();
@@ -233,16 +253,25 @@ public class TestDistributer extends TestCase {
             }
             catch (IOException ignored) {
             }
+            for (SocketChannel sc : channels) {
+                try {
+                    sc.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
 
-        public void shutdown() {
+        public void shutdown() throws InterruptedException {
             shutdown.set(true);
+            join();
         }
 
-        AtomicBoolean shutdown = new AtomicBoolean(false);
+        private AtomicBoolean shutdown = new AtomicBoolean(false);
         volatile ServerSocketChannel socket = null;
         volatile MockInputHandler handler = null;
         volatile VoltNetworkPool network;
+        List<SocketChannel> channels = new ArrayList<SocketChannel>();
     }
 
     private static class CSL extends ClientStatusListenerExt {
@@ -267,7 +296,6 @@ public class TestDistributer extends TestCase {
             throw new RuntimeException();
         }
     }
-
 
     @Test
     public void testCreateConnection() throws Exception {
@@ -296,11 +324,9 @@ public class TestDistributer extends TestCase {
         finally {
             if (volt0 != null) {
                 volt0.shutdown();
-                volt0.join();
             }
             if (volt1 != null) {
                 volt1.shutdown();
-                volt1.join();
             }
         }
     }
@@ -323,9 +349,9 @@ public class TestDistributer extends TestCase {
             CSL csl = new CSL();
 
             Distributer dist = new Distributer(false,
-                    ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
+                    ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                     ClientConfig.DEFAULT_CONNECTION_TIMOUT_MS,
-                    false);
+                    false, null /* subject */);
             dist.addClientStatusListener(csl);
             dist.createConnection("localhost", "", "", 20000);
             dist.createConnection("localhost", "", "", 20001);
@@ -342,14 +368,14 @@ public class TestDistributer extends TestCase {
             ProcedureInvocation pi5 = new ProcedureInvocation(++handle, "i1", new Integer(1));
             ProcedureInvocation pi6 = new ProcedureInvocation(++handle, "i1", new Integer(1));
 
-            dist.queue(pi1, new ThrowingCallback(), true, 0);
+            dist.queue(pi1, new ThrowingCallback(), true, System.nanoTime(), 0);
             dist.drain();
             assertTrue(csl.m_exceptionHandled);
-            dist.queue(pi2, new ProcCallback(), true, 0);
-            dist.queue(pi3, new ProcCallback(), true, 0);
-            dist.queue(pi4, new ProcCallback(), true, 0);
-            dist.queue(pi5, new ProcCallback(), true, 0);
-            dist.queue(pi6, new ProcCallback(), true, 0);
+            dist.queue(pi2, new ProcCallback(), true, System.nanoTime(), 0);
+            dist.queue(pi3, new ProcCallback(), true, System.nanoTime(), 0);
+            dist.queue(pi4, new ProcCallback(), true, System.nanoTime(), 0);
+            dist.queue(pi5, new ProcCallback(), true, System.nanoTime(), 0);
+            dist.queue(pi6, new ProcCallback(), true, System.nanoTime(), 0);
 
             dist.drain();
             System.err.println("Finished drain.");
@@ -363,15 +389,12 @@ public class TestDistributer extends TestCase {
         finally {
             if (volt0 != null) {
                 volt0.shutdown();
-                volt0.join();
             }
             if (volt1 != null) {
                 volt1.shutdown();
-                volt1.join();
             }
             if (volt2 != null) {
                 volt2.shutdown();
-                volt2.join();
             }
         }
     }
@@ -411,9 +434,9 @@ public class TestDistributer extends TestCase {
 
         // create distributer and connect it to the client
         Distributer dist = new Distributer(false,
-                ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
+                ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                 1000 /* One second connection timeout */,
-                false);
+                false, null /* subject */);
         dist.addClientStatusListener(new TimeoutMonitorCSL());
         dist.createConnection("localhost", "", "", 20000);
 
@@ -424,21 +447,97 @@ public class TestDistributer extends TestCase {
         Thread.sleep(3000);
         assertTrue(volt.handler.gotPing);
 
+        //Check that we can send a ping and get a response ourselves
+        SyncCallback sc = new SyncCallback();
+        dist.queue(new ProcedureInvocation(88, "@Ping"), sc, true, System.nanoTime(), 0);
+        sc.waitForResponse();
+        assertEquals(ClientResponse.SUCCESS, sc.getResponse().getStatus());
+
         // tell the mock voltdb to stop responding
         volt.handler.sendResponses.set(false);
 
-        // this call should hang until the connection is closed,
-        // then will be called with CONNECTION_LOST
-        ProcedureInvocation invocation = new ProcedureInvocation(44, "@Ping");
-        dist.queue(invocation, new TimeoutMonitorPCB(), true, 0);
+        try {
+            // this call should hang until the connection is closed,
+            // then will be called with CONNECTION_LOST
+            ProcedureInvocation invocation = new ProcedureInvocation(44, "@Ping");
+            dist.queue(invocation, new TimeoutMonitorPCB(), true, System.nanoTime(), 0);
+        } catch (NoConnectionsException e) {
+            //Ok this is a little odd scheduling wise, would expect to at least be able to submit
+            //the transaction before reaching a multi-second timeout, but such is life
+            //The callback won't be invoked so count the latch down for it
+            latch.countDown();
+        }
 
         // wait for both callbacks
         latch.await();
 
         // clean up
         dist.shutdown();
-        volt.shutdown.set(true);
-        volt.join();
+        volt.shutdown();
+    }
+
+    /**
+     * Test premature connection timeouts.
+     */
+    @Test
+    public void testPrematureTimeout() throws Exception {
+        final AtomicBoolean failed = new AtomicBoolean(false);
+        class TimeoutMonitorCSL extends ClientStatusListenerExt {
+            @Override
+            public void connectionLost(String hostname, int port, int connectionsLeft,
+                                       ClientStatusListenerExt.DisconnectCause cause) {
+                if (cause.equals(DisconnectCause.TIMEOUT)) {
+                    failed.set(true);
+                }
+            }
+        }
+
+        // create a fake server and connect to it.
+        MockVolt volt = new MockVolt(20000);
+        volt.start();
+
+        // create distributer and connect it to the client
+        Distributer dist = new Distributer(false,
+                ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
+                2000 /* Two seconds connection timeout */,
+                false, null /* subject */);
+        dist.addClientStatusListener(new TimeoutMonitorCSL());
+        dist.createConnection("localhost", "", "", 20000);
+
+        // make sure it connected
+        assertTrue(volt.handler != null);
+
+        // run fine for long enough to send some pings
+        long start = System.currentTimeMillis();
+        while ((System.currentTimeMillis() - start) < 3000) {
+            Thread.yield();
+        }
+
+        start = System.currentTimeMillis();
+
+        // tell the mock voltdb to stop responding
+        volt.handler.sendResponses.set(false);
+
+        // Should not timeout unless 2 seconds has passed
+        while (!failed.get()) {
+            if ((System.currentTimeMillis() - start) > 2000) {
+                break;
+            } else {
+                Thread.yield();
+            }
+        }
+
+        // If the actual elapsed time is smaller than the timeout value,
+        // but the connection was closed due to a timeout, fail.
+        // Only check if the duration is within a range, because the timer may not be accurate.
+        if ((System.currentTimeMillis() - start) < 1900 &&
+            (System.currentTimeMillis() - start) > 2100) {
+            fail("Premature timeout occurred " + (System.currentTimeMillis() - start));
+        }
+
+        // clean up
+        dist.shutdown();
+        volt.shutdown();
     }
 
     /**
@@ -466,9 +565,9 @@ public class TestDistributer extends TestCase {
 
         // create distributer and connect it to the client
         Distributer dist = new Distributer(false,
-                ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
+                ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                 30000 /* thirty second connection timeout */,
-                false);
+                false, null /* subject */);
         dist.createConnection("localhost", "", "", 20000);
 
         // make sure it connected
@@ -483,15 +582,14 @@ public class TestDistributer extends TestCase {
         // this call should hang until the connection is closed,
         // then will be called with CONNECTION_LOST
         ProcedureInvocation invocation = new ProcedureInvocation(45, "@Ping");
-        dist.queue(invocation, new QueryTimeoutMonitor(), true, 10);
+        dist.queue(invocation, new QueryTimeoutMonitor(), true, System.nanoTime(), 10);
 
         // wait for callback
         latch.await();
 
         // clean up
         dist.shutdown();
-        volt.shutdown.set(true);
-        volt.join();
+        volt.shutdown();
     }
 
     /**
@@ -520,9 +618,9 @@ public class TestDistributer extends TestCase {
 
         // create distributer and connect it to the client
         Distributer dist = new Distributer( false,
-                ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
+                ClientConfig.DEFAULT_PROCEDURE_TIMOUT_NANOS,
                 CONNECTION_TIMEOUT /* six second connection timeout */,
-                false);
+                false, null /* subject */);
         dist.addClientStatusListener(new TimeoutMonitorCSL());
         long start = System.currentTimeMillis();
         dist.createConnection("localhost", "", "", 20000);
@@ -549,8 +647,7 @@ public class TestDistributer extends TestCase {
 
         // clean up
         dist.shutdown();
-        volt.shutdown.set(true);
-        volt.join();
+        volt.shutdown();
     }
 
     public void testClient() throws Exception {
@@ -566,17 +663,16 @@ public class TestDistributer extends TestCase {
 
            // this call blocks for a result!
            clt.callProcedure("Foo", new Integer(1));
-           assertEquals(3, volt.handler.roundTrips.get());
+           assertEquals(4, volt.handler.roundTrips.get());
 
            // this call doesn't block! (use drain)
            clt.callProcedure(new ProcCallback(), "Bar", new Integer(2));
            clt.drain();
-           assertEquals(4, volt.handler.roundTrips.get());
+           assertEquals(5, volt.handler.roundTrips.get());
        }
        finally {
            if (volt != null) {
                volt.shutdown();
-               volt.join();
            }
        }
     }
@@ -592,11 +688,7 @@ public class TestDistributer extends TestCase {
             volt0.start();
 
             ClientConfig config = new ClientConfig();
-            /*
-             * The library will immediately generate two transactions
-             * to init client affinity
-             */
-            config.setMaxOutstandingTxns(7);
+            config.setMaxOutstandingTxns(5);
             config.setConnectionResponseTimeout(2000);
 
             final Client client = ClientFactory.createClient(config);
@@ -637,12 +729,84 @@ public class TestDistributer extends TestCase {
         final String hostname = "doesnotexist";
         boolean threwException = false;
         try {
-            ConnectionUtil.getAuthenticatedConnection(hostname, "", new byte[0], 32);
+            ConnectionUtil.getAuthenticatedConnection(hostname, "", new byte[0], 32, null);
         } catch (java.net.UnknownHostException e) {
             threwException = true;
             assertTrue(e.getMessage().equals(hostname));
         }
         assertTrue(threwException);
+    }
+
+    public void testSubscription() throws Exception {
+        Distributer.RESUBSCRIPTION_DELAY_MS = 1;
+        MockVolt volt0 = new MockVolt(20000);
+        MockVolt volt1 = new MockVolt(20001);
+        volt0.start();
+        volt1.start();
+
+        try {
+        Client c = ClientFactory.createClient();
+        c.createConnection("localhost", 20000);
+
+        //Test that metadata was retrieved
+        assertTrue(volt0.handler.invokedSubscribe.tryAcquire(10, TimeUnit.SECONDS));
+        assertTrue(volt0.handler.invokedSystemInformation.tryAcquire(10, TimeUnit.SECONDS));
+        assertTrue(volt0.handler.invokedTopology.tryAcquire( 10, TimeUnit.SECONDS));
+
+        c.createConnection("localhost", 20001);
+
+        Thread.sleep(50);
+        //Should not have invoked anything
+        assertFalse(volt1.handler.invokedSubscribe.tryAcquire());
+        assertFalse(volt1.handler.invokedSystemInformation.tryAcquire());
+        assertFalse(volt1.handler.invokedTopology.tryAcquire());
+
+        volt0.shutdown();
+
+        Thread.sleep(50);
+        //Test that topology is retrieved and re-subscribed
+        assertTrue(volt1.handler.invokedSubscribe.tryAcquire(10, TimeUnit.SECONDS));
+        assertTrue(volt1.handler.invokedTopology.tryAcquire( 10, TimeUnit.SECONDS));
+        //Don't need to get the catalog again due to node failure
+        assertFalse(volt1.handler.invokedSystemInformation.tryAcquire());
+        } finally {
+            volt0.shutdown();
+            volt1.shutdown();
+        }
+    }
+
+    public void testSubscribeConnectionLost() throws Exception {
+        Distributer.RESUBSCRIPTION_DELAY_MS = 1;
+        MockVolt volt0 = new MockVolt(20000);
+        volt0.handleConnection = false;
+        MockVolt volt1 = new MockVolt(20001);
+        volt0.start();
+        volt1.start();
+
+        try {
+            Client c = ClientFactory.createClient();
+            c.createConnection("localhost", 20000);
+
+            c.createConnection("localhost", 20001);
+
+            Thread.sleep(50);
+            //Should not have invoked anything
+            assertFalse(volt1.handler.invokedSubscribe.tryAcquire());
+            assertFalse(volt1.handler.invokedSystemInformation.tryAcquire());
+            assertFalse(volt1.handler.invokedTopology.tryAcquire());
+
+            volt0.shutdown();
+
+            Thread.sleep(50);
+            //Test that topology is retrieved and re-subscribed
+            assertTrue(volt1.handler.invokedSubscribe.tryAcquire(10, TimeUnit.SECONDS));
+            assertTrue(volt1.handler.invokedTopology.tryAcquire( 10, TimeUnit.SECONDS));
+            //Don't need to get the catalog again due to node failure
+            assertTrue(volt1.handler.invokedSystemInformation.tryAcquire());
+        } finally {
+            volt0.shutdown();
+            volt1.shutdown();
+        }
     }
 
 }

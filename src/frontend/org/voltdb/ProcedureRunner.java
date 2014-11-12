@@ -35,6 +35,8 @@ import java.util.concurrent.ExecutionException;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32C;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
+import org.voltdb.CatalogContext.ProcedurePartitionInfo;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.ProcParameter;
@@ -51,6 +53,7 @@ import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
+import org.voltdb.exceptions.SpecifiedException;
 import org.voltdb.groovy.GroovyScriptProcedureDelegate;
 import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -63,6 +66,10 @@ import org.voltdb.utils.MiscUtils;
 public class ProcedureRunner {
 
     private static final VoltLogger log = new VoltLogger("HOST");
+    private static final boolean HOST_TRACE_ENABLED;
+    static {
+        HOST_TRACE_ENABLED = log.isTraceEnabled();
+    }
 
     // SQL statement queue info
     //
@@ -109,6 +116,12 @@ public class ProcedureRunner {
     protected ProcedureStatsCollector m_statsCollector;
     protected final Procedure m_catProc;
     protected final boolean m_isSysProc;
+    protected final boolean m_isSinglePartition;
+    protected final boolean m_hasJava;
+    protected final boolean m_isReadOnly;
+    protected final boolean m_isEverySite;
+    protected final int m_partitionColumn;
+    protected final VoltType m_partitionColumnType;
     protected final Language m_language;
 
     // dependency ids for ad hoc
@@ -165,6 +178,22 @@ public class ProcedureRunner {
         m_procedure = procedure;
         m_isSysProc = procedure instanceof VoltSystemProcedure;
         m_catProc = catProc;
+        m_hasJava = catProc.getHasjava();
+        m_isReadOnly = catProc.getReadonly();
+        m_isSinglePartition = m_catProc.getSinglepartition();
+        boolean isEverySite = false;
+        if (isSystemProcedure()) {
+            isEverySite = m_catProc.getEverysite();
+        }
+        m_isEverySite = isEverySite();
+        if (m_isSinglePartition) {
+            ProcedurePartitionInfo ppi = (ProcedurePartitionInfo)m_catProc.getAttachment();
+            m_partitionColumn = ppi.index;
+            m_partitionColumnType = ppi.type;
+        } else {
+            m_partitionColumn = 0;
+            m_partitionColumnType = null;
+        }
         m_site = site;
         m_systemProcedureContext = sysprocContext;
         m_csp = csp;
@@ -188,11 +217,7 @@ public class ProcedureRunner {
     }
 
     public boolean isEverySite() {
-        boolean retval = false;
-        if (isSystemProcedure()) {
-            retval = m_catProc.getEverysite();
-        }
-        return retval;
+        return m_isEverySite;
     }
     /**
      * Note this fails for Sysprocs that use it in non-coordinating fragment work. Don't.
@@ -215,6 +240,7 @@ public class ProcedureRunner {
         return m_cachedRNG;
     }
 
+    @SuppressWarnings("finally")
     public ClientResponseImpl call(Object... paramListIn) {
         // verify per-txn state has been reset
         assert(m_statusCode == ClientResponse.SUCCESS);
@@ -248,7 +274,9 @@ public class ProcedureRunner {
             if (isSystemProcedure()) {
                 final Object[] combinedParams = new Object[paramList.length + 1];
                 combinedParams[0] = m_systemProcedureContext;
-                for (int i=0; i < paramList.length; ++i) combinedParams[i+1] = paramList[i];
+                for (int i=0; i < paramList.length; ++i) {
+                    combinedParams[i+1] = paramList[i];
+                }
                 // swap the lists.
                 paramList = combinedParams;
             }
@@ -278,11 +306,11 @@ public class ProcedureRunner {
             boolean error = false;
             boolean abort = false;
             // run a regular java class
-            if (m_catProc.getHasjava()) {
+            if (m_hasJava) {
                 try {
                     if (m_language == Language.JAVA) {
-                        if (log.isTraceEnabled()) {
-                            log.trace("invoking... procMethod=" + m_procMethod.getName() + ", class=" + getClass().getName());
+                        if (HOST_TRACE_ENABLED) {
+                            log.trace("invoking... procMethod=" + m_procMethod.getName() + ", class=" + m_procMethod.getDeclaringClass().getName());
                         }
                         try {
                             Object rawResult = m_procMethod.invoke(m_procedure, paramList);
@@ -293,7 +321,7 @@ public class ProcedureRunner {
                         }
                     }
                     else if (m_language == Language.GROOVY) {
-                        if (log.isTraceEnabled()) {
+                        if (HOST_TRACE_ENABLED) {
                             log.trace("invoking... groovy closure on class=" + getClass().getName());
                         }
                         GroovyScriptProcedureDelegate proc = (GroovyScriptProcedureDelegate)m_procedure;
@@ -311,11 +339,18 @@ public class ProcedureRunner {
                     } else {
                         error = true;
                     }
-                    if (ex instanceof Error) {
-                        m_statsCollector.endProcedure(false, true, null, null);
-                        throw (Error)ex;
+                    if (CoreUtils.isStoredProcThrowableFatalToServer(ex)) {
+                        // If the stored procedure attempted to do something other than linklibraray or instantiate
+                        // a missing object that results in an error, throw the error and let the server deal with
+                        // the condition as best as it can (usually a crashLocalVoltDB).
+                        try {
+                            m_statsCollector.endProcedure(false, true, null, null);
+                        }
+                        finally {
+                            // Ensure that ex is always re-thrown even if endProcedure throws an exception.
+                            throw (Error)ex;
+                        }
                     }
-
                     retval = getErrorResponse(ex);
                 }
             }
@@ -350,16 +385,18 @@ public class ProcedureRunner {
             m_statsCollector.endProcedure(abort, error, results, paramSet);
 
             // don't leave empty handed
-            if (results == null)
+            if (results == null) {
                 results = new VoltTable[0];
+            }
 
-            if (retval == null)
+            if (retval == null) {
                 retval = new ClientResponseImpl(
                         m_statusCode,
                         m_appStatusCode,
                         m_appStatusString,
                         results,
                         m_statusString);
+            }
 
             int hash = (int) m_inputCRC.getValue();
             if (ClientResponseImpl.isTransactionallySuccessful(retval.getStatus()) && (hash != 0)) {
@@ -401,7 +438,7 @@ public class ProcedureRunner {
      * @return true if the txn hashes to the current partition, false otherwise
      */
     public boolean checkPartition(TransactionState txnState, TheHashinator hashinator) {
-        if (m_catProc.getSinglepartition()) {
+        if (m_isSinglePartition) {
             TheHashinator.HashinatorType hashinatorType = hashinator.getConfigurationType();
             if (hashinatorType == TheHashinator.HashinatorType.LEGACY) {
                 // Legacy hashinator is not used for elastic, no need to check partitioning. In fact,
@@ -411,18 +448,17 @@ public class ProcedureRunner {
             }
 
             StoredProcedureInvocation invocation = txnState.getInvocation();
-            int parameterType;
+            VoltType parameterType;
             Object parameterAtIndex;
 
             // check if AdHoc_RO_SP or AdHoc_RW_SP
             if (m_procedure instanceof AdHocBase) {
                 // ClientInterface should pre-validate this param is valid
                 parameterAtIndex = invocation.getParameterAtIndex(0);
-                parameterType = (Byte) invocation.getParameterAtIndex(1);
+                parameterType = VoltType.get((Byte) invocation.getParameterAtIndex(1));
             } else {
-                parameterType = m_catProc.getPartitioncolumn().getType();
-                int partitionparameter = m_catProc.getPartitionparameter();
-                parameterAtIndex = invocation.getParameterAtIndex(partitionparameter);
+                parameterType = m_partitionColumnType;
+                parameterAtIndex = invocation.getParameterAtIndex(m_partitionColumn);
             }
 
             // Note that @LoadSinglepartitionTable has problems if the parititoning param
@@ -437,7 +473,7 @@ public class ProcedureRunner {
                     return true;
                 } else {
                     // Wrong partition, should restart the txn
-                    if (log.isTraceEnabled()) {
+                    if (HOST_TRACE_ENABLED) {
                         log.trace("Txn " + txnState.getInvocation().getProcName() +
                                 " will be restarted");
                     }
@@ -447,6 +483,12 @@ public class ProcedureRunner {
             }
             return false;
         } else {
+            // For n-partition transactions, we need to rehash the partitioning values and check
+            // if they still hash to the assigned partitions.
+            //
+            // Note that when n-partition transaction runs, it's run on the MPI site, so calling
+            // m_site.getCorrespondingPartitionId() will return the MPI's partition ID. We need
+            // another way of getting what partitions were assigned to this transaction.
             return true;
         }
     }
@@ -525,7 +567,7 @@ public class ProcedureRunner {
 
     public void voltQueueSQL(final SQLStmt stmt, Expectation expectation, Object... args) {
         if (stmt == null) {
-            throw new IllegalArgumentException("SQLStmt paramter to voltQueueSQL(..) was null.");
+            throw new IllegalArgumentException("SQLStmt parameter to voltQueueSQL(..) was null.");
         }
         QueuedSQL queuedSQL = new QueuedSQL();
         queuedSQL.expectation = expectation;
@@ -546,12 +588,12 @@ public class ProcedureRunner {
         }
 
         try {
-            AdHocPlannedStmtBatch batch = m_csp.plan(sql, args, m_catProc.getSinglepartition()).get();
+            AdHocPlannedStmtBatch batch = m_csp.plan(sql, args,m_isSinglePartition).get();
             if (batch.errorMsg != null) {
                 throw new VoltAbortException("Failed to plan sql '" + sql + "' error: " + batch.errorMsg);
             }
 
-            if (m_catProc.getReadonly() && !batch.isReadOnly()) {
+            if (m_isReadOnly && !batch.isReadOnly()) {
                 throw new VoltAbortException("Attempted to queue DML adhoc sql '" + sql + "' from read only procedure");
             }
 
@@ -561,11 +603,11 @@ public class ProcedureRunner {
             AdHocPlannedStatement plannedStatement = batch.plannedStatements.get(0);
 
             long aggFragId = ActivePlanRepository.loadOrAddRefPlanFragment(
-                    plannedStatement.core.aggregatorHash, plannedStatement.core.aggregatorFragment);
+                    plannedStatement.core.aggregatorHash, plannedStatement.core.aggregatorFragment, sql);
             long collectorFragId = 0;
             if (plannedStatement.core.collectorFragment != null) {
                 collectorFragId = ActivePlanRepository.loadOrAddRefPlanFragment(
-                        plannedStatement.core.collectorHash, plannedStatement.core.collectorFragment);
+                        plannedStatement.core.collectorHash, plannedStatement.core.collectorFragment, sql);
             }
 
             queuedSQL.stmt = SQLStmtAdHocHelper.createWithPlan(
@@ -596,13 +638,16 @@ public class ProcedureRunner {
             // supporting @AdHocSpForTest with queries that contain '?' parameters.
             if (plannedStatement.hasExtractedParams()) {
                 if (args.length > 0) {
-                    throw new ExpectedProcedureException(
+                    throw new VoltAbortException(
                             "Number of arguments provided was " + args.length  +
                             " where 0 were expected for statement: " + sql);
                 }
                 argumentParams = plannedStatement.extractedParamArray();
                 if (argumentParams.length != queuedSQL.stmt.statementParamJavaTypes.length) {
-                    String msg = String.format("Wrong number of params for parameterized statement: %s", sql);
+                    String msg = String.format(
+                            "The wrong number of arguments (" + argumentParams.length +
+                            " vs. the " + queuedSQL.stmt.statementParamJavaTypes.length +
+                            " expected) were passed for the parameterized statement: %s", sql);
                     throw new VoltAbortException(msg);
                 }
             }
@@ -697,7 +742,7 @@ public class ProcedureRunner {
                         qs.stmt, qs.params, qs.stmt.statementParamJavaTypes);
             }
         }
-        else if (m_catProc.getSinglepartition()) {
+        else if (m_isSinglePartition) {
             results = fastPath(batch);
         }
         else {
@@ -718,16 +763,16 @@ public class ProcedureRunner {
     }
 
     public byte[] voltLoadTable(String clusterName, String databaseName,
-                              String tableName, VoltTable data, boolean returnUniqueViolations)
+                              String tableName, VoltTable data, boolean returnUniqueViolations, boolean shouldDRStream)
     throws VoltAbortException
     {
         if (data == null || data.getRowCount() == 0) {
             return null;
         }
         try {
-            return m_site.loadTable(m_txnState.txnId,
+            return m_site.loadTable(m_txnState.txnId, m_txnState.m_spHandle,
                              clusterName, databaseName,
-                             tableName, data, returnUniqueViolations, false);
+                             tableName, data, returnUniqueViolations, shouldDRStream, false);
         }
         catch (EEException e) {
             throw new VoltAbortException("Failed to load table: " + tableName);
@@ -749,7 +794,7 @@ public class ProcedureRunner {
         final byte stmtParamTypes[] = stmt.statementParamJavaTypes;
         final Object[] args = new Object[numParamTypes];
         if (inArgs.length != numParamTypes) {
-            throw new ExpectedProcedureException(
+            throw new VoltAbortException(
                     "Number of arguments provided was " + inArgs.length  +
                     " where " + numParamTypes + " was expected for statement " + stmt.getText());
         }
@@ -761,27 +806,29 @@ public class ProcedureRunner {
             }
             // this handles null values
             VoltType type = VoltType.get(stmtParamTypes[ii]);
-            if (type == VoltType.TINYINT)
+            if (type == VoltType.TINYINT) {
                 args[ii] = Byte.MIN_VALUE;
-            else if (type == VoltType.SMALLINT)
+            } else if (type == VoltType.SMALLINT) {
                 args[ii] = Short.MIN_VALUE;
-            else if (type == VoltType.INTEGER)
+            } else if (type == VoltType.INTEGER) {
                 args[ii] = Integer.MIN_VALUE;
-            else if (type == VoltType.BIGINT)
+            } else if (type == VoltType.BIGINT) {
                 args[ii] = Long.MIN_VALUE;
-            else if (type == VoltType.FLOAT)
+            } else if (type == VoltType.FLOAT) {
                 args[ii] = VoltType.NULL_FLOAT;
-            else if (type == VoltType.TIMESTAMP)
+            } else if (type == VoltType.TIMESTAMP) {
                 args[ii] = new TimestampType(Long.MIN_VALUE);
-            else if (type == VoltType.STRING)
+            } else if (type == VoltType.STRING) {
                 args[ii] = VoltType.NULL_STRING_OR_VARBINARY;
-            else if (type == VoltType.VARBINARY)
+            } else if (type == VoltType.VARBINARY) {
                 args[ii] = VoltType.NULL_STRING_OR_VARBINARY;
-            else if (type == VoltType.DECIMAL)
+            } else if (type == VoltType.DECIMAL) {
                 args[ii] = VoltType.NULL_DECIMAL;
-            else
-                throw new ExpectedProcedureException("Unknown type " + type +
-                 " can not be converted to NULL representation for arg " + ii + " for SQL stmt " + stmt.getText());
+            } else {
+                throw new VoltAbortException("Unknown type " + type +
+                        " can not be converted to NULL representation for arg " + ii +
+                        " for SQL stmt: " + stmt.getText());
+            }
         }
 
         return ParameterSet.fromArrayNoCopy(args);
@@ -794,7 +841,7 @@ public class ProcedureRunner {
         for (PlanFragment frag : catStmt.getFragments()) {
             byte[] planHash = Encoder.hexDecode(frag.getPlanhash());
             byte[] plan = Encoder.decodeBase64AndDecompressToBytes(frag.getPlannodetree());
-            long id = ActivePlanRepository.loadOrAddRefPlanFragment(planHash, plan);
+            long id = ActivePlanRepository.loadOrAddRefPlanFragment(planHash, plan, catStmt.getSqltext());
             boolean transactional = frag.getNontransactional() == false;
 
             SQLStmt.Frag stmtFrag = new SQLStmt.Frag(id, planHash, transactional);
@@ -916,8 +963,9 @@ public class ProcedureRunner {
                     for (final Method m : methods) {
                         String name = m.getName();
                         if (name.equals("run")) {
-                            if (Modifier.isPublic(m.getModifiers()) == false)
+                            if (Modifier.isPublic(m.getModifiers()) == false) {
                                 continue;
+                            }
                             p.m_procMethod = m;
                             return m.getParameterTypes();
                         }
@@ -979,11 +1027,13 @@ public class ProcedureRunner {
        // use local var to avoid warnings about reassigning method argument
        Throwable e = eIn;
        boolean expected_failure = true;
+       boolean hideStackTrace = false;
        StackTraceElement[] stack = e.getStackTrace();
        ArrayList<StackTraceElement> matches = new ArrayList<StackTraceElement>();
        for (StackTraceElement ste : stack) {
-           if (isProcedureStackTraceElement(ste))
+           if (isProcedureStackTraceElement(ste)) {
                matches.add(ste);
+           }
        }
 
        byte status = ClientResponse.UNEXPECTED_FAILURE;
@@ -1009,37 +1059,52 @@ public class ProcedureRunner {
        }
        else if (e.getClass() == org.voltdb.ExpectedProcedureException.class) {
            msg.append("HSQL-BACKEND ERROR\n");
-           if (e.getCause() != null)
+           if (e.getCause() != null) {
                e = e.getCause();
+           }
        }
        else if (e.getClass() == org.voltdb.exceptions.TransactionRestartException.class) {
            status = ClientResponse.TXN_RESTART;
            msg.append("TRANSACTION RESTART\n");
+       }
+       // SpecifiedException means the dev wants control over status and message
+       else if (e.getClass() == SpecifiedException.class) {
+           SpecifiedException se = (SpecifiedException) e;
+           status = se.getStatus();
+           expected_failure = true;
+           hideStackTrace = true;
        }
        else {
            msg.append("UNEXPECTED FAILURE:\n");
            expected_failure = false;
        }
 
-       // if the error is something we know can happen as part of normal
-       // operation, reduce the verbosity.  Otherwise, generate
-       // more output for debuggability
-       if (expected_failure)
-       {
+       // ensure the message is returned if we're not going to hit the verbose condition below
+       if (expected_failure || hideStackTrace) {
            msg.append("  ").append(e.getMessage());
-           for (StackTraceElement ste : matches) {
-               msg.append("\n    at ");
-               msg.append(ste.getClassName()).append(".").append(ste.getMethodName());
-               msg.append("(").append(ste.getFileName()).append(":");
-               msg.append(ste.getLineNumber()).append(")");
-           }
        }
-       else
-       {
-           Writer result = new StringWriter();
-           PrintWriter pw = new PrintWriter(result);
-           e.printStackTrace(pw);
-           msg.append("  ").append(result.toString());
+
+       // Rarely hide the stack trace.
+       // Right now, just for SpecifiedException, which is usually from sysprocs where the error is totally
+       // known and not helpful to the user.
+       if (!hideStackTrace) {
+           // If the error is something we know can happen as part of normal operation,
+           // reduce the verbosity.
+           // Otherwise, generate more output for debuggability
+           if (expected_failure) {
+               for (StackTraceElement ste : matches) {
+                   msg.append("\n    at ");
+                   msg.append(ste.getClassName()).append(".").append(ste.getMethodName());
+                   msg.append("(").append(ste.getFileName()).append(":");
+                   msg.append(ste.getLineNumber()).append(")");
+               }
+           }
+           else {
+               Writer result = new StringWriter();
+               PrintWriter pw = new PrintWriter(result);
+               e.printStackTrace(pw);
+               msg.append("  ").append(result.toString());
+           }
        }
 
        return getErrorResponse(
@@ -1066,11 +1131,12 @@ public class ProcedureRunner {
        }
        if (result instanceof VoltTable[]) {
            VoltTable[] retval = (VoltTable[]) result;
-           for (VoltTable table : retval)
-               if (table == null) {
+           for (VoltTable table : retval) {
+            if (table == null) {
                    Exception e = new RuntimeException("VoltTable arrays with non-zero length cannot contain null values.");
                    throw new InvocationTargetException(e);
                }
+        }
 
            return retval;
        }
@@ -1223,7 +1289,11 @@ public class ProcedureRunner {
                }
                else {
                    byte[] planBytes = ActivePlanRepository.planForFragmentId(stmt.aggregator.id);
-                   m_localTask.addCustomFragment(stmt.aggregator.planHash, m_depsToResume[index], params, planBytes);
+                   m_localTask.addCustomFragment(stmt.aggregator.planHash,
+                           m_depsToResume[index],
+                           params,
+                           planBytes,
+                           stmt.getText());
                }
            }
            // two fragments
@@ -1238,9 +1308,9 @@ public class ProcedureRunner {
                }
                else {
                    byte[] planBytes = ActivePlanRepository.planForFragmentId(stmt.aggregator.id);
-                   m_localTask.addCustomFragment(stmt.aggregator.planHash, m_depsToResume[index], params, planBytes);
+                   m_localTask.addCustomFragment(stmt.aggregator.planHash, m_depsToResume[index], params, planBytes, stmt.getText());
                    planBytes = ActivePlanRepository.planForFragmentId(stmt.collector.id);
-                   m_distributedTask.addCustomFragment(stmt.collector.planHash, outputDepId, params, planBytes);
+                   m_distributedTask.addCustomFragment(stmt.collector.planHash, outputDepId, params, planBytes, stmt.getText());
                }
            }
        }
@@ -1305,7 +1375,9 @@ public class ProcedureRunner {
 
        // create all the local work for the transaction
        for (int i = 0; i < state.m_depsForLocalTask.length; i++) {
-           if (state.m_depsForLocalTask[i] < 0) continue;
+           if (state.m_depsForLocalTask[i] < 0) {
+            continue;
+        }
            state.m_localTask.addInputDepId(i, state.m_depsForLocalTask[i]);
        }
 
@@ -1342,6 +1414,7 @@ public class ProcedureRunner {
        final int batchSize = batch.size();
        Object[] params = new Object[batchSize];
        long[] fragmentIds = new long[batchSize];
+       String[] sqlTexts = new String[batchSize];
 
        int i = 0;
        for (final QueuedSQL qs : batch) {
@@ -1354,6 +1427,7 @@ public class ProcedureRunner {
            else {
                params[i] = qs.params;
            }
+           sqlTexts[i] = qs.stmt.getText();
            i++;
        }
        return m_site.executePlanFragments(
@@ -1361,8 +1435,10 @@ public class ProcedureRunner {
            fragmentIds,
            null,
            params,
+           sqlTexts,
+           m_txnState.txnId,
            m_txnState.m_spHandle,
            m_txnState.uniqueId,
-           m_catProc.getReadonly());
+           m_isReadOnly);
     }
 }

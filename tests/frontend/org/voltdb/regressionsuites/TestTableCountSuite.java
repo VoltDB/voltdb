@@ -31,11 +31,6 @@ import org.voltdb.client.Client;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.BatchedMultiPartitionTest;
 public class TestTableCountSuite extends RegressionSuite {
-
-    // procedures used by these tests
-    static final Class<?>[] PROCEDURES = {
-    };
-
     /**
      * Constructor needed for JUnit. Should just pass on parameters to superclass.
      * @param name The name of the method to test. This is just passed to the superclass.
@@ -57,6 +52,12 @@ public class TestTableCountSuite extends RegressionSuite {
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(6, table.getLong(0));
+
+        // subquery temp table count
+        table = client.callProcedure("@AdHoc","select count(*) from (SELECT * FROM TU1) Temp").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(5, table.getLong(0));
     }
 
     public void testTableCounts() throws Exception {
@@ -75,6 +76,18 @@ public class TestTableCountSuite extends RegressionSuite {
         assertTrue(table.advanceRow());
         assertEquals(5, table.getLong(0));
 
+        // subquery temp table count
+        table = client.callProcedure("@AdHoc","select count(*) from (SELECT * FROM TU1) Temp").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(5, table.getLong(0));
+
+        table = client.callProcedure("@AdHoc","select count(*) " +
+                "from (SELECT * FROM TU1 where id > 3) Temp").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(2, table.getLong(0));
+
 
         // Unique Map, two column index
         client.callProcedure("TU3.insert", 1, 1, 123);
@@ -89,6 +102,12 @@ public class TestTableCountSuite extends RegressionSuite {
         client.callProcedure("TU3.insert", 10, 8, 456);
 
         table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU3").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(10, table.getLong(0));
+
+        // subquery temp table count
+        table = client.callProcedure("@AdHoc","select count(*) from (SELECT * FROM TU3) Temp").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(10, table.getLong(0));
@@ -120,6 +139,12 @@ public class TestTableCountSuite extends RegressionSuite {
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(20, table.getLong(0));
+
+        // subquery temp table count
+        table = client.callProcedure("@AdHoc","select count(*) from (SELECT * FROM TM2) Temp").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(20, table.getLong(0));
     }
 
     /**
@@ -139,7 +164,6 @@ public class TestTableCountSuite extends RegressionSuite {
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(BatchedMultiPartitionTest.class.getResource("sqlindex-ddl.sql"));
-        project.addProcedures(PROCEDURES);
 
         boolean success;
 

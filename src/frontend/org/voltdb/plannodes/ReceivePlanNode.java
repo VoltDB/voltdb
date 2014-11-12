@@ -18,12 +18,14 @@
 package org.voltdb.plannodes;
 
 import java.util.Collection;
+import java.util.Map;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.PlanNodeType;
 
 public class ReceivePlanNode extends AbstractPlanNode {
@@ -86,8 +88,8 @@ public class ReceivePlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void getTablesAndIndexes(Collection<String> tablesRead, Collection<String> tableUpdated,
-                                    Collection<String> indexes)
+    public void getTablesAndIndexes(Map<String, StmtTargetTableScan> tablesRead,
+            Collection<String> indexes)
     {
         // ReceiveNode is a dead end. This method is not intended to cross fragments
         // even within a pre-fragmented plan tree.

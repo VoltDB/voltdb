@@ -304,7 +304,7 @@ import org.xml.sax.SAXException;
  *     <TBODY>
  *         <TR >
  *             <TH>
- *                 <tt>org.hsqldb.jdbc.JDBCConnection.createSQLXML()</tt>
+ *                 <tt>org.hsqldb_voltpatches.jdbc.JDBCConnection.createSQLXML()</tt>
  *             </TH>
  *             <TD >
  *                 Write-only
@@ -321,7 +321,7 @@ import org.xml.sax.SAXException;
  *         </TR>
  *         <TR>
  *             <TH>
- *                 <tt>org.hsqldb.jdbc.JDBCResultSet.getSQLXML(...)</tt>
+ *                 <tt>org.hsqldb_voltpatches.jdbc.JDBCResultSet.getSQLXML(...)</tt>
  *             </TH>
  *             <TD >
  *                 Read-only

@@ -31,6 +31,7 @@
 
 package org.hsqldb_voltpatches.util;
 
+import java.sql.Connection;
 import java.awt.BorderLayout;
 import java.awt.Button;
 import java.awt.Choice;
@@ -50,7 +51,6 @@ import java.awt.event.ItemListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.awt.event.WindowEvent;
-import java.sql.Connection;
 
 /**
  * Class declaration
@@ -208,7 +208,6 @@ implements ActionListener, ItemListener, KeyListener {
      *
      * @param ev
      */
-    @Override
     public void actionPerformed(ActionEvent ev) {
 
         String s = ev.getActionCommand();
@@ -290,7 +289,6 @@ implements ActionListener, ItemListener, KeyListener {
      *
      * @param e
      */
-    @Override
     public void itemStateChanged(ItemEvent e) {
 
         String s = (String) e.getItem();

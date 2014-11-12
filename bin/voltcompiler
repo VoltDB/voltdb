@@ -111,6 +111,11 @@ if [ "$JAVA_HOME" != "" ]; then
   JAVA=$JAVA_HOME/bin/java
 fi
 
+if [ "$JAVA" = "" ]; then
+  echo "Couldn't find java version to run (make sure JAVA_HOME is set)."
+  exit 1
+fi
+
 # check envvars to see if a user overrides log4j conf
 if [ -z "${LOG4J_CONFIG_PATH}" ]; then
   if [ -f "$VOLTDB_HOME/src/frontend/log4j.xml" ]; then

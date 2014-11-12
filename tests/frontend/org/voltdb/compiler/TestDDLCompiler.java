@@ -35,6 +35,12 @@ import junit.framework.TestCase;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
+import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Table;
+import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
+import org.voltdb.compilereport.TableAnnotation;
 
 public class TestDDLCompiler extends TestCase {
 
@@ -97,6 +103,7 @@ public class TestDDLCompiler extends TestCase {
             ddl1 += line + "\n";
         }
 
+        br.close();
         HSQLInterface hsql = HSQLInterface.loadHsqldb();
 
         hsql.runDDLCommand(ddl1);
@@ -232,22 +239,73 @@ public class TestDDLCompiler extends TestCase {
 
         // compile and fail on bad import
         VoltCompiler compiler = new VoltCompiler();
-        return compiler.compileFromDDL(jarOut.getPath(), schemaFile.getPath());
+        try {
+            return compiler.compileFromDDL(jarOut.getPath(), schemaFile.getPath());
+        }
+        catch (VoltCompilerException e) {
+            e.printStackTrace();
+            fail();
+            return false;
+        }
     }
 
     public void testExtraClasses() {
         assertFalse(checkImportValidity("org.1oltdb.**"));
-        assertTrue(checkImportValidity("org.voltdb.V**"));
+        assertTrue(checkImportValidity("org.voltdb_testprocs.a**"));
         assertFalse(checkImportValidity("$.1oltdb.**"));
         assertFalse(checkImportValidity("org.voltdb.** org.bolt"));
-        assertTrue(checkImportValidity("org.voltdb.V*"));
-        assertTrue(checkImportValidity("你rg.voltdb.V*"));
+        assertTrue(checkImportValidity("org.voltdb_testprocs.a*"));
+        assertTrue(checkImportValidity("你rg.voltdb_testprocs.a*"));
         assertTrue(checkImportValidity("org.我不爱你.V*"));
         assertFalse(checkImportValidity("org.1我不爱你.V*"));
-        assertTrue(checkImportValidity("org"));
-        assertTrue(checkImportValidity("*org"));
-        assertTrue(checkImportValidity("org.**.RealVoltDB"));
-        assertTrue(checkImportValidity("org.vol*db.RealVoltDB"));
+        assertFalse(checkImportValidity("org"));
+        assertTrue(checkImportValidity("org.**.executeSQLMP"));
+        assertTrue(checkImportValidity("org.vol*_testprocs.adhoc.executeSQLMP"));
+        assertTrue(checkImportValidity("org.voltdb_testprocs.adhoc.executeSQLMP"));
+        assertFalse(checkImportValidity("org."));
+        assertFalse(checkImportValidity("org.."));
+        assertFalse(checkImportValidity("org.v_dt"));
+        assertTrue(checkImportValidity("org.voltdb.compiler.dummy_test_underscore"));
+    }
+
+    boolean checkMultiDDLImportValidity(String importStmt1, String importStmt2, boolean checkWarn) {
+        File jarOut = new File("checkImportValidity.jar");
+        jarOut.deleteOnExit();
+
+        String schema1 = String.format("IMPORT CLASS %s;", importStmt1);
+        File schemaFile1 = VoltProjectBuilder.writeStringToTempFile(schema1);
+        schemaFile1.deleteOnExit();
+
+        String schema2 = String.format("IMPORT CLASS %s;", importStmt2);
+        File schemaFile2 = VoltProjectBuilder.writeStringToTempFile(schema2);
+        schemaFile2.deleteOnExit();
+
+        // compile and fail on bad import
+        VoltCompiler compiler = new VoltCompiler();
+        try {
+            boolean rslt = compiler.compileFromDDL(jarOut.getPath(), schemaFile1.getPath(), schemaFile2.getPath());
+            assertTrue(checkWarn^compiler.m_warnings.isEmpty());
+            return rslt;
+        }
+        catch (VoltCompilerException e) {
+            e.printStackTrace();
+            fail();
+            assertTrue(checkWarn^compiler.m_warnings.isEmpty());
+            return false;
+        }
+    }
+
+    public void testExtraClassesFrom2Ddls() {
+        assertTrue(checkMultiDDLImportValidity("org.voltdb_testprocs.a**", "org.voltdb_testprocs.a**", false));
+        assertTrue(checkMultiDDLImportValidity("org.woltdb_testprocs.a**", "org.voltdb_testprocs.a**", true));
+        assertTrue(checkMultiDDLImportValidity("org.voltdb_testprocs.a**", "org.woltdb_testprocs.a**", true));
+        assertTrue(checkMultiDDLImportValidity("org.woltdb_testprocs.*", "org.voltdb_testprocs.a**", true));
+        assertTrue(checkMultiDDLImportValidity("org.voltdb_testprocs.a**", "org.woltdb_testprocs.*", true));
+        assertFalse(checkMultiDDLImportValidity("org.vol*db_testprocs.adhoc.executeSQLMP", "org.voltdb_testprocs.", false));
+        assertTrue(checkMultiDDLImportValidity("org.vol*db_testprocs.adhoc.executeSQLMP", "org.voltdb_testprocs.adhoc.*", false));
+        assertFalse(checkMultiDDLImportValidity("org.voltdb_testprocs.adhoc.executeSQLMP", "org.woltdb", false));
+        assertTrue(checkMultiDDLImportValidity("org.vol*db_testprocs.adhoc.executeSQLMP", "org.voltdb_testprocs.adhoc.executeSQLMP", false));
+        assertTrue(checkMultiDDLImportValidity("org.voltdb_testprocs.adhoc.executeSQLMP", "org.voltdb_testprocs.adhoc.executeSQLMP", false));
     }
 
     public void testIndexedMinMaxViews() {
@@ -362,6 +420,16 @@ public class TestDDLCompiler extends TestCase {
 
             // cleanup after the test
             jarOut.delete();
+        }
+    }
+
+    public void testNullAnnotation() throws IOException {
+
+        Catalog catalog  = new TPCCProjectBuilder().createTPCCSchemaCatalog();
+        Database catalog_db = catalog.getClusters().get("cluster").getDatabases().get("database");
+
+        for(Table t : catalog_db.getTables()) {
+            assertNotNull(((TableAnnotation)t.getAnnotation()).ddl);
         }
     }
 }

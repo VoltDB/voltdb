@@ -45,6 +45,7 @@ import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
@@ -52,15 +53,16 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.iv2.SiteTaskerQueue;
 import org.voltdb.iv2.SnapshotTask;
+import org.voltdb.rejoin.StreamSnapshotDataTarget.StreamSnapshotTimeoutException;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.collect.ListMultimap;
+import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 
 /**
  * Encapsulates the state needed to manage an ongoing snapshot at the
@@ -156,7 +158,7 @@ public class SnapshotSiteProcessor {
      * of targets in case this EE ends up being the one that needs
      * to close each target.
      */
-    private ArrayList<SnapshotDataTarget> m_snapshotTargets = null;
+    private volatile ArrayList<SnapshotDataTarget> m_snapshotTargets = null;
 
     /**
      * Map of tasks for tables that still need to be snapshotted.
@@ -260,11 +262,25 @@ public class SnapshotSiteProcessor {
         }
     }
 
+
+    public static boolean isSnapshotInProgress()
+    {
+        final int numSitesSnapshotting = SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.size();
+        if (numSitesSnapshotting > 0) {
+            if (SNAP_LOG.isDebugEnabled()) {
+                SNAP_LOG.debug("Snapshot in progress, " + numSitesSnapshotting + " sites are still snapshotting");
+            }
+            return true;
+        }
+        return false;
+    }
+
     private BBContainer createNewBuffer(final BBContainer origin, final boolean noSchedule)
     {
-        return new BBContainer(origin.b, origin.address) {
+        return new BBContainer(origin.b()) {
             @Override
             public void discard() {
+                checkDoubleFree();
                 origin.discard();
                 m_availableSnapshotBuffers.incrementAndGet();
 
@@ -352,7 +368,6 @@ public class SnapshotSiteProcessor {
             SystemProcedureExecutionContext context,
             SnapshotFormat format,
             Deque<SnapshotTableTask> tasks,
-            List<SnapshotDataTarget> targets,
             long txnId,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers)
     {
@@ -363,16 +378,8 @@ public class SnapshotSiteProcessor {
         m_lastSnapshotTxnId = txnId;
         m_snapshotTableTasks = MiscUtils.sortedArrayListMultimap();
         m_streamers = Maps.newHashMap();
-        m_snapshotTargets = new ArrayList<SnapshotDataTarget>();
         m_snapshotTargetTerminators = new ArrayList<Thread>();
         m_exportSequenceNumbersToLogOnCompletion = exportSequenceNumbers;
-
-        for (final SnapshotDataTarget target : targets) {
-            if (target.needsFinalClose()) {
-                assert(m_snapshotTargets != null);
-                m_snapshotTargets.add(target);
-            }
-        }
 
         // Table doesn't implement hashCode(), so use the table ID as key
         for (Map.Entry<Integer, byte[]> tablePredicates : makeTablesAndPredicatesToSnapshot(tasks).entrySet()) {
@@ -401,14 +408,29 @@ public class SnapshotSiteProcessor {
         for (Collection<SnapshotTableTask> perTableTasks : m_snapshotTableTasks.asMap().values()) {
             maxTableTaskSize = Math.max(maxTableTaskSize, perTableTasks.size());
         }
-
-        // This site has no snapshot work to do, still queue a task to clean up. Otherwise,
-        // the snapshot will never finish.
-        queueInitialSnapshotTasks(now);
     }
 
-    private void queueInitialSnapshotTasks(long now)
+    /**
+     * This is called from the snapshot IO thread when the deferred setup is finished. It sets
+     * the data targets and queues a snapshot task onto the site thread.
+     */
+    public void startSnapshotWithTargets(Collection<SnapshotDataTarget> targets, long now)
     {
+        //Basically asserts that there are no tasks with null targets at this point
+        //getTarget checks and crashes
+        for (SnapshotTableTask t : m_snapshotTableTasks.values()) {
+            t.getTarget();
+        }
+
+        ArrayList<SnapshotDataTarget> targetsToClose = Lists.newArrayList();
+        for (final SnapshotDataTarget target : targets) {
+            if (target.needsFinalClose()) {
+                targetsToClose.add(target);
+            }
+        }
+        m_snapshotTargets = targetsToClose;
+
+        // Queue the first snapshot task
         VoltDB.instance().schedulePriorityWork(
                 new Runnable() {
                     @Override
@@ -496,8 +518,10 @@ public class SnapshotSiteProcessor {
                             try {
                                 tableTask.m_target.close();
                             } catch (IOException e) {
+                                m_lastSnapshotSucceded = false;
                                 throw new RuntimeException(e);
                             } catch (InterruptedException e) {
+                                m_lastSnapshotSucceded = false;
                                 throw new RuntimeException(e);
                             }
 
@@ -523,6 +547,10 @@ public class SnapshotSiteProcessor {
          */
         if (m_snapshotTableTasks == null) {
             return retval;
+        }
+
+        if (m_snapshotTargets == null) {
+            return null;
         }
 
         /*
@@ -560,12 +588,17 @@ public class SnapshotSiteProcessor {
                             writeFutures.get();
                         } catch (Throwable t) {
                             if (m_lastSnapshotSucceded) {
-                                SNAP_LOG.error("Error while attempting to write snapshot data", t);
+                                if (t instanceof StreamSnapshotTimeoutException ||
+                                        t.getCause() instanceof StreamSnapshotTimeoutException) {
+                                    //This error is already logged by the watchdog when it generates the exception
+                                } else {
+                                    SNAP_LOG.error("Error while attempting to write snapshot data", t);
+                                }
                                 m_lastSnapshotSucceded = false;
                             }
                         }
                     }
-                }, MoreExecutors.sameThreadExecutor());
+                }, CoreUtils.SAMETHREADEXECUTOR);
             }
 
             /**
@@ -658,11 +691,19 @@ public class SnapshotSiteProcessor {
                                 }
                             }
                         } finally {
+                            // Caching the value here before the site removes itself from the
+                            // ExecutionSitesCurrentlySnapshotting set, so
+                            // logSnapshotCompletionToZK() will not see incorrect values
+                            // from the next snapshot
+                            final boolean snapshotSucceeded = m_lastSnapshotSucceded;
+
                             try {
-                                logSnapshotCompleteToZK(
-                                        txnId,
-                                        m_lastSnapshotSucceded,
-                                        exportSequenceNumbers);
+                                VoltDB.instance().getHostMessenger().getZK().delete(
+                                        VoltZK.nodes_currently_snapshotting + "/" + VoltDB.instance().getHostMessenger().getHostId(), -1);
+                            } catch (NoNodeException e) {
+                                SNAP_LOG.warn("Expect the snapshot node to already exist during deletion", e);
+                            } catch (Exception e) {
+                                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
                             } finally {
                                 /**
                                  * Remove this last site from the set here after the terminator has run
@@ -670,9 +711,16 @@ public class SnapshotSiteProcessor {
                                  * everything is on disk for the previous snapshot. This prevents a really long
                                  * snapshot initiation procedure from occurring because it has to contend for
                                  * filesystem resources
+                                 *
+                                 * Do this before logSnapshotCompleteToZK() because the ZK operations are slow,
+                                 * and they can trigger snapshot completion interests to fire before this site
+                                 * removes itself from the set. The next snapshot request may come in and see
+                                 * this snapshot is still in progress.
                                  */
                                 ExecutionSitesCurrentlySnapshotting.remove(SnapshotSiteProcessor.this);
                             }
+
+                            logSnapshotCompleteToZK(txnId, snapshotSucceeded, exportSequenceNumbers);
                         }
                     }
                 };
@@ -699,13 +747,23 @@ public class SnapshotSiteProcessor {
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
 
+        // Timeout after 10 minutes
+        final long endTime = System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(10);
         final String snapshotPath = VoltZK.completed_snapshots + "/" + txnId;
         boolean success = false;
         while (!success) {
+            if (System.currentTimeMillis() > endTime) {
+                VoltDB.crashLocalVoltDB("Timed out logging snapshot completion to ZK");
+            }
+
             Stat stat = new Stat();
             byte data[] = null;
             try {
                 data = zk.getData(snapshotPath, false, stat);
+            } catch (NoNodeException e) {
+                // The MPI creates the snapshot completion node asynchronously,
+                // if the node doesn't exist yet, retry
+                continue;
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("This ZK get should never fail", true, e);
             }
@@ -720,8 +778,8 @@ public class SnapshotSiteProcessor {
                 }
                 int remainingHosts = jsonObj.getInt("hostCount") - 1;
                 jsonObj.put("hostCount", remainingHosts);
+                jsonObj.put("didSucceed", snapshotSuccess);
                 if (!snapshotSuccess) {
-                    SNAP_LOG.error("Snapshot failed at this node, snapshot will not be viable for log truncation");
                     jsonObj.put("isTruncation", false);
                 }
                 mergeExportSequenceNumbers(jsonObj, exportSequenceNumbers);
@@ -752,15 +810,6 @@ public class SnapshotSiteProcessor {
             }
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Retrieving list of completed snapshots from ZK should never fail", true, e);
-        }
-
-        try {
-            VoltDB.instance().getHostMessenger().getZK().delete(
-                    VoltZK.nodes_currently_snapshotting + "/" + VoltDB.instance().getHostMessenger().getHostId(), -1);
-        } catch (NoNodeException e) {
-            SNAP_LOG.warn("Expect the snapshot node to already exist during deletion", e);
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
     }
 
@@ -841,19 +890,27 @@ public class SnapshotSiteProcessor {
     public HashSet<Exception> completeSnapshotWork(SystemProcedureExecutionContext context)
         throws InterruptedException {
         HashSet<Exception> retval = new HashSet<Exception>();
-        while (m_snapshotTableTasks != null) {
-            Future<?> result = doSnapshotWork(context, true);
-            if (result != null) {
-                try {
-                    result.get();
-                } catch (ExecutionException e) {
-                    final boolean added = retval.add((Exception)e.getCause());
-                    assert(added);
-                } catch (Exception e) {
-                    final boolean added = retval.add((Exception)e.getCause());
-                    assert(added);
+        //Set to 10 gigabytes/sec, basically unlimited
+        //Does nothing if rate limiting is not enabled
+        DefaultSnapshotDataTarget.setRate(1024 * 10);
+        try {
+            while (m_snapshotTableTasks != null) {
+                Future<?> result = doSnapshotWork(context, true);
+                if (result != null) {
+                    try {
+                        result.get();
+                    } catch (ExecutionException e) {
+                        final boolean added = retval.add((Exception)e.getCause());
+                        assert(added);
+                    } catch (Exception e) {
+                        final boolean added = retval.add((Exception)e.getCause());
+                        assert(added);
+                    }
                 }
             }
+        } finally {
+            //Request default rate again
+            DefaultSnapshotDataTarget.setRate(null);
         }
 
         /**

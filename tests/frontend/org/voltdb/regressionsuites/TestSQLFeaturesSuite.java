@@ -44,7 +44,6 @@ import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.PassByteArrayArg;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.SelectOrderLineByDistInfo;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.SelectWithJoinOrder;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.SelfJoinTest;
-import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.TruncateTable;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.UpdateTests;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.WorkWithBigString;
 
@@ -59,8 +58,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         FeaturesSelectAll.class, UpdateTests.class,
         SelfJoinTest.class, SelectOrderLineByDistInfo.class,
         BatchedMultiPartitionTest.class, WorkWithBigString.class, PassByteArrayArg.class,
-        PassAllArgTypes.class, InsertLotsOfData.class, SelectWithJoinOrder.class,
-        TruncateTable.class
+        PassAllArgTypes.class, InsertLotsOfData.class, SelectWithJoinOrder.class
     };
 
     /**
@@ -112,7 +110,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
     /** Verify that non-latin-1 characters can be stored and retrieved */
     public void testUTF8() throws IOException {
         Client client = getClient();
-        final String testString = "並丧";
+        final String testString = "������";
         try {
             client.callProcedure("ORDER_LINE.insert", 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1.5, testString);
             VoltTable[] results = client.callProcedure("FeaturesSelectAll").getResults();
@@ -401,198 +399,6 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         assertTrue(exception);
     }
 
-    public void testConstraintCheck() throws Exception {
-        System.out.println("STARTING Constraint Check......");
-        Client client = getClient();
-        VoltTable vt = null;
-        Exception ex = null;
-
-        /**
-         *  CREATE TABLE TableCheck (
-            ID INTEGER DEFAULT 0 NOT NULL,
-            AGE INTEGER,
-            WAGE FLOAT,
-            CITY VARCHAR(300),
-            TM TIMESTAMP DEFAULT NOW,
-            CONSTRAINT PK_PTABLE PRIMARY KEY (ID),
-            CHECK (ID < 100),
-            CONSTRAINT check1  CHECK (ID > 0),
-            CONSTRAINT check2  CHECK (TRUNCATE(YEAR) >= 2014),
-            CONSTRAINT check3  CHECK (age > 0 AND age < 50 AND FLOOR(wage/AGE) > 2)
-        );
-         */
-
-        Timestamp tm = Timestamp.valueOf("2014-02-05 13:56:40.123456");
-        client.callProcedure("TABLECHECK.insert", 1, 1, 3, "bedford", tm);
-        vt = client.callProcedure("@AdHoc", "select count(*) from TABLECHECK where id = 1").getResults()[0];
-        validateTableOfScalarLongs(vt, new long[] {1});
-
-        /**
-         * Test insert constraint check
-         */
-        // test check
-        try {
-            client.callProcedure("TABLECHECK.insert", 101, 1, 3, "bedford", tm);
-        } catch (ProcCallException e) {
-            ex = e;
-            if (isHSQL()) { assertTrue(e.getMessage().contains("check constraint;"));
-            } else {
-                assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint "));
-                assertTrue(e.getMessage().contains("SYS_CT"));
-            }
-        } finally {
-            assertNotNull(ex);
-        }
-
-        // test check1
-        ex = null;
-        try {
-            client.callProcedure("TABLECHECK.insert", -1, 1, 3, "bedford", tm);
-        } catch (ProcCallException e) {
-            ex = e;
-            if (isHSQL())  assertTrue(e.getMessage().contains("check constraint;"));
-            else assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK1"));
-
-        } finally {
-            assertNotNull(ex);
-        }
-
-        // test check2
-        ex = null;
-        try {
-            client.callProcedure("TABLECHECK.insert", 2, 1, 3, "bedford", Timestamp.valueOf("2013-02-05 13:56:40.123456"));
-        } catch (ProcCallException e) {
-            ex = e;
-            if (isHSQL())  assertTrue(e.getMessage().contains("check constraint;"));
-            else assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK2"));
-        } finally {
-            assertNotNull(ex);
-        }
-
-        // test check3
-        ex = null;
-        try {
-            client.callProcedure("TABLECHECK.insert", 2, 51, 300, "bedford", tm);
-        } catch (ProcCallException e) {
-            ex = e;
-            if (isHSQL())  assertTrue(e.getMessage().contains("check constraint;"));
-            else assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK3"));
-        } finally {
-            assertNotNull(ex);
-        }
-
-        ex = null;
-        try {
-            client.callProcedure("TABLECHECK.insert", 2, 1, 1, "bedford", tm);
-        } catch (ProcCallException e) {
-            ex = e;
-            if (isHSQL())  assertTrue(e.getMessage().contains("check constraint;"));
-            else assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK3"));
-        } finally {
-            assertNotNull(ex);
-        }
-
-        // test check3 with null
-        if (!isHSQL()) {
-            // Hsql has a bug with NULL check.
-            ex = null;
-            try {
-                client.callProcedure("TABLECHECK.insert", 2, null, 5, "bedford", tm);
-            } catch (ProcCallException e) {
-                ex = e;
-                assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK3"));
-            } finally {
-                assertNotNull(ex);
-            }
-        }
-
-        vt = client.callProcedure("@AdHoc", "select count(*) from TABLECHECK where id = 1").getResults()[0];
-        validateTableOfScalarLongs(vt, new long[] {1});
-
-
-        /**
-         * Test update constraint check
-         */
-        try {
-            client.callProcedure("@AdHoc", "update TABLECHECK set id = 101 where id = 1");
-        } catch (ProcCallException e) {
-            ex = e;
-            if (isHSQL())  assertTrue(e.getMessage().contains("check constraint;"));
-            else {
-                assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint "));
-                assertTrue(e.getMessage().contains("SYS_CT"));
-            }
-        } finally {
-            assertNotNull(ex);
-        }
-
-        // test check1
-        ex = null;
-        try {
-            client.callProcedure("@AdHoc", "update TABLECHECK set id = -1 where id = 1");
-        } catch (ProcCallException e) {
-            ex = e;
-            if (isHSQL())  assertTrue(e.getMessage().contains("check constraint;"));
-            else assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK1"));
-        } finally {
-            assertNotNull(ex);
-        }
-
-        // test check2
-        ex = null;
-        try {
-            client.callProcedure("@AdHoc", "update TABLECHECK set tm = '2013-02-05 13:56:40.123456' where id = 1");
-        } catch (ProcCallException e) {
-            ex = e;
-            if (isHSQL())  assertTrue(e.getMessage().contains("check constraint;"));
-            else assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK2"));
-        } finally {
-            assertNotNull(ex);
-        }
-
-        // test check3
-        ex = null;
-        try {
-            client.callProcedure("@AdHoc", "update TABLECHECK set id = 2, age = 51, wage = 300 where id = 1");
-        } catch (ProcCallException e) {
-            ex = e;
-            if (isHSQL())  assertTrue(e.getMessage().contains("check constraint;"));
-            else assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK3"));
-        } finally {
-            assertNotNull(ex);
-        }
-
-        ex = null;
-        try {
-            client.callProcedure("@AdHoc", "update TABLECHECK set id = 2, age = 1, wage = 1 where id = 1");
-        } catch (ProcCallException e) {
-            ex = e;
-            if (isHSQL())  assertTrue(e.getMessage().contains("check constraint;"));
-            else assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK3"));
-        } finally {
-            assertNotNull(ex);
-        }
-
-        // test check3 with null
-        if (!isHSQL()) {
-            // Hsql has a bug with NULL check.
-            ex = null;
-            try {
-                client.callProcedure("@AdHoc", "update TABLECHECK set id = 2, age = NULL, wage = 5 where id = 1");
-            } catch (ProcCallException e) {
-                ex = e;
-                if (isHSQL())  assertTrue(e.getMessage().contains("check constraint;"));
-                else assertTrue(e.getMessage().contains("Table TABLECHECK failed on check constraint CHECK3"));
-            } finally {
-                assertNotNull(ex);
-            }
-        }
-
-        vt = client.callProcedure("@AdHoc", "select count(*) from TABLECHECK where id = 1").getResults()[0];
-        validateTableOfScalarLongs(vt, new long[] {1});
-    }
-
-
     public void testSetOpsThatFail() throws Exception {
         Client client = getClient();
 
@@ -623,96 +429,6 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         assertTrue(caught);
     }
 
-
-    private void loadTableForTruncateTest(Client client, String[] procs) throws Exception {
-        for (String proc: procs) {
-            client.callProcedure(proc, 1,  1,  1.1, "Luke",  "WOBURN");
-            client.callProcedure(proc, 2,  2,  2.1, "Leia",  "Bedfor");
-            client.callProcedure(proc, 3,  30,  3.1, "Anakin","Concord");
-            client.callProcedure(proc, 4,  20,  4.1, "Padme", "Burlington");
-            client.callProcedure(proc, 5,  10,  2.1, "Obiwan","Lexington");
-            client.callProcedure(proc, 6,  30,  3.1, "Jedi",  "Winchester");
-        }
-    }
-
-    public void testTruncateTable() throws Exception {
-        System.out.println("STARTING TRUNCATE TABLE......");
-        Client client = getClient();
-        VoltTable vt = null;
-
-        String[] procs = {"RTABLE.insert", "PTABLE.insert"};
-        String[] tbs = {"RTABLE", "PTABLE"};
-        // Insert data
-        loadTableForTruncateTest(client, procs);
-
-        for (String tb: tbs) {
-            vt = client.callProcedure("@AdHoc", "select count(*) from " + tb).getResults()[0];
-            validateTableOfScalarLongs(vt, new long[] {6});
-        }
-
-        if (isHSQL()) {
-            return;
-        }
-
-        Exception e = null;
-        try {
-            client.callProcedure("TruncateTable");
-        } catch (ProcCallException ex) {
-            System.out.println(ex.getMessage());
-            e = ex;
-            assertTrue(ex.getMessage().contains("CONSTRAINT VIOLATION"));
-        } finally {
-            assertNotNull(e);
-        }
-        for (String tb: tbs) {
-            vt = client.callProcedure("@AdHoc", "select count(*) from " + tb).getResults()[0];
-            validateTableOfScalarLongs(vt, new long[] {6});
-
-            client.callProcedure("@AdHoc", "INSERT INTO "+ tb +" VALUES (7,  30,  1.1, 'Jedi','Winchester');");
-
-            vt = client.callProcedure("@AdHoc", "select count(ID) from " + tb).getResults()[0];
-            validateTableOfScalarLongs(vt, new long[] {7});
-
-
-            vt = client.callProcedure("@AdHoc", "Truncate table " + tb).getResults()[0];
-
-            vt = client.callProcedure("@AdHoc", "select count(*) from " + tb).getResults()[0];
-            validateTableOfScalarLongs(vt, new long[] {0});
-
-            client.callProcedure("@AdHoc", "INSERT INTO "+ tb +" VALUES (7,  30,  1.1, 'Jedi','Winchester');");
-            vt = client.callProcedure("@AdHoc", "select ID from " + tb).getResults()[0];
-            validateTableOfScalarLongs(vt, new long[] {7});
-
-            vt = client.callProcedure("@AdHoc", "Truncate table " + tb).getResults()[0];
-        }
-
-        // insert the data back
-        loadTableForTruncateTest(client, procs);
-        String nestedLoopIndexJoin = "select count(*) from rtable r join ptable p on r.age = p.age";
-
-        // Test nested loop index join
-        for (String tb: tbs) {
-            vt = client.callProcedure("@AdHoc", "select count(*) from " + tb).getResults()[0];
-            validateTableOfScalarLongs(vt, new long[] {6});
-        }
-
-        vt = client.callProcedure("@Explain", nestedLoopIndexJoin).getResults()[0];
-        System.err.println(vt);
-        assertTrue(vt.toString().contains("NESTLOOP INDEX INNER JOIN"));
-        assertTrue(vt.toString().contains("inline INDEX SCAN of \"PTABLE\""));
-        assertTrue(vt.toString().contains("SEQUENTIAL SCAN of \"RTABLE\""));
-
-        vt = client.callProcedure("@AdHoc",nestedLoopIndexJoin).getResults()[0];
-        validateTableOfScalarLongs(vt, new long[] {8});
-
-        vt = client.callProcedure("@AdHoc", "Truncate table ptable").getResults()[0];
-        vt = client.callProcedure("@AdHoc", "select count(*) from ptable").getResults()[0];
-        validateTableOfScalarLongs(vt, new long[] {0});
-
-        vt = client.callProcedure("@AdHoc",nestedLoopIndexJoin).getResults()[0];
-        validateTableOfScalarLongs(vt, new long[] {0});
-    }
-
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
@@ -731,10 +447,6 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(BatchedMultiPartitionTest.class.getResource("sqlfeatures-ddl.sql"));
         project.addProcedures(PROCEDURES);
-        project.addStmtProcedure("SelectRightOrder",
-                "SELECT * FROM WIDE, T1, T2 WHERE T2.ID = T1.ID", null, "T1,T2,WIDE");
-        project.addStmtProcedure("SelectWrongOrder",
-                "SELECT * FROM WIDE, T1, T2 WHERE T2.ID = T1.ID", null, "WIDE,T1,T2");
 
         boolean success;
 

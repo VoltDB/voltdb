@@ -33,6 +33,10 @@ import java.util.concurrent.TimeUnit;
 
 import junit.framework.Test;
 
+import org.HdrHistogram_voltpatches.AbstractHistogram;
+import org.HdrHistogram_voltpatches.Histogram;
+import org.hsqldb_voltpatches.HSQLInterface;
+import org.voltcore.utils.CompressionStrategySnappy;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -44,7 +48,6 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.join.BalancePartitionsStatistics;
 import org.voltdb.utils.MiscUtils;
-import org.voltdb_testprocs.regressionsuites.SaveRestoreBase;
 import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
 
 public class TestStatisticsSuite extends SaveRestoreBase {
@@ -62,19 +65,6 @@ public class TestStatisticsSuite extends SaveRestoreBase {
 
     public TestStatisticsSuite(String name) {
         super(name);
-    }
-
-    // ALL OF THE VALIDATION SCHEMAS IN THIS TEST ARE BASED OFF OF
-    // THE VOLTDB DOCS, RATHER THAN REUSING THE CODE THAT GENERATES THEM.
-    // IN SOME MAGICAL FUTURE MAYBE THEY ALL CAN BE GENERATED FROM THE
-    // SAME METADATA.
-    public void validateSchema(VoltTable result, VoltTable expected)
-    {
-        assertEquals(expected.getColumnCount(), result.getColumnCount());
-        for (int i = 0; i < result.getColumnCount(); i++) {
-            assertEquals("Failed name column: " + i, expected.getColumnName(i), result.getColumnName(i));
-            assertEquals("Failed type column: " + i, expected.getColumnType(i), result.getColumnType(i));
-        }
     }
 
     // For the provided table, verify that there is a row for each host in the cluster where
@@ -95,6 +85,21 @@ public class TestStatisticsSuite extends SaveRestoreBase {
                             " in column " + columnName, hostsSeen.contains(thisHostId));
                 }
                 hostsSeen.add(thisHostId);
+            }
+        }
+        // Before failing the assert, report details of the non-conforming result.
+        if (HOSTS != hostsSeen.size()) {
+            System.out.println("Something in the following results will fail the assert.");
+            result.resetRowPosition();
+            while (result.advanceRow()) {
+                String procName = result.getString(columnName);
+                Long thisHostId = result.getLong("HOST_ID");
+                if (procName.equalsIgnoreCase(rowId)) {
+                    System.out.println("Found the match at host " + thisHostId + " for proc " + procName +
+                                       (hostsSeen.add(thisHostId) ? " added" : " duplicated"));
+                } else {
+                    System.out.println("Found non-match at host " + thisHostId + " for proc " + procName);
+                }
             }
         }
         assertEquals(HOSTS, hostsSeen.size());
@@ -187,14 +192,12 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         System.out.println("\n\nTESTING LATENCY STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
-        ColumnInfo[] expectedSchema = new ColumnInfo[7];
+        ColumnInfo[] expectedSchema = new ColumnInfo[5];
         expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
         expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
         expectedSchema[3] = new ColumnInfo("SITE_ID", VoltType.INTEGER);
-        expectedSchema[4] = new ColumnInfo("BUCKET_MIN", VoltType.INTEGER);
-        expectedSchema[5] = new ColumnInfo("BUCKET_MAX", VoltType.INTEGER);
-        expectedSchema[6] = new ColumnInfo("INVOCATIONS", VoltType.BIGINT);
+        expectedSchema[4] = new ColumnInfo("HISTOGRAM", VoltType.VARBINARY);
         VoltTable expectedTable = new VoltTable(expectedSchema);
 
         VoltTable[] results = null;
@@ -213,12 +216,14 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         results[0].advanceRow();
         validateRowSeenAtAllHosts(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), false);
         // actually, there are 26 rows per host so:
-        assertEquals(26 * HOSTS, results[0].getRowCount());
+        assertEquals(HOSTS, results[0].getRowCount());
         // Check for non-zero invocations (ENG-4668)
         long invocations = 0;
         results[0].resetRowPosition();
         while (results[0].advanceRow()) {
-            invocations += results[0].getLong("INVOCATIONS");
+            byte histogramBytes[] = results[0].getVarbinary("HISTOGRAM");
+            Histogram h = AbstractHistogram.fromCompressedBytes(histogramBytes, CompressionStrategySnappy.INSTANCE);
+            invocations += h.getHistogramData().getTotalCount();
         }
         assertTrue(invocations > 0);
     }
@@ -248,7 +253,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         //
         VoltTable results[] = null;
         // This should get us an invocation at each host
-        for (int i = 0; i < SITES * HOSTS; i++) {
+        for (int i = 0; i < 1000; i++) {
             results = client.callProcedure("NEW_ORDER.insert", i).getResults();
         }
         results = client.callProcedure("@Statistics", "INITIATOR", 0).getResults();
@@ -271,7 +276,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
                 counts += results[0].getLong("INVOCATIONS");
             }
         }
-        assertEquals(HOSTS * SITES, counts);
+        assertEquals(1000, counts);
         // verify that each node saw a NEW_ORDER.insert initiation
         validateRowSeenAtAllHosts(results[0], "PROCEDURE_NAME", "NEW_ORDER.insert", true);
     }
@@ -303,7 +308,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         System.out.println("\n\nTESTING TABLE STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
-        ColumnInfo[] expectedSchema = new ColumnInfo[11];
+        ColumnInfo[] expectedSchema = new ColumnInfo[13];
         expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
         expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
@@ -315,6 +320,8 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         expectedSchema[8] = new ColumnInfo("TUPLE_ALLOCATED_MEMORY", VoltType.INTEGER);
         expectedSchema[9] = new ColumnInfo("TUPLE_DATA_MEMORY", VoltType.INTEGER);
         expectedSchema[10] = new ColumnInfo("STRING_DATA_MEMORY", VoltType.INTEGER);
+        expectedSchema[11] = new ColumnInfo("TUPLE_LIMIT", VoltType.INTEGER);
+        expectedSchema[12] = new ColumnInfo("PERCENT_FULL", VoltType.INTEGER);
         VoltTable expectedTable = new VoltTable(expectedSchema);
 
         VoltTable[] results = null;
@@ -379,10 +386,12 @@ public class TestStatisticsSuite extends SaveRestoreBase {
             assertEquals(1, results.length);
             validateSchema(results[0], expectedTable);
             if (success) {
-                success = validateRowSeenAtAllSites(results[0], "INDEX_NAME", "SYS_IDX_W_PK_TREE_10018", true);
+                success = validateRowSeenAtAllSites(results[0], "INDEX_NAME",
+                        HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "W_PK_TREE", true);
             }
             if (success) {
-                success = validateRowSeenAtAllSites(results[0], "INDEX_NAME", "SYS_IDX_I_PK_TREE_10020", true);
+                success = validateRowSeenAtAllSites(results[0], "INDEX_NAME",
+                        HSQLInterface.AUTO_GEN_CONSTRAINT_WRAPPER_PREFIX + "I_PK_TREE", true);
             }
             if (success) break;
         }
@@ -392,7 +401,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         System.out.println("\n\nTESTING MEMORY STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
-        ColumnInfo[] expectedSchema = new ColumnInfo[12];
+        ColumnInfo[] expectedSchema = new ColumnInfo[13];
         expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
         expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
@@ -405,6 +414,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         expectedSchema[9] = new ColumnInfo("STRINGMEMORY", VoltType.INTEGER);
         expectedSchema[10] = new ColumnInfo("TUPLECOUNT", VoltType.BIGINT);
         expectedSchema[11] = new ColumnInfo("POOLEDMEMORY", VoltType.BIGINT);
+        expectedSchema[12] = new ColumnInfo("PHYSICALMEMORY", VoltType.BIGINT);
         VoltTable expectedTable = new VoltTable(expectedSchema);
 
         VoltTable[] results = null;
@@ -422,6 +432,35 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         results[0].advanceRow();
         // Hacky, on a single local cluster make sure that all 'nodes' are present.
         // MEMORY stats lacks a common string across nodes, but we can hijack the hostname in this case.
+        validateRowSeenAtAllHosts(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), true);
+    }
+
+    public void testCpuStatistics() throws Exception {
+        System.out.println("\n\nTESTING CPU STATS\n\n\n");
+        Client client  = getFullyConnectedClient();
+
+        ColumnInfo[] expectedSchema = new ColumnInfo[4];
+        expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
+        expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
+        expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
+        expectedSchema[3] = new ColumnInfo("PERCENT_USED", VoltType.BIGINT);
+        VoltTable expectedTable = new VoltTable(expectedSchema);
+
+        VoltTable[] results = null;
+
+        //
+        // cpu
+        //
+        // give time to seed the stats cache?
+        Thread.sleep(1000);
+        results = client.callProcedure("@Statistics", "cpu", 0).getResults();
+        System.out.println("Node cpu statistics table: " + results[0].toString());
+        // one aggregate table returned
+        assertEquals(1, results.length);
+        validateSchema(results[0], expectedTable);
+        results[0].advanceRow();
+        // Hacky, on a single local cluster make sure that all 'nodes' are present.
+        // CPU stats lacks a common string across nodes, but we can hijack the hostname in this case.
         validateRowSeenAtAllHosts(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), true);
     }
 
@@ -982,9 +1021,9 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         // LIVECLIENTS
         //
         results = client.callProcedure("@Statistics", "MANAGEMENT", 0).getResults();
-        // six aggregate tables returned.  Assume that we have selected the right
+        // eight aggregate tables returned.  Assume that we have selected the right
         // subset of stats internally, just check that we get stuff.
-        assertEquals(7, results.length);
+        assertEquals(8, results.length);
     }
 
     class RebalanceStatsChecker

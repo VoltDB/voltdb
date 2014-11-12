@@ -141,6 +141,9 @@ public class AsyncBenchmark {
         @Option(desc = "Benchmark duration, in seconds.")
         int duration = 120;
 
+        @Option(desc = "Max number of puts. This does not count any preloading or warmup and may not be reached if duration is too short.")
+        long maxputs = Long.MAX_VALUE;
+
         @Option(desc = "Warmup duration in seconds.")
         int warmup = 0;
 
@@ -169,7 +172,6 @@ public class AsyncBenchmark {
                 "and puts (singlePartition vs multiPartition).")
         double multisingleratio = 0; // By default, don't run multi-partition
 
-
         @Option(desc = "Size of keys in bytes.")
         int keysize = 32;
 
@@ -186,7 +188,7 @@ public class AsyncBenchmark {
         boolean usecompression= false;
 
         @Option(desc = "Maximum TPS rate for benchmark.")
-        int ratelimit = 100000;
+        int ratelimit = Integer.MAX_VALUE;
 
         @Option(desc = "Determine transaction rate dynamically based on latency.")
         boolean autotune = false;
@@ -284,14 +286,7 @@ public class AsyncBenchmark {
                 }
                 System.err.printf("Connection to %s:%d was lost.\n", hostname, port);
                 totalConnections.decrementAndGet();
-                if (config.recover) {
-                    try {
-                        connectThis(hostname, "Retry");
-                    } catch (Exception e) {
-                        // TODO Auto-generated catch block
-                        e.printStackTrace();
-                    }
-                } else {
+                if (!config.recover) {
                     if (totalConnections.get() == 0) {
                         //totalConnections.set(-1);
                         System.exit(1);
@@ -311,6 +306,7 @@ public class AsyncBenchmark {
         this.config = config;
 
         ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
+        clientConfig.setReconnectOnConnectionLoss(config.recover);
 
         if (config.autotune) {
             clientConfig.enableAutoTune();
@@ -460,8 +456,8 @@ public class AsyncBenchmark {
             System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
             System.out.printf("Aborts/Failures %d/%d, ",
                     stats.getInvocationAborts(), stats.getInvocationErrors());
-            System.out.printf("Avg/95%% Latency %.2f/%dms\n", stats.getAverageLatency(),
-                    stats.kPercentileLatency(0.95));
+            System.out.printf("Avg/95%% Latency %.2f/%.2fms\n", stats.getAverageLatency(),
+                    stats.kPercentileLatencyAsDouble(0.95));
             if(totalConnections.get() == -1 && stats.getTxnThroughput() == 0) {
                 if(!config.recover) {
                     String errMsg = "Lost all connections. Exit...";
@@ -472,7 +468,7 @@ public class AsyncBenchmark {
             String msg = "In printStatistics. We got an exception: '" + e.getMessage() + "'!!";
             prt(msg);
         }
-        if ((System.currentTimeMillis() - lastSuccessfulResponse) > 6*60*1000) {
+        if (lastSuccessfulResponse > 0  && (System.currentTimeMillis() - lastSuccessfulResponse) > 6*60*1000) {
             prt("Not making any progress, last at " +
                     (new SimpleDateFormat("yyyy-MM-DD HH:mm:ss.S")).format(new Date(lastSuccessfulResponse)) + ", exiting");
             printJStack();
@@ -587,8 +583,8 @@ public class AsyncBenchmark {
 
         System.out.printf("Average throughput:            %,9d txns/sec\n", stats.getTxnThroughput());
         System.out.printf("Average latency:               %,9.2f ms\n", stats.getAverageLatency());
-        System.out.printf("95th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.95));
-        System.out.printf("99th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.99));
+        System.out.printf("95th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.95));
+        System.out.printf("99th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.99));
 
         System.out.print("\n" + HORIZONTAL_RULE);
         System.out.println(" System Server Statistics");
@@ -713,17 +709,6 @@ public class AsyncBenchmark {
         }
     }
 
-    private void connectThis(final String server, final String info) throws InterruptedException, NoConnectionsException, IOException {
-        System.out.println("Trying to reconnect this server: '" + server + "'");
-        Thread t = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                connectToOneServerWithRetry(server, info);
-            }
-        });
-        t.setDaemon(true);
-        t.start();
-    }
     /**
      * Core benchmark code.
      * Connect. Initialize. Run the loop. Cleanup. Print Results.
@@ -791,17 +776,18 @@ public class AsyncBenchmark {
             // If Volt is running on one node only, no need to run this test on multi-partition
             config.multisingleratio = 0;
 
-        // Run the benchmark loop for the requested duration
+        // Run the benchmark loop for the requested duration or txn count
         // The throughput may be throttled depending on client configuration
         System.out.println("\nRunning benchmark...");
         final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
         long currentTime = System.currentTimeMillis();
         long diff = benchmarkEndTime - currentTime;
         int i = 1;
+        long putCount = 0;
 
         double mpRand;
         String msg = "";
-        while (benchmarkEndTime > currentTime) {
+        while (benchmarkEndTime > currentTime && putCount < config.maxputs) {
             if(debug && diff != 0 && diff%5000.00 == 0 && i%5 == 0) {
                 msg = "i = " + i + ", Time remaining in seconds: " + diff/1000l +
                       ", totalConnections = " + totalConnections.get();
@@ -837,6 +823,7 @@ public class AsyncBenchmark {
             }
             else {
                 // Put a key/value pair, asynchronously
+                putCount++;
                 final PayloadProcessor.Pair pair = processor.generateForStore();
                 mpRand = rand.nextDouble();
                 if(rand.nextDouble() < config.multisingleratio) {
@@ -990,7 +977,7 @@ public class AsyncBenchmark {
     }
 
     public static String dateformat(long ctime) {
-        return DateFormatUtils.format(ctime, "MM/dd/yyyy HH:mm:ss");
+        return DateFormatUtils.format(ctime, "yyyy-MM-dd HH:mm:ss,SSS");
     }
 
     public static long getTime() {

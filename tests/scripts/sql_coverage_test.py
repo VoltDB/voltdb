@@ -58,6 +58,51 @@ class Config:
     def get_config(self, config_name):
         return self.__config[config_name]
 
+def print_seconds(seconds=0, message_end="", message_begin="Total   time: ",
+                  include_current_time=False):
+    """ Prints, and returns, a message containing the specified number of
+    seconds, preceded by the 'message_begin' and followed by "seconds, " and
+    the 'message_end'; if the number of seconds is greater than or equal to 60,
+    it also prints the minutes and seconds in parentheses, e.g., 61.9 seconds
+    would be printed as "61.9 seconds (01:02), ". Optionally, if
+    'include_current_time' is True, the current time (in seconds since January
+    1, 1970) is also printed, in brackets, e.g.,
+    "61.9 seconds (1:02) [at 1408645826.68], ", which is useful for debugging
+    purposes.
+    """
+
+    time_msg = str(seconds) + " seconds"
+    if (seconds >= 60):
+        time_msg += " (" + re.sub("^0:", "", str(datetime.timedelta(0, round(seconds))), 1) + ")"
+    if (include_current_time):
+        time_msg += " [at " + str(time.time()) + "]"
+
+    message = message_begin + time_msg + ", " + message_end
+    print message
+    return message
+
+def print_elapsed_seconds(message_end="", prev_time=-1,
+                          message_begin="Elapsed time: "):
+    """Computes, returns and prints the difference (in seconds) between the
+    current system time and a previous time, which is either the specified
+    'prev_time' or, if that is negative (or unspecified), the previous time
+    at which this function was called. The printed message is preceded by
+    'message_begin' and followed by "seconds, " and 'message_end'; if the
+    elapsed time is greater than or equal to 60 seconds, it also includes the
+    minutes and seconds in parentheses, e.g., 61.9 seconds would be printed
+    as "61.9 seconds (01:02), ".
+    """
+
+    now = time.time()
+    global save_prev_time
+    if (prev_time < 0):
+        prev_time = save_prev_time
+    save_prev_time = now
+
+    diff_time = now - prev_time
+    print_seconds(diff_time, message_end, message_begin)
+    return diff_time
+
 def run_once(name, command, statements_path, results_path, submit_verbosely, testConfigKit):
 
     print "Running \"run_once\":"
@@ -98,7 +143,6 @@ def run_once(name, command, statements_path, results_path, submit_verbosely, tes
 #        print "999 Key = '%s', Val = '%s'" % (key, testConfigKits[key])
     if(host != defaultHost):
         # Flush database
-        client.onecmd("updatecatalog " + testConfigKit["flushCatalog"] + " " + testConfigKit["deploymentFile"])
         client.onecmd("updatecatalog " + testConfigKit["testCatalog"]  + " " + testConfigKit["deploymentFile"])
 
     statements_file = open(statements_path, "rb")
@@ -124,7 +168,7 @@ def run_once(name, command, statements_path, results_path, submit_verbosely, tes
                     print >> sys.stderr, \
                         "Failed to kill the server process %d" % (server.pid)
             break
-        tables = None
+        table = None
         if client.response == None:
             print >> sys.stderr, "No error, but an unexpected null client response (server crash?) from executing statement '%s': %s" % \
                 (statement["SQL"], sys.exc_info()[1])
@@ -135,14 +179,16 @@ def run_once(name, command, statements_path, results_path, submit_verbosely, tes
                     print >> sys.stderr, \
                         "Failed to kill the server process %d" % (server.pid)
             break
-        if client.response.tables != None:
+        if client.response.tables:
             ### print "DEBUG: got table(s) from ", statement["SQL"] ,"."
-            tables = [normalize(t, statement["SQL"]) for t in client.response.tables]
-        else:
-            print "DEBUG: returned no table(s) from ?", statement["SQL"] ,"?"
+            table = normalize(client.response.tables[0], statement["SQL"])
+            if len(client.response.tables) > 1:
+                print "WARNING: ignoring extra table(s) from result of query ?", statement["SQL"] ,"?"
+        # else:
+            # print "WARNING: returned no table(s) from ?", statement["SQL"] ,"?"
         cPickle.dump({"Status": client.response.status,
                       "Info": client.response.statusString,
-                      "Result": tables,
+                      "Result": table,
                       "Exception": str(client.response.exception)},
                      results_file)
     results_file.close()
@@ -162,7 +208,12 @@ def run_once(name, command, statements_path, results_path, submit_verbosely, tes
     else:
         return 0
 
-def run_config(suite_name, config, basedir, output_dir, random_seed, report_all, generate_only, submit_verbosely, args, testConfigKit):
+def run_config(suite_name, config, basedir, output_dir, random_seed, report_all, generate_only,
+    subversion_generation, submit_verbosely, args, testConfigKit):
+
+    # Store the current, initial system time (in seconds since January 1, 1970)
+    time0 = time.time()
+
     for key in config.iterkeys():
         print "in run_config key = '%s', config[key] = '%s'" % (key, config[key])
         if not os.path.isabs(config[key]):
@@ -189,7 +240,7 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
     random_state = random.getstate()
     if "template-jni" in config:
         template = config["template-jni"]
-    generator = SQLGenerator(config["schema"], template, True)
+    generator = SQLGenerator(config["schema"], template, subversion_generation)
     counter = 0
 
     statements_file = open(statements_path, "wb")
@@ -204,37 +255,41 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
         # Claim success without running servers.
         return {"keyStats" : None, "mis" : 0}
 
+    # Print the elapsed time, with a message
+    global gensql_time
+    gensql_time += print_elapsed_seconds("for generating statements (" + suite_name + ")", time0)
+
     if run_once("jni", command, statements_path, jni_path, submit_verbosely, testConfigKit) != 0:
         print >> sys.stderr, "Test with the JNI backend had errors."
         print >> sys.stderr, "  jni_path: %s" % (jni_path)
         sys.stderr.flush()
         exit(1)
 
+    # Print the elapsed time, with a message
+    global voltdb_time
+    voltdb_time += print_elapsed_seconds("for running VoltDB (JNI) statements (" + suite_name + ")")
+
     random.seed(random_seed)
     random.setstate(random_state)
-    # To get around the timestamp issue. Volt and HSQLDB use different units
-    # for timestamp (microsec vs. millisec), so we have to use different
-    # template file for regression test, since all the statements are not
-    # generated in this case.
-    if "template-hsqldb" in config:
-        template = config["template-hsqldb"]
-    generator = SQLGenerator(config["schema"], template, False)
-    counter = 0
-
-    statements_file = open(statements_path, "wb")
-    for i in generator.generate():
-        cPickle.dump({"id": counter, "SQL": i}, statements_file)
-        counter += 1
-    statements_file.close()
 
     if run_once("hsqldb", command, statements_path, hsql_path, submit_verbosely, testConfigKit) != 0:
         print >> sys.stderr, "Test with the HSQLDB backend had errors."
         exit(1)
 
+    # Print the elapsed time, with a message
+    global hsqldb_time
+    hsqldb_time += print_elapsed_seconds("for running HSqlDB statements (" + suite_name + ")")
+
     global compare_results
     compare_results = imp.load_source("normalizer", config["normalizer"]).compare_results
     success = compare_results(suite_name, random_seed, statements_path, hsql_path,
                               jni_path, output_dir, report_all)
+
+    # Print the elapsed time and total time, with a message
+    global compar_time
+    compar_time += print_elapsed_seconds("for comparing DB results (" + suite_name + ")")
+    print_elapsed_seconds("for run_config of '" + suite_name + "'", time0, "Sub-tot time: ")
+
     return success
 
 def get_voltcompiler(basedir):
@@ -262,9 +317,9 @@ def get_hostinfo(options):
             sys.exit(3)
     return (hostname, hostport)
 
-def create_catalogFile(voltcompiler, flush4projectFile, catalogFilename):
+def create_catalogFile(voltcompiler, projectFile, catalogFilename):
     catalogFile = "/tmp/" + catalogFilename + ".jar"
-    cmd = voltcompiler + " /tmp " + flush4projectFile + " " + catalogFile
+    cmd = voltcompiler + " /tmp " + projectFile + " " + catalogFile
     call(cmd, shell=True)
     if not os.path.exists(catalogFile):
         catalogFile = None
@@ -306,27 +361,12 @@ def create_deploymentFile(options):
 def create_testConfigKits(options, basedir):
     testConfigKits = {}
 
-    flushDDL = basedir + "/" + options.flush
-    if not os.path.exists(flushDDL):
-        print >> sys.stderr, "Cannot find the flush DDL file: '%s'!" % flushDDL
-        sys.exit(3)
-#    else:
-#        print "flushDDL = #%s#" % flushDDL
-
     voltcompiler = get_voltcompiler(basedir)
     if voltcompiler == None:
         print >> sys.stderr, "Cannot find the executable voltcompiler!"
         sys.exit(3)
     else:
         testConfigKits["voltcompiler"] = voltcompiler
-
-    flush4projectFile = create_projectFile(flushDDL, 'flush')
-    flushCatalog = create_catalogFile(voltcompiler, flush4projectFile, 'flush')
-    if flushCatalog == None:
-        print >> sys.stderr, "Cannot find the flush catalog jar file!"
-        sys.exit(3)
-    else:
-        testConfigKits["flushCatalog"] = flushCatalog
 
     deploymentFile = create_deploymentFile(options)
     if deploymentFile == None:
@@ -401,6 +441,18 @@ The following place holders are supported,
 """
 
 if __name__ == "__main__":
+    #print the whole command line, maybe useful for debugging
+    #print " ".join(sys.argv)
+
+    # Print the current, initial system time
+    time0 = time.time()
+    print "Initial time: " + str(time0) + ", at start (in seconds since January 1, 1970)"
+    save_prev_time = time0
+    gensql_time = 0.0
+    voltdb_time = 0.0
+    hsqldb_time = 0.0
+    compar_time = 0.0
+
     parser = OptionParser()
     parser.add_option("-l", "--leader", dest="hostname",
                       help="the hostname of the leader")
@@ -412,12 +464,13 @@ if __name__ == "__main__":
                       help="the number of partitions used in this test")
     parser.add_option("-p", "--port", dest="hostport",
                       help="the port number of the leader")
-    parser.add_option("-f", "--flush", dest="flush",
-                      help="the temporary DDL file used to flush databases")
     parser.add_option("-s", "--seed", dest="seed",
                       help="seed for random number generator")
     parser.add_option("-c", "--config", dest="config", default=None,
                       help="the name of the config to run")
+    parser.add_option("-S", "--subversion_generation", dest="subversion_generation",
+                      action="store_true", default=None,
+                      help="enable generation of additional subquery forms for select statements")
     parser.add_option("-r", "--report-all", action="store_true",
                       dest="report_all", default=False,
                       help="report all attempted SQL statements rather than mismatches")
@@ -460,9 +513,8 @@ if __name__ == "__main__":
     defaultHost = "localhost"
     defaultPort = 21212
     if(options.hostname != None and options.hostname != defaultHost):
-        # To set a dictionary with following 5 keys:
+        # To set a dictionary with following 4 keys:
         # testConfigKits["voltcompiler"]
-        # testConfigKits["flushCatalog"]
         # testConfigKits["deploymentFile"]
         # testConfigKits["hostname"]
         # testConfigKits["hostport"]
@@ -480,16 +532,27 @@ if __name__ == "__main__":
             testCatalog = create_catalogFile(testConfigKits['voltcompiler'], testProjectFile, 'test')
             # To add one more key
             testConfigKits["testCatalog"] = testCatalog
-        result = run_config(config_name, config, basedir, report_dir, seed, options.report_all, \
-                            options.generate_only, options.report_all, args, testConfigKits)
+        result = run_config(config_name, config, basedir, report_dir, seed, options.report_all,
+                            options.generate_only, options.subversion_generation,
+                            options.report_all, args, testConfigKits)
         statistics[config_name] = result["keyStats"]
         statistics["seed"] = seed
         if result["mis"] != 0:
             success = False
 
     # Write the summary
+    time1 = time.time()
     generate_summary(output_dir, statistics)
+
+    # Print the elapsed time, and the current system time
+    print_seconds(gensql_time, "for generating ALL statements")
+    print_seconds(voltdb_time, "for running ALL VoltDB (JNI) statements")
+    print_seconds(hsqldb_time, "for running ALL HSqlDB statements")
+    print_seconds(compar_time, "for comparing ALL DB results")
+    print_elapsed_seconds("for generating the output report", time1, "Total   time: ")
+    print_elapsed_seconds("for the entire run", time0, "Total   time: ")
 
     if not success:
         print >> sys.stderr, "SQL coverage has errors."
         exit(1)
+

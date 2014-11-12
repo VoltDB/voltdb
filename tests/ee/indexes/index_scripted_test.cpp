@@ -30,6 +30,7 @@
 #include <cassert>
 #include <sys/time.h>
 #include <boost/foreach.hpp>
+#include <boost/scoped_ptr.hpp>
 #include "common/NValue.hpp"
 #include "common/ValueFactory.hpp"
 #include "indexes/tableindex.h"
@@ -81,6 +82,7 @@ struct Command {
 
 vector<voltdb::TableIndex*> currentIndexes;
 voltdb::TableIndex *currentIndex;
+
 vector<voltdb::ValueType> currentColumnTypes;
 vector<int32_t> currentColumnLengths;
 vector<bool> currentColumnAllowNull;
@@ -111,12 +113,14 @@ bool commandLS(voltdb::TableTuple &key)
 {
     //cout << "running ls" << endl;
     //cout << " candidate key : " << key.tupleLength() << " - " << key.debug("") << endl;
-    bool result = currentIndex->moveToKey(&key);
+    IndexCursor indexCursor(currentIndex->getTupleSchema());
+
+    bool result = currentIndex->moveToKey(&key, indexCursor);
     if (!result) {
         cout << "ls FAIL(moveToKey()) key length: " << key.tupleLength() << endl << key.debug("") << endl;
         return false;
     }
-    voltdb::TableTuple value = currentIndex->nextValueAtKey();
+    voltdb::TableTuple value = currentIndex->nextValueAtKey(indexCursor);
     if (value.isNullTuple()) {
         cout << "ls FAIL(isNullTuple()) key length: " << key.tupleLength() << endl << key.debug("") << endl;
         return false;
@@ -136,7 +140,8 @@ bool commandLF(voltdb::TableTuple &key)
 
     // Don't just call !commandLS(key) here. That does an equality check.
     // Here, the valid test is for existence, not equality.
-    return !(currentIndex->moveToKey(&key));
+    IndexCursor indexCursor(currentIndex->getTupleSchema());
+    return !(currentIndex->moveToKey(&key, indexCursor));
 }
 
 bool commandDS(voltdb::TableTuple &key)
@@ -191,7 +196,7 @@ void setNewCurrent(const char *testName,
     currentColumnLengths = columnLengths;
     currentColumnAllowNull = columnAllowNull;
 
-    voltdb::TupleSchema *schema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
+    voltdb::TupleSchema *schema = voltdb::TupleSchema::createTupleSchemaForTest(columnTypes, columnLengths, columnAllowNull);
     schemaCache.push_back(schema);
     // just pack the indices tightly
     vector<int> columnIndices;
@@ -510,7 +515,9 @@ int main(int argc, char **argv)
                 cerr << "Operation code parse error on line: " << line << endl;
                 exit(-1);
             }
-            voltdb::TupleSchema *tupleSchema = voltdb::TupleSchema::createTupleSchema(currentColumnTypes, currentColumnLengths, currentColumnAllowNull, true);
+            voltdb::TupleSchema *tupleSchema = voltdb::TupleSchema::createTupleSchemaForTest(currentColumnTypes,
+                                                                                      currentColumnLengths,
+                                                                                      currentColumnAllowNull);
             schemaCache.push_back(tupleSchema);
             cmd.key = tupleFromString(tuple1, tupleSchema);
             if (tuple2) cmd.key2 = tupleFromString(tuple2, tupleSchema);

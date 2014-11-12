@@ -80,7 +80,8 @@ Table::Table(int tableAllocationTargetSize) :
     m_ownsTupleSchema(true),
     m_tableAllocationTargetSize(tableAllocationTargetSize),
     m_pkeyIndex(NULL),
-    m_refcount(0)
+    m_refcount(0),
+    m_compactionThreshold(95)
 {
 }
 
@@ -114,7 +115,7 @@ Table::~Table() {
     }
 }
 
-void Table::initializeWithColumns(TupleSchema *schema, const std::vector<string> &columnNames, bool ownsTupleSchema) {
+void Table::initializeWithColumns(TupleSchema *schema, const std::vector<string> &columnNames, bool ownsTupleSchema, int32_t compactionThreshold) {
 
     // copy the tuple schema
     if (m_ownsTupleSchema) {
@@ -163,6 +164,8 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::vector<string>
     m_tupleCount = 0;
 
     onSetColumns(); // for more initialization
+
+    m_compactionThreshold = compactionThreshold;
 }
 
 // ------------------------------------------------------------------
@@ -390,9 +393,10 @@ bool Table::equals(voltdb::Table *other) {
     return true;
 }
 
-void Table::loadTuplesFromNoHeader(SerializeInput &serialize_io,
+void Table::loadTuplesFromNoHeader(SerializeInputBE &serialize_io,
                                    Pool *stringPool,
-                                   ReferenceSerializeOutput *uniqueViolationOutput) {
+                                   ReferenceSerializeOutput *uniqueViolationOutput,
+                                   bool shouldDRStreamRow) {
     int tupleCount = serialize_io.readInt();
     assert(tupleCount >= 0);
 
@@ -416,7 +420,7 @@ void Table::loadTuplesFromNoHeader(SerializeInput &serialize_io,
 
         target.deserializeFrom(serialize_io, stringPool);
 
-        processLoadedTuple(target, uniqueViolationOutput, serializedTupleCount, tupleCountPosition);
+        processLoadedTuple(target, uniqueViolationOutput, serializedTupleCount, tupleCountPosition, shouldDRStreamRow);
     }
 
     //If unique constraints are being handled, write the length/size of constraints that occured
@@ -432,9 +436,10 @@ void Table::loadTuplesFromNoHeader(SerializeInput &serialize_io,
     }
 }
 
-void Table::loadTuplesFrom(SerializeInput &serialize_io,
+void Table::loadTuplesFrom(SerializeInputBE &serialize_io,
                            Pool *stringPool,
-                           ReferenceSerializeOutput *uniqueViolationOutput) {
+                           ReferenceSerializeOutput *uniqueViolationOutput,
+                           bool shouldDRStreamRow) {
     /*
      * directly receives a VoltTable buffer.
      * [00 01]   [02 03]   [04 .. 0x]
@@ -491,7 +496,7 @@ void Table::loadTuplesFrom(SerializeInput &serialize_io,
                                       message.str().c_str());
     }
 
-    loadTuplesFromNoHeader(serialize_io, stringPool, uniqueViolationOutput);
+    loadTuplesFromNoHeader(serialize_io, stringPool, uniqueViolationOutput, shouldDRStreamRow);
 }
 
 bool isExistingTableIndex(std::vector<TableIndex*> &indexes, TableIndex* index) {

@@ -748,9 +748,25 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(2, vt.getLong(0));
         // Test NULL
 
-        assertTrue(after.getTime()*1000 >= vt.getTimestampAsLong(2));
-        assertTrue(before.getTime()*1000 <= vt.getTimestampAsLong(2));
-        assertEquals(vt.getTimestampAsLong(2), vt.getTimestampAsLong(3));
+        long t2FirstRow = vt.getTimestampAsLong(2);
+        long t3FirstRow = vt.getTimestampAsLong(3);
+
+        assertTrue(after.getTime()*1000 >= t2FirstRow);
+        assertTrue(before.getTime()*1000 <= t2FirstRow);
+        assertEquals(t2FirstRow, t3FirstRow);
+
+        // execute the same insert again, to assert that we get a newer timestamp
+        // even if we are re-using the same plan (ENG-6755)
+
+        // sleep a quarter of a second just to be certain we get a different timestamp
+        Thread.sleep(250);
+
+        cr = client.callProcedure("@AdHoc", "Insert into R_TIME (ID) VALUES(2);");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        vt = client.callProcedure("@AdHoc", "SELECT C1, T1, T2, T3 FROM R_TIME WHERE ID = 2;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        long t2SecondRow = vt.getTimestampAsLong(2);
+        assertTrue(t2FirstRow < t2SecondRow);
 
         before = new Date();
         vt = client.callProcedure("@AdHoc", "SELECT NOW, CURRENT_TIMESTAMP FROM R_TIME;").getResults()[0];
@@ -795,6 +811,28 @@ public class TestFunctionsSuite extends RegressionSuite {
             strTime = "2013-12-31 23:59:59.999999";
             cr = client.callProcedure("R2.insert", 4, strTime, 14, 1.1, strTime);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            // test only given date
+            strTime = "2014-07-02";
+            cr = client.callProcedure("R2.insert", 5, strTime + " 00:00:00.000000", 15, 1.1, strTime);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            strTime = "2014-07-03";
+            cr = client.callProcedure("R2.insert", 6, strTime, 16, 1.1, strTime +" 00:00:00.000000");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            strTime = "2014-07-04";
+            cr = client.callProcedure("R2.insert", 7, strTime, 17, 1.1, strTime);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+            // test AdHoc cast
+            cr = client.callProcedure("@AdHoc", "select cast('2014-07-04 00:00:00.000000' as timestamp) from R2 where id = 1;");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            r = cr.getResults()[0];
+            r.advanceRow();
+            assertEquals(r.getTimestampAsTimestamp(0).toString(), "2014-07-04 00:00:00.000000");
+            cr = client.callProcedure("@AdHoc", "select cast('2014-07-05' as timestamp) from R2 where id = 1;");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            r = cr.getResults()[0];
+            r.advanceRow();
+            assertEquals(r.getTimestampAsTimestamp(0).toString(), "2014-07-05 00:00:00.000000");
 
             cr = client.callProcedure("VERIFY_TIMESTAMP_STRING_EQ");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -808,10 +846,14 @@ public class TestFunctionsSuite extends RegressionSuite {
             cr = client.callProcedure("VERIFY_STRING_TIMESTAMP_EQ");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             r = cr.getResults()[0];
-            if (r.getRowCount() != 0) {
-                System.out.println("VERIFY_STRING_TIMESTAMP_EQ failed on " + r.getRowCount() + " rows:");
+            // there should be 2 rows wrong, because the cast always return a long format string, but we
+            // have two rows containing short format strings
+            if (r.getRowCount() != 2) {
+                System.out.println("VERIFY_STRING_TIMESTAMP_EQ failed on " + r.getRowCount() +
+                        " rows, where only 2 were expected:");
                 System.out.println(r.toString());
-                fail("VERIFY_TIMESTAMP_STRING_EQ failed on " + r.getRowCount() + " rows");
+                fail("VERIFY_TIMESTAMP_STRING_EQ failed on " + r.getRowCount() +
+                        " rows, where only 2 were expected:");
             }
 
             cr = client.callProcedure("DUMP_TIMESTAMP_STRING_PATHS");
@@ -869,6 +911,10 @@ public class TestFunctionsSuite extends RegressionSuite {
         result = r.getLong(columnIndex++);
         assertEquals(EXPECTED_DOW, result);
 
+        int EXPECTED_DOM = EXPECTED_DAY;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_DOM, result);
+
         int EXPECTED_DOY = 252;
         result = r.getLong(columnIndex++);
         assertEquals(EXPECTED_DOY, result);
@@ -888,6 +934,26 @@ public class TestFunctionsSuite extends RegressionSuite {
         BigDecimal EXPECTED_SECONDS = new BigDecimal("40.789000000000");
         BigDecimal decimalResult = r.getDecimalAsBigDecimal(columnIndex++);
         assertEquals(EXPECTED_SECONDS, decimalResult);
+
+        // ISO 8601 regards Sunday as the last day of a week
+        int EXPECTED_WEEK = 36;
+        if (isHSQL()) {
+            // hsql get answer 37, because it believes a week starts with Sunday
+            EXPECTED_WEEK = 37;
+        }
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_WEEK, result);
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_WEEK, result);
+
+        // VoltDB has a special function to handle WEEKDAY, and it is not the same as DAY_OF_WEEK
+        int EXPECTED_WEEKDAY = 6;
+        if (isHSQL()) {
+            // We map WEEKDAY keyword to DAY_OF_WEEK in hsql parser
+            EXPECTED_WEEKDAY = EXPECTED_DOW;
+        }
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_WEEKDAY, result);
 
         // test timestamp before epoch, Human time (GMT): Thu, 18 Nov 1948 16:32:02 GMT
         // Leap year!
@@ -916,6 +982,10 @@ public class TestFunctionsSuite extends RegressionSuite {
         result = r.getLong(columnIndex++);
         assertEquals(EXPECTED_DOW, result);
 
+        EXPECTED_DOM = EXPECTED_DAY;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_DOM, result);
+
         EXPECTED_DOY = 323;
         result = r.getLong(columnIndex++);
         assertEquals(EXPECTED_DOY, result);
@@ -935,6 +1005,21 @@ public class TestFunctionsSuite extends RegressionSuite {
         EXPECTED_SECONDS = new BigDecimal("2.877000000000");
         decimalResult = r.getDecimalAsBigDecimal(columnIndex++);
         assertEquals(EXPECTED_SECONDS, decimalResult);
+
+        EXPECTED_WEEK = 47;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_WEEK, result);
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_WEEK, result);
+
+        // VoltDB has a special function to handle WEEKDAY, and it is not the same as DAY_OF_WEEK
+        EXPECTED_WEEKDAY = 3;
+        if (isHSQL()) {
+            // We map WEEKDAY keyword to DAY_OF_WEEK in hsql parser
+            EXPECTED_WEEKDAY = EXPECTED_DOW;
+        }
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_WEEKDAY, result);
 
         // test timestamp with a very old date, Human time (GMT): Fri, 05 Jul 1658 14:22:27 GMT
         cr = client.callProcedure("P1.insert", 3, "X0", 10, 1.1, new Timestamp(-9829676252456L));
@@ -961,6 +1046,10 @@ public class TestFunctionsSuite extends RegressionSuite {
         result = r.getLong(columnIndex++);
         assertEquals(EXPECTED_DOW, result);
 
+        EXPECTED_DOM = EXPECTED_DAY;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_DOM, result);
+
         EXPECTED_DOY = 186;
         result = r.getLong(columnIndex++);
         assertEquals(EXPECTED_DOY, result);
@@ -980,6 +1069,21 @@ public class TestFunctionsSuite extends RegressionSuite {
         EXPECTED_SECONDS = new BigDecimal("27.544000000000");
         decimalResult = r.getDecimalAsBigDecimal(columnIndex++);
         assertEquals(EXPECTED_SECONDS, decimalResult);
+
+        EXPECTED_WEEK = 27;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_WEEK, result);
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_WEEK, result);
+
+        // VoltDB has a special function to handle WEEKDAY, and it is not the same as DAY_OF_WEEK
+        EXPECTED_WEEKDAY = 4;
+        if (isHSQL()) {
+            // We map WEEKDAY keyword to DAY_OF_WEEK in hsql parser
+            EXPECTED_WEEKDAY = EXPECTED_DOW;
+        }
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_WEEKDAY, result);
 
         // Move in this testcase of quickfix-extract(), Human time (GMT): Mon, 02 Jul 1956 12:53:37 GMT
         cr = client.callProcedure("P1.insert", 4, "X0", 10, 1.1, new Timestamp(-425991982877L));
@@ -1007,6 +1111,10 @@ public class TestFunctionsSuite extends RegressionSuite {
         result = r.getLong(columnIndex++);
         assertEquals(EXPECTED_DOW, result);
 
+        EXPECTED_DOM = EXPECTED_DAY;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_DOM, result);
+
         EXPECTED_DOY = 184;
         result = r.getLong(columnIndex++);
         assertEquals(EXPECTED_DOY, result);
@@ -1026,6 +1134,21 @@ public class TestFunctionsSuite extends RegressionSuite {
         EXPECTED_SECONDS = new BigDecimal("37.123000000000");
         decimalResult = r.getDecimalAsBigDecimal(columnIndex++);
         assertEquals(EXPECTED_SECONDS, decimalResult);
+
+        EXPECTED_WEEK = 27;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_WEEK, result);
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_WEEK, result);
+
+        // VoltDB has a special function to handle WEEKDAY, and it is not the same as DAY_OF_WEEK
+        EXPECTED_WEEKDAY = 0;
+        if (isHSQL()) {
+            // We map WEEKDAY keyword to DAY_OF_WEEK in hsql parser
+            EXPECTED_WEEKDAY = EXPECTED_DOW;
+        }
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_WEEKDAY, result);
     }
 
     public void testParams() throws NoConnectionsException, IOException, ProcCallException {
@@ -1804,7 +1927,24 @@ public class TestFunctionsSuite extends RegressionSuite {
         Client client = getClient();
         insertNumbers(client, values, values.length);
         subtestVarCharCasts(client);
+        subtestInlineVarCharCast(client);
         System.out.println("ENDING test of TO VARCHAR CAST");
+    }
+
+    private void subtestInlineVarCharCast(Client client) throws Exception {
+        // This is regression test coverage for ENG-6666.
+        String sql = "INSERT INTO INLINED_VC_VB_TABLE (ID, VC1, VC2, VB1, VB2) " +
+            "VALUES (22, 'FOO', 'BAR', 'DEADBEEF', 'CDCDCDCD');";
+        client.callProcedure("@AdHoc", sql);
+        sql = "SELECT CAST(VC1 AS VARCHAR) FROM INLINED_VC_VB_TABLE WHERE ID = 22;";
+        VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        vt.advanceRow();
+        assertEquals("FOO", vt.getString(0));
+
+        sql = "SELECT CAST(VB1 AS VARBINARY) FROM INLINED_VC_VB_TABLE WHERE ID = 22;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        vt.advanceRow();
+        assertTrue(VoltType.varbinaryToPrintableString(vt.getVarbinary(0)).contains("DEADBEEF"));
     }
 
     private void subtestVarCharCasts(Client client) throws Exception
@@ -2042,6 +2182,230 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals("     ", result.getString(1));
     }
 
+
+    public void testLowerUpper() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING test Space");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P1.insert", 1, "VoltDB", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("LOWER_UPPER", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("voltdb", result.getString(1));
+        assertEquals("VOLTDB", result.getString(2));
+
+
+        cr = client.callProcedure("P1.insert", 2, "VoltDB贾鑫", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("LOWER_UPPER", 2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("voltdb贾鑫", result.getString(1));
+        assertEquals("VOLTDB贾鑫", result.getString(2));
+
+
+        cr = client.callProcedure("P1.insert", 3, null, 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("LOWER_UPPER", 3);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(null, result.getString(1));
+        assertEquals(null, result.getString(2));
+
+        // Edge case: UTF-8 string can have Upper and Lower cases
+        String grussen = "grüßEN";
+        cr = client.callProcedure("P1.insert", 4, grussen, 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("LOWER_UPPER", 4);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+
+        // Turn on this test case when EE supports the locale CASE conversion
+//        if (isHSQL()) {
+//            assertEquals(grussen, result.getString(1));
+//            assertEquals(grussen, result.getString(2));
+//        } else {
+//            assertEquals("GRÜSSEN", result.getString(1));
+//            assertEquals("grüßen", result.getString(2));
+//        }
+    }
+
+    public void testTrim() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING test Trim");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P1.insert", 1, "  VoltDB   ", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        result = client.callProcedure("@AdHoc", "select trim(LEADING null from desc) from P1").getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals(null, result.getString(0));
+
+        cr = client.callProcedure("TRIM_SPACE", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("VoltDB   ", result.getString(1));
+        assertEquals("VoltDB   ", result.getString(2));
+        assertEquals("  VoltDB",  result.getString(3));
+        assertEquals("  VoltDB",  result.getString(4));
+        assertEquals("VoltDB",  result.getString(5));
+        assertEquals("VoltDB",  result.getString(6));
+
+
+        cr = client.callProcedure("TRIM_ANY", " ", " ", " ", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("VoltDB   ", result.getString(1));
+        assertEquals("  VoltDB",  result.getString(2));
+        assertEquals("VoltDB",  result.getString(3));
+
+        try {
+            cr = client.callProcedure("TRIM_ANY", "", "", "", 1);
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("data exception"));
+            assertTrue(ex.getMessage().contains("trim error"));
+        }
+
+        // Test TRIM with other character
+        cr = client.callProcedure("P1.insert", 2, "vVoltDBBB", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("TRIM_ANY", "v", "B", "B", 2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("VoltDBBB", result.getString(1));
+        assertEquals("vVoltD", result.getString(2));
+        assertEquals("vVoltD", result.getString(3));
+
+        // Multiple character trim, Hsql does not support
+        if (!isHSQL()) {
+            cr = client.callProcedure("TRIM_ANY", "vV", "BB", "Vv", 2);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            assertEquals("oltDBBB", result.getString(1));
+            assertEquals("vVoltDB", result.getString(2));
+            assertEquals("vVoltDBBB", result.getString(3));
+        }
+
+        // Test null trim character
+        cr = client.callProcedure("TRIM_ANY", null, null, null, 2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(null, result.getString(1));
+        assertEquals(null, result.getString(2));
+        assertEquals(null, result.getString(3));
+
+
+        // Test non-ASCII trim_char
+        cr = client.callProcedure("P1.insert", 3, "贾vVoltDBBB", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("TRIM_ANY", "贾", "v", "贾", 3);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("vVoltDBBB", result.getString(1));
+        assertEquals("贾vVoltDBBB", result.getString(2));
+        assertEquals("vVoltDBBB", result.getString(3));
+
+        if (!isHSQL()) {
+            // Complete match
+            cr = client.callProcedure("TRIM_ANY", "贾vVoltDBBB", "贾vVoltDBBB", "贾vVoltDBBB", 3);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            assertEquals("", result.getString(1));
+            assertEquals("", result.getString(2));
+            assertEquals("", result.getString(3));
+
+            cr = client.callProcedure("TRIM_ANY", "贾vVoltDBBB_TEST", "贾vVoltDBBB贾vVoltDBBB", "贾vVoltDBBBT", 3);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            assertEquals("贾vVoltDBBB", result.getString(1));
+            assertEquals("贾vVoltDBBB", result.getString(2));
+            assertEquals("贾vVoltDBBB", result.getString(3));
+        }
+
+        // Complicated test
+        cr = client.callProcedure("P1.insert", 4, "贾贾vVoltDBBB贾贾贾", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        // UTF-8 hex, 贾: 0xe8 0xb4 0xbe, 辴: 0xe8 0xbe 0xb4
+        cr = client.callProcedure("TRIM_ANY", "辴", "辴", "辴", 4);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("贾贾vVoltDBBB贾贾贾", result.getString(1));
+        assertEquals("贾贾vVoltDBBB贾贾贾", result.getString(2));
+        assertEquals("贾贾vVoltDBBB贾贾贾", result.getString(3));
+
+        cr = client.callProcedure("TRIM_ANY", "贾", "贾", "贾", 4);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("vVoltDBBB贾贾贾", result.getString(1));
+        assertEquals("贾贾vVoltDBBB", result.getString(2));
+        assertEquals("vVoltDBBB", result.getString(3));
+
+        if (!isHSQL()) {
+            cr = client.callProcedure("TRIM_ANY", "贾辴", "贾辴", "贾辴", 4);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            assertEquals("贾贾vVoltDBBB贾贾贾", result.getString(1));
+            assertEquals("贾贾vVoltDBBB贾贾贾", result.getString(2));
+            assertEquals("贾贾vVoltDBBB贾贾贾", result.getString(3));
+
+            cr = client.callProcedure("TRIM_ANY", "贾贾vV", "贾贾", "B贾贾贾", 4);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            result = cr.getResults()[0];
+            assertEquals(1, result.getRowCount());
+            assertTrue(result.advanceRow());
+            assertEquals("oltDBBB贾贾贾", result.getString(1));
+            assertEquals("贾贾vVoltDBBB贾", result.getString(2));
+            assertEquals("贾贾vVoltDBB", result.getString(3));
+        }
+
+        cr = client.callProcedure("P1.insert", 5, "vVoltADBDB", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+    }
+
     public void testRepeat() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING test Repeat");
         Client client = getClient();
@@ -2073,44 +2437,241 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals("foofoofoo", result.getString(1));
     }
 
-    public void testConcat() throws NoConnectionsException, IOException, ProcCallException {
-        System.out.println("STARTING test Concat and its Operator");
+    public void testReplace() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING test Replace");
         Client client = getClient();
         ClientResponse cr;
         VoltTable result;
 
-        cr = client.callProcedure("P1.insert", 1, "Xin", 1, 1.0, new Timestamp(1000000000000L));
+        cr = client.callProcedure("P1.insert", 1, "foo", 1, 1.0, new Timestamp(1000000000000L));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
-        cr = client.callProcedure("CONCAT", "", 1);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
+        result = client.callProcedure("REPLACE", "o", "XX", 1).getResults()[0];
         assertTrue(result.advanceRow());
-        assertEquals("Xin", result.getString(1));
+        assertEquals("fXXXX", result.getString(1));
 
-        cr = client.callProcedure("CONCAT", "@VoltDB", 1);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
+        result = client.callProcedure("REPLACE", "o", null, 1).getResults()[0];
         assertTrue(result.advanceRow());
-        assertEquals("Xin@VoltDB", result.getString(1));
+        if (isHSQL()) {
+            // NULL means empty string for Hsql
+            assertEquals("f", result.getString(1));
+        } else {
+            assertEquals(null, result.getString(1));
+        }
 
-        cr = client.callProcedure("ConcatOpt", "", 1);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
+        result = client.callProcedure("REPLACE", null, "XX", 1).getResults()[0];
         assertTrue(result.advanceRow());
-        assertEquals("Xin", result.getString(1));
+        if (isHSQL()) {
+            // NULL means not change for the original string for Hsql
+            assertEquals("foo", result.getString(1));
+        } else {
+            assertEquals(null, result.getString(1));
+        }
 
-        cr = client.callProcedure("ConcatOpt", "@VoltDB", 1);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
+        result = client.callProcedure("REPLACE", "fo", "V", 1).getResults()[0];
         assertTrue(result.advanceRow());
-        assertEquals("Xin@VoltDB", result.getString(1));
+        assertEquals("Vo", result.getString(1));
+
+        // UTF-8 String
+        cr = client.callProcedure("P1.insert", 2, "贾鑫@VoltDB", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        result = client.callProcedure("REPLACE", "鑫", "XX", 2).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("贾XX@VoltDB", result.getString(1));
     }
 
+    public void testOverlay() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING test Overlay");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P1.insert", 1, "Xin@VoltDB", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        result = client.callProcedure("OVERLAY", "Jia", 4, 7, 1).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("XinJia", result.getString(1));
+
+        result = client.callProcedure("OVERLAY", "Jia_", 4, 1, 1).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("XinJia_VoltDB", result.getString(1));
+
+        result = client.callProcedure("OVERLAY", "Jia", 4.2, 7, 1).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("XinJia", result.getString(1));
+
+        result = client.callProcedure("OVERLAY", "Jia", 4.9, 7, 1).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("XinJia", result.getString(1));
+
+        // Test NULL results
+        result = client.callProcedure("OVERLAY", null, 4, 7, 1).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals(null, result.getString(1));
+
+        result = client.callProcedure("OVERLAY", "Jia", 4, null, 1).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals(null, result.getString(1));
+
+        result = client.callProcedure("OVERLAY", "Jia", null, 7, 1).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals(null, result.getString(1));
+
+        result = client.callProcedure("OVERLAY_FULL_LENGTH", "Jia", 4, 1).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("XinJialtDB", result.getString(1));
+
+        result = client.callProcedure("OVERLAY_FULL_LENGTH", "J", 4, 1).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("XinJVoltDB", result.getString(1));
+
+
+        // Test UTF-8 OVERLAY
+        cr = client.callProcedure("P1.insert", 2, "贾鑫@VoltDB", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        result = client.callProcedure("OVERLAY", "XinJia", 1, 2, 2).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("XinJia@VoltDB", result.getString(1));
+
+        result = client.callProcedure("OVERLAY", "XinJia", 8, 2, 2).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("贾鑫@VoltXinJia", result.getString(1));
+
+        result = client.callProcedure("OVERLAY", "XinJia", 1, 9, 2).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("XinJia", result.getString(1));
+
+        result = client.callProcedure("OVERLAY", "XinJia", 2, 7, 2).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("贾XinJiaB", result.getString(1));
+
+        result = client.callProcedure("OVERLAY", "XinJia", 2, 8, 2).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("贾XinJia", result.getString(1));
+
+        result = client.callProcedure("OVERLAY_FULL_LENGTH", "_", 3, 2).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("贾鑫_VoltDB", result.getString(1));
+
+        result = client.callProcedure("OVERLAY_FULL_LENGTH", " at ", 2, 2).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("贾 at ltDB", result.getString(1));
+
+
+        result = client.callProcedure("OVERLAY", "XinJia", 9, 1, 2).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("贾鑫@VoltDXinJia", result.getString(1));
+
+        result = client.callProcedure("OVERLAY", "石宁", 9, 1, 2).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("贾鑫@VoltD石宁", result.getString(1));
+
+        // Hsql has bugs on string(substring) index
+        if (!isHSQL()) {
+            result = client.callProcedure("OVERLAY", "XinJia", 9, 2, 2).getResults()[0];
+            assertTrue(result.advanceRow());
+            assertEquals("贾鑫@VoltDXinJia", result.getString(1));
+
+            result = client.callProcedure("OVERLAY", "石宁", 9, 2, 2).getResults()[0];
+            assertTrue(result.advanceRow());
+            assertEquals("贾鑫@VoltD石宁", result.getString(1));
+
+            result = client.callProcedure("OVERLAY", "XinJia", 10, 2, 2).getResults()[0];
+            assertTrue(result.advanceRow());
+            assertEquals("贾鑫@VoltDBXinJia", result.getString(1));
+
+            result = client.callProcedure("OVERLAY", "石宁", 10, 2, 2).getResults()[0];
+            assertTrue(result.advanceRow());
+            assertEquals("贾鑫@VoltDB石宁", result.getString(1));
+
+            // various start argument tests
+            // start from 0, not 1, but treat it at least 1
+            result = client.callProcedure("OVERLAY", "XinJia", 100, 2, 2).getResults()[0];
+            assertTrue(result.advanceRow());
+            assertEquals("贾鑫@VoltDBXinJia", result.getString(1));
+
+            // various length argument
+            result = client.callProcedure("OVERLAY", "XinJia", 2, 0, 2).getResults()[0];
+            assertTrue(result.advanceRow());
+            assertEquals("贾XinJia鑫@VoltDB", result.getString(1));
+
+            result = client.callProcedure("OVERLAY", "XinJia", 1, 10, 2).getResults()[0];
+            assertTrue(result.advanceRow());
+            assertEquals("XinJia", result.getString(1));
+
+            result = client.callProcedure("OVERLAY", "XinJia", 1, 100, 2).getResults()[0];
+            assertTrue(result.advanceRow());
+            assertEquals("XinJia", result.getString(1));
+
+            result = client.callProcedure("OVERLAY", "XinJia", 2, 100, 2).getResults()[0];
+            assertTrue(result.advanceRow());
+            assertEquals("贾XinJia", result.getString(1));
+
+
+            // Negative tests
+            try {
+                result = client.callProcedure("OVERLAY", "XinJia", -10, 2, 2).getResults()[0];
+                fail();
+            } catch (Exception ex) {
+                assertTrue(ex.getMessage().contains(
+                        "data exception -- OVERLAY error, not positive start argument -10"));
+            }
+
+            try {
+                result = client.callProcedure("OVERLAY", "XinJia", 0, 2, 2).getResults()[0];
+                fail();
+            } catch (Exception ex) {
+                assertTrue(ex.getMessage().contains(
+                        "data exception -- OVERLAY error, not positive start argument 0"));
+            }
+
+            try {
+                result = client.callProcedure("OVERLAY", "XinJia", 1, -1, 2).getResults()[0];
+                fail();
+            } catch (Exception ex) {
+                assertTrue(ex.getMessage().contains(
+                        "data exception -- OVERLAY error, negative length argument -1"));
+            }
+        }
+    }
+
+    // Unicode character to UTF8 string character
+    public void testChar() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING test CHAR");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        // Hsql has wrong answers.
+        if (isHSQL()) return;
+
+        cr = client.callProcedure("P1.insert", 1, "Xin@VoltDB", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        result = client.callProcedure("CHAR", 36158, 1).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("贾", result.getString(1));
+
+        result = client.callProcedure("CHAR", 37995, 1).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals("鑫", result.getString(1));
+
+        String voltDB = "VoltDB";
+
+        for (int i = 0; i < voltDB.length(); i++) {
+            char ch = voltDB.charAt(i);
+            result = client.callProcedure("CHAR", (int)ch, 1).getResults()[0];
+            assertTrue(result.advanceRow());
+            assertEquals(String.valueOf(ch), result.getString(1));
+        }
+
+        result = client.callProcedure("CHAR", null, 1).getResults()[0];
+        assertTrue(result.advanceRow());
+        assertEquals(null, result.getString(1));
+    }
 
     public void testCaseWhen() throws Exception {
         System.out.println("STARTING test Case When...");
@@ -2215,6 +2776,21 @@ public class TestFunctionsSuite extends RegressionSuite {
             assertTrue(vt.getString(1).equals("Memsql:Bad"));
         }
 
+        // Test inlined varchar/varbinary value produced by CASE WHEN.
+        // This is regression coverage for ENG-6666.
+        sql = "INSERT INTO INLINED_VC_VB_TABLE (ID, VC1, VC2, VB1, VB2) " +
+            "VALUES (72, 'FOO', 'BAR', 'DEADBEEF', 'CDCDCDCD');";
+        cl.callProcedure("@AdHoc", sql);
+        sql = "SELECT CASE WHEN ID > 11 THEN VC1 ELSE VC2 END FROM INLINED_VC_VB_TABLE WHERE ID = 72;";
+        vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
+        vt.advanceRow();
+        assertEquals("FOO", vt.getString(0));
+
+        sql = "SELECT CASE WHEN ID > 11 THEN VB1 ELSE VB2 END FROM INLINED_VC_VB_TABLE WHERE ID = 72;";
+        vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
+        vt.advanceRow();
+        assertTrue(VoltType.varbinaryToPrintableString(vt.getVarbinary(0)).contains("DEADBEEF"));
+
         cl.callProcedure("R1.insert", 3, "ORACLE",  8, 8.0, new Timestamp(1000000000000L));
         // Test nested case when
         sql = "SELECT ID, CASE WHEN num < 5 THEN num * 5 " +
@@ -2285,6 +2861,469 @@ public class TestFunctionsSuite extends RegressionSuite {
         } else {
             validateTableOfLongs(cl, sql, new long[][] {{1, 11},{2, 50}, {3, Long.MIN_VALUE}});
         }
+    }
+
+    private static StringBuilder joinStringArray(String[] params, String sep) {
+        StringBuilder sb = new StringBuilder();
+        for (String s : params) {
+            sb.append(s).append(sep);
+        }
+        sb.delete(sb.length()-sep.length(), sb.length());
+        return sb;
+    }
+
+    // concat params with a sql query string, and test the return value
+    private void doTestCoalesceWithoutConst(Client cl, String[] params,
+                                                   String expect, String id) throws Exception {
+        String allPara = joinStringArray(params, ",").toString();
+        String sql;
+        if (expect=="NULL"){
+            // sql = "SELECT CASE WHEN (COALESCE(para1, para2, ...) IS NULL)
+            //               THEN 0 ELSE 1
+            //               END FROM C_NULL WHERE ID=id";
+            sql = "SELECT CASE WHEN(COALESCE(" + allPara + ") IS NULL)" +
+                  " THEN 0 ELSE 1 END FROM C_NULL WHERE ID=" + id;
+        }
+        else {
+            // sql = "SELECT CASE COALESCE(para1, para2, ...)
+            //               WHEN expect
+            //               THEN 0 ELSE 1
+            //               END FROM C_NULL WHERE ID=id";
+            sql = "SELECT CASE COALESCE(" + allPara + ") " +
+                   "WHEN " + expect + " THEN 0 ELSE 1 END FROM C_NULL WHERE ID=" + id;
+        }
+        validateTableOfLongs(cl, sql, new long[][] {{0}});
+    }
+
+    private void doTestCoalesceWithConst(Client cl, String[] params,
+                                                String cst ,String expect, String id) throws Exception {
+        String allPara = joinStringArray(params, ",").toString();
+        allPara += ","+cst;
+        String sql;
+        if (expect=="NULL"){
+            // sql = "SELECT CASE WHEN (COALESCE(para1, para2, ..., cst) IS NULL)
+            //               THEN 0 ELSE 1
+            //               END FROM C_NULL WHERE ID=id";
+            sql = "SELECT CASE WHEN(COALESCE(" + allPara + ") IS NULL)" +
+                  " THEN 0 ELSE 1 END FROM C_NULL WHERE ID=" + id;
+        }
+        else {
+            // sql = "SELECT CASE COALESCE(para1, para2, ..., cst)
+            //               WHEN expect
+            //               THEN 0 ELSE 1
+            //               END FROM C_NULL WHERE ID=id";
+            sql = "SELECT CASE COALESCE(" + allPara + ") " +
+                   "WHEN " + expect + " THEN 0 ELSE 1 END FROM C_NULL WHERE ID=" + id;
+        }
+        validateTableOfLongs(cl, sql, new long[][] {{0}});
+    }
+
+    // col1 is not null while col2 is null
+    private void doTestCoalescePairOneNull(Client cl, String col1, String col2) throws Exception {
+        // coalesce(col1, col2) == coalesce(col2, col1) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col1, col2}, col1, "1");
+        doTestCoalesceWithoutConst(cl, new String[]{col2, col1}, col1, "1");
+    }
+
+    private void doTestCoalescePairBothNull(Client cl, String col1, String col2) throws Exception{
+        // coalesce(col1, col2) == coalesce(col2, col1) == NULL
+        doTestCoalesceWithoutConst(cl, new String[]{col1, col2}, "NULL", "0");
+        doTestCoalesceWithoutConst(cl, new String[]{col2, col1}, "NULL", "0");
+    }
+
+    // Both the columns are not null
+    private void doTestCoalescePairNotNull(Client cl, String col1, String col2) throws Exception {
+        // coalesce(col1, col2) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col1, col2}, col1, "2");
+        // coalesce(col2, col1) == col2
+        doTestCoalesceWithoutConst(cl, new String[]{col2, col1}, col2, "2");
+    }
+
+    // All the columns are not null
+    private void doTestCoalesceTriNotNull(Client cl, String col1,
+                                                 String col2, String col3, String cst) throws Exception {
+        // coalesce(col1, col2, col3) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col1, col2, col3}, col1, "3");
+        // coalesce(col1, col3, col2) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col1, col3, col2}, col1, "3");
+        // coalesce(col2, col1, col3) == col2
+        doTestCoalesceWithoutConst(cl, new String[]{col2, col1, col3}, col2, "3");
+        // coalesce(col2, col3, col1) == col2
+        doTestCoalesceWithoutConst(cl, new String[]{col2, col3, col1}, col2, "3");
+        // coalesce(col3, col1, col2) == col3
+        doTestCoalesceWithoutConst(cl, new String[]{col3, col1, col2}, col3, "3");
+        // coalesce(col3, col2, col1) == col3
+        doTestCoalesceWithoutConst(cl, new String[]{col3, col2, col1}, col3, "3");
+        // coalesce(col1, col2, col3, cst) == col1
+        doTestCoalesceWithConst(cl, new String[]{col1, col2, col3}, cst, col1, "3");
+        // coalesce(col1, col3, col2, cst) == col1
+        doTestCoalesceWithConst(cl, new String[]{col1, col3, col2}, cst, col1, "3");
+        // coalesce(col2, col1, col3, cst) == col2
+        doTestCoalesceWithConst(cl, new String[]{col2, col1, col3}, cst, col2, "3");
+        // coalesce(col2, col3, col1, cst) == col2
+        doTestCoalesceWithConst(cl, new String[]{col2, col3, col1}, cst, col2, "3");
+        // coalesce(col3, col1, col2, cst) == col3
+        doTestCoalesceWithConst(cl, new String[]{col3, col1, col2}, cst, col3, "3");
+        // coalesce(col3, col2, col1, cst) == col3
+        doTestCoalesceWithConst(cl, new String[]{col3, col2, col1}, cst, col3, "3");
+    }
+
+    // col3 is null
+    private void doTestCoalesceTriOneNull(Client cl, String col1,
+                                                 String col2, String col3, String cst) throws Exception {
+        // coalesce(col1, col2, col3) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col1, col2, col3}, col1, "2");
+        // coalesce(col1, col3, col2) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col1, col3, col2}, col1, "2");
+        // coalesce(col2, col1, col3) == col2
+        doTestCoalesceWithoutConst(cl, new String[]{col2, col1, col3}, col2, "2");
+        // coalesce(col2, col3, col1) == col2
+        doTestCoalesceWithoutConst(cl, new String[]{col2, col3, col1}, col2, "2");
+        // coalesce(col3, col1, col2) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col3, col1, col2}, col1, "2");
+        // coalesce(col3, col2, col2) == col2
+        doTestCoalesceWithoutConst(cl, new String[]{col3, col2, col1}, col2, "2");
+        // coalesce(col1, col2, col3, cst) == col1
+        doTestCoalesceWithConst(cl, new String[]{col1, col2, col3}, cst, col1, "2");
+        // coalesce(col1, col3, col2, cst) == col1
+        doTestCoalesceWithConst(cl, new String[]{col1, col3, col2}, cst, col1, "2");
+        // coalesce(col2, col1, col3, cst) == col2
+        doTestCoalesceWithConst(cl, new String[]{col2, col1, col3}, cst, col2, "2");
+        // coalesce(col2, col3, col1, cst) == col2
+        doTestCoalesceWithConst(cl, new String[]{col2, col3, col1}, cst, col2, "2");
+        // coalesce(col3, col1, col2, cst) == col1
+        doTestCoalesceWithConst(cl, new String[]{col3, col1, col2}, cst, col1, "2");
+        // coalesce(col3, col1, col2, cst) == col2
+        doTestCoalesceWithConst(cl, new String[]{col3, col2, col1}, cst, col2, "2");
+    }
+
+    // col2 and col3 are null
+    private void doTestCoalesceTriTwoNull(Client cl, String col1,
+                                                 String col2, String col3, String cst) throws Exception {
+        // coalesce(col1, col2, col3) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col1, col2, col3}, col1, "1");
+        // coalesce(col1, col3, col2) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col1, col3, col2}, col1, "1");
+        // coalesce(col2, col1, col3) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col2, col1, col3}, col1, "1");
+        // coalesce(col2, col3, col1) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col2, col3, col1}, col1, "1");
+        // coalesce(col3, col1, col2) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col3, col1, col2}, col1, "1");
+        // coalesce(col3, col2, col2) == col1
+        doTestCoalesceWithoutConst(cl, new String[]{col3, col2, col1}, col1, "1");
+        // coalesce(col1, col2, col3, cst) == col1
+        doTestCoalesceWithConst(cl, new String[]{col1, col2, col3}, cst, col1, "1");
+        // coalesce(col1, col3, col2, cst) == col1
+        doTestCoalesceWithConst(cl, new String[]{col1, col3, col2}, cst, col1, "1");
+        // coalesce(col2, col1, col3, cst) == col1
+        doTestCoalesceWithConst(cl, new String[]{col2, col1, col3}, cst, col1, "1");
+        // coalesce(col2, col3, col1, cst) == col1
+        doTestCoalesceWithConst(cl, new String[]{col2, col3, col1}, cst, col1, "1");
+        // coalesce(col3, col1, col2, cst) == col1
+        doTestCoalesceWithConst(cl, new String[]{col3, col1, col2}, cst, col1, "1");
+        // coalesce(col3, col1, col2, cst) == col1
+        doTestCoalesceWithConst(cl, new String[]{col3, col2, col1}, cst, col1, "1");
+    }
+
+    // all columns are null
+    private void doTestCoalesceTriAllNull(Client cl, String col1,
+                                                 String col2, String col3, String cst) throws Exception{
+        // coalesce(col1, col2, col3) == NULL
+        doTestCoalesceWithoutConst(cl, new String[]{col1, col2, col3}, "NULL", "0");
+        // coalesce(col1, col3, col2) == NULL
+        doTestCoalesceWithoutConst(cl, new String[]{col1, col3, col2}, "NULL", "0");
+        // coalesce(col2, col1, col3) == NULL
+        doTestCoalesceWithoutConst(cl, new String[]{col2, col1, col3}, "NULL", "0");
+        // coalesce(col2, col3, col1) == NULL
+        doTestCoalesceWithoutConst(cl, new String[]{col2, col3, col1}, "NULL", "0");
+        // coalesce(col3, col1, col2) == NULL
+        doTestCoalesceWithoutConst(cl, new String[]{col3, col1, col2}, "NULL", "0");
+        // coalesce(col3, col2, col2) == NULL
+        doTestCoalesceWithoutConst(cl, new String[]{col3, col2, col1}, "NULL", "0");
+        // coalesce(col1, col2, col3, cst) == cst
+        doTestCoalesceWithConst(cl, new String[]{col1, col2, col3}, cst, cst, "0");
+        // coalesce(col1, col3, col2, cst) == cst
+        doTestCoalesceWithConst(cl, new String[]{col1, col3, col2}, cst, cst, "0");
+        // coalesce(col2, col1, col3, cst) == cst
+        doTestCoalesceWithConst(cl, new String[]{col2, col1, col3}, cst, cst, "0");
+        // coalesce(col2, col3, col1, cst) == cst
+        doTestCoalesceWithConst(cl, new String[]{col2, col3, col1}, cst, cst, "0");
+        // coalesce(col3, col1, col2, cst) == cst
+        doTestCoalesceWithConst(cl, new String[]{col3, col1, col2}, cst, cst, "0");
+        // coalesce(col3, col1, col2, cst) == cst
+        doTestCoalesceWithConst(cl, new String[]{col3, col2, col1}, cst, cst, "0");
+    }
+
+    private void doTestTwoColCoalesce(Client cl, String col1, String col2) throws Exception {
+        doTestCoalescePairBothNull(cl, col1, col2);
+        doTestCoalescePairOneNull(cl, col1, col2);
+        doTestCoalescePairNotNull(cl, col1, col2);
+    }
+
+    private void doTestThreeColCoalesce(Client cl, String col1,
+                                        String col2, String col3, String cst) throws Exception {
+        doTestCoalesceTriAllNull(cl, col1, col2, col3, cst);
+        doTestCoalesceTriTwoNull(cl, col1, col2, col3, cst);
+        doTestCoalesceTriOneNull(cl, col1, col2, col3, cst);
+        doTestCoalesceTriNotNull(cl, col1, col2, col3, cst);
+    }
+
+    public void testCoalesce() throws Exception {
+        System.out.println("STARTING test COALESCE function...");
+        Client cl = getClient();
+
+        // one row with three sets of nulls
+        cl.callProcedure("@AdHoc", "insert into C_NULL(ID) values (0);");
+        // one row with one set of non-null columns and two sets of nulls
+        cl.callProcedure("@AdHoc", "insert into C_NULL(ID,S1,I1,F1,D1,V1,T1) values (1,1,1,1,1,'1',100000)");
+        // TODO: below is wrong, because the null timestamp will be regarded as an invalid input by hsql
+        //cl.callProcedure("C_NULL.insert", 1,1,1,1,1,"1",new Timestamp(1000000000000L), null, null, null, null, null);
+        // two sets of non-null columns and one set of null column
+        cl.callProcedure("@AdHoc", "insert into C_NULL(ID,S1,I1,F1,D1,V1,T1,I2,F2,D2,V2,T2)"
+                                + " values (2,1,1,1,1,'1',100000,2,2,2,'2',200000)");
+        // three set non-nulls
+        cl.callProcedure("C_NULL.insert", 3,1,1,1,1,"1",new Timestamp(1000000000000L),
+                                              2,2,2,"2",new Timestamp(2000000000000L),
+                                              3,3,3,"3",new Timestamp(3000000000000L));
+
+        doTestTwoColCoalesce(cl, "I1", "I2");
+        doTestTwoColCoalesce(cl, "F1", "F2");
+        doTestTwoColCoalesce(cl, "D1", "D2");
+        doTestTwoColCoalesce(cl, "V1", "V2");
+        doTestTwoColCoalesce(cl, "T1", "T2");
+
+        doTestThreeColCoalesce(cl, "I1", "I2", "I3", "100");
+        doTestThreeColCoalesce(cl, "F1", "F2", "F3", "100.0");
+        doTestThreeColCoalesce(cl, "D1", "D2", "D3", "100.0");
+        doTestThreeColCoalesce(cl, "V1", "V2", "V3", "'hahaha'");
+        doTestThreeColCoalesce(cl, "T1", "T2", "T3", "CAST ('2014-07-09 00:00:00.000000' as TIMESTAMP)");
+
+        // test compatiable types
+        doTestThreeColCoalesce(cl, "S1", "I2", "I3", "100");
+        doTestThreeColCoalesce(cl, "S1", "F2", "D3", "100.0");
+        doTestThreeColCoalesce(cl, "I1", "F2", "D3", "100.0");
+
+        // test incompatiable types
+        // TODO: Is the exception throwed by coalesce? Or by decode?
+        try {
+            doTestThreeColCoalesce(cl, "S1", "I2", "V3", "100");
+            fail();
+        } catch (ProcCallException pcex){
+            assertTrue(pcex.getMessage().contains("incompatible data types"));
+        }
+        try {
+            doTestThreeColCoalesce(cl, "S1", "I2", "T3", "100");
+            fail();
+        } catch (ProcCallException pcex){
+            assertTrue(pcex.getMessage().contains("incompatible data types"));
+        }
+    }
+
+    public void testManyExtractTimeFieldFunction() throws Exception {
+        System.out.println("STARTING test functions extracting fields in timestamp ...");
+        Client cl = getClient();
+        VoltTable result;
+        String sql;
+
+        ClientResponse cr = cl.callProcedure("P1.insert", 0, null, null, null,
+                Timestamp.valueOf("2014-07-15 01:02:03.456"));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = cl.callProcedure("P1.insert", 1, null, null, null, Timestamp.valueOf("2012-02-29 12:20:30.123"));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = cl.callProcedure("P1.insert", 2, null, null, null, Timestamp.valueOf("2012-12-31 12:59:30"));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        sql = "select id, YEAR(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql, new long[][]{{0, 2014}, {1, 2012}, {2, 2012}});
+
+        sql = "select id, MONTH(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql, new long[][]{{0, 7}, {1, 2}, {2, 12}});
+
+        sql = "select id, DAY(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql, new long[][]{{0, 15}, {1, 29}, {2, 31}});
+
+        sql = "select id, HOUR(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql, new long[][]{{0, 1}, {1, 12}, {2, 12}});
+
+        sql = "select id, MINUTE(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql, new long[][]{{0, 2}, {1, 20}, {2, 59}});
+
+        sql = "select id, cast(SECOND(past) as VARCHAR) from p1 order by id;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        if (isHSQL()) {
+            validateTableColumnOfScalarVarchar(result, 1, new String[]{"3.456000", "30.123000", "30.000000"});
+        }
+        else {
+            validateTableColumnOfScalarVarchar(result, 1, new String[]{"3.456000000000", "30.123000000000",
+                    "30.000000000000"});
+        }
+
+        sql = "select id, QUARTER(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql, new long[][]{{0, 3}, {1, 1}, {2, 4}});
+
+        sql = "select DAYOFWEEK(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql,new long[][]{{3}, {4}, {2}});
+
+        sql = "select WEEKDAY(past) from p1 order by id;";
+        if (isHSQL()) {
+            // we modify the hsql parser, and so it maps to extract week_of_day
+            validateTableOfLongs(cl, sql,new long[][]{{3}, {4}, {2}});
+        }
+        else {
+            // call our ee function, and so return different value
+            validateTableOfLongs(cl, sql,new long[][]{{1}, {2}, {0}});
+        }
+
+        sql = "select DAYOFMONTH(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql,new long[][]{{15}, {29}, {31}});
+
+        sql = "select DAYOFYEAR(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql,new long[][]{{196}, {60}, {366}});
+
+        // WEEK 1 is often the correct answer for the last day of the year.
+        // See https://en.wikipedia.org/wiki/ISO_week_year#Last_week
+        sql = "select WEEK(past) from p1 order by id;";
+        validateTableOfLongs(cl, sql,new long[][]{{29}, {9}, {1}});
+    }
+
+    // ENG-3283
+    public void testAliasesOfSomeStringFunctions() throws IOException, ProcCallException {
+        String sql;
+        VoltTable result;
+        Client cl = getClient();
+        ClientResponse cr = cl.callProcedure("P1.insert", 0, "abc123ABC", null, null,
+                Timestamp.valueOf("2014-07-15 01:02:03.456"));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        // LTRIM and RTRIM has been implemented and tested
+
+        // SUBSTR
+        sql = "select SUBSTR(DESC, 1, 2) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"ab"});
+
+        sql = "select SUBSTR(DESC, 4, 3) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"123"});
+
+        sql = "select SUBSTR(DESC, 3) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"c123ABC"});
+
+        // Test spelled out SUBSTRING with comma delimiters vs. old-school FROM and FOR keywords.
+        sql = "select SUBSTRING(DESC, 1, 2) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"ab"});
+
+        sql = "select SUBSTRING(DESC, 4, 3) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"123"});
+
+        sql = "select SUBSTRING(DESC, 3) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"c123ABC"});
+
+        // Some weird cases -- the SQL-2003 standard says that even START < 1
+        // moves the end point (in this case, to the left) which is based on (LENGTH + START).
+        sql = "select SUBSTR(DESC, 0, 2) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"a"}); // not "ab" !
+
+        sql = "select SUBSTR(DESC, -1, 2) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{""}); // not "ab" !
+
+        sql = "select SUBSTR(DESC, -1, 1) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{""}); // not "a" !
+
+        sql = "select SUBSTR(DESC, -3, 1) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{""}); // not an error !
+
+        sql = "select SUBSTRING(DESC, 0, 2) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"a"}); // not "ab" !
+
+        sql = "select SUBSTRING(DESC, -1, 2) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{""}); // not "ab" !
+
+        sql = "select SUBSTRING(DESC, -1, 1) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{""}); // not "a" !
+
+        sql = "select SUBSTRING(DESC, -3, 1) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{""}); // not an error !
+
+        // LCASE and UCASE
+        sql = "select LCASE(DESC) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"abc123abc"});
+
+        sql = "select UCASE(DESC) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"ABC123ABC"});
+
+        // INSERT
+        sql = "select INSERT(DESC, 1, 3,'ABC') from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"ABC123ABC"});
+
+        sql = "select INSERT(DESC, 1, 1,'ABC') from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"ABCbc123ABC"});
+
+        sql = "select INSERT(DESC, 1, 4,'ABC') from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"ABC23ABC"});
+
+        sql = "select INSERT(DESC, 1, 0,'ABC') from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"ABCabc123ABC"});
     }
 
     //
@@ -2368,8 +3407,36 @@ public class TestFunctionsSuite extends RegressionSuite {
                 "T1 TIMESTAMP DEFAULT NULL, " +
                 "T2 TIMESTAMP DEFAULT NOW, " +
                 "T3 TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                "T4 TIMESTAMP DEFAULT '2012-12-12 12:12:12.121212', " +
                 "PRIMARY KEY (ID) ); " +
 
+                "CREATE TABLE C_NULL ( " +
+                "ID INTEGER DEFAULT 0 NOT NULL, " +
+                "S1 SMALLINT DEFAULT NULL, " +
+                "I1 INTEGER DEFAULT NULL, " +
+                "F1 FLOAT DEFAULT NULL, " +
+                "D1 DECIMAL DEFAULT NULL, " +
+                "V1 VARCHAR(10) DEFAULT NULL, " +
+                "T1 TIMESTAMP DEFAULT NULL, " +
+                "I2 INTEGER DEFAULT NULL, " +
+                "F2 FLOAT DEFAULT NULL, " +
+                "D2 DECIMAL DEFAULT NULL, " +
+                "V2 VARCHAR(10) DEFAULT NULL, " +
+                "T2 TIMESTAMP DEFAULT NULL, " +
+                "I3 INTEGER DEFAULT NULL, " +
+                "F3 FLOAT DEFAULT NULL, " +
+                "D3 DECIMAL DEFAULT NULL, " +
+                "V3 VARCHAR(10) DEFAULT NULL, " +
+                "T3 TIMESTAMP DEFAULT NULL, " +
+                "PRIMARY KEY (ID) ); " +
+                "PARTITION TABLE C_NULL ON COLUMN ID;" +
+
+                "CREATE TABLE INLINED_VC_VB_TABLE (" +
+                "ID INTEGER DEFAULT 0 NOT NULL," +
+                "VC1 VARCHAR(6)," +     // inlined
+                "VC2 VARCHAR(16)," +    // not inlined
+                "VB1 VARBINARY(6)," +   // inlined
+                "VB2 VARBINARY(64));" + // not inlined
                 "";
         try {
             project.addLiteralSchema(literalSchema);
@@ -2627,8 +3694,9 @@ public class TestFunctionsSuite extends RegressionSuite {
         project.addStmtProcedure("DISPLAY_SUBSTRING2", "select SUBSTRING (DESC FROM 2 FOR 2) from P1 where ID = -12");
 
         project.addStmtProcedure("EXTRACT_TIMESTAMP", "select EXTRACT(YEAR FROM PAST), EXTRACT(MONTH FROM PAST), EXTRACT(DAY FROM PAST), " +
-                "EXTRACT(DAY_OF_WEEK FROM PAST), EXTRACT(DAY_OF_YEAR FROM PAST), EXTRACT(QUARTER FROM PAST), EXTRACT(HOUR FROM PAST), " +
-                "EXTRACT(MINUTE FROM PAST), EXTRACT(SECOND FROM PAST) from P1 where ID = ?");
+                "EXTRACT(DAY_OF_WEEK FROM PAST), EXTRACT(DAY_OF_MONTH FROM PAST), EXTRACT(DAY_OF_YEAR FROM PAST), EXTRACT(QUARTER FROM PAST), " +
+                "EXTRACT(HOUR FROM PAST), EXTRACT(MINUTE FROM PAST), EXTRACT(SECOND FROM PAST), EXTRACT(WEEK_OF_YEAR FROM PAST), " +
+                "EXTRACT(WEEK FROM PAST), EXTRACT(WEEKDAY FROM PAST) from P1 where ID = ?");
 
 
         project.addStmtProcedure("VERIFY_TIMESTAMP_STRING_EQ",
@@ -2681,9 +3749,19 @@ public class TestFunctionsSuite extends RegressionSuite {
         project.addStmtProcedure("LEFT", "select id, LEFT(DESC,?) from P1 where id = ?");
         project.addStmtProcedure("RIGHT", "select id, RIGHT(DESC,?) from P1 where id = ?");
         project.addStmtProcedure("SPACE", "select id, SPACE(?) from P1 where id = ?");
+        project.addStmtProcedure("LOWER_UPPER", "select id, LOWER(DESC), UPPER(DESC) from P1 where id = ?");
+
+        project.addStmtProcedure("TRIM_SPACE", "select id, LTRIM(DESC), TRIM(LEADING ' ' FROM DESC), " +
+                "RTRIM(DESC), TRIM(TRAILING ' ' FROM DESC), TRIM(DESC), TRIM(BOTH ' ' FROM DESC) from P1 where id = ?");
+        project.addStmtProcedure("TRIM_ANY", "select id, TRIM(LEADING ? FROM DESC), TRIM(TRAILING ? FROM DESC), " +
+                "TRIM(BOTH ? FROM DESC) from P1 where id = ?");
+
         project.addStmtProcedure("REPEAT", "select id, REPEAT(DESC,?) from P1 where id = ?");
-        project.addStmtProcedure("CONCAT", "select id, CONCAT(DESC,?) from P1 where id = ?");
-        project.addStmtProcedure("ConcatOpt", "select id, DESC || ? from P1 where id = ?");
+        project.addStmtProcedure("REPLACE", "select id, REPLACE(DESC,?, ?) from P1 where id = ?");
+        project.addStmtProcedure("OVERLAY", "select id, OVERLAY(DESC PLACING ? FROM ? FOR ?) from P1 where id = ?");
+        project.addStmtProcedure("OVERLAY_FULL_LENGTH", "select id, OVERLAY(DESC PLACING ? FROM ?) from P1 where id = ?");
+
+        project.addStmtProcedure("CHAR", "select id, CHAR(?) from P1 where id = ?");
 
         project.addStmtProcedure("INSERT_NULL", "insert into P1 values (?, null, null, null, null)");
         // project.addStmtProcedure("UPS", "select count(*) from P1 where UPPER(DESC) > 'L'");

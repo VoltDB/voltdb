@@ -29,7 +29,6 @@ import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexCountPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
-import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.types.PlanNodeType;
 
@@ -72,9 +71,7 @@ public class CompiledPlan {
     private VoltType[] m_parameterTypes = null;
 
     /** Parameter values, if the planner pulled constants out of the plan */
-    public ParameterSet extractedParamValues = ParameterSet.emptyParameterSet();
-
-    public ParsedSelectStmt  selectStmt = null;
+    private ParameterSet m_extractedParamValues = ParameterSet.emptyParameterSet();
 
     /**
      * If true, divide the number of tuples changed
@@ -83,8 +80,8 @@ public class CompiledPlan {
      */
     public boolean replicatedTableDML = false;
 
-    /** Does the statment write? */
-    public boolean readOnly = false;
+    /** Does the statement write? */
+    private boolean m_readOnly = false;
 
     /**
      * Whether the plan's statement mandates a result with nondeterministic content;
@@ -275,4 +272,24 @@ public class CompiledPlan {
         return m_parameterTypes;
     }
 
+    public boolean extractParamValues(ParameterizationInfo paramzInfo) throws Exception {
+        VoltType[] paramTypes = parameterTypes();
+        if (paramTypes.length > MAX_PARAM_COUNT) {
+            return false;
+        }
+        m_extractedParamValues = paramzInfo.extractedParamValues(paramTypes);
+        return true;
+    }
+
+    public ParameterSet extractedParamValues() {
+        return m_extractedParamValues;
+    }
+
+    public boolean getReadOnly() {
+        return m_readOnly;
+    }
+
+    public void setReadOnly(boolean newValue) {
+        m_readOnly = newValue;
+    }
 }
