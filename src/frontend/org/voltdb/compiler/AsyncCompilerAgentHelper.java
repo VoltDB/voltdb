@@ -172,7 +172,7 @@ public class AsyncCompilerAgentHelper
 
             long result = CatalogUtil.compileDeploymentString(newCatalog, deploymentString, false, false);
             if (result < 0) {
-                retval.errorMsg = "Unable to read from deployment file string";
+                retval.errorMsg = "Unable to update deployment configuration; see the server logs for more details.";
                 return retval;
             }
 
