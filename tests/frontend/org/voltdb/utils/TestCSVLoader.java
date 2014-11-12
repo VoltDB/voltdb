@@ -449,6 +449,33 @@ public class TestCSVLoader {
     }
 
     @Test
+    public void testCustomNULL() throws Exception
+    {
+        String []myOptions = {
+                "-f" + path_csv,
+                "--reportdir=" + reportDir,
+                "--maxerrors=50",
+                "--user=",
+                "--password=",
+                "--port=",
+                "--separator=,",
+                "--quotechar=\"",
+                "--escape=\\",
+                "--skip=0",
+                "--customNullString=test",
+                "BLAH"
+        };
+        //Both \N and \\N as csv input are treated as NULL
+        String []myData = {
+                "1,test,1,11111111,\"\"NULL\"\",1.10,1.11,\"7777-12-25 14:35:26\"",
+                "2,test,1,11111111,\"NULL\",1.10,1.11,\"7777-12-25 14:35:26\"",
+        };
+        int invalidLineCnt = 0;
+        int validLineCnt = myData.length - invalidLineCnt;
+        test_Interface(myOptions, myData, invalidLineCnt, validLineCnt );
+    }
+
+    @Test
     public void testBlankDefault() throws Exception
     {
         String []myOptions = {

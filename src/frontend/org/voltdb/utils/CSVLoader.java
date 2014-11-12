@@ -24,10 +24,7 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.Map;
-import java.util.TreeMap;
 import java.util.concurrent.LinkedBlockingQueue;
-
 
 import org.supercsv.io.CsvListReader;
 import org.supercsv.io.ICsvListReader;
@@ -278,6 +275,9 @@ public class CSVLoader implements BulkLoaderErrorHandler {
 
         @Option(desc = "port to use when connecting to database (default: 21212)")
         int port = Client.VOLTDB_SERVER_PORT;
+
+        @Option(shortOpt = "n", desc = "Custom null string, overrides all other Null pattern matching")
+        String customNullString = "";
 
         /**
          * Batch size for processing batched operations.

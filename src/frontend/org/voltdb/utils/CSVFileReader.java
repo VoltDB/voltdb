@@ -183,8 +183,14 @@ class CSVFileReader implements Runnable {
                 } else {
                     lineValues[i] = lineValues[i].trim();
                 }
+
+                if(!m_config.customNullString.equals("")){
+                    if(lineValues[i].equals(m_config.customNullString)){
+                        lineValues[i] = null;
+                    }
+                }
                 // treat NULL, \N and "\N" as actual null value
-                if (lineValues[i].equals("NULL")
+                else if (lineValues[i].equals("NULL")
                         || lineValues[i].equals(Constants.CSV_NULL)
                         || lineValues[i].equals(Constants.QUOTED_CSV_NULL)) {
                     lineValues[i] = null;
