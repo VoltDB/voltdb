@@ -303,7 +303,7 @@
             var callbackTimeout = isLoginTest ? 10000 : 5000;
             var conn = new DbConnection(server, port, admin, user, password, isHashedPassword, processName);
             var timeout = setTimeout(function () {
-                callback(false, { "status": -100, "statusstring" : "Server is not available."});
+                callback(false, { "status": -100, "statusstring": "Server is not available." }, isLoginTest);
             }, callbackTimeout);
             
             conn.BeginExecute('@Statistics', ['TABLE', 0], function (response) {

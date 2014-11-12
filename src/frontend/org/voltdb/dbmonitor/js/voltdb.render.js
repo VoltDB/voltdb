@@ -164,7 +164,7 @@ function alertNodeClicked(obj) {
                     
                     testConnection($("#username").data("servername"), $("#username").data("portid"), usernameVal, passwordVal, true, function (result, response) {
                         
-                        if (responseObtained)
+                        if (responseObtained || (response != undefined && response.hasOwnProperty("status") && response.status == -1))
                             return;
                         responseObtained = true;
 
@@ -188,7 +188,7 @@ function alertNodeClicked(obj) {
                         } else {
 
                             //Error: Server is not available(-100) or Connection refused(-5) but is not "Authentication rejected(-3)"
-                            if (response.hasOwnProperty("status") && (response.status == -100 || response.status == -5) && response.status != -3) {
+                            if (response != undefined && response.status != -3) {
                                 popupCallback();
                                 $("#loginBoxDialogue").hide();
                                 $("#serUnavailablePopup").trigger("click");
@@ -241,7 +241,7 @@ function alertNodeClicked(obj) {
                 serverName = VoltDBConfig.GetDefaultServerIP(true);
                 testConnection(serverName, portId, username, password, true, function(result, response) {
 
-                    if (responseObtained)
+                    if (responseObtained || (response != undefined && response.hasOwnProperty("status") && response.status == -1))
                         return;
                     responseObtained = true;
 
@@ -249,7 +249,7 @@ function alertNodeClicked(obj) {
 
                     if (!result) {
                         
-                        if (response.hasOwnProperty("status")) {
+                        if (response != undefined && response.hasOwnProperty("status")) {
 
                             //Error: Hashedpassword must be a 40-byte hex-encoded SHA-1 hash.
                             if (response.status == -3 && response.hasOwnProperty("statusstring") && response.statusstring.indexOf("Hashedpassword must be a 40-byte") > -1) {
@@ -260,7 +260,7 @@ function alertNodeClicked(obj) {
                                 return;
                             }
                                 //Error: Server is not available(-100) or Connection refused(-5) but is not "Authentication rejected(-3)"
-                            else if ((response.status == -100 || response.status == -5) && response.status != -3) {
+                            else if (response.status != -3) {
                                 $("#serUnavailablePopup").trigger("click");
                                 return;
                             }
