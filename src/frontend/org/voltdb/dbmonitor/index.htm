@@ -37,6 +37,7 @@
     <script type="text/javascript" src="js/sorttable.js"></script>
     <script type="text/javascript" src="js/shortcut.js"></script>
     <script type="text/javascript" src="js/jquery.getSelectedText.min.js"></script>
+    <script type="text/javascript" src="js/admin-mock.js"></script>
 </head>
 
 <body>
@@ -375,10 +376,44 @@
                 
                 <div class="adminServer">
                 	<div class="serverName">Server</div>
-                    <div class="setServer adminIcons"></div>
-                
+                    <div class="setServer adminIcons" id="btnServerConfigAdmin"></div>
+                <!-- server list -->
+                <div id="serverConfigAdmin" style="display:none;">
+        <div class="slide-pop-wrapper">
+          <div class="slide-pop-title icon-server">
+            <div class="thresholdVal">Alert Threshold
+            	<input type="text" id="" class="theVal" onclick="this.value='';" onblur="this.value=!this.value?'98%':this.value;" value="98%" />
+                <a href="#" class="setVal">Set</a>
+            </div>
+            <div class="search">Servers
+              <input type="text" id="popServerSearch" class="icon-search" onclick="this.value='';" onblur="this.value=!this.value?'Search Server':this.value;" value="Search Server" />
+            </div>
+            <div class="clear"></div>
+          </div>
+          <div class="slide-pop-content">
+          <div class="server-info-heading">
+          <span class="server">Server Name</span>
+          <span class="memory-use">Memory Usage</span>
+           <div class="clear"></div>        
+          </div>
+            <div id="serverListWrapper">            
+              <ul class="servers-list" id="serversList">
+                <li class="active monitoring"><a href="#">Jefferson</a> <span class="memory-status">78%</span></li>
+                <li class="active"><a href="#">Madison</a> <span class="memory-status alert">98%</span></li>
+                <li class="active"><a href="#">Lorem Ipsum</a> <span class="memory-status">50%</span></li>
+                <li class="active"><a href="#">Door Sit Amet</a> <span class="memory-status alert">99%</span></li>
+                <li class="active"><a href="#">Very Very long server name goes here and the text is trimmed</a> <span class="memory-status">10%</span></li>
+                <li class="joining">Lorem Joining</li>
+                <li class="joining">Ipsum Joining</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+                <!-- server list -->
                 </div>
                 <div class="clear"></div>
+                
             </div>
           
             <div class="clear"></div>
@@ -390,74 +425,90 @@
              </div>
              <div class="overviewTbl">
              <table width="100%" border="0" cellspacing="0" cellpadding="0" class="adminTbl1">
-  <tr>
-    <td width="2%">&nbsp;</td>
-    <td width="88%">Site per host</td>
-    <td width="4%" align="right">8</td>
-    <td width="4%">&nbsp;</td>
-    <td width="2%">&nbsp;</td>
-  </tr>
-  <tr>
-    <td>&nbsp;</td>
-    <td>K-safety </td>
-    <td align="right">3</td>
-    <td>&nbsp;</td>
-    <td>&nbsp;</td>
-  </tr>
-  <tr>
-    <td>&nbsp;</td>
-    <td>Partition detection </td>
-    <td align="right">
-    <div class="onIcon"></div>
-    </td>
-    <td>On</td>
-    <td>&nbsp;</td>
-  </tr>
-  <tr>
-    <td>&nbsp;</td>
-    <td>Security </td>
-    <td align="right"><div class="offIcon"></div></td>
-    <td>Off</td>
-    <td>
-    <div class="edit"></div>
-    </td>
-  </tr>
-  <tr>
-    <td><div class="arrow"></div></td>
-    <td>HTTP Access</td>
-    <td align="right"><div class="onIcon"></div></td>
-    <td>On</td>
-    <td>&nbsp;</td>
-  </tr>
-  <tr>
-    <td>&nbsp;</td>
-    <td>Auto Snapshots </td>
-    <td align="right"><div class="onIcon"></div></td>
-    <td>On</td>
-    <td>&nbsp;</td>
-  </tr>
-  <tr>
-    <td>&nbsp;</td>
-    <td>Command Logging </td>
-    <td align="right"><div class="offIcon"></div></td>
-    <td>Off</td>
-    <td>&nbsp;</td>
-  </tr>
-  <tr>
-    <td>&nbsp;</td>
-    <td>Export </td>
-    <td align="right"><div class="offIcon"></div></td>
-    <td>Off</td>
-    <td>&nbsp;</td>
-  </tr>
-  <tr>
-    <td>&nbsp;</td>
-    <td>Advanced</td>
-    <td>&nbsp;</td>
-    <td>&nbsp;</td>
-    <td>&nbsp;</td>
-  </tr>
-</table>
+                  <tr>
+                    <td width="72%" class="configLabel">Site per host</td>
+                    <td width="20%" align="right">8</td>
+                    <td width="4%">&nbsp;</td>
+                    <td width="4%">&nbsp;</td>
+                  </tr>
+                  <tr>
+                    <td class="configLabel">K-safety </td>
+                    <td align="right">3</td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                  </tr>
+                  <tr>
+                    <td class="configLabel">Partition detection </td>
+                    <td align="right">
+                    <div class="onIcon"></div>
+                    </td>
+                    <td>On</td>
+                    <td>&nbsp;</td>
+                  </tr>
+                  <tr>
+                    <td class="configLabel">Security</td>
+                    <td align="right"><div class="offIcon"></div></td>
+                    <td>Off</td>
+                    <td>
+                    <div class="edit"></div>
+                    </td>
+                  </tr>
+                  <tr class="hasSubLabel">
+                    <td class="configLabel"><a href="#" class="labelCollapsed">HTTP Access</a></td>
+                    <td align="right"><div class="onIcon"></div></td>
+                    <td>On</td>
+                    <td>&nbsp;</td>
+                  </tr>
+                  
+                  <tr class="hasSubLabel">
+                    <td class="configLabel"><a href="#" class="labelCollapsed">Auto Snapshots</a> </td>
+                    <td align="right"><div class="onIcon"></div></td>
+                    <td>On</td>
+                    <td>&nbsp;</td>
+                  </tr>
+                  <tr class="hasSubLabel">
+                    <td class="configLabel"><a href="#" class="labelCollapsed">Command Logging</a></td>
+                    <td align="right"><div class="offIcon"></div></td>
+                    <td>Off</td>
+                    <td>&nbsp;</td>
+                  </tr>
+                  <tr class="hasSubLabel">
+                    <td class="configLabel"><a href="#" class="labelCollapsed">Export</a></td>
+                    <td align="right"><div class="offIcon"></div></td>
+                    <td>Off</td>
+                    <td>&nbsp;</td>
+                  </tr>
+                  <tr class="hasSubLabel parent" id="row-1">
+                    <td class="configLabel"><a href="#" class="labelCollapsed">Advanced</a></td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                  </tr>
+                  <tr class="child-row-1 subLabelRow">
+                  	<td class="configLabel">Max Java Heap </td>
+                    <td align="right">512 MB</td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                  </tr>
+                  <tr class="child-row-1 subLabelRow">
+                  	<td class="configLabel">Heartbeat time out </td>
+                    <td align="right">500 ms</td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                  </tr>
+                  <tr class="child-row-1 subLabelRow">
+                  	<td class="configLabel">Max temp table memory</td>
+                    <td align="right">256 MB</td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                  </tr>
+                  <tr class="child-row-1 subLabelRow">
+                  	<td class="configLabel">Snapshot priority</td>
+                    <td align="right">8</td>
+                    <td>&nbsp;</td>
+                    <td>&nbsp;</td>
+                  </tr>
+                </table>
 
 				</div>
              

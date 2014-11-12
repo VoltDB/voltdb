@@ -744,7 +744,7 @@ ul.helpSchemaList li { list-style:disc; line-height:25px!important; padding:0; m
 .VDBQueryHelp p { line-height:20px;font:15px  Arial, Helvetica, sans-serif;}
 
 /**admin**/
-.adminIcons, .pause, .promote, .restore, .stop, .onIcon, .offIcon, .edit, .arrow
+.adminIcons, .pause, .promote, .restore, .stop, .onIcon, .offIcon, .edit, .arrow, .labelCollapsed, .labelExpanded
  { background-image:url(images/admin-icons.png);}
 .adminWrapper{ margin:0; padding:15px 20px;background:#FFFFFF; border-bottom:1px solid #CCCCCC;}
 		  
@@ -773,17 +773,27 @@ ul.adminClusterList li a.stop { display:inline-block;background-position:-570px 
 .headerAdminContent h1 {padding: 15px 0 0 20px; font-weight:bold;}
 .adminPorts { margin:0 0 10px 0; background:#f3f3f3;}
 .adminTbl { margin:0; padding:0;}
-.adminTbl1 tr td { margin:0; padding:10px 25px 13px 10px; font-weight:bold; border-left:1px solid #CCCCCC;}
-.adminTbl2 tr td { margin:0; padding:15px 25px 15px 10px; font-weight:bold; border-left:1px solid #CCCCCC;}
+.adminTbl1 tr td { margin:0; padding:10px 25px 13px 10px; border-left:1px solid #CCCCCC;}
+.adminTbl2 tr td { margin:0; padding:15px 25px 15px 10px; border-left:1px solid #CCCCCC;}
 .onIcon			 { background-position: -266px -58px; width: 31px; height: 17px;}
 .offIcon 		 { background-position:-266px -106px; width: 31px; height: 17px;}
-.edit 			 { background-position: -226px -58px; width: 31px; height: 17px;}
+.edit 			 { background-position: -226px -58px; width: 31px; height: 25px;}
 .arrow 			 { background-position: -316px -102px;width: 10px; height: 17px;}
 .textClusterP {position: relative; top: 31px; text-align: center; left: 22px;}
 .textClusterPr {position: relative; top: 31px; text-align: center; left: 12px;}
 .textClusterR {position: relative; top: 31px; text-align: center; left: 7px;}
 .textClusterS {position: relative; top: 31px; text-align: center; left: 22px;}
 
+.adminTbl1 tr td.configLabel{ padding-left:35px; font-weight:bold;}
+.adminTbl1 tr.hasSubLabel td.configLabel{ padding-left:10px; font-weight:bold;}
+.adminTbl1 tr.subLabelRow td.configLabel{padding-left:40px; font-weight:normal;}
+.hasSubLabel{} 
+.labelCollapsed{ background-position:-313px -11px; padding-left:25px;}
+.labelExpanded{ background-position:-313px -55px; padding-left:25px;}
+
+.adminWrapper{position:relative;}
+#btnServerConfigAdmin:hover{cursor:pointer;}
+#serverConfigAdmin{ position:absolute;right:20px; top:49px; z-index:99;}
 
 /*********************************************media Qu********************/
 @media (max-width: 479px) {
