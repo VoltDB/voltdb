@@ -57,7 +57,12 @@ public class AdhocDDLTestBase extends TestCase {
 
     protected void startClient(ClientConfig clientConfig) throws Exception
     {
-        m_client = ClientFactory.createClient(clientConfig);
+        if (clientConfig != null) {
+            m_client = ClientFactory.createClient(clientConfig);
+        }
+        else {
+            m_client = ClientFactory.createClient();
+        }
         m_client.createConnection("localhost");
     }
 
