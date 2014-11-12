@@ -83,7 +83,7 @@ function alertNodeClicked(obj) {
         var htmlMarkups = { "SystemInformation": [] };
         var htmlMarkup;
         var htmlTableMarkups = { "SystemInformation": [] };
-        var htmlTableMarkup="";
+        var htmlTableMarkup = "";
         var minLatency = 0;
         var maxLatency = 0;
         var avgLatency = 0;
@@ -163,9 +163,9 @@ function alertNodeClicked(obj) {
                     var usernameVal = $("#username").val();
                     var passwordVal = $("#password").val() != '' ? $().crypt({ method: "sha1", source: $("#password").val() }) : $("#password").val();
                     responseObtained = false;
-                    
+
                     testConnection($("#username").data("servername"), $("#username").data("portid"), usernameVal, passwordVal, true, function (result, response) {
-                        
+
                         if (responseObtained || (response != undefined && response.hasOwnProperty("status") && response.status == -1))
                             return;
                         responseObtained = true;
@@ -235,13 +235,13 @@ function alertNodeClicked(obj) {
                     popupCallback();
                 }
             });
-            
+
             //Try to login with saved username/password or no username and password
             var tryAutoLogin = function () {
                 $("#overlay").show();
                 responseObtained = false;
                 serverName = VoltDBConfig.GetDefaultServerIP(true);
-                testConnection(serverName, portId, username, password, true, function(result, response) {
+                testConnection(serverName, portId, username, password, true, function (result, response) {
 
                     if (responseObtained || (response != undefined && response.hasOwnProperty("status") && response.status == -1))
                         return;
@@ -250,7 +250,7 @@ function alertNodeClicked(obj) {
                     $("#overlay").hide();
 
                     if (!result) {
-                        
+
                         if (response != undefined && response.hasOwnProperty("status")) {
 
                             //Error: Hashedpassword must be a 40-byte hex-encoded SHA-1 hash.
@@ -276,7 +276,7 @@ function alertNodeClicked(obj) {
                     } else {
                         pageLoadCallback();
                     }
-                    
+
                 });
             };
 
@@ -387,22 +387,6 @@ function alertNodeClicked(obj) {
             });
         };
 
-       
-        this.getTablesInformationByIndex = function (onDataTablesInformationLoaded) {
-            VoltDBService.GetDataTablesInformation(function (connection) {
-                populateTablesInformation(connection);
-            });
-            onDataTablesInformationLoaded();
-        };
-
-        this.getProceduresInformationByIndex = function (onProcedureInformationLoaded) {
-            VoltDBService.GetDataTablesInformation(function (connection) {
-                populateTablesInformation(connection);
-            });
-            onProcedureInformationLoaded();
-
-        };
-        
         this.GetHostNodesHtml = function (callback) {
             try {
                 VoltDBService.GetHostNodes(function (connection, state) {
@@ -413,7 +397,7 @@ function alertNodeClicked(obj) {
 
             }
         };
-        
+
         this.GetClusterHealth = function (callback) {
             if (systemOverview == null || systemOverview == undefined) {
                 alert("Error: Unable to extract cluster health information.");
@@ -431,11 +415,11 @@ function alertNodeClicked(obj) {
                 else if (val["CLUSTERSTATE"] == "JOINING")
                     joiningCount++;
             });
-            
+
             if (totalServerCount == 0) {
                 totalServerCount = activeCount + joiningCount;
             }
-            
+
             missingCount = totalServerCount - (activeCount + joiningCount);
 
             if (missingCount < 0)
@@ -493,8 +477,8 @@ function alertNodeClicked(obj) {
                 else if (columnInfo["name"] == "TUPLE_COUNT")
                     tupleCountIndex = counter;
 
-
                 counter++;
+
             });
 
             counter = 0;
@@ -1285,25 +1269,22 @@ function alertNodeClicked(obj) {
 
                 }
 
-                else if (((currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.NEXT ) ||
+                else if (((currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.NEXT) ||
                     (currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.PREVIOUS)) && !voltDbRenderer.isTableSortClicked) {
                     if (voltDbRenderer.isSearchTextCleaned) {
                         tablePageStartIndex = 0;
-                        voltDbRenderer.tableIndex = 0;                        
+                        voltDbRenderer.tableIndex = 0;
                     }
-                        
-                    else                   
+
+                    else
                         tablePageStartIndex = (voltDbRenderer.tableIndex) * voltDbRenderer.maxVisibleRows;
 
-                }                            
+                }
 
                 else if (currentAction == VoltDbUI.ACTION_STATES.SEARCH || currentAction == VoltDbUI.ACTION_STATES.NONE || voltDbRenderer.isTableSortClicked == true) {
-                    //if (!(priorAction == VoltDbUI.ACTION_STATES.PREVIOUS || priorAction == VoltDbUI.ACTION_STATES.NEXT)) {
-                        tablePageStartIndex = 0;
-                        voltDbRenderer.tableIndex = 0;
-                        
-                    //}
-                    
+                    tablePageStartIndex = 0;
+                    voltDbRenderer.tableIndex = 0;
+
                 }
 
                 var lTableData = this.isTableSearch ? this.searchData.tables : tableData;
@@ -1373,7 +1354,7 @@ function alertNodeClicked(obj) {
                         }
 
                         if ((counter == (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1 || counter == voltDbRenderer.tableSearchDataSize - 1) && htmlTableMarkup != "") {
-                            voltDbRenderer.tableIndex++;                           
+                            voltDbRenderer.tableIndex++;
                             return false;
                         }
 
@@ -2097,7 +2078,6 @@ function alertNodeClicked(obj) {
             } else {
                 return columnType;
             }
-
 
         };
 

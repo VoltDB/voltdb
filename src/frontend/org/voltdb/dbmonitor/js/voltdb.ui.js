@@ -464,24 +464,20 @@ var loadPage = function (serverName, portid) {
                 voltDbRenderer.mapTableInformation(currentTableAction, priorTableAction, voltDbRenderer.isTableSearch, function (htmlData) {
 
                     if (!voltDbRenderer.isTableSearch) {
-                        if ((currentTableAction == VoltDbUI.ACTION_STATES.REFRESH && currentTableAction != VoltDbUI.ACTION_STATES.NONE) || (currentTableAction != VoltDbUI.ACTION_STATES.REFRESH && currentTableAction == VoltDbUI.ACTION_STATES.NONE)) {
-                            //lblTotalPagesofTables.innerHTML = voltDbRenderer.tableDataSize < voltDbRenderer.maxVisibleRows ? " ".concat(1) : " ".concat(Math.ceil(voltDbRenderer.tableDataSize / voltDbRenderer.maxVisibleRows));
+                        if ((currentTableAction == VoltDbUI.ACTION_STATES.REFRESH && currentTableAction != VoltDbUI.ACTION_STATES.NONE) || (currentTableAction != VoltDbUI.ACTION_STATES.REFRESH && currentTableAction == VoltDbUI.ACTION_STATES.NONE)) {                            
                             setPaginationIndicesOfTables(voltDbRenderer.isTableSearch);
 
                         }
 
                         if (htmlData != "") {
                             if (currentTableAction == VoltDbUI.ACTION_STATES.NONE && currentTableAction == VoltDbUI.ACTION_STATES.NONE) //only during initial load
-                            {
-                                //lblPreviousTable.innerHTML = " ".concat(1, ' ');
+                            {                                
                                 setPaginationIndicesOfTables(voltDbRenderer.isTableSearch);
                             }
                             $('#tablesBody').html(htmlData);
 
                         } else {
-                            setPaginationIndicesOfTables(voltDbRenderer.isTableSearch);
-                            //lblPreviousTable.innerHTML = " ".concat(0, ' ');
-                            //lblTotalPagesofTables.innerHTML = " ".concat(0, ' ');
+                            setPaginationIndicesOfTables(voltDbRenderer.isTableSearch);                            
                             $('#tablesBody').html("<tr><td colspan=6> No data to be displayed</td></tr>");
                         }
 
@@ -811,7 +807,7 @@ var loadPage = function (serverName, portid) {
                     lblTotalPagesofTables.innerHTML = voltDbRenderer.tableSearchDataSize < voltDbRenderer.maxVisibleRows ? " ".concat(1) : " ".concat(Math.ceil(voltDbRenderer.tableSearchDataSize / voltDbRenderer.maxVisibleRows));
 
                 }                
-                //else if for 46141                
+                         
                 else if (currentTableAction == VoltDbUI.ACTION_STATES.REFRESH && (priorTableAction == VoltDbUI.ACTION_STATES.PREVIOUS || priorTableAction == VoltDbUI.ACTION_STATES.NEXT)) {
                    lblTotalPagesofTables.innerHTML = voltDbRenderer.tableSearchDataSize < voltDbRenderer.maxVisibleRows ? " ".concat(1) : " ".concat(Math.ceil(voltDbRenderer.tableSearchDataSize / voltDbRenderer.maxVisibleRows));
                 }
@@ -969,9 +965,6 @@ var loadPage = function (serverName, portid) {
             if (voltDbRenderer.isProcedureSearch) {
                 VoltDbUI.sortStatus = VoltDbUI.SORT_STATES.SORTING;
                 voltDbRenderer.searchProcedures('', $('#filterStoredProc')[0].value, function (searchResult) {
-                    //priorProcedureAction = currentProcedureAction;
-                    //currentProcedureAction = VoltDbUI.ACTION_STATES.SEARCH;
-
                     currentProcedureAction = VoltDbUI.ACTION_STATES.SORT;
                     voltDbRenderer.formatSearchDataToJsonArray();
                     if (voltDbRenderer.sortProceduresByColumns(false)) {
@@ -993,7 +986,6 @@ var loadPage = function (serverName, portid) {
                     }
                     priorProcedureAction = VoltDbUI.ACTION_STATES.SEARCH;
 
-
                 });
             } else {
                 VoltDbUI.sortStatus = VoltDbUI.SORT_STATES.SORTING;
@@ -1004,7 +996,6 @@ var loadPage = function (serverName, portid) {
 
                     else
                         $('#storeProcedureBody').html("<tr><td colspan=6> No data to be displayed</td></tr>");
-
 
                     setPaginationIndicesOfProcedures(voltDbRenderer.isProcedureSearch);
                     VoltDbUI.sortStatus = VoltDbUI.SORT_STATES.SORTED;
