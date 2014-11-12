@@ -1888,8 +1888,7 @@ public class DDLCompiler {
      * @param table       The table with the constraint being defined on it
      * @param deleteStmt  The text of the DELETE statement
      *  */
-    private void validateTupleLimitDeleteStmt(Table table, String deleteStmt) throws VoltCompilerException {
-        String tableName = table.getTypeName();
+    private void validateTupleLimitDeleteStmt(String tableName, String deleteStmt) throws VoltCompilerException {
         String msgPrefix = "Error: Table " + tableName + " has invalid DELETE statement for LIMIT PARTITION ROWS constraint: ";
         VoltXMLElement deleteXml = null;
         try {
@@ -1909,8 +1908,7 @@ public class DDLCompiler {
         }
 
         String deleteTarget = deleteXml.attributes.get("table");
-        // Comparing identifiers: what's the best way, keeping in mind we may someday want to use quoted IDs?
-        if (deleteTarget.compareToIgnoreCase(tableName) != 0) {
+        if (! deleteTarget.equals(tableName)) {
             throw m_compiler.new VoltCompilerException(msgPrefix + "target of DELETE must be " + tableName);
         }
     }
@@ -1946,7 +1944,7 @@ public class DDLCompiler {
             table.setTuplelimit(tupleLimit);
             String deleteStmt = node.attributes.get("rowslimitdeletestmt");
             if (deleteStmt != null) {
-                validateTupleLimitDeleteStmt(table, deleteStmt);
+                validateTupleLimitDeleteStmt(tableName, deleteStmt);
                 Statement catStmt = table.getTuplelimitdeletestmt().add(name + "_limit_delete");
                 catStmt.setSqltext(deleteStmt);
             }

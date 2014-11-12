@@ -1024,6 +1024,7 @@ public final class Constraint implements SchemaObject {
     String rowsLimitDeleteStmt;
 
     // A VoltDB extension to support indexed expressions
+    // and new kinds of constraints
     public Constraint withExpressions(Expression[] exprs) {
         indexExprs = exprs;
         return this;
