@@ -109,19 +109,19 @@ caption {
 }
 /* hidden filter row */
 .tablesorter-bootstrap .tablesorter-filter-row.hideme td {
-	padding: 2px; /* change this to modify the thickness of the closed border row */
-	margin: 0;
-	line-height: 0;
+	/*padding: 2px;*/ /* change this to modify the thickness of the closed border row */
+	/*margin: 0;
+	line-height: 0;*/
 }
 .tablesorter-bootstrap .tablesorter-filter-row.hideme .tablesorter-filter {
-	height: 1px;
+	/*height: 1px;
 	min-height: 0;
 	border: 0;
 	padding: 0;
-	margin: 0;
+	margin: 0;*/
 	/* don't use visibility: hidden because it disables tabbing */
-	opacity: 0;
-	filter: alpha(opacity=0);
+/*	opacity: 0;
+	filter: alpha(opacity=0);*/
 }
 
 /* pager plugin */

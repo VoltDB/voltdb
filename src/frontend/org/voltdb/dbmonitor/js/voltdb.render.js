@@ -47,6 +47,7 @@ function alertNodeClicked(obj) {
         this.nodeStatus = new Array();
         this.isProcedureSearch = false;
         this.isTableSearch = false;
+        this.isSearchTextCleaned = false;
         this.isProcedureSortClicked = false;
         this.isTableSortClicked = false;
         this.isNextClicked = false;
@@ -67,6 +68,7 @@ function alertNodeClicked(obj) {
         this.sortOrder = "";
         this.sortTableOrder = "";
         this.refreshTables = false;
+        var totalServerCount = 0;
         var kFactor = 0;
         var procedureData = {};
         var procedureJsonArray = [];
@@ -81,7 +83,7 @@ function alertNodeClicked(obj) {
         var htmlMarkups = { "SystemInformation": [] };
         var htmlMarkup;
         var htmlTableMarkups = { "SystemInformation": [] };
-        var htmlTableMarkup="";
+        var htmlTableMarkup = "";
         var minLatency = 0;
         var maxLatency = 0;
         var avgLatency = 0;
@@ -161,10 +163,10 @@ function alertNodeClicked(obj) {
                     var usernameVal = $("#username").val();
                     var passwordVal = $("#password").val() != '' ? $().crypt({ method: "sha1", source: $("#password").val() }) : $("#password").val();
                     responseObtained = false;
-                    
+
                     testConnection($("#username").data("servername"), $("#username").data("portid"), usernameVal, passwordVal, true, function (result, response) {
-                        
-                        if (responseObtained)
+
+                        if (responseObtained || (response != undefined && response.hasOwnProperty("status") && response.status == -1))
                             return;
                         responseObtained = true;
 
@@ -188,7 +190,7 @@ function alertNodeClicked(obj) {
                         } else {
 
                             //Error: Server is not available(-100) or Connection refused(-5) but is not "Authentication rejected(-3)"
-                            if (response.hasOwnProperty("status") && (response.status == -100 || response.status == -5) && response.status != -3) {
+                            if (response != undefined && response.status != -3) {
                                 popupCallback();
                                 $("#loginBoxDialogue").hide();
                                 $("#serUnavailablePopup").trigger("click");
@@ -233,23 +235,23 @@ function alertNodeClicked(obj) {
                     popupCallback();
                 }
             });
-            
+
             //Try to login with saved username/password or no username and password
             var tryAutoLogin = function () {
                 $("#overlay").show();
                 responseObtained = false;
                 serverName = VoltDBConfig.GetDefaultServerIP(true);
-                testConnection(serverName, portId, username, password, true, function(result, response) {
+                testConnection(serverName, portId, username, password, true, function (result, response) {
 
-                    if (responseObtained)
+                    if (responseObtained || (response != undefined && response.hasOwnProperty("status") && response.status == -1))
                         return;
                     responseObtained = true;
 
                     $("#overlay").hide();
 
                     if (!result) {
-                        
-                        if (response.hasOwnProperty("status")) {
+
+                        if (response != undefined && response.hasOwnProperty("status")) {
 
                             //Error: Hashedpassword must be a 40-byte hex-encoded SHA-1 hash.
                             if (response.status == -3 && response.hasOwnProperty("statusstring") && response.statusstring.indexOf("Hashedpassword must be a 40-byte") > -1) {
@@ -260,7 +262,7 @@ function alertNodeClicked(obj) {
                                 return;
                             }
                                 //Error: Server is not available(-100) or Connection refused(-5) but is not "Authentication rejected(-3)"
-                            else if ((response.status == -100 || response.status == -5) && response.status != -3) {
+                            else if (response.status != -3) {
                                 $("#serUnavailablePopup").trigger("click");
                                 return;
                             }
@@ -274,7 +276,7 @@ function alertNodeClicked(obj) {
                     } else {
                         pageLoadCallback();
                     }
-                    
+
                 });
             };
 
@@ -385,52 +387,6 @@ function alertNodeClicked(obj) {
             });
         };
 
-        //this.getStoredProceduresAndTableInformation = function (onProcedureAndDataTablesInformationLoaded) {
-        //    if (this.userPreferences) {
-        //        if (this.userPreferences['DatabaseTables'] == true) {
-        //            VoltDBService.GetDataTablesInformation(function (connection) {
-        //                populateTablesInformation(connection);
-
-        //            });
-        //        }
-
-        //        if (this.userPreferences['StoredProcedures'] == true) {
-        //            VoltDBService.GetProceduresInformation(function (connection) {
-        //                populateProceduresInformation(connection);
-        //            });
-        //        }
-        //        onProcedureAndDataTablesInformationLoaded();
-        //    }
-        //};
-
-        this.getTablesInformationByIndex = function (onDataTablesInformationLoaded) {
-            VoltDBService.GetDataTablesInformation(function (connection) {
-                populateTablesInformation(connection);
-            });
-            onDataTablesInformationLoaded();
-        };
-
-        this.getProceduresInformationByIndex = function (onProcedureInformationLoaded) {
-            VoltDBService.GetDataTablesInformation(function (connection) {
-                populateTablesInformation(connection);
-            });
-            onProcedureInformationLoaded();
-
-        };
-
-        //this.getProcedureData = function (onProcedureDataTraversed) {
-        //    VoltDBService.GetProceduresInformation(function (nestConnection) {
-        //        populateProceduresInformation(nestConnection);
-
-        //    });
-
-        //    VoltDBService.GetDataTablesInformation(function (nestConnection) {
-        //        populateTablesInformation(nestConnection);
-        //        populateTableTypes(nestConnection);
-        //        onProcedureDataTraversed();
-        //    });
-        //};
-
         this.GetHostNodesHtml = function (callback) {
             try {
                 VoltDBService.GetHostNodes(function (connection, state) {
@@ -458,10 +414,16 @@ function alertNodeClicked(obj) {
                     activeCount++;
                 else if (val["CLUSTERSTATE"] == "JOINING")
                     joiningCount++;
-                else if (val["CLUSTERSTATE"] == "MISSING")
-                    missingCount++;
             });
 
+            if (totalServerCount == 0) {
+                totalServerCount = activeCount + joiningCount;
+            }
+
+            missingCount = totalServerCount - (activeCount + joiningCount);
+
+            if (missingCount < 0)
+                missingCount = 0;
 
             var html =
                 '<li class="activeIcon">Active <span id="activeCount">(' + activeCount + ')</span></li>' +
@@ -515,8 +477,8 @@ function alertNodeClicked(obj) {
                 else if (columnInfo["name"] == "TUPLE_COUNT")
                     tupleCountIndex = counter;
 
-
                 counter++;
+
             });
 
             counter = 0;
@@ -1309,17 +1271,20 @@ function alertNodeClicked(obj) {
 
                 else if (((currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.NEXT) ||
                     (currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.PREVIOUS)) && !voltDbRenderer.isTableSortClicked) {
-                    tablePageStartIndex = (voltDbRenderer.tableIndex) * voltDbRenderer.maxVisibleRows;
+                    if (voltDbRenderer.isSearchTextCleaned) {
+                        tablePageStartIndex = 0;
+                        voltDbRenderer.tableIndex = 0;
+                    }
+
+                    else
+                        tablePageStartIndex = (voltDbRenderer.tableIndex) * voltDbRenderer.maxVisibleRows;
 
                 }
 
                 else if (currentAction == VoltDbUI.ACTION_STATES.SEARCH || currentAction == VoltDbUI.ACTION_STATES.NONE || voltDbRenderer.isTableSortClicked == true) {
-                    //if (!(priorAction == VoltDbUI.ACTION_STATES.PREVIOUS || priorAction == VoltDbUI.ACTION_STATES.NEXT)) {
-                        tablePageStartIndex = 0;
-                        voltDbRenderer.tableIndex = 0;
-                        
-                    //}
-                    
+                    tablePageStartIndex = 0;
+                    voltDbRenderer.tableIndex = 0;
+
                 }
 
                 var lTableData = this.isTableSearch ? this.searchData.tables : tableData;
@@ -1389,7 +1354,7 @@ function alertNodeClicked(obj) {
                         }
 
                         if ((counter == (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1 || counter == voltDbRenderer.tableSearchDataSize - 1) && htmlTableMarkup != "") {
-                            voltDbRenderer.tableIndex++;                           
+                            voltDbRenderer.tableIndex++;
                             return false;
                         }
 
@@ -1553,7 +1518,7 @@ function alertNodeClicked(obj) {
             var tupledDataIndex = 0;
             var tupleCountIndex = 0;
             var rssIndex = 0;
-            var totalMemoryIndex = -1;
+            var physicalMemoryIndex = -1;
             var suffix = "";
             var timeStampIndex = 0;
             var idIndex = 0;
@@ -1578,8 +1543,8 @@ function alertNodeClicked(obj) {
                     tupleCountIndex = counter;
                 else if (columnInfo["name"] == "RSS")
                     rssIndex = counter;
-                else if (columnInfo["name"] == "TOTALMEMORY")
-                    totalMemoryIndex = counter;
+                else if (columnInfo["name"] == "PHYSICALMEMORY")
+                    physicalMemoryIndex = counter;
                 else if (columnInfo["name"] == "TIMESTAMP")
                     timeStampIndex = counter;
                 else if (columnInfo["name"] == "HOST_ID")
@@ -1603,14 +1568,9 @@ function alertNodeClicked(obj) {
                         sysMemory[hostName]["TUPLECOUNT"] = memoryInfo[tupleCountIndex];
                         sysMemory[hostName]["RSS"] = memoryInfo[rssIndex];
                         sysMemory[hostName]["HOST_ID"] = memoryInfo[idIndex];
+                        sysMemory[hostName]["PHYSICALMEMORY"] = memoryInfo[physicalMemoryIndex];
 
-                        //If the value of TotalMemory is passed, then totalMemoryIndex will be greater than -1.
-                        //TODO: Remove the condition "totalMemoryIndex > -1" and just set it to "memoryInfo[totalMemoryIndex]" after it has been implemented in the API.
-                        sysMemory[hostName]["TOTALMEMORY"] = totalMemoryIndex > -1 ? memoryInfo[totalMemoryIndex] : -1;
-
-                        //TODO: Use TotalMemory after it has been implemented in the API.
-                        //sysMemory[hostName]["MEMORYUSAGE"] = (sysMemory[hostName]["RSS"] / sysMemory[hostName]["TOTALMEMORY"]) * 100;
-                        var memoryUsage = (sysMemory[hostName]["TUPLEDATA"] / sysMemory[hostName]["RSS"]) * 100;
+                        var memoryUsage = (sysMemory[hostName]["RSS"] / sysMemory[hostName]["PHYSICALMEMORY"]) * 100;
                         sysMemory[hostName]["MEMORYUSAGE"] = Math.round(memoryUsage * 100) / 100;
                     }
 
@@ -2118,7 +2078,6 @@ function alertNodeClicked(obj) {
             } else {
                 return columnType;
             }
-
 
         };
 
