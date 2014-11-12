@@ -705,7 +705,7 @@ var loadPage = function (serverName, portid) {
             else {
                 voltDbRenderer.mapTableInformation(currentTableAction, priorTableAction, voltDbRenderer.isTableSearch, function (htmlData) {
                     if (htmlData != "") {
-                        $('#tablesBody').html(htmlData.SystemInformation);
+                        $('#tablesBody').html(htmlData);
                     } else {
                         $('#tablesBody').html("<tr><td colspan=6> No data to be displayed</td></tr>");
                     }
