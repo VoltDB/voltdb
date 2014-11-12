@@ -1553,7 +1553,7 @@ function alertNodeClicked(obj) {
             var tupledDataIndex = 0;
             var tupleCountIndex = 0;
             var rssIndex = 0;
-            var totalMemoryIndex = -1;
+            var physicalMemoryIndex = -1;
             var suffix = "";
             var timeStampIndex = 0;
             var idIndex = 0;
@@ -1578,8 +1578,8 @@ function alertNodeClicked(obj) {
                     tupleCountIndex = counter;
                 else if (columnInfo["name"] == "RSS")
                     rssIndex = counter;
-                else if (columnInfo["name"] == "TOTALMEMORY")
-                    totalMemoryIndex = counter;
+                else if (columnInfo["name"] == "PHYSICALMEMORY")
+                    physicalMemoryIndex = counter;
                 else if (columnInfo["name"] == "TIMESTAMP")
                     timeStampIndex = counter;
                 else if (columnInfo["name"] == "HOST_ID")
@@ -1603,14 +1603,9 @@ function alertNodeClicked(obj) {
                         sysMemory[hostName]["TUPLECOUNT"] = memoryInfo[tupleCountIndex];
                         sysMemory[hostName]["RSS"] = memoryInfo[rssIndex];
                         sysMemory[hostName]["HOST_ID"] = memoryInfo[idIndex];
+                        sysMemory[hostName]["PHYSICALMEMORY"] = memoryInfo[physicalMemoryIndex];
 
-                        //If the value of TotalMemory is passed, then totalMemoryIndex will be greater than -1.
-                        //TODO: Remove the condition "totalMemoryIndex > -1" and just set it to "memoryInfo[totalMemoryIndex]" after it has been implemented in the API.
-                        sysMemory[hostName]["TOTALMEMORY"] = totalMemoryIndex > -1 ? memoryInfo[totalMemoryIndex] : -1;
-
-                        //TODO: Use TotalMemory after it has been implemented in the API.
-                        //sysMemory[hostName]["MEMORYUSAGE"] = (sysMemory[hostName]["RSS"] / sysMemory[hostName]["TOTALMEMORY"]) * 100;
-                        var memoryUsage = (sysMemory[hostName]["TUPLEDATA"] / sysMemory[hostName]["RSS"]) * 100;
+                        var memoryUsage = (sysMemory[hostName]["RSS"] / sysMemory[hostName]["PHYSICALMEMORY"]) * 100;
                         sysMemory[hostName]["MEMORYUSAGE"] = Math.round(memoryUsage * 100) / 100;
                     }
 

@@ -16,7 +16,7 @@
         var ramChart;
         var latencyChart;
         var transactionChart;
-        var totalMemory = -1;
+        var physicalMemory = -1;
         this.Monitors = {};
         this.ChartCpu = nv.models.lineChart();
         this.ChartRam = nv.models.lineChart();
@@ -505,18 +505,17 @@
             var memRss = parseFloat(memDetails[currentServer].RSS * 1.0 / 1048576.0).toFixed(3) * 1;
             var memTimeStamp = new Date(memDetails[currentServer].TIMESTAMP);
             
-            //TODO: Check this once we have the value for total memory from API.
-            if (memDetails[currentServer].TOTALMEMORY != -1 && totalMemory != memDetails[currentServer].TOTALMEMORY) {
-                totalMemory = memDetails[currentServer].TOTALMEMORY * 1;
+            if (memDetails[currentServer].PHYSICALMEMORY != -1 && physicalMemory != memDetails[currentServer].PHYSICALMEMORY) {
+                physicalMemory = parseFloat(memDetails[currentServer].PHYSICALMEMORY * 1.0 / 1048576.0).toFixed(3) * 1;
                 
-                MonitorGraphUI.ChartRam.yAxis.scale().domain([0, totalMemory]);
-                MonitorGraphUI.ChartRam.lines.forceY([0, totalMemory]);
+                MonitorGraphUI.ChartRam.yAxis.scale().domain([0, physicalMemory]);
+                MonitorGraphUI.ChartRam.lines.forceY([0, physicalMemory]);
             }
 
             if (memRss < 0)
                 memRss = 0;
-            else if (totalMemory != -1 && memRss > totalMemory)
-                memRss = totalMemory;
+            else if (physicalMemory != -1 && memRss > physicalMemory)
+                memRss = physicalMemory;
 
             if (memSecCount == 6 || monitor.memFirstData) {
                 dataMemMin = dataMemMin.slice(1);
