@@ -47,6 +47,7 @@ function alertNodeClicked(obj) {
         this.nodeStatus = new Array();
         this.isProcedureSearch = false;
         this.isTableSearch = false;
+        this.isSearchTextCleaned = false;
         this.isProcedureSortClicked = false;
         this.isTableSortClicked = false;
         this.isNextClicked = false;
@@ -385,24 +386,7 @@ function alertNodeClicked(obj) {
             });
         };
 
-        //this.getStoredProceduresAndTableInformation = function (onProcedureAndDataTablesInformationLoaded) {
-        //    if (this.userPreferences) {
-        //        if (this.userPreferences['DatabaseTables'] == true) {
-        //            VoltDBService.GetDataTablesInformation(function (connection) {
-        //                populateTablesInformation(connection);
-
-        //            });
-        //        }
-
-        //        if (this.userPreferences['StoredProcedures'] == true) {
-        //            VoltDBService.GetProceduresInformation(function (connection) {
-        //                populateProceduresInformation(connection);
-        //            });
-        //        }
-        //        onProcedureAndDataTablesInformationLoaded();
-        //    }
-        //};
-
+       
         this.getTablesInformationByIndex = function (onDataTablesInformationLoaded) {
             VoltDBService.GetDataTablesInformation(function (connection) {
                 populateTablesInformation(connection);
@@ -417,20 +401,7 @@ function alertNodeClicked(obj) {
             onProcedureInformationLoaded();
 
         };
-
-        //this.getProcedureData = function (onProcedureDataTraversed) {
-        //    VoltDBService.GetProceduresInformation(function (nestConnection) {
-        //        populateProceduresInformation(nestConnection);
-
-        //    });
-
-        //    VoltDBService.GetDataTablesInformation(function (nestConnection) {
-        //        populateTablesInformation(nestConnection);
-        //        populateTableTypes(nestConnection);
-        //        onProcedureDataTraversed();
-        //    });
-        //};
-
+        
         this.GetHostNodesHtml = function (callback) {
             try {
                 VoltDBService.GetHostNodes(function (connection, state) {
@@ -1307,11 +1278,17 @@ function alertNodeClicked(obj) {
 
                 }
 
-                else if (((currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.NEXT) ||
+                else if (((currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.NEXT ) ||
                     (currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.PREVIOUS)) && !voltDbRenderer.isTableSortClicked) {
-                    tablePageStartIndex = (voltDbRenderer.tableIndex) * voltDbRenderer.maxVisibleRows;
+                    if (voltDbRenderer.isSearchTextCleaned) {
+                        tablePageStartIndex = 0;
+                        voltDbRenderer.tableIndex = 0;                        
+                    }
+                        
+                    else                   
+                        tablePageStartIndex = (voltDbRenderer.tableIndex) * voltDbRenderer.maxVisibleRows;
 
-                }
+                }                            
 
                 else if (currentAction == VoltDbUI.ACTION_STATES.SEARCH || currentAction == VoltDbUI.ACTION_STATES.NONE || voltDbRenderer.isTableSortClicked == true) {
                     //if (!(priorAction == VoltDbUI.ACTION_STATES.PREVIOUS || priorAction == VoltDbUI.ACTION_STATES.NEXT)) {

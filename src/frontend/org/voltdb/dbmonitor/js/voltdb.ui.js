@@ -561,10 +561,10 @@ var loadPage = function (serverName, portid) {
                     setPaginationIndicesOfTables(voltDbRenderer.isTableSearch);
                     $('#tablesBody').html(htmlData);
                     priorTableAction = currentTableAction;
-
+                    currentTableAction = VoltDbUI.ACTION_STATES.REFRESH;
                 });
 
-                currentTableAction = VoltDbUI.ACTION_STATES.REFRESH;
+                
 
             }
 
@@ -596,9 +596,10 @@ var loadPage = function (serverName, portid) {
 
                         }
                         priorTableAction = currentTableAction;
+                        currentTableAction = VoltDbUI.ACTION_STATES.REFRESH;
                         voltDbRenderer.isNextClicked = false;
                     });
-                    currentTableAction = VoltDbUI.ACTION_STATES.REFRESH;
+                    
 
                 }
 
@@ -670,10 +671,12 @@ var loadPage = function (serverName, portid) {
         $('#filterDatabaseTable').on('keyup', function () {
             if ($('#filterDatabaseTable')[0].value != '' && $('#filterDatabaseTable')[0].value != defaultSearchTextTable) {
                 voltDbRenderer.isTableSearch = true;
+                voltDbRenderer.isSearchTextCleaned = false;
                 currentTableAction = VoltDbUI.ACTION_STATES.SEARCH;
 
             } else {
                 voltDbRenderer.isTableSearch = false;
+                voltDbRenderer.isSearchTextCleaned = true;
                 currentTableAction = VoltDbUI.ACTION_STATES.REFRESH;
             }
 
@@ -834,8 +837,9 @@ var loadPage = function (serverName, portid) {
                     lblPreviousTable.innerHTML = " ".concat(voltDbRenderer.tableIndex + 1, ' ');
                     
                 } else if ((currentTableAction == VoltDbUI.ACTION_STATES.REFRESH || currentTableAction == VoltDbUI.ACTION_STATES.NONE) &&
-                    !(priorTableAction == VoltDbUI.ACTION_STATES.PREVIOUS || priorTableAction == VoltDbUI.ACTION_STATES.NEXT)) {
+                    (voltDbRenderer.isSearchTextCleaned || !(priorTableAction == VoltDbUI.ACTION_STATES.PREVIOUS || priorTableAction == VoltDbUI.ACTION_STATES.NEXT))) {
                     lblPreviousTable.innerHTML = " ".concat(1, ' ');
+                    voltDbRenderer.isSearchTextCleaned = false;
                     
                 }
                 else if (voltDbRenderer.isTableSortClicked) {
