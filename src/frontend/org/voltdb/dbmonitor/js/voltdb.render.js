@@ -67,6 +67,7 @@ function alertNodeClicked(obj) {
         this.sortOrder = "";
         this.sortTableOrder = "";
         this.refreshTables = false;
+        var totalServerCount = 0;
         var kFactor = 0;
         var procedureData = {};
         var procedureJsonArray = [];
@@ -441,7 +442,7 @@ function alertNodeClicked(obj) {
 
             }
         };
-
+        
         this.GetClusterHealth = function (callback) {
             if (systemOverview == null || systemOverview == undefined) {
                 alert("Error: Unable to extract cluster health information.");
@@ -458,10 +459,16 @@ function alertNodeClicked(obj) {
                     activeCount++;
                 else if (val["CLUSTERSTATE"] == "JOINING")
                     joiningCount++;
-                else if (val["CLUSTERSTATE"] == "MISSING")
-                    missingCount++;
             });
+            
+            if (totalServerCount == 0) {
+                totalServerCount = activeCount + joiningCount;
+            }
+            
+            missingCount = totalServerCount - (activeCount + joiningCount);
 
+            if (missingCount < 0)
+                missingCount = 0;
 
             var html =
                 '<li class="activeIcon">Active <span id="activeCount">(' + activeCount + ')</span></li>' +
