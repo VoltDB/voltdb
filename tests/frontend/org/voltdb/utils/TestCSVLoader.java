@@ -793,7 +793,8 @@ public class TestCSVLoader {
         VoltTable ts_table = client.callProcedure("@AdHoc", "SELECT * FROM BLAH;").getResults()[0];
         ts_table.advanceRow();
         long tableTimeCol = ts_table.getTimestampAsLong(7);
-        long time = (new TimestampType(currentTime)).getTime();
+        // 2007-09-23 10:10:10.0 converted to long is 1190542210000000
+        long time = 1190542210000000L;
         long diff = tableTimeCol - time;
         assertEquals(TimeUnit.MICROSECONDS.toHours(diff), 7);
     }
