@@ -357,10 +357,10 @@
       		<h1 class="headText clusterIcon">Cluster</h1>
             <div class="adminClusterProperties">
             <ul class="adminClusterList">
-            <li><a href="#" class="pause"><span class="textClusterP">Pause</span></a></li>
-            <li><a href="#" class="promote"><span class="textClusterPr">Promote</span></a></li>
-            <li><a href="#" class="restore"><span class="textClusterR">Restore</span></a></li>
-            <li><a href="#" class="stop	"><span class="textClusterS">Stop</span></a></li>
+            <li><a href="#" class="resume">Pause</a></li>
+            <li><a href="#" class="promote">Promote</a></li>
+            <li><a href="#" class="restore">Restore</a></li>
+            <li><a href="#" class="stop">Stop</a></li>
            </ul>
             
             </div>
@@ -396,7 +396,7 @@
           <span class="memory-use">Memory Usage</span>
            <div class="clear"></div>        
           </div>
-            <div id="serverListWrapper">            
+            <div id="serverListWrapperAdmin">            
               <ul class="servers-list" id="serversList">
                 <li class="active monitoring"><a href="#">Jefferson</a> <span class="memory-status">78%</span></li>
                 <li class="active"><a href="#">Madison</a> <span class="memory-status alert">98%</span></li>
@@ -450,7 +450,7 @@
                     <td align="right"><div class="offIcon"></div></td>
                     <td>Off</td>
                     <td>
-                    <div class="edit"></div>
+                    <a href="#" class="edit" title="Edit">&nbsp;</a>
                     </td>
                   </tr>
                  <tr class="hasSubLabel parent" id="row-1">
@@ -546,7 +546,7 @@
                   	<td class="configLabel">Heartbeat time out </td>
                     <td align="right">500 ms</td>
                     <td>&nbsp;</td>
-                    <td>&nbsp;</td>
+                    <td><a href="#" class="edit" title="Edit">&nbsp;</a></td>
                   </tr>
                   <tr class="child-row-5 subLabelRow">
                   	<td class="configLabel">Max temp table memory</td>
