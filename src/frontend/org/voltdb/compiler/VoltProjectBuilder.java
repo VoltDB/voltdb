@@ -948,7 +948,9 @@ public class VoltProjectBuilder {
             systemSettingType.setElastic(elastic);
         }
         if (m_queryTimeout != null) {
-            factory.createSystemSettingsTypeQuery().setTimeout(m_queryTimeout);
+            SystemSettingsType.Query query = factory.createSystemSettingsTypeQuery();
+            query.setTimeout(m_queryTimeout);
+            systemSettingType.setQuery(query);
         }
 
         deployment.setSystemsettings(systemSettingType);
