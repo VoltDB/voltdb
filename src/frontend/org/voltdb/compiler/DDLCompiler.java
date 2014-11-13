@@ -1945,7 +1945,7 @@ public class DDLCompiler {
             String deleteStmt = node.attributes.get("rowslimitdeletestmt");
             if (deleteStmt != null) {
                 validateTupleLimitDeleteStmt(tableName, deleteStmt);
-                Statement catStmt = table.getTuplelimitdeletestmt().add(name + "_limit_delete");
+                Statement catStmt = table.getTuplelimitdeletestmt().add("limit_delete");
                 catStmt.setSqltext(deleteStmt);
             }
             return;

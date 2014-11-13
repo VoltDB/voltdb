@@ -5055,6 +5055,9 @@ public class ParserDDL extends ParserRoutine {
                     }
                     break;
 
+                case Tokens.X_ENDPARSE:
+                    throw unexpectedToken();
+
                 default:
                     read();
                 }

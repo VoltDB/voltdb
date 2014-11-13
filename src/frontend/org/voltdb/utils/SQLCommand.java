@@ -195,6 +195,13 @@ public class SQLCommand
                     "(" + alterTableCommonPrefix + ")drop",
                     Pattern.MULTILINE + Pattern.CASE_INSENSITIVE + Pattern.DOTALL);
 
+    private static final Pattern LimitPartitionRowsExecuteDelete =
+            Pattern.compile(
+                    "(" + // start capturing group
+                    "\\s*limit\\s*partition\\s*rows\\s*[0-9]+\\s*" +
+                    ")execute\\s*\\(\\s*delete",
+                    Pattern.MULTILINE + Pattern.CASE_INSENSITIVE + Pattern.DOTALL);
+
     private static final Pattern AutoSplitParameters = Pattern.compile("[\\s,]+", Pattern.MULTILINE);
     /**
      * Matches a command followed by and SQL CRUD statement verb
@@ -277,6 +284,7 @@ public class SQLCommand
         query = InsertIntoSelect.matcher(query).replaceAll("$1SQL_PARSER_SAME_INSERTINTOSELECT");
         query = AlterTableAlter.matcher(query).replaceAll("$1SQL_PARSER_SAME_ALTERTABLEALTER");
         query = AlterTableDrop.matcher(query).replaceAll("$1SQL_PARSER_SAME_ALTERTABLEDROP");
+        query = LimitPartitionRowsExecuteDelete.matcher(query).replaceAll("$1SQL_PARSER_SAME_LIMITDELETE");
         query = AutoSplit.matcher(query).replaceAll(";$2$4 "); // there be dragons here
         query = query.replaceAll("SQL_PARSER_SAME_SELECT", "select");
         query = query.replaceAll("SQL_PARSER_SAME_CREATEVIEW", "select");
@@ -287,6 +295,7 @@ public class SQLCommand
         query = query.replaceAll("SQL_PARSER_SAME_INSERTINTOSELECT", "select");
         query = query.replaceAll("SQL_PARSER_SAME_ALTERTABLEALTER", "alter");
         query = query.replaceAll("SQL_PARSER_SAME_ALTERTABLEDROP", "drop");
+        query = query.replaceAll("SQL_PARSER_SAME_LIMITDELETE", "execute (delete");
         String[] sqlFragments = query.split("\\s*;+\\s*");
 
         ArrayList<String> queries = new ArrayList<String>();
