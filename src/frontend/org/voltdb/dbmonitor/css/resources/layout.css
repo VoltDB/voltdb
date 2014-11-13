@@ -767,8 +767,8 @@ ul.helpSchemaList li { list-style:disc; line-height:25px!important; padding:0; m
 .adminClusterProperties { /*float:left;*/}
 ul.adminClusterList { margin:0; padding:0; width:325px; height:40px;}
 ul.adminClusterList li { margin:0; padding:0; float:left; width:50px; height:100%; text-align:center; line-height:75px;}
-ul.adminClusterList li a.pause { display:inline-block; background-position:-16px -105px; width:50px; height:36px;}
-ul.adminClusterList li a.resume { display:inline-block; background-position:-16px -150px; width:50px; height:36px;}
+ul.adminClusterList li a.pause { display:inline-block; background-position:-16px -106px; width:50px; height:36px;}
+ul.adminClusterList li a.resume { display:inline-block; background-position:-16px -151px; width:50px; height:36px;}
 ul.adminClusterList li a.promote { display:inline-block; background-position:-67px -12px;width:50px; height:36px;}
 ul.adminClusterList li a.restore { display:inline-block;background-position:-116px -12px; width:50px; height:36px;}
 ul.adminClusterList li a.save { display:inline-block;background-position:-116px -57px; width:50px; height:36px;}
@@ -780,6 +780,7 @@ ul.adminClusterList li a:hover{color:#000;}
 .adminMode { float:left; margin:0 10px 0 0;}
 .adminM { float:left;background:#dfdfdf; padding:8px; font-weight:bold;}
 .adminD {float:left;background:#c70000; color:#FFFFFF; padding:8px; font-weight:bold;}  
+.adminE {float:left;background:#76bd1d; color:#FFFFFF; padding:8px; font-weight:bold;}  
 .adminServer { float:left}
 .serverName { float:left; background:#dfdfdf; padding:8px; font-weight:bold; } 
 .setServer {float:left;}

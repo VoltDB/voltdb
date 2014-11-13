@@ -26,16 +26,23 @@ $( document ).ready(function() {
 	// Cluster Controls
 	$('.adminClusterList a').click(function(){
 			var theClass;
-			theClass = $(this).attr('class');
+			theClass = $(this).attr('class');	
+			
 			//alert(theClass);
 			
 			if(theClass == 'resume'){
 				$(this).removeClass('resume').addClass('pause');
 				$(this).html('Resume');
+				$('.adminD').hide();
+				$('.adminE').show();
+				
 			}
 			if(theClass == 'pause'){
 				$(this).removeClass('pause').addClass('resume');
 				$(this).html('Pause');
+				$('.adminE').hide();
+				$('.adminD').show();
+				
 			}
 			if(theClass == 'restore'){
 				$(this).removeClass('restore').addClass('save');
