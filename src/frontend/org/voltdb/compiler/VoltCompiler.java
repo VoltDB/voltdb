@@ -1147,15 +1147,17 @@ public class VoltCompiler {
 
         for (Map.Entry<Statement, VoltXMLElement> entry : deleteStmtXmlEntries) {
             Statement stmt = entry.getKey();
+            VoltXMLElement xml = entry.getValue();
 
             // choose DeterminismMode.FASTER for determinism, and rely on the planner to error out
             // if we generated a plan that is content-non-deterministic.
-            StatementCompiler.compile(this,
+            StatementCompiler.compileFromXml(this,
                     hsql,
                     db.getCatalog(),
                     db,
                     m_estimates,
                     stmt,
+                    xml,
                     stmt.getSqltext(),
                     null, // no user-supplied join order
                     DeterminismMode.FASTER,

@@ -21,6 +21,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
 import org.hsqldb_voltpatches.HSQLInterface;
+import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.PlanFragment;
@@ -203,6 +204,15 @@ public abstract class StatementCompiler {
         int validType = catalogStmt.getQuerytype();
         assert(validType != QueryType.INVALID.getValue());
     }
+
+    static void compileFromXml(VoltCompiler compiler, HSQLInterface hsql,
+            Catalog catalog, Database db, DatabaseEstimates estimates,
+            Statement catalogStmt, VoltXMLElement xml, String sqlText, String joinOrder,
+            DeterminismMode detMode, StatementPartitioning partitioning)
+    throws VoltCompiler.VoltCompilerException {
+        compile(compiler, hsql, catalog, db, estimates, catalogStmt, sqlText, joinOrder, detMode, partitioning);
+    }
+
 
     /**
      * Update the plan fragment and return the bytes of the plan
