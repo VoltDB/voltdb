@@ -198,8 +198,9 @@ public class SQLCommand
     private static final Pattern LimitPartitionRowsExecuteDelete =
             Pattern.compile(
                     "(" + // start capturing group
-                    "\\s*limit\\s*partition\\s*rows\\s*[0-9]+\\s*" +
-                    ")execute\\s*\\(\\s*delete",
+                    "limit\\s+partition\\s+rows\\s+[0-9]+\\s+" +
+                    ")" + // end capturing group
+                    "execute\\s*\\(\\s*delete",
                     Pattern.MULTILINE + Pattern.CASE_INSENSITIVE + Pattern.DOTALL);
 
     private static final Pattern AutoSplitParameters = Pattern.compile("[\\s,]+", Pattern.MULTILINE);
