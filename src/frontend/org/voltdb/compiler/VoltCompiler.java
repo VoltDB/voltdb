@@ -54,6 +54,7 @@ import javax.xml.validation.SchemaFactory;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.HSQLInterface;
+import org.hsqldb_voltpatches.VoltXMLElement;
 import org.json_voltpatches.JSONException;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -1135,37 +1136,34 @@ public class VoltCompiler {
         m_importLines = voltDdlTracker.m_importLines.toArray(new String[0]);
         addExtraClasses(jarOutput);
 
-        compileRowLimitDeleteStmts(db, hsql);
+        compileRowLimitDeleteStmts(db, hsql, ddlcompiler.getLimitDeleteStmtToXmlEntries());
     }
 
-    private void compileRowLimitDeleteStmts(Database db, HSQLInterface hsql) throws VoltCompilerException {
-        // This loop will be linear in the number of tables, but we expect the number of tables with a
-        // limit rows delete statement to be much smaller than this.  Is it worth it to try
-        // and do better here?
-        for (Table tbl : db.getTables()) {
-            CatalogMap<Statement> map = tbl.getTuplelimitdeletestmt();
-            assert(map.size() <= 1);
-            if (map.size() == 1) {
-                m_currentFilename = tbl.getTypeName() + " limit rows delete";
-                Statement stmt = map.iterator().next();
+    private void compileRowLimitDeleteStmts(
+            Database db,
+            HSQLInterface hsql,
+            Collection<Map.Entry<Statement, VoltXMLElement>> deleteStmtXmlEntries)
+            throws VoltCompilerException {
 
-                // choose DeterminismMode.FASTER for determinism, and rely on the planner to error out
-                // if we generated a plan that is content-non-deterministic.
-                StatementCompiler.compile(this,
-                        hsql,
-                        db.getCatalog(),
-                        db,
-                        m_estimates,
-                        stmt,
-                        stmt.getSqltext(),
-                        null, // no user-supplied join order
-                        DeterminismMode.FASTER,
-                        StatementPartitioning.partitioningForRowLimitDelete());
+        for (Map.Entry<Statement, VoltXMLElement> entry : deleteStmtXmlEntries) {
+            Statement stmt = entry.getKey();
 
-                // Temporarily log the plan to demonstrate it's actually getting compiled
-                String explainedPlan = Encoder.hexDecodeToString(stmt.getExplainplan());
-                compilerLog.info("Plan for " + m_currentFilename + ":\n" + explainedPlan);
-            }
+            // choose DeterminismMode.FASTER for determinism, and rely on the planner to error out
+            // if we generated a plan that is content-non-deterministic.
+            StatementCompiler.compile(this,
+                    hsql,
+                    db.getCatalog(),
+                    db,
+                    m_estimates,
+                    stmt,
+                    stmt.getSqltext(),
+                    null, // no user-supplied join order
+                    DeterminismMode.FASTER,
+                    StatementPartitioning.partitioningForRowLimitDelete());
+
+            // Temporarily log the plan to demonstrate it's actually getting compiled
+            String explainedPlan = Encoder.hexDecodeToString(stmt.getExplainplan());
+            compilerLog.info("Plan for " + m_currentFilename + ":\n" + explainedPlan);
         }
     }
 

@@ -24,6 +24,8 @@ import java.io.Reader;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -437,6 +439,10 @@ public class DDLCompiler {
     // There's specifically no cleanup here because I don't think
     // any is needed.
     Map<String, String> m_tableNameToDDL = new TreeMap<String, String>();
+
+    /** A cache of the XML used to do validation on the DELETE statement
+     * provided in DDL to enforce LIMIT ROWS constraint */
+    private final Map<Statement, VoltXMLElement> m_limitDeleteStmtToXml = new HashMap<>();
 
     // Resolve classes using a custom loader. Needed for catalog version upgrade.
     final ClassLoader m_classLoader;
@@ -1888,15 +1894,14 @@ public class DDLCompiler {
      * @param table       The table with the constraint being defined on it
      * @param deleteStmt  The text of the DELETE statement
      *  */
-    private void validateTupleLimitDeleteStmt(String tableName, String deleteStmt) throws VoltCompilerException {
+    private void validateTupleLimitDeleteStmt(Statement catStmt) throws VoltCompilerException {
+        String tableName = catStmt.getParent().getTypeName();
         String msgPrefix = "Error: Table " + tableName + " has invalid DELETE statement for LIMIT PARTITION ROWS constraint: ";
         VoltXMLElement deleteXml = null;
         try {
-            // We are parsing the statement here just for error checking.  We will parse it later as well
-            // in order to plan the statement.  It would be nice to only have to parse it once, but this
-            // is tricky: we can't parse it until the table definition is complete, and VoltCompiler
-            // doesn't provide a way to do checking after parsing but before planning.
-            deleteXml = m_hsql.getXMLCompiledStatement(deleteStmt);
+            // We parse the statement here and cache the XML below if the statement passes
+            // validation.
+            deleteXml = m_hsql.getXMLCompiledStatement(catStmt.getSqltext());
         }
         catch (HSQLInterface.HSQLParseException e) {
             throw m_compiler.new VoltCompilerException(msgPrefix + "parse error: " + e.getMessage());
@@ -1911,6 +1916,13 @@ public class DDLCompiler {
         if (! deleteTarget.equals(tableName)) {
             throw m_compiler.new VoltCompilerException(msgPrefix + "target of DELETE must be " + tableName);
         }
+
+        m_limitDeleteStmtToXml.put(catStmt, deleteXml);
+    }
+
+    /** Accessor */
+    public Collection<Map.Entry<Statement, VoltXMLElement>> getLimitDeleteStmtToXmlEntries() {
+        return Collections.unmodifiableCollection(m_limitDeleteStmtToXml.entrySet());
     }
 
     /**
@@ -1944,9 +1956,9 @@ public class DDLCompiler {
             table.setTuplelimit(tupleLimit);
             String deleteStmt = node.attributes.get("rowslimitdeletestmt");
             if (deleteStmt != null) {
-                validateTupleLimitDeleteStmt(tableName, deleteStmt);
                 Statement catStmt = table.getTuplelimitdeletestmt().add("limit_delete");
                 catStmt.setSqltext(deleteStmt);
+                validateTupleLimitDeleteStmt(catStmt);
             }
             return;
         }
