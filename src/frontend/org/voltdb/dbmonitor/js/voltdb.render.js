@@ -47,6 +47,7 @@ function alertNodeClicked(obj) {
         this.nodeStatus = new Array();
         this.isProcedureSearch = false;
         this.isTableSearch = false;
+        this.isSearchTextCleaned = false;
         this.isProcedureSortClicked = false;
         this.isTableSortClicked = false;
         this.isNextClicked = false;
@@ -82,7 +83,7 @@ function alertNodeClicked(obj) {
         var htmlMarkups = { "SystemInformation": [] };
         var htmlMarkup;
         var htmlTableMarkups = { "SystemInformation": [] };
-        var htmlTableMarkup="";
+        var htmlTableMarkup = "";
         var minLatency = 0;
         var maxLatency = 0;
         var avgLatency = 0;
@@ -162,9 +163,9 @@ function alertNodeClicked(obj) {
                     var usernameVal = $("#username").val();
                     var passwordVal = $("#password").val() != '' ? $().crypt({ method: "sha1", source: $("#password").val() }) : $("#password").val();
                     responseObtained = false;
-                    
+
                     testConnection($("#username").data("servername"), $("#username").data("portid"), usernameVal, passwordVal, true, function (result, response) {
-                        
+
                         if (responseObtained || (response != undefined && response.hasOwnProperty("status") && response.status == -1))
                             return;
                         responseObtained = true;
@@ -234,13 +235,13 @@ function alertNodeClicked(obj) {
                     popupCallback();
                 }
             });
-            
+
             //Try to login with saved username/password or no username and password
             var tryAutoLogin = function () {
                 $("#overlay").show();
                 responseObtained = false;
                 serverName = VoltDBConfig.GetDefaultServerIP(true);
-                testConnection(serverName, portId, username, password, true, function(result, response) {
+                testConnection(serverName, portId, username, password, true, function (result, response) {
 
                     if (responseObtained || (response != undefined && response.hasOwnProperty("status") && response.status == -1))
                         return;
@@ -249,7 +250,7 @@ function alertNodeClicked(obj) {
                     $("#overlay").hide();
 
                     if (!result) {
-                        
+
                         if (response != undefined && response.hasOwnProperty("status")) {
 
                             //Error: Hashedpassword must be a 40-byte hex-encoded SHA-1 hash.
@@ -275,7 +276,7 @@ function alertNodeClicked(obj) {
                     } else {
                         pageLoadCallback();
                     }
-                    
+
                 });
             };
 
@@ -300,25 +301,18 @@ function alertNodeClicked(obj) {
             });
         };
 
-        this.getDatabaseInformation = function (onInformationLoaded) {
+        this.getProceduresInformation = function (onProceduresDataLoaded) {
             var procedureMetadata = "";
 
-            VoltDBService.GetSystemInformationDeployment(function (connection) {
+            VoltDBService.GetSystemInformationDeployment(function(connection) {
                 setKFactor(connection);
-                VoltDBService.GetProceduresInformation(function (nestConnection) {
+                VoltDBService.GetProceduresInformation(function(nestConnection) {
                     populateProceduresInformation(nestConnection);
                     procedureMetadata = procedureData;
-
-                    VoltDBService.GetDataTablesInformation(function (inestConnection) {
-                        populateTableTypes(inestConnection);
-                        populateTablesInformation(inestConnection);
-
-                        populatePartitionColumnTypes(inestConnection);
-                        onInformationLoaded(procedureMetadata, inestConnection.Metadata['@Statistics_TABLE'].data);
-                    });
+                    onProceduresDataLoaded(procedureMetadata);
                 });
             });
-
+            
             var setKFactor = function (connection) {
                 connection.Metadata['@SystemInformation_DEPLOYMENT'].data.forEach(function (entry) {
                     if (entry[0] == 'kfactor')
@@ -327,7 +321,17 @@ function alertNodeClicked(obj) {
 
             };
 
+        };
 
+        this.getTablesInformation = function(onTableDataLoaded) {
+            VoltDBService.GetDataTablesInformation(function(inestConnection) {
+                populateTableTypes(inestConnection);
+                populateTablesInformation(inestConnection);
+
+                populatePartitionColumnTypes(inestConnection);
+                onTableDataLoaded(inestConnection.Metadata['@Statistics_TABLE'].data);
+            });
+       
         };
 
         this.GetDataTablesInformation = function (contextConnectionReturned) {
@@ -386,52 +390,6 @@ function alertNodeClicked(obj) {
             });
         };
 
-        //this.getStoredProceduresAndTableInformation = function (onProcedureAndDataTablesInformationLoaded) {
-        //    if (this.userPreferences) {
-        //        if (this.userPreferences['DatabaseTables'] == true) {
-        //            VoltDBService.GetDataTablesInformation(function (connection) {
-        //                populateTablesInformation(connection);
-
-        //            });
-        //        }
-
-        //        if (this.userPreferences['StoredProcedures'] == true) {
-        //            VoltDBService.GetProceduresInformation(function (connection) {
-        //                populateProceduresInformation(connection);
-        //            });
-        //        }
-        //        onProcedureAndDataTablesInformationLoaded();
-        //    }
-        //};
-
-        this.getTablesInformationByIndex = function (onDataTablesInformationLoaded) {
-            VoltDBService.GetDataTablesInformation(function (connection) {
-                populateTablesInformation(connection);
-            });
-            onDataTablesInformationLoaded();
-        };
-
-        this.getProceduresInformationByIndex = function (onProcedureInformationLoaded) {
-            VoltDBService.GetDataTablesInformation(function (connection) {
-                populateTablesInformation(connection);
-            });
-            onProcedureInformationLoaded();
-
-        };
-
-        //this.getProcedureData = function (onProcedureDataTraversed) {
-        //    VoltDBService.GetProceduresInformation(function (nestConnection) {
-        //        populateProceduresInformation(nestConnection);
-
-        //    });
-
-        //    VoltDBService.GetDataTablesInformation(function (nestConnection) {
-        //        populateTablesInformation(nestConnection);
-        //        populateTableTypes(nestConnection);
-        //        onProcedureDataTraversed();
-        //    });
-        //};
-
         this.GetHostNodesHtml = function (callback) {
             try {
                 VoltDBService.GetHostNodes(function (connection, state) {
@@ -442,7 +400,7 @@ function alertNodeClicked(obj) {
 
             }
         };
-        
+
         this.GetClusterHealth = function (callback) {
             if (systemOverview == null || systemOverview == undefined) {
                 alert("Error: Unable to extract cluster health information.");
@@ -460,11 +418,11 @@ function alertNodeClicked(obj) {
                 else if (val["CLUSTERSTATE"] == "JOINING")
                     joiningCount++;
             });
-            
+
             if (totalServerCount == 0) {
                 totalServerCount = activeCount + joiningCount;
             }
-            
+
             missingCount = totalServerCount - (activeCount + joiningCount);
 
             if (missingCount < 0)
@@ -522,8 +480,8 @@ function alertNodeClicked(obj) {
                 else if (columnInfo["name"] == "TUPLE_COUNT")
                     tupleCountIndex = counter;
 
-
                 counter++;
+
             });
 
             counter = 0;
@@ -1316,17 +1274,20 @@ function alertNodeClicked(obj) {
 
                 else if (((currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.NEXT) ||
                     (currentAction == VoltDbUI.ACTION_STATES.REFRESH && priorAction == VoltDbUI.ACTION_STATES.PREVIOUS)) && !voltDbRenderer.isTableSortClicked) {
-                    tablePageStartIndex = (voltDbRenderer.tableIndex) * voltDbRenderer.maxVisibleRows;
+                    if (voltDbRenderer.isSearchTextCleaned) {
+                        tablePageStartIndex = 0;
+                        voltDbRenderer.tableIndex = 0;
+                    }
+
+                    else
+                        tablePageStartIndex = (voltDbRenderer.tableIndex) * voltDbRenderer.maxVisibleRows;
 
                 }
 
                 else if (currentAction == VoltDbUI.ACTION_STATES.SEARCH || currentAction == VoltDbUI.ACTION_STATES.NONE || voltDbRenderer.isTableSortClicked == true) {
-                    //if (!(priorAction == VoltDbUI.ACTION_STATES.PREVIOUS || priorAction == VoltDbUI.ACTION_STATES.NEXT)) {
-                        tablePageStartIndex = 0;
-                        voltDbRenderer.tableIndex = 0;
-                        
-                    //}
-                    
+                    tablePageStartIndex = 0;
+                    voltDbRenderer.tableIndex = 0;
+
                 }
 
                 var lTableData = this.isTableSearch ? this.searchData.tables : tableData;
@@ -1396,7 +1357,7 @@ function alertNodeClicked(obj) {
                         }
 
                         if ((counter == (voltDbRenderer.tableIndex + 2) * voltDbRenderer.maxVisibleRows - 1 || counter == voltDbRenderer.tableSearchDataSize - 1) && htmlTableMarkup != "") {
-                            voltDbRenderer.tableIndex++;                           
+                            voltDbRenderer.tableIndex++;
                             return false;
                         }
 
@@ -2120,7 +2081,6 @@ function alertNodeClicked(obj) {
             } else {
                 return columnType;
             }
-
 
         };
 
