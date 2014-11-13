@@ -27,15 +27,17 @@ import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-public class LongRunningReadWriteProc extends VoltProcedure {
-    public final SQLStmt longGroupby = new SQLStmt
+public class PartitionReadWriteProc extends VoltProcedure {
+    public final SQLStmt selfJoinSelect = new SQLStmt
             ("SELECT t1.contestant_number, t2.state, COUNT(*) "
-            + "FROM votes t1, votes t2 GROUP BY t1.contestant_number, t2.state;");
+            + "FROM P1 t1, R1 t2 "
+            + "GROUP BY t1.contestant_number, t2.state;");
 
-    public final SQLStmt singleInsert = new SQLStmt("insert into Votes Values(1000, 'MA', 2)");
+    public final SQLStmt singleInsert = new SQLStmt("insert into R1 Values(1000, 'MA', 2)");
 
     public VoltTable[] run() {
-        voltQueueSQL(longGroupby);
+        voltQueueSQL(selfJoinSelect);
+
         voltQueueSQL(singleInsert);
         return voltExecuteSQL(true);
     }

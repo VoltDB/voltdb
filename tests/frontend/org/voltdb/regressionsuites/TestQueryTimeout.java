@@ -26,44 +26,108 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestQueryTimeout extends RegressionSuite {
 
-    private void loadData(Client client) throws IOException, ProcCallException {
-        int scale = 5000;
+    private static final int TIMEOUT = 1500;
+    private static String ERRORMSG = String.format(
+            "A SQL query was terminated after %.2f seconds", TIMEOUT / 1000.0);
+
+
+    private void loadData(Client client, String tb, int scale)
+            throws NoConnectionsException, IOException, ProcCallException {
+        ProcedureCallback callback = new ProcedureCallback() {
+            @Override
+            public void clientCallback(ClientResponse clientResponse)
+                    throws Exception {
+                if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+                    throw new RuntimeException("Failed with response: " + clientResponse.getStatusString());
+                }
+            }
+        };
 
         for (int i = 0; i < scale; i++) {
-            client.callProcedure("VOTES.insert", i, "MA", i % 6);
+            client.callProcedure(callback, tb + ".insert", i, "MA", i % 6);
         }
-        System.out.println("Finish loading " + scale + " rows");
+        System.out.println("Finish loading " + scale + " rows for table " + tb);
     }
 
-    public void testReadWriteProcTimeout() throws IOException, ProcCallException, InterruptedException {
-        System.out.println("test read/write proc timeout disabled...");
+    public void testReplicatedProcTimeout() throws IOException, ProcCallException, InterruptedException {
+        System.out.println("test replicated table procedures timeout...");
 
         Client client = this.getClient();
-        loadData(client);
+        loadData(client, "R1", 5000);
+        client.drain();
 
-        VoltTable vt = client.callProcedure("@SystemInformation", "DEPLOYMENT").getResults()[0];
-        System.out.println(vt);
+        client.callProcedure("@SystemInformation", "DEPLOYMENT");
+        checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT));
 
-        checkDeploymentPropertyValue(client, "querytimeout", "2000");
-
+        //
+        // Replicated table procedure tests
+        //
         try {
-            client.callProcedure("LongRunningReadOnlyProc");
+            client.callProcedure("ReplicatedReadOnlyProc");
             fail();
         } catch(Exception ex) {
-            assertTrue(ex.getMessage().contains("A SQL query was terminated after 2.00 seconds"));
+            assertTrue(ex.getMessage().contains(ERRORMSG));
         }
 
-        // 'LongRunningReadWriteProc' has the same Read query as 'LongRunningReadOnlyProc'
-        // but it should not be timed out.
+        // It's a write procedure and it's timed out safely because the MPI has not issue
+        // any write query before it's timed out
         try {
-            client.callProcedure("LongRunningReadWriteProc");
+            client.callProcedure("ReplicatedReadWriteProc");
+            fail();
+        } catch(Exception ex) {
+            assertTrue(ex.getMessage().contains(ERRORMSG));
+        }
+
+        // It's a write procedure and should not be timed out.
+        try {
+            client.callProcedure("ReplicatedWriteReadProc");
+        } catch(Exception ex) {
+            fail("Write procedure should not be timed out");
+        }
+    }
+
+    public void testPartitionedProcTimeout() throws IOException, ProcCallException, InterruptedException {
+        System.out.println("test partitioned table procedures timeout...");
+
+        Client client = this.getClient();
+
+        loadData(client, "P1", 10000);
+        loadData(client, "R1", 3000);
+        client.drain();
+
+        client.callProcedure("@SystemInformation", "DEPLOYMENT");
+        checkDeploymentPropertyValue(client, "querytimeout", Integer.toString(TIMEOUT));
+
+        //
+        // Partition table procedure tests
+        //
+        try {
+            client.callProcedure("PartitionReadOnlyProc");
+            fail();
+        } catch(Exception ex) {
+            assertTrue(ex.getMessage().contains(ERRORMSG));
+        }
+
+        // Read on partition table should not have MPI optimizations
+        // so the MPI should mark it write and not time out the procedure
+        try {
+            client.callProcedure("PartitionReadWriteProc");
+        } catch(Exception ex) {
+            fail("Write procedure should not be timed out");
+        }
+
+        // It's a write procedure and should not be timed out.
+        try {
+            client.callProcedure("PartitionWriteReadProc");
         } catch(Exception ex) {
             fail("Write procedure should not be timed out");
         }
@@ -77,8 +141,12 @@ public class TestQueryTimeout extends RegressionSuite {
         super(name);
     }
     static final Class<?>[] PROCEDURES = {
-        org.voltdb_testprocs.regressionsuites.querytimeout.LongRunningReadOnlyProc.class,
-        org.voltdb_testprocs.regressionsuites.querytimeout.LongRunningReadWriteProc.class
+        org.voltdb_testprocs.regressionsuites.querytimeout.ReplicatedReadOnlyProc.class,
+        org.voltdb_testprocs.regressionsuites.querytimeout.ReplicatedReadWriteProc.class,
+        org.voltdb_testprocs.regressionsuites.querytimeout.ReplicatedWriteReadProc.class,
+        org.voltdb_testprocs.regressionsuites.querytimeout.PartitionReadOnlyProc.class,
+        org.voltdb_testprocs.regressionsuites.querytimeout.PartitionReadWriteProc.class,
+        org.voltdb_testprocs.regressionsuites.querytimeout.PartitionWriteReadProc.class
     };
 
     static public junit.framework.Test suite() {
@@ -87,11 +155,17 @@ public class TestQueryTimeout extends RegressionSuite {
                 TestQueryTimeout.class);
         VoltProjectBuilder project = new VoltProjectBuilder();
         final String literalSchema =
-                "CREATE TABLE VOTES ( " +
+                "CREATE TABLE R1 ( " +
                 "phone_number INTEGER NOT NULL, " +
                 "state VARCHAR(2) NOT NULL, " +
                 "contestant_number INTEGER NOT NULL);" +
 
+                "CREATE TABLE P1 ( " +
+                "phone_number INTEGER NOT NULL, " +
+                "state VARCHAR(2) NOT NULL, " +
+                "contestant_number INTEGER NOT NULL);" +
+
+                "PARTITION TABLE P1 ON COLUMN phone_number;" +
                 ""
                 ;
         try {
@@ -101,7 +175,7 @@ public class TestQueryTimeout extends RegressionSuite {
         }
         project.addProcedures(PROCEDURES);
 
-        project.setQueryTimeout(2000);
+        project.setQueryTimeout(TIMEOUT);
         boolean success;
 
         config = new LocalCluster("querytimeout-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);

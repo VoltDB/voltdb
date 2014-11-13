@@ -27,13 +27,19 @@ import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-public class LongRunningReadOnlyProc extends VoltProcedure {
-    public final SQLStmt longGroupby = new SQLStmt
+public class ReplicatedReadWriteProc extends VoltProcedure {
+    public final SQLStmt selfJoinSelect = new SQLStmt
             ("SELECT t1.contestant_number, t2.state, COUNT(*) "
-            + "FROM votes t1, votes t2 GROUP BY t1.contestant_number, t2.state;");
+            + "FROM R1 t1, R1 t2 "
+            + "GROUP BY t1.contestant_number, t2.state;");
+
+    public final SQLStmt singleInsert = new SQLStmt("insert into R1 Values(1000, 'MA', 2)");
 
     public VoltTable[] run() {
-        voltQueueSQL(longGroupby);
+        // read on replicated table first will make the MPI think it is read only procedure temporarily
+        voltQueueSQL(selfJoinSelect);
+
+        voltQueueSQL(singleInsert);
         return voltExecuteSQL(true);
     }
 }
