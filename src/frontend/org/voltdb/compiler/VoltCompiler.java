@@ -1151,7 +1151,7 @@ public class VoltCompiler {
 
             // choose DeterminismMode.FASTER for determinism, and rely on the planner to error out
             // if we generated a plan that is content-non-deterministic.
-            StatementCompiler.compileFromXml(this,
+            StatementCompiler.compileStamentAndUpdateCatalog(this,
                     hsql,
                     db.getCatalog(),
                     db,

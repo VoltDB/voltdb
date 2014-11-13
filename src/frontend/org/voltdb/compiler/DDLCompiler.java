@@ -440,8 +440,8 @@ public class DDLCompiler {
     // any is needed.
     Map<String, String> m_tableNameToDDL = new TreeMap<String, String>();
 
-    /** A cache of the XML used to do validation on the DELETE statement
-     * provided in DDL to enforce LIMIT ROWS constraint */
+    /** A cache of the XML used to do validation on LIMIT DELETE statements
+     * Preserved here to avoid having to re-parse for planning */
     private final Map<Statement, VoltXMLElement> m_limitDeleteStmtToXml = new HashMap<>();
 
     // Resolve classes using a custom loader. Needed for catalog version upgrade.
@@ -1891,9 +1891,8 @@ public class DDLCompiler {
      * - Is actually a DELETE statement
      * - Targets the table being constrained
      * Throws VoltCompilerException if any of these does not hold
-     * @param table       The table with the constraint being defined on it
-     * @param deleteStmt  The text of the DELETE statement
-     *  */
+     * @param catStmt     The catalog statement whose sql text field is the DELETE to be validated
+     **/
     private void validateTupleLimitDeleteStmt(Statement catStmt) throws VoltCompilerException {
         String tableName = catStmt.getParent().getTypeName();
         String msgPrefix = "Error: Table " + tableName + " has invalid DELETE statement for LIMIT PARTITION ROWS constraint: ";
