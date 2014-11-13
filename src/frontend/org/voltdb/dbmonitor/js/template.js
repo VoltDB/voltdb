@@ -183,14 +183,14 @@ $(document).ready(function () {
         return false;
     });
 
-    $(".cb").click(function(){
-        if($(this).is(":checked")) {
+    $('.cb').click(function () {
+        if ($(this).is(":checked")) {
             var elementList = $(".tableL1").find(".togglex");
             for ( var i = 0; i < elementList.length; i++ ) {
                 var item = elementList[i];
                 var id = item["id"];
 
-                var anchor = id.toLowerCase().substring(1);
+                var anchor = id.toLowerCase();
                 var parts = anchor.split('-');
                 var toppage = parts[0];
 
@@ -211,7 +211,7 @@ $(document).ready(function () {
                     }
                 }
             }
-        }else {
+        } else {
             // reset everything
             $('.tablesorter-childRow>td').hide();
             $('.dropdown2>td').hide();
