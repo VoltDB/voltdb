@@ -3179,8 +3179,8 @@ public class TestVoltCompiler extends TestCase {
     }
 
     public void testRoleDDL() throws Exception {
-        goodRoleDDL("create role r1;", new TestRole("r1"));
-        goodRoleDDL("create role r1;create role r2;", new TestRole("r1"), new TestRole("r2"));
+        goodRoleDDL("create role R1;", new TestRole("r1"));
+        goodRoleDDL("create role r1;create role r2;", new TestRole("r1"), new TestRole("R2"));
         goodRoleDDL("create role r1 with adhoc;", new TestRole("r1", true, true, false, true, true, false));
         goodRoleDDL("create role r1 with sql;", new TestRole("r1", true, true, false, true, true, false));
         goodRoleDDL("create role r1 with sqlread;", new TestRole("r1", false, true, false, false, true, false));
