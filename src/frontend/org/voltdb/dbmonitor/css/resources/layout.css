@@ -418,6 +418,7 @@ ul.servers-list{ padding-right:20px; margin-bottom:10px;}
 ul.servers-list li{border-bottom:1px solid #dbdbdb; padding:15px 10px 15px 30px;}
 
 .searchLeft {float:left; width:20%}
+.searchLeftAdmin { width:10%;}
 .searchRight {float:right; }
 .search{float:left; padding:0 20px 0 0; }
 .search input.icon-search{margin-left:5px;}
@@ -799,7 +800,7 @@ ul.adminClusterList li a:hover{color:#000;}
 .arrow 			 { background-position: -316px -102px;width: 10px; height: 17px;}
 
 
-.adminTbl1 tr td.configLabel{ padding-left:35px; font-weight:bold;}
+.adminTbl1 tr td.configLabel{ padding-left:35px; font-weight:bold; white-space:nowrap;}
 .adminTbl1 tr.hasSubLabel td.configLabel{ padding-left:10px; font-weight:bold;}
 .adminTbl1 tr.subLabelRow td.configLabel{padding-left:40px; font-weight:normal;}
 .hasSubLabel{} 
@@ -818,12 +819,16 @@ ul.adminClusterList li a:hover{color:#000;}
 .displayPre { height:100px;}
 ul.rightShowhideList { float:none;}
   
-ul.rightShowhideList li {padding:10px 0;}
+ul.rightShowhideList li {padding:10px 0;}/*admin*/
 #popServerList{ position:absolute;right:0;top: 186px;}
 
 
 .overlay-content { min-width:250px;}
 }
+@media (max-width: 639px) {
+#serverConfigAdmin{ top:100px;}	/*admin*/
+	
+	 }
 @media (max-width: 699px) {
 	
 ul.topRightList li.responsiveMenuPlaceHolder{display:block;}
@@ -890,6 +895,7 @@ ul.catalogNav li.active a, ul.catalogNav li.active a:hover{background:#76bd1d; d
 h3.systemHeader{}
 
 
+
 @media (width: 640px) {
 	
 	.documentation span {float:right}	
@@ -915,13 +921,15 @@ h3.systemHeader{}
  .adminServer {margin-top:10px}
  .adminClusterProperties { float:left; margin:10px 0;}
  .overviewTbl { overflow:auto; width:222px;}
-  ul.adminClusterList { width:300px;}
+ul.adminClusterList { width:250px;}/*admin*/
 
 	 }
 
 @media (width: 320px) {
 
  input.icon-search { width:182px;}
+ #serverConfigAdmin{ top:182px;}	
+  input.icoSS { width:135px!important;}
  
  }
 @media screen and (orientation:landscape) {
