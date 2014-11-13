@@ -32,7 +32,7 @@ import org.voltcore.utils.Pair;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.SubqueryExpression;
+import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.types.PlanNodeType;
 
 /**
@@ -217,11 +217,11 @@ public class PlanNodeTree implements JSONString {
             return;
         }
         List<AbstractExpression> subquerysExprs = predicate.findAllSubexpressionsOfClass(
-                SubqueryExpression.class);
+                AbstractSubqueryExpression.class);
 
         for (AbstractExpression expr : subquerysExprs) {
-            assert(expr instanceof SubqueryExpression);
-            SubqueryExpression subqueryExpr = (SubqueryExpression) expr;
+            assert(expr instanceof AbstractSubqueryExpression);
+            AbstractSubqueryExpression subqueryExpr = (AbstractSubqueryExpression) expr;
             int subqueryId = subqueryExpr.getSubqueryId();
             int subqueryNodeId = subqueryExpr.getSubqueryNodeId();
             List<AbstractPlanNode> subqueryNodes = m_planNodesListMap.get(subqueryId);
@@ -325,11 +325,11 @@ public class PlanNodeTree implements JSONString {
      */
     private void extractSubqueries(AbstractPlanNode node)  throws Exception {
         assert(node != null);
-        Collection<AbstractExpression> subexprs = node.findAllExpressionsOfClass(SubqueryExpression.class);
+        Collection<AbstractExpression> subexprs = node.findAllExpressionsOfClass(AbstractSubqueryExpression.class);
 
         for(AbstractExpression nextexpr : subexprs) {
-            assert(nextexpr instanceof SubqueryExpression);
-            SubqueryExpression subqueryExpr = (SubqueryExpression) nextexpr;
+            assert(nextexpr instanceof AbstractSubqueryExpression);
+            AbstractSubqueryExpression subqueryExpr = (AbstractSubqueryExpression) nextexpr;
             int stmtId = subqueryExpr.getSubqueryId();
             m_subqueryMap.put(stmtId, subqueryExpr.getSubqueryNode());
             List<AbstractPlanNode> planNodes = new ArrayList<AbstractPlanNode>();

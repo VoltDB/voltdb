@@ -209,7 +209,7 @@ public class HSQLInterface {
         sessionProxy.sessionData.persistentStoreCollection.clearAllTables();
 
         // clean up sql-in expressions
-        fixupInStatementExpressions(xml);
+        fixupStatementExpressions(xml);
 
         assert(xml != null);
 
@@ -217,20 +217,69 @@ public class HSQLInterface {
     }
 
     /**
-     * Recursively find all in-lists found in the XML and munge them into the
+     * Recursively find all in-lists, subquery, row comparisons found in the XML and munge them into the
      * simpler thing we want to pass to the AbstractParsedStmt.
      * @throws HSQLParseException 
      */
-    private void fixupInStatementExpressions(VoltXMLElement expr) throws HSQLParseException {
+    private void fixupStatementExpressions(VoltXMLElement expr) throws HSQLParseException {
         if (doesExpressionReallyMeanIn(expr)) {
             inFixup(expr);
             // can't return because in with subquery can be nested
         }
+        if (doesExpressionReallyNeedVecorComparison(expr)) {
+            comparisonFixup(expr);
+        }
 
         // recursive hunt
         for (VoltXMLElement child : expr.children) {
-            fixupInStatementExpressions(child);
+            fixupStatementExpressions(child);
         }
+    }
+
+    private boolean doesExpressionReallyNeedVecorComparison(VoltXMLElement expr) {
+        if (!expr.name.equals("operation")) {
+            return false;
+        }
+        String optype = expr.attributes.get("optype");
+        if (!"equal".equals(optype) && 
+            !"greaterthanorequalto".equals(optype) &&
+            !"greaterthan".equals(optype) &&
+            !"lessthan".equals(optype) &&
+            !"lessthanorequalto".equals(optype) &&
+            !"notequal".equals(optype)) {
+            return false;
+        }
+        // see if the children are "row" and "tablesubquery".
+        int rowCount = 0;
+        int subqueryCount = 0;
+        for (VoltXMLElement child : expr.children) {
+            if (child.name.equals("row") && child.children.size() > 1) {
+                rowCount++;
+            } else if (child.name.equals("tablesubquery")) {
+                for(VoltXMLElement gc : child.children) {
+                    if (gc.name.equals("select")) {
+                        for(VoltXMLElement gcc : gc.children) {
+                            if (gcc.name.equals("columns") && gcc.children.size() > 1) {
+                                subqueryCount++;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        //  (C1, C2)    (SELECT ...)      => row           comp   tablesubquery => VECTOR
+        //  (SELECT ...)  =  (SELECT ...) => tablesubquery equal  tablesubquery => VECTOR
+        //  (C1,C2)  = (C1,C2)            => row           equal  row => VECTOR
+        if (rowCount == 2 ||  subqueryCount == 2 || (subqueryCount + rowCount) == 2 ) {
+            return true;
+        }
+
+        return false;
+   }
+
+    private void comparisonFixup(VoltXMLElement expr) {
+        String optype = expr.attributes.get("optype");
+        expr.attributes.put("optype", "vector" + optype);
     }
 
     /**
@@ -270,9 +319,9 @@ public class HSQLInterface {
                 valueCount++;
             }
         }
-        //  T.C     IN (SELECT ...) => row       equal                  tablesubquery
+        //  T.C     IN (SELECT ...) => row       equal                  tablesubquery => IN
         //  T.C     =  (SELECT ...) => columnref equal                  tablesubquery
-        //  C1,C2)  IN (SELECT ...) => row       equal/anyqunatified    tablesubquery
+        //  C1,C2)  IN (SELECT ...) => row       equal/anyqunatified    tablesubquery => IN
         //  C1, C2) =  (SELECT ...) => row       equal                  tablesubquery
         if ((tableCount + rowCount > 0) && (tableCount + valueCount > 0) ||
                 ((subqueryCount + rowCount) > 1 && anyQuantified)) {

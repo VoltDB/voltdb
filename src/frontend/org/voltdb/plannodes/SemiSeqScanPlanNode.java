@@ -23,10 +23,12 @@ import java.util.List;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
-import org.voltdb.expressions.VectorValueExpression;
+import org.voltdb.expressions.RowSubqueryExpression;
 import org.voltdb.types.PlanNodeType;
 
 public class SemiSeqScanPlanNode extends AbstractScanPlanNode {
+
+    private List<AbstractExpression> m_inColumnList = new ArrayList<AbstractExpression>();
 
     public SemiSeqScanPlanNode() {
         super();
@@ -42,10 +44,13 @@ public class SemiSeqScanPlanNode extends AbstractScanPlanNode {
         // the IN expression:
         // outer_expr IN (SELECT inner_expr FROM ... WHERE subq_where)
         // The predicate: outer_expr=inner_expr
-        if (inColumns instanceof VectorValueExpression) {
+        if (inColumns instanceof RowSubqueryExpression) {
+            assert(inColumns.getArgs() != null);
+            for (AbstractExpression inColumn : inColumns.getArgs()) {
+                m_inColumnList.add((AbstractExpression) inColumn.clone());
+            }
             m_inColumnList = ((AbstractExpression)inColumns.clone()).getArgs();
         } else {
-            m_inColumnList = new ArrayList<AbstractExpression>();
             m_inColumnList.add((AbstractExpression)inColumns.clone());
         }
     }
@@ -90,5 +95,4 @@ public class SemiSeqScanPlanNode extends AbstractScanPlanNode {
         return "SEQUENTIAL SCAN of \"" + tableName + "\"" + explainPredicate("\n" + indent + " filter by ");
     }
 
-    private List<AbstractExpression> m_inColumnList ;
 }
