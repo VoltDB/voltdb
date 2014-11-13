@@ -1619,33 +1619,40 @@ public class TestSubQueries extends PlannerTestCase {
         checkPrimaryKeyIndexScan(pn, "P2");
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
 
-        // TODO: Re-enable the original stronger version of the test
-        // that insists on matching the joinErrorMsg
-        // once multi-column distinct is correctly re-enabled.
-        // This will most likely happen as a side effect of fixing ENG-6436.
-        failToCompile(
-                //* stronger */ "SELECT * FROM (SELECT DISTINCT A, C FROM P1) T1, P2 where T1.A = P2.A", joinErrorMsg);
-                /*  weaker   */ "SELECT * FROM (SELECT DISTINCT A, C FROM P1) T1, P2 where T1.A = P2.A");
-
+        // Distinct with GROUP BY
         failToCompile(
                 "SELECT * FROM (SELECT DISTINCT A, C FROM P1 GROUP BY A, C) T1, P2 " +
                 "where T1.A = P2.A");
 
         failToCompile(
-                "SELECT * FROM (SELECT T0.A, R1.C FROM R1, " +
+                "SELECT * FROM (SELECT DISTINCT A, C FROM P1 GROUP BY A, C) T1, P2 " +
+                "where T1.A = P2.A");
+
+        // Distinct without GROUP BY
+        String sql1, sql2;
+        sql1 = "SELECT * FROM (SELECT DISTINCT A, C FROM P1) T1, P2 where T1.A = P2.A";
+        sql2 = "SELECT * FROM (SELECT A, C FROM P1 GROUP BY A, C) T1, P2 where T1.A = P2.A";
+        checkQueriesPlansAreTheSame(sql1, sql2);
+
+        sql1 =  "SELECT * FROM (SELECT T0.A, R1.C FROM R1, " +
                 "                (SELECT Distinct P1.A, C FROM P1,R2 where P1.A = R2.A) T0 where R1.A = T0.A ) T1, " +
                 "              P2 " +
-                "where T1.A = P2.A");
+                "where T1.A = P2.A";
+        sql2 =  "SELECT * FROM (SELECT T0.A, R1.C FROM R1, " +
+                "                (SELECT P1.A, C FROM P1,R2 where P1.A = R2.A group by P1.A, C) T0 where R1.A = T0.A ) T1, " +
+                "              P2 " +
+                "where T1.A = P2.A";
+        checkQueriesPlansAreTheSame(sql1, sql2);
 
-        failToCompile(
-                "SELECT * FROM (SELECT DISTINCT T0.A, R1.C FROM R1, " +
+        sql1 =  "SELECT * FROM (SELECT DISTINCT T0.A, R1.C FROM R1, " +
                 "                (SELECT P1.A, C FROM P1,R2 where P1.A = R2.A) T0 where R1.A = T0.A ) T1, " +
                 "              P2 " +
-                "where T1.A = P2.A");
-
-        failToCompile(
-                "SELECT * FROM (SELECT DISTINCT A, C FROM P1 GROUP BY A, C) T1, P2 " +
-                "where T1.A = P2.A");
+                "where T1.A = P2.A";
+        sql2 =  "SELECT * FROM (SELECT T0.A, R1.C FROM R1, " +
+                "                (SELECT P1.A, C FROM P1,R2 where P1.A = R2.A) T0 where R1.A = T0.A GROUP BY T0.A, R1.C) T1, " +
+                "              P2 " +
+                "where T1.A = P2.A";
+        checkQueriesPlansAreTheSame(sql1, sql2);
     }
 
     public void testEdgeCases() {
