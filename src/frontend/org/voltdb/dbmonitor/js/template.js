@@ -129,6 +129,7 @@ $(document).ready(function () {
         }
         // history.replaceState(null, null, hash);
         navigate(hash);
+        $('.cb').prop('checked', false);
         return false;
     });
 
@@ -152,6 +153,7 @@ $(document).ready(function () {
         }
         // history.replaceState(null, null, hash);
         navigate(hash);
+        $('.cb').prop('checked', false);
         return false;
     });
 
@@ -179,6 +181,47 @@ $(document).ready(function () {
         // history.replaceState(null, null, hash);
         navigate(hash);
         return false;
+    });
+
+    $(".cb").click(function(){
+        if($(this).is(":checked")) {
+            var elementList = $(".tableL1").find(".togglex");
+            for ( var i = 0; i < elementList.length; i++ ) {
+                var item = elementList[i];
+                var id = item["id"];
+
+                var anchor = id.toLowerCase().substring(1);
+                var parts = anchor.split('-');
+                var toppage = parts[0];
+
+                if (parts.length > 1) {
+                    var primary = parts[1];
+                    var iconid = "#" + toppage + "-" + primary + "--icon";
+                    var dropdownid = "#" + id + "--dropdown";
+                    $(iconid).removeClass('icon-chevron-right').addClass('icon-chevron-down');
+                    $(dropdownid).show();
+                    var disableLink = function(){ return false;};
+					$('a').bind('click', disableLink);
+                    if (parts.length > 2) {
+                        var secondary = parts[2];
+                        var iconid2 = "#" + toppage + "-" + primary + "-" + secondary + "--icon";
+                        var dropdownid2 = "#" + toppage + "-" + primary + "-" + secondary + "--dropdown";
+                        $(iconid2).removeClass('icon-chevron-right').addClass('icon-chevron-down');
+                        $(dropdownid2).show();
+                    }
+                }
+            }
+        }else {
+            // reset everything
+            $('.tablesorter-childRow>td').hide();
+            $('.dropdown2>td').hide();
+            $('.primaryrow>td').show();
+            $('.primaryrow2>td').show();
+            // make arrows point the right way
+            $('.icon-chevron-down').removeClass('icon-chevron-down').addClass('icon-chevron-right');
+            $('.primaryrow').css('background-color', '#ffffff');
+            $('a').unbind('click', disableLink);
+        }
     });
 
     navigate($(location).attr('hash'));
