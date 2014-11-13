@@ -22,6 +22,7 @@ $( document ).ready(function() {
 		  height:'225px'	  
 		});
 		
+	
 	// Cluster Controls
 	$('.adminClusterList a').click(function(){
 			var theClass;

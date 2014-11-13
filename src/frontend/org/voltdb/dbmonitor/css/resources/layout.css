@@ -762,7 +762,7 @@ ul.helpSchemaList li { list-style:disc; line-height:25px!important; padding:0; m
 .adminWrapper{ margin:0; padding:15px 20px;background:#FFFFFF; border-bottom:1px solid #CCCCCC;}
 		  
 .adminLeft { float:left; width:50%;}
-.adminLeft h1 { float:left;}
+.adminLeft h1 { float:left; padding-right:20px;}
 .adminClusterProperties { /*float:left;*/}
 ul.adminClusterList { margin:0; padding:0; width:325px; height:40px;}
 ul.adminClusterList li { margin:0; padding:0; float:left; width:50px; height:100%; text-align:center; line-height:75px;}
