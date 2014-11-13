@@ -52,13 +52,13 @@ import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
 
 public class TestStatisticsSuite extends SaveRestoreBase {
 
-    private static int SITES = 2;
-    private static int HOSTS = 3;
-    private static int KFACTOR = MiscUtils.isPro() ? 1 : 0;
-    private static int PARTITIONS = (SITES * HOSTS) / (KFACTOR + 1);
-    private static boolean hasLocalServer = false;
+    private final static int SITES = 2;
+    private final static int HOSTS = 3;
+    private final static int KFACTOR = MiscUtils.isPro() ? 1 : 0;
+    private final static int PARTITIONS = (SITES * HOSTS) / (KFACTOR + 1);
+    private final static boolean hasLocalServer = false;
 
-    static final Class<?>[] PROCEDURES =
+    private static final Class<?>[] PROCEDURES =
     {
         GoSleep.class
     };
@@ -71,14 +71,20 @@ public class TestStatisticsSuite extends SaveRestoreBase {
     // the column designated by 'columnName' has the value 'rowId'.  For example, for
     // Initiator stats, if columnName is 'PROCEDURE_NAME' and rowId is 'foo', this
     // will verify that the initiator at each node has seen a procedure invocation for 'foo'
-    public void validateRowSeenAtAllHosts(VoltTable result, String columnName, String rowId,
+    private void validateRowSeenAtAllHosts(VoltTable result, String columnName, String rowId,
+            boolean enforceUnique)
+    {
+        assertEquals(HOSTS, countHostsProvidingRows(result, columnName, rowId, enforceUnique));
+    }
+
+    private int countHostsProvidingRows(VoltTable result, String columnName, String rowId,
             boolean enforceUnique)
     {
         result.resetRowPosition();
         Set<Long> hostsSeen = new HashSet<Long>();
         while (result.advanceRow()) {
-            String procName = result.getString(columnName);
-            if (procName.equalsIgnoreCase(rowId)) {
+            String idFromRow = result.getString(columnName);
+            if (rowId.equalsIgnoreCase(idFromRow)) {
                 Long thisHostId = result.getLong("HOST_ID");
                 if (enforceUnique) {
                     assertFalse("HOST_ID: " + thisHostId + " seen twice in table looking for " + rowId +
@@ -89,34 +95,37 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         }
         // Before failing the assert, report details of the non-conforming result.
         if (HOSTS != hostsSeen.size()) {
-            System.out.println("Something in the following results will fail the assert.");
+            System.out.println("Something in the following results may fail an assert expecting " +
+                    HOSTS + " and getting " + hostsSeen.size());
+            Set<Long> seenAgain = new HashSet<Long>();
             result.resetRowPosition();
             while (result.advanceRow()) {
-                String procName = result.getString(columnName);
+                String idFromRow = result.getString(columnName);
                 Long thisHostId = result.getLong("HOST_ID");
-                if (procName.equalsIgnoreCase(rowId)) {
-                    System.out.println("Found the match at host " + thisHostId + " for proc " + procName +
-                                       (hostsSeen.add(thisHostId) ? " added" : " duplicated"));
+                if (rowId.equalsIgnoreCase(idFromRow)) {
+                    System.out.println("Found the match at host " + thisHostId + " for " + columnName + " " + idFromRow +
+                                       (seenAgain.add(thisHostId) ? " added" : " duplicated"));
+                    seenAgain.add(thisHostId);
                 } else {
-                    System.out.println("Found non-match at host " + thisHostId + " for proc " + procName);
+                    System.out.println("Found non-match at host " + thisHostId + " for " + columnName + " " + idFromRow);
                 }
             }
         }
-        assertEquals(HOSTS, hostsSeen.size());
+        return hostsSeen.size();
     }
 
     // For the provided table, verify that there is a row for each site in the cluster where
     // the column designated by 'columnName' has the value 'rowId'.  For example, for
     // Table stats, if columnName is 'TABLE_NAME' and rowId is 'foo', this
     // will verify that each site has returned results for table 'foo'
-    public boolean validateRowSeenAtAllSites(VoltTable result, String columnName, String rowId,
+    private boolean validateRowSeenAtAllSites(VoltTable result, String columnName, String rowId,
             boolean enforceUnique)
     {
         result.resetRowPosition();
         Set<Long> sitesSeen = new HashSet<Long>();
         while (result.advanceRow()) {
-            String procName = result.getString(columnName);
-            if (procName.equalsIgnoreCase(rowId)) {
+            String idFromRow = result.getString(columnName);
+            if (rowId.equalsIgnoreCase(idFromRow)) {
                 long hostId = result.getLong("HOST_ID");
                 long thisSiteId = result.getLong("SITE_ID");
                 thisSiteId |= hostId << 32;
@@ -132,14 +141,14 @@ public class TestStatisticsSuite extends SaveRestoreBase {
 
     // For the provided table, verify that there is a row for each partition in the cluster where
     // the column designated by 'columnName' has the value 'rowId'.
-    public void validateRowSeenAtAllPartitions(VoltTable result, String columnName, String rowId,
+    private void validateRowSeenAtAllPartitions(VoltTable result, String columnName, String rowId,
             boolean enforceUnique)
     {
         result.resetRowPosition();
         Set<Long> partsSeen = new HashSet<Long>();
         while (result.advanceRow()) {
-            String procName = result.getString(columnName);
-            if (procName.equalsIgnoreCase(rowId)) {
+            String idFromRow = result.getString(columnName);
+            if (rowId.equalsIgnoreCase(idFromRow)) {
                 long thisPartId = result.getLong("PARTITION_ID");
                 if (enforceUnique) {
                     assertFalse("PARTITION_ID: " + thisPartId + " seen twice in table looking for " + rowId +
@@ -918,20 +927,24 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         expectedSchema[7] = new ColumnInfo("OUTSTANDING_RESPONSE_MESSAGES", VoltType.BIGINT);
         expectedSchema[8] = new ColumnInfo("OUTSTANDING_TRANSACTIONS", VoltType.BIGINT);
         VoltTable expectedTable = new VoltTable(expectedSchema);
-
-        VoltTable[] results = null;
+        int patientRetries = 2;
+        int hostsHeardFrom = 0;
         //
         // LIVECLIENTS
         //
-        results = client.callProcedure("@Statistics", "LIVECLIENTS", 0).getResults();
-        // one aggregate table returned
-        assertEquals(1, results.length);
-        System.out.println("Test LIVECLIENTS table: " + results[0].toString());
-        validateSchema(results[0], expectedTable);
-        // Hacky, on a single local cluster make sure that all 'nodes' are present.
-        // LiveClients stats lacks a common string across nodes, but we can hijack the hostname in this case.
-        results[0].advanceRow();
-        validateRowSeenAtAllHosts(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), true);
+        do { // loop until we get the desired answer or lose patience waiting out possible races.
+            VoltTable[] results = client.callProcedure("@Statistics", "LIVECLIENTS", 0).getResults();
+            // one aggregate table returned
+            assertEquals(1, results.length);
+            System.out.println("Test LIVECLIENTS table: " + results[0].toString());
+            validateSchema(results[0], expectedTable);
+            // Hacky, on a single local cluster make sure that all 'nodes' are present.
+            // LiveClients stats lacks a common string across nodes, but we can hijack the hostname in this case.
+            results[0].advanceRow();
+            hostsHeardFrom =
+                    countHostsProvidingRows(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), true);
+        } while ((hostsHeardFrom < HOSTS) && (--patientRetries) > 0);
+        assertEquals(HOSTS, hostsHeardFrom);
     }
 
     public void testStarvationStatistics() throws Exception {
