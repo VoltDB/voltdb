@@ -24,6 +24,7 @@
 package org.voltdb.utils;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.BufferedReader;
@@ -467,12 +468,25 @@ public class TestCSVLoader {
         };
         //Both \N and \\N as csv input are treated as NULL
         String []myData = {
-                "1,test,1,11111111,\"\"NULL\"\",1.10,1.11,\"7777-12-25 14:35:26\"",
-                "2,test,1,11111111,\"NULL\",1.10,1.11,\"7777-12-25 14:35:26\"",
+                "1,1,1,11111111,test,1.10,1.11,",
+                "2,2,1,11111111,\"test\",1.10,1.11,",
+                "3,3,1,11111111,testme,1.10,1.11,",
+                "4,4,1,11111111,iamtest,1.10,1.11,",
         };
         int invalidLineCnt = 0;
         int validLineCnt = myData.length - invalidLineCnt;
         test_Interface(myOptions, myData, invalidLineCnt, validLineCnt );
+        VoltTable ts_table = client.callProcedure("@AdHoc", "SELECT * FROM BLAH ORDER BY clm_integer;").getResults()[0];
+        int i = 0;
+        while (ts_table.advanceRow()) {
+            String value = ts_table.getString(4);
+            if(i < 2) {
+                assertEquals(value, null);
+            } else {
+                assertNotNull(value);
+            }
+            i++;
+        }
     }
 
     @Test
