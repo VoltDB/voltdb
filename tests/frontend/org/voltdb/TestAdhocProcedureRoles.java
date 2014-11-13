@@ -83,7 +83,7 @@ public class TestAdhocProcedureRoles extends AdhocDDLTestBase {
             this.builder.addUsers(new UserInfo[] {new UserInfo(user, password, roles)});
         }
 
-        void createProcedureAdHoc(String tableName, String procName, String role, boolean drop) throws Exception
+        void createProcedureAdHoc(String procName, String role, String tableName, boolean drop) throws Exception
         {
             List<String> statements = new ArrayList<String>();
             if (drop) {
@@ -167,7 +167,7 @@ public class TestAdhocProcedureRoles extends AdhocDDLTestBase {
         Tester tester = new Tester();
         tester.createTable("FOO");
         tester.createRoles(ADMIN_TEMPLATE, "ADMIN");
-        tester.createRoles(USER_TEMPLATE, "GOOD", "BAD");
+        tester.createRoles(USER_TEMPLATE, "GOOD");
         tester.createUser("ADMIN", "PASSWORD", "ADMIN");
         tester.createUser("USER", "PASSWORD", "GOOD");
         tester.compile();
@@ -175,7 +175,7 @@ public class TestAdhocProcedureRoles extends AdhocDDLTestBase {
             tester.start();
             try {
                 tester.connect("ADMIN", "PASSWORD");
-                tester.createProcedureAdHoc("FOO", "PROC", "GOOD", false);
+                tester.createProcedureAdHoc("PROC", "GOOD", "FOO", false);
             }
             finally {
                 tester.disconnect();
@@ -206,7 +206,7 @@ public class TestAdhocProcedureRoles extends AdhocDDLTestBase {
             tester.start();
             try {
                 tester.connect("ADMIN", "PASSWORD");
-                tester.createProcedureAdHoc("FOO", "PROC", "GOOD", false);
+                tester.createProcedureAdHoc("PROC", "GOOD", "FOO", false);
             }
             finally {
                 tester.disconnect();
@@ -239,7 +239,7 @@ public class TestAdhocProcedureRoles extends AdhocDDLTestBase {
             tester.start();
             try {
                 tester.connect("ADMIN", "PASSWORD");
-                tester.createProcedureAdHoc("FOO", "PROC", "GOOD", false);
+                tester.createProcedureAdHoc("PROC", "GOOD", "FOO", false);
             }
             finally {
                 tester.disconnect();
@@ -253,7 +253,7 @@ public class TestAdhocProcedureRoles extends AdhocDDLTestBase {
             }
             try {
                 tester.connect("ADMIN", "PASSWORD");
-                tester.createProcedureAdHoc("FOO", "PROC", "BAD", true);
+                tester.createProcedureAdHoc("PROC", "BAD", "FOO", true);
             }
             finally {
                 tester.disconnect();
