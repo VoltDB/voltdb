@@ -301,25 +301,18 @@ function alertNodeClicked(obj) {
             });
         };
 
-        this.getDatabaseInformation = function (onInformationLoaded) {
+        this.getProceduresInformation = function (onProceduresDataLoaded) {
             var procedureMetadata = "";
 
-            VoltDBService.GetSystemInformationDeployment(function (connection) {
+            VoltDBService.GetSystemInformationDeployment(function(connection) {
                 setKFactor(connection);
-                VoltDBService.GetProceduresInformation(function (nestConnection) {
+                VoltDBService.GetProceduresInformation(function(nestConnection) {
                     populateProceduresInformation(nestConnection);
                     procedureMetadata = procedureData;
-
-                    VoltDBService.GetDataTablesInformation(function (inestConnection) {
-                        populateTableTypes(inestConnection);
-                        populateTablesInformation(inestConnection);
-
-                        populatePartitionColumnTypes(inestConnection);
-                        onInformationLoaded(procedureMetadata, inestConnection.Metadata['@Statistics_TABLE'].data);
-                    });
+                    onProceduresDataLoaded(procedureMetadata);
                 });
             });
-
+            
             var setKFactor = function (connection) {
                 connection.Metadata['@SystemInformation_DEPLOYMENT'].data.forEach(function (entry) {
                     if (entry[0] == 'kfactor')
@@ -328,7 +321,17 @@ function alertNodeClicked(obj) {
 
             };
 
+        };
 
+        this.getTablesInformation = function(onTableDataLoaded) {
+            VoltDBService.GetDataTablesInformation(function(inestConnection) {
+                populateTableTypes(inestConnection);
+                populateTablesInformation(inestConnection);
+
+                populatePartitionColumnTypes(inestConnection);
+                onTableDataLoaded(inestConnection.Metadata['@Statistics_TABLE'].data);
+            });
+       
         };
 
         this.GetDataTablesInformation = function (contextConnectionReturned) {
@@ -449,15 +452,17 @@ function alertNodeClicked(obj) {
         };
 
         var populateSystemInformation = function (connection) {
+            var updatedSystemOverview = {};
             connection.Metadata['@SystemInformation_OVERVIEW'].data.forEach(function (entry) {
                 var singleData = entry;
                 var id = singleData[0];
 
-                if (!systemOverview.hasOwnProperty(id)) {
-                    systemOverview[id] = {};
+                if (!updatedSystemOverview.hasOwnProperty(id)) {
+                    updatedSystemOverview[id] = {};
                 }
-                systemOverview[id][singleData[1]] = singleData[2];
+                updatedSystemOverview[id][singleData[1]] = singleData[2];
             });
+            systemOverview = updatedSystemOverview;
         };
 
         var populateTablesInformation = function (connection) {
