@@ -199,6 +199,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         assert(displayElement != null);
         parseDisplayColumns(displayElement, false);
 
+        if (groupbyElement == null && havingElement == null && m_distinct) {
+            // attribute "id" is the only one that differs from a real GROUP BY query
+            groupbyElement = displayElement.duplicate();
+            m_distinct = false;
+        }
+
         if (groupbyElement != null) {
             parseGroupByColumns(groupbyElement);
             insertToColumnList(m_aggResultColumns, m_groupByColumns);

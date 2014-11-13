@@ -2131,7 +2131,7 @@ public class PlanAssembler {
             // We currently can't handle DISTINCT of multiple columns.
             // Throw a planner error if this is attempted.
             if (m_parsedSelect.m_displayColumns.size() > 1) {
-                throw new PlanningErrorException("Multiple DISTINCT columns currently unsupported");
+                throw new PlanningErrorException("Multiple DISTINCT columns with GROUP BY clause currently unsupported");
             }
             AbstractExpression distinctExpr = null;
             for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.m_displayColumns) {
@@ -2145,7 +2145,7 @@ public class PlanAssembler {
                 }
                 else
                 {
-                    throw new PlanningErrorException("DISTINCT of an expression currently unsupported");
+                    throw new PlanningErrorException("DISTINCT of an expression with GROUP BY clause currently unsupported");
                 }
             }
             // Add a distinct node to the plan.
