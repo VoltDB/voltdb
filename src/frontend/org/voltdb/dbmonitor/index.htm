@@ -380,16 +380,23 @@
                 <!-- server list -->
                 <div id="serverConfigAdmin" style="display:none;">
         <div class="slide-pop-wrapper">
-          <div class="slide-pop-title icon-server">
-            <div class="thresholdVal">Alert Threshold
-            	<input type="text" id="" class="theVal" onclick="this.value='';" onblur="this.value=!this.value?'98%':this.value;" value="98%" />
-                <a href="#" class="setVal">Set</a>
+        
+        <div class="slide-pop-title ">
+          <div class="icon-server searchLeft searchLeftAdmin">Servers</div>      
+          
+          <div class="searchRight">
+            <div class="search">
+              <input type="text" id="popServerSearch" class="icon-search icoSS" onclick="this.value='';" onblur="this.value=!this.value?'Search Server':this.value;" value="Search Server" placeholder="Search Server">
             </div>
-            <div class="search">Servers
-              <input type="text" id="popServerSearch" class="icon-search" onclick="this.value='';" onblur="this.value=!this.value?'Search Server':this.value;" value="Search Server" />
+            <div class="thresholdVal">Alert Threshold
+            	<input type="text" id="threshold" class="theVal" maxlength="3">%
+                 <a href="#" id="saveThreshold" class="setVal">Set</a>
+            </div>
+             <div class="clear"></div>
             </div>
             <div class="clear"></div>
           </div>
+          
           <div class="slide-pop-content">
           <div class="server-info-heading">
           <span class="server">Server Name</span>
