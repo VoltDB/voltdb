@@ -19,6 +19,7 @@ package org.hsqldb_voltpatches;
 
 import java.util.TimeZone;
 
+import org.hsqldb_voltpatches.VoltXMLElement.VoltXMLDiff;
 import org.hsqldb_voltpatches.lib.HashMappedList;
 import org.hsqldb_voltpatches.persist.HsqlProperties;
 import org.hsqldb_voltpatches.result.Result;
@@ -36,6 +37,8 @@ import org.hsqldb_voltpatches.result.Result;
  * </ul>
  */
 public class HSQLInterface {
+
+    static public String XML_SCHEMA_NAME = "databaseschema";
     /**
      * Naming conventions for unnamed indexes and constraints
      */
@@ -86,9 +89,12 @@ public class HSQLInterface {
     }
 
     Session sessionProxy;
+    // Initialize to an empty schema
+    VoltXMLElement lastSchema = new VoltXMLElement(XML_SCHEMA_NAME);
     static int instanceId = 0;
 
     private HSQLInterface(Session sessionProxy) {
+        lastSchema.attributes.put("name", XML_SCHEMA_NAME);
         this.sessionProxy = sessionProxy;
     }
 
@@ -126,6 +132,23 @@ public class HSQLInterface {
         sessionProxy.executeDirectStatement("SET IGNORECASE TRUE;");
 
         return new HSQLInterface(sessionProxy);
+    }
+
+    /**
+     * Modify the current schema with a SQL DDL command and get the
+     * diff which represents the changes
+     *
+     * @param ddl The SQL DDL statement to be run.
+     * @return the "diff" of the before and after trees
+     * @throws HSQLParseException Throws exception if SQL parse error is
+     * encountered.
+     */
+    public VoltXMLDiff runDDLCommandAndDiff(String ddl) throws HSQLParseException {
+        runDDLCommand(ddl);
+        VoltXMLElement thisSchema = getXMLFromCatalog();
+        VoltXMLDiff diff = VoltXMLElement.computeDiff(lastSchema, thisSchema);
+        lastSchema = thisSchema.duplicate();
+        return diff;
     }
 
     /**
@@ -350,8 +373,8 @@ public class HSQLInterface {
      * @throws HSQLParseException
      */
     public VoltXMLElement getXMLFromCatalog() throws HSQLParseException {
-        VoltXMLElement xml = new VoltXMLElement("databaseschema");
-
+        VoltXMLElement xml = new VoltXMLElement(XML_SCHEMA_NAME);
+        xml.attributes.put("name", XML_SCHEMA_NAME);
         String schemaName = null;
         try {
             schemaName = sessionProxy.getSchemaName(null);
