@@ -673,6 +673,10 @@ public abstract class CatalogUtil {
      */
     private static boolean validateDeployment(Catalog catalog, DeploymentType deployment) {
         if (deployment.getUsers() == null) {
+            if (deployment.getSecurity() != null && deployment.getSecurity().isEnabled()) {
+                hostLog.error("Cannot enable security without defining users in the deployment file.");
+                return false;
+            }
             return true;
         }
 
@@ -775,13 +779,13 @@ public abstract class CatalogUtil {
 
             // copy schema modification behavior from xml to catalog
             if (cluster.getSchema() != null) {
-                catCluster.setUseadhocschema(cluster.getSchema() == SchemaType.ADHOC);
+                catCluster.setUseddlschema(cluster.getSchema() == SchemaType.DDL);
             }
             else {
                 // Don't think we can get here, deployment schema guarantees a default value
                 hostLog.warn("Schema modification setting not found. " +
                         "Forcing default behavior of UpdateCatalog to modify database schema.");
-                catCluster.setUseadhocschema(false);
+                catCluster.setUseddlschema(false);
             }
         }
     }
@@ -792,31 +796,39 @@ public abstract class CatalogUtil {
         // Create catalog Systemsettings
         Systemsettings syssettings =
             catDeployment.getSystemsettings().add("systemsettings");
-        int maxtemptablesize = 100;
-        int snapshotpriority = 6;
-        int elasticPauseTime = 50;
+        int temptableMaxSize = 100;
+        int snapshotPriority = 6;
+        int elasticDuration = 50;
         int elasticThroughput = 2;
+        int queryTimeout = 0;
         if (deployment.getSystemsettings() != null)
         {
             Temptables temptables = deployment.getSystemsettings().getTemptables();
             if (temptables != null)
             {
-                maxtemptablesize = temptables.getMaxsize();
+                temptableMaxSize = temptables.getMaxsize();
             }
             SystemSettingsType.Snapshot snapshot = deployment.getSystemsettings().getSnapshot();
             if (snapshot != null) {
-                snapshotpriority = snapshot.getPriority();
+                snapshotPriority = snapshot.getPriority();
             }
             SystemSettingsType.Elastic elastic = deployment.getSystemsettings().getElastic();
             if (elastic != null) {
-                elasticPauseTime = deployment.getSystemsettings().getElastic().getDuration();
-                elasticThroughput = deployment.getSystemsettings().getElastic().getThroughput();
+                elasticDuration = elastic.getDuration();
+                elasticThroughput = elastic.getThroughput();
+            }
+
+            SystemSettingsType.Query timeout = deployment.getSystemsettings().getQuery();
+            if (timeout != null)
+            {
+                queryTimeout = timeout.getTimeout();
             }
         }
-        syssettings.setMaxtemptablesize(maxtemptablesize);
-        syssettings.setSnapshotpriority(snapshotpriority);
-        syssettings.setElasticpausetime(elasticPauseTime);
+        syssettings.setTemptablemaxsize(temptableMaxSize);
+        syssettings.setSnapshotpriority(snapshotPriority);
+        syssettings.setElasticduration(elasticDuration);
         syssettings.setElasticthroughput(elasticThroughput);
+        syssettings.setQuerytimeout(queryTimeout);
     }
 
     private static void validateDirectory(String type, File path, boolean crashOnFailedValidation) {

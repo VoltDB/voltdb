@@ -18,10 +18,8 @@
 package org.voltdb.utils;
 
 import java.io.BufferedInputStream;
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.URL;
 import java.util.HashMap;
@@ -44,7 +42,6 @@ import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.HTTPClientInterface;
 import org.voltdb.VoltDB;
-import org.voltdb.catalog.Cluster;
 import org.voltdb.compilereport.ReportMaker;
 
 import com.google_voltpatches.common.base.Charsets;
@@ -56,88 +53,107 @@ public class HTTPAdminListener {
     HTTPClientInterface httpClientInterface = new HTTPClientInterface();
     final boolean m_jsonEnabled;
     Map<String, String> m_htmlTemplates = new HashMap<String, String>();
+    final boolean m_mustListen;
 
-    class StudioHander extends AbstractHandler {
+    class DBMonitorHandler extends AbstractHandler {
 
         @Override
         public void handle(String target, Request baseRequest,
-                HttpServletRequest request, HttpServletResponse response)
-                throws IOException, ServletException {
+                           HttpServletRequest request, HttpServletResponse response)
+                            throws IOException, ServletException {
+            VoltLogger logger = new VoltLogger("HOST");
+            try{
 
-            // redirect the base dir
-            if (target.equals("/")) target = "/index.htm";
-
-            // check if a file exists
-            URL url = VoltDB.class.getResource("studio" + target);
-            if (url == null) {
-                // write 404
-                String msg = "404: Resource not found.\n";
-                response.setContentType("text/plain;charset=utf-8");
-                response.setStatus(HttpServletResponse.SC_NOT_FOUND);
-                baseRequest.setHandled(true);
-                response.getWriter().print(msg);
-            }
-
-            // read the template
-            InputStream is = VoltDB.class.getResourceAsStream("studio" + target);
-
-            if (target.endsWith("/index.htm")) {
-                // load the file as text
-                BufferedReader r = new BufferedReader(new InputStreamReader(is));
-                StringBuilder sb = new StringBuilder();
-                String line = null;
-                while ((line = r.readLine()) != null) {
-                    sb.append(line + "\n");
+                // if this is an internal jetty retry, then just tell
+                // jetty we're still working on it. There is a risk of
+                // masking other errors in doing this, but it's probably
+                // low compared with the default policy of retrys.
+                AsyncContinuation cont = baseRequest.getAsyncContinuation();
+                // this is set to false on internal jetty retrys
+                if (!cont.isInitial()) {
+                    // The continuation object has been woken up by the
+                    // retry. Tell it to go back to sleep.
+                    cont.suspend();
+                    return;
                 }
-                r.close(); is.close();
-                String template = sb.toString();
 
-                // fill in missing values in the template
-                Cluster cluster = VoltDB.instance().getCatalogContext().cluster;
-                template = template.replace("${hostname}", "localhost");
-                template = template.replace("${portnumber}", String.valueOf(cluster.getHttpdportno()));
-                template = template.replace("${requires-authentication}", cluster.getSecurityenabled() ? "true" : "false");
-
-                // set the headers
-                response.setContentType("text/html;charset=utf-8");
-                response.setStatus(HttpServletResponse.SC_OK);
-                baseRequest.setHandled(true);
-
-                // write the response
-                assert(template != null);
-                response.getWriter().print(template);
-            }
-            else {
-                // set the mime type in a giant hack
-                String mime = "text/html;charset=utf-8";
-                if (target.endsWith(".js"))
-                    mime = "application/x-javascript;charset=utf-8";
-                if (target.endsWith(".css"))
-                    mime = "text/css;charset=utf-8";
-                if (target.endsWith(".gif"))
-                    mime = "image/gif";
-                if (target.endsWith(".png"))
-                    mime = "image/png";
-                if ((target.endsWith(".jpg")) || (target.endsWith(".jpeg")))
-                    mime = "image/jpeg";
-
-                // set the headers
-                response.setContentType(mime);
-                response.setStatus(HttpServletResponse.SC_OK);
-                baseRequest.setHandled(true);
-
-                // write the file out
-                BufferedInputStream bis = new BufferedInputStream(is);
-                OutputStream os = response.getOutputStream();
-                int c = -1;
-                while ((c = bis.read()) != -1) {
-                    os.write(c);
+                //Special handling for API as they continue and setHandled differently
+                if (baseRequest.getRequestURI().contains("/api/1.0/")) {
+                    baseRequest.setHandled(false);
+                    return;
                 }
+                //Send old /studio back to "/"
+                if (baseRequest.getRequestURI().contains("/studio")) {
+                    response.sendRedirect("/");
+                    baseRequest.setHandled(true);
+                    return;
+                }
+                // redirect the base dir
+                if (target.equals("/")) target = "/index.htm";
+                // check if a file exists
+                URL url = VoltDB.class.getResource("dbmonitor" + target);
+                if (url == null) {
+                    // write 404
+                    String msg = "404: Resource not found.\n"+url.toString();
+                    response.setContentType("text/plain;charset=utf-8");
+                    response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                    baseRequest.setHandled(true);
+                    response.getWriter().print(msg);
+                    return;
+                }
+
+                // read the template
+                InputStream is = VoltDB.class.getResourceAsStream("dbmonitor" + target);
+
+                if (target.endsWith("/index.htm")) {
+
+                    // set the headers
+                    response.setContentType("text/html;charset=utf-8");
+                    response.setStatus(HttpServletResponse.SC_OK);
+                    baseRequest.setHandled(true);
+
+                    OutputStream os = response.getOutputStream();
+                    BufferedInputStream bis = new BufferedInputStream(is);
+
+                    int c = -1;
+                    while ((c = bis.read()) != -1) {
+                        os.write(c);
+                    }
+                }
+                else {
+                    // set the mime type in a giant hack
+                    String mime = "text/html;charset=utf-8";
+                    if (target.endsWith(".js"))
+                        mime = "application/x-javascript;charset=utf-8";
+                    if (target.endsWith(".css"))
+                        mime = "text/css;charset=utf-8";
+                    if (target.endsWith(".gif"))
+                        mime = "image/gif";
+                    if (target.endsWith(".png"))
+                        mime = "image/png";
+                    if ((target.endsWith(".jpg")) || (target.endsWith(".jpeg")))
+                        mime = "image/jpeg";
+
+                    // set the headers
+                    response.setContentType(mime);
+                    response.setStatus(HttpServletResponse.SC_OK);
+                    baseRequest.setHandled(true);
+
+                    // write the file out
+                    BufferedInputStream bis = new BufferedInputStream(is);
+                    OutputStream os = response.getOutputStream();
+                    int c = -1;
+                    while ((c = bis.read()) != -1) {
+                        os.write(c);
+                    }
+                }
+            }catch(Exception ex){
+                logger.error("Error servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage());
             }
         }
     }
 
-    class RequestHandler extends AbstractHandler {
+    class CatalogRequestHandler extends AbstractHandler {
 
         @Override
         public void handle(String target,
@@ -146,21 +162,38 @@ public class HTTPAdminListener {
                            HttpServletResponse response)
                            throws IOException, ServletException {
 
-            // if this is an internal jetty retry, then just tell
-            // jetty we're still working on it. There is a risk of
-            // masking other errors in doing this, but it's probably
-            // low compared with the default policy of retrys.
-            AsyncContinuation cont = baseRequest.getAsyncContinuation();
-            // this is set to false on internal jetty retrys
-            if (!cont.isInitial()) {
-                // The continuation object has been woken up by the
-                // retry. Tell it to go back to sleep.
-                cont.suspend();
-                return;
-            }
+            handleReportPage(baseRequest, response);
+        }
 
-            // kick over to the HTTP/JSON interface
-            if (baseRequest.getRequestURI().contains("/api/1.0/")) {
+    }
+
+    class DDLRequestHandler extends AbstractHandler {
+
+        @Override
+        public void handle(String target,
+                           Request baseRequest,
+                           HttpServletRequest request,
+                           HttpServletResponse response)
+                           throws IOException, ServletException {
+
+            byte[] reportbytes = VoltDB.instance().getCatalogContext().getFileInJar("autogen-ddl.sql");
+            String ddl = new String(reportbytes, Charsets.UTF_8);
+            response.setContentType("text/plain;charset=utf-8");
+            response.setStatus(HttpServletResponse.SC_OK);
+            baseRequest.setHandled(true);
+            response.getWriter().print(ddl);
+        }
+
+    }
+
+    class APIRequestHandler extends AbstractHandler {
+
+        @Override
+        public void handle(String target, Request baseRequest,
+                           HttpServletRequest request, HttpServletResponse response)
+                            throws IOException, ServletException {
+            VoltLogger logger = new VoltLogger("HOST");
+            try {
                 // http://www.ietf.org/rfc/rfc4627.txt dictates this mime type
                 response.setContentType("application/json;charset=utf-8");
                 if (m_jsonEnabled) {
@@ -171,43 +204,16 @@ public class HTTPAdminListener {
                     response.setStatus(HttpServletResponse.SC_OK);
                     baseRequest.setHandled(true);
                     response.getWriter().print(msg);*/
-                }
-                else {
+                } else {
                     response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                     baseRequest.setHandled(true);
                     response.getWriter().println("JSON API IS CURRENTLY DISABLED");
                 }
-                return;
-            }
 
-            // handle the CSV request for memory stats
-            if (baseRequest.getRequestURI().contains("/memorycsv/")) {
-                String msg = SystemStatsCollector.getCSV();
-                response.setContentType("text/plain;charset=utf-8");
-                response.setStatus(HttpServletResponse.SC_OK);
-                baseRequest.setHandled(true);
-                response.getWriter().print(msg);
-                return;
+            } catch(Exception ex){
+                logger.error("Error servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage());
             }
-
-            if (baseRequest.getRequestURI().contains("/memory/")) {
-                handleMemoryPage(baseRequest, response);
-                return;
-            }
-
-            if (baseRequest.getRequestURI().contains("/ddl/")) {
-                byte[] reportbytes = VoltDB.instance().getCatalogContext().getFileInJar("autogen-ddl.sql");
-                String ddl = new String(reportbytes, Charsets.UTF_8);
-                response.setContentType("text/plain;charset=utf-8");
-                response.setStatus(HttpServletResponse.SC_OK);
-                baseRequest.setHandled(true);
-                response.getWriter().print(ddl);
-                return;
-            }
-
-            handleReportPage(baseRequest, response);
         }
-
     }
 
     /**
@@ -225,47 +231,6 @@ public class HTTPAdminListener {
         } catch (IOException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
-        }
-    }
-
-    /**
-     * Draw the memory page.
-     */
-    void handleMemoryPage(Request baseRequest, HttpServletResponse response) {
-        try {
-            // get memory usage
-            SystemStatsCollector.Datum d = SystemStatsCollector.getRecentSample();
-            double totalmemory = SystemStatsCollector.memorysize;
-            double used = d.rss / (double) (SystemStatsCollector.memorysize * 1024 * 1024);
-            double javaclaimed = d.javatotalheapmem + d.javatotalsysmem;
-            double javaused = d.javausedheapmem + d.javausedsysmem;
-            double javaunused = SystemStatsCollector.javamaxheapmem - d.javatotalheapmem;
-            double risk = (d.rss + javaunused) / (SystemStatsCollector.memorysize * 1024 * 1024);
-
-            Map<String,String> params = new HashMap<String,String>();
-
-            params.put("2mincharturl", SystemStatsCollector.getGoogleChartURL(2, 640, 240, "-2min"));
-            params.put("30mincharturl", SystemStatsCollector.getGoogleChartURL(30, 640, 240, "-30min"));
-            params.put("24hrcharturl", SystemStatsCollector.getGoogleChartURL(1440, 640, 240, "-24hrs"));
-
-            params.put("totalmemory", String.format("%.1f", totalmemory));
-            params.put("used", String.format("%.1f", used * 100.0));
-            params.put("risk", String.format("%.1f", risk * 100.0));
-            params.put("rss", String.format("%.1f", d.rss / 1024.0 / 1024.0));
-            params.put("usedjava", String.format("%.1f", javaused / 1024.0 / 1024.0));
-            params.put("claimedjava", String.format("%.1f", javaclaimed / 1024.0 / 1024.0));
-            params.put("javamaxheap", String.format("%.1f", SystemStatsCollector.javamaxheapmem / 1024.0 / 1024.0));
-
-            String msg = getHTMLForAdminPage(params);
-
-            response.setContentType("text/html;charset=utf-8");
-            response.setStatus(HttpServletResponse.SC_OK);
-            baseRequest.setHandled(true);
-            response.getWriter().print(msg);
-        }
-        catch (IOException e) {
-            e.printStackTrace();
-            throw new RuntimeException(e);
         }
     }
 
@@ -298,7 +263,8 @@ public class HTTPAdminListener {
         m_htmlTemplates.put(name, contents);
     }
 
-    public HTTPAdminListener(boolean jsonEnabled, String intf, int port) throws Exception {
+    public HTTPAdminListener(boolean jsonEnabled, String intf, int port, boolean mustListen) throws Exception {
+        m_mustListen = mustListen;
         // PRE-LOAD ALL HTML TEMPLATES (one for now)
         try {
             loadTemplate(HTTPAdminListener.class, "admintemplate.html");
@@ -309,30 +275,45 @@ public class HTTPAdminListener {
             throw e;
         }
 
-        // NOW START JETTY SERVER
+        // NOW START SocketConnector and create Jetty server but dont start.
+        SocketConnector connector = null;
         try {
             // The socket channel connector seems to be faster for our use
             //SelectChannelConnector connector = new SelectChannelConnector();
-            SocketConnector connector = new SocketConnector();
+            connector = new SocketConnector();
 
             if (intf != null && intf.length() > 0) {
                 connector.setHost(intf);
             }
-
             connector.setPort(port);
+            connector.statsReset();
             connector.setName("VoltDB-HTTPD");
+            //open the connector here so we know if port is available and Init work can retry with next port.
+            connector.open();
             m_server.addConnector(connector);
 
-            ContextHandler studioHander = new ContextHandler("/studio");
-            studioHander.setHandler(new StudioHander());
+            //"/"
+            ContextHandler dbMonitorHandler = new ContextHandler("/");
+            dbMonitorHandler.setHandler(new DBMonitorHandler());
 
-            ContextHandler baseHander = new ContextHandler("/");
-            baseHander.setHandler(new RequestHandler());
+            ///api/1.0/
+            ContextHandler apiRequestHandler = new ContextHandler("/api/1.0");
+            apiRequestHandler.setHandler(new APIRequestHandler());
+
+            ///catalog
+            ContextHandler catalogRequestHandler = new ContextHandler("/catalog");
+            catalogRequestHandler.setHandler(new CatalogRequestHandler());
+
+            ///catalog
+            ContextHandler ddlRequestHandler = new ContextHandler("/ddl");
+            ddlRequestHandler.setHandler(new DDLRequestHandler());
 
             ContextHandlerCollection handlers = new ContextHandlerCollection();
             handlers.setHandlers(new Handler[] {
-                    studioHander,
-                    baseHander
+                    apiRequestHandler,
+                    catalogRequestHandler,
+                    ddlRequestHandler,
+                    dbMonitorHandler
             });
 
             m_server.setHandler(handlers);
@@ -345,14 +326,26 @@ public class HTTPAdminListener {
             qtp.setMinThreads(1);
             m_server.setThreadPool(qtp);
 
-            m_server.start();
             m_jsonEnabled = jsonEnabled;
+        } catch (Exception e) {
+            // double try to make sure the port doesn't get eaten
+            try { connector.close(); } catch (Exception e2) {}
+            try { m_server.destroy(); } catch (Exception e2) {}
+            throw new Exception(e);
         }
-        catch (Exception e) {
+    }
+
+    public void start() throws Exception {
+        try {
+            m_server.start();
+        } catch (Exception e) {
             // double try to make sure the port doesn't get eaten
             try { m_server.stop(); } catch (Exception e2) {}
             try { m_server.destroy(); } catch (Exception e2) {}
-            throw new Exception(e);
+            //We only throw exception to halt and we expect to mustListen;
+            if (m_mustListen) {
+                throw new Exception(e);
+            }
         }
     }
 

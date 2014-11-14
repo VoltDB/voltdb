@@ -127,10 +127,10 @@ class SumAgg : public Agg
         }
     }
 
-    virtual NValue finalize()
+    virtual NValue finalize(ValueType type)
     {
         ifDistinct.clear();
-        return m_value;
+        return Agg::finalize(type);
     }
 
 private:
@@ -159,15 +159,15 @@ public:
         ++m_count;
     }
 
-    virtual NValue finalize()
+    virtual NValue finalize(ValueType type)
     {
         if (m_count == 0)
         {
-            return ValueFactory::getNullValue();
+            return ValueFactory::getNullValue().castAs(type);;
         }
         ifDistinct.clear();
-        const NValue finalizeResult = m_value.op_divide(ValueFactory::getBigIntValue(m_count));
-        return finalizeResult;
+
+        return m_value.op_divide(ValueFactory::getBigIntValue(m_count)).castAs(type);
     }
 
     virtual void resetAgg()
@@ -197,10 +197,10 @@ public:
         m_count++;
     }
 
-    virtual NValue finalize()
+    virtual NValue finalize(ValueType type)
     {
         ifDistinct.clear();
-        return ValueFactory::getBigIntValue(m_count);
+        return ValueFactory::getBigIntValue(m_count).castAs(type);
     }
 
     virtual void resetAgg()
@@ -224,9 +224,9 @@ public:
         ++m_count;
     }
 
-    virtual NValue finalize()
+    virtual NValue finalize(ValueType type)
     {
-        return ValueFactory::getBigIntValue(m_count);
+        return ValueFactory::getBigIntValue(m_count).castAs(type);
     }
 
     virtual void resetAgg()
@@ -267,6 +267,7 @@ public:
                 // avoid this, un-inline the incoming NValue to its
                 // own storage.
                 m_value.allocateObjectFromInlinedValue(m_memoryPool);
+                m_inlineCopiedToOutline = true;
             }
             m_haveAdvanced = true;
         }
@@ -277,6 +278,15 @@ public:
                 m_value.allocateObjectFromInlinedValue(m_memoryPool);
             }
         }
+    }
+
+    virtual NValue finalize(ValueType type)
+    {
+        m_value.castAs(type);
+        if (m_inlineCopiedToOutline) {
+            m_value.allocateObjectFromOutlinedValue();
+        }
+        return m_value;
     }
 
 private:
@@ -304,6 +314,7 @@ public:
                 // see comment in MaxAgg above, regarding why we're
                 // doing this.
                 m_value.allocateObjectFromInlinedValue(m_memoryPool);
+                m_inlineCopiedToOutline = true;
             }
             m_haveAdvanced = true;
         }
@@ -314,6 +325,15 @@ public:
                 m_value.allocateObjectFromInlinedValue(m_memoryPool);
             }
         }
+    }
+
+    virtual NValue finalize(ValueType type)
+    {
+        m_value.castAs(type);
+        if (m_inlineCopiedToOutline) {
+            m_value.allocateObjectFromOutlinedValue();
+        }
+        return m_value;
     }
 
 private:
@@ -481,7 +501,8 @@ inline bool AggregateExecutorBase::insertOutputTuple(AggregateRow* aggregateRow)
     Agg** aggs = aggregateRow->m_aggregates;
     for (int ii = 0; ii < m_aggregateOutputColumns.size(); ii++) {
         const int columnIndex = m_aggregateOutputColumns[ii];
-        tempTuple.setNValue(columnIndex, aggs[ii]->finalize().castAs(tempTuple.getSchema()->columnType(columnIndex)));
+        NValue result = aggs[ii]->finalize(tempTuple.getSchema()->columnType(columnIndex));
+        tempTuple.setNValue(columnIndex, result);
     }
 
     VOLT_TRACE("Setting passthrough columns");
@@ -567,10 +588,14 @@ TableTuple AggregateExecutorBase::p_execute_init(const NValueArray& params,
     if (newTempTable != NULL) {
         m_tmpOutputTable = newTempTable;
     }
+    m_memoryPool.purge();
     executeAggBase(params);
     m_pmp = pmp;
 
     m_nextGroupByKeyStorage.init(m_groupByKeySchema, &m_memoryPool);
+    TableTuple& nextGroupByKeyTuple = m_nextGroupByKeyStorage;
+    nextGroupByKeyTuple.move(NULL);
+
     m_inputSchema = schema;
 
     m_inProgressGroupByKeyTuple.setSchema(m_groupByKeySchema);
@@ -598,6 +623,8 @@ TableTuple AggregateHashExecutor::p_execute_init(const NValueArray& params,
         ProgressMonitorProxy* pmp, const TupleSchema * schema, TempTable* newTempTable)
 {
     VOLT_TRACE("hash aggregate executor init..");
+    m_hash.clear();
+
     return AggregateExecutorBase::p_execute_init(params, pmp, schema, newTempTable);
 }
 
@@ -814,6 +841,10 @@ TableTuple AggregatePartialExecutor::p_execute_init(const NValueArray& params,
 
     m_atTheFirstRow = true;
     m_nextPartialGroupByKeyStorage.init(m_groupByKeyPartialHashSchema, &m_memoryPool);
+    TableTuple& nextPartialGroupByKeyTuple = m_nextGroupByKeyStorage;
+    nextPartialGroupByKeyTuple.move(NULL);
+
+    m_hash.clear();
 
     // for next input tuple
     return nextInputTuple;

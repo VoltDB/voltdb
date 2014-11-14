@@ -65,21 +65,21 @@ public class VoltDDLElementTracker {
      *
      * @param tableName table name
      * @param colName column name
-     * @throws VoltCompilerException
      */
-    void put(String tableName, String colName) throws VoltCompilerException
+    void addPartition(String tableName, String colName)
     {
-        // where is table and column validity checked?
-        if (tableName.length() == 0) {
-            throw m_compiler.new VoltCompilerException("PARTITION or REPLICATE has no TABLE specified");
-        }
-
         if (m_partitionMap.containsKey(tableName.toLowerCase())) {
-            throw m_compiler.new VoltCompilerException(String.format(
-                    "Partitioning already specified for table \"%s\"", tableName));
+            m_compiler.addInfo(String.format("Replacing partition column %s on table %s with column %s\n",
+                        m_partitionMap.get(tableName.toLowerCase()), tableName,
+                        colName));
         }
 
-        m_partitionMap.put(tableName.toLowerCase(), colName);
+        m_partitionMap.put(tableName.toLowerCase(), colName.toLowerCase());
+    }
+
+    void removePartition(String tableName)
+    {
+        m_partitionMap.remove(tableName);
     }
 
     /**
@@ -218,6 +218,11 @@ public class VoltDDLElementTracker {
             m_exportsByGroup.put(groupName, tableGroup);
         }
         tableGroup.add(tableName);
+    }
+
+    void removeExportedTable(String tableName)
+    {
+        m_exportsByGroup.remove(tableName);
     }
 
     /**

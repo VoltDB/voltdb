@@ -42,6 +42,7 @@ public enum LogKeys {
     host_Backend_ErrorOnShutdown,
     host_ClientInterface_checkForAdhocSQL_SerializationException,
     host_VoltDB_ErrorStartAcceptingConnections,
+    host_VoltDB_ErrorStartHTTPListener,
     host_VoltDB_ServerCompletedInitialization,
     host_VoltDB_StartingNetwork,
     host_VoltDB_InternalProfilingDisabledOnMultipartitionHosts,
@@ -60,7 +61,7 @@ public enum LogKeys {
     //AUTH
     auth_ClientInterface_ProcedureNotFound,
     auth_ClientInterface_LackingPermissionForProcedure,
-    auth_ClientInterface_LackingPermissionForAdhoc,
+    auth_ClientInterface_LackingPermissionForSql,
     auth_ClientInterface_LackingPermissionForSysproc,
     auth_ClientInterface_LackingPermissionForDefaultproc,
     auth_AuthSystem_NoSuchAlgorithm,

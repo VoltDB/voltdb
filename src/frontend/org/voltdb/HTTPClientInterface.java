@@ -104,7 +104,7 @@ public class HTTPClientInterface {
 
         Continuation continuation = ContinuationSupport.getContinuation(request);
         continuation.suspend(response);
-
+        String jsonp = null;
         try {
             // first check for a catalog update and purge the cached connections
             // if one has happened since we were here last
@@ -136,6 +136,7 @@ public class HTTPClientInterface {
                 m_connections = new AuthenticatedConnectionCache(10, clientInterface, port, adminInterface, adminPort);
             }
 
+            jsonp = request.getParameter("jsonp");
             if (request.getMethod().equalsIgnoreCase("POST")) {
                 int queryParamSize = request.getContentLength();
                 if (queryParamSize > 150000) {
@@ -152,7 +153,6 @@ public class HTTPClientInterface {
             String hashedPassword = request.getParameter("Hashedpassword");
             String procName = request.getParameter("Procedure");
             String params = request.getParameter("Parameters");
-            String jsonp = request.getParameter("jsonp");
             String admin = request.getParameter("admin");
 
             // check for admin mode
@@ -240,6 +240,9 @@ public class HTTPClientInterface {
             // Don't print a stack trace, and return a server unavailable reason.
             ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.SERVER_UNAVAILABLE, new VoltTable[0], c_ex.getMessage());
             String msg = rimpl.toJSONString();
+            if (jsonp != null) {
+                msg = String.format("%s( %s )", jsonp, msg);
+            }
             response.setStatus(HttpServletResponse.SC_OK);
             request.setHandled(true);
             try {
@@ -252,6 +255,9 @@ public class HTTPClientInterface {
             m_rate_limited_log.log("JSON interface exception: " + msg, EstTime.currentTimeMillis());
             ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg);
             msg = rimpl.toJSONString();
+            if (jsonp != null) {
+                msg = String.format("%s( %s )", jsonp, msg);
+            }
             response.setStatus(HttpServletResponse.SC_OK);
             request.setHandled(true);
             try {

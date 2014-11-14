@@ -23,10 +23,14 @@
 
 package aggregationbenchmark;
 
+import java.io.FileWriter;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.List;
 
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
@@ -49,12 +53,12 @@ public class AggregationBenchmark {
     final AggConfig config;
     // Reference to the database connection we will use
     final Client client;
-   
+
     AtomicInteger total = new AtomicInteger();
-    
+
     // Statistics manager objects from the client
     final ClientStatsContext fullStatsContext;
-    
+
     /**
      * Uses included {@link CLIConfig} class to
      * declaratively state command line options with defaults
@@ -66,10 +70,10 @@ public class AggregationBenchmark {
 
         @Option(desc = "Number of invocations.")
         int invocations = 6;
-        
+
         @Option(desc = "Restore the data from snapshot or not.")
         int restore = 0;
-        
+
         @Option(desc = "Snapshot path.")
         String snapshotpath = "";
 
@@ -130,7 +134,7 @@ public class AggregationBenchmark {
         while (true) {
             try {
                 client.createConnection(server);
-                
+
                 break;
             }
             catch (Exception e) {
@@ -169,7 +173,7 @@ public class AggregationBenchmark {
         // block until all have connected
         connections.await();
     }
-    
+
     void restoreDatabase() throws Exception {
         ClientResponse resp = null;
         try {
@@ -179,7 +183,7 @@ public class AggregationBenchmark {
             System.exit(-1);
         }
     }
-    
+
     /**
      * Core benchmark code.
      * Connect. Initialize. Run the loop. Cleanup. Print Results.
@@ -191,44 +195,72 @@ public class AggregationBenchmark {
         connect(config.servers);
 
         if (config.restore > 0) {
-        	System.out.println("\nLoading data from snapshot...");
-        	restoreDatabase();
+            System.out.println("\nLoading data from snapshot...");
+            restoreDatabase();
         }
-        
+
+        FileWriter fw = null;
+        if ((config.statsfile != null) && (config.statsfile.length() != 0)) {
+            fw = new FileWriter(config.statsfile);
+        }
+
         System.out.print(HORIZONTAL_RULE);
         System.out.println("\nRunning Benchmark");
         System.out.println(HORIZONTAL_RULE);
 
         // Benchmark start time
         long queryStartTS, queryElapse;
-        
+
         int counter = config.invocations;
         String procName = "Q" + config.proc;
+        List<Long> m = new ArrayList<Long>();
         for (int i = 1; i <= counter; i++) {
-        	System.out.println(String.format("Running procedure %s for the %d times", procName, i));
-        	
-        	queryStartTS = System.nanoTime();
-        	
-        	VoltTable vt = client.callProcedure(procName).getResults()[0];
-        	
-        	queryElapse =  System.nanoTime() - queryStartTS;
-        	
-        	System.out.printf("\n\n(Returned %d rows in %.3fs)\n",
-        			vt.getRowCount(), queryElapse / 1000000000.0);
+            System.out.println(String.format("Running procedure %s for the %d times", procName, i));
+
+            queryStartTS = System.nanoTime();
+
+            VoltTable vt = client.callProcedure(procName).getResults()[0];
+
+            queryElapse =  System.nanoTime() - queryStartTS;
+
+            if (vt.getRowCount() <= 0) {
+                System.err.println("ERROR Query %d empty result set");
+                System.exit(-1);
+            }
+
+            m.add(queryElapse);
+
+            System.out.printf("\n\n(Returned %d rows in %.3fs)\n",
+                    vt.getRowCount(), queryElapse / 1000000000.0);
         }
 
         // block until all outstanding txns return
         client.drain();
-        
+
+        Collections.sort(m);
+        if (m.size() > 4)
+            m = m.subList(1, m.size()-1);
+        double sum = 0.;
+        for (long d : m) { sum += d; }
+        double avg = sum / m.size() - 2;
+
         //retrieve stats
-    	ClientStats stats = fullStatsContext.fetch().getStats();
-    	// write stats to file
-    	client.writeSummaryCSV(stats, config.statsfile);
+        ClientStats stats = fullStatsContext.fetch().getStats();
+        // write stats to file
+        //client.writeSummaryCSV(stats, config.statsfile);
+
+        fw.append(String.format("%s,%d,-1,0,0,0,0,%f,0,0,0,0,0,0\n",
+                                "Q" + String.format("%02d", config.proc),
+                                stats.getStartTimestamp(),
+                                avg/1000.0));
 
         // close down the client connections
         client.close();
+
+        if (fw != null)
+            fw.close();
     }
-    
+
     /**
      * Main routine creates a benchmark instance and kicks off the run method.
      *

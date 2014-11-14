@@ -21,6 +21,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+package adhocddl;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;

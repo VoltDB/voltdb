@@ -31,7 +31,8 @@
                                 supports_live=True,
                                 default_host=False,
                                 safemode_available=False,
-                                supports_daemon=True),
+                                supports_daemon=True,
+                                supports_multiple_daemons=True),
     description = 'Rejoin the current node to a VoltDB cluster.'
 )
 def rejoin(runner):

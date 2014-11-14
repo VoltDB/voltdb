@@ -43,7 +43,6 @@ import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.TableCountPlanNode;
 import org.voltdb.plannodes.UnionPlanNode;
 import org.voltdb.plannodes.UpdatePlanNode;
-import org.voltdb.plannodes.UpsertPlanNode;
 
 /**
  *
@@ -72,7 +71,6 @@ public enum PlanNodeType {
     UPDATE          (30, UpdatePlanNode.class),
     INSERT          (31, InsertPlanNode.class),
     DELETE          (32, DeletePlanNode.class),
-    UPSERT          (33, UpsertPlanNode.class),
 
     //
     // Communication Nodes

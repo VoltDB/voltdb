@@ -160,7 +160,6 @@ inline TableIterator::TableIterator(Table *parent, TBMapI start)
     {
     }
 
-// FIXME: This constructor is called from Temptable constructor, but set m_tempTableIterator to be false
 inline TableIterator::TableIterator(Table *parent)
     : m_table(parent),
       m_dataPtr(NULL),
@@ -171,7 +170,7 @@ inline TableIterator::TableIterator(Table *parent)
       m_tupleLength(0),
       m_tuplesPerBlock(1),
       m_currentBlock(NULL),
-      m_tempTableIterator(false),
+      m_tempTableIterator(true),
       m_tempTableDeleteAsGo(false)
     {
     }

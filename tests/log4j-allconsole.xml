@@ -40,7 +40,7 @@
         <level value="INFO"/>
     </logger -->
 
-    <!-- logger name="ADHOCPLANNERTHREAD">
+    <!-- logger name="ADHOC">
         <level value="INFO"/>
     </logger -->
 

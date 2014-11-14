@@ -27,6 +27,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -77,6 +78,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
+import org.voltdb.common.Permission;
 import org.voltdb.compiler.projectfile.ClassdependenciesType.Classdependency;
 import org.voltdb.compiler.projectfile.DatabaseType;
 import org.voltdb.compiler.projectfile.ExportType;
@@ -843,7 +845,25 @@ public class VoltCompiler {
     private Database initCatalogDatabase() {
         // create the database in the catalog
         m_catalog.execute("add /clusters[cluster] databases database");
+        addDefaultRoles();
         return getCatalogDatabase();
+    }
+
+    /**
+     * Create default roles. These roles cannot be removed nor overridden in the DDL.
+     * Make sure to omit these roles in the generated DDL in {@link org.voltdb.utils.CatalogSchemaTools}
+     */
+    private void addDefaultRoles()
+    {
+        // admin
+        m_catalog.execute("add /clusters[cluster]/databases[database] groups ADMINISTRATOR");
+        Permission.setPermissionsInGroup(getCatalogDatabase().getGroups().get("ADMINISTRATOR"),
+                                         Permission.getPermissionsFromAliases(Arrays.asList("ADMIN")));
+
+        // user
+        m_catalog.execute("add /clusters[cluster]/databases[database] groups USER");
+        Permission.setPermissionsInGroup(getCatalogDatabase().getGroups().get("USER"),
+                                         Permission.getPermissionsFromAliases(Arrays.asList("SQL", "ALLPROC")));
     }
 
     public static enum DdlProceduresToLoad
@@ -918,9 +938,18 @@ public class VoltCompiler {
         if (database.getGroups() != null) {
             for (GroupsType.Group group : database.getGroups().getGroup()) {
                 org.voltdb.catalog.Group catGroup = db.getGroups().add(group.getName());
-                catGroup.setAdhoc(group.isAdhoc());
-                catGroup.setSysproc(group.isSysproc());
-                catGroup.setDefaultproc(group.isDefaultproc());
+                catGroup.setSql(group.isAdhoc());
+                catGroup.setSqlread(catGroup.getSql());
+                catGroup.setDefaultproc(group.isDefaultproc() || catGroup.getSql());
+                catGroup.setDefaultprocread(group.isDefaultprocread() || catGroup.getDefaultproc() || catGroup.getSqlread());
+
+                if (group.isSysproc()) {
+                    catGroup.setAdmin(true);
+                    catGroup.setSql(true);
+                    catGroup.setSqlread(true);
+                    catGroup.setDefaultproc(true);
+                    catGroup.setDefaultprocread(true);
+                }
             }
         }
 
@@ -928,9 +957,18 @@ public class VoltCompiler {
         if (database.getRoles() != null) {
             for (RolesType.Role role : database.getRoles().getRole()) {
                 org.voltdb.catalog.Group catGroup = db.getGroups().add(role.getName());
-                catGroup.setAdhoc(role.isAdhoc());
-                catGroup.setSysproc(role.isSysproc());
-                catGroup.setDefaultproc(role.isDefaultproc());
+                catGroup.setSql(role.isAdhoc());
+                catGroup.setSqlread(catGroup.getSql());
+                catGroup.setDefaultproc(role.isDefaultproc() || catGroup.getSql());
+                catGroup.setDefaultprocread(role.isDefaultprocread() || catGroup.getDefaultproc() || catGroup.getSqlread());
+
+                if (role.isSysproc()) {
+                    catGroup.setAdmin(true);
+                    catGroup.setSql(true);
+                    catGroup.setSqlread(true);
+                    catGroup.setDefaultproc(true);
+                    catGroup.setDefaultprocread(true);
+                }
             }
         }
 
@@ -951,7 +989,7 @@ public class VoltCompiler {
         // partitions/table
         if (database.getPartitions() != null) {
             for (PartitionsType.Partition table : database.getPartitions().getPartition()) {
-                voltDdlTracker.put(table.getTable(), table.getColumn());
+                voltDdlTracker.addPartition(table.getTable(), table.getColumn());
             }
         }
 

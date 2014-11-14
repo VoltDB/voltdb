@@ -20,6 +20,8 @@ package org.voltdb.utils;
 import org.voltdb.VoltType;
 import org.voltdb.client.NoConnectionsException;
 
+import java.util.concurrent.ExecutionException;
+
 /**
  * The interface CSVLoader uses to insert rows into the database.
  */
@@ -44,7 +46,7 @@ public interface CSVDataLoader {
      * @throws InterruptedException
      * @throws NoConnectionsException
      */
-    public void close() throws InterruptedException, NoConnectionsException;
+    public void close() throws Exception;
 
     /**
      * @return The number of rows processed, including successfully inserted and failed ones.
@@ -57,4 +59,9 @@ public interface CSVDataLoader {
     public long getFailedRows();
 
     public void setFlushInterval(int delay, int seconds);
+
+    /**
+     * Flush use this only when you think you are done and want to push everything before close/quit.
+     */
+    public void flush() throws ExecutionException, InterruptedException;
 }

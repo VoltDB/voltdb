@@ -73,6 +73,7 @@ import org.voltcore.network.Connection;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.Pair;
+import org.voltdb.AuthSystem;
 import org.voltdb.ClientInterface.ClientInputHandler;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -463,6 +464,7 @@ public class TestClientInterface {
         catalogResult.invocationType = ProcedureInvocationType.REPLICATED;
         catalogResult.originalTxnId = 12345678l;
         catalogResult.originalUniqueId = 87654321l;
+        catalogResult.user = new AuthSystem.AuthDisabledUser();
         m_ci.processFinishedCompilerWork(catalogResult).run();
 
         ArgumentCaptor<Long> destinationCaptor =

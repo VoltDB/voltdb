@@ -50,9 +50,10 @@ import org.voltdb.utils.MiscUtils;
 
 public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
 
-    String firstCanonicalDDL = null;
+    private String firstCanonicalDDL = null;
+    private boolean triedSqlcmdDryRun = false;
 
-    public String getFirstCanonicalDDL() throws Exception {
+    private String getFirstCanonicalDDL() throws Exception {
         String pathToCatalog = Configuration.getPathToCatalogForTest("fullDDL.jar");
 
         VoltCompiler compiler = new VoltCompiler();
@@ -63,14 +64,14 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
         return compiler.getCanonicalDDL();
     }
 
-    public void secondCanonicalDDLFromAdhoc() throws Exception {
+    private void secondCanonicalDDLFromAdhoc() throws Exception {
         String pathToCatalog = Configuration.getPathToCatalogForTest("emptyDDL.jar");
         String pathToDeployment = Configuration.getPathToCatalogForTest("emptyDDL.xml");
 
         VoltCompiler compiler = new VoltCompiler();
         VoltProjectBuilder builder = new VoltProjectBuilder();
 
-        builder.setUseAdhocSchema(true);
+        builder.setUseDDLSchema(true);
         boolean success = builder.compile(pathToCatalog);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
@@ -88,13 +89,13 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
         teardownSystem();
     }
 
-    public void secondCanonicalDDLFromSQLcmd() throws Exception {
+    private void secondCanonicalDDLFromSQLcmd() throws Exception {
         String pathToCatalog = Configuration.getPathToCatalogForTest("emptyDDL.jar");
         String pathToDeployment = Configuration.getPathToCatalogForTest("emptyDDL.xml");
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
 
-        builder.setUseAdhocSchema(true);
+        builder.setUseDDLSchema(true);
         PortGenerator pg = new PortGenerator();
         int httpdPort = pg.next();
         builder.setHTTPDPort(httpdPort);
@@ -111,19 +112,29 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
         String roundtripDDL;
 
         assert(firstCanonicalDDL != null);
-        assertTrue(callSQLcmd(firstCanonicalDDL));
+
+        if ( ! triedSqlcmdDryRun) {
+            assertEquals("sqlcmd dry run failed -- maybe some sqlcmd component (the voltdb jar file?) needs to be rebuilt.",
+                    0, callSQLcmd("\n"));
+            triedSqlcmdDryRun = true;
+        }
+
+        assertEquals("sqlcmd failed on input:\n" + firstCanonicalDDL, 0, callSQLcmd(firstCanonicalDDL));
         roundtripDDL = getDDLFromHTTP(httpdPort);
         // IZZY: we force single statement SQL keywords to lower case, it seems
         assertTrue(firstCanonicalDDL.equalsIgnoreCase(roundtripDDL));
 
-        assertTrue(callSQLcmd("CREATE TABLE NONSENSE (id INTEGER);\n"));
+        assertEquals("sqlcmd failed on last call", 0, callSQLcmd("CREATE TABLE NONSENSE (id INTEGER);\n"));
         roundtripDDL = getDDLFromHTTP(httpdPort);
         assertFalse(firstCanonicalDDL.equals(roundtripDDL));
 
         teardownSystem();
     }
 
-    public boolean callSQLcmd(String ddl) throws Exception {
+    private int callSQLcmd(String ddl) throws Exception {
+        final String commandPath = "bin/sqlcmd";
+        final long timeout = 60000; // 60,000 millis -- give up after 1 minute of trying.
+
         File f = new File("ddl.sql");
         f.deleteOnExit();
         FileOutputStream fos = new FileOutputStream(f);
@@ -134,7 +145,7 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
 
         File error = new File("error.log");
 
-        ProcessBuilder pb = new ProcessBuilder("bin/sqlcmd");
+        ProcessBuilder pb = new ProcessBuilder(commandPath);
         pb.redirectInput(f);
         pb.redirectOutput(out);
         pb.redirectError(error);
@@ -142,26 +153,33 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
 
         // Set timeout to 1 minute
         long starttime = System.currentTimeMillis();
-        long endtime = starttime + 60000;
-
-        int exitValue = -1;
-        while(System.currentTimeMillis() < endtime) {
+        long elapsedtime = 0;
+        long pollcount = 0;
+        do {
             Thread.sleep(1000);
-            try{
-                exitValue = process.exitValue();
-                if(exitValue == 0) {
-                    break;
+            try {
+                int exitValue = process.exitValue();
+                // Only verbosely report the successful exit after verbosely reporting a delay.
+                // Frequent false alarms might lead to raising the sleep time.
+                if (pollcount > 0) {
+                    elapsedtime = System.currentTimeMillis() - starttime;
+                    System.err.println("External process (" + commandPath + ") exited after being polled " +
+                            pollcount + " times over " + elapsedtime + "ms");
                 }
+                return exitValue;
             }
             catch (Exception e) {
-                System.out.println("Process hasn't exited");
+                elapsedtime = System.currentTimeMillis() - starttime;
+                ++pollcount;
+                System.err.println("External process (" + commandPath + ") has not yet exited after " + elapsedtime + "ms");
             }
-        }
+        } while (elapsedtime < timeout);
 
-        return (exitValue == 0);
+        fail("External process (" + commandPath + ") timed out after " + elapsedtime + "ms on input:\n" + ddl);
+        return 0;
     }
 
-    public String getDDLFromHTTP(int httpdPort) throws Exception {
+    private String getDDLFromHTTP(int httpdPort) throws Exception {
         URL ddlURL = new URL(String.format("http://localhost:%d/ddl/", httpdPort));
 
         HttpURLConnection conn = (HttpURLConnection) ddlURL.openConnection();
@@ -171,15 +189,15 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
 
         BufferedReader in = null;
         try {
-            if(conn.getInputStream() != null){
+            if (conn.getInputStream() != null) {
                 in = new BufferedReader(
                         new InputStreamReader(
                         conn.getInputStream(), "UTF-8"));
             }
-        } catch(IOException e){
+        } catch (IOException e) {
             e.printStackTrace();
         }
-        if(in == null) {
+        if (in == null) {
             throw new Exception("Unable to read response from server");
         }
 

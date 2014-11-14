@@ -71,3 +71,7 @@ run.sh catalog       : build the catalog
 
 run.sh clean         : remove compiled files
 
+run.sh empty-server  : compiles procedures and packages them in voter-procs.jar. Starts the server with empty database.
+                       After this is done run sqlcmd and at prompt type file loadschema.sql; This will load necessary 
+                       tables/view/procedures (from voter-procs.jar). You can then run the client.
+

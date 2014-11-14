@@ -183,6 +183,25 @@ public class StatementPartitioning implements Cloneable{
     }
 
     /**
+     * Returns true if the expression can be used to restrict plan execution to a single partition.
+     * For now this is anything other than a constant or parameter.  (In the future, one could
+     * imagine evaluating expressions like sqrt(8 * 8) and the like during planning)
+     *
+     * @param expr  The expression to consider
+     * @return      true or false
+     */
+    private static boolean isUsefulPartitioningExpression(AbstractExpression expr) {
+        if (expr instanceof ParameterValueExpression) {
+            return true;
+        }
+        if (expr instanceof ConstantValueExpression) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * @param string table.column name of a(nother) equality-filtered partitioning column
      * @param constExpr -- a constant/parameter-based expression that equality-filters the partitioning column
      */
@@ -200,6 +219,13 @@ public class StatementPartitioning implements Cloneable{
         }
     }
 
+    /**
+     * For a multi-partition statement that can definitely be run SP, this is a constant partitioning key value
+     * inferred from the analysis (suitable for hashinating).
+     * If null, SP may not be safe, or the partitioning may be based on something less obvious like a parameter or constant expression.
+     *
+     * @return  an instance of String or an instance of container class Long
+     */
     public Object getInferredPartitioningValue() {
         return m_inferredValue;
     }
@@ -227,12 +253,15 @@ public class StatementPartitioning implements Cloneable{
     }
 
     /**
-     * Returns true if there exists a single partition expression
+     * Returns true if partitioning inference has been requested, and
+     * at least one of the following is true:
+     *    - We are not doing DML on a replicated table, OR
+     *    - There is a single useful partitioning expression
      */
     public boolean isInferredSingle() {
         return m_inferPartitioning &&
                 (((m_countOfIndependentlyPartitionedTables == 0) && ! m_isDML)  ||
-                        (m_inferredExpression.size() == 1));
+                        (singlePartitioningExpression() != null));
     }
 
     /**
@@ -252,10 +281,22 @@ public class StatementPartitioning implements Cloneable{
     }
 
     /**
-     * smart accessor - only returns a value if it was unique
+     * smart accessor - only returns a value if it was unique and is useful
      * @return
      */
     public AbstractExpression singlePartitioningExpression() {
+        AbstractExpression e = singlePartitioningExpressionForReport();
+        if (e != null && isUsefulPartitioningExpression(e)) {
+            return e;
+        }
+        return null;
+    }
+
+    /**
+     * smart accessor - only returns a value if it was unique.
+     * @return
+     */
+    public AbstractExpression singlePartitioningExpressionForReport() {
         if (m_inferredExpression.size() == 1) {
             return m_inferredExpression.iterator().next();
         }
@@ -394,7 +435,7 @@ public class StatementPartitioning implements Cloneable{
             if (unfiltered) {
                 ++unfilteredPartitionKeyCount;
             }
-        }
+        } // end for each table StmtTableScan in the collection
 
         m_countOfIndependentlyPartitionedTables = eqSets.size() + unfilteredPartitionKeyCount;
         if (m_countOfIndependentlyPartitionedTables > 1) {

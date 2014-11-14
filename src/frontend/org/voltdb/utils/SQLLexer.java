@@ -35,7 +35,7 @@ public class SQLLexer
 
     private static final Pattern WHITELIST_1 = Pattern.compile(
             "^\\s*" +  // start of line, 0 or more whitespace
-            "(alter|create|drop|partition)" + // DDL we're ready to handle
+            "(alter|create|drop|export|partition)" + // DDL we're ready to handle
             "\\s+" + // one or more whitespace
             "(table|assumeunique|unique|index|view|procedure)" +
             "\\s+" + // one or more whitespace
@@ -48,7 +48,7 @@ public class SQLLexer
     // Don't accept these DDL tokens yet
     private static final Pattern BLACKLIST_1 = Pattern.compile(
             "^\\s*" +  // start of line, 0 or more whitespace
-            "(export|import)" + // DDL we're not ready to handle
+            "(import)" + // DDL we're not ready to handle
             "\\s+" + // one or more whitespace
             ".*$", // all the rest
             Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL
