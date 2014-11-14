@@ -98,6 +98,10 @@ SELECT 52,              @optionalfn(@onefun(A._variable[#GB @columntype])) as ta
 SELECT DISTINCT @optionalfn(A._variable[@columntype]) AS C56, A._variable FROM @fromtables A 
 SELECT DISTINCT @onefun(A._variable[@columntype]) AS C56, A._variable FROM @fromtables A ORDER BY 1, 2 LIMIT 10 
 
+-- Edge case: table aggregate with DISTINCT
+SELECT DISTINCT COUNT(*) FROM @fromtables A 
+SELECT DISTINCT @agg( A._variable[@columntype] ), COUNT(*)  FROM   @fromtables A 
+
 -- update
 -- compare two cols
 -- UPDATE @fromtables A SET @updatecolumn = @updatevalue WHERE @optionalfn(A._variable[@columntype]) _somecmp @optionalfn(A._variable[@columntype])

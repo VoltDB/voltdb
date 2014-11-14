@@ -64,17 +64,21 @@ public class TestPlansDistinct extends PlannerTestCase {
         sql2 = "SELECT B3, A3 from T3 group by A3, B3 LIMIT 10";
         checkQueriesPlansAreTheSame(sql1, sql2);
 
-        // Disinct *
+        // Distinct *
         sql1 = "SELECT distinct * from T3";
         sql2 = "SELECT pkey, A3, B3, C3, D3 from T3 group by pkey, A3, B3, C3, D3";
         checkQueriesPlansAreTheSame(sql1, sql2);
 
+        // Distinct on table aggregation
+        // single table aggregate select
+        sql1 = "SELECT distinct count(*), SUM(A3) from T3";
+        sql2 = "SELECT count(*), SUM(A3) from T3";
+        checkQueriesPlansAreTheSame(sql1, sql2);
 
-
-        pns = compileToFragments("SELECT distinct count(*) from T3");
-        for (AbstractPlanNode apn: pns) {
-            System.out.println(apn.toExplainPlanString());
-        }
+        // multiple table aggregate select
+        sql1 = "SELECT distinct SUM(A3) from T3";
+        sql2 = "SELECT SUM(A3) from T3";
+        checkQueriesPlansAreTheSame(sql1, sql2);
     }
 
     public void testMultipleExpressions()
@@ -141,7 +145,6 @@ public class TestPlansDistinct extends PlannerTestCase {
             sql2 = "SELECT V_CNT, V_SUM_C1 FROM " + tb + " GROUP BY V_CNT, V_SUM_C1";
             checkQueriesPlansAreTheSame(sql1, sql2);
 
-
             // expressions
             sql1 = "SELECT distinct V_A1, V_SUM_C1 / 10 FROM " + tb;
             sql2 = "SELECT V_A1, V_SUM_C1 / 10 FROM " + tb + " GROUP BY V_A1, V_SUM_C1 / 10";
@@ -161,11 +164,20 @@ public class TestPlansDistinct extends PlannerTestCase {
         failToCompile(sql, "expression not in aggregate or GROUP BY columns: PUBLIC.T3.C3");
 
         // Group by with multiple columns distinct
+
+        // PKEY, A3 is the primary key or contains the unique key.
         sql = "SELECT distinct B3, C3 from T3 group by PKEY, A3";
         failToCompile(sql, "Multiple DISTINCT columns with GROUP BY clause currently unsupported");
+
         // edge case because grouping by primary key
         sql = "SELECT distinct A3, B3, sum(C3) from T3 group by A3, B3";
         failToCompile(sql, "Multiple DISTINCT columns with GROUP BY clause currently unsupported");
+
+        sql = "SELECT distinct A3, B3 from T3 group by A3, B3, C3";
+        failToCompile(sql, "Multiple DISTINCT columns with GROUP BY clause currently unsupported");
+
+        sql = "SELECT distinct A3 from T3 group by A3, B3, C3";
+        compileToFragments(sql); // make sure the DISTINCT with GROUP BY is still working
 
         // distinct on expression with group by clause
         sql = "SELECT distinct sum(C3) from T3 group by A3, B3";

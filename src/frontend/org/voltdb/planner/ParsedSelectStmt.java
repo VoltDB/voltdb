@@ -200,9 +200,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         parseDisplayColumns(displayElement, false);
 
         if (groupbyElement == null && havingElement == null && m_distinct) {
-            // attribute "id" is the only one that differs from a real GROUP BY query
-            groupbyElement = displayElement.duplicate();
             m_distinct = false;
+
+            if (m_aggResultColumns.isEmpty()) {
+                // attribute "id" is the only one that differs from a real GROUP BY query
+                groupbyElement = displayElement.duplicate();
+            }
+            // when it is table aggregate, there will be only one row in the result
+            // so it's also safe to drop it.
         }
 
         if (groupbyElement != null) {
