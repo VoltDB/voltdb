@@ -74,6 +74,7 @@ public class HTTPAdminListener {
                 String localMetadata = VoltDB.instance().getLocalMetadata();
                 JSONObject jsObj = new JSONObject(localMetadata);
                 JSONArray interfaces = jsObj.getJSONArray("interfaces");
+                //The first interface is external interface if specified.
                 String iface = interfaces.getString(0);
                 addr = InetAddress.getByName(iface);
                 httpPort = jsObj.getInt("httpPort");
