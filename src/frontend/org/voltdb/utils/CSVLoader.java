@@ -24,10 +24,8 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.TimeZone;
 import java.util.concurrent.LinkedBlockingQueue;
-
 
 import org.supercsv.io.CsvListReader;
 import org.supercsv.io.ICsvListReader;
@@ -279,6 +277,9 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         @Option(desc = "port to use when connecting to database (default: 21212)")
         int port = Client.VOLTDB_SERVER_PORT;
 
+        @Option(shortOpt = "z", desc = "timezone for interpreting date and time strings")
+        String timezone = "";
+
         /**
          * Batch size for processing batched operations.
          */
@@ -323,6 +324,19 @@ public class CSVLoader implements BulkLoaderErrorHandler {
             }
             if ((procedure != null) && (procedure.trim().length() > 0)) {
                 useSuppliedProcedure = true;
+            }
+            if(!timezone.equals("")){
+                boolean isValidTimezone = false;
+                for (String tzId : TimeZone.getAvailableIDs()) {
+                    if(tzId.equals(timezone)) {
+                        TimeZone.setDefault(TimeZone.getTimeZone(timezone));
+                        isValidTimezone = true;
+                        break;
+                    }
+                }
+                if(!isValidTimezone){
+                    exitWithMessageAndUsage("specified timezone \"" + timezone + "\" is invalid");
+                }
             }
         }
 
