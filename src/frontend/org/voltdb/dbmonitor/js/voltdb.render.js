@@ -304,15 +304,15 @@ function alertNodeClicked(obj) {
         this.getProceduresInformation = function (onProceduresDataLoaded) {
             var procedureMetadata = "";
 
-            VoltDBService.GetSystemInformationDeployment(function(connection) {
+            VoltDBService.GetSystemInformationDeployment(function (connection) {
                 setKFactor(connection);
-                VoltDBService.GetProceduresInformation(function(nestConnection) {
+                VoltDBService.GetProceduresInformation(function (nestConnection) {
                     populateProceduresInformation(nestConnection);
                     procedureMetadata = procedureData;
                     onProceduresDataLoaded(procedureMetadata);
                 });
             });
-            
+
             var setKFactor = function (connection) {
                 connection.Metadata['@SystemInformation_DEPLOYMENT'].data.forEach(function (entry) {
                     if (entry[0] == 'kfactor')
@@ -323,15 +323,15 @@ function alertNodeClicked(obj) {
 
         };
 
-        this.getTablesInformation = function(onTableDataLoaded) {
-            VoltDBService.GetDataTablesInformation(function(inestConnection) {
+        this.getTablesInformation = function (onTableDataLoaded) {
+            VoltDBService.GetDataTablesInformation(function (inestConnection) {
                 populateTableTypes(inestConnection);
                 populateTablesInformation(inestConnection);
 
                 populatePartitionColumnTypes(inestConnection);
                 onTableDataLoaded(inestConnection.Metadata['@Statistics_TABLE'].data);
             });
-       
+
         };
 
         this.GetDataTablesInformation = function (contextConnectionReturned) {
@@ -1805,7 +1805,8 @@ function alertNodeClicked(obj) {
                                             //if partition is repeated for a given table in "partitionData"
                                             if (tupleData[partitionIndex] == partitionData[tupleData[tableNameIndex]][i][partitionIndex]) {
                                                 newPartition = false;
-                                                schemaCatalogTableTypes[tupleData[tableNameIndex]]["TABLE_TYPE"] = schemaCatalogTableTypes[tupleData[tableNameIndex]].TABLE_TYPE == "VIEW" ? "VIEW" : "REPLICATED";
+                                                //schemaCatalogTableTypes[tupleData[tableNameIndex]]["TABLE_TYPE"] = schemaCatalogTableTypes[tupleData[tableNameIndex]].TABLE_TYPE == "VIEW" ? "VIEW" : "REPLICATED";
+                                                schemaCatalogTableTypes[tupleData[tableNameIndex]]["TABLE_TYPE"] = "REPLICATED";
                                                 return false;
                                             }
 
@@ -1813,7 +1814,9 @@ function alertNodeClicked(obj) {
                                         if (partitionEntryCount == partitionData[tupleData[tableNameIndex]].length) {
                                             newPartition = true;
                                             partitionData[tupleData[tableNameIndex]].push(tupleData);
-                                            return true;
+                                            if (kFactor > 0)
+                                                schemaCatalogTableTypes[tupleData[tableNameIndex]]["TABLE_TYPE"] = "REPLICATED";
+                                            return false;
 
                                         }
                                     });
@@ -1823,6 +1826,7 @@ function alertNodeClicked(obj) {
 
                         //formulate max, min, average for each table
                         $.each(partitionData, function (key, data) {
+                            totalTupleCount = 0;
                             if (!tableData.hasOwnProperty(key)) {
                                 tableData[key] = {};
                             }
@@ -1837,7 +1841,7 @@ function alertNodeClicked(obj) {
                                 "MAX_ROWS": Math.max.apply(null, tupleCountPartitions),
                                 "MIN_ROWS": Math.min.apply(null, tupleCountPartitions),
                                 "AVG_ROWS": getAverage(tupleCountPartitions),
-                                "TUPLE_COUNT": totalTupleCount,
+                                "TUPLE_COUNT": schemaCatalogTableTypes[key].TABLE_TYPE == "REPLICATED" ? data[0][tupleCountIndex] : totalTupleCount,
                                 "TABLE_TYPE": getColumnTypes(key) == "PARTITION_COLUMN" ? "PARTITIONED" : schemaCatalogTableTypes[key].TABLE_TYPE
                             };
 
