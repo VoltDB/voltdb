@@ -249,6 +249,8 @@ public class SchemaChangeClient {
             }
         }
         catch (IOException e) {
+            // All SchemaChanger problems become IOExceptions.
+            // This is a normal error return that is handled by the caller.
             return null;
         }
 
@@ -294,6 +296,8 @@ public class SchemaChangeClient {
             }
         }
         catch (IOException e) {
+            // All SchemaChanger problems become IOExceptions.
+            // This is a normal error return that is handled by the caller.
             return null;
         }
 
@@ -898,7 +902,7 @@ public class SchemaChangeClient {
     }
 
     /**
-     * Perform @Update... call.
+     * Perform an @UpdateApplicationCatalog or @UpdateClasses call.
      */
     private static boolean execUpdate(Client client, String procName, byte[] bytes, boolean hardFail) throws IOException
     {
