@@ -127,9 +127,6 @@ $(document).ready(function () {
     // Shows memory alerts
     $('#showMemoryAlerts').popup();
 
-    //error popup
-    $('#errorPopup').popup();
-
     //Logout popup
     $('#logOut').popup();
     $('#btnlogOut').popup();
