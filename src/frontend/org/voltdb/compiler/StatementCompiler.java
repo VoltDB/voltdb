@@ -76,10 +76,10 @@ public abstract class StatementCompiler {
      *                      (may be null)
      * @param  stmt         Text of statement to be compiled
      * @param  joinOrder    Pass through parameter to QueryPlanner
-     * @param               Pass through parameter to QueryPlanner
+     * @param  detMode      Pass through parameter to QueryPlanner
      * @param  partitioning Partition info for statement
     */
-    static void compileStamentAndUpdateCatalog(VoltCompiler compiler, HSQLInterface hsql,
+    static void compileStatementAndUpdateCatalog(VoltCompiler compiler, HSQLInterface hsql,
             Catalog catalog, Database db, DatabaseEstimates estimates,
             Statement catalogStmt, VoltXMLElement xml, String stmt, String joinOrder,
             DeterminismMode detMode, StatementPartitioning partitioning)
@@ -239,7 +239,7 @@ public abstract class StatementCompiler {
             Statement catalogStmt, String sqlText, String joinOrder,
             DeterminismMode detMode, StatementPartitioning partitioning)
     throws VoltCompiler.VoltCompilerException {
-        compileStamentAndUpdateCatalog(compiler, hsql, catalog, db, estimates, catalogStmt,
+        compileStatementAndUpdateCatalog(compiler, hsql, catalog, db, estimates, catalogStmt,
                 null, sqlText, joinOrder, detMode, partitioning);
     }
 
