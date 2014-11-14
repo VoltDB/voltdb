@@ -452,15 +452,17 @@ function alertNodeClicked(obj) {
         };
 
         var populateSystemInformation = function (connection) {
+            var updatedSystemOverview = {};
             connection.Metadata['@SystemInformation_OVERVIEW'].data.forEach(function (entry) {
                 var singleData = entry;
                 var id = singleData[0];
 
-                if (!systemOverview.hasOwnProperty(id)) {
-                    systemOverview[id] = {};
+                if (!updatedSystemOverview.hasOwnProperty(id)) {
+                    updatedSystemOverview[id] = {};
                 }
-                systemOverview[id][singleData[1]] = singleData[2];
+                updatedSystemOverview[id][singleData[1]] = singleData[2];
             });
+            systemOverview = updatedSystemOverview;
         };
 
         var populateTablesInformation = function (connection) {

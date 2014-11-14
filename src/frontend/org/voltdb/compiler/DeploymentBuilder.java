@@ -413,7 +413,7 @@ public class DeploymentBuilder {
                     for (final String group : info.groups) {
                         if (groups.length() > 0)
                             groups.append(",");
-                        groups.append(group);
+                        groups.append(group.toLowerCase());
                     }
                     user.setGroups(groups.toString());
                 }

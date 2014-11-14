@@ -54,8 +54,6 @@ function navigate(hash) {
             $(iconid2).removeClass('icon-chevron-right').addClass('icon-chevron-down');
         }
     }
-
-    location.hash = hash;
 }
 
 $(document).ready(function () {
@@ -69,18 +67,25 @@ $(document).ready(function () {
         $('ul.catalogNav').children().removeClass('active');
         $("#" + hash + "-nav").addClass('active');
     }
+    
+    $('body').bind('touchmove', function (e) {
+        e.preventDefault();
+    });
 
     $(window).bind('hashchange', function () {
+        
         var hash = window.location.hash.substr(1);
         $('ul.catalogNav').children().removeClass('active');
         $("#" + hash + "-nav").addClass('active');
+    });
 
-        if (location.hash) {
+    var timeOut = (navigator.userAgent.indexOf('Firefox') >= 0) ? 20 : 1;
+    
+    $(".catalogNav > li > a").on("click", function () {
+        
+        setTimeout(function() {
             window.scrollTo(0, 0);
-            setTimeout(function () {
-                window.scrollTo(0, 0);
-            }, 1);
-        }
+        }, timeOut);
     });
     
     $.extend($.tablesorter.themes.bootstrap, {
@@ -182,7 +187,7 @@ $(document).ready(function () {
         navigate(window.location.hash);
     });
 
-    // tooltips
+     //tooltips
     $('.l-Table').popover({
         trigger: 'focus hover', delay: { show: 500, hide: 100 }, placement: 'top', content:
             'Persistent Relational Table'
