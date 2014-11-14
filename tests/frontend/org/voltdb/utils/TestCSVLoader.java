@@ -537,6 +537,7 @@ public class TestCSVLoader {
                 "\"4\",\"1\",\"1\",\"1\",\"a word\",\"1.10\",\"1.11\",\"7777-12-25 14:35:26\"",
                 "5,\"5\",\"5\",\"5\",,,,",
                 "\"5\",5,\"5\",\"5\",,,,",
+                "\"5\",\"5\",,,,,,",
         };
         int invalidLineCnt = 4;
         int validLineCnt = myData.length - invalidLineCnt;
