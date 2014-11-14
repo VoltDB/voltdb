@@ -201,10 +201,10 @@
                     <div class="data">
                         <div id="firstpane" class="menu_list">
                             <!--Code for menu starts here-->
-                            <div class="menu_head collapsed">
+                            <div class="menu_head expanded">
                                 <h1 id="ShowHideBlock">Show/Hide Data</h1>
                             </div>
-                            <div class="menu_body" style="display: none;">
+                            <div class="menu_body" style="display: block;">
                                 <div id="tblStoredProcedures" class="storedProcWrapper">
                                     <div class="tabs-filter-wrapper">
                                         <div class="tableTitle icon-procedures">Stored Procedures (Cluster)</div>
@@ -391,34 +391,7 @@
     </div>
     <!-- POPUP Alerts -->
 
-    <!-- POPUP Unreachable -->
-    <div id="serverUnreachable" style="display: none">
-        <div class="overlay-title">Connection Lost</div>
-        <div class="clear"></div>
-        <div class="overlay-content">
-            <div class="msg-pop-alert">
-                Could not connect to the VoltDBMonitor.<br />
-                Please click ok when the connection to the VoltDBMonitor is available.
-            </div>
-
-        </div>
-        <div class="overlay-btns"><a href="#" class="btn" id="overlayBtn" onclick="$('.popup_close').trigger('click');">OK</a></div>
-    </div>
-    <!-- POPUP Unreachable -->
-
     <div style="display: none"><a href="#error" id="errorPopup">Error</a></div>
-
-    <!--Error popup-->
-    <div id="error" style="display: none">
-        <div class="overlay-title errorIcon ">Error</div>
-        <div class="clear"></div>
-        <div class="overlay-contentError errorMsg">
-            <p id="errorMessage"></p>
-            <br />
-            <div class="overlay-btns" style="padding: 0"><a href="#" class="btn" id="btnOk" title="save">Ok</a></div>
-        </div>
-    </div>
-    <!--Error popup-->
 
     <!--Logout popup-->
     <div id="logoutPopup" style="display: none">
@@ -456,6 +429,24 @@
         </div>
     </div>
     <!--Connection popup-->
+    
+    <!--Server not available popup-->
+    <div style="display: none"><a href="#serverUnavailablePopup" id="serUnavailablePopup">Connection Error</a></div>
+
+    <div id="serverUnavailablePopup" style="display: none">
+        <div id="servUnavailablePop">
+            <div class="overlay-title ">
+                <img src="css/resources/images/error.png" class="imgError" />Error</div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorMsg">
+                <p>Could not establish connection to DB Monitor service. The service is either down, very slow to respond or the server refused connection.
+                    Please click ok when the server is back online. </p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="serverUnavailableBtn" title="Ok">Ok</a></div>
+            </div>
+        </div>
+    </div>
+    <!--Server not available popup-->
 
     <!--Help popup-->
     <div id="help" style="display: none">

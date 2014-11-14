@@ -290,23 +290,33 @@
             return paramSet;
         };
 
-        this.TestConnection = function (server, port, admin, user, password, isHashedPassword, processName, onConnectionTested) {
+        this.TestConnection = function (server, port, admin, user, password, isHashedPassword, processName, onConnectionTested, isLoginTest) {
+
+            var callback = function (result, response, loginTest) {
+                if (loginTest == true) {
+                    onConnectionTested(result, response);
+                } else {
+                    onConnectionTested(result);
+                }
+            };
+
+            var callbackTimeout = isLoginTest ? 10000 : 5000;
             var conn = new DbConnection(server, port, admin, user, password, isHashedPassword, processName);
-            var timeout = setTimeout(function() {
-                onConnectionTested(false);
-            }, 5000);
+            var timeout = setTimeout(function () {
+                callback(false, { "status": -100, "statusstring": "Server is not available." }, isLoginTest);
+            }, callbackTimeout);
             
             conn.BeginExecute('@Statistics', ['TABLE', 0], function (response) {
                 try {
-                    if (response.status == 1) {
-                        clearTimeout(timeout);
-                        onConnectionTested(true);
-                    } else {
-                        onConnectionTested(false);
-                    }
-                } catch(x) {
                     clearTimeout(timeout);
-                    onConnectionTested(true);
+                    if (response.status == 1) {
+                        callback(true, response, isLoginTest);
+                    } else {
+                        callback(false, response, isLoginTest);
+                    }
+                } catch (x) {
+                    clearTimeout(timeout);
+                    callback(true, response, isLoginTest);
                 }
             });
         };
