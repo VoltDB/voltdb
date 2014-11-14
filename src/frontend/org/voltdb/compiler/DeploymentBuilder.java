@@ -188,6 +188,11 @@ public class DeploymentBuilder {
         m_commandLogSize = logSize;
     }
 
+    public void setEnableCommandLogging(boolean value)
+    {
+        m_commandLogEnabled = value;
+    }
+
     public void setSnapshotPriority(int priority) {
         m_snapshotPriority = priority;
     }
@@ -413,7 +418,7 @@ public class DeploymentBuilder {
                     for (final String group : info.groups) {
                         if (groups.length() > 0)
                             groups.append(",");
-                        groups.append(group);
+                        groups.append(group.toLowerCase());
                     }
                     user.setGroups(groups.toString());
                 }

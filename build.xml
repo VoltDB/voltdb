@@ -74,7 +74,7 @@
 <property name='src.testproc.dir'            location='tests/testprocs' />
 <property name='src.hsqldb.test.dir'         location='tests/hsqldb' />
 <property name='src.ee.test.dir'             location='tests/ee' />
-<property name='src.studio.dir'              location='src/frontend/org/voltdb/studio' />
+<property name='src.dbmonitor.dir'           location='src/frontend/org/voltdb/dbmonitor' />
 <property name='build.testoutput.dir'        location='${build.dir}/testoutput' />
 <property name='build.testobjects.dir'       location='${build.dir}/testobjects' />
 <property name='lib.dir'                     location='lib' />
@@ -541,14 +541,6 @@ DISTRIBUTION
 
     <antcall target="copy_pro_bin"/>
 
-    <!-- copy studio.web -->
-    <mkdir dir="${dist.dir}/tools/studio.web" />
-    <copy todir="${dist.dir}/tools/studio.web">
-        <fileset dir="${src.gpl.dir}/org/voltdb/studio" defaultexcludes="yes">
-            <include name="**"/>
-        </fileset>
-    </copy>
-
     <!-- make shell scripts executable -->
     <chmod perm="ugo+rx">
         <fileset dir="${dist.dir}" defaultexcludes="yes">
@@ -578,12 +570,6 @@ DISTRIBUTION
         <arg value="${raw.dist.dir}/dist"/>
     </exec>
 
-    <!-- package up studio web trivially -->
-    <zip destfile="${raw.dist.dir}/voltdb-studio.web-${dist.version}.zip">
-        <fileset dir="${src.studio.dir}" defaultexcludes="yes">
-            <include name="**/*" />
-        </fileset>
-    </zip>
 </target>
 
 <target name="dist_client" depends="dist_internal_core"
@@ -974,8 +960,8 @@ JAVA COMPILATION
         </fileset>
     </copy>
 
-    <copy todir='${build.prod.dir}/org/voltdb/studio'>
-        <fileset dir="${src.gpl.dir}/org/voltdb/studio">
+    <copy todir='${build.prod.dir}/org/voltdb/dbmonitor'>
+        <fileset dir="${src.gpl.dir}/org/voltdb/dbmonitor">
             <include name="**"/>
         </fileset>
     </copy>

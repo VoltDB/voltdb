@@ -340,28 +340,4 @@ public class TestPartitionDDL extends TestCase {
         // PARTITION from XML.
         tester.partitioned(new PartitionXML("books", "cash"));
     }
-
-    public void testRedundant() {
-        Tester tester = new Tester();
-
-        // PARTITION from both XML and DDL.
-        tester.bad(".*Partitioning already specified for table.*",
-                new PartitionXML("books", "cash"),
-                new PartitionDDL("books", "cash"));
-
-        // PARTITION and REPLICATE from both XML and DDL.
-        tester.bad(".*Partitioning already specified for table.*",
-                new PartitionXML("books", "cash"),
-                new ReplicateDDL("books"));
-
-        // PARTITION and REPLICATE from DDL.
-        tester.bad(".*Partitioning already specified for table.*",
-                new PartitionDDL("books", "cash"),
-                new ReplicateDDL("books"));
-
-        // PARTITION twice from DDL.
-        tester.bad(".*Partitioning already specified for table.*",
-                new PartitionDDL("books", "cash"),
-                new PartitionDDL("books", "cash"));
-    }
 }
