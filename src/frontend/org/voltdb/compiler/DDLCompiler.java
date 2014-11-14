@@ -951,7 +951,7 @@ public class DDLCompiler {
         // group 2 is comma-separated permission list or null if there is no WITH clause
         statementMatcher = createRolePattern.matcher(statement);
         if (statementMatcher.matches()) {
-            String roleName = statementMatcher.group(1);
+            String roleName = statementMatcher.group(1).toLowerCase();
             CatalogMap<Group> groupMap = db.getGroups();
             if (groupMap.get(roleName) != null) {
                 throw m_compiler.new VoltCompilerException(String.format(
