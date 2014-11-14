@@ -437,7 +437,7 @@ function alertNodeClicked(obj) {
 
             jQuery.each(systemMemory, function (id, val) {
 
-                var threshold = $.cookie("alert-threshold") != undefined ? $.cookie("alert-threshold") : 90;
+                var threshold = $.cookie("alert-threshold") != undefined ? $.cookie("alert-threshold") : 70;
                 if (val["MEMORYUSAGE"] * 1 >= threshold) {
                     alertHtml += '<li class="active"><a data-ip="' + systemMemory[val['HOSTNAME']]['HOST_ID'] + '" onclick=\"alertNodeClicked(this);\" href=\"#\">' + val['HOSTNAME'] + '</a> <span class=\"memory-status alert\">' + val['MEMORYUSAGE'] + '%</span></li>';
                     alertCount++;

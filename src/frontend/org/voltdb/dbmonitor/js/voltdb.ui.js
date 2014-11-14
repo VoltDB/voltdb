@@ -858,7 +858,7 @@ var loadPage = function (serverName, portid) {
 
     var saveThreshold = function () {
 
-        var defaultThreshold = 90;
+        var defaultThreshold = 70;
         var thresholdInput = $("#threshold");
 
         if (thresholdInput.val() == "") {
