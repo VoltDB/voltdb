@@ -1772,15 +1772,101 @@ function alertNodeClicked(obj) {
 
         };
 
+        //var formatTableData = function (connection) {
+        //    var i = 0;
+        //    var tableMetadata = [];
+        //    var totalTupleCount = 0;
+        //    var partitionEntryCount = 0;
+        //    var newPartition = false;
+        //    var tupleCountPartitions = [];
+        //    var partitionData = {};
+
+        //    if (voltDbRenderer.refreshTables) {
+        //        if (connection.Metadata["@Statistics_TABLE"] != undefined || connection.Metadata["@Statistics_TABLE"] != null) {
+        //            if (connection.Metadata["@Statistics_TABLE"].data != "" &&
+        //                connection.Metadata["@Statistics_TABLE"].data != [] &&
+        //                connection.Metadata["@Statistics_TABLE"].data != undefined) {
+
+        //                tableMetadata = connection.Metadata["@Statistics_TABLE"].data;
+        //                tableData = {};
+
+        //                $.each(tableMetadata, function (key, tupleData) {
+        //                    if (tupleData != undefined) {
+        //                        partitionEntryCount = 0;
+
+        //                        if (!partitionData.hasOwnProperty(tupleData[tableNameIndex])) {
+        //                            partitionData[tupleData[tableNameIndex]] = [];
+        //                            partitionData[tupleData[tableNameIndex]].push(tupleData);
+
+        //                        } else {
+        //                            $.each(partitionData[tupleData[tableNameIndex]], function (nestKey, nestData) {
+        //                                for (i = 0; i < partitionData[tupleData[tableNameIndex]].length; i++) {
+        //                                    partitionEntryCount++;
+        //                                    //if partition is repeated for a given table in "partitionData"
+        //                                    if (tupleData[partitionIndex] == partitionData[tupleData[tableNameIndex]][i][partitionIndex]) {
+        //                                        newPartition = false;
+        //                                        //schemaCatalogTableTypes[tupleData[tableNameIndex]]["TABLE_TYPE"] = schemaCatalogTableTypes[tupleData[tableNameIndex]].TABLE_TYPE == "VIEW" ? "VIEW" : "REPLICATED";
+        //                                        schemaCatalogTableTypes[tupleData[tableNameIndex]]["TABLE_TYPE"] = "REPLICATED";
+        //                                        return false;
+        //                                    }
+
+        //                                }
+        //                                if (partitionEntryCount == partitionData[tupleData[tableNameIndex]].length) {
+        //                                    newPartition = true;
+        //                                    partitionData[tupleData[tableNameIndex]].push(tupleData);
+        //                                    if (kFactor > 0)
+        //                                        schemaCatalogTableTypes[tupleData[tableNameIndex]]["TABLE_TYPE"] = "REPLICATED";
+        //                                    return false;
+
+        //                                }
+        //                            });
+        //                        }
+        //                    }
+        //                });
+
+        //                //formulate max, min, average for each table
+        //                $.each(partitionData, function (key, data) {
+        //                    totalTupleCount = 0;
+        //                    if (!tableData.hasOwnProperty(key)) {
+        //                        tableData[key] = {};
+        //                    }
+
+        //                    for (i = 0; i < data.length; i++) {
+        //                        totalTupleCount += parseInt(data[i][tupleCountIndex]);
+        //                        tupleCountPartitions[i] = data[i][tupleCountIndex];
+        //                    }
+
+        //                    tableData[key] = {
+        //                        "TABLE_NAME": key,
+        //                        "MAX_ROWS": Math.max.apply(null, tupleCountPartitions),
+        //                        "MIN_ROWS": Math.min.apply(null, tupleCountPartitions),
+        //                        "AVG_ROWS": getAverage(tupleCountPartitions),
+        //                        "TUPLE_COUNT": schemaCatalogTableTypes[key].TABLE_TYPE == "REPLICATED" ? data[0][tupleCountIndex] : totalTupleCount,
+        //                        "TABLE_TYPE": getColumnTypes(key) == "PARTITION_COLUMN" ? "PARTITIONED" : schemaCatalogTableTypes[key].TABLE_TYPE
+        //                    };
+
+        //                });
+        //            }
+        //            else {
+        //                formatTableNoData("TABLE");
+
+        //            }
+
+        //        }
+        //    }
+
+        //};
+        
         var formatTableData = function (connection) {
             var i = 0;
             var tableMetadata = [];
             var totalTupleCount = 0;
             var partitionEntryCount = 0;
-            var newPartition = false;
+            var duplicatePartition = false;
             var tupleCountPartitions = [];
             var partitionData = {};
-
+            var averageRowCount = 0;
+            
             if (voltDbRenderer.refreshTables) {
                 if (connection.Metadata["@Statistics_TABLE"] != undefined || connection.Metadata["@Statistics_TABLE"] != null) {
                     if (connection.Metadata["@Statistics_TABLE"].data != "" &&
@@ -1791,6 +1877,7 @@ function alertNodeClicked(obj) {
                         tableData = {};
 
                         $.each(tableMetadata, function (key, tupleData) {
+                            duplicatePartition = false;
                             if (tupleData != undefined) {
                                 partitionEntryCount = 0;
 
@@ -1804,18 +1891,21 @@ function alertNodeClicked(obj) {
                                             partitionEntryCount++;
                                             //if partition is repeated for a given table in "partitionData"
                                             if (tupleData[partitionIndex] == partitionData[tupleData[tableNameIndex]][i][partitionIndex]) {
-                                                newPartition = false;
+                                                duplicatePartition = true;
                                                 //schemaCatalogTableTypes[tupleData[tableNameIndex]]["TABLE_TYPE"] = schemaCatalogTableTypes[tupleData[tableNameIndex]].TABLE_TYPE == "VIEW" ? "VIEW" : "REPLICATED";
                                                 schemaCatalogTableTypes[tupleData[tableNameIndex]]["TABLE_TYPE"] = "REPLICATED";
                                                 return false;
                                             }
 
                                         }
-                                        if (partitionEntryCount == partitionData[tupleData[tableNameIndex]].length) {
-                                            newPartition = true;
+                                        if (partitionEntryCount == partitionData[tupleData[tableNameIndex]].length && !duplicatePartition) {                                            
                                             partitionData[tupleData[tableNameIndex]].push(tupleData);
                                             if (kFactor > 0)
                                                 schemaCatalogTableTypes[tupleData[tableNameIndex]]["TABLE_TYPE"] = "REPLICATED";
+                                            
+                                            else if (partitionData[tupleData[tableNameIndex]].length > 1)
+                                                schemaCatalogTableTypes[tupleData[tableNameIndex]]["TABLE_TYPE"] = "REPLICATED";
+                                            
                                             return false;
 
                                         }
@@ -1827,6 +1917,7 @@ function alertNodeClicked(obj) {
                         //formulate max, min, average for each table
                         $.each(partitionData, function (key, data) {
                             totalTupleCount = 0;
+                            
                             if (!tableData.hasOwnProperty(key)) {
                                 tableData[key] = {};
                             }
@@ -1836,12 +1927,13 @@ function alertNodeClicked(obj) {
                                 tupleCountPartitions[i] = data[i][tupleCountIndex];
                             }
 
+                            averageRowCount=getAverage(tupleCountPartitions);
                             tableData[key] = {
                                 "TABLE_NAME": key,
                                 "MAX_ROWS": Math.max.apply(null, tupleCountPartitions),
                                 "MIN_ROWS": Math.min.apply(null, tupleCountPartitions),
-                                "AVG_ROWS": getAverage(tupleCountPartitions),
-                                "TUPLE_COUNT": schemaCatalogTableTypes[key].TABLE_TYPE == "REPLICATED" ? data[0][tupleCountIndex] : totalTupleCount,
+                                "AVG_ROWS": averageRowCount,
+                                "TUPLE_COUNT": schemaCatalogTableTypes[key].TABLE_TYPE == "REPLICATED" ? averageRowCount : totalTupleCount,
                                 "TABLE_TYPE": getColumnTypes(key) == "PARTITION_COLUMN" ? "PARTITIONED" : schemaCatalogTableTypes[key].TABLE_TYPE
                             };
 
