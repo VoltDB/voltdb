@@ -26,7 +26,7 @@ package org.voltdb.planner;
 import java.util.List;
 
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.SubqueryExpression;
+import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
@@ -61,8 +61,8 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         assertTrue(col != null);
         assertEquals("SCALAR", col.getColumnName());
         AbstractExpression colExpr = col.getExpression();
-        assertTrue(colExpr instanceof SubqueryExpression);
-        SubqueryExpression subqueryExpr = (SubqueryExpression) colExpr;
+        assertTrue(colExpr instanceof AbstractSubqueryExpression);
+        AbstractSubqueryExpression subqueryExpr = (AbstractSubqueryExpression) colExpr;
         List<Integer> params = subqueryExpr.getParameterIdxList();
         assertEquals(1, params.size());
         assertEquals(new Integer(0), params.get(0));
@@ -79,8 +79,8 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         assertTrue(col != null);
         assertEquals("SCALAR", col.getColumnName());
         AbstractExpression colExpr = col.getExpression();
-        assertTrue(colExpr instanceof SubqueryExpression);
-        SubqueryExpression subqueryExpr = (SubqueryExpression) colExpr;
+        assertTrue(colExpr instanceof AbstractSubqueryExpression);
+        AbstractSubqueryExpression subqueryExpr = (AbstractSubqueryExpression) colExpr;
         AbstractPlanNode subquery = subqueryExpr.getSubqueryNode();
         assertEquals(PlanNodeType.SEQSCAN, subquery.getPlanNodeType());
         AbstractExpression pred = ((SeqScanPlanNode) subquery).getPredicate();
