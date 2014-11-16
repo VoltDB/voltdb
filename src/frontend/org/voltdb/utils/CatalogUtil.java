@@ -1197,7 +1197,7 @@ public abstract class CatalogUtil {
             String [] grouplist = user.getGroups().trim().split(",");
             for (String group: grouplist) {
                 if( group == null || group.trim().isEmpty()) continue;
-                roles.add(group.trim());
+                roles.add(group.trim().toLowerCase());
             }
         }
 
@@ -1205,7 +1205,7 @@ public abstract class CatalogUtil {
             String [] rolelist = user.getRoles().trim().split(",");
             for (String role: rolelist) {
                 if( role == null || role.trim().isEmpty()) continue;
-                roles.add(role.trim());
+                roles.add(role.trim().toLowerCase());
             }
         }
 

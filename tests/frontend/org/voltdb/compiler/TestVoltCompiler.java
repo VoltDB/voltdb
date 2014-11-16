@@ -2124,6 +2124,18 @@ public class TestVoltCompiler extends TestCase {
                 "create view my_view2 (num, total, sumwage) " +
                 "as select num, count(*), sum(sumwage) from my_view1 group by num; ";
         checkDDLErrorMessage(ddl, "A materialized view (MY_VIEW2) can not be defined on another view (MY_VIEW1)");
+
+        ddl = "create table t(id integer not null, num integer);\n" +
+                "create view my_view as select num, count(*) from t group by num limit 1;";
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with LIMIT or OFFSET clause is not supported.");
+
+        ddl = "create table t(id integer not null, num integer);\n" +
+                "create view my_view as select num, count(*) from t group by num limit 1 offset 10;";
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with LIMIT or OFFSET clause is not supported.");
+
+        ddl = "create table t(id integer not null, num integer);\n" +
+                "create view my_view as select num, count(*) from t group by num having count(*) > 3;";
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with HAVING clause is not supported.");
     }
 
     public void testDDLCompilerTableLimit()
@@ -3167,8 +3179,8 @@ public class TestVoltCompiler extends TestCase {
     }
 
     public void testRoleDDL() throws Exception {
-        goodRoleDDL("create role r1;", new TestRole("r1"));
-        goodRoleDDL("create role r1;create role r2;", new TestRole("r1"), new TestRole("r2"));
+        goodRoleDDL("create role R1;", new TestRole("r1"));
+        goodRoleDDL("create role r1;create role r2;", new TestRole("r1"), new TestRole("R2"));
         goodRoleDDL("create role r1 with adhoc;", new TestRole("r1", true, true, false, true, true, false));
         goodRoleDDL("create role r1 with sql;", new TestRole("r1", true, true, false, true, true, false));
         goodRoleDDL("create role r1 with sqlread;", new TestRole("r1", false, true, false, false, true, false));
@@ -3340,7 +3352,7 @@ public class TestVoltCompiler extends TestCase {
 
     public void testBadExportTable() throws Exception {
 
-        badDDLAgainstSimpleSchema(".+\\sexport, table non_existant was not present in the catalog.*",
+        badDDLAgainstSimpleSchema(".+\\sEXPORT statement: table non_existant was not present in the catalog.*",
                 "export table non_existant;"
                 );
 
@@ -3374,12 +3386,6 @@ public class TestVoltCompiler extends TestCase {
                 "create table view_source( id integer, f1 varchar(16), f2 varchar(12));",
                 "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;",
                 "export table my_view;"
-                );
-
-        badDDLAgainstSimpleSchema("Table \"E1\" is already exported.*",
-                "create table e1( id integer, f1 varchar(16), f2 varchar(12));",
-                "export table e1;",
-                "export table E1;"
                 );
     }
 

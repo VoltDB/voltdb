@@ -191,6 +191,21 @@ public class SQLCommand
                     ")" +                  // end capturing group
                     "select",
                     Pattern.MULTILINE + Pattern.CASE_INSENSITIVE + Pattern.DOTALL);
+
+    // the common prefix for both ALTER TABLE <table> DROP
+    // and ALTER TABLE <table> ALTER
+    private static String alterTableCommonPrefix =
+            "\\s*alter\\s*table" + followedBySpaceOrQuote + "\\s*" +
+            idPattern + "\\s*";
+    private static final Pattern AlterTableAlter =
+            Pattern.compile(
+                    "(" + alterTableCommonPrefix + ")alter",
+                    Pattern.MULTILINE + Pattern.CASE_INSENSITIVE + Pattern.DOTALL);
+    private static final Pattern AlterTableDrop =
+            Pattern.compile(
+                    "(" + alterTableCommonPrefix + ")drop",
+                    Pattern.MULTILINE + Pattern.CASE_INSENSITIVE + Pattern.DOTALL);
+
     private static final Pattern AutoSplitParameters = Pattern.compile("[\\s,]+", Pattern.MULTILINE);
     /**
      * Matches a command followed by and SQL CRUD statement verb
@@ -272,6 +287,8 @@ public class SQLCommand
         query = CreateProcedureUpdate.matcher(query).replaceAll("$1$2SQL_PARSER_SAME_CREATEUPDATE");
         query = CreateProcedureDelete.matcher(query).replaceAll("$1$2SQL_PARSER_SAME_CREATEDELETE");
         query = InsertIntoSelect.matcher(query).replaceAll("$1SQL_PARSER_SAME_INSERTINTOSELECT");
+        query = AlterTableAlter.matcher(query).replaceAll("$1SQL_PARSER_SAME_ALTERTABLEALTER");
+        query = AlterTableDrop.matcher(query).replaceAll("$1SQL_PARSER_SAME_ALTERTABLEDROP");
         query = AutoSplit.matcher(query).replaceAll(";$2$4 "); // there be dragons here
         query = query.replaceAll("SQL_PARSER_SAME_SELECT", "select");
         query = query.replaceAll("SQL_PARSER_SAME_CREATEVIEW", "select");
@@ -280,6 +297,8 @@ public class SQLCommand
         query = query.replaceAll("SQL_PARSER_SAME_CREATEUPDATE", "update");
         query = query.replaceAll("SQL_PARSER_SAME_CREATEDELETE", "delete");
         query = query.replaceAll("SQL_PARSER_SAME_INSERTINTOSELECT", "select");
+        query = query.replaceAll("SQL_PARSER_SAME_ALTERTABLEALTER", "alter");
+        query = query.replaceAll("SQL_PARSER_SAME_ALTERTABLEDROP", "drop");
         String[] sqlFragments = query.split("\\s*;+\\s*");
 
         ArrayList<String> queries = new ArrayList<String>();

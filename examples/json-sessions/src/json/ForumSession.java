@@ -28,7 +28,8 @@ import java.util.Random;
 public class ForumSession extends SessionBase {
     static final Random random = new Random();
     static final String version_list[] = {"v3.0", "v2.8.4.1", "v2.8.4", "v2.7", "v2.6", "v2.5"};
-    static final String language_list[] = {"Java", "node.js", "PHP", "erlang", "C++", "C#", "Ruby"};
+    static final String language_lists[][] = {{"Java"}, {"node.js"}, {"PHP"}, {"erlang"}, {"C++"}, {"C#"}, {"Ruby"}, {"C++", "Java"}};
+    static final int two_language_list_index = 7;
     boolean moderator = false;
     long download_count = 0;
 
@@ -37,19 +38,27 @@ public class ForumSession extends SessionBase {
         super("VoltDB Forum");
 
         if (random.nextInt(10000) == 0) {
-            moderator = true;  // make 1 out of a 10,000 moderators.
+            moderator = true;  // make 1 out of 10,000 moderators.
         }
 
         // Set versions for 1/3rd of the logins
-        int version_idx = random.nextInt(version_list.length)*3;
+        int version_idx = random.nextInt(version_list.length*3);
         if (version_idx < version_list.length) {
             setDownloadVersion(version_list[version_idx]);
+            // For one in 3,000 of those, add a second download
+            version_idx = random.nextInt(version_list.length*3000);
+            if (version_idx < version_list.length) {
+                setDownloadVersion(version_list[version_idx]);
+            }
         }
 
-        // Set programming language for 1/10th of the logins
-        int language_idx = random.nextInt(language_list.length)*10;
-        if (language_idx <= 5) {
-            setLanguage(language_list[language_idx]);
+        // Set TWO programming languages, for 1 out of 5,000
+        int language_idx = random.nextInt(5000);
+        if (language_idx == 0) {
+            setLanguages(language_lists[two_language_list_index]);
+        // Set one programming language for 1/10th of the logins
+        } else if (language_idx < 500) {
+            setLanguages(language_lists[language_idx % two_language_list_index]);
         }
     }
 
@@ -59,9 +68,9 @@ public class ForumSession extends SessionBase {
         download_count++;
     }
 
-    public void setLanguage(String language)
+    public void setLanguages(String[] languages)
     {
-        addProperty("client_language", language);
+        addProperty("client_languages", languages);
     }
 
     public void setAvatar(String avatar)

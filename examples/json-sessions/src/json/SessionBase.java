@@ -34,7 +34,7 @@ public abstract class SessionBase {
         this.site = site;
     }
 
-    public void addProperty(String prop_name, String prop_val)
+    public void addProperty(String prop_name, Object prop_val)
     {
         props.put(prop_name, prop_val);
     }

@@ -159,6 +159,11 @@ public class CommandLine extends VoltDB.Configuration
         return this;
     }
 
+    public CommandLine httpPort(int httpPort) {
+        m_httpPort = httpPort;
+        return this;
+    }
+
     public CommandLine startCommand(String command)
     {
         StartAction action = StartAction.monickerFor(command);
