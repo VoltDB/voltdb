@@ -23,7 +23,7 @@ command input and the format of the output. The allowable options are:
     --output-format={fixed|csv|tab}
     --output-skip-metadata
     --query=query
-    --stop-on-first-error
+    --on-error=(stop|continue)
     --debug
 
 
