@@ -413,8 +413,8 @@ string planNodeToString(PlanNodeType type)
     case PLAN_NODE_TYPE_MATERIALIZEDSCAN: {
         return "MATERIALIZEDSCAN";
     }
-    case PLAN_NODE_TYPE_SEMISEQSCAN: {
-        return "SEMISEQSCAN";
+    case PLAN_NODE_TYPE_TUPLESCAN: {
+        return "TUPLESCAN";
     }
     } // END OF SWITCH
     return "UNDEFINED";
@@ -466,8 +466,8 @@ PlanNodeType stringToPlanNode(string str )
         return PLAN_NODE_TYPE_DISTINCT;
     } else if (str == "MATERIALIZEDSCAN") {
         return PLAN_NODE_TYPE_MATERIALIZEDSCAN;
-    } else if (str == "SEMISEQSCAN") {
-        return PLAN_NODE_TYPE_SEMISEQSCAN;
+    } else if (str == "TUPLESCAN") {
+        return PLAN_NODE_TYPE_TUPLESCAN;
     }
     return PLAN_NODE_TYPE_INVALID;
 }
@@ -504,6 +504,9 @@ string expressionToString(ExpressionType type)
     }
     case EXPRESSION_TYPE_OPERATOR_IS_NULL: {
         return "OPERATOR_IS_NULL";
+    }
+    case EXPRESSION_TYPE_OPERATOR_EXISTS: {
+        return "OPERATOR_EXISTS";
     }
     case EXPRESSION_TYPE_COMPARE_EQUAL: {
         return "COMPARE_EQUAL";
@@ -583,17 +586,14 @@ string expressionToString(ExpressionType type)
     case EXPRESSION_TYPE_OPERATOR_ALTERNATIVE: {
         return "OPERATOR_ALTERNATIVE";
     }
-    case EXPRESSION_TYPE_IN_SUBQUERY: {
-        return "IN_SUBQUERY";
-    }
-    case EXPRESSION_TYPE_EXISTS_SUBQUERY: {
-        return "EXISTS_SUBQUERY";
+    case EXPRESSION_TYPE_ROW_SUBQUERY: {
+        return "ROW_SUBQUERY";
     }
     case EXPRESSION_TYPE_SCALAR_SUBQUERY: {
         return "SCALAR_SUBQUERY";
     }
-    case EXPRESSION_TYPE_ROW_SUBQUERY: {
-        return "ROW_SUBQUERY";
+    case EXPRESSION_TYPE_SELECT_SUBQUERY: {
+        return "SELECT_SUBQUERY";
     }
     }
     return "INVALID";
@@ -621,6 +621,8 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_OPERATOR_NOT;
     } else if (str == "OPERATOR_IS_NULL") {
         return EXPRESSION_TYPE_OPERATOR_IS_NULL;
+    } else if (str == "OPERATOR_EXISTS") {
+        return EXPRESSION_TYPE_OPERATOR_EXISTS;
     } else if (str == "COMPARE_EQUAL") {
         return EXPRESSION_TYPE_COMPARE_EQUAL;
     } else if (str == "COMPARE_NOTEQUAL") {
@@ -673,14 +675,12 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_OPERATOR_CASE_WHEN;
     } else if (str == "OPERATOR_ALTERNATIVE") {
         return EXPRESSION_TYPE_OPERATOR_ALTERNATIVE;
-    } else if (str == "IN_SUBQUERY") {
-        return EXPRESSION_TYPE_IN_SUBQUERY;
-    } else if (str == "EXISTS_SUBQUERY") {
-        return EXPRESSION_TYPE_EXISTS_SUBQUERY;
-    } else if (str == "SCALAR_SUBQUERY") {
-        return EXPRESSION_TYPE_SCALAR_SUBQUERY;
     } else if (str == "ROW_SUBQUERY") {
         return EXPRESSION_TYPE_ROW_SUBQUERY;
+    } else if (str == "SCALAR_SUBQUERY") {
+        return EXPRESSION_TYPE_SCALAR_SUBQUERY;
+    } else if (str == "SELECT_SUBQUERY") {
+        return EXPRESSION_TYPE_SELECT_SUBQUERY;
     }
 
 

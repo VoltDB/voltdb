@@ -109,24 +109,36 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
         return newId;
     }
 
+//    @Override
+//    public Object clone() {
+//        SelectSubqueryExpression clone = new SelectSubqueryExpression(m_type, m_subquery);// aaa need to redo/equal clone for ROw and Tuple
+//        clone.m_subqueryId = m_subqueryId;
+//        clone.m_subqueryNodeId = m_subqueryNodeId;
+//        clone.m_valueType = m_valueType;
+//        clone.m_valueSize = m_valueSize;
+//        // The parameter TVE map must be cloned explicitly because the original TVEs
+//        // from the statement are already replaced with the corresponding PVEs
+//        if (m_args != null) {
+//            clone.m_args = new ArrayList<AbstractExpression>();
+//            for (AbstractExpression arg: m_args) {
+//                clone.m_args.add((AbstractExpression)arg.clone());
+//            }
+//        }
+//        clone.m_parameterIdxList = new ArrayList<Integer>();
+//        clone.m_parameterIdxList.addAll(m_parameterIdxList);
+//        clone.m_allParameterIdxList.addAll(m_allParameterIdxList);
+//        return clone;
+//    }
+
     @Override
     public Object clone() {
-        SelectSubqueryExpression clone = new SelectSubqueryExpression(m_type, m_subquery);
-        clone.m_subqueryId = m_subqueryId;
-        clone.m_subqueryNodeId = m_subqueryNodeId;
-        clone.m_valueType = m_valueType;
-        clone.m_valueSize = m_valueSize;
-        // The parameter TVE map must be cloned explicitly because the original TVEs
-        // from the statement are already replaced with the corresponding PVEs
-        if (m_args != null) {
-            clone.m_args = new ArrayList<AbstractExpression>();
-            for (AbstractExpression arg: m_args) {
-                clone.m_args.add((AbstractExpression)arg.clone());
+        SelectSubqueryExpression clone = (SelectSubqueryExpression) super.clone();
+        if (!m_allParameterIdxList.isEmpty()) {
+            clone.m_allParameterIdxList = new ArrayList<Integer>();
+            for (Integer paramIdx : m_allParameterIdxList) {
+                clone.m_allParameterIdxList.add(new Integer(paramIdx.intValue()));
             }
         }
-        clone.m_parameterIdxList = new ArrayList<Integer>();
-        clone.m_parameterIdxList.addAll(m_parameterIdxList);
-        clone.m_allParameterIdxList.addAll(m_allParameterIdxList);
         return clone;
     }
 

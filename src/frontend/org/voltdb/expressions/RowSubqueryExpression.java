@@ -66,26 +66,6 @@ public class RowSubqueryExpression extends AbstractSubqueryExpression {
     }
 
     @Override
-    public Object clone() {
-        RowSubqueryExpression clone = new RowSubqueryExpression();
-        clone.m_subqueryId = m_subqueryId;
-        clone.m_subqueryNodeId = m_subqueryNodeId;
-        clone.m_subqueryNode = m_subqueryNode;
-        clone.setExpressionType(m_type);
-        clone.m_valueType = m_valueType;
-        clone.m_valueSize = m_valueSize;
-        for (Integer paramIdx : m_parameterIdxList) {
-            clone.m_parameterIdxList.add(new Integer(paramIdx));
-        }
-        assert (m_args != null);
-        clone.m_args = new ArrayList<AbstractExpression>();
-        for (AbstractExpression arg: m_args) {
-            clone.m_args.add((AbstractExpression)arg.clone());
-        }
-        return clone;
-    }
-
-    @Override
     public void validate() throws Exception {
         super.validate();
 

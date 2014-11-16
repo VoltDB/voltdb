@@ -24,7 +24,6 @@ import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ConjunctionExpression;
-import org.voltdb.expressions.SubqueryExpression;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.types.ExpressionType;
@@ -176,59 +175,59 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         return exprs;
     }
 
-    /**
-     * Break up UNION/INTERSECT (ALL) set ops into individual selects that are part
-     * of the IN/EXISTS subquery into multiple expressions for each set op child
-     * combined by the conjunction AND/OR expression.
-     * col IN ( queryA UNION queryB ) - > col IN (queryA) OR col IN (queryB)
-     * col IN ( queryA INTERSECTS queryB ) - > col IN (queryA) AND col IN (queryB)
-     * The EXCEPT set op is LEFT as is
-     * Also the ALL qualifier is dropped because IN/EXISTS expressions only
-     * need just one tuple in the results set
-     *
-     * @param subqueryExpr - IN/EXISTS expression with a possible SET OP subquery
-     * @return simplified expression
-     */
-    protected static AbstractExpression breakUpSetOpSubquery(AbstractExpression subqueryExpr) {
-        assert (subqueryExpr instanceof SubqueryExpression);
-        AbstractParsedStmt subquery = ((SubqueryExpression) subqueryExpr).getSubquery();
-        if (!(subquery instanceof ParsedUnionStmt)) {
-            return subqueryExpr;
-        }
-        ParsedUnionStmt setOpStmt = (ParsedUnionStmt) subquery;
-        if (UnionType.EXCEPT == setOpStmt.m_unionType || UnionType.EXCEPT_ALL == setOpStmt.m_unionType) {
-            setOpStmt.m_unionType = UnionType.EXCEPT;
-            return subqueryExpr;
-        }
-        if (UnionType.UNION_ALL == setOpStmt.m_unionType) {
-            setOpStmt.m_unionType = UnionType.UNION;
-        } else if (UnionType.INTERSECT_ALL == setOpStmt.m_unionType) {
-            setOpStmt.m_unionType = UnionType.INTERSECT;
-        }
-        ExpressionType conjuctionType = (setOpStmt.m_unionType == UnionType.UNION) ?
-                ExpressionType.CONJUNCTION_OR : ExpressionType.CONJUNCTION_AND;
-        AbstractExpression retval = null;
-        AbstractParsedStmt parentStmt = subquery.m_parentStmt;
-        // It's a subquery which meant it must have a parent
-        assert (parentStmt != null);
-        for (AbstractParsedStmt child : setOpStmt.m_children) {
-            String tableName = "VOLT_TEMP_TABLE_" + child.m_stmtId;
-            // add table to the query cache
-            StmtTableScan tableCache = parentStmt.addTableToStmtCache(tableName, tableName, child);
-            assert(tableCache instanceof StmtSubqueryScan);
-            AbstractExpression childSubqueryExpr =
-                    new SubqueryExpression(subqueryExpr.getExpressionType(), (StmtSubqueryScan)tableCache);
-            if (ExpressionType.IN_SUBQUERY == subqueryExpr.getExpressionType()) {
-                childSubqueryExpr.setLeft(subqueryExpr.getLeft());
-            }
-            // Recurse
-            childSubqueryExpr = ParsedUnionStmt.breakUpSetOpSubquery(childSubqueryExpr);
-            if (retval == null) {
-                retval = childSubqueryExpr;
-            } else {
-                retval = new ConjunctionExpression(conjuctionType, retval, childSubqueryExpr);
-            }
-        }
-        return retval;
-    }
+//    /**
+//     * Break up UNION/INTERSECT (ALL) set ops into individual selects that are part
+//     * of the IN/EXISTS subquery into multiple expressions for each set op child
+//     * combined by the conjunction AND/OR expression.
+//     * col IN ( queryA UNION queryB ) - > col IN (queryA) OR col IN (queryB)
+//     * col IN ( queryA INTERSECTS queryB ) - > col IN (queryA) AND col IN (queryB)
+//     * The EXCEPT set op is LEFT as is
+//     * Also the ALL qualifier is dropped because IN/EXISTS expressions only
+//     * need just one tuple in the results set
+//     *
+//     * @param subqueryExpr - IN/EXISTS expression with a possible SET OP subquery
+//     * @return simplified expression
+//     */
+//    protected static AbstractExpression breakUpSetOpSubquery(AbstractExpression subqueryExpr) {
+//        assert (subqueryExpr instanceof SubqueryExpression);
+//        AbstractParsedStmt subquery = ((SubqueryExpression) subqueryExpr).getSubquery();
+//        if (!(subquery instanceof ParsedUnionStmt)) {
+//            return subqueryExpr;
+//        }
+//        ParsedUnionStmt setOpStmt = (ParsedUnionStmt) subquery;
+//        if (UnionType.EXCEPT == setOpStmt.m_unionType || UnionType.EXCEPT_ALL == setOpStmt.m_unionType) {
+//            setOpStmt.m_unionType = UnionType.EXCEPT;
+//            return subqueryExpr;
+//        }
+//        if (UnionType.UNION_ALL == setOpStmt.m_unionType) {
+//            setOpStmt.m_unionType = UnionType.UNION;
+//        } else if (UnionType.INTERSECT_ALL == setOpStmt.m_unionType) {
+//            setOpStmt.m_unionType = UnionType.INTERSECT;
+//        }
+//        ExpressionType conjuctionType = (setOpStmt.m_unionType == UnionType.UNION) ?
+//                ExpressionType.CONJUNCTION_OR : ExpressionType.CONJUNCTION_AND;
+//        AbstractExpression retval = null;
+//        AbstractParsedStmt parentStmt = subquery.m_parentStmt;
+//        // It's a subquery which meant it must have a parent
+//        assert (parentStmt != null);
+//        for (AbstractParsedStmt child : setOpStmt.m_children) {
+//            String tableName = "VOLT_TEMP_TABLE_" + child.m_stmtId;
+//            // add table to the query cache
+//            StmtTableScan tableCache = parentStmt.addTableToStmtCache(tableName, tableName, child);
+//            assert(tableCache instanceof StmtSubqueryScan);
+//            AbstractExpression childSubqueryExpr =
+//                    new SubqueryExpression(subqueryExpr.getExpressionType(), (StmtSubqueryScan)tableCache);
+//            if (ExpressionType.IN_SUBQUERY == subqueryExpr.getExpressionType()) {
+//                childSubqueryExpr.setLeft(subqueryExpr.getLeft());
+//            }
+//            // Recurse
+//            childSubqueryExpr = ParsedUnionStmt.breakUpSetOpSubquery(childSubqueryExpr);
+//            if (retval == null) {
+//                retval = childSubqueryExpr;
+//            } else {
+//                retval = new ConjunctionExpression(conjuctionType, retval, childSubqueryExpr);
+//            }
+//        }
+//        return retval;
+//    }
 }

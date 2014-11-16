@@ -182,8 +182,8 @@ enum PlanNodeType {
     PLAN_NODE_TYPE_TABLECOUNT       = 13,
     // for sql-in using indexes
     PLAN_NODE_TYPE_MATERIALIZEDSCAN = 14,
-    // for sql-in-select
-    PLAN_NODE_TYPE_SEMISEQSCAN      = 15,
+    // for sql-expression-select
+    PLAN_NODE_TYPE_TUPLESCAN        = 15,
     //
     // Join Nodes
     //
@@ -264,6 +264,7 @@ enum ExpressionType {
     EXPRESSION_TYPE_OPERATOR_CAST                   = 7, // explicitly cast left as right (right is integer in ValueType enum)
     EXPRESSION_TYPE_OPERATOR_NOT                    = 8, // logical not operator
     EXPRESSION_TYPE_OPERATOR_IS_NULL                = 9, // is null test.
+    EXPRESSION_TYPE_OPERATOR_EXISTS                 = 18, // exists test.
 
     // -----------------------------
     // Comparison Operators
@@ -323,10 +324,9 @@ enum ExpressionType {
     // -----------------------------
     // Subquery IN/EXISTS
     // -----------------------------
-    EXPRESSION_TYPE_IN_SUBQUERY                        = 400,
-    EXPRESSION_TYPE_EXISTS_SUBQUERY                    = 401,
-    EXPRESSION_TYPE_SCALAR_SUBQUERY                    = 402,
-    EXPRESSION_TYPE_ROW_SUBQUERY                       = 403
+    EXPRESSION_TYPE_ROW_SUBQUERY                       = 400,
+    EXPRESSION_TYPE_SCALAR_SUBQUERY                    = 401,
+    EXPRESSION_TYPE_SELECT_SUBQUERY                    = 402
 
 };
 

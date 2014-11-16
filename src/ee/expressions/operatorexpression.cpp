@@ -48,7 +48,7 @@ NValue OperatorExistsExpression::eval(const TableTuple *tuple1, const TableTuple
     // The EXISTS (SELECT inner_expr ...) evaluates as follows:
     // The subquery produces a row => TRUE
     // The subquery produces an empty result set => FALSE
-    Table* outputTable = exeContext->getOutputTable(subqueryId);
+    Table* outputTable = exeContext->getSubqueryOutputTable(subqueryId);
     assert(outputTable != NULL);
     // Check the first tuple if it's NULL tuple or not
     TableIterator& it = outputTable->iterator();

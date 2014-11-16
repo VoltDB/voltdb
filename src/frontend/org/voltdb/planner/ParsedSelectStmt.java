@@ -46,7 +46,7 @@ import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
-import org.voltdb.expressions.SubqueryExpression;
+import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.VectorValueExpression;
 import org.voltdb.planner.parseinfo.BranchNode;
@@ -656,8 +656,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             } else if (child.name.equals("tablesubquery")) {
                 // Scalar subquery like 'select c, (select count(*) from t1), from t2;'
                 col.columnName = child.attributes.get("alias");
-                assert(col.expression instanceof SubqueryExpression);
-                SubqueryExpression scalarSubqueryExpr = (SubqueryExpression) col.expression;
+                assert(col.expression instanceof SelectSubqueryExpression);
+                SelectSubqueryExpression scalarSubqueryExpr = (SelectSubqueryExpression) col.expression;
                 if (scalarSubqueryExpr.getTable().getOutputSchema().size() != 1) {
                     throw new PlanningErrorException("Scalar subquery can have only one output column");
                 }

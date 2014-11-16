@@ -31,7 +31,8 @@ import org.voltdb.expressions.HashRangeExpression;
 import org.voltdb.expressions.InComparisonExpression;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
-import org.voltdb.expressions.SubqueryExpression;
+import org.voltdb.expressions.RowSubqueryExpression;
+import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.VectorValueExpression;
@@ -133,10 +134,9 @@ public enum ExpressionType {
     // -----------------------------
     // Subquery
     // -----------------------------
-    IN_SUBQUERY                 (SubqueryExpression.class, 400, "<in subquery>"),
-    EXISTS_SUBQUERY             (SubqueryExpression.class, 401, "<exists subquery>"),
-    SCALAR_SUBQUERY             (SubqueryExpression.class, 402, "<scalar subquery>"),
-    ROW_SUBQUERY                (SubqueryExpression.class, 403, "<row subquery>"),
+    ROW_SUBQUERY                 (RowSubqueryExpression.class, 400, "<row subquery>"),
+    SCALAR_SUBQUERY              (SelectSubqueryExpression.class, 401, "<scalar subquery>"),
+    SELECT_SUBQUERY              (SelectSubqueryExpression.class, 402, "<select subquery>"),
 ;
 
     private final int m_value;

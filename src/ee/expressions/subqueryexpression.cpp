@@ -22,6 +22,7 @@
 #include "common/debuglog.h"
 #include "common/executorcontext.hpp"
 #include "common/NValue.hpp"
+#include "common/ValueFactory.hpp"
 #include "common/tabletuple.h"
 #include "executors/executorutil.h"
 #include "storage/table.h"
@@ -45,8 +46,6 @@ SubqueryExpression::SubqueryExpression(
     VOLT_TRACE("SubqueryExpression %d", subqueryId);
     assert((m_tveParams.get() == NULL && m_paramIdxs.empty()) ||
         (m_tveParams.get() != NULL && m_paramIdxs.size() == m_tveParams->size()));
-    assert(subqueryType == EXPRESSION_TYPE_IN_SUBQUERY || subqueryType == EXPRESSION_TYPE_EXISTS_SUBQUERY ||
-            subqueryType == EXPRESSION_TYPE_SCALAR_SUBQUERY || subqueryType == EXPRESSION_TYPE_ROW_SUBQUERY);
 }
 
 SubqueryExpression::~SubqueryExpression()
@@ -118,61 +117,8 @@ NValue SubqueryExpression::eval(const TableTuple *tuple1, const TableTuple *tupl
     }
 
     // Out of luck. Need to run the executors
-
-    NValue retval = NValue::getFalse();
-
-    // The outer_expr IN (SELECT inner_expr ...) evaluates as follows:
-    // There is an exact match outer_expr = inner_expr => TRUE
-    // There no match and the subquery produces a row where inner_expr is NULL => NULL
-    // There no match and the subquery produces only non- NULL rows or empty => FASLE
-    // The outer_expr is NULL and the subquery is empty => FASLE
-    // The outer_expr is NULL and the subquery produces any row => NULL
-
-    // The EXISTS (SELECT inner_expr ...) evaluates as follows:
-    // The subquery produces a row => TRUE
-    // The subquery produces an empty result set => FALSE
-    Table* outputTable = exeContext->executeExecutors(m_subqueryId);
-    assert(outputTable != NULL);
-    // Check the first tuple if it's NULL tuple or not
-    TableIterator& it = outputTable->iterator();
-    TableTuple tuple(outputTable->schema());
-    if (it.next(tuple)) {
-        if (m_type == EXPRESSION_TYPE_IN_SUBQUERY) {
-            // This subquery is part of the IN expression, its top plan node will be a
-            // special purpose seqscan node which inserts a tuple with all columns set to NULL
-            // to indicate NULL result, so we can try any (the first one) index.
-            if (tuple.isNull(0)) {
-                retval.setNull();
-            } else {
-                retval = NValue::getTrue();
-            }
-        } else if (m_type == EXPRESSION_TYPE_EXISTS_SUBQUERY) {
-            // This subquery is part of the EXISTS expression, the EXISTS expression
-            // only cares whether the tuple exists or not.
-            retval = NValue::getTrue();
-        } else if (m_type == EXPRESSION_TYPE_SCALAR_SUBQUERY) {
-            // This subquery is part of the SCALAR subquery expression. The scalar subquery is guaranteed
-            // to have a single output column and must have no more than a single returned row.
-            if (outputTable->activeTupleCount() == 1) {
-                retval = tuple.getNValue(0);
-            } else if (outputTable->activeTupleCount() > 1) {
-                // throw runtime exception
-                char message[256];
-                snprintf(message, 256, "More than one row returned by a scalar or row subquery");
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
-            }
-        } else {
-            // unsupported subquery
-            char message[256];
-            snprintf(message, 256, "Unsupported expression type: %d", m_type);
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
-        }
-    } else if (m_type == EXPRESSION_TYPE_SCALAR_SUBQUERY) {
-        const TupleSchema* tableSchema = outputTable->schema();
-        assert(tableSchema != NULL);
-        ValueType columnType = tableSchema->columnType(0);
-        retval = NValue::getNullValue(columnType);
-    }
+    exeContext->cleanupExecutors(m_subqueryId);
+    exeContext->executeExecutors(m_subqueryId);
 
     if (context == NULL) {
         // Preserve the value for the next run. Only 'other' parameters need to be copied
@@ -186,9 +132,8 @@ NValue SubqueryExpression::eval(const TableTuple *tuple1, const TableTuple *tupl
     }
 
     // Update the cached result for the current params. All params are already updated
+    NValue retval = ValueFactory::getIntegerValue(m_subqueryId);
     context->setResult(retval);
-
-    exeContext->cleanupExecutors(m_subqueryId);
     return retval;
 }
 

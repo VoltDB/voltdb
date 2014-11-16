@@ -209,7 +209,7 @@ public class HSQLInterface {
         sessionProxy.sessionData.persistentStoreCollection.clearAllTables();
 
         // clean up sql-in expressions
-        fixupStatementExpressions(xml);
+        fixupInStatementExpressions(xml);
 
         assert(xml != null);
 
@@ -221,65 +221,16 @@ public class HSQLInterface {
      * simpler thing we want to pass to the AbstractParsedStmt.
      * @throws HSQLParseException 
      */
-    private void fixupStatementExpressions(VoltXMLElement expr) throws HSQLParseException {
+    private void fixupInStatementExpressions(VoltXMLElement expr) throws HSQLParseException {
         if (doesExpressionReallyMeanIn(expr)) {
             inFixup(expr);
             // can't return because in with subquery can be nested
         }
-        if (doesExpressionReallyNeedVecorComparison(expr)) {
-            comparisonFixup(expr);
-        }
 
         // recursive hunt
         for (VoltXMLElement child : expr.children) {
-            fixupStatementExpressions(child);
+            fixupInStatementExpressions(child);
         }
-    }
-
-    private boolean doesExpressionReallyNeedVecorComparison(VoltXMLElement expr) {
-        if (!expr.name.equals("operation")) {
-            return false;
-        }
-        String optype = expr.attributes.get("optype");
-        if (!"equal".equals(optype) && 
-            !"greaterthanorequalto".equals(optype) &&
-            !"greaterthan".equals(optype) &&
-            !"lessthan".equals(optype) &&
-            !"lessthanorequalto".equals(optype) &&
-            !"notequal".equals(optype)) {
-            return false;
-        }
-        // see if the children are "row" and "tablesubquery".
-        int rowCount = 0;
-        int subqueryCount = 0;
-        for (VoltXMLElement child : expr.children) {
-            if (child.name.equals("row") && child.children.size() > 1) {
-                rowCount++;
-            } else if (child.name.equals("tablesubquery")) {
-                for(VoltXMLElement gc : child.children) {
-                    if (gc.name.equals("select")) {
-                        for(VoltXMLElement gcc : gc.children) {
-                            if (gcc.name.equals("columns") && gcc.children.size() > 1) {
-                                subqueryCount++;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        //  (C1, C2)    (SELECT ...)      => row           comp   tablesubquery => VECTOR
-        //  (SELECT ...)  =  (SELECT ...) => tablesubquery equal  tablesubquery => VECTOR
-        //  (C1,C2)  = (C1,C2)            => row           equal  row => VECTOR
-        if (rowCount == 2 ||  subqueryCount == 2 || (subqueryCount + rowCount) == 2 ) {
-            return true;
-        }
-
-        return false;
-   }
-
-    private void comparisonFixup(VoltXMLElement expr) {
-        String optype = expr.attributes.get("optype");
-        expr.attributes.put("optype", "vector" + optype);
     }
 
     /**

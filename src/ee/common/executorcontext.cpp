@@ -120,6 +120,13 @@ Table* ExecutorContext::executeExecutors(int subqueryId) const
     return executorList[ttl-1]->getPlanNode()->getOutputTable();
 }
 
+Table* ExecutorContext::getSubqueryOutputTable(int subqueryId) const
+{
+    const std::vector<AbstractExecutor*>& executorList = getExecutors(subqueryId);
+    assert(!executorList.empty());
+    return executorList.back()->getPlanNode()->getOutputTable();
+}
+
 void ExecutorContext::cleanupExecutors(int subqueryId) const
 {
     const std::vector<AbstractExecutor*>& executorList = getExecutors(subqueryId);

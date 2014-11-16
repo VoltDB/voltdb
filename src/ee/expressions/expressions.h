@@ -52,6 +52,7 @@
 
 #include "expressions/operatorexpression.h"
 #include "expressions/comparisonexpression.h"
+#include "expressions/incomparisonexpression.h"
 #include "expressions/conjunctionexpression.h"
 #include "expressions/constantvalueexpression.h"
 #include "expressions/functionexpression.h"

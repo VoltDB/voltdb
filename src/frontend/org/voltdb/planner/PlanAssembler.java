@@ -41,7 +41,7 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
-import org.voltdb.expressions.SubqueryExpression;
+import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
@@ -68,7 +68,6 @@ import org.voltdb.plannodes.PartialAggregatePlanNode;
 import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
-import org.voltdb.plannodes.SemiSeqScanPlanNode;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.UnionPlanNode;
@@ -94,13 +93,11 @@ public class PlanAssembler {
     private static class ParsedResultAccumulator {
         public final boolean m_orderIsDeterministic;
         public final boolean m_hasLimitOrOffset;
-        public final int m_planId;
 
-        public ParsedResultAccumulator(boolean orderIsDeterministic, boolean hasLimitOrOffset, int planId)
+        public ParsedResultAccumulator(boolean orderIsDeterministic, boolean hasLimitOrOffset)
         {
             m_orderIsDeterministic = orderIsDeterministic;
             m_hasLimitOrOffset  = hasLimitOrOffset;
-            m_planId = planId;
         }
     }
 
@@ -343,7 +340,7 @@ public class PlanAssembler {
 
         // Get the best plans for the expression subqueries ( IN/EXISTS (SELECT...) )
         List<AbstractExpression> subqueryExprs = parsedStmt.findAllSubexpressionsOfClass(
-                SubqueryExpression.class);
+                SelectSubqueryExpression.class);
         ParsedResultAccumulator exprSubqueryResult = null;
         if ( ! subqueryExprs.isEmpty() ) {
             if (parsedStmt instanceof ParsedSelectStmt == false) {
@@ -468,7 +465,7 @@ public class PlanAssembler {
         // need to reset plan id for the entire SQL
         m_planSelector.m_planId = nextPlanId;
 
-        return new ParsedResultAccumulator(orderIsDeterministic, hasSignificantOffsetOrLimit, nextPlanId);
+        return new ParsedResultAccumulator(orderIsDeterministic, hasSignificantOffsetOrLimit);
     }
 
 
@@ -481,11 +478,11 @@ public class PlanAssembler {
         int nextPlanId = m_planSelector.m_planId;
 
         for (AbstractExpression expr : subqueryExprs) {
-            if (!(expr instanceof SubqueryExpression)) {
+            if (!(expr instanceof SelectSubqueryExpression)) {
                 // it can be IN (values)
                 continue;
             }
-            SubqueryExpression subqueryExpr = (SubqueryExpression) expr;
+            SelectSubqueryExpression subqueryExpr = (SelectSubqueryExpression) expr;
             StmtSubqueryScan subqueryScan = subqueryExpr.getTable();
             nextPlanId = planForParsedSubquery(subqueryScan, nextPlanId);
             CompiledPlan bestPlan = subqueryScan.getBestCostPlan();
@@ -501,11 +498,11 @@ public class PlanAssembler {
                 m_recentErrorMsg = "IN/EXISTS subquery clauses are only supported in single partition procedures";
                 return false;
             }
-            // For IN Expressions only
-            if (ExpressionType.IN_SUBQUERY  == expr.getExpressionType()) {
-                // Add an artificial SeqScan on top of the subquery plan
-                addScanToInSubquery(subqueryExpr);
-            }
+//            // For IN Expressions only
+//            if (ExpressionType.IN_SUBQUERY  == expr.getExpressionType()) {
+//                // Add an artificial SeqScan on top of the subquery plan
+//                addScanToInSubquery(subqueryExpr);
+//            }
         }
         // need to reset plan id for the entire SQL
         m_planSelector.m_planId = nextPlanId;
@@ -513,28 +510,28 @@ public class PlanAssembler {
         return true;
     }
 
-    /*
-     * Create a SemiSeqScan node to aid the EE to perform the scan of the
-     * subquery output table. The scan will have a predicate built from
-     * the IN expression:
-     * outer_expr IN (SELECT inner_expr FROM ... WHERE subq_where)
-     * The predicate: outer_expr=inner_expr
-     * The node's executor quits either after it encounters the first tuple
-     * satisfied the predicate or after the whole table is exhausted.
-     * @param subqueryExpr The subquery Expression
-     * @param inColumnsExpr - PVE for each column from the IN list combined by the AND expression
-     */
-    private void addScanToInSubquery(SubqueryExpression subqueryExpr) {
-        // Get the top node from the subquery best plan
-        AbstractPlanNode subqueryNode = subqueryExpr.getSubqueryNode();
-        assert(subqueryNode != null);
-        AbstractExpression inColumnsExpr = subqueryExpr.getLeft();
-        assert(inColumnsExpr != null);
-        SemiSeqScanPlanNode inScanNode = new SemiSeqScanPlanNode(subqueryExpr.getTable().getTableName(), inColumnsExpr);
-        // Add the new node to the top
-        inScanNode.addAndLinkChild(subqueryNode);
-        subqueryExpr.setSubqueryNode(inScanNode);
-    }
+//    /*
+//     * Create a SemiSeqScan node to aid the EE to perform the scan of the
+//     * subquery output table. The scan will have a predicate built from
+//     * the IN expression:
+//     * outer_expr IN (SELECT inner_expr FROM ... WHERE subq_where)
+//     * The predicate: outer_expr=inner_expr
+//     * The node's executor quits either after it encounters the first tuple
+//     * satisfied the predicate or after the whole table is exhausted.
+//     * @param subqueryExpr The subquery Expression
+//     * @param inColumnsExpr - PVE for each column from the IN list combined by the AND expression
+//     */
+//    private void addScanToInSubquery(SubqueryExpression subqueryExpr) {
+//        // Get the top node from the subquery best plan
+//        AbstractPlanNode subqueryNode = subqueryExpr.getSubqueryNode();
+//        assert(subqueryNode != null);
+//        AbstractExpression inColumnsExpr = subqueryExpr.getLeft();
+//        assert(inColumnsExpr != null);
+//        SemiSeqScanPlanNode inScanNode = new SemiSeqScanPlanNode(subqueryExpr.getTable().getTableName(), inColumnsExpr);
+//        // Add the new node to the top
+//        inScanNode.addAndLinkChild(subqueryNode);
+//        subqueryExpr.setSubqueryNode(inScanNode);
+//    }
 
     /**
      * Generate a unique and correct plan for the current SQL statement context.

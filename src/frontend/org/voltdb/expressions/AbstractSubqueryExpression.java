@@ -53,7 +53,7 @@ public abstract class AbstractSubqueryExpression extends AbstractExpression {
     protected List<Integer> m_parameterIdxList = new ArrayList<Integer>();
 
     protected AbstractSubqueryExpression() {
-        m_valueType = VoltType.TINYINT;
+        m_valueType = VoltType.BIGINT;
         m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
     }
 
@@ -100,8 +100,11 @@ public abstract class AbstractSubqueryExpression extends AbstractExpression {
         clone.setExpressionType(m_type);
         clone.m_valueType = m_valueType;
         clone.m_valueSize = m_valueSize;
-        for (Integer paramIdx : m_parameterIdxList) {
-            clone.m_parameterIdxList.add(new Integer(paramIdx));
+        if (!m_parameterIdxList.isEmpty()) {
+            clone.m_parameterIdxList = new ArrayList<Integer>();
+            for (Integer paramIdx : m_parameterIdxList) {
+                clone.m_parameterIdxList.add(new Integer(paramIdx.intValue()));
+            }
         }
         return clone;
     }
@@ -115,10 +118,9 @@ public abstract class AbstractSubqueryExpression extends AbstractExpression {
 
     }
 
-
     @Override
     public boolean equals(Object obj) {
-        if (super.equals(obj)) {
+        if (super.equals(obj) && obj instanceof AbstractSubqueryExpression) {
             AbstractSubqueryExpression other = (AbstractSubqueryExpression) obj;
             // Expressions are equal if they have the same subquery id (refer to the same subquery)
             return m_subqueryId == other.m_subqueryId;

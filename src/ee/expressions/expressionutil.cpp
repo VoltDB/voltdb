@@ -175,6 +175,18 @@ getMoreSpecialized(ExpressionType c, L* l, R* r)
     }
 }
 
+static AbstractExpression *
+getInSelectComparison(AbstractExpression *lc, AbstractExpression *rc)
+{
+    SubqueryExpression *l_subquery =
+      dynamic_cast<SubqueryExpression*>(lc);
+    if (l_subquery != NULL) {
+        return new InComparisonExpression<SubqueryValueExtractor>(lc, rc);
+    } else {
+        return new InComparisonExpression<NValueExtractor>(lc, rc);
+    }
+}
+
 /** convert the enumerated value type into a concrete c type for the
  * comparison helper templates. */
 AbstractExpression *
@@ -203,6 +215,12 @@ ExpressionUtil::comparisonFactory(ExpressionType et, AbstractExpression *lc, Abs
         return getMoreSpecialized<TupleValueExpression, ConstantValueExpression >(et, l_tuple, r_const);
     } else if (l_tuple != NULL && r_tuple != NULL) { // TUPLE-TUPLE
         return getMoreSpecialized<TupleValueExpression, TupleValueExpression>(et, l_tuple, r_tuple);
+    }
+
+    SubqueryExpression *r_subquery =
+        dynamic_cast<SubqueryExpression*>(rc);
+    if (et == EXPRESSION_TYPE_COMPARE_IN && r_subquery != NULL) { // ...IN (SELECT....)
+        return getInSelectComparison(lc, rc);
     }
 
     //okay, still getTypedValue is beneficial.
@@ -240,6 +258,10 @@ operatorFactory(ExpressionType et,
 
      case (EXPRESSION_TYPE_OPERATOR_IS_NULL):
          ret = new OperatorIsNullExpression(lc);
+         break;
+
+     case (EXPRESSION_TYPE_OPERATOR_EXISTS):
+         ret = new OperatorExistsExpression(lc);
          break;
 
      case (EXPRESSION_TYPE_OPERATOR_MOD):
@@ -429,6 +451,7 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
     case (EXPRESSION_TYPE_OPERATOR_MOD):
     case (EXPRESSION_TYPE_OPERATOR_NOT):
     case (EXPRESSION_TYPE_OPERATOR_IS_NULL):
+    case (EXPRESSION_TYPE_OPERATOR_EXISTS):
         ret = operatorFactory(et, lc, rc);
     break;
 
@@ -517,10 +540,9 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
         break;
 
     // Subquery
-    case (EXPRESSION_TYPE_IN_SUBQUERY):
-    case (EXPRESSION_TYPE_EXISTS_SUBQUERY):
-    case (EXPRESSION_TYPE_SCALAR_SUBQUERY):
     case (EXPRESSION_TYPE_ROW_SUBQUERY):
+    case (EXPRESSION_TYPE_SCALAR_SUBQUERY):
+    case (EXPRESSION_TYPE_SELECT_SUBQUERY):
         ret = subqueryFactory(et, obj, args);
         break;
 
