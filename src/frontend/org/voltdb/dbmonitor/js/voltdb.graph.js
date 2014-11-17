@@ -375,7 +375,7 @@
             transactionChart = transactinoChartObj;
             currentView = view;
             MonitorGraphUI.Monitors = {                
-                'latHistogram': null,
+                'latHistogram': {},
                 'latData': getEmptyDataOptimized(),
                 'latDataMin': getEmptyDataForMinutesOptimized(),
                 'latDataDay': getEmptyDataForDaysOptimized(),
@@ -490,28 +490,32 @@
             var dataLat = monitor.latData;
             var dataLatMin = monitor.latDataMin;
             var dataLatDay = monitor.latDataDay;
-            var strLatStats = "";
             var timeStamp;
+            var maxLatency = 0;
 
             // Compute latency statistics
-            jQuery.each(latency, function (id, val) {
-                strLatStats += val["UNCOMPRESSED_HISTOGRAM"];
+            jQuery.each(latency, function(id, val) {
+                var strLatStats = val["UNCOMPRESSED_HISTOGRAM"];
                 timeStamp = val["TIMESTAMP"];
+                var latStats = convert2Histogram(strLatStats);
+
+                var singlelat = 0;
+                if (!monitor.latHistogram.hasOwnProperty(id))
+                    singlelat = latStats.getValueAtPercentile(99);
+                else
+                    singlelat = monitor.latHistogram[id].diff(latStats).getValueAtPercentile(99);
+                singlelat = parseFloat(singlelat).toFixed(1) * 1;
+
+                if (singlelat > maxLatency) {
+                    maxLatency = singlelat;
+                }
+
+                monitor.latHistogram[id] = latStats;
             });
 
-            var latStats = convert2Histogram(strLatStats);
-            
-            var lat = 0;
-            if (monitor.latHistogram == null)
-                lat = latStats.getValueAtPercentile(99);
-            else
-                lat = monitor.latHistogram.diff(latStats).getValueAtPercentile(99);
-            lat = parseFloat(lat).toFixed(1) * 1;
-
+            var lat = maxLatency;
             if (lat < 0)
                 lat = 0;
-
-            monitor.latHistogram = latStats;
 
             if (latSecCount == 6 || monitor.latFirstData) {
                 dataLatMin = sliceFirstData(dataLatMin, dataView.Minutes);
@@ -548,7 +552,7 @@
             latSecCount++;
             latMinCount++;
         };
-
+        
         this.RefreshMemory = function (memoryDetails, currentServer, graphView, currentTab) {
             var monitor = MonitorGraphUI.Monitors;
             var dataMem = monitor.memData;
