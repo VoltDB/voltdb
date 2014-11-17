@@ -64,7 +64,7 @@ public enum ExpressionType {
         // logical not
     OPERATOR_IS_NULL               (OperatorExpression.class,  9, "IS NULL"),
     // unary null evaluation
-    OPERATOR_EXISTS                (OperatorExpression.class, 18, "EXISTS"),
+    OPERATOR_EXISTS                (OperatorExpression.class, 19, "EXISTS"),
     // unary exists evaluation
 
     // ----------------------------
@@ -84,8 +84,10 @@ public enum ExpressionType {
         // greater than equal operator between left and right
     COMPARE_LIKE                 (ComparisonExpression.class, 16, "LIKE"),
         // LIKE operator (left LIKE right). both children must be string.
-    COMPARE_IN                 (InComparisonExpression.class, 17, "IN"),
+    COMPARE_IN                   (InComparisonExpression.class, 17, "IN"),
         // IN operator. left IN right. right must be VectorValue
+    COMPARE_IN_SUBQUERY         (ComparisonExpression.class, 18, "IN"),
+    // IN operator. left IN right. right must be a subquery
 
     // ----------------------------
     // Conjunction Operator

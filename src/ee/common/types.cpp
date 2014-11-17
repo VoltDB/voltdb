@@ -532,6 +532,9 @@ string expressionToString(ExpressionType type)
     case EXPRESSION_TYPE_COMPARE_IN: {
         return "COMPARE_IN";
     }
+    case EXPRESSION_TYPE_COMPARE_IN_SUBQUERY: {
+        return "COMPARE_IN_SUBQUERY";
+    }
     case EXPRESSION_TYPE_CONJUNCTION_AND: {
         return "CONJUNCTION_AND";
     }
@@ -639,6 +642,8 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_COMPARE_LIKE;
     } else if (str == "COMPARE_IN") {
         return EXPRESSION_TYPE_COMPARE_IN;
+    } else if (str == "COMPARE_IN_SUBQUERY") {
+        return EXPRESSION_TYPE_COMPARE_IN_SUBQUERY;
     } else if (str == "CONJUNCTION_AND") {
         return EXPRESSION_TYPE_CONJUNCTION_AND;
     } else if (str == "CONJUNCTION_OR") {

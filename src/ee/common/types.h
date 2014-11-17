@@ -264,7 +264,7 @@ enum ExpressionType {
     EXPRESSION_TYPE_OPERATOR_CAST                   = 7, // explicitly cast left as right (right is integer in ValueType enum)
     EXPRESSION_TYPE_OPERATOR_NOT                    = 8, // logical not operator
     EXPRESSION_TYPE_OPERATOR_IS_NULL                = 9, // is null test.
-    EXPRESSION_TYPE_OPERATOR_EXISTS                 = 18, // exists test.
+    EXPRESSION_TYPE_OPERATOR_EXISTS                 = 19, // exists test.
 
     // -----------------------------
     // Comparison Operators
@@ -277,6 +277,7 @@ enum ExpressionType {
     EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO    = 15, // greater than equal operator between left and right
     EXPRESSION_TYPE_COMPARE_LIKE                    = 16, // LIKE operator (left LIKE right). both children must be string.
     EXPRESSION_TYPE_COMPARE_IN                      = 17, // IN operator [left IN (right1, right2, ...)]
+    EXPRESSION_TYPE_COMPARE_IN_SUBQUERY             = 18, // IN operator [left IN (SELECT ...)]
 
     // -----------------------------
     // Conjunction Operators

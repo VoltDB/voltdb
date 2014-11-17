@@ -256,6 +256,7 @@ CTX.INPUT['executors'] = """
 CTX.INPUT['expressions'] = """
  abstractexpression.cpp
  expressionutil.cpp
+ incomparisonexpression.cpp
  vectorexpression.cpp
  functionexpression.cpp
  tupleaddressexpression.cpp

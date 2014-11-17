@@ -178,42 +178,5 @@ NValue InComparisonExpression<ValueExtractor>::eval(const TableTuple *tuple1, co
     return retval;
 }
 
-SubqueryValueExtractor::SubqueryValueExtractor(NValue value) :
-    m_tuple()
-{
-    int subqueryId = ValuePeeker::peekInteger(value);
-    ExecutorContext* exeContext = ExecutorContext::getExecutorContext();
-    Table* table = exeContext->getSubqueryOutputTable(subqueryId);
-    assert(table != NULL);
-    if (table->activeTupleCount() > 1) {
-        // throw runtime exception
-        char message[256];
-        snprintf(message, 256, "More than one row returned by a scalar/row subquery");
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
-    }
-    if (table->activeTupleCount() != 0) {
-        m_tuple.setSchema(table->schema());
-        TableIterator& iterator = table->iterator();
-        iterator.next(m_tuple);
-    }
-}
-
-bool SubqueryValueExtractor::isNUllOrEmpty() const
-{
-    if (m_tuple.isNullTuple() == false)
-    {
-        int size = m_tuple.getSchema()->columnCount();
-        for (int i = 0; i < size; ++i)
-        {
-            if (m_tuple.isNull(i) == true)
-            {
-                    return true;
-            }
-        }
-        return false;
-    }
-    return true;
-}
-
 }
 #endif
