@@ -14,7 +14,7 @@
         var latMinCount = 0;
         var totalEmptyData = 121;
         var totalEmptyDataForMinutes = 121;
-        var totalEmptyDataForDays = 180;
+        var totalEmptyDataForDays = 360;
         var cpuChart;
         var ramChart;
         var latencyChart;
@@ -77,7 +77,7 @@
         function getEmptyDataForMinutesOptimized() {
             var arr = [];
             arr.push(emptyDataForMinutes[0]);
-            arr.push(emptyDataForMinutes[emptyData.length - 1]);
+            arr.push(emptyDataForMinutes[emptyDataForMinutes.length - 1]);
 
             return arr;
         }
@@ -85,7 +85,7 @@
         function getEmptyDataForDaysOptimized() {
             var arr = [];
             arr.push(emptyDataForDays[0]);
-            arr.push(emptyDataForDays[emptyData.length - 1]);
+            arr.push(emptyDataForDays[emptyDataForDays.length - 1]);
 
             return arr;
         }
@@ -403,7 +403,7 @@
             changeAxisTimeFormat(view);
         };
 
-        this.RefreshGraph = function(view) {
+        this.RefreshGraph = function (view) {
             if (view == 'Days') {
                 dataCpu[0]["values"] = MonitorGraphUI.Monitors.cpuDataHrs;
                 dataTransactions[0]["values"] = MonitorGraphUI.Monitors.tpsDataDay;
@@ -472,13 +472,19 @@
         function sliceFirstData(dataArray, view) {
 
             var total = totalEmptyData;
-            if (view == dataView.Minutes)
+            var refEmptyData = emptyData;
+            
+            if (view == dataView.Minutes) {
                 total = totalEmptyDataForMinutes;
-            else if (view == dataView.Days)
+                refEmptyData = emptyDataForMinutes;
+            }
+            else if (view == dataView.Days) {
                 total = totalEmptyDataForDays;
+                refEmptyData = emptyDataForDays;
+            }
 
             if (dataArray.length <= total)
-                dataArray[0] = emptyData[dataArray.length - 1];
+                dataArray[0] = refEmptyData[dataArray.length - 1];
             else
                 dataArray = dataArray.slice(1);
 
