@@ -229,4 +229,14 @@ public class PlannerTestCase extends TestCase {
         return explain;
     }
 
+    protected void checkQueriesPlansAreTheSame(String sql1, String sql2) {
+        String explainStr1, explainStr2;
+        List<AbstractPlanNode> pns = compileToFragments(sql1);
+        explainStr1 = buildExplainPlan(pns);
+        pns = compileToFragments(sql2);
+        explainStr2 = buildExplainPlan(pns);
+
+        assertEquals(explainStr1, explainStr2);
+    }
+
 }

@@ -88,10 +88,19 @@ SELECT 23,               A._variable[#GB1 @columntype],  A._variable[#GB2 @colum
 SELECT     @agg(                     @optionalfn(        A._variable[@columntype]     )), @agg(@optionalfn(A._variable[@columntype])) AS Q24 FROM @fromtables A
 SELECT     @agg(                     @optionalfn(        A._variable[@columntype]     )), COUNT(*)                                    AS Q25 FROM @fromtables A
 
--- group by alias (50 - 60)
+-- group by alias (50 - 55)
 SELECT 50,                           @optionalfn(@onefun(A._variable[#GB @columntype])) as tag , @agg(            A._variable[@columntype] )        FROM @fromtables A GROUP BY tag
 SELECT 51,                           A._variable[#GB @columntype] as tag ,                       @agg(            A._variable[@columntype] )        FROM @fromtables A GROUP BY tag
 SELECT 52,              @optionalfn(@onefun(A._variable[#GB @columntype])) as tag1,  A._variable[@columntype] as tag2,  @agg(           A._variable[@columntype])         FROM @fromtables A GROUP BY        tag2, tag1
+
+-- DISTINCT expression (56 - 60)
+-- basic select template has covered multiple columns distinct
+SELECT DISTINCT @optionalfn(A._variable[@columntype]) AS C56, A._variable FROM @fromtables A 
+SELECT DISTINCT @onefun(A._variable[@columntype]) AS C56, A._variable FROM @fromtables A ORDER BY 1, 2 LIMIT 10 
+
+-- Edge case: table aggregate with DISTINCT
+SELECT DISTINCT COUNT(*) FROM @fromtables A 
+SELECT DISTINCT @agg( A._variable[@columntype] ), COUNT(*)  FROM   @fromtables A 
 
 -- update
 -- compare two cols
