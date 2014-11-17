@@ -214,6 +214,8 @@ public:
         return ENGINE_ERRORCODE_SUCCESS;
     }
 
+private:
+
     /** Clean up resources assocated with each executor and plan node. */
     void cleanup(bool hasException) {
         // Clean up all the tempTables when each plan finishes
@@ -234,8 +236,6 @@ public:
 
         m_limits.resetPeakMemory();
     }
-
-private:
 
     void initPlanNode(VoltDBEngine* engine, AbstractPlanNode* node)
     {
@@ -1240,6 +1240,54 @@ void VoltDBEngine::rebuildTableCollections()
 static const std::string PURGE_FRAGMENT_JSON =
     "{\"PLAN_NODES\":[{\"ID\":5,\"PLAN_NODE_TYPE\":\"DELETE\",\"CHILDREN_IDS\":[6],\"TARGET_TABLE_NAME\":\"CAPPED3_LIMIT_ROWS_EXEC\",\"TRUNCATE\":false},{\"ID\":6,\"PLAN_NODE_TYPE\":\"SEQSCAN\",\"INLINE_NODES\":[{\"ID\":0,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"tuple_address\",\"EXPRESSION\":{\"TYPE\":33,\"VALUE_TYPE\":6}}]}],\"PREDICATE\":{\"TYPE\":20,\"VALUE_TYPE\":6,\"LEFT\":{\"TYPE\":11,\"VALUE_TYPE\":6,\"LEFT\":{\"TYPE\":32,\"VALUE_TYPE\":3,\"COLUMN_IDX\":0},\"RIGHT\":{\"TYPE\":30,\"VALUE_TYPE\":5,\"ISNULL\":false,\"VALUE\":0}},\"RIGHT\":{\"TYPE\":11,\"VALUE_TYPE\":6,\"LEFT\":{\"TYPE\":32,\"VALUE_TYPE\":3,\"COLUMN_IDX\":0},\"RIGHT\":{\"TYPE\":30,\"VALUE_TYPE\":5,\"ISNULL\":false,\"VALUE\":0}}},\"TARGET_TABLE_NAME\":\"CAPPED3_LIMIT_ROWS_EXEC\",\"TARGET_TABLE_ALIAS\":\"CAPPED3_LIMIT_ROWS_EXEC\"}],\"EXECUTE_LIST\":[6,5]}";
 
+static boost::shared_ptr<ExecutorVector> jsonPlanToExecutorVector(VoltDBEngine* engine,
+                                                                  const std::string& jsonPlan,
+                                                                  int64_t fragId) {
+    PlanNodeFragment *pnf = NULL;
+    try {
+        pnf = PlanNodeFragment::createFromCatalog(jsonPlan);
+    }
+    catch (SerializableEEException &seee) {
+        throw;
+    }
+    catch (...) {
+        char msg[1024 * 100];
+        snprintf(msg, 1024 * 100, "Unable to initialize PlanNodeFragment for PlanFragment '%jd' with plan:\n%s",
+                 (intmax_t)fragId, jsonPlan.c_str());
+        VOLT_ERROR("%s", msg);
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
+    }
+    VOLT_TRACE("\n%s\n", pnf->debug().c_str());
+    assert(pnf->getRootNode());
+
+    if (!pnf->getRootNode()) {
+        char msg[1024];
+        snprintf(msg, 1024, "Deserialized PlanNodeFragment for PlanFragment '%jd' does not have a root PlanNode",
+                 (intmax_t)fragId);
+        VOLT_ERROR("%s", msg);
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
+    }
+
+    int64_t tempTableLogLimit = engine->tempTableLogLimit();
+    int64_t tempTableMemoryLimit = engine->tempTableMemoryLimit();
+
+    // ENG-1333 HACK.  If the plan node fragment has a delete node,
+    // then turn off the governors
+    if (pnf->hasDelete()) {
+        tempTableLogLimit = DEFAULT_TEMP_TABLE_MEMORY;
+        tempTableMemoryLimit = -1;
+    }
+
+    // Note: the executor vector takes ownership of the plan node
+    // fragment here.
+    boost::shared_ptr<ExecutorVector> ev(new ExecutorVector(fragId,
+                                                            tempTableLogLimit,
+                                                            tempTableMemoryLimit,
+                                                            pnf));
+    ev->init(engine);
+    return ev;
+}
+
 ExecutorVector *VoltDBEngine::getExecutorVectorForFragmentId(const int64_t fragId)
 {
     if (m_plans) {
@@ -1280,49 +1328,13 @@ ExecutorVector *VoltDBEngine::getExecutorVectorForFragmentId(const int64_t fragI
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
         }
 
-        PlanNodeFragment *pnf = NULL;
-        try {
-            pnf = PlanNodeFragment::createFromCatalog(plan);
-        }
-        catch (SerializableEEException &seee) {
-            throw;
-        }
-        catch (...) {
-            char msg[1024 * 100];
-            snprintf(msg, 1024 * 100, "Unable to initialize PlanNodeFragment for PlanFragment '%jd' with plan:\n%s",
-                     (intmax_t)fragId, plan.c_str());
-            VOLT_ERROR("%s", msg);
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
-        }
-        VOLT_TRACE("\n%s\n", pnf->debug().c_str());
-        assert(pnf->getRootNode());
-
-        if (!pnf->getRootNode()) {
-            char msg[1024];
-            snprintf(msg, 1024, "Deserialized PlanNodeFragment for PlanFragment '%jd' does not have a root PlanNode",
-                     (intmax_t)fragId);
-            VOLT_ERROR("%s", msg);
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
-        }
-
-        // ENG-1333 HACK.  If the plan node fragment has a delete node,
-        // then turn off the governors
-        int64_t frag_temptable_log_limit = (m_tempTableMemoryLimit * 3) / 4;
-        int64_t frag_temptable_limit = m_tempTableMemoryLimit;
-        if (pnf->hasDelete()) {
-            frag_temptable_log_limit = DEFAULT_TEMP_TABLE_MEMORY;
-            frag_temptable_limit = -1;
-        }
-
-        // Note: the executor vector takes ownership of the plan node
-        // fragment here.
-        ExecutorVector* ev =
-          new ExecutorVector(fragId, frag_temptable_log_limit, frag_temptable_limit, pnf);
-        boost::shared_ptr<ExecutorVector> ev_guard(ev);
-        ev->init(this);
+        boost::shared_ptr<ExecutorVector> ev = jsonPlanToExecutorVector(this, plan, fragId);
 
         // add the plan to the back
-        plans.get<0>().push_back(ev_guard);
+        //
+        // (Why to the back?  Shouldn't it be at the front with the
+        // most recently used items?)
+        plans.get<0>().push_back(ev);
 
         // remove a plan from the front if the cache is full
         if (plans.size() > PLAN_CACHE_SIZE) {
@@ -1330,7 +1342,7 @@ ExecutorVector *VoltDBEngine::getExecutorVectorForFragmentId(const int64_t fragI
             plans.erase(iter);
         }
     //TODO -- properly re-indent the section above
-    return ev;
+    return ev.get();
 }
 
 // -------------------------------------------------
