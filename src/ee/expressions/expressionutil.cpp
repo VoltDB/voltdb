@@ -193,6 +193,10 @@ AbstractExpression *
 ExpressionUtil::comparisonFactory(ExpressionType et, AbstractExpression *lc, AbstractExpression *rc)
 {
     assert(lc);
+    if (EXPRESSION_TYPE_COMPARE_IN_SUBQUERY == et) {
+        return getInSelectComparison(lc, rc);
+    }
+
     // more specialization available?
     ConstantValueExpression *l_const =
       dynamic_cast<ConstantValueExpression*>(lc);
@@ -215,12 +219,6 @@ ExpressionUtil::comparisonFactory(ExpressionType et, AbstractExpression *lc, Abs
         return getMoreSpecialized<TupleValueExpression, ConstantValueExpression >(et, l_tuple, r_const);
     } else if (l_tuple != NULL && r_tuple != NULL) { // TUPLE-TUPLE
         return getMoreSpecialized<TupleValueExpression, TupleValueExpression>(et, l_tuple, r_tuple);
-    }
-
-    SubqueryExpression *r_subquery =
-        dynamic_cast<SubqueryExpression*>(rc);
-    if (et == EXPRESSION_TYPE_COMPARE_IN && r_subquery != NULL) { // ...IN (SELECT....)
-        return getInSelectComparison(lc, rc);
     }
 
     //okay, still getTypedValue is beneficial.
@@ -464,6 +462,7 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
     case (EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO):
     case (EXPRESSION_TYPE_COMPARE_LIKE):
     case (EXPRESSION_TYPE_COMPARE_IN):
+    case (EXPRESSION_TYPE_COMPARE_IN_SUBQUERY):
         ret = comparisonFactory( et, lc, rc);
     break;
 
