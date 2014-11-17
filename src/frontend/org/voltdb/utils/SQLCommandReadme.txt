@@ -9,18 +9,22 @@ of a script.
 
 The command line for running the sqlcmd utility is the following:
 
-    $ ./sqlcmd  [options]  [command]
+    $ sqlcmd  [options]  [command]
 
-The options let you specify what database to connect to and how the output is
-formatted. The allowable options are:
+The options let you specify what database to connect to, the source of the
+command input and the format of the output. The allowable options are:
 
     --help or --usage
     --servers=comma_separated_server_list
     --port=port_number
     --user=user
     --password=password
+    --kerberos=jaas_login_configuration_entry_key
     --output-format={fixed|csv|tab}
     --output-skip-metadata
+    --query=query
+    --on-error=(stop|continue)
+    --debug
 
 
 If you specify a command when you invoke the utility, that command is executed
@@ -84,7 +88,7 @@ Executing SQL Statements -------------------------------------------------------
   Note that sqlcmd does not complete terms and database objects in the body of the 
   command.
 
-+ To request execution, enter a semi-colon at the end of a statement, or enter the
++ To request execution, enter a semi-colon at the end of a line, or enter the
   interactive command GO.
 
 
