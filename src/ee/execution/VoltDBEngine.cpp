@@ -54,6 +54,7 @@
 #include "catalog/database.h"
 #include "catalog/index.h"
 #include "catalog/materializedviewinfo.h"
+#include "catalog/planfragment.h"
 #include "catalog/procedure.h"
 #include "catalog/statement.h"
 #include "catalog/table.h"
@@ -124,25 +125,55 @@ typedef std::pair<std::string, catalog::MaterializedViewInfo*> LabeledView;
 class ExecutorVector {
 public:
     /**
-     * Construct an ExecutorVector instance.  Object will not be
-     * initialized until its init method is called.  (Initialization
-     * has been placed there to avoid throwing an exception in the
-     * constructor.)
-     *
-     * Note: This constructed instance of ExecutorVector takes
-     * ownership of the PlanNodeFragment here; it will be released
-     * (automatically via boost::scoped_ptr) when this instance goes
-     * away.
+     * This is the static factory method for creating instances of
+     * this class from a plan serialized to JSON.
      */
-    ExecutorVector(int64_t fragmentId,
-                   int64_t logThreshold,
-                   int64_t memoryLimit,
-                   PlanNodeFragment* fragment)
-        : m_fragId(fragmentId)
-        , m_list()
-        , m_limits(memoryLimit, logThreshold)
-        , m_fragment(fragment)
-    {
+    static boost::shared_ptr<ExecutorVector> fromJsonPlan(VoltDBEngine* engine,
+                                                          const std::string& jsonPlan,
+                                                          int64_t fragId) {
+        PlanNodeFragment *pnf = NULL;
+        try {
+            pnf = PlanNodeFragment::createFromCatalog(jsonPlan);
+        }
+        catch (SerializableEEException &seee) {
+            throw;
+        }
+        catch (...) {
+            char msg[1024 * 100];
+            snprintf(msg, 1024 * 100, "Unable to initialize PlanNodeFragment for PlanFragment '%jd' with plan:\n%s",
+                     (intmax_t)fragId, jsonPlan.c_str());
+            VOLT_ERROR("%s", msg);
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
+        }
+        VOLT_TRACE("\n%s\n", pnf->debug().c_str());
+        assert(pnf->getRootNode());
+
+        if (!pnf->getRootNode()) {
+            char msg[1024];
+            snprintf(msg, 1024, "Deserialized PlanNodeFragment for PlanFragment '%jd' does not have a root PlanNode",
+                     (intmax_t)fragId);
+            VOLT_ERROR("%s", msg);
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
+        }
+
+        int64_t tempTableLogLimit = engine->tempTableLogLimit();
+        int64_t tempTableMemoryLimit = engine->tempTableMemoryLimit();
+
+        // ENG-1333 HACK.  If the plan node fragment has a delete node,
+        // then turn off the governors
+        if (pnf->hasDelete()) {
+            tempTableLogLimit = DEFAULT_TEMP_TABLE_MEMORY;
+            tempTableMemoryLimit = -1;
+        }
+
+        // Note: the executor vector takes ownership of the plan node
+        // fragment here.
+        boost::shared_ptr<ExecutorVector> ev(new ExecutorVector(fragId,
+                                                                tempTableLogLimit,
+                                                                tempTableMemoryLimit,
+                                                                pnf));
+        ev->init(engine);
+        return ev;
     }
 
     /** Build the list of executors from its plan node fragment */
@@ -215,6 +246,31 @@ public:
     }
 
 private:
+
+    /**
+     * This method is private.  Please use static factory method
+     * fromJsonPlan to construct an instance of ExecutorVector.
+     *
+     * Construct an ExecutorVector instance.  Object will not be
+     * initialized until its init method is called.  (Initialization
+     * has been placed there to avoid throwing an exception in the
+     * constructor.)
+     *
+     * Note: This constructed instance of ExecutorVector takes
+     * ownership of the PlanNodeFragment here; it will be released
+     * (automatically via boost::scoped_ptr) when this instance goes
+     * away.
+     */
+    ExecutorVector(int64_t fragmentId,
+                   int64_t logThreshold,
+                   int64_t memoryLimit,
+                   PlanNodeFragment* fragment)
+        : m_fragId(fragmentId)
+        , m_list()
+        , m_limits(memoryLimit, logThreshold)
+        , m_fragment(fragment)
+    {
+    }
 
     /** Clean up resources assocated with each executor and plan node. */
     void cleanup(bool hasException) {
@@ -966,6 +1022,11 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
             // the new tuple limit.
             //
             persistenttable->setTupleLimit(catalogTable->tuplelimit());
+            if (catalogTable->tuplelimitDeleteStmt().size() > 0) {
+                catalog::Statement* stmt = catalogTable->tuplelimitDeleteStmt().begin()->second;
+                const std::string& jsonPlan = stmt->fragments().begin()->second->plannodetree();
+                ExecutorVector::fromJsonPlan(this, jsonPlan, -1);
+            }
 
             //////////////////////////////////////////
             // find all of the indexes to add
@@ -1240,54 +1301,6 @@ void VoltDBEngine::rebuildTableCollections()
 static const std::string PURGE_FRAGMENT_JSON =
     "{\"PLAN_NODES\":[{\"ID\":5,\"PLAN_NODE_TYPE\":\"DELETE\",\"CHILDREN_IDS\":[6],\"TARGET_TABLE_NAME\":\"CAPPED3_LIMIT_ROWS_EXEC\",\"TRUNCATE\":false},{\"ID\":6,\"PLAN_NODE_TYPE\":\"SEQSCAN\",\"INLINE_NODES\":[{\"ID\":0,\"PLAN_NODE_TYPE\":\"PROJECTION\",\"OUTPUT_SCHEMA\":[{\"COLUMN_NAME\":\"tuple_address\",\"EXPRESSION\":{\"TYPE\":33,\"VALUE_TYPE\":6}}]}],\"PREDICATE\":{\"TYPE\":20,\"VALUE_TYPE\":6,\"LEFT\":{\"TYPE\":11,\"VALUE_TYPE\":6,\"LEFT\":{\"TYPE\":32,\"VALUE_TYPE\":3,\"COLUMN_IDX\":0},\"RIGHT\":{\"TYPE\":30,\"VALUE_TYPE\":5,\"ISNULL\":false,\"VALUE\":0}},\"RIGHT\":{\"TYPE\":11,\"VALUE_TYPE\":6,\"LEFT\":{\"TYPE\":32,\"VALUE_TYPE\":3,\"COLUMN_IDX\":0},\"RIGHT\":{\"TYPE\":30,\"VALUE_TYPE\":5,\"ISNULL\":false,\"VALUE\":0}}},\"TARGET_TABLE_NAME\":\"CAPPED3_LIMIT_ROWS_EXEC\",\"TARGET_TABLE_ALIAS\":\"CAPPED3_LIMIT_ROWS_EXEC\"}],\"EXECUTE_LIST\":[6,5]}";
 
-static boost::shared_ptr<ExecutorVector> jsonPlanToExecutorVector(VoltDBEngine* engine,
-                                                                  const std::string& jsonPlan,
-                                                                  int64_t fragId) {
-    PlanNodeFragment *pnf = NULL;
-    try {
-        pnf = PlanNodeFragment::createFromCatalog(jsonPlan);
-    }
-    catch (SerializableEEException &seee) {
-        throw;
-    }
-    catch (...) {
-        char msg[1024 * 100];
-        snprintf(msg, 1024 * 100, "Unable to initialize PlanNodeFragment for PlanFragment '%jd' with plan:\n%s",
-                 (intmax_t)fragId, jsonPlan.c_str());
-        VOLT_ERROR("%s", msg);
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
-    }
-    VOLT_TRACE("\n%s\n", pnf->debug().c_str());
-    assert(pnf->getRootNode());
-
-    if (!pnf->getRootNode()) {
-        char msg[1024];
-        snprintf(msg, 1024, "Deserialized PlanNodeFragment for PlanFragment '%jd' does not have a root PlanNode",
-                 (intmax_t)fragId);
-        VOLT_ERROR("%s", msg);
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
-    }
-
-    int64_t tempTableLogLimit = engine->tempTableLogLimit();
-    int64_t tempTableMemoryLimit = engine->tempTableMemoryLimit();
-
-    // ENG-1333 HACK.  If the plan node fragment has a delete node,
-    // then turn off the governors
-    if (pnf->hasDelete()) {
-        tempTableLogLimit = DEFAULT_TEMP_TABLE_MEMORY;
-        tempTableMemoryLimit = -1;
-    }
-
-    // Note: the executor vector takes ownership of the plan node
-    // fragment here.
-    boost::shared_ptr<ExecutorVector> ev(new ExecutorVector(fragId,
-                                                            tempTableLogLimit,
-                                                            tempTableMemoryLimit,
-                                                            pnf));
-    ev->init(engine);
-    return ev;
-}
-
 ExecutorVector *VoltDBEngine::getExecutorVectorForFragmentId(const int64_t fragId)
 {
     if (m_plans) {
@@ -1328,7 +1341,7 @@ ExecutorVector *VoltDBEngine::getExecutorVectorForFragmentId(const int64_t fragI
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
         }
 
-        boost::shared_ptr<ExecutorVector> ev = jsonPlanToExecutorVector(this, plan, fragId);
+        boost::shared_ptr<ExecutorVector> ev = ExecutorVector::fromJsonPlan(this, plan, fragId);
 
         // add the plan to the back
         //
