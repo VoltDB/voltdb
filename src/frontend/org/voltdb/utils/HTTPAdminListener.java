@@ -46,6 +46,9 @@ import org.voltdb.compilereport.ReportMaker;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.io.Resources;
+import java.net.InetAddress;
+import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONObject;
 
 public class HTTPAdminListener {
 
@@ -55,13 +58,53 @@ public class HTTPAdminListener {
     Map<String, String> m_htmlTemplates = new HashMap<String, String>();
     final boolean m_mustListen;
 
-    class DBMonitorHandler extends AbstractHandler {
+    //Somewhat like Filter but we dont have Filter in version and jars we use.
+    class VoltRequestHandler extends AbstractHandler {
+        VoltLogger logger = new VoltLogger("HOST");
+        private String m_hostHeader = null;
+
+        protected String getHostHeader() {
+            if (m_hostHeader != null) {
+                return m_hostHeader;
+            }
+
+            InetAddress addr = null;
+            int httpPort = VoltDB.DEFAULT_HTTP_PORT;
+            try {
+                String localMetadata = VoltDB.instance().getLocalMetadata();
+                JSONObject jsObj = new JSONObject(localMetadata);
+                JSONArray interfaces = jsObj.getJSONArray("interfaces");
+                //The first interface is external interface if specified.
+                String iface = interfaces.getString(0);
+                addr = InetAddress.getByName(iface);
+                httpPort = jsObj.getInt("httpPort");
+            } catch (Exception e) {
+                logger.warn("Failed to get HTTP interface information.", e);
+            }
+            if (addr == null) {
+                addr = org.voltcore.utils.CoreUtils.getLocalAddress();
+            }
+            //Make the header string.
+            m_hostHeader = addr.getHostAddress() + ":" + httpPort;
+            return m_hostHeader;
+        }
+
+
+        @Override
+        public void handle(String string, Request rqst, HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
+            response.setHeader("Host", getHostHeader());
+        }
+
+    }
+
+    class DBMonitorHandler extends VoltRequestHandler {
 
         @Override
         public void handle(String target, Request baseRequest,
                            HttpServletRequest request, HttpServletResponse response)
                             throws IOException, ServletException {
             VoltLogger logger = new VoltLogger("HOST");
+            super.handle(target, baseRequest, request, response);
             try{
 
                 // if this is an internal jetty retry, then just tell
@@ -153,7 +196,7 @@ public class HTTPAdminListener {
         }
     }
 
-    class CatalogRequestHandler extends AbstractHandler {
+    class CatalogRequestHandler extends VoltRequestHandler {
 
         @Override
         public void handle(String target,
@@ -162,12 +205,13 @@ public class HTTPAdminListener {
                            HttpServletResponse response)
                            throws IOException, ServletException {
 
+            super.handle(target, baseRequest, request, response);
             handleReportPage(baseRequest, response);
         }
 
     }
 
-    class DDLRequestHandler extends AbstractHandler {
+    class DDLRequestHandler extends VoltRequestHandler {
 
         @Override
         public void handle(String target,
@@ -176,6 +220,7 @@ public class HTTPAdminListener {
                            HttpServletResponse response)
                            throws IOException, ServletException {
 
+            super.handle(target, baseRequest, request, response);
             byte[] reportbytes = VoltDB.instance().getCatalogContext().getFileInJar("autogen-ddl.sql");
             String ddl = new String(reportbytes, Charsets.UTF_8);
             response.setContentType("text/plain;charset=utf-8");
@@ -186,13 +231,14 @@ public class HTTPAdminListener {
 
     }
 
-    class APIRequestHandler extends AbstractHandler {
+    class APIRequestHandler extends VoltRequestHandler {
 
         @Override
         public void handle(String target, Request baseRequest,
                            HttpServletRequest request, HttpServletResponse response)
                             throws IOException, ServletException {
             VoltLogger logger = new VoltLogger("HOST");
+            super.handle(target, baseRequest, request, response);
             try {
                 // http://www.ietf.org/rfc/rfc4627.txt dictates this mime type
                 response.setContentType("application/json;charset=utf-8");

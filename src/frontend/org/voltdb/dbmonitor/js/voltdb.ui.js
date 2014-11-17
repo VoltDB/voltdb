@@ -127,9 +127,6 @@ $(document).ready(function () {
     // Shows memory alerts
     $('#showMemoryAlerts').popup();
 
-    //error popup
-    $('#errorPopup').popup();
-
     //Logout popup
     $('#logOut').popup();
     $('#btnlogOut').popup();
@@ -858,7 +855,7 @@ var loadPage = function (serverName, portid) {
 
     var saveThreshold = function () {
 
-        var defaultThreshold = 90;
+        var defaultThreshold = 70;
         var thresholdInput = $("#threshold");
 
         if (thresholdInput.val() == "") {
