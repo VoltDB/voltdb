@@ -248,12 +248,20 @@ public class JdbcDatabaseMetaDataGenerator
         VoltTable results = new VoltTable(TABLE_SCHEMA);
         for (Table table : m_database.getTables())
         {
+            String type = getTableType(table);
+            Column partColumn;
+            if (type.equals("VIEW")) {
+                partColumn = table.getMaterializer().getPartitioncolumn();
+            }
+            else {
+                partColumn = table.getPartitioncolumn();
+            }
             // REMARKS and all following columns are always null for us.
             results.addRow(null,
                            null, // no schema name
                            table.getTypeName(),
-                           getTableType(table),
-                           null, // REMARKS
+                           type,
+                           partColumn == null ? null : partColumn.getName(), // REMARKS
                            null, // unused TYPE_CAT
                            null, // unused TYPE_SCHEM
                            null, // unused TYPE_NAME
