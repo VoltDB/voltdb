@@ -306,7 +306,7 @@ public class TestUpdateDeployment extends RegressionSuite {
         cb.waitForResponse();
         assertEquals(ClientResponse.GRACEFUL_FAILURE, cb.getResponse().getStatus());
         System.out.println(cb.getResponse().getStatusString());
-        assertTrue(cb.getResponse().getStatusString().contains("Unable to read"));
+        assertTrue(cb.getResponse().getStatusString().contains("Unable to update"));
     }
 
     private void deleteDirectory(File dir) {
