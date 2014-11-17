@@ -185,6 +185,7 @@ $(document).ready(function () {
 
     $('.cb').click(function () {
         if ($(this).is(":checked")) {
+            $('.togglex').click(function() { return false; });
             var elementList = $(".tableL1").find(".togglex");
             for ( var i = 0; i < elementList.length; i++ ) {
                 var item = elementList[i];
@@ -200,8 +201,6 @@ $(document).ready(function () {
                     var dropdownid = "#" + id + "--dropdown";
                     $(iconid).removeClass('icon-chevron-right').addClass('icon-chevron-down');
                     $(dropdownid).show();
-                    var disableLink = function(){ return false;};
-					$('a').bind('click', disableLink);
                     if (parts.length > 2) {
                         var secondary = parts[2];
                         var iconid2 = "#" + toppage + "-" + primary + "-" + secondary + "--icon";
@@ -220,8 +219,13 @@ $(document).ready(function () {
             // make arrows point the right way
             $('.icon-chevron-down').removeClass('icon-chevron-down').addClass('icon-chevron-right');
             $('.primaryrow').css('background-color', '#ffffff');
-            $('a').unbind('click', disableLink);
+            $('.togglex').unbind('click');
         }
+    });
+
+    $('#s-nav, #p-nav').click(function(){
+        $('.cb').prop('checked',false);
+        $('.togglex').unbind('click');
     });
 
     navigate($(location).attr('hash'));
