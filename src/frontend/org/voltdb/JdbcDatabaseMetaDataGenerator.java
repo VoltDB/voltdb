@@ -44,6 +44,7 @@ public class JdbcDatabaseMetaDataGenerator
     public static final String JSON_PARTITION_PARAMETER_TYPE = "partitionParameterType";
     public static final String JSON_SINGLE_PARTITION = "singlePartition";
     public static final String JSON_READ_ONLY = "readOnly";
+    public static final String JSON_PARTITION_COLUMN = "partitionColumn";
 
     static public final ColumnInfo[] TABLE_SCHEMA =
         new ColumnInfo[] {
@@ -256,12 +257,27 @@ public class JdbcDatabaseMetaDataGenerator
             else {
                 partColumn = table.getPartitioncolumn();
             }
-            // REMARKS and all following columns are always null for us.
+
+            String remark = null;
+            if (partColumn != null) {
+                try {
+                    JSONObject jsObj = new JSONObject();
+                    jsObj.put(JSON_PARTITION_COLUMN, partColumn.getName());
+                    remark = jsObj.toString();
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                    StringWriter sw = new StringWriter();
+                    PrintWriter pw = new PrintWriter(sw);
+                    e.printStackTrace(pw);
+                    pw.flush();
+                    remark = sw.toString();
+                }
+            }
             results.addRow(null,
                            null, // no schema name
                            table.getTypeName(),
                            type,
-                           partColumn == null ? null : partColumn.getName(), // REMARKS
+                           remark, // REMARKS
                            null, // unused TYPE_CAT
                            null, // unused TYPE_SCHEM
                            null, // unused TYPE_NAME
