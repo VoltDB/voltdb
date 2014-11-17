@@ -14,7 +14,7 @@
         var latMinCount = 0;
         var totalEmptyData = 121;
         var totalEmptyDataForMinutes = 121;
-        var totalEmptyDataForDays = 180;
+        var totalEmptyDataForDays = 360;
         var cpuChart;
         var ramChart;
         var latencyChart;
@@ -77,7 +77,7 @@
         function getEmptyDataForMinutesOptimized() {
             var arr = [];
             arr.push(emptyDataForMinutes[0]);
-            arr.push(emptyDataForMinutes[emptyData.length - 1]);
+            arr.push(emptyDataForMinutes[emptyDataForMinutes.length - 1]);
 
             return arr;
         }
@@ -85,7 +85,7 @@
         function getEmptyDataForDaysOptimized() {
             var arr = [];
             arr.push(emptyDataForDays[0]);
-            arr.push(emptyDataForDays[emptyData.length - 1]);
+            arr.push(emptyDataForDays[emptyDataForDays.length - 1]);
 
             return arr;
         }
@@ -375,7 +375,7 @@
             transactionChart = transactinoChartObj;
             currentView = view;
             MonitorGraphUI.Monitors = {                
-                'latHistogram': null,
+                'latHistogram': {},
                 'latData': getEmptyDataOptimized(),
                 'latDataMin': getEmptyDataForMinutesOptimized(),
                 'latDataDay': getEmptyDataForDaysOptimized(),
@@ -403,7 +403,7 @@
             changeAxisTimeFormat(view);
         };
 
-        this.RefreshGraph = function(view) {
+        this.RefreshGraph = function (view) {
             if (view == 'Days') {
                 dataCpu[0]["values"] = MonitorGraphUI.Monitors.cpuDataHrs;
                 dataTransactions[0]["values"] = MonitorGraphUI.Monitors.tpsDataDay;
@@ -472,13 +472,19 @@
         function sliceFirstData(dataArray, view) {
 
             var total = totalEmptyData;
-            if (view == dataView.Minutes)
+            var refEmptyData = emptyData;
+            
+            if (view == dataView.Minutes) {
                 total = totalEmptyDataForMinutes;
-            else if (view == dataView.Days)
+                refEmptyData = emptyDataForMinutes;
+            }
+            else if (view == dataView.Days) {
                 total = totalEmptyDataForDays;
+                refEmptyData = emptyDataForDays;
+            }
 
             if (dataArray.length <= total)
-                dataArray[0] = emptyData[dataArray.length - 1];
+                dataArray[0] = refEmptyData[dataArray.length - 1];
             else
                 dataArray = dataArray.slice(1);
 
@@ -490,28 +496,32 @@
             var dataLat = monitor.latData;
             var dataLatMin = monitor.latDataMin;
             var dataLatDay = monitor.latDataDay;
-            var strLatStats = "";
             var timeStamp;
+            var maxLatency = 0;
 
             // Compute latency statistics
-            jQuery.each(latency, function (id, val) {
-                strLatStats += val["UNCOMPRESSED_HISTOGRAM"];
+            jQuery.each(latency, function(id, val) {
+                var strLatStats = val["UNCOMPRESSED_HISTOGRAM"];
                 timeStamp = val["TIMESTAMP"];
+                var latStats = convert2Histogram(strLatStats);
+
+                var singlelat = 0;
+                if (!monitor.latHistogram.hasOwnProperty(id))
+                    singlelat = latStats.getValueAtPercentile(99);
+                else
+                    singlelat = monitor.latHistogram[id].diff(latStats).getValueAtPercentile(99);
+                singlelat = parseFloat(singlelat).toFixed(1) * 1;
+
+                if (singlelat > maxLatency) {
+                    maxLatency = singlelat;
+                }
+
+                monitor.latHistogram[id] = latStats;
             });
 
-            var latStats = convert2Histogram(strLatStats);
-            
-            var lat = 0;
-            if (monitor.latHistogram == null)
-                lat = latStats.getValueAtPercentile(99);
-            else
-                lat = monitor.latHistogram.diff(latStats).getValueAtPercentile(99);
-            lat = parseFloat(lat).toFixed(1) * 1;
-
+            var lat = maxLatency;
             if (lat < 0)
                 lat = 0;
-
-            monitor.latHistogram = latStats;
 
             if (latSecCount == 6 || monitor.latFirstData) {
                 dataLatMin = sliceFirstData(dataLatMin, dataView.Minutes);
@@ -548,7 +558,7 @@
             latSecCount++;
             latMinCount++;
         };
-
+        
         this.RefreshMemory = function (memoryDetails, currentServer, graphView, currentTab) {
             var monitor = MonitorGraphUI.Monitors;
             var dataMem = monitor.memData;
