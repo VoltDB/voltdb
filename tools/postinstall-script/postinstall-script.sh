@@ -4,13 +4,14 @@
 # ensure your PATH is configured to properly with voltdb
 # script assumes you are on a running node or exits
 
+# standard usage function
 function usage() {
-	echo "Usage: $0 [-user username] [-password password] [-admin adminport]  "
+	echo "Usage: $0 [--user username] [--password password] [--port portnumber]  "
 	echo "Description: postinstall checkup script"
 	echo "Command line parameters:"
-	echo "  -user 			login username"
-	echo "  -password		login password"
-	echo "  -admin			admin port"
+	echo "  --user 			login username"
+	echo "  --password		login password"
+	echo "  --port			portnumber"
 	echo ""
 	if [ -n "$1" ]; then
 		echo "*** ERROR: $1 ***"
@@ -82,10 +83,10 @@ PASSWORD=
 ADMINPORT=
 # check arguments
 if [ -z "$1" ]; then
-	echo "no arguments passed; no username/password/adminport provided"
+	echo "no arguments passed; no username/password/port provided"
 else
 	while [ -n "$1" ]; do
-		if [ "$1" == "-user" ]; then
+		if [ "$1" == "--user" ]; then
 			if [ -z "$2" ]; then
 				usage "You must specify an argument with $1!"
 			else
@@ -93,7 +94,7 @@ else
 				shift
 				shift
 			fi
-		elif [ "$1" == "-password" ]; then
+		elif [ "$1" == "--password" ]; then
 			if [ -z "$2" ]; then
 				usage "You must specify an argument with $1!"
 			else
@@ -101,7 +102,7 @@ else
 				shift
 				shift
 			fi
-		elif [ "$1" == "-admin" ]; then
+		elif [ "$1" == "--port" ]; then
 			if [ -z "$2" ]; then
 				usage "You must specify an argument with $1!"
 			else
