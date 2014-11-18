@@ -71,8 +71,10 @@ public class SQLCommand
                                                   .put("integer", "numeric")
                                                   .put("bigint", "long numeric")
                                                   .build();
-    private static boolean m_stopOnFirstError = false;
+    private static boolean m_stopOnError = true;
     private static boolean m_debug = false;
+    private static boolean m_interactive;
+    private static boolean m_returningToPromptAfterError = false;
     private static int m_exitCode = 0;
 
     // SQL Parsing
@@ -366,9 +368,9 @@ public class SQLCommand
     private static final Pattern HelpToken = Pattern.compile("^\\s*help;*\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern GoToken = Pattern.compile("^\\s*go;*\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern ExitToken = Pattern.compile("^\\s*(exit|quit);*\\s*$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern ListProceduresToken = Pattern.compile("^\\s*((?:list|show) proc|(?:list|show) procedures);*\\s*$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern ListTablesToken = Pattern.compile("^\\s*((?:list|show) tables);*\\s*$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern ListClassesToken = Pattern.compile("^\\s*((?:list|show) classes);*\\s*$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern ListProceduresToken = Pattern.compile("^\\s*((?:list|show)\\s+proc|(?:list|show)\\s+procedures);*\\s*$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern ListTablesToken = Pattern.compile("^\\s*((?:list|show)\\s+tables);*\\s*$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern ListClassesToken = Pattern.compile("^\\s*((?:list|show)\\s+classes);*\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern SemicolonToken = Pattern.compile("^.*\\s*;+\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern RecallToken = Pattern.compile("^\\s*recall\\s*([^;]+)\\s*;*\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern FileToken = Pattern.compile("^\\s*file\\s*['\"]*([^;'\"]+)['\"]*\\s*;*\\s*", Pattern.CASE_INSENSITIVE);
@@ -605,18 +607,21 @@ public class SQLCommand
                     printHelp(System.out); // Print readme to the screen
                 }
             }
-            // FILE command - include the content of the file into the query
             else {
                 // Was there a line-ending semicolon typed at the prompt?
                 boolean executeImmediate =
                         interactive && SemicolonToken.matcher(line).matches();
-                Matcher matcher = FileToken.matcher(line);
-                if (matcher.matches()) {
-                    line = readScriptFile(matcher.group(1));
-                    if (line == null) {
-                        // In the recursive call, stopOrContinue decided to continue.
-                        // So, continue.
-                        continue;
+                // If the line is a FILE command - include the content of the file into the query queue
+                Matcher fileMatcher = FileToken.matcher(line);
+                if (fileMatcher.matches()) {
+                    // Get the line(s) from the file(s) to queue as regular database commands
+                    // or get back a null if in the recursive call, stopOrContinue decided to continue.
+                    line = readScriptFile(fileMatcher.group(1));
+                    if (m_returningToPromptAfterError) {
+                        // readScriptFile stopped because of an error. Wipe the slate clean.
+                        query = new StringBuilder();
+                        line = null;
+                        m_returningToPromptAfterError = false;
                     }
                     // else treat the line(s) from the file(s) as regular database commands
                 }
@@ -683,13 +688,16 @@ public class SQLCommand
                     continue;
                 }
                 // Recursively process FILE commands, any failure will cause a recursive failure
-                Matcher m = FileToken.matcher(line);
-                if (m.matches()) {
-                    line = readScriptFile(m.group(1));
-                    if (line == null) {
-                        // In the recursive call, stopOrContinue decided to continue.
-                        // So, continue.
-                        continue;
+                Matcher fileMatcher = FileToken.matcher(line);
+                if (fileMatcher.matches()) {
+                    // Get the line(s) from the file(s) to queue as regular database commands
+                    // or get back a null if in the recursive call, stopOrContinue decided to continue.
+                    line = readScriptFile(fileMatcher.group(1));
+                    if (m_returningToPromptAfterError) {
+                        // The recursive readScriptFile stopped because of an error.
+                        // Escape to the outermost readScriptFile caller so it can exit or
+                        // return to the interactive prompt.
+                        return null;
                     }
                 }
                 query.append(line);
@@ -887,8 +895,15 @@ public class SQLCommand
         // This is useful for debugging a script that may have multiple errors
         // and multiple valid statements.
         m_exitCode = -1;
-        if (m_stopOnFirstError) {
-            System.exit(m_exitCode);
+        if (m_stopOnError) {
+            if ( ! m_interactive ) {
+                System.exit(m_exitCode);
+            }
+            // Setting this member to drive a fast stack unwind from
+            // recursive readScriptFile requires explicit checks in that code,
+            // but still seems easier than a "throw" here from a catch block that
+            // would require additional exception handlers in the caller(s)
+            m_returningToPromptAfterError = true;
         }
     }
 
@@ -1041,7 +1056,7 @@ public class SQLCommand
         + "              [--query=query]\n"
         + "              [--output-format=(fixed|csv|tab)]\n"
         + "              [--output-skip-metadata]\n"
-        + "              [--stop-on-first-error]\n"
+        + "              [--stop-on-error=(true|false)]\n"
         + "              [--debug]\n"
         + "\n"
         + "[--servers=comma_separated_server_list]\n"
@@ -1077,8 +1092,10 @@ public class SQLCommand
         + "  Removes metadata information such as column headers and row count from\n"
         + "  produced output.\n"
         + "\n"
-        + "[--stop-on-first-error]\n"
-        + "  Causes the utility to stop execution on the first error detected.\n"
+        + "[--stop-on-error=(true|false)]\n"
+        + "  Causes the utility to stop immediately or continue after detecting an error.\n"
+        + "  In interactive mode, a value of \"true\" discards any unprocessed input\n"
+        + "  and returns to the command prompt.\n"
         + "[--debug]\n"
         + "  Causes the utility to print out stack traces for all exceptions.\n"
         );
@@ -1280,8 +1297,17 @@ public class SQLCommand
             else if (arg.equals("--debug")) {
                 m_debug = true;
             }
-            else if (arg.equals("--stop-on-first-error")) {
-                m_stopOnFirstError = true;
+            else if (arg.startsWith("--stop-on-error=")) {
+                String optionName = arg.split("=")[1].toLowerCase();
+                if (optionName.equals("true")) {
+                    m_stopOnError = true;
+                }
+                else if (optionName.equals("false")) {
+                    m_stopOnError = false;
+                }
+                else {
+                    printUsage("Invalid value for --stop-on-error");
+                }
             }
             else if (arg.equals("--help")) {
                 printHelp(System.out); // Print readme to the screen

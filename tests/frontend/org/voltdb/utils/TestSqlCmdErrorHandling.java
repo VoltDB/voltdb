@@ -92,10 +92,10 @@ public class TestSqlCmdErrorHandling extends TestCase {
         m_client.createConnection("localhost");
 
         assertEquals("sqlcmd dry run failed -- maybe some sqlcmd component (the voltdb jar file?) needs to be rebuilt.",
-                0, callSQLcmd(false, ";\n"));
-
-        assertEquals("sqlcmd stop-on-first-error dry run failed.",
                 0, callSQLcmd(true, ";\n"));
+
+        assertEquals("sqlcmd --stop-on-error=false dry run failed.",
+                0, callSQLcmd(false, ";\n"));
 
         // Execute the constrained write to end all constrained writes.
         // This poisons all future executions of the badWriteCommand() query.
@@ -184,9 +184,8 @@ public class TestSqlCmdErrorHandling extends TestCase {
 
         File error = new File("error.log");
 
-        ProcessBuilder pb = (stopOnError ?
-                new ProcessBuilder(commandPath, "--stop-on-first-error") :
-                    new ProcessBuilder(commandPath));
+        ProcessBuilder pb =
+                new ProcessBuilder(commandPath, "--stop-on-error=" + (stopOnError ? "true" : "false"));
         pb.redirectInput(f);
         pb.redirectOutput(out);
         pb.redirectError(error);
@@ -270,21 +269,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
         assertTrue("skipped a post-error write", checkIfWritten(id));
     }
 
-    public void test70BadFileMidWrite() throws Exception
-    {
-        int id = 70;
-        assertFalse("pre-condition violated", checkIfWritten(id));
-        String inputText = writeCommand(id);
-        String[] splitCommand = inputText.split(";");
-        assertEquals("pre-condition violated", 2, splitCommand.length);
-        // Reconnect the split command around an intervening FILE command that
-        // should actually fail with no ill effect.
-        inputText = splitCommand[0] + "\n" + badFileCommand() + ";" + splitCommand[1];
-        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(false, inputText));
-        assertTrue("skipped a post-error write", checkIfWritten(id));
-    }
-
-    public void test80BadNestedFileWithWriteThenWrite() throws Exception
+    public void test70BadNestedFileWithWriteThenWrite() throws Exception
     {
         int id = 80;
         assertFalse("pre-condition violated", checkIfWritten(id));
@@ -344,19 +329,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
         assertFalse("did a post-error write", checkIfWritten(id));
     }
 
-    public void test71BadFileStoppedMidWrite() throws Exception
-    {
-        int id = 71;
-        assertFalse("pre-condition violated", checkIfWritten(id));
-        String inputText = writeCommand(id);
-        String[] splitCommand = inputText.split(";");
-        assertEquals("pre-condition violated", 2, splitCommand.length);
-        inputText = splitCommand[0] + "\n" + badFileCommand() + ";" + splitCommand[1];
-        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(true, inputText));
-        assertFalse("did a post-error write", checkIfWritten(id));
-    }
-
-    public void test81BadNestedFileStoppedBeforeWrites() throws Exception
+    public void test71BadNestedFileStoppedBeforeWrites() throws Exception
     {
         int id = 81;
         assertFalse("pre-condition violated", checkIfWritten(id));
