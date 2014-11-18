@@ -1093,16 +1093,6 @@ public class VoltCompiler {
                         setGroupedTablePartitionColumn(mvi, partitionCol);
                     }
                 }
-            } else {
-                // Replicated tables case.
-                for (Index index: table.getIndexes()) {
-                    if (index.getAssumeunique()) {
-                        String exceptionMsg = String.format(
-                                "ASSUMEUNIQUE is not valid for replicated tables. Please use UNIQUE instead");
-                        throw new VoltCompilerException(exceptionMsg);
-                    }
-                }
-
             }
         }
 
