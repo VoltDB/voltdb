@@ -357,68 +357,25 @@
       		<h1 class="headText clusterIcon">Cluster</h1>
             <div class="adminClusterProperties">
             <ul class="adminClusterList">
-            <li><a href="#" class="resume"><span class="adminTxt01">Pause</span></a></li>
-            <li><a href="#" class="promote"><span class="adminTxt02">Promote</span></a></li>
-            <li><a href="#" class="restore"><span class="adminTxt03">Restore</span></a></li>
-            <li><a href="#" class="stop"><span class="adminTxt04">Stop</span></a></li>
+            <li>
+            <a href="#pauseConfirmationPop" class="resume" id="pauseConfirmation">Pause</a>
+            <a href="#resumeConfirmationPop" class="pause" id="resumeConfirmation" style="display:none;">Resume</a>
+            </li>
+           
+            <li><a href="#" class="promote">Promote</a></li>
+            <li><a href="#" class="save">Save</a></li>
+            <li><a href="#" class="restore">Restore</a></li>
+            <li><a href="#shutDownConfirmationPop" class="shutdown" id="shutDownConfirmation">Shutdown</a></li>
            </ul>
             
             </div>
             <div class="clear"></div>
             </div>
             <div class="adminRight">
-            	<div class="adminMode">
-            
-                	<div class="adminM">Admin Mode</div>
-                    <div class="adminD">Disable</div>
-                    <div class="adminE" style="display:none;">Enable</div>
-                    <div class="clear"></div>
-                   </div>
-                
+            	                
                 <div class="adminServer">
                 	<div class="serverName">Server</div>
                     <div class="setServer adminIcons" id="btnServerConfigAdmin"></div>
-                <!-- server list -->
-                <div id="serverConfigAdmin" style="display:none;">
-        <div class="slide-pop-wrapper">
-        
-        <div class="slide-pop-title ">
-          <div class="icon-server searchLeft searchLeftAdmin">Servers</div>      
-          
-          <div class="searchRight">
-            <div class="search">
-              <input type="text" id="popServerSearch" class="icon-search icoSS" onclick="this.value='';" onblur="this.value=!this.value?'Search Server':this.value;" value="Search Server" placeholder="Search Server">
-            </div>
-            <div class="thresholdVal">Alert Threshold
-            	<input type="text" id="threshold" class="theVal" maxlength="3">%
-                 <a href="#" id="saveThreshold" class="setVal">Set</a>
-            </div>
-             <div class="clear"></div>
-            </div>
-            <div class="clear"></div>
-          </div>
-          
-          <div class="slide-pop-content">
-          <div class="server-info-heading">
-          <span class="server">Server Name</span>
-          <span class="memory-use">Memory Usage</span>
-           <div class="clear"></div>        
-          </div>
-            <div id="serverListWrapperAdmin">            
-              <ul class="servers-list" id="serversList">
-                <li class="active monitoring"><a href="#">Jefferson</a> <span class="memory-status">78%</span></li>
-                <li class="active"><a href="#">Madison</a> <span class="memory-status alert">98%</span></li>
-                <li class="active"><a href="#">Lorem Ipsum</a> <span class="memory-status">50%</span></li>
-                <li class="active"><a href="#">Door Sit Amet</a> <span class="memory-status alert">99%</span></li>
-                <li class="active"><a href="#">Very Very long server name goes here and the text is trimmed</a> <span class="memory-status">10%</span></li>
-                <li class="joining">Lorem Joining</li>
-                <li class="joining">Ipsum Joining</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
-                <!-- server list -->
                 </div>
                 <div class="clear"></div>
                 
@@ -552,9 +509,9 @@
                   </tr>
                   <tr class="child-row-5 subLabelRow">
                   	<td class="configLabel">Heartbeat time out </td>
-                    <td align="right">500 ms</td>
+                    <td align="right"><span id="hrtTimeOutSpan">500</span><input id="txtHrtTimeOutSpan" class="exitableTxtBx" type="text" style="display:none" /> ms</td>
                     <td>&nbsp;</td>
-                    <td><a href="#" class="edit" title="Edit">&nbsp;</a></td>
+                    <td><a id="btnEditHrtTimeOut" href="#" class="edit" title="Edit">&nbsp;</a></td>
                   </tr>
                   <tr class="child-row-5 subLabelRow">
                   	<td class="configLabel">Max temp table memory</td>
@@ -829,6 +786,42 @@
 
     </div>
     <!--help popup ends-->
+    
+      <!-- POPUP shutDownConfirmationPop -->
+    <div id="shutDownConfirmationPop" style="display: none">
+        <div class="overlay-title icon-alert">Shutdown: Confirmation!</div>
+        <div class="clear"></div>
+        <div class="overlay-content">            
+            <p class="txt-bold">Are you sure you want to shutdown the cluster?</p>
+            <p>Any data not saved to a snapshot or command log will be lost.</p>
+            <p>Continue with the shutdown?</p>
+        </div>
+        <div class="overlay-btns"><a class="btn" title="Ok">Ok</a> <a class="btn btn-gray" title="Ok">Cancel</a></div>
+    </div>
+    <!-- POPUP shutDownConfirmationPop -->
+    
+     <!-- POPUP pauseConfirmationPop -->
+    <div id="pauseConfirmationPop" style="display: none">
+        <div class="overlay-title icon-alert">Pause: Confirmation!</div>
+        <div class="clear"></div>
+        <div class="overlay-content">            
+            <p class="txt-bold">Do you want to pause the cluster and enter admin mode?</p>
+            
+        </div>
+        <div class="overlay-btns"><a class="btn" title="Ok">Ok</a> <a class="btn btn-gray" title="Ok">Cancel</a></div>
+    </div>
+    <!-- POPUP pauseConfirmationPop -->
+    
+    <!-- POPUP resumeConfirmationPop -->
+    <div id="resumeConfirmationPop" style="display: none">
+        <div class="overlay-title icon-alert">Resume: Confirmation!</div>
+        <div class="clear"></div>
+        <div class="overlay-content">            
+            <p class="txt-bold">Do you want to exit admin mode and resume the cluster?</p>
+        </div>
+        <div class="overlay-btns"><a class="btn" title="Ok">Ok</a> <a class="btn btn-gray" title="Ok">Cancel</a></div>
+    </div>
+    <!-- POPUP resumeConfirmationPop -->
 
     <!-- Loading -->
     <div id="overlay" style="display: none;">

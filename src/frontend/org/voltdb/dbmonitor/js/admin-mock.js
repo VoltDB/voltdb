@@ -31,18 +31,23 @@ $( document ).ready(function() {
 			
 			//alert(theClass);
 			
-			if(theClass == 'resume'){
+					
+			
+			
+			/*if(theClass == 'resume'){
 				$(this).removeClass('resume').addClass('pause');
 				$(this).html('Resume');
-				$('.adminD').hide();
-				$('.adminE').show();
+				$(this).attr('id','resumeConfirmation');
+				$(this).attr('href','#resumeConfirmationPop');
+				
 				
 			}
 			if(theClass == 'pause'){
 				$(this).removeClass('pause').addClass('resume');
 				$(this).html('Pause');
-				$('.adminE').hide();
-				$('.adminD').show();
+				$(this).attr('id','pauseConfirmation');	
+				$(this).attr('href','#pauseConfirmationPop');			
+				
 				
 			}
 			if(theClass == 'restore'){
@@ -62,8 +67,40 @@ $( document ).ready(function() {
 			if(theClass == 'shutdown'){
 				$(this).removeClass('shutdown').addClass('stop');
 				$(this).html('Stop');
+			}*/
+		})
+		
+		$('#pauseConfirmation').click(function(){
+			$('#resumeConfirmation').show();
+			$(this).hide();
+		});
+		
+		$('#resumeConfirmation').click(function(){
+			$('#pauseConfirmation').show();
+			$(this).hide();
+		});
+		
+		//$('a.shutdown').click(function(){
+			    $('#shutDownConfirmation').popup();
+		//});	
+		
+		//$('a.pause').click(function(){
+			    $('#pauseConfirmation').popup();
+		//});	
+		
+		//$('a.resume').click(function(){
+			    $('#resumeConfirmation').popup();
+		//});	
+		$('#btnEditHrtTimeOut').click(function(){
+			if(  $("#hrtTimeOutSpan").is(":visible") == true ){
+				$("#hrtTimeOutSpan").hide();
+				$("#txtHrtTimeOutSpan").show();
+				$("#txtHrtTimeOutSpan").val($("#hrtTimeOutSpan").html())
+			}else{
+				$("#hrtTimeOutSpan").show();
+				$("#txtHrtTimeOutSpan").hide();
+				$("#hrtTimeOutSpan").html($("#txtHrtTimeOutSpan").val())
 			}
-		})	
-	
+		});
 
 });

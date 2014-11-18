@@ -580,7 +580,7 @@ div.popup {background: #fff;box-shadow: 0 3px 10px #222;}
 .preloader {left: 50%;margin: -10px 0 0 -25px;position: fixed;top: 50%;}
 
 .overlay-title{background:#fbfbfb; height:42px; line-height:42px; padding:4px 4px 4px 20px; border-bottom:1px solid #dbdbdb; font-size:16px; font-weight:bold; color:#3e3a3a;}
-.overlay-content{ padding:20px; margin-bottom:15px; min-width:450px;height:200px; overflow:auto;}
+.overlay-content{ padding:20px; margin-bottom:15px; min-width:450px;height:200px; overflow:auto; line-height:18px;}
 .overlay-btns{ text-align:right; padding:5px 20px 20px 20px;}
 
 
@@ -765,15 +765,16 @@ ul.helpSchemaList li { list-style:disc; line-height:25px!important; padding:0; m
 .adminLeft { float:left; width:50%;}
 .adminLeft h1 { float:left; padding-right:20px;}
 .adminClusterProperties { /*float:left;*/}
-ul.adminClusterList { margin:0; padding:0; width:366px; height:40px;}
-ul.adminClusterList li { margin:0; padding:0; float:left; width:65px; height:100%; line-height:75px;}
-ul.adminClusterList li a.pause { display:inline-block; background-position:-16px -106px; width:40px; height:36px;}
-ul.adminClusterList li a.resume { display:inline-block; background-position:-16px -151px; width:40px; height:36px;}
-ul.adminClusterList li a.promote { display:inline-block; background-position:-67px -12px;width:40px; height:36px;}
-ul.adminClusterList li a.restore { display:inline-block;background-position:-116px -12px; width:40px; height:36px;}
-ul.adminClusterList li a.save { display:inline-block;background-position:-116px -57px; width:40px; height:36px;}
+ul.adminClusterList { margin:0; padding:0; /*width:366px;*/ height:40px;}
+ul.adminClusterList li { margin:0; padding:0; float:left; width:50px; height:100%; line-height:75px; text-align:center; margin-right:5px;}
+ul.adminClusterList li a{display:block;}
+ul.adminClusterList li a.pause { display:inline-block; background-position:-20px -106px; width:40px; height:36px;}
+ul.adminClusterList li a.resume { display:inline-block; background-position:-20px -151px; width:40px; height:36px;}
+ul.adminClusterList li a.promote { display:inline-block; background-position:-70px -12px;width:40px; height:36px;}
+ul.adminClusterList li a.restore { display:inline-block;background-position:-120px -12px; width:40px; height:36px;}
+ul.adminClusterList li a.save { display:inline-block;background-position:-120px -57px; width:40px; height:36px;}
 ul.adminClusterList li a.stop { display:inline-block;background-position:-580px -12px; width:40px; height:36px;}
-ul.adminClusterList li a.shutdown { display:inline-block;background-position:-580px -56px; width:40px; height:36px;}
+ul.adminClusterList li a.shutdown { display:inline-block;background-position:-581px -56px; width:40px; height:36px;}
 ul.adminClusterList li a:hover{color:#000;}
 .adminTxt01 { margin:0 0 0 6px;}
 .adminTxt02 { margin:0 0 0 2px;}
@@ -816,6 +817,10 @@ ul.adminClusterList li a:hover{color:#000;}
 .adminWrapper{position:relative;}
 #btnServerConfigAdmin:hover{cursor:pointer;}
 #serverConfigAdmin{ position:absolute;right:20px; top:49px; z-index:99;}
+.txt-bold{font-weight:bold;}
+
+.btn-gray { background-color:#999; cursor:pointer; padding:8px 10px; text-align:center; color:#fff; font:14px Arial, Helvetica, sans-serif; text-shadow:none; text-decoration:none; border-radius:0; border:none;} 
+input.exitableTxtBx{float:left; width:40px; position:relative; top:-5px; padding:5px;}
 
 /*********************************************media Qu********************/
 @media (max-width: 479px) {
