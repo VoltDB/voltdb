@@ -28,13 +28,14 @@ function cleanup() {
 }
  
 function checkvoltdbstatus() {
-	if (( $( ps -ef | grep -v grep | grep -i voltdb | wc -l ) > 0 )); then
+	if (( $( jps | grep -c VoltDB ) > 0 )); then
 		echo "voltdb is running"
 	else
 		echo "VOLTDB IS NOT RUNNING"
 		echo "EXITING"
 		exit 1
 	fi
+	exit 1
 }
  
 function formatoutput() {
@@ -118,7 +119,7 @@ else
 fi
 #find old files in current directory and clean up
 echo "clean up old files"
-for f in $( ls -l postcheckup* | tr -s " " | cut -d' ' -f9 ); do
+for f in $( ls -l postcheckup* 2>/dev/null | tr -s " " | cut -d' ' -f9 ); do
 	cleanup $f
 done
 echo "checking for running voltdb"
