@@ -114,7 +114,7 @@ else
 			usage "Please check usage"
 		fi
 	done
-	echo "arguments passed - USER=$USER PASSWORD=$PASSWORD ADMINPORT=$ADMINPORT "
+	echo "arguments passed - USER=$USER PASSWORD=$PASSWORD PORT=$ADMINPORT "
 fi
 #find old files in current directory and clean up
 echo "clean up old files"
@@ -125,14 +125,17 @@ echo "checking for running voltdb"
 checkvoltdbstatus
 echo "collecting system information"
 systeminfocheck
-if [ -z "$USER" ] && [ -z "$PASSWORD" ] && [ -z "$ADMINPORT" ]; then
+if [ -z "$USER" ] && [ -z "$PASSWORD" ]; then
 	parameter=
-elif [ -n "$USER" ] && [ -z "$ADMINPORT" ]; then
+elif [ -n "$USER" ] && [ -n "$PASSWORD" ]; then
 	parameter="--user=$USER --password=$PASSWORD"
-elif [ -z "$USER" ] && [ -n "$ADMINPORT" ]; then
-	parameter="--port=$ADMINPORT"
-elif [ -n "$USER" ] && [ -n "$ADMINPORT" ]; then
-	parameter="--user=$USER --password=$PASSWORD --port=$ADMINPORT"
+else
+	echo "USER or PASSWORD not defined"
+	echo "EXITING"
+	exit 1
+fi
+if [ -n "$ADMINPORT" ]; then
+	export parameter="$parameter --port=$ADMINPORT"
 fi
 echo "testing sqlcmd connection"
 testsqlcmd $parameter
