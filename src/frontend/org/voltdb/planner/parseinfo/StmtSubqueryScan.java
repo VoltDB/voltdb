@@ -320,7 +320,7 @@ public class StmtSubqueryScan extends StmtTableScan {
 
         // Now If query has LIMIT/OFFSET/DISTINCT on a replicated table column,
         // we should get rid of the receive node.
-        if (selectStmt.hasLimitOrOffset() || selectStmt.hasDistinct()) {
+        if (selectStmt.hasLimitOrOffset() || selectStmt.hasDistinctNonTricky()) {
             return root;
         }
 

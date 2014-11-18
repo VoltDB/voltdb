@@ -116,12 +116,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     public ArrayList<ParsedColInfo> m_orderColumns = new ArrayList<ParsedColInfo>();
     public AbstractExpression m_having = null;
     public ArrayList<ParsedColInfo> m_groupByColumns = new ArrayList<ParsedColInfo>();
+    public ArrayList<ParsedColInfo> m_distinctGroupByColumns = null;
     private boolean m_groupAndOrderByPermutationWasTested = false;
     private boolean m_groupAndOrderByPermutationResult = false;
 
     // It will store the final projection node schema for this plan if it is needed.
     // Calculate once, and use it everywhere else.
     private NodeSchema m_projectSchema = null;
+    private NodeSchema m_projectSchemaForDistinct = null;
 
     // It may has the consistent element order as the displayColumns
     public ArrayList<ParsedColInfo> m_aggResultColumns = new ArrayList<ParsedColInfo>();
@@ -134,6 +136,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private NodeSchema m_avgPushdownNewAggSchema;
     private boolean m_hasPartitionColumnInGroupby = false;
     private boolean m_hasAggregateDistinct = false;
+    private boolean m_hasPartitionColumnInDistinctGroupby = false;
 
     // Limit plan node information.
     private LimitPlanNode m_limitNodeTop = null;
@@ -199,15 +202,24 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         assert(displayElement != null);
         parseDisplayColumns(displayElement, false);
 
-        if (groupbyElement == null && havingElement == null && m_distinct) {
-            m_distinct = false;
+        // process DISTINCT clause
+        if (m_distinct) {
+            if (groupbyElement == null) {
+                // DISTINCT without GROUP BY
+                // Hsql guards against HAVING without GROUP BY.
+                assert(havingElement == null);
 
-            if (m_aggResultColumns.isEmpty()) {
-                // attribute "id" is the only one that differs from a real GROUP BY query
-                groupbyElement = displayElement.duplicate();
+                // Tricky: rewrote DISTINCT without GROUP BY with GROUP BY clause
+                if ( ! hasAggregateExpression()) {
+                    // attribute "id" is the only one that differs from a real GROUP BY query
+                    groupbyElement = displayElement.duplicate();
+                }
+                // When it is table aggregate, it's also safe to drop DISTINCT.
+                m_distinct = false;
+            } else {
+                // DISTINCT with GROUP BY
+                parseDistinctGroupByColumns();
             }
-            // when it is table aggregate, there will be only one row in the result
-            // so it's also safe to drop it.
         }
 
         if (groupbyElement != null) {
@@ -215,13 +227,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             insertToColumnList(m_aggResultColumns, m_groupByColumns);
         }
 
+        if (havingElement != null) {
+            parseHavingExpression(havingElement, false);
+        }
+
         if (orderbyElement != null && ! hasAOneRowResult()) {
             parseOrderColumns(orderbyElement, false);
         }
 
-        if (havingElement != null) {
-            parseHavingExpression(havingElement, false);
-        }
         // At this point, we have collected all aggregations in the select statement.
         // We do not need aggregationList container in parseXMLtree
         // Make it null to prevent others adding elements to it when parsing the tree
@@ -641,60 +654,64 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     private void parseDisplayColumns(VoltXMLElement columnsNode, boolean isDistributed) {
         for (VoltXMLElement child : columnsNode.children) {
-            ParsedColInfo col = new ParsedColInfo();
-            m_aggregationList.clear();
-            col.expression = parseExpressionTree(child);
-            if (col.expression instanceof ConstantValueExpression) {
-                assert(col.expression.getValueType() != VoltType.NUMERIC);
-            }
-            assert(col.expression != null);
-            if (isDistributed) {
-                col.expression = col.expression.replaceAVG();
-                updateAvgExpressions();
-            }
-            ExpressionUtil.finalizeValueTypes(col.expression);
-
-            if (child.name.equals("columnref")) {
-                col.columnName = child.attributes.get("column");
-                col.tableName = child.attributes.get("table");
-                col.tableAlias = child.attributes.get("tablealias");
-                if (col.tableAlias == null) {
-                    col.tableAlias = col.tableName;
-                }
-            }
-            else
-            {
-                // XXX hacky, assume all non-column refs come from a temp table
-                col.tableName = "VOLT_TEMP_TABLE";
-                col.tableAlias = "VOLT_TEMP_TABLE";
-                col.columnName = "";
-            }
-            col.alias = child.attributes.get("alias");
-            if (col.alias == null) {
-                col.alias = col.columnName;
-            }
-           // This index calculation is only used for sanity checking
-            // materialized views (which use the parsed select statement but
-            // don't go through the planner pass that does more involved
-            // column index resolution).
-            col.index = m_displayColumns.size();
-
-            insertAggExpressionsToAggResultColumns(m_aggregationList, col);
-            if (m_aggregationList.size() >= 1) {
-                m_hasAggregateExpression = true;
-
-                for (AbstractExpression agg: m_aggregationList) {
-                    assert(agg instanceof AggregateExpression);
-                    if (! m_hasAggregateDistinct &&
-                            ((AggregateExpression)agg).isDistinct() ) {
-                        m_hasAggregateDistinct = true;
-                        break;
-                    }
-                }
-            }
-
-            m_displayColumns.add(col);
+            parseDisplayColumn(child, isDistributed);
         }
+    }
+
+    private void parseDisplayColumn(VoltXMLElement child, boolean isDistributed) {
+        ParsedColInfo col = new ParsedColInfo();
+        m_aggregationList.clear();
+        col.expression = parseExpressionTree(child);
+        if (col.expression instanceof ConstantValueExpression) {
+            assert(col.expression.getValueType() != VoltType.NUMERIC);
+        }
+        assert(col.expression != null);
+        if (isDistributed) {
+            col.expression = col.expression.replaceAVG();
+            updateAvgExpressions();
+        }
+        ExpressionUtil.finalizeValueTypes(col.expression);
+
+        if (child.name.equals("columnref")) {
+            col.columnName = child.attributes.get("column");
+            col.tableName = child.attributes.get("table");
+            col.tableAlias = child.attributes.get("tablealias");
+            if (col.tableAlias == null) {
+                col.tableAlias = col.tableName;
+            }
+        }
+        else
+        {
+            // XXX hacky, assume all non-column refs come from a temp table
+            col.tableName = "VOLT_TEMP_TABLE";
+            col.tableAlias = "VOLT_TEMP_TABLE";
+            col.columnName = "";
+        }
+        col.alias = child.attributes.get("alias");
+        if (col.alias == null) {
+            col.alias = col.columnName;
+        }
+        // This index calculation is only used for sanity checking
+        // materialized views (which use the parsed select statement but
+        // don't go through the planner pass that does more involved
+        // column index resolution).
+        col.index = m_displayColumns.size();
+
+        insertAggExpressionsToAggResultColumns(m_aggregationList, col);
+        if (m_aggregationList.size() >= 1) {
+            m_hasAggregateExpression = true;
+
+            for (AbstractExpression agg: m_aggregationList) {
+                assert(agg instanceof AggregateExpression);
+                if (! m_hasAggregateDistinct &&
+                        ((AggregateExpression)agg).isDistinct() ) {
+                    m_hasAggregateDistinct = true;
+                    break;
+                }
+            }
+        }
+
+        m_displayColumns.add(col);
     }
 
     private void parseGroupByColumns(VoltXMLElement columnsNode) {
@@ -730,7 +747,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
         else
         {
-            // TODO(XIN): throw a error for Materialized view when possible.
             // XXX hacky, assume all non-column refs come from a temp table
             groupbyCol.tableName = "VOLT_TEMP_TABLE";
             groupbyCol.tableAlias = "VOLT_TEMP_TABLE";
@@ -879,6 +895,29 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 ExpressionUtil.finalizeValueTypes(col.expression);
                 m_aggResultColumns.add(col);
             }
+        }
+    }
+
+    private void parseDistinctGroupByColumns() {
+        m_distinctGroupByColumns = new ArrayList<ParsedColInfo>();
+        m_projectSchemaForDistinct = new NodeSchema();
+
+        // Iterate in the Display code
+        for (ParsedColInfo col: m_displayColumns) {
+            TupleValueExpression tve = new TupleValueExpression(
+                    col.tableName, col.tableAlias, col.columnName, col.alias, col.index);
+            ParsedColInfo pcol = new ParsedColInfo();
+            pcol.tableName = col.tableName;
+            pcol.tableAlias = col.tableAlias;
+            pcol.columnName = col.columnName;
+            pcol.alias = col.alias;
+            pcol.expression = tve;
+            m_distinctGroupByColumns.add(pcol);
+
+            // ParsedColInfo, TVE, SchemaColumn, NodeSchema ??? Could it be more complicated ???
+            SchemaColumn schema_col = new SchemaColumn(
+                    col.tableName, col.tableAlias, col.columnName, col.alias, tve);
+            m_projectSchemaForDistinct.addColumn(schema_col);
         }
     }
 
@@ -1184,7 +1223,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
 
-    public boolean hasAggregateExpression () {
+    public boolean hasAggregateExpression() {
         return m_hasAggregateExpression;
     }
 
@@ -1194,6 +1233,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     public NodeSchema getFinalProjectionSchema () {
         return m_projectSchema;
+    }
+
+    public NodeSchema getFinalProjectionSchemaForDistinct () {
+        return m_projectSchemaForDistinct;
     }
 
     public boolean hasComplexGroupby() {
@@ -1216,11 +1259,24 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         m_hasPartitionColumnInGroupby = true;
     }
 
+    public boolean hasPartitionColumnInDistinctGroupby() {
+        return m_hasPartitionColumnInDistinctGroupby;
+    }
+
+    public void setHasPartitionColumnInDistinctGroupby() {
+        m_hasPartitionColumnInDistinctGroupby = true;
+    }
+
     public boolean hasOrderByColumns() {
         return ! m_orderColumns.isEmpty();
     }
 
-    public boolean hasDistinct() {
+    /**
+     * DISTINCT without GROUP BY is completely rewrote with a GROUP BY query.
+     * DISTINCT with GROUP BY is not tricky, it needs another GROUP BY on the original GROUP BY.
+     * @return true if query has a DISTINCT with GROUP BY
+     */
+    public boolean hasDistinctNonTricky() {
         return m_distinct;
     }
 
