@@ -145,13 +145,13 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
                     polarity = 1
                     cv = np.nanmin(ma)
                     rp = (u[0][np.nanargmin(ma)], cv)
-                    if ma[-1] > cv * 1.05:
+                    if b == 'master' and ma[-1] > cv * 1.05:
                         failed = 1
                 else:
                     polarity = -1
                     cv = np.nanmax(ma)
                     rp = (u[0][np.nanargmax(ma)], cv)
-                    if ma[-1] < cv * 0.95:
+                    if b == 'master' and ma[-1] < cv * 0.95:
                         failed = 1
 
                 twosigma = np.sum([np.convolve(mstd, polarity*2), ma], axis=0)
