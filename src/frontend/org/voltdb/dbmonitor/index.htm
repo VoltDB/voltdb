@@ -429,7 +429,7 @@
         </div>
     </div>
     <!--Connection popup-->
-    
+
     <!--Server not available popup-->
     <div style="display: none"><a href="#serverUnavailablePopup" id="serUnavailablePopup">Connection Error</a></div>
 
@@ -464,7 +464,7 @@
         <li>Performance Data</li>
         </ul>
         <br />
-        
+
         <h2 class="help">Cluster Health At-a-Glance</h2>
         <p>The cluster health bar provides a quick look at the current health of the database cluster, including:</p>
         <ul class="helpList">
@@ -473,20 +473,20 @@
         <li>How many are missing (that is, servers that have stopped either intentionally or by accident)</li>
         <li>If any servers are running low on memory</li>
         </ul>
-        
+
         <P>The cluster health bar also indicates which server you are currently connected to and contains a pulldown menu (from the <span class="helpStyleButton">&raquo;&nbsp;Server</span> button on the right) that lists all of the servers in the cluster and their current memory usage. Click on a server name in the list to switch to view statistics from that server. You can also use the input field and the <span class="helpStyleButton">Set</span> button to set the threashold for out-of-memory alerts. Any servers using more than the threshold percent of total memory will be highlighted with an alert status.
-        
+
         <h2 class="help">Performance Graphs</h2>
         <p>The second section of the monitor shows graphs for CPU and memory usage of the current server and 99th percentile query latency and transactions per sectond for the entire cluster. You can use the pull down "View" menu to change the scale and update rate of the graphs between seconds, minutes, and days.</p>
-        
+
         <h2 class="help">Performance Data</h2>
         <p>The third and last section of the monitor shows data charts of performance metrics for each stored procedure and the number of rows for each table and view. You can sort by any of the columns in the charts by clicking on the column heading. Or you can filter by the procedure names using the search box above the chart. </p>
-        
+
         <h2 class="help">Additional Controls</h2>
         <p>To quckly hide or show either the graphs or the charts, you can click on the "Show/Hide" triangle above each section. You can also choose to display or hide specific charts and graphs using the <span class="helpStyleButton">Display&nbsp;Preference</span> button above the graphs. Clear the checkbox next to the graphs and/or charts you want to hide and press "Save". This setting is saved as a browser cookie so will be retained across sessions.
         </p>
-        
-        
+
+
         </div>
         <div class="VDBSchemaHelp" id="VDBSchHelp"  style="display:none;">
         <p>
@@ -498,14 +498,14 @@
         <li><span class="helpStyleTitle">Procedures &amp; SQL</span> &mdash; A list of all of the user-defined stored procedures and their attributes. Click on a procedure name to view the SQL statements it contains. Click on the SQL statements to see their execution plans.</li>
         <li><span class="helpStyleTitle">Size Worksheet</span> &mdash; An interactive worksheet that helps you estimate the amount of memory required based on the current schema and estimated row counts you enter.all of the user-defined stored procedures and their attributes. Click on a procedure name to view the SQL statements it contains. Click on the SQL statements to see their execution plans.</li>
         <li><span class="helpStyleTitle">DDL Source</span> &mdash; A complete listing of the DDL source statements for the current schema.</li>
-        
-        
+
+
         </ul>
         <br/>
-        
+
         </div>
         <div class="VDBQueryHelp" id="VDBQHelp"  style="display:none;"  >
-        
+
         <p>
         The <strong class="helpStyleTitle">VoltDB Management Center SQL Query</strong> page lets you execute SQL queries interactively. Simply type your query into the box on the right and click "Run". A list of database tables, views, and stored procedures are provided to the left for reference. Click on a table or view to expand it and see the columns. Click on a stored procedure to see the datatypes of its input parameters and return value.
         </p>
@@ -516,11 +516,11 @@
         <blockquote>
         EXEC {procedure-name} [parameter] ...
         </blockquote>
-        <p>Finally, you can change the format of the output using the pull-down menu above and to the right of the query results pane. The results can be displayed as a formatted (HTML) table, comma-separated value (CSV) lines, or as monospaced text.</p> 
-        
+        <p>Finally, you can change the format of the output using the pull-down menu above and to the right of the query results pane. The results can be displayed as a formatted (HTML) table, comma-separated value (CSV) lines, or as monospaced text.</p>
+
         </div>
-    
-    
+
+
     </div>
 
     </div>
@@ -533,9 +533,9 @@
     <!-- Loading -->
 
     <!-- Placed at the end of the document so the pages load faster -->
-    <script src="http://assets.voltdb.com/b/js/bootstrap.js"></script>
-    <script src="http://assets.voltdb.com/t/js/jquery.tablesorter.js"></script>
-    <script src="http://assets.voltdb.com/t/js/jquery.tablesorter.widgets.js"></script>
+    <script type="text/javascript" src="js/bootstrap.js"></script>
+    <script type="text/javascript" src="js/jquery.tablesorter.js"></script>
+    <script type="text/javascript" src="js/jquery.tablesorter.widgets.js"></script>
     <!-- Placed at the end of the document so the pages load faster -->
 </body>
 </html>
