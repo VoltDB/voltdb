@@ -68,7 +68,7 @@ public class TestSystemCatalogSuite extends RegressionSuite {
         results[0].advanceRow();
         assertEquals("{\"partitionColumn\":\"A1\"}", results[0].get("REMARKS", VoltType.STRING));
         results[0].advanceRow();
-        assertEquals("{\"partitionColumn\":\"A1\"}", results[0].get("REMARKS", VoltType.STRING));
+        assertEquals("{\"partitionColumn\":\"A1\",\"sourceTable\":\"T\"}", results[0].get("REMARKS", VoltType.STRING));
     }
 
     public void testColumnsSelector() throws IOException, ProcCallException
@@ -136,7 +136,7 @@ public class TestSystemCatalogSuite extends RegressionSuite {
             assertEquals("T", blah.getString("TABLE_NAME"));
         }
         blah.close();
-        blah = huh.getMetaData().getTables(null, null, null, null);
+        blah = huh.getMetaData().getTables(null, null, "T", null);
         while (blah.next())
         {
             assertEquals("T", blah.getString("TABLE_NAME"));
@@ -188,7 +188,7 @@ public class TestSystemCatalogSuite extends RegressionSuite {
 
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addLiteralSchema("CREATE TABLE T(A1 INTEGER NOT NULL, A2 INTEGER, PRIMARY KEY(A1));" +
-                                 "CREATE VIEW V(A1, SUM) AS SELECT A1, COUNT(*) FROM T GROUP BY A1;");
+                                 "CREATE VIEW V(A1, S) AS SELECT A1, COUNT(*) FROM T GROUP BY A1;");
         project.addPartitionInfo("T", "A1");
         project.addStmtProcedure("InsertA", "INSERT INTO T VALUES(?,?);", "T.A1: 0");
 

@@ -22,6 +22,7 @@ import java.io.StringWriter;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Column;
@@ -39,12 +40,15 @@ import org.voltdb.utils.InMemoryJarfile;
 
 public class JdbcDatabaseMetaDataGenerator
 {
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     public static final String JSON_PARTITION_PARAMETER = "partitionParameter";
     public static final String JSON_PARTITION_PARAMETER_TYPE = "partitionParameterType";
     public static final String JSON_SINGLE_PARTITION = "singlePartition";
     public static final String JSON_READ_ONLY = "readOnly";
     public static final String JSON_PARTITION_COLUMN = "partitionColumn";
+    public static final String JSON_SOURCE_TABLE = "sourceTable";
+    public static final String JSON_ERROR = "error";
 
     static public final ColumnInfo[] TABLE_SCHEMA =
         new ColumnInfo[] {
@@ -260,17 +264,16 @@ public class JdbcDatabaseMetaDataGenerator
 
             String remark = null;
             if (partColumn != null) {
+                JSONObject jsObj = new JSONObject();
                 try {
-                    JSONObject jsObj = new JSONObject();
                     jsObj.put(JSON_PARTITION_COLUMN, partColumn.getName());
+                    if (type.equals("VIEW")) {
+                        jsObj.put(JSON_SOURCE_TABLE, table.getMaterializer().getTypeName());
+                    }
                     remark = jsObj.toString();
                 } catch (JSONException e) {
-                    e.printStackTrace();
-                    StringWriter sw = new StringWriter();
-                    PrintWriter pw = new PrintWriter(sw);
-                    e.printStackTrace(pw);
-                    pw.flush();
-                    remark = sw.toString();
+                    hostLog.error("Invalid JSON object", e);
+                    remark = "{\"" + JSON_ERROR + "\",\"" + e.getMessage() + "\"}";
                 }
             }
             results.addRow(null,
@@ -552,12 +555,8 @@ public class JdbcDatabaseMetaDataGenerator
                 }
                 remark = jsObj.toString();
             } catch (JSONException e) {
-                e.printStackTrace();
-                StringWriter sw = new StringWriter();
-                PrintWriter pw = new PrintWriter(sw);
-                e.printStackTrace(pw);
-                pw.flush();
-                remark = sw.toString();
+                hostLog.error("Invalid JSON object", e);
+                remark = "{\"" + JSON_ERROR + "\",\"" + e.getMessage() + "\"}";
             }
             results.addRow(
                            null,
