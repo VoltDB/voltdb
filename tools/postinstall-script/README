@@ -1,0 +1,10 @@
+Postinstall-script
+This script is used to gather information about deployment. This script requires a running voltdb instance inorder to collect data. Upon completion of the script, please send the postcheckup.zip file to support@voltdb.com.
+
+Usage: ./postinstall.sh [--user username] [--password password] [--port portnumber]  
+Description: postinstall checkup script
+Command line parameters:
+  --user 			login username
+  --password			login password
+  --port			portnumber
+
