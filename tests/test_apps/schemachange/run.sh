@@ -66,14 +66,17 @@ function client() {
         --duration=1800
 }
 
-# quick client run
+# quick client run to exercise it fully, including failures, before checking in
 function quick() {
     srccompile
     java -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
         schemachange.SchemaChangeClient \
         --servers=localhost \
-        --targetrowcount=100000 \
-        --duration=60
+        --targetrowcount=1000 \
+        --duration=60 \
+        --retryForcedPercent=50 \
+        --retryLimit=10 \
+        --retrySleep=2
 }
 
 function help() {

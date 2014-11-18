@@ -107,10 +107,22 @@ public class SchemaChangeClient {
         @Option(desc = "Time (secs) to end run if no progress is being made.")
         int noProgressTimeout = 600;
 
+        @Option(desc = "Percent forced failures to trigger retry logic.")
+        int retryForcedPercent = 0;
+
+        @Option(desc = "Maximum number of retries.")
+        int retryLimit = 20;
+
+        @Option(desc = "Seconds between retries.")
+        int retrySleep = 10;
+
         @Override
         public void validate() {
             if (targetrowcount <= 0) exitWithMessageAndUsage("targetrowcount must be > 0");
             if (duration < 0) exitWithMessageAndUsage("duration must be >= 0");
+            if (retryForcedPercent < 0 || retryForcedPercent > 100) exitWithMessageAndUsage("retryForcedPercent must be >= 0 and <= 100");
+            if (retryLimit < 0) exitWithMessageAndUsage("retryLimit must be >= 0");
+            if (retrySleep < 0) exitWithMessageAndUsage("retrySleep must be >= 0");
         }
     }
 
@@ -194,169 +206,205 @@ public class SchemaChangeClient {
         this.config = config;
     }
 
-    class RetryState {
-        int retry = 0;
-        int stage = 0;
-    }
-
     /**
-     * Perform a schema change to a mutated version of the current table (80%) or
-     * to a new table entirely (20%, drops and adds the new table).
+     * Test driver that initiates catalog changes and tracks state, e.g. for retries.
      */
-    private Pair<VoltTable,TableHelper.ViewRep> catalogChange(
-            VoltTable t1,
-            boolean newTable,
-            TableHelper.ViewRep viewIn,
-            RetryState retryState) throws Exception {
-        VoltTable t2 = null;
-        String currentName = t1 == null ? "B" : TableHelper.getTableName(t1);
-        String newName = currentName;
+    private class CatalogChangeTestDriver {
 
-        // add an empty table with the schema version number in it
-        VoltTable versionT = TableHelper.quickTable(_F("V%d (BIGINT)", schemaVersionNo + 1));
+        private int retryCount = 0;
+        private int retryFromStage = 0;
+        private VoltTable t2 = null;
+        private String currentName = null;
+        private String newName = null;
+        private VoltTable versionT = null;
+        private TableHelper.ViewRep newViewRep = null;
 
-        if (newTable) {
-            newName = currentName.equals("A") ? "B" : "A";
-            t2 = TableHelper.getTotallyRandomTable(newName, rand, false);
-        }
-        else {
-            t2 = TableHelper.mutateTable(t1, true, rand);
-        }
+        /**
+         * Perform a schema change to a mutated version of the current table (80%) or
+         * to a new table entirely (20%, drops and adds the new table).
+         */
+        Pair<VoltTable,TableHelper.ViewRep> catalogChange(
+                VoltTable t1,
+                boolean newTable,
+                TableHelper.ViewRep viewIn,
+                boolean isRetry) throws Exception {
 
-        // handle views
-        TableHelper.ViewRep newViewRep = viewIn;
-        if (newViewRep == null) {
-            newViewRep = TableHelper.ViewRep.viewRepForTable("MV", t2, rand);
-        }
-        else {
-            if (!newViewRep.compatibleWithTable(t2)) {
-                newViewRep = null;
-            }
-        }
-
-        // Do the drops as a separate batch. It's a NOP for the catalog update method.
-        // Skip if it's a retry attempt and this part already succeeded.
-        if (retryState == null || retryState.stage == 0) {
-            if (retryState != null && retryState.retry > 0) {
-                log.info(_F("Retry #%d: stage %d (drops)", retryState.retry, retryState.stage+1));
-            }
-            schemaChanger.beginBatch();
-            try {
-                schemaChanger.dropTables(_F("V%d", schemaVersionNo));
-                if (activeViewRep != null) {
-                    schemaChanger.dropViews(activeViewRep.viewName);
-                    activeViewRep = null;
+            if (isRetry) {
+                if (++this.retryCount > config.retryLimit) {
+                    throw new IOException("Retry limit reached");
                 }
-                activeViewRep = newViewRep;
-                if (activeVerifyProc != null) {
-                    schemaChanger.dropProcedures(activeVerifyProc.getName());
-                    activeVerifyProc = null;
-                }
+                assert(this.t2 != null);
+                assert(this.currentName != null);
+                assert(this.newName != null);
+                assert(this.versionT != null);
+                // this.newViewRep can be null
+            } else {
+                this.t2 = null;
+                this.currentName = t1 == null ? "B" : TableHelper.getTableName(t1);
+                this.newName = this.currentName;
+
+                // add an empty table with the schema version number in it
+                this.versionT = TableHelper.quickTable(_F("V%d (BIGINT)", schemaVersionNo + 1));
+
                 if (newTable) {
-                    if (activeTableNames.contains(newName)) {
-                        schemaChanger.dropTables(newName);
-                        activeTableNames.remove(newName);
+                    this.newName = this.currentName.equals("A") ? "B" : "A";
+                    this.t2 = TableHelper.getTotallyRandomTable(this.newName, rand, false);
+                }
+                else {
+                    this.t2 = TableHelper.mutateTable(t1, true, rand);
+                }
+
+                // handle views
+                this.newViewRep = viewIn;
+                if (this.newViewRep == null) {
+                    this.newViewRep = TableHelper.ViewRep.viewRepForTable("MV", this.t2, rand);
+                }
+                else {
+                    if (!this.newViewRep.compatibleWithTable(this.t2)) {
+                        this.newViewRep = null;
                     }
                 }
-                if (!schemaChanger.executeBatch(this.client)) {
+            }
+
+            // Do the drops as a separate batch. It's a NOP for the catalog update method.
+            // Skip if it's a retry attempt and this part already succeeded.
+            if (!isRetry || this.retryFromStage == 0) {
+                if (isRetry) {
+                    this.logRetryStage("drop");
+                }
+                schemaChanger.beginBatch();
+                try {
+                    // Force failure? (t1 test avoids failing initial call)
+                    if (t1 != null && config.retryForcedPercent > rand.nextInt(100)) {
+                        schemaChanger.addForcedFailure();
+                    }
+                    schemaChanger.dropTables(_F("V%d", schemaVersionNo));
+                    if (activeViewRep != null) {
+                        schemaChanger.dropViews(activeViewRep.viewName);
+                    }
+                    activeViewRep = this.newViewRep;
+                    if (activeVerifyProc != null) {
+                        schemaChanger.dropProcedures(activeVerifyProc.getName());
+                    }
+                    if (newTable) {
+                        if (activeTableNames.contains(this.newName)) {
+                            schemaChanger.dropTables(this.newName);
+                            activeTableNames.remove(this.newName);
+                        }
+                    }
+                    if (!schemaChanger.executeBatch(client)) {
+                        return null;
+                    }
+                    activeViewRep = null;
+                    activeVerifyProc = null;
+                }
+                catch (IOException e) {
+                    // All SchemaChanger problems become IOExceptions.
+                    // This is a normal error return that is handled by the caller.
                     return null;
                 }
+                // If we fail don't repeat this successful stage.
+                this.retryFromStage++;
+            }
+
+            // Now do the creates and alters.
+            if (isRetry) {
+                this.logRetryStage("create/alter");
+            }
+            schemaChanger.beginBatch();
+            long count = 0;
+            long start = 0;
+            try {
+                // Force failure? (t1 test avoids failing initial call)
+                if (t1 != null && config.retryForcedPercent > rand.nextInt(100)) {
+                    schemaChanger.addForcedFailure();
+                }
+                schemaChanger.createTables(this.versionT);
+                // make tables name A partitioned and tables named B replicated
+                boolean partitioned = this.newName.equalsIgnoreCase("A");
+                if (newTable) {
+                    schemaChanger.createTables(this.t2);
+                }
+                else {
+                    schemaChanger.updateTable(t1, this.t2);
+                }
+                Class<?> provisionalActiveVerifyProc;
+                if (partitioned) {
+                    schemaChanger.addTablePartitionInfo(this.t2, this.newName);
+                    provisionalActiveVerifyProc = VerifySchemaChangedA.class;
+                }
+                else {
+                    provisionalActiveVerifyProc = VerifySchemaChangedB.class;
+                }
+                schemaChanger.createProcedures(client, provisionalActiveVerifyProc);
+                if (activeViewRep != null) {
+                    schemaChanger.createViews(activeViewRep);
+                }
+
+                count = tupleCount(t1);
+                start = System.nanoTime();
+
+                if (newTable) {
+                    log.info("Starting to swap tables.");
+                }
+                else {
+                    log.info("Starting to change schema.");
+                }
+
+                if (!schemaChanger.executeBatch(client)) {
+                    return null;
+                }
+
+                if (newTable) {
+                    activeTableNames.add(this.newName);
+                }
+                activeVerifyProc = provisionalActiveVerifyProc;
             }
             catch (IOException e) {
                 // All SchemaChanger problems become IOExceptions.
                 // This is a normal error return that is handled by the caller.
                 return null;
             }
-            if (retryState != null) {
-                retryState.stage++;
-            }
-        }
 
-        // Now do the creates and alters.
-        if (retryState != null && retryState.retry > 0) {
-            log.info(_F("Retry #%d: stage %d (creates/alters)", retryState.retry, retryState.stage+1));
-        }
-        schemaChanger.beginBatch();
-        long count = 0;
-        long start = 0;
-        try {
-            schemaChanger.createTables(versionT);
-            // make tables name A partitioned and tables named B replicated
-            boolean partitioned = newName.equalsIgnoreCase("A");
-            if (newTable) {
-                schemaChanger.createTables(t2);
-                activeTableNames.add(newName);
-            }
-            else {
-                schemaChanger.updateTable(t1, t2);
-            }
-            if (partitioned) {
-                schemaChanger.addTablePartitionInfo(t2, newName);
-                activeVerifyProc = VerifySchemaChangedA.class;
-            }
-            else {
-                activeVerifyProc = VerifySchemaChangedB.class;
-            }
-            schemaChanger.createProcedures(client, activeVerifyProc);
-            if (activeViewRep != null) {
-                schemaChanger.createViews(activeViewRep);
+            // Reset the retry data since the batch at least succeeded mechanically, if not logically.
+            this.retryCount = 0;
+            this.retryFromStage = 0;
+
+            // don't actually trust the call... manually verify
+            int obsCatVersion = verifyAndGetSchemaVersion();
+            // UAC worked
+            if (obsCatVersion == schemaVersionNo) {
+                log.error(_F("Catalog update was reported to be successful but did not pass "
+                           + "verification: expected V%d, observed V%d",
+                             schemaVersionNo+1, obsCatVersion));
+                assert(false);
+                System.exit(-1);
             }
 
-            count = tupleCount(t1);
-            start = System.nanoTime();
+            if (obsCatVersion == schemaVersionNo+1) {
+                schemaVersionNo++;
+            }
+            else {
+                assert(false);
+                System.exit(-1);
+            }
+
+            long end = System.nanoTime();
+            double seconds = (end - start) / 1000000000.0;
 
             if (newTable) {
-                log.info("Starting to swap tables.");
+                log.info(_F("Completed table swap in %.4f seconds", seconds));
             }
             else {
-                log.info("Starting to change schema.");
+                log.info(_F("Completed %d tuples in %.4f seconds (%d tuples/sec)",
+                            count, seconds, (long) (count / seconds)));
             }
-
-            if (!schemaChanger.executeBatch(this.client)) {
-                return null;
-            }
-        }
-        catch (IOException e) {
-            // All SchemaChanger problems become IOExceptions.
-            // This is a normal error return that is handled by the caller.
-            return null;
+            return new Pair<VoltTable,TableHelper.ViewRep>(this.t2, this.newViewRep, false);
         }
 
-        // Reset the retry stage since the batch at least succeeded mechanically, if not logically.
-        if (retryState != null) {
-            retryState.stage = 0;
+        private void logRetryStage(final String action) {
+            log.info(_F("Retry #%d: stage %d (%s)", this.retryCount, this.retryFromStage+1, action));
         }
-
-        // don't actually trust the call... manually verify
-        int obsCatVersion = verifyAndGetSchemaVersion();
-        // UAC worked
-        if (obsCatVersion == schemaVersionNo) {
-            log.error(_F("Catalog update was reported to be successful but did not pass "
-                       + "verification: expected V%d, observed V%d",
-                         schemaVersionNo+1, obsCatVersion));
-            assert(false);
-            System.exit(-1);
-        }
-
-        if (obsCatVersion == schemaVersionNo+1) {
-            schemaVersionNo++;
-        }
-        else {
-            assert(false);
-            System.exit(-1);
-        }
-
-        long end = System.nanoTime();
-        double seconds = (end - start) / 1000000000.0;
-
-        if (newTable) {
-            log.info(_F("Completed table swap in %.4f seconds", seconds));
-        }
-        else {
-            log.info(_F("Completed %d tuples in %.4f seconds (%d tuples/sec)",
-                        count, seconds, (long) (count / seconds)));
-        }
-        return new Pair<VoltTable,TableHelper.ViewRep>(t2, newViewRep, false);
     }
 
     interface SchemaChanger {
@@ -370,6 +418,7 @@ public class SchemaChangeClient {
         void dropProcedures(String... names) throws IOException;
         void updateTable(VoltTable t1, VoltTable t2) throws IOException;
         void addTablePartitionInfo(VoltTable table, String name) throws IOException;
+        void addForcedFailure() throws IOException;
         boolean executeBatch(Client client) throws IOException;
     }
 
@@ -442,6 +491,11 @@ public class SchemaChangeClient {
         public void addTablePartitionInfo(VoltTable table, String name) throws IOException {
             int pkeyIndex = TableHelper.getBigintPrimaryKeyIndexIfExists(table);
             this.builder.addPartitionInfo(name, table.getColumnName(pkeyIndex));
+        }
+
+        @Override
+        public void addForcedFailure() throws IOException {
+            // Unimplemented.
         }
 
         @Override
@@ -538,12 +592,17 @@ public class SchemaChangeClient {
         }
 
         @Override
+        public void addForcedFailure() throws IOException {
+            this.add("DRIZZLE GOBBLE GUNK");
+        }
+
+        @Override
         public boolean executeBatch(Client client) throws IOException {
             String ddlString = this.ddl.toString();
             boolean success = true;
             try {
                 if (ddl.length() > 0) {
-                    log.info(_F("::: DDL Batch (BEGIN) :::\n%s\n::: DDL Batch (END) :::", ddlString));
+                    log.info(_F("\n::: DDL Batch (BEGIN) :::\n%s\n::: DDL Batch (END) :::", ddlString));
                     try {
                         ClientResponse cr = client.callProcedure("@AdHoc", ddlString);
                         success = (cr.getStatus() == ClientResponse.SUCCESS);
@@ -842,11 +901,13 @@ public class SchemaChangeClient {
         // The ad hoc DDL mechanism requires the procs be available on the server.
         schemaChanger.addProcedureClasses(client, VerifySchemaChangedA.class, VerifySchemaChangedB.class);
 
+        CatalogChangeTestDriver testDriver = new CatalogChangeTestDriver();
+
         // kick this off with a random schema
         VoltTable t = null;
         TableHelper.ViewRep v = null;
         while (t == null) {
-            Pair<VoltTable, TableHelper.ViewRep> schema = catalogChange(null, true, null, null);
+            Pair<VoltTable, TableHelper.ViewRep> schema = testDriver.catalogChange(null, true, null, false);
             t = schema.getFirst();
             v = schema.getSecond();
         }
@@ -881,13 +942,16 @@ public class SchemaChangeClient {
                 VoltTable newT = null;
                 TableHelper.ViewRep newV = null;
                 boolean isNewTable = (j == 0) && (rand.nextInt(5) == 0);
-                RetryState retryState = new RetryState();
+                boolean isRetry = false;
                 while (newT == null) {
-                    Pair<VoltTable, TableHelper.ViewRep> schema = catalogChange(t, isNewTable, v, retryState);
+                    Pair<VoltTable, TableHelper.ViewRep> schema = testDriver.catalogChange(t, isNewTable, v, isRetry);
                     if (schema == null) {
-                            log.info(_F("Retrying an unsuccessful catalog update."));
-                            retryState.retry++;
+                            log.info(_F("Retrying an unsuccessful catalog update (in %d seconds).", config.retrySleep));
+                            Thread.sleep(config.retrySleep * 1000);
+                            isRetry = true;
                             continue;   // try again
+                    } else {
+                        isRetry = false;
                     }
                     newT = schema.getFirst();
                     newV = schema.getSecond();
