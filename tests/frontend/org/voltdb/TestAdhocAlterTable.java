@@ -321,6 +321,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
 
     public void testAlterColumnOther() throws Exception
     {
+        System.out.println("----------------\n\n TestAlterColumnOther \n\n--------------");
         String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
         String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
 
@@ -363,6 +364,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
                         "alter table FOO alter VAL set not null;");
             }
             catch (ProcCallException pce) {
+                pce.printStackTrace();
                 threw = true;
             }
             assertTrue("Shouldn't be able to declare not null on existing column", threw);
@@ -386,6 +388,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
                         "alter table FOO alter ID set null;");
             }
             catch (ProcCallException pce) {
+                pce.printStackTrace();
                 threw = true;
             }
             assertTrue("Shouldn't be able to make the primary key nullable", threw);
@@ -749,6 +752,54 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             assertTrue("Shouldn't be able to drop partition column on non-empty table", threw);
             assertTrue(isColumnPartitionColumn("FOO", "ID"));
             assertTrue(verifyTableColumnType("FOO", "ID", "BIGINT"));
+        }
+        finally {
+            teardownSystem();
+        }
+    }
+
+    public void testAlterConstraintAssumeUnique() throws Exception
+    {
+        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("-- dont care");
+        builder.setUseDDLSchema(true);
+        boolean success = builder.compile(pathToCatalog, 1, 1, 0);
+        assertTrue("Schema compilation failed", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = pathToCatalog;
+        config.m_pathToDeployment = pathToDeployment;
+        try {
+            startSystem(config);
+            m_client.callProcedure("@AdHoc",
+                    "create table FOO (ID integer not null, VAL bigint not null);");
+            m_client.callProcedure("@AdHoc",
+                    "partition table foo on column ID;");
+            // Should be no indexes in the system (no constraints)
+            VoltTable indexes = m_client.callProcedure("@Statistics", "INDEX", 0).getResults()[0];
+            assertEquals(0, indexes.getRowCount());
+            // now add an ASSUMEUNIQUE constraint (ENG-7224)
+            m_client.callProcedure("@AdHoc",
+                    "alter table FOO add constraint blerg ASSUMEUNIQUE(VAL);");
+            do {
+                indexes = m_client.callProcedure("@Statistics", "INDEX", 0).getResults()[0];
+            }
+            while (indexes.getRowCount() != 1);
+            // Only one host, one site/host, should only be one row in returned result
+            indexes.advanceRow();
+            assertEquals(1, indexes.getLong("IS_UNIQUE"));
+            // Make sure we can drop a named one (can't drop unnamed at the moment, haha)
+            m_client.callProcedure("@AdHoc",
+                    "alter table FOO drop constraint blerg;");
+            indexes = m_client.callProcedure("@Statistics", "INDEX", 0).getResults()[0];
+            do {
+                indexes = m_client.callProcedure("@Statistics", "INDEX", 0).getResults()[0];
+            }
+            while (indexes.getRowCount() != 0);
         }
         finally {
             teardownSystem();
