@@ -76,6 +76,8 @@ public:
             std::string lastAccessedTable, int64_t lastAccessedTableSize, int64_t tuplesProcessed,
             int64_t currMemoryInBytes, int64_t peakMemoryInBytes);
 
+    std::string decodeBase64AndDecompress(const std::string& base64Data);
+
     /**
      * Retrieve a plan from Java via the IPC connection for a fragment id.
      * Plan is JSON. Returns the empty string on failure, but failure is

@@ -181,6 +181,30 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         throw std::exception();
     }
 
+    m_encoderClass = m_jniEnv->FindClass("org/voltdb/utils/Encoder");
+    if (m_encoderClass == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        assert(m_partitionDRGatewayClass != NULL);
+        throw std::exception();
+    }
+
+    m_encoderClass = static_cast<jclass>(m_jniEnv->NewGlobalRef(m_encoderClass));
+    if (m_encoderClass == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        assert(m_encoderClass != NULL);
+        throw std::exception();
+    }
+
+    m_decodeBase64AndDecompressToBytes = m_jniEnv->GetStaticMethodID(
+            m_encoderClass,
+            "decodeBase64AndDecompressToBytes",
+            "(Ljava/lang/String;)[B");
+    if (m_decodeBase64AndDecompressToBytes == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        assert(m_decodeBase64AndDecompressToBytes != NULL);
+        throw std::exception();
+    }
+
     if (m_nextDependencyMID == 0 ||
         m_crashVoltDBMID == 0 ||
         m_pushExportBufferMID == 0 ||
@@ -311,10 +335,48 @@ std::string JNITopend::planForFragmentId(int64_t fragmentId) {
 
         return std::string(strdata.get());
     }
-    else {
+
+    return "";
+}
+
+std::string JNITopend::decodeBase64AndDecompress(const std::string& base64Str) {
+    JNILocalFrameBarrier jni_frame = JNILocalFrameBarrier(m_jniEnv, 2);
+    if (jni_frame.checkResult() < 0) {
+        VOLT_ERROR("Unable to load dependency: jni frame error.");
+        throw std::exception();
+    }
+
+    jstring jBase64Str = m_jniEnv->NewStringUTF(base64Str.c_str());
+    if (m_jniEnv->ExceptionCheck()) {
+        m_jniEnv->ExceptionDescribe();
+        throw std::exception();
+    }
+
+    jbyteArray jbuf = (jbyteArray)m_jniEnv->CallStaticObjectMethod(m_encoderClass,
+                                                                   m_decodeBase64AndDecompressToBytes,
+                                                                   jBase64Str);
+    if (!jbuf) {
         // this will be trapped later ;-)
         return std::string("");
     }
+
+    jsize length = m_jniEnv->GetArrayLength(jbuf);
+    if (length > 0) {
+        jboolean is_copy;
+        jbyte *bytes = m_jniEnv->GetByteArrayElements(jbuf, &is_copy);
+        // Add the plan buffer info to the stack object
+        // so it'll get cleaned up if loadTuplesFrom throws
+        jni_frame.addDependencyRef(is_copy, jbuf, bytes);
+
+        // make a null terminated copy
+        boost::scoped_array<char> strdata(new char[length + 1]);
+        memcpy(strdata.get(), bytes, length);
+        strdata.get()[length] = '\0';
+
+        return std::string(strdata.get());
+    }
+
+    return "";
 }
 
 void JNITopend::crashVoltDB(FatalException e) {

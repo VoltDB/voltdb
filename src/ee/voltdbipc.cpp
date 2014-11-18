@@ -1337,6 +1337,10 @@ void VoltDBIPC::executeTask(struct ipc_command *cmd) {
     writeOrDie(m_fd, (unsigned char*)resultsBuffer, responseLength);
 }
 
+std::string VoltDBIPC::decodeBase64AndDecompress(const std::string& base64Data) {
+    return "";
+}
+
 void VoltDBIPC::pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block) {
     if (block != NULL) {
         delete []block->rawPtr();

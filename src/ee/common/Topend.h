@@ -65,6 +65,10 @@ class Topend {
     virtual void pushDRBuffer(int32_t partitionId, StreamBlock *block) = 0;
 
     virtual void fallbackToEEAllocatedBuffer(char *buffer, size_t length) = 0;
+
+    /** Calls the java method in org.voltdb.utils.Encoder */
+    virtual std::string decodeBase64AndDecompress(const std::string& buffer) = 0;
+
     virtual ~Topend()
     {
     }
