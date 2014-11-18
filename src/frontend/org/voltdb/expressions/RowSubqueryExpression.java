@@ -45,24 +45,10 @@ public class RowSubqueryExpression extends AbstractSubqueryExpression {
         // to the evaluation
         List<AbstractExpression> pves = new ArrayList<AbstractExpression>();
         for (AbstractExpression expr : args) {
-            // Create a matching PVE for this expression to be used on the EE side
-            // to get the original expression value
-            int paramIdx = AbstractParsedStmt.NEXT_PARAMETER_ID++;
-            m_parameterIdxList.add(paramIdx);
-            ParameterValueExpression pve = new ParameterValueExpression();
-            pve.setParameterIndex(paramIdx);
-            pve.setValueSize(expr.getValueSize());
-            pve.setValueType(expr.getValueType());
-            pve.setCorrelatedExpression(expr);
-            pves.add(pve);
+            collectParameterValueExpressions(expr, pves);
         }
         String tableName = "VOLT_TEMP_TABLE_" + m_subqueryId;
         m_subqueryNode = new TupleScanPlanNode(tableName, pves);
-    }
-
-    @Override
-    public void finalizeValueTypes() {
-        // nothing to finalize
     }
 
     @Override
@@ -87,4 +73,32 @@ public class RowSubqueryExpression extends AbstractSubqueryExpression {
         return result;
     }
 
+    // Recursively collect all TVE and aggregate expressions to be replaced with the corresponding
+    // PVE inside the Row subquery
+    private void collectParameterValueExpressions(AbstractExpression expr, List<AbstractExpression> pves) {
+        if (expr == null) {
+            return;
+        }
+
+        // Create a matching PVE for this expression to be used on the EE side
+        // to get the original expression value
+        if (expr instanceof TupleValueExpression || expr instanceof AggregateExpression) {
+            int paramIdx = AbstractParsedStmt.NEXT_PARAMETER_ID++;
+            m_parameterIdxList.add(paramIdx);
+            ParameterValueExpression pve = new ParameterValueExpression();
+            pve.setParameterIndex(paramIdx);
+            pve.setValueSize(expr.getValueSize());
+            pve.setValueType(expr.getValueType());
+            pve.setCorrelatedExpression(expr);
+            pves.add(pve);
+            return;
+        }
+        collectParameterValueExpressions(expr.getLeft(), pves);
+        collectParameterValueExpressions(expr.getRight(), pves);
+        if (expr.getArgs() != null) {
+            for (AbstractExpression arg : expr.getArgs()) {
+                collectParameterValueExpressions(arg, pves);
+            }
+        }
+    }
 }

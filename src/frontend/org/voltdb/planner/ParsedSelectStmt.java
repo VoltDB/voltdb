@@ -46,9 +46,9 @@ import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
+import org.voltdb.expressions.RowSubqueryExpression;
 import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.expressions.VectorValueExpression;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
@@ -990,10 +990,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         List<AbstractExpression> whereList = new ArrayList<AbstractExpression>();
         List<AbstractExpression> havingList = new ArrayList<AbstractExpression>();
 
-        // multi-column IN expression is a VectorValueExpression
+        // multi-column IN expression is a RowSubqueryExpression
         // where each arg represents individual columns
         List<AbstractExpression> inExprList = null;
-        if (inListExpr instanceof VectorValueExpression) {
+        if (inListExpr instanceof RowSubqueryExpression) {
             inExprList = inListExpr.getArgs();
         } else {
             inExprList = new ArrayList<AbstractExpression>();

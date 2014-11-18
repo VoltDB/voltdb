@@ -30,6 +30,7 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
@@ -586,56 +587,45 @@ public abstract class AbstractParsedStmt {
                 expr.setValueSize(voltType.getMaxLengthInBytes());
             }
         }
-//        if ((exprType == ExpressionType.COMPARE_IN && expr.getRight() instanceof SelectSubqueryExpression) ||
-//                exprType == ExpressionType.OPERATOR_EXISTS) {
-//            // Compact the expression hierarchy by removing parent and setting
-//            // the subquery type (IN/EXISTS) to the child - SubqueryExpression
-//            AbstractExpression subqueryExpr = null;
-//            if (ExpressionType.COMPARE_IN == exprType) {
-//                subqueryExpr = expr.getRight();
-//                subqueryExpr.setLeft(expr.getLeft());
-//                subqueryExpr.setExpressionType(ExpressionType.IN_SUBQUERY);
-//            } else {
-//                subqueryExpr = expr.getLeft();
-//                subqueryExpr.setExpressionType(ExpressionType.EXISTS_SUBQUERY);
-//            }
-//            assert(subqueryExpr != null);
-//
-//            // Break up UNION/INTERSECT (ALL) set ops into individual selects connected by
-//            // AND/OR operator
-//            // col IN ( queryA UNION queryB ) - > col IN (queryA) OR col IN (queryB)
-//            // col IN ( queryA INTERSECTS queryB ) - > col IN (queryA) AND col IN (queryB)
-//            subqueryExpr = ParsedUnionStmt.breakUpSetOpSubquery(subqueryExpr);
-//            expr = optimizeSubqueryExpression(subqueryExpr);
-//        }
+        if ((exprType == ExpressionType.COMPARE_IN && expr.getRight() instanceof AbstractSubqueryExpression) ||
+                exprType == ExpressionType.OPERATOR_EXISTS) {
+            if (ExpressionType.COMPARE_IN == exprType) {
+                expr.setExpressionType(ExpressionType.COMPARE_IN_SUBQUERY);
+            }
+            // Break up UNION/INTERSECT (ALL) set ops into individual selects connected by
+            // AND/OR operator
+            // col IN ( queryA UNION queryB ) - > col IN (queryA) OR col IN (queryB)
+            // col IN ( queryA INTERSECTS queryB ) - > col IN (queryA) AND col IN (queryB)
+            expr = ParsedUnionStmt.breakUpSetOpSubquery(expr);
+            expr = optimizeSubqueryExpression(expr);
+        }
         return expr;
     }
 
-//    /**
-//     * Perform various optimizations for IN/EXISTS subqueries if possible
-//     *
-//     * @param expr to optimize
-//     * @return optimized expression
-//     */
-//    private AbstractExpression optimizeSubqueryExpression(AbstractExpression expr) {
-//        ExpressionType exprType = expr.getExpressionType();
-//        if (ExpressionType.CONJUNCTION_AND == exprType || ExpressionType.CONJUNCTION_OR == exprType) {
-//            AbstractExpression optimizedLeft = optimizeSubqueryExpression(expr.getLeft());
-//            expr.setLeft(optimizedLeft);
-//            AbstractExpression optimizedRight = optimizeSubqueryExpression(expr.getRight());
-//            expr.setRight(optimizedRight);
-//        }
-//        AbstractExpression retval = expr;
-//        if (ExpressionType.IN_SUBQUERY == retval.getExpressionType()) {
-//            retval = optimizeInExpression(retval);
-//            // Do not return here because the original IN expressions
-//            // is converted to EXISTS and can be optimized farther.
-//        }
-//        if (ExpressionType.EXISTS_SUBQUERY == retval.getExpressionType()) {
-//            retval = optimizeExistsExpression(retval);
-//        }
-//        return retval;
-//    }
+    /**
+     * Perform various optimizations for IN/EXISTS subqueries if possible
+     *
+     * @param expr to optimize
+     * @return optimized expression
+     */
+    private AbstractExpression optimizeSubqueryExpression(AbstractExpression expr) {
+        ExpressionType exprType = expr.getExpressionType();
+        if (ExpressionType.CONJUNCTION_AND == exprType || ExpressionType.CONJUNCTION_OR == exprType) {
+            AbstractExpression optimizedLeft = optimizeSubqueryExpression(expr.getLeft());
+            expr.setLeft(optimizedLeft);
+            AbstractExpression optimizedRight = optimizeSubqueryExpression(expr.getRight());
+            expr.setRight(optimizedRight);
+        }
+        if (ExpressionType.COMPARE_IN_SUBQUERY == expr.getExpressionType()) {
+            expr = optimizeInExpression(expr);
+            // Do not return here because the original IN expressions
+            // is converted to EXISTS and can be optimized farther.
+        }
+        if (ExpressionType.OPERATOR_EXISTS == expr.getExpressionType()) {
+            expr = optimizeExistsExpression(expr);
+        }
+        return expr;
+    }
 
     /**
      * Verify that an IN expression can be safely converted to an EXISTS one
@@ -645,8 +635,22 @@ public abstract class AbstractParsedStmt {
      * @param inExpr
      * @return existsExpr
      */
-    private boolean canConvertInToExistsExpression(AbstractParsedStmt subquery) {
+    private boolean canConvertInToExistsExpression(AbstractExpression inExpr) {
+        AbstractExpression leftExpr = inExpr.getLeft();
+        if (leftExpr instanceof SelectSubqueryExpression) {
+            // If the left child is a (SELECT ...) expression itself we can't convert it
+            // to the EXISTS expression because of the run time scalar check (expression must return
+            // a single row)
+            return false;
+        }
+        AbstractExpression rightExpr = inExpr.getRight();
+        if (!(rightExpr instanceof SelectSubqueryExpression)) {
+            return false;
+        }
+
         // Must be a SELECT statement
+        SelectSubqueryExpression subqueryExpr = (SelectSubqueryExpression) inExpr.getRight();
+        AbstractParsedStmt subquery = subqueryExpr.getSubquery();
         if (!(subquery instanceof ParsedSelectStmt)) {
             return false;
         }
@@ -663,60 +667,70 @@ public abstract class AbstractParsedStmt {
         return canConvert;
     }
 
-//    /**
-//     * Optimize EXISTS expression:
-//     *  1. Replace the display columns with a single dummy column "1"
-//     *  2. Drop DISTINCT expression
-//     *  3. Add LIMIT 1
-//     *  4. Remove ORDER BY, GROUP BY expressions if HAVING expression is not present
-//     *
-//     * @param inExpr
-//     * @return existsExpr
-//     */
-//    private AbstractExpression optimizeExistsExpression(AbstractExpression existsExpr) {
-//        assert(ExpressionType.EXISTS_SUBQUERY == existsExpr.getExpressionType());
-//        assert(existsExpr instanceof  SubqueryExpression);
-//
-//        SubqueryExpression subqueryExpr = (SubqueryExpression) existsExpr;
-//        AbstractParsedStmt subquery = subqueryExpr.getSubquery();
-//        if (subquery instanceof ParsedSelectStmt) {
-//            ParsedSelectStmt selectSubquery = (ParsedSelectStmt) subquery;
-//
-//            selectSubquery.simplifyExistsExpression();
-//        }
-//        return existsExpr;
-//    }
-//
-//    /**
-//     * Optimize IN expression
-//     *
-//     * @param inExpr
-//     * @return existsExpr
-//     */
-//    private AbstractExpression optimizeInExpression(AbstractExpression inExpr) {
-//        assert(ExpressionType.IN_SUBQUERY == inExpr.getExpressionType());
-//        assert(inExpr instanceof SubqueryExpression);
-//        assert(inExpr.getLeft() != null);
-//
-//        AbstractExpression inColumns = inExpr.getLeft();
-//        SubqueryExpression subqueryExpr = (SubqueryExpression) inExpr;
-//        AbstractParsedStmt subquery = subqueryExpr.getSubquery();
-//        if (canConvertInToExistsExpression(subquery)) {
-//            ParsedSelectStmt selectStmt = (ParsedSelectStmt) subquery;
-//            ParsedSelectStmt.rewriteInSubqueryAsExists(selectStmt, inColumns);
-//            subqueryExpr.moveUpTVE();
-//            subqueryExpr.setExpressionType(ExpressionType.EXISTS_SUBQUERY);
-//            subqueryExpr.setLeft(null);
-//            return subqueryExpr;
-//        } else {
-//            // Need to replace TVE from the IN list with the corresponding PVE
-//            // to be passed as parameters to the subquery similar to the correlated TVE
-//            inColumns = ParsedSelectStmt.replaceExpressionsWithPve(subquery, inColumns);
-//            subqueryExpr.moveUpTVE();
-//            inExpr.setLeft(inColumns);
-//            return inExpr;
-//        }
-//    }
+    /**
+     * Optimize EXISTS expression:
+     *  1. Replace the display columns with a single dummy column "1"
+     *  2. Drop DISTINCT expression
+     *  3. Add LIMIT 1
+     *  4. Remove ORDER BY, GROUP BY expressions if HAVING expression is not present
+     *
+     * @param inExpr
+     * @return existsExpr
+     */
+    private AbstractExpression optimizeExistsExpression(AbstractExpression existsExpr) {
+        assert(ExpressionType.OPERATOR_EXISTS == existsExpr.getExpressionType());
+        assert(existsExpr.getLeft() != null);
+
+        if (existsExpr.getLeft() instanceof SelectSubqueryExpression) {
+            SelectSubqueryExpression subqueryExpr = (SelectSubqueryExpression) existsExpr.getLeft();
+            AbstractParsedStmt subquery = subqueryExpr.getSubquery();
+            if (subquery instanceof ParsedSelectStmt) {
+                ParsedSelectStmt selectSubquery = (ParsedSelectStmt) subquery;
+                selectSubquery.simplifyExistsExpression();
+            }
+        }
+        return existsExpr;
+    }
+
+    /**
+     * Optimize IN expression
+     *
+     * @param inExpr
+     * @return existsExpr
+     */
+    private AbstractExpression optimizeInExpression(AbstractExpression inExpr) {
+        assert(ExpressionType.COMPARE_IN_SUBQUERY == inExpr.getExpressionType());
+        assert(inExpr.getLeft() != null);
+        assert(inExpr.getRight() != null);
+        if (!(inExpr.getRight() instanceof SelectSubqueryExpression)) {
+            // The right expression is not SELECT ... subquery
+            return inExpr;
+        }
+
+        if (canConvertInToExistsExpression(inExpr)) {
+            AbstractExpression inColumns = inExpr.getLeft();
+            assert(inColumns != null);
+            assert(inExpr.getRight() instanceof SelectSubqueryExpression);
+            SelectSubqueryExpression subqueryExpr = (SelectSubqueryExpression) inExpr.getRight();
+            AbstractParsedStmt subquery = subqueryExpr.getSubquery();
+            assert(subquery instanceof ParsedSelectStmt);
+            ParsedSelectStmt selectStmt = (ParsedSelectStmt) subquery;
+            ParsedSelectStmt.rewriteInSubqueryAsExists(selectStmt, inColumns);
+            subqueryExpr.moveUpTVE();
+            AbstractExpression existsExpr = null;
+            try {
+                existsExpr = ExpressionType.OPERATOR_EXISTS.getExpressionClass().newInstance();
+            } catch (Exception e) {
+                e.printStackTrace();
+                throw new RuntimeException(e.getMessage(), e);
+            }
+            existsExpr.setExpressionType(ExpressionType.OPERATOR_EXISTS);
+            existsExpr.setLeft(subqueryExpr);
+            return existsExpr;
+        } else {
+            return inExpr;
+        }
+    }
 
     /**
      *
