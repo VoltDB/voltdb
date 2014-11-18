@@ -236,8 +236,8 @@ public class SchemaChangeClient {
 
         // Do the drops as a separate batch. It's a NOP for the catalog update method.
         // Skip if it's a retry attempt and this part already succeeded.
-        if (retryState.stage == 0) {
-            if (retryState.retry > 0) {
+        if (retryState == null || retryState.stage == 0) {
+            if (retryState != null && retryState.retry > 0) {
                 log.info(_F("Retry #%d: stage %d (drops)", retryState.retry, retryState.stage+1));
             }
             schemaChanger.beginBatch();
@@ -267,11 +267,13 @@ public class SchemaChangeClient {
                 // This is a normal error return that is handled by the caller.
                 return null;
             }
-            retryState.stage++;
+            if (retryState != null) {
+                retryState.stage++;
+            }
         }
 
         // Now do the creates and alters.
-        if (retryState.retry > 0) {
+        if (retryState != null && retryState.retry > 0) {
             log.info(_F("Retry #%d: stage %d (creates/alters)", retryState.retry, retryState.stage+1));
         }
         schemaChanger.beginBatch();
@@ -321,7 +323,9 @@ public class SchemaChangeClient {
         }
 
         // Reset the retry stage since the batch at least succeeded mechanically, if not logically.
-        retryState.stage = 0;
+        if (retryState != null) {
+            retryState.stage = 0;
+        }
 
         // don't actually trust the call... manually verify
         int obsCatVersion = verifyAndGetSchemaVersion();
