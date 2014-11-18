@@ -272,7 +272,10 @@ public class JdbcDatabaseMetaDataGenerator
                     }
                     remark = jsObj.toString();
                 } catch (JSONException e) {
-                    hostLog.error("Invalid JSON object", e);
+                    hostLog.warn("You have encountered an unexpected error while generating results for the " +
+                            "@SystemCatalog procedure call. This error will not affect your database's " +
+                            "operation. Please contact VoltDB support with your log files and a " +
+                            "description of what you were doing when this error occured.", e);
                     remark = "{\"" + JSON_ERROR + "\",\"" + e.getMessage() + "\"}";
                 }
             }
@@ -555,7 +558,10 @@ public class JdbcDatabaseMetaDataGenerator
                 }
                 remark = jsObj.toString();
             } catch (JSONException e) {
-                hostLog.error("Invalid JSON object", e);
+                hostLog.warn("You have encountered an unexpected error while generating results for the " +
+                             "@SystemCatalog procedure call. This error will not affect your database's " +
+                             "operation. Please contact VoltDB support with your log files and a " +
+                             "description of what you were doing when this error occured.", e);
                 remark = "{\"" + JSON_ERROR + "\",\"" + e.getMessage() + "\"}";
             }
             results.addRow(
