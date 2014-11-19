@@ -137,7 +137,7 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
             pl.plot(u[0], u[1], mc[b][0], mc[b][1], b, '-')
 
             ma = [None]
-            if len(u[0]) >= 10:
+            if b == 'master' and len(u[0]) >= 10:
                 (ma,mstd) = moving_average(u[1], 10)
                 pl.plot(u[0], ma, mc[b][0], None, None, ":")
                 failed = 0
