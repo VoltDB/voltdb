@@ -1927,7 +1927,7 @@ function alertNodeClicked(obj) {
                                 "TABLE_NAME": key,
                                 "MAX_ROWS": Math.max.apply(null, tupleCountPartitions),
                                 "MIN_ROWS": Math.min.apply(null, tupleCountPartitions),
-                                "AVG_ROWS": averageRowCount,
+                                "AVG_ROWS": getAverage(tupleCountPartitions),
                                 "TUPLE_COUNT": schemaCatalogTableTypes[key].REMARKS == "REPLICATED" ? data[0][tupleCountIndex] : totalTupleCount,
                                 "TABLE_TYPE": schemaCatalogTableTypes[key].REMARKS
                             };
