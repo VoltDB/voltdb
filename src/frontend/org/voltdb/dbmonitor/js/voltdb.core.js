@@ -117,7 +117,7 @@
                     timeoutOccurred = 1;
                     UserCallback(criticalErrorResponse);
                 }, 20000);
-                this.Callback = function (response,headerInfo) {
+                this.Callback = function (response, headerInfo) {
                     clearTimeout(timeout);
                     if (timeoutOccurred == 0) UserCallback(response, headerInfo);
                 };
@@ -156,7 +156,7 @@
                         var item = stack[0];
                         Connection.CallExecute(item[0], item[1], (new callbackWrapper(
                             (function (queue, item) {
-                                return function (response,headerInfo) {
+                                return function (response, headerInfo) {
                                     try {
                                         if (validateIPAddress(headerInfo)) {
                                             if (Connection.hostName == "") {
@@ -164,7 +164,7 @@
 
                                             }
                                         }
-                                       
+
                                         if (response.status != 1)
                                             success = false;
                                         if (item[2] != null)
@@ -459,11 +459,13 @@ jQuery.extend({
                 data: formData,
                 dataType: 'jsonp',
                 success: function (data, textStatus, request) {
-                    callback(data, request.getResponseHeader("Host"));
-                    //callback(data, "10.10.1.52");
+                    callback(data, (request.getResponseHeader("Host").split(":"))[0]);                    
+                },
+                error: function (e) {
+                    console.log(e.message);
                 }
             });
-            
+
         } else {
             jQuery.post(url, formData, callback, "json");
         }
@@ -472,14 +474,14 @@ jQuery.extend({
 
 var verifyURIRequest = function (uriData) {
     var result = false;
-    
-    var decodedUri = decodeURIComponent(uriData);   
+
+    var decodedUri = decodeURIComponent(uriData);
     var procedureName = decodedUri.substring(decodedUri.indexOf('@', 0), decodedUri.indexOf('&', 0));
     var parameterName = (decodedUri.split("[\""))[1].substring();
     parameterName = parameterName.substring(0, parameterName.indexOf("]") - 1);
     if (procedureName == "@SystemInformation" && parameterName == "OVERVIEW")
         result = true;
-    
+
     return result;
 };
 
