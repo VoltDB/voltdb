@@ -297,7 +297,7 @@ function alertNodeClicked(obj) {
             VoltDBService.GetSystemInformation(function (connection) {
                 populateSystemInformation(connection);
                 getMemoryDetails(connection, systemMemory);
-                onInformationLoaded();
+                onInformationLoaded(connection.hostName);
             });
         };
 
@@ -449,6 +449,40 @@ function alertNodeClicked(obj) {
             }
 
             callback(html, alertHtml);
+        };
+        
+        this.configureRequestedHost = function (hostName) {
+            var currentServer = "";
+            var counter = 0;
+            
+            if (validateIPAddress(hostName)) {
+                //loop through cluster Information and get current server ip
+                $.each(systemOverview, function (id, val) {
+                    if (val["IPADDRESS"] == hostName) {
+                        currentServer = val["HOSTNAME"];
+                        saveCookie("currentServer", val["HOSTNAME"]);
+                        return false;
+
+                    }
+
+                });
+
+            }
+            else {
+                $.each(systemOverview, function (id, val) {
+                    if (val["CLUSTERSTATE"] == "RUNNING") {
+                        if (counter == 0)
+                            currentServer = val["HOSTNAME"];
+                    }
+                    if (val["HOSTNAME"] == hostName) {
+                        currentServer = val["HOSTNAME"];
+                        saveCookie("currentServer", val["HOSTNAME"]);
+                        return false;
+                    }
+                    counter++;
+                });
+            }
+
         };
 
         var populateSystemInformation = function (connection) {
