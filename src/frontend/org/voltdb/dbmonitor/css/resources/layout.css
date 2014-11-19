@@ -750,6 +750,7 @@ ul.helpSchemaList li { list-style:disc; line-height:25px!important; padding:0; m
 .resume, 
 .save, 
 .promote, 
+.promote-disabled,
 .restore, 
 .stop,
 .shutdown, 
@@ -771,6 +772,7 @@ ul.adminClusterList li a{display:block;}
 ul.adminClusterList li a.pause { display:inline-block; background-position:-20px -106px; width:40px; height:36px;}
 ul.adminClusterList li a.resume { display:inline-block; background-position:-20px -151px; width:40px; height:36px;}
 ul.adminClusterList li a.promote { display:inline-block; background-position:-70px -12px;width:40px; height:36px;}
+ul.adminClusterList li a.promote-disabled, ul.adminClusterList li a.promote-disabled:hover{ display:inline-block; background-position:-70px -56px;width:40px; height:36px; color:#bbb;}
 ul.adminClusterList li a.restore { display:inline-block;background-position:-120px -12px; width:40px; height:36px;}
 ul.adminClusterList li a.save, .save { display:inline-block;background-position:-120px -57px; width:40px; height:26px;}
 
@@ -821,7 +823,7 @@ ul.adminClusterList li a:hover{color:#000;}
 .txt-bold{font-weight:bold;}
 
 .btn-gray { background-color:#999; cursor:pointer; padding:8px 10px; text-align:center; color:#fff; font:14px Arial, Helvetica, sans-serif; text-shadow:none; text-decoration:none; border-radius:0; border:none;} 
-input.exitableTxtBx{float:left; width:40px; position:relative; top:-5px; padding:5px;}
+input.exitableTxtBx{width:30px; position:relative; top:-5px; padding:2px 3px;}
 .tblSave { border:none}
 .tblSave tr{border:1px solid #CCCCCC;}
 .tblSave tr td { padding:10px;border:none;}
