@@ -25,12 +25,13 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.Database;
 import org.voltdb.plannodes.AbstractPlanNode;
 
 /**
-* Base class to represent sub-select, row, and scalar expressions
- * The value type is always a TINYINT because
- * the expression's eval method on the EE side returns the subquery id as a result.
+ * Base class to represent sub-select, row, and scalar expressions
+ * The value type is always a BIGINT because the expression's eval method on the EE side
+ * returns the subquery id as a result.
  * This id can be used by others expressions to access the actual subquery results
 */
 public abstract class AbstractSubqueryExpression extends AbstractExpression {
@@ -178,4 +179,15 @@ public abstract class AbstractSubqueryExpression extends AbstractExpression {
         // Nothing to do there
     }
 
+    public void resolveColumnIndexes() {
+        if (m_subqueryNode != null) {
+            m_subqueryNode.resolveColumnIndexes();
+        }
+    }
+
+    public void generateOutputSchema(Database db) {
+        if (m_subqueryNode != null) {
+            m_subqueryNode.generateOutputSchema(db);
+        }
+    }
 }

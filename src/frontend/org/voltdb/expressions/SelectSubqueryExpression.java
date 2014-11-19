@@ -34,7 +34,7 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.ExpressionType;
 
 /**
- * Expression to represent select subqueries (SELECT ...).
+ * Expression to represent a select sub query (SELECT ...).
 *
 */
 public class SelectSubqueryExpression extends AbstractSubqueryExpression {
@@ -52,26 +52,23 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
     /**
      * Create a new SubqueryExpression. The type can be either:
      *    SCALAR_SUBQUERY   - SELECT A, (SELECT C...) FROM .... - single row one column
-     *    ROW_SUBQUERY      - WHERE (...) = (SELECT C1, C2 ...) - single row multiple columns
-     *    SELECT_SUBQUERY   - WHERE (...) = (SELECT C1, C2 ...) - multiple rows
+     *    SELECT_SUBQUERY   - WHERE (...) IN (SELECT C1, C2 ...) - multiple rows
      * @param subqueryType
      * @param subquey The parsed statement
      */
     public SelectSubqueryExpression(ExpressionType type, StmtSubqueryScan subquery) {
         super();
         m_type = type;
-        // subquery is null if loaded from JSON
-        if (subquery != null) {
-            m_subquery = subquery;
-            assert(m_subquery.getSubqueryStmt() != null);
-            m_subqueryId = m_subquery.getSubqueryStmt().m_stmtId;
-            if (m_subquery.getBestCostPlan() != null && m_subquery.getBestCostPlan().rootPlanGraph != null) {
-                m_subqueryNode = m_subquery.getBestCostPlan().rootPlanGraph;
-                m_subqueryNodeId = m_subqueryNode.getPlanNodeId();
-            }
-            m_args = new ArrayList<AbstractExpression>();
-            moveUpTVE();
+        assert(subquery != null);
+        m_subquery = subquery;
+        assert(m_subquery.getSubqueryStmt() != null);
+        m_subqueryId = m_subquery.getSubqueryStmt().m_stmtId;
+        if (m_subquery.getBestCostPlan() != null && m_subquery.getBestCostPlan().rootPlanGraph != null) {
+            m_subqueryNode = m_subquery.getBestCostPlan().rootPlanGraph;
+            m_subqueryNodeId = m_subqueryNode.getPlanNodeId();
         }
+        m_args = new ArrayList<AbstractExpression>();
+        moveUpTVE();
     }
 
     /**
@@ -88,9 +85,12 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
     }
 
     public AbstractParsedStmt getSubquery() {
-        return m_subquery.getSubqueryStmt();
+        return (m_subquery != null) ? m_subquery.getSubqueryStmt() : null;
     }
 
+    /**
+     * From JSON
+     */
     public void setSubqueryNode(AbstractPlanNode subqueryNode) {
         assert(subqueryNode != null);
         m_subqueryNode = subqueryNode;
@@ -165,11 +165,12 @@ public class SelectSubqueryExpression extends AbstractSubqueryExpression {
     protected void loadFromJSONObject(JSONObject obj) throws JSONException {
         super.loadFromJSONObject(obj);
         if (obj.has(Members.OTHER_PARAM_IDX.name())) {
-            JSONArray allParamIdxArray = obj.getJSONArray(Members.OTHER_PARAM_IDX.name());
-            int paramSize = allParamIdxArray.length();
+            JSONArray otherParamIdxArray = obj.getJSONArray(Members.OTHER_PARAM_IDX.name());
+            int paramSize = otherParamIdxArray.length();
             for (int i = 0; i < paramSize; ++i) {
-                m_allParameterIdxList.add(allParamIdxArray.getInt(i));
+                m_allParameterIdxList.add(otherParamIdxArray.getInt(i));
             }
+            m_allParameterIdxList.addAll(m_parameterIdxList);
         }
     }
 

@@ -71,8 +71,6 @@ namespace voltdb
     private:
         AggregateExecutorBase* m_aggExec;
 
-        // If the indicator is set to true, the scan finishes on the first predicate hit
-        bool m_isSemiScan;
     };
 }
 

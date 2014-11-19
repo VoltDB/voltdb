@@ -184,8 +184,8 @@ public class AggregatePlanNode extends AbstractPlanNode {
             // aggregate's output schema is pre-determined, don't touch
         }
         // Possible subquery expressions
-        generateSubqueryExpressionOutputSchema(m_postPredicate, db);
-        generateSubqueryExpressionOutputSchema(m_prePredicate, db);
+        ExpressionUtil.generateSubqueryExpressionOutputSchema(m_postPredicate, db);
+        ExpressionUtil.generateSubqueryExpressionOutputSchema(m_prePredicate, db);
         return;
     }
 
@@ -263,8 +263,8 @@ public class AggregatePlanNode extends AbstractPlanNode {
         }
 
         // Possible subquery expressions
-        resolveSubqueryExpressionColumnIndexes(m_prePredicate);
-        resolveSubqueryExpressionColumnIndexes(m_postPredicate);
+        ExpressionUtil.resolveSubqueryExpressionColumnIndexes(m_prePredicate);
+        ExpressionUtil.resolveSubqueryExpressionColumnIndexes(m_postPredicate);
     }
 
     /**

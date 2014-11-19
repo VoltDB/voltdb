@@ -61,8 +61,9 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         assertTrue(col != null);
         assertEquals("SCALAR", col.getColumnName());
         AbstractExpression colExpr = col.getExpression();
-        assertTrue(colExpr instanceof AbstractSubqueryExpression);
-        AbstractSubqueryExpression subqueryExpr = (AbstractSubqueryExpression) colExpr;
+        assertEquals(ExpressionType.VALUE_SCALAR, colExpr.getExpressionType());
+        assertTrue(colExpr.getLeft() instanceof AbstractSubqueryExpression);
+        AbstractSubqueryExpression subqueryExpr = (AbstractSubqueryExpression) colExpr.getLeft();
         List<Integer> params = subqueryExpr.getParameterIdxList();
         assertEquals(1, params.size());
         assertEquals(new Integer(0), params.get(0));
@@ -79,8 +80,9 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         assertTrue(col != null);
         assertEquals("SCALAR", col.getColumnName());
         AbstractExpression colExpr = col.getExpression();
-        assertTrue(colExpr instanceof AbstractSubqueryExpression);
-        AbstractSubqueryExpression subqueryExpr = (AbstractSubqueryExpression) colExpr;
+        assertEquals(ExpressionType.VALUE_SCALAR, colExpr.getExpressionType());
+        assertTrue(colExpr.getLeft() instanceof AbstractSubqueryExpression);
+        AbstractSubqueryExpression subqueryExpr = (AbstractSubqueryExpression) colExpr.getLeft();
         AbstractPlanNode subquery = subqueryExpr.getSubqueryNode();
         assertEquals(PlanNodeType.SEQSCAN, subquery.getPlanNodeType());
         AbstractExpression pred = ((SeqScanPlanNode) subquery).getPredicate();
@@ -99,7 +101,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         AbstractExpression pred = ((AbstractScanPlanNode) pn).getPredicate();
         assertEquals(ExpressionType.COMPARE_EQUAL, pred.getExpressionType());
         assertEquals(ExpressionType.VALUE_TUPLE, pred.getLeft().getExpressionType());
-        assertEquals(ExpressionType.SCALAR_SUBQUERY, pred.getRight().getExpressionType());
+        assertEquals(ExpressionType.SELECT_SUBQUERY, pred.getRight().getExpressionType());
     }
 
     public void testWhereGreaterScalar() {
@@ -109,7 +111,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         AbstractExpression pred = ((AbstractScanPlanNode) pn).getPredicate();
         assertEquals(ExpressionType.COMPARE_LESSTHAN, pred.getExpressionType());
         assertEquals(ExpressionType.VALUE_TUPLE, pred.getLeft().getExpressionType());
-        assertEquals(ExpressionType.SCALAR_SUBQUERY, pred.getRight().getExpressionType());
+        assertEquals(ExpressionType.SELECT_SUBQUERY, pred.getRight().getExpressionType());
     }
 
     public void testWhereParamScalar() {
@@ -119,7 +121,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         AbstractExpression pred = ((AbstractScanPlanNode) pn).getPredicate();
         assertEquals(ExpressionType.COMPARE_EQUAL, pred.getExpressionType());
         assertEquals(ExpressionType.VALUE_TUPLE, pred.getLeft().getExpressionType());
-        assertEquals(ExpressionType.SCALAR_SUBQUERY, pred.getRight().getExpressionType());
+        assertEquals(ExpressionType.SELECT_SUBQUERY, pred.getRight().getExpressionType());
         assertEquals(1, pred.getRight().getArgs().size());
     }
 
@@ -130,7 +132,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         AbstractExpression pred = ((AbstractScanPlanNode) pn).getPredicate();
         assertEquals(ExpressionType.COMPARE_EQUAL, pred.getExpressionType());
         assertEquals(ExpressionType.VALUE_TUPLE, pred.getLeft().getExpressionType());
-        assertEquals(ExpressionType.SCALAR_SUBQUERY, pred.getRight().getExpressionType());
+        assertEquals(ExpressionType.SELECT_SUBQUERY, pred.getRight().getExpressionType());
         assertEquals(0, pred.getRight().getArgs().size());
     }
 
@@ -140,8 +142,8 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         assertTrue(pn instanceof AbstractScanPlanNode);
         AbstractExpression pred = ((AbstractScanPlanNode) pn).getPredicate();
         assertEquals(ExpressionType.COMPARE_GREATERTHAN, pred.getExpressionType());
-        assertEquals(ExpressionType.VALUE_VECTOR, pred.getLeft().getExpressionType());
-        assertEquals(ExpressionType.ROW_SUBQUERY, pred.getRight().getExpressionType());
+        assertEquals(ExpressionType.ROW_SUBQUERY, pred.getLeft().getExpressionType());
+        assertEquals(ExpressionType.SELECT_SUBQUERY, pred.getRight().getExpressionType());
     }
 
     public void testWhereEqualRow() {
@@ -150,8 +152,8 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         assertTrue(pn instanceof AbstractScanPlanNode);
         AbstractExpression pred = ((AbstractScanPlanNode) pn).getPredicate();
         assertEquals(ExpressionType.COMPARE_EQUAL, pred.getExpressionType());
-        assertEquals(ExpressionType.VALUE_VECTOR, pred.getLeft().getExpressionType());
-        assertEquals(ExpressionType.ROW_SUBQUERY, pred.getRight().getExpressionType());
+        assertEquals(ExpressionType.ROW_SUBQUERY, pred.getLeft().getExpressionType());
+        assertEquals(ExpressionType.SELECT_SUBQUERY, pred.getRight().getExpressionType());
         assertEquals(1, pred.getRight().getArgs().size());
     }
 
@@ -166,7 +168,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         assertEquals(PlanNodeType.SEQSCAN, pn.getPlanNodeType());
         AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(pn);
         AbstractExpression aggExpr = aggNode.getPostPredicate();
-        assertEquals(ExpressionType.SCALAR_SUBQUERY, aggExpr.getRight().getExpressionType());
+        assertEquals(ExpressionType.SELECT_SUBQUERY, aggExpr.getRight().getExpressionType());
     }
 
     public void testHavingRow() {
@@ -175,7 +177,7 @@ public class TestPlansScalarSubQueries extends PlannerTestCase {
         assertEquals(PlanNodeType.SEQSCAN, pn.getPlanNodeType());
         AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(pn);
         AbstractExpression aggExpr = aggNode.getPostPredicate();
-        assertEquals(ExpressionType.ROW_SUBQUERY, aggExpr.getRight().getExpressionType());
+        assertEquals(ExpressionType.SELECT_SUBQUERY, aggExpr.getRight().getExpressionType());
     }
 
     public void testHavingRowMismatch() {

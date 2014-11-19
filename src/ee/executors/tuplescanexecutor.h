@@ -64,8 +64,6 @@ namespace voltdb
                     TempTableLimits* limits);
         bool p_execute(const NValueArray& params);
 
-    private:
-
     };
 }
 

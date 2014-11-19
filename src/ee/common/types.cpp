@@ -553,6 +553,9 @@ string expressionToString(ExpressionType type)
     case EXPRESSION_TYPE_VALUE_TUPLE_ADDRESS: {
         return "VALUE_TUPLE_ADDRESS";
     }
+    case EXPRESSION_TYPE_VALUE_SCALAR: {
+        return "VALUE_SCALAR";
+    }
     case EXPRESSION_TYPE_VALUE_NULL: {
         return "VALUE_NULL";
     }
@@ -591,9 +594,6 @@ string expressionToString(ExpressionType type)
     }
     case EXPRESSION_TYPE_ROW_SUBQUERY: {
         return "ROW_SUBQUERY";
-    }
-    case EXPRESSION_TYPE_SCALAR_SUBQUERY: {
-        return "SCALAR_SUBQUERY";
     }
     case EXPRESSION_TYPE_SELECT_SUBQUERY: {
         return "SELECT_SUBQUERY";
@@ -656,6 +656,8 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_VALUE_TUPLE;
     } else if (str == "VALUE_TUPLE_ADDRESS") {
         return EXPRESSION_TYPE_VALUE_TUPLE_ADDRESS;
+    } else if (str == "VALUE_SCALAR") {
+        return EXPRESSION_TYPE_VALUE_SCALAR;
     } else if (str == "VALUE_NULL") {
         return EXPRESSION_TYPE_VALUE_NULL;
     } else if (str == "AGGREGATE_COUNT") {
@@ -682,8 +684,6 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_OPERATOR_ALTERNATIVE;
     } else if (str == "ROW_SUBQUERY") {
         return EXPRESSION_TYPE_ROW_SUBQUERY;
-    } else if (str == "SCALAR_SUBQUERY") {
-        return EXPRESSION_TYPE_SCALAR_SUBQUERY;
     } else if (str == "SELECT_SUBQUERY") {
         return EXPRESSION_TYPE_SELECT_SUBQUERY;
     }

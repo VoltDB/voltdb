@@ -47,6 +47,7 @@ import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.RowSubqueryExpression;
+import org.voltdb.expressions.ScalarValueExpression;
 import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.BranchNode;
@@ -635,18 +636,19 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         for (VoltXMLElement child : columnsNode.children) {
             ParsedColInfo col = new ParsedColInfo();
             m_aggregationList.clear();
-            col.expression = parseExpressionTree(child);
-            if (col.expression instanceof ConstantValueExpression) {
-                assert(col.expression.getValueType() != VoltType.NUMERIC);
+            AbstractExpression colExpr = parseExpressionTree(child);;
+            if (colExpr instanceof ConstantValueExpression) {
+                assert(colExpr.getValueType() != VoltType.NUMERIC);
             }
-            assert(col.expression != null);
+            assert(colExpr != null);
             if (isDistributed) {
-                col.expression = col.expression.replaceAVG();
+                colExpr = colExpr.replaceAVG();
                 updateAvgExpressions();
             }
-            ExpressionUtil.finalizeValueTypes(col.expression);
+            ExpressionUtil.finalizeValueTypes(colExpr);
 
             if (child.name.equals("columnref")) {
+                col.expression = colExpr;
                 col.columnName = child.attributes.get("column");
                 col.tableName = child.attributes.get("table");
                 col.tableAlias = child.attributes.get("tablealias");
@@ -656,16 +658,26 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             } else if (child.name.equals("tablesubquery")) {
                 // Scalar subquery like 'select c, (select count(*) from t1), from t2;'
                 col.columnName = child.attributes.get("alias");
-                assert(col.expression instanceof SelectSubqueryExpression);
-                SelectSubqueryExpression scalarSubqueryExpr = (SelectSubqueryExpression) col.expression;
+                assert(colExpr instanceof SelectSubqueryExpression);
+                SelectSubqueryExpression scalarSubqueryExpr = (SelectSubqueryExpression) colExpr;
                 if (scalarSubqueryExpr.getTable().getOutputSchema().size() != 1) {
                     throw new PlanningErrorException("Scalar subquery can have only one output column");
                 }
                 col.tableName = scalarSubqueryExpr.getTable().getTableName();
                 col.tableAlias = scalarSubqueryExpr.getTable().getTableAlias();
-                // Subquery can be only a scalar subquery here
-                col.expression.setExpressionType(ExpressionType.SCALAR_SUBQUERY);
+                // Need to insert a ScalarValueExpression on top of the subquery expression
+                // to be able to extract the subquery expression results which is a subquery id
+                // and convert them into NValue.
+                AbstractExpression scalarExpr = new ScalarValueExpression();
+                scalarExpr.setLeft(scalarSubqueryExpr);
+                scalarExpr.setValueType(scalarSubqueryExpr.getValueType());
+                scalarExpr.setValueSize(scalarSubqueryExpr.getValueSize());
+                // reset scalarSubqueryExpr type to BIGINT
+                scalarSubqueryExpr.setValueType(VoltType.BIGINT);
+                scalarSubqueryExpr.setValueSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
+                col.expression = scalarExpr;
             } else {
+                col.expression = colExpr;
                 // XXX hacky, assume all non-column refs come from a temp table
                 col.tableName = "VOLT_TEMP_TABLE";
                 col.tableAlias = "VOLT_TEMP_TABLE";
@@ -991,7 +1003,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         List<AbstractExpression> havingList = new ArrayList<AbstractExpression>();
 
         // multi-column IN expression is a RowSubqueryExpression
-        // where each arg represents individual columns
+        // where each arg represents an individual column
         List<AbstractExpression> inExprList = null;
         if (inListExpr instanceof RowSubqueryExpression) {
             inExprList = inListExpr.getArgs();

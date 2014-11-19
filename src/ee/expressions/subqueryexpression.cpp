@@ -116,7 +116,7 @@ NValue SubqueryExpression::eval(const TableTuple *tuple1, const TableTuple *tupl
         }
     }
 
-    // Out of luck. Need to run the executors
+    // Out of luck. Need to run the executors. Clean up the output tables with cached results
     exeContext->cleanupExecutors(m_subqueryId);
     exeContext->executeExecutors(m_subqueryId);
 

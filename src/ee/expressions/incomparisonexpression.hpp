@@ -128,16 +128,16 @@ NValue InComparisonExpression<ValueExtractor>::eval(const TableTuple *tuple1, co
     // Evaluate the outer_expr. The return value can be either the value itself or a subquery id
     // in case of the row expression on the left side
     NValue lvalue = m_left->eval(tuple1, tuple2);
-    ValueExtractor extractor(lvalue);
+    ValueExtractor lvalueExtractor(lvalue);
 
     // Evaluate the inner_expr. The return value is a subquery id
     NValue rvalue = m_right->eval(tuple1, tuple2);
     int rsubqueryId = ValuePeeker::peekInteger(rvalue);
     ExecutorContext* exeContext = ExecutorContext::getExecutorContext();
-    Table* rightTable = exeContext->executeExecutors(rsubqueryId);
+    Table* rightTable = exeContext->getSubqueryOutputTable(rsubqueryId);
     assert(rightTable != NULL);
 
-    if (extractor.isNUllOrEmpty()) {
+    if (lvalueExtractor.isNUllOrEmpty()) {
         NValue retval = NValue::getFalse();
         if (rightTable->activeTupleCount() > 0) {
             retval.setNull();
@@ -150,7 +150,7 @@ NValue InComparisonExpression<ValueExtractor>::eval(const TableTuple *tuple1, co
     TableTuple rtuple(rightTable->schema());
     int tuple_ctr = 0;
     int rschemaSize = rightTable->schema()->columnCount();
-    bool hasOuterNull = false;
+    bool hasInnerNull = false;
     while (iterator.next(rtuple))
     {
         VOLT_TRACE("INNER TUPLE: %s, %d/%ld\n",
@@ -161,18 +161,18 @@ NValue InComparisonExpression<ValueExtractor>::eval(const TableTuple *tuple1, co
         for (; columnIdx < rschemaSize; ++columnIdx)
         {
             if (rtuple.isNull(columnIdx)) {
-                hasOuterNull = true;
+                hasInnerNull = true;
                 break;
             }
         }
-        if (columnIdx == rschemaSize && extractor.equals(rtuple)) {
+        if (columnIdx == rschemaSize && lvalueExtractor.equals(rtuple)) {
             return NValue::getTrue();
         }
     }
 
     // No match
     NValue retval = NValue::getFalse();
-    if (hasOuterNull == true) {
+    if (hasInnerNull == true) {
         retval.setNull();
     }
     return retval;

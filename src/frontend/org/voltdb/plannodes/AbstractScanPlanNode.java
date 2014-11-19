@@ -317,7 +317,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         }
 
         // Generate the output schema for subqueries
-        generateSubqueryExpressionOutputSchema(m_predicate, db);
+        ExpressionUtil.generateSubqueryExpressionOutputSchema(m_predicate, db);
 
         AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(this);
         if (aggNode != null) {
@@ -386,7 +386,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             limit.m_hasSignificantOutputSchema = false; // It's just another cheap knock-off
         }
         // Resolve subquery expression indexes
-        resolveSubqueryExpressionColumnIndexes(m_predicate);
+        ExpressionUtil.resolveSubqueryExpressionColumnIndexes(m_predicate);
 
         AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(this);
 

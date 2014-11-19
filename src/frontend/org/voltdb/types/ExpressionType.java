@@ -32,6 +32,7 @@ import org.voltdb.expressions.InComparisonExpression;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.RowSubqueryExpression;
+import org.voltdb.expressions.ScalarValueExpression;
 import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
@@ -103,6 +104,7 @@ public enum ExpressionType {
     VALUE_TUPLE                  (TupleValueExpression.class, 32, "<column>"),
     VALUE_TUPLE_ADDRESS        (TupleAddressExpression.class, 33, "<address>"),
     VALUE_VECTOR                (VectorValueExpression.class, 35, "<vector>"),
+    VALUE_SCALAR                (ScalarValueExpression.class, 36, "<scalar>"),
 
     // ----------------------------
     // Aggregate
@@ -137,8 +139,7 @@ public enum ExpressionType {
     // Subquery
     // -----------------------------
     ROW_SUBQUERY                 (RowSubqueryExpression.class, 400, "<row subquery>"),
-    SCALAR_SUBQUERY              (SelectSubqueryExpression.class, 401, "<scalar subquery>"),
-    SELECT_SUBQUERY              (SelectSubqueryExpression.class, 402, "<select subquery>"),
+    SELECT_SUBQUERY              (SelectSubqueryExpression.class, 401, "<select subquery>"),
 ;
 
     private final int m_value;

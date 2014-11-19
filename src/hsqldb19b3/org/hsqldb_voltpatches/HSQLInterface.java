@@ -249,7 +249,7 @@ public class HSQLInterface {
         }
 
         String opSubType = expr.attributes.get("opsubtype");
-        boolean anyQuantified = (opSubType != null && opSubType.equals("anyquantified"));
+        boolean anyQuantified = "anyquantified".equals(opSubType);
 
         // see if the children are "row" and "table" or "tablesubquery".
         int rowCount = 0;

@@ -25,9 +25,8 @@ import org.voltdb.plannodes.TupleScanPlanNode;
 import org.voltdb.types.ExpressionType;
 
 /**
- * Expression to represent scalar/row subqueries with the exception of IN (LIST)
- * where a VectorValueExpression is used.
- */
+ * Expression to represent row subqueries (C1, C2, ...)
+  */
 public class RowSubqueryExpression extends AbstractSubqueryExpression {
 
     public RowSubqueryExpression() {
@@ -36,13 +35,15 @@ public class RowSubqueryExpression extends AbstractSubqueryExpression {
         m_subqueryId = AbstractParsedStmt.NEXT_STMT_ID++;
     }
 
+    /**
+     * Constructor to build the expression from the list of column expressions
+     * @param args
+     */
     public RowSubqueryExpression(List<AbstractExpression> args) {
         this();
         assert(args != null);
         m_args = args;
-        // List of correlated parameters that match the original expressions from
-        // a row subquery and need to be set by this RowExpression on the EE side prior
-        // to the evaluation
+        // replace the TVE and aggregated expressions from the IN List with the correlated parameters
         List<AbstractExpression> pves = new ArrayList<AbstractExpression>();
         for (AbstractExpression expr : args) {
             collectParameterValueExpressions(expr, pves);
@@ -80,9 +81,9 @@ public class RowSubqueryExpression extends AbstractSubqueryExpression {
             return;
         }
 
-        // Create a matching PVE for this expression to be used on the EE side
-        // to get the original expression value
         if (expr instanceof TupleValueExpression || expr instanceof AggregateExpression) {
+            // Create a matching PVE for this expression to be used on the EE side
+            // to get the original expression value
             int paramIdx = AbstractParsedStmt.NEXT_PARAMETER_ID++;
             m_parameterIdxList.add(paramIdx);
             ParameterValueExpression pve = new ParameterValueExpression();

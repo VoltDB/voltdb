@@ -528,6 +528,9 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
     case (EXPRESSION_TYPE_VALUE_TUPLE_ADDRESS):
         ret = new TupleAddressExpression();
         break;
+    case (EXPRESSION_TYPE_VALUE_SCALAR):
+        ret = new ScalarValueExpression(lc);
+        break;
     case (EXPRESSION_TYPE_HASH_RANGE):
         ret = hashRangeFactory(obj);
         break;
@@ -540,7 +543,6 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
 
     // Subquery
     case (EXPRESSION_TYPE_ROW_SUBQUERY):
-    case (EXPRESSION_TYPE_SCALAR_SUBQUERY):
     case (EXPRESSION_TYPE_SELECT_SUBQUERY):
         ret = subqueryFactory(et, obj, args);
         break;

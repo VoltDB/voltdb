@@ -200,23 +200,6 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     /**
-     * Generate the output schemas for the subquery expression nodes
-     * @param expr
-     * @param db
-     */
-    protected void generateSubqueryExpressionOutputSchema(AbstractExpression expr, Database db) {
-        if (expr == null) {
-            return;
-        }
-        List<AbstractExpression> subqueryExpressions = expr.findAllSubexpressionsOfClass(AbstractSubqueryExpression.class);
-        for (AbstractExpression subqueryExpression : subqueryExpressions) {
-            assert(subqueryExpression instanceof AbstractSubqueryExpression);
-            AbstractPlanNode subqueryPlan = ((AbstractSubqueryExpression) subqueryExpression).getSubqueryNode();
-            subqueryPlan.generateOutputSchema(db);
-        }
-    }
-
-    /**
      * Recursively iterate through the plan and resolve the column_idx value for
      * every TupleValueExpression in every AbstractExpression in every PlanNode.
      * Few enough common cases so we force every AbstractPlanNode subclass to
@@ -230,26 +213,6 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
      * FIXME: This needs to be reworked with generateOutputSchema to eliminate redundancies.
      */
     public abstract void resolveColumnIndexes();
-
-    /**
-     * Recursively iterate through the subquery expression plan and resolve the column indexes
-     * @param expr
-     * @param db
-     */
-    protected void resolveSubqueryExpressionColumnIndexes(AbstractExpression expr) {
-        if (expr == null) {
-            return;
-        }
-        List<AbstractExpression> subqueryExpressions = expr.findAllSubexpressionsOfClass(AbstractSubqueryExpression.class);
-        if (subqueryExpressions.isEmpty()) {
-            return;
-        }
-        for (AbstractExpression subqueryExpression : subqueryExpressions) {
-            assert(subqueryExpression instanceof AbstractSubqueryExpression);
-            AbstractPlanNode subqueryPlan = ((AbstractSubqueryExpression) subqueryExpression).getSubqueryNode();
-            subqueryPlan.resolveColumnIndexes();
-        }
-    }
 
     public void validate() throws Exception {
         //

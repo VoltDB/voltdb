@@ -28,6 +28,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
 
+import org.voltdb.catalog.Database;
+import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.ExpressionType;
 
 /**
@@ -425,4 +427,40 @@ public abstract class ExpressionUtil {
         }
         return false;
     }
+
+    /**
+     * Resolve the column indexes from all subqueries that are part of this expression
+     * @param expr
+     * @param db
+     */
+    public static void resolveSubqueryExpressionColumnIndexes(AbstractExpression expr) {
+        if (expr == null) {
+            return;
+        }
+        List<AbstractExpression> subqueryExpressions = expr.findAllSubexpressionsOfClass(AbstractSubqueryExpression.class);
+        if (subqueryExpressions.isEmpty()) {
+            return;
+        }
+        for (AbstractExpression subqueryExpression : subqueryExpressions) {
+            assert(subqueryExpression instanceof AbstractSubqueryExpression);
+            ((AbstractSubqueryExpression) subqueryExpression).resolveColumnIndexes();
+        }
+    }
+
+    /**
+     * Generate the output schemas for the subquery expression nodes
+     * @param expr
+     * @param db
+     */
+    public static void generateSubqueryExpressionOutputSchema(AbstractExpression expr, Database db) {
+        if (expr == null) {
+            return;
+        }
+        List<AbstractExpression> subqueryExpressions = expr.findAllSubexpressionsOfClass(AbstractSubqueryExpression.class);
+        for (AbstractExpression subqueryExpression : subqueryExpressions) {
+            assert(subqueryExpression instanceof AbstractSubqueryExpression);
+            ((AbstractSubqueryExpression) subqueryExpression).generateOutputSchema(db);
+        }
+    }
+
 }

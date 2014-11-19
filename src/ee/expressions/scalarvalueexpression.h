@@ -43,27 +43,26 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTORESEQSCANNODE_H
-#define HSTORESEQSCANNODE_H
+#ifndef HSTORESCALARVALUEEXPRESSION_H
+#define HSTORESCALARVALUEEXPRESSION_H
 
-#include "abstractscannode.h"
+#include "expressions/abstractexpression.h"
+
+#include <string>
 
 namespace voltdb {
 
-class AbstractExpression;
+class ScalarValueExpression : public AbstractExpression {
+  public:
+    ScalarValueExpression(AbstractExpression *lc)
+        : AbstractExpression(EXPRESSION_TYPE_VALUE_SCALAR, lc, NULL)
+    {};
 
-/**
- * Seqential scan plan node
- */
-class SeqScanPlanNode : public AbstractScanPlanNode {
-public:
-    SeqScanPlanNode()  { }
-    ~SeqScanPlanNode();
-    PlanNodeType getPlanNodeType() const;
+    voltdb::NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const;
+
     std::string debugInfo(const std::string &spacer) const;
 
 };
 
 }
-
 #endif

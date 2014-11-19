@@ -446,7 +446,7 @@ public abstract class AbstractParsedStmt {
         // add table to the query cache
         StmtTableScan tableCache = addTableToStmtCache(tableName, tableName, subqueryStmt);
         assert(tableCache instanceof StmtSubqueryScan);
-        // Set to the default SCALAR_SUBQUERY. May be overriden dependin gon the context
+        // Set to the default SELECT_SUBQUERY. May be overridden depending on the context
         return new SelectSubqueryExpression(ExpressionType.SELECT_SUBQUERY, (StmtSubqueryScan)tableCache);
     }
 
@@ -590,6 +590,7 @@ public abstract class AbstractParsedStmt {
         if ((exprType == ExpressionType.COMPARE_IN && expr.getRight() instanceof AbstractSubqueryExpression) ||
                 exprType == ExpressionType.OPERATOR_EXISTS) {
             if (ExpressionType.COMPARE_IN == exprType) {
+                // To differentiate from IN (LIST)
                 expr.setExpressionType(ExpressionType.COMPARE_IN_SUBQUERY);
             }
             // Break up UNION/INTERSECT (ALL) set ops into individual selects connected by
@@ -639,8 +640,8 @@ public abstract class AbstractParsedStmt {
         AbstractExpression leftExpr = inExpr.getLeft();
         if (leftExpr instanceof SelectSubqueryExpression) {
             // If the left child is a (SELECT ...) expression itself we can't convert it
-            // to the EXISTS expression because of the run time scalar check (expression must return
-            // a single row)
+            // to the EXISTS expression because the manadatory run time scalar check -
+            // (expression must return a single row at most)
             return false;
         }
         AbstractExpression rightExpr = inExpr.getRight();
@@ -700,12 +701,6 @@ public abstract class AbstractParsedStmt {
      */
     private AbstractExpression optimizeInExpression(AbstractExpression inExpr) {
         assert(ExpressionType.COMPARE_IN_SUBQUERY == inExpr.getExpressionType());
-        assert(inExpr.getLeft() != null);
-        assert(inExpr.getRight() != null);
-        if (!(inExpr.getRight() instanceof SelectSubqueryExpression)) {
-            // The right expression is not SELECT ... subquery
-            return inExpr;
-        }
 
         if (canConvertInToExistsExpression(inExpr)) {
             AbstractExpression inColumns = inExpr.getLeft();

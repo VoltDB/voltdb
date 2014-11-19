@@ -166,9 +166,9 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         m_hasSignificantOutputSchema = true;
 
         // Generate the output schema for subqueries
-        generateSubqueryExpressionOutputSchema(m_preJoinPredicate, db);
-        generateSubqueryExpressionOutputSchema(m_joinPredicate, db);
-        generateSubqueryExpressionOutputSchema(m_wherePredicate, db);
+        ExpressionUtil.generateSubqueryExpressionOutputSchema(m_preJoinPredicate, db);
+        ExpressionUtil.generateSubqueryExpressionOutputSchema(m_joinPredicate, db);
+        ExpressionUtil.generateSubqueryExpressionOutputSchema(m_wherePredicate, db);
 
         generateRealOutputSchema(db);
     }
@@ -249,9 +249,9 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         resolvePredicate(m_wherePredicate, outer_schema, inner_schema);
 
         // Resolve subquery expression indexes
-        resolveSubqueryExpressionColumnIndexes(m_preJoinPredicate);
-        resolveSubqueryExpressionColumnIndexes(m_joinPredicate);
-        resolveSubqueryExpressionColumnIndexes(m_wherePredicate);
+        ExpressionUtil.resolveSubqueryExpressionColumnIndexes(m_preJoinPredicate);
+        ExpressionUtil.resolveSubqueryExpressionColumnIndexes(m_joinPredicate);
+        ExpressionUtil.resolveSubqueryExpressionColumnIndexes(m_wherePredicate);
 
         resolveRealOutputSchema();
     }

@@ -294,6 +294,7 @@ enum ExpressionType {
     EXPRESSION_TYPE_VALUE_TUPLE_ADDRESS             = 33,
     EXPRESSION_TYPE_VALUE_NULL                      = 34,
     EXPRESSION_TYPE_VALUE_VECTOR                    = 35,
+    EXPRESSION_TYPE_VALUE_SCALAR                    = 36,
 
     // -----------------------------
     // Aggregates
@@ -326,8 +327,7 @@ enum ExpressionType {
     // Subquery IN/EXISTS
     // -----------------------------
     EXPRESSION_TYPE_ROW_SUBQUERY                       = 400,
-    EXPRESSION_TYPE_SCALAR_SUBQUERY                    = 401,
-    EXPRESSION_TYPE_SELECT_SUBQUERY                    = 402
+    EXPRESSION_TYPE_SELECT_SUBQUERY                    = 401
 
 };
 
