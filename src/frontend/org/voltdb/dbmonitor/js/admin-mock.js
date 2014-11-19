@@ -99,6 +99,8 @@ $( document ).ready(function() {
 		 $('#btnSaveHrtTimeOut').popup();
 		 $('#shutdownPopupPopConfirmation').popup();
 		  $('#shutdownPopupPopConfirmation1').popup();
+		  $('#shutdownClusterPopupPopConfirmation').popup();
+	
 	
 		 
 		 $('#autoSnapshotSave').popup({

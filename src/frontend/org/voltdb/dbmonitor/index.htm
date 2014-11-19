@@ -804,9 +804,9 @@
             <p>Any data not saved to a snapshot or command log will be lost.</p>
             <p>Continue with the shutdown?</p>-->
             
-            <!--<table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblshutdown">
+            <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblshutdown">
                     <tr>
-                    <td class="configLabel">Stop Node 1 </td>
+                    <td class="configLabel" width="50%">Stop Node 1 </td>
                     <td align="right">
                     <div class="onIcon"></div>
                     </td>
@@ -822,10 +822,24 @@
                     <td>On</td>
                     <td><a href="#shutdownPopupPop1" id="shutdownPopupPopConfirmation1" class="edit" title="Edit">&nbsp;</a></td>
                     </tr>
-			</table>-->
+			</table>
+            
+            <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblshutdown" style=" margin:10px 0 0 0">
+                    <tr>
+                    <td class="configLabel" width="50%" >Cluster </td>
+                    <td align="right">
+                    <div class="onIcon"></div>
+                    </td>
+                    <td>On</td>
+                    <td><a href="#shutdownClusterPopupPop" id="shutdownClusterPopupPopConfirmation" class="edit" title="Edit">&nbsp;</a></td>
+                    </tr>
+                    
+                    
+			</table>
             
             
-            <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblshutdown">
+            
+            <!--<table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblshutdown">
                     <tr>
                     <td class="configLabel">Stop Node 1 </td>
                     <td align="right">
@@ -843,7 +857,7 @@
                     <td>On</td>
                     <td><a href="#" class="edit" title="Edit">&nbsp;</a></td>
                     </tr>
-			</table>
+			</table>-->
 
         </div>
         <div class="overlay-btns"><a class="btn closeBtn" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Ok">Cancel</a></div>
@@ -867,8 +881,7 @@
         <div class="overlay-title icon-alert">Shutdown</div>
         <div class="clear"></div>
         <div class="overlay-content">            
-           <p class="txt-bold">Are you sure you want to shutdown the cluster?</p>
-            <p>Any data not saved to a snapshot or command log will be lost.</p>
+           <p class="txt-bold">Are you sure you want to shutdown this node?</p>
             <p>Continue with the shutdown?</p>
             
         </div>
@@ -877,6 +890,19 @@
     <!-- POPUP shutdownPopupPop -->
       <!-- POPUP shutdownPopupPop -->
     <div id="shutdownPopupPop1" style="display: none">
+        <div class="overlay-title icon-alert">Shutdown</div>
+        <div class="clear"></div>
+        <div class="overlay-content">            
+           <p class="txt-bold">Are you sure you want to shutdown this node?</p>
+            <p>Continue with the shutdown?</p>
+            
+        </div>
+        <div class="overlay-btns"><a class="btn closeBtn" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Ok">Cancel</a></div>
+    </div>
+    <!-- POPUP shutdownPopupPop -->
+    
+     <!-- POPUP shutdownClusterPopupPop -->
+    <div id="shutdownClusterPopupPop" style="display: none">
         <div class="overlay-title icon-alert">Shutdown</div>
         <div class="clear"></div>
         <div class="overlay-content">            
@@ -979,7 +1005,7 @@
         <div class="overlay-title icon-alert">Heartbeat time out</div>
         <div class="clear"></div>
         <div class="overlay-content"> 
-       Heartbeat time out
+       <p class="txt-bold">Do you want to save the value?</p>
                 </div>
         <div class="overlay-btns"><a class="btn closeBtn" id="btnDone" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Cancel">Cancel</a></div>
     </div>
