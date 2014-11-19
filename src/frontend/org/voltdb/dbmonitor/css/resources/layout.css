@@ -772,7 +772,8 @@ ul.adminClusterList li a.pause { display:inline-block; background-position:-20px
 ul.adminClusterList li a.resume { display:inline-block; background-position:-20px -151px; width:40px; height:36px;}
 ul.adminClusterList li a.promote { display:inline-block; background-position:-70px -12px;width:40px; height:36px;}
 ul.adminClusterList li a.restore { display:inline-block;background-position:-120px -12px; width:40px; height:36px;}
-ul.adminClusterList li a.save { display:inline-block;background-position:-120px -57px; width:40px; height:36px;}
+ul.adminClusterList li a.save, .save { display:inline-block;background-position:-120px -57px; width:40px; height:26px;}
+
 ul.adminClusterList li a.stop { display:inline-block;background-position:-580px -12px; width:40px; height:36px;}
 ul.adminClusterList li a.shutdown { display:inline-block;background-position:-581px -56px; width:40px; height:36px;}
 ul.adminClusterList li a:hover{color:#000;}
@@ -821,6 +822,18 @@ ul.adminClusterList li a:hover{color:#000;}
 
 .btn-gray { background-color:#999; cursor:pointer; padding:8px 10px; text-align:center; color:#fff; font:14px Arial, Helvetica, sans-serif; text-shadow:none; text-decoration:none; border-radius:0; border:none;} 
 input.exitableTxtBx{float:left; width:40px; position:relative; top:-5px; padding:5px;}
+.tblSave { border:none}
+.tblSave tr{border:1px solid #CCCCCC;}
+.tblSave tr td { padding:10px;border:none;}
+.browseBtn {}
+.tblRestore { border:none}
+.tblRestore tr{border:1px solid #CCCCCC}
+.tblRestore th { padding:10px; font-weight:bold;}
+.tblRestore tr td { padding:10px;border:none;}
+
+.tblshutdown tr {border:1px solid #CCCCCC;}
+.tblshutdown tr td  { border:none;}
+
 
 /*********************************************media Qu********************/
 @media (max-width: 479px) {

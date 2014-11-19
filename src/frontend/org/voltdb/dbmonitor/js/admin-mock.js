@@ -2,7 +2,7 @@
 
 $( document ).ready(function() { 
    // Make Expandable Rows.
-    $('tr.parent > td:first-child')
+    $('tr.parent > td:first-child' || 'tr.parent > td:fourth-child')
         .css("cursor", "pointer")
         .attr("title", "Click to expand/collapse")
         .click(function () {
@@ -79,6 +79,7 @@ $( document ).ready(function() {
 			$('#pauseConfirmation').show();
 			$(this).hide();
 		});
+		 
 		
 		//$('a.shutdown').click(function(){
 			    $('#shutDownConfirmation').popup();
@@ -90,9 +91,38 @@ $( document ).ready(function() {
 		
 		//$('a.resume').click(function(){
 			    $('#resumeConfirmation').popup();
-		//});	
-		$('#btnEditHrtTimeOut').click(function(){
+		//});
+		 $('#securityEdit').popup();
+		 $('#autoSnapshotEdit').popup();
+		 $('#saveConfirmation').popup();
+		 $('#restoreConfirmation').popup();
+		 $('#btnSaveHrtTimeOut').popup();
+		 $('#shutdownPopupPopConfirmation').popup();
+		  $('#shutdownPopupPopConfirmation1').popup();
+	
+		 
+		 $('#autoSnapshotSave').popup({
+		  	saveSnaps: function () {
+					$("#frequencySpan").show();
+					$("#txtFrequency").hide();
+					$("#frequencySpan").html($("#txtFrequency").val())
+					
+					$("#retainedSpan").show();
+					$("#txtRetained").hide();
+					$("#retainedSpan").html($("#txtRetained").val())
+					
+					$("#autoSnapshotSave").hide();
+					$("#autoSnapshotEdit").show();
+					
+				}
+		 });
+
+		 
+		 	
+		$('#btnEditHrtTimeOut').click(function(e){
 			if(  $("#hrtTimeOutSpan").is(":visible") == true ){
+				$('#btnEditHrtTimeOut').hide();
+				$('#btnSaveHrtTimeOut').show();
 				$("#hrtTimeOutSpan").hide();
 				$("#txtHrtTimeOutSpan").show();
 				$("#txtHrtTimeOutSpan").val($("#hrtTimeOutSpan").html())
@@ -101,6 +131,34 @@ $( document ).ready(function() {
 				$("#txtHrtTimeOutSpan").hide();
 				$("#hrtTimeOutSpan").html($("#txtHrtTimeOutSpan").val())
 			}
+			e.preventDefault();
 		});
+		
+		$('#btnSaveHrtTimeOut').click(function(e){
+			$("#hrtTimeOutSpan").show();
+			$("#txtHrtTimeOutSpan").hide();
+			$('#btnEditHrtTimeOut').show();
+			$('#btnSaveHrtTimeOut').hide();
+			$("#hrtTimeOutSpan").html($("#txtHrtTimeOutSpan").val())
+		});
+		
+		$('#autoSnapshotEdit').click(function(){
+			var parent = $(this).parent().parent();
+            parent.siblings('.child-' + parent.attr("id")).show();
+			parent.find(".labelCollapsed").addClass("labelExpanded");
+			
+			$("#autoSnapshotSave").show();
+			$("#autoSnapshotEdit").hide();
+			
+			$("#frequencySpan").hide();
+			$("#txtFrequency").show();
+			$("#txtFrequency").val($("#frequencySpan").html())
+			
+			$("#retainedSpan").hide();
+			$("#txtRetained").show();
+			$("#txtRetained").val($("#retainedSpan").html())
+		});
+		
 
 });
+

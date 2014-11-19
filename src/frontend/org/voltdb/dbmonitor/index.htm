@@ -10,11 +10,9 @@
     <link href="css/resources/layout.css" rel="stylesheet" />
     <link href="css/resources/nv.d3.css" rel="stylesheet" />
     <link href="css/resources/tablesorter.css" rel="stylesheet" />
-
     <link href="css/resources/schema/bootstrap.min.css" id="styleBootstrapMin" disabled="disabled" rel="stylesheet">
     <link href="css/resources/schema/bootstrap-responsive.css" id="styleBootstrapResponsive" disabled="disabled" rel="stylesheet">
     <link href="css/resources/schema/theme.bootstrap.css" id="styleThemeBootstrap" disabled="disabled" rel="stylesheet">
-
     <script type="text/javascript" src="js/jquery-1.11.1.min.js"></script>
     <script type="text/javascript" src="js/d3/d3.v3.min.js"></script>
     <script type="text/javascript" src="js/d3/nv.d3.min.js"></script>
@@ -363,8 +361,8 @@
             </li>
            
             <li><a href="#" class="promote">Promote</a></li>
-            <li><a href="#" class="save">Save</a></li>
-            <li><a href="#" class="restore">Restore</a></li>
+            <li><a href="#savePop" id="saveConfirmation" class="save">Save</a></li>
+            <li><a href="#restorePop" id="restoreConfirmation" class="restore">Restore</a></li>
             <li><a href="#shutDownConfirmationPop" class="shutdown" id="shutDownConfirmation">Shutdown</a></li>
            </ul>
             
@@ -415,7 +413,7 @@
                     <td align="right"><div class="offIcon"></div></td>
                     <td>Off</td>
                     <td>
-                    <a href="#" class="edit" title="Edit">&nbsp;</a>
+                    <a href="#securityPop" id="securityEdit" class="edit" title="Edit">&nbsp;</a>
                     </td>
                   </tr>
                  <tr class="hasSubLabel parent" id="row-1">
@@ -434,20 +432,29 @@
                     <td class="configLabel"><a href="#" class="labelCollapsed">Auto Snapshots</a> </td>
                     <td align="right"><div class="onIcon"></div></td>
                     <td>On</td>
-                    <td><a href="#" class="edit" title="Edit">&nbsp;</a></td>
+                    <td><a href="#" id="autoSnapshotEdit" class="edit" title="Edit">&nbsp;</a>
+                    <a href="#autoSnapshotPop" id="autoSnapshotSave" class="save" title="Save" style="display:none">&nbsp;</a>
+                    </td>
                   </tr>
                     <tr class="child-row-2 subLabelRow">
                   	<td class="configLabel">Frequency </td>
-                    <td>&nbsp;</td>
+                    <td align="right">
+                    <span id="frequencySpan">500</span>
+                    <input id="txtFrequency" class="exitableTxtBx" type="text" style="display:none"> ms
+                    </td>
                     <td>&nbsp;</td>
                     <td>&nbsp;</td>
                   </tr>
                   
                    <tr class="child-row-2 subLabelRow">
                   	<td class="configLabel">Retained </td>
+                    <td align="right">
+                    <span id="retainedSpan">500</span>
+                    <input id="txtRetained" class="exitableTxtBx" type="text" style="display:none"> ms
+                    </td>
                     <td>&nbsp;</td>
                     <td>&nbsp;</td>
-                    <td>&nbsp;</td>
+                   
                   </tr>
                     <tr class="hasSubLabel parent" id="row-3">
                     <td class="configLabel"><a href="#" class="labelCollapsed">Command Logging</a></td>
@@ -511,7 +518,8 @@
                   	<td class="configLabel">Heartbeat time out </td>
                     <td align="right"><span id="hrtTimeOutSpan">500</span><input id="txtHrtTimeOutSpan" class="exitableTxtBx" type="text" style="display:none" /> ms</td>
                     <td>&nbsp;</td>
-                    <td><a id="btnEditHrtTimeOut" href="#" class="edit" title="Edit">&nbsp;</a></td>
+                    <td><a id="btnEditHrtTimeOut" href="#" class="edit" title="Edit">&nbsp;</a>
+                    <a id="btnSaveHrtTimeOut" href="#HrtTimeOutPopup" class="save" title="Save" style="display:none;">&nbsp;</a></td>
                   </tr>
                   <tr class="child-row-5 subLabelRow">
                   	<td class="configLabel">Max temp table memory</td>
@@ -789,39 +797,194 @@
     
       <!-- POPUP shutDownConfirmationPop -->
     <div id="shutDownConfirmationPop" style="display: none">
-        <div class="overlay-title icon-alert">Shutdown: Confirmation!</div>
+        <div class="overlay-title icon-alert">Shutdown: Confirmation</div>
         <div class="clear"></div>
         <div class="overlay-content">            
-            <p class="txt-bold">Are you sure you want to shutdown the cluster?</p>
+            <!--<p class="txt-bold">Are you sure you want to shutdown the cluster?</p>
             <p>Any data not saved to a snapshot or command log will be lost.</p>
-            <p>Continue with the shutdown?</p>
+            <p>Continue with the shutdown?</p>-->
+            
+            <!--<table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblshutdown">
+                    <tr>
+                    <td class="configLabel">Stop Node 1 </td>
+                    <td align="right">
+                    <div class="onIcon"></div>
+                    </td>
+                    <td>On</td>
+                    <td><a href="#shutdownPopupPop" id="shutdownPopupPopConfirmation" class="edit" title="Edit">&nbsp;</a></td>
+                    </tr>
+                    
+                    <tr>
+                    <td class="configLabel">Stop Node 2 </td>
+                    <td align="right">
+                    <div class="onIcon"></div>
+                    </td>
+                    <td>On</td>
+                    <td><a href="#shutdownPopupPop1" id="shutdownPopupPopConfirmation1" class="edit" title="Edit">&nbsp;</a></td>
+                    </tr>
+			</table>-->
+            
+            
+            <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblshutdown">
+                    <tr>
+                    <td class="configLabel">Stop Node 1 </td>
+                    <td align="right">
+                    <div class="onIcon"></div>
+                    </td>
+                    <td>On</td>
+                    <td><a href="#" class="edit" title="Edit">&nbsp;</a></td>
+                    </tr>
+                    
+                    <tr>
+                    <td class="configLabel">Stop Node 2 </td>
+                    <td align="right">
+                    <div class="onIcon"></div>
+                    </td>
+                    <td>On</td>
+                    <td><a href="#" class="edit" title="Edit">&nbsp;</a></td>
+                    </tr>
+			</table>
+
         </div>
-        <div class="overlay-btns"><a class="btn" title="Ok">Ok</a> <a class="btn btn-gray" title="Ok">Cancel</a></div>
+        <div class="overlay-btns"><a class="btn closeBtn" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Ok">Cancel</a></div>
     </div>
     <!-- POPUP shutDownConfirmationPop -->
     
-     <!-- POPUP pauseConfirmationPop -->
+     <!-- POPUP pauseConfirmationPop 1 -->
     <div id="pauseConfirmationPop" style="display: none">
-        <div class="overlay-title icon-alert">Pause: Confirmation!</div>
+        <div class="overlay-title icon-alert">Pause: Confirmation</div>
         <div class="clear"></div>
         <div class="overlay-content">            
             <p class="txt-bold">Do you want to pause the cluster and enter admin mode?</p>
             
         </div>
-        <div class="overlay-btns"><a class="btn" title="Ok">Ok</a> <a class="btn btn-gray" title="Ok">Cancel</a></div>
+        <div class="overlay-btns"><a class="btn closeBtn" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Ok">Cancel</a></div>
     </div>
     <!-- POPUP pauseConfirmationPop -->
     
+      <!-- POPUP shutdownPopupPop 2 -->
+    <div id="shutdownPopupPop" style="display: none">
+        <div class="overlay-title icon-alert">Shutdown</div>
+        <div class="clear"></div>
+        <div class="overlay-content">            
+           <p class="txt-bold">Are you sure you want to shutdown the cluster?</p>
+            <p>Any data not saved to a snapshot or command log will be lost.</p>
+            <p>Continue with the shutdown?</p>
+            
+        </div>
+        <div class="overlay-btns"><a class="btn closeBtn" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Ok">Cancel</a></div>
+    </div>
+    <!-- POPUP shutdownPopupPop -->
+      <!-- POPUP shutdownPopupPop -->
+    <div id="shutdownPopupPop1" style="display: none">
+        <div class="overlay-title icon-alert">Shutdown</div>
+        <div class="clear"></div>
+        <div class="overlay-content">            
+           <p class="txt-bold">Are you sure you want to shutdown the cluster?</p>
+            <p>Any data not saved to a snapshot or command log will be lost.</p>
+            <p>Continue with the shutdown?</p>
+            
+        </div>
+        <div class="overlay-btns"><a class="btn closeBtn" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Ok">Cancel</a></div>
+    </div>
+    <!-- POPUP shutdownPopupPop -->
+    
     <!-- POPUP resumeConfirmationPop -->
     <div id="resumeConfirmationPop" style="display: none">
-        <div class="overlay-title icon-alert">Resume: Confirmation!</div>
+        <div class="overlay-title icon-alert">Resume: Confirmation</div>
         <div class="clear"></div>
         <div class="overlay-content">            
             <p class="txt-bold">Do you want to exit admin mode and resume the cluster?</p>
         </div>
-        <div class="overlay-btns"><a class="btn" title="Ok">Ok</a> <a class="btn btn-gray" title="Ok">Cancel</a></div>
+        <div class="overlay-btns"><a class="btn closeBtn" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Ok">Cancel</a></div>
     </div>
     <!-- POPUP resumeConfirmationPop -->
+    
+    <!-- POPUP autoSnapshotyPop -->
+    <div id="autoSnapshotPop" style="display: none">
+        <div class="overlay-title icon-alert">Auto Snapshots</div>
+        <div class="clear"></div>
+        <div class="overlay-content"> 
+         <p class="txt-bold">Do you want to save the value?</p>
+        </div>
+        <div class="overlay-btns"><a id="btnSaveSnapshot" class="btn" title="Ok">Ok</a> <a class="btn btn-gray" title="Ok">Cancel</a></div>
+    </div>
+    <!-- POPUP autoSnapshotyPop -->
+    
+    
+     <!-- POPUP securityPop -->
+    <div id="securityPop" style="display: none">
+        <div class="overlay-title icon-alert">Security: Confirmation!</div>
+        <div class="clear"></div>
+        <div class="overlay-content">            
+            <p class="txt-bold">Do you want to enable Security?</p>
+        </div>
+        <div class="overlay-btns"><a class="btn closeBtn" id="btnDone" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Cancel">Cancel</a></div>
+    </div>
+    <!-- POPUP securityPop -->
+    
+     <!-- POPUP savePop -->
+    <div id="savePop" style="display: none">
+        <div class="overlay-title icon-alert">Save</div>
+        <div class="clear"></div>
+        <div class="overlay-content">            
+          <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblSave">
+  <tr>
+    <td>Directory:</td>
+    <td>D:</td>
+    <td><a href="#" class="edit" title="Edit">&nbsp;</a></td>
+  </tr>
+  <tr>
+    <td colspan="2">Snapshot Name:</td>
+    <td><input type="text" placeholder="VEMMANUAL_2014.11.13.21.19.24" /></td>
+  </tr>
+</table>
+
+        </div>
+        <div class="overlay-btns"><a class="btn closeBtn" id="btnDone" title="Save">Save</a> <a class="btn btn-gray closeBtn" title="Cancel">Cancel</a></div>
+    </div>
+    <!-- POPUP savePop -->
+    
+     <!-- POPUP restorePop -->
+    <div id="restorePop" style="display: none">
+        <div class="overlay-title icon-alert">Restore</div>
+        <div class="clear"></div>
+        <div class="overlay-content"> 
+        <div style="float:right; margin:0 0 15px 0"><a href="#" class="btn">Upload New</a></div>   
+        <div class="clear"></div>        
+          <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblRestore">
+  <tr>
+    <th align="left">Snapshot Name</th>
+    <th align="left" >Directory</th>
+    <th>&nbsp;</th>
+  </tr>
+  <tr>
+    <td>VEMMANUAL_2014.11.13.21.19.24</td>
+    <td>c:</td>
+     <td><input type="checkbox"></td>
+  </tr>
+  <tr>
+    <td>VEMMANUAL_2014.11.14.06.03.20</td>
+    <td>d:</td>
+    <td><input type="checkbox"></td>
+  </tr>
+</table>
+  
+        </div>
+        <div class="overlay-btns"><a class="btn closeBtn" id="btnDone" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Cancel">Cancel</a></div>
+    </div>
+    <!-- POPUP restorePop -->
+     <!-- POPUP restorePop -->
+    <div id="HrtTimeOutPopup" style="display: none">
+        <div class="overlay-title icon-alert">Heartbeat time out</div>
+        <div class="clear"></div>
+        <div class="overlay-content"> 
+       Heartbeat time out
+                </div>
+        <div class="overlay-btns"><a class="btn closeBtn" id="btnDone" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Cancel">Cancel</a></div>
+    </div>
+    <!-- POPUP restorePop -->
+  
 
     <!-- Loading -->
     <div id="overlay" style="display: none;">
