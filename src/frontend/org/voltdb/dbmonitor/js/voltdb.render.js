@@ -328,7 +328,7 @@ function alertNodeClicked(obj) {
                 populateTableTypes(inestConnection);
                 populateTablesInformation(inestConnection);
 
-                populatePartitionColumnTypes(inestConnection);
+                //populatePartitionColumnTypes(inestConnection);
                 onTableDataLoaded(inestConnection.Metadata['@Statistics_TABLE'].data);
             });
 
@@ -796,8 +796,11 @@ function alertNodeClicked(obj) {
                     schemaCatalogTableTypes[tableName] = {};
                     schemaCatalogTableTypes[tableName]['TABLE_NAME'] = entry[tableNameIndex];
                     schemaCatalogTableTypes[tableName]['TABLE_TYPE'] = entry[tableTypeIndex];
-                    schemaCatalogTableTypes[tableName]['REMARKS'] = entry[remarksIndex];
-
+                    if(entry[remarksIndex]!=null)
+                        schemaCatalogTableTypes[tableName]['REMARKS'] = jQuery.parseJSON(entry[remarksIndex]).partitionColumn != null ? "PARTITIONED" : "REPLICATED";
+                    else {
+                        schemaCatalogTableTypes[tableName]['REMARKS'] = "REPLICATED";
+                    }
                 }
             });
 
@@ -1892,20 +1895,12 @@ function alertNodeClicked(obj) {
                                             //if partition is repeated for a given table in "partitionData"
                                             if (tupleData[partitionIndex] == partitionData[tupleData[tableNameIndex]][i][partitionIndex]) {
                                                 duplicatePartition = true;
-                                                //schemaCatalogTableTypes[tupleData[tableNameIndex]]["TABLE_TYPE"] = schemaCatalogTableTypes[tupleData[tableNameIndex]].TABLE_TYPE == "VIEW" ? "VIEW" : "REPLICATED";
-                                                schemaCatalogTableTypes[tupleData[tableNameIndex]]["TABLE_TYPE"] = "REPLICATED";
                                                 return false;
                                             }
 
                                         }
                                         if (partitionEntryCount == partitionData[tupleData[tableNameIndex]].length && !duplicatePartition) {                                            
-                                            partitionData[tupleData[tableNameIndex]].push(tupleData);
-                                            if (kFactor > 0)
-                                                schemaCatalogTableTypes[tupleData[tableNameIndex]]["TABLE_TYPE"] = "REPLICATED";
-                                            
-                                            else if (partitionData[tupleData[tableNameIndex]].length > 1)
-                                                schemaCatalogTableTypes[tupleData[tableNameIndex]]["TABLE_TYPE"] = "REPLICATED";
-                                            
+                                            partitionData[tupleData[tableNameIndex]].push(tupleData);                                                                                        
                                             return false;
 
                                         }
@@ -1927,14 +1922,14 @@ function alertNodeClicked(obj) {
                                 tupleCountPartitions[i] = data[i][tupleCountIndex];
                             }
 
-                            averageRowCount=getAverage(tupleCountPartitions);
+                            
                             tableData[key] = {
                                 "TABLE_NAME": key,
                                 "MAX_ROWS": Math.max.apply(null, tupleCountPartitions),
                                 "MIN_ROWS": Math.min.apply(null, tupleCountPartitions),
                                 "AVG_ROWS": averageRowCount,
-                                "TUPLE_COUNT": schemaCatalogTableTypes[key].TABLE_TYPE == "REPLICATED" ? averageRowCount : totalTupleCount,
-                                "TABLE_TYPE": getColumnTypes(key) == "PARTITION_COLUMN" ? "PARTITIONED" : schemaCatalogTableTypes[key].TABLE_TYPE
+                                "TUPLE_COUNT": schemaCatalogTableTypes[key].REMARKS == "REPLICATED" ? data[0][tupleCountIndex] : totalTupleCount,
+                                "TABLE_TYPE": schemaCatalogTableTypes[key].REMARKS
                             };
 
                         });
