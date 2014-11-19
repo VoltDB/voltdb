@@ -139,8 +139,8 @@
             try {
                 var processName = "DATABASE_INFORMATION";
                 var procedureNames = ['@Statistics', '@SystemCatalog', '@SystemCatalog'];
-                var parameters = ["TABLE", "TABLES","COLUMNS"];
-                var values = ['0', undefined, undefined];
+                var parameters = ["TABLE", "TABLES"];
+                var values = ['0', undefined];
                 _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
                 if (_connection == null) {
                     VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
