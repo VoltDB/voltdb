@@ -459,8 +459,8 @@ jQuery.extend({
                 data: formData,
                 dataType: 'jsonp',
                 success: function (data, textStatus, request) {
-                    //callback(data, request.getResponseHeader("Host"));
-                    callback(data, "10.10.1.52");
+                    callback(data, request.getResponseHeader("Host"));
+                    //callback(data, "10.10.1.52");
                 }
             });
             
