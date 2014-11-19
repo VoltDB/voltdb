@@ -93,7 +93,7 @@
         var dataCpu = [{
             "key": "CPU",
             "values": getEmptyDataOptimized(),
-            "color": "rgb(164, 136, 5)",
+            "color": "rgb(164, 136, 5)"
         }];
 
         var dataRam = [{

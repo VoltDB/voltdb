@@ -2072,8 +2072,7 @@ function alertNodeClicked(obj) {
                         "MIN_ROWS": tableJsonArray[i].MIN_ROWS,
                         "AVG_ROWS": tableJsonArray[i].AVG_ROWS,
                         "TUPLE_COUNT": tableJsonArray[i].TUPLE_COUNT,
-                        "TABLE_TYPE": tableJsonArray[i].TABLE_TYPE,
-
+                        "TABLE_TYPE": tableJsonArray[i].TABLE_TYPE
                     };
                 }
             }
@@ -2105,7 +2104,7 @@ function alertNodeClicked(obj) {
                         "MIN_ROWS": tableSearchJsonArray[i].MIN_ROWS,
                         "AVG_ROWS": tableSearchJsonArray[i].AVG_ROWS,
                         "TUPLE_COUNT": tableSearchJsonArray[i].TUPLE_COUNT,
-                        "TABLE_TYPE": tableSearchJsonArray[i].TABLE_TYPE,
+                        "TABLE_TYPE": tableSearchJsonArray[i].TABLE_TYPE
                     };
                     counter++;
 
