@@ -104,16 +104,14 @@ AS
          , name
     FROM User
     WHERE age = ?
-    GROUP BY name
-;
+    GROUP BY name;
 
 CREATE PROCEDURE p2
 ALLOW
     admin
 AS
     INSERT INTO User
-    VALUES (?, ?)
-;
+    VALUES (?, ?);
 
 -- as source code
 
@@ -248,7 +246,7 @@ CREATE TABLE T14
     )
 );
 
-CREATE TABLE T15 
+CREATE TABLE T15
 (
     C INTEGER
 ,   C2 TINYINT NOT NULL
@@ -285,7 +283,7 @@ CREATE TABLE T18
     )
 );
 
-CREATE TABLE T19 
+CREATE TABLE T19
 (
     C INTEGER
 ,   C2 TINYINT NOT NULL
@@ -305,7 +303,7 @@ CREATE TABLE T20
 
 -- both column and table constraints
 
-CREATE TABLE T21 
+CREATE TABLE T21
 (
     C1 TINYINT DEFAULT 127 NOT NULL
 ,   C2 SMALLINT DEFAULT 32767 NOT NULL
@@ -478,4 +476,53 @@ CREATE TABLE T27
 );
 
 PARTITION TABLE T27 ON COLUMN C;
+
+-- CREATE PROCEDURE
+-- Verify that the sqlcmd parsing survives two consecutive create procedures
+
+CREATE TABLE T28
+(
+    C1 BIGINT
+,   C2 BIGINT
+);
+
+CREATE PROCEDURE FOO1 AS SELECT * FROM T28;
+CREATE PROCEDURE FOO2 AS SELECT COUNT(*) FROM T28;
+
+-- Verify that consecutive procedure/view statements survive sqlcmd parsing
+CREATE PROCEDURE FOO3 AS SELECT * FROM T28;
+
+CREATE VIEW VT3
+(
+    C1
+,   C2
+,   TOTAL
+)
+AS
+    SELECT C1
+        ,  C2
+        ,  COUNT(*)
+    FROM T28
+    GROUP BY C1
+          ,  C2
+;
+
+CREATE PROCEDURE FOO4 AS SELECT * FROM VT3;
+
+-- Verify that create procedure with INSERT INTO SELECT
+-- survives sqlcmd
+CREATE PROCEDURE INS_T1_SELECT_T1 AS
+    INSERT INTO T1 SELECT * FROM T1;
+
+CREATE PROCEDURE INS_T1_COLS_SELECT_T1 AS
+    INSERT INTO T1 (WIDTH, LENGTH, VOLUME)
+        SELECT WIDTH, LENGTH, VOLUME FROM T1;
+
+CREATE PROCEDURE UPS_T4_SELECT_T4 AS
+    INSERT INTO T4 SELECT * FROM T4 ORDER BY C1, C9;
+
+CREATE PROCEDURE UPS_T4_COLS_SELECT_T4 AS
+    INSERT INTO T4 (C9, C1, C4, C5, C8, C6, C7)
+        SELECT C9, C1, C4, C5, C8, C6, C7 FROM T4;
+
 
