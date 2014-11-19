@@ -285,6 +285,10 @@ public class AuthSystem {
             return false;
         }
 
+        public boolean isAuthEnabled() {
+            return true;
+        }
+
         private void finish() {
             m_groups = ImmutableList.copyOf(m_groups);
             m_authorizedProcedures = ImmutableSet.copyOf(m_authorizedProcedures);
@@ -536,6 +540,12 @@ public class AuthSystem {
         public boolean authorizeConnector(String connectorName) {
             return true;
         }
+
+        @Override
+        public boolean isAuthEnabled() {
+            return false;
+        }
+
     }
 
     private final AuthUser m_authDisabledUser = new AuthDisabledUser();

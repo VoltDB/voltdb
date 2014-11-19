@@ -36,9 +36,11 @@ import org.voltdb.compiler.VoltProjectBuilder;
 public class TestQueryTimeout extends RegressionSuite {
 
     private static final int TIMEOUT = 1500;
-    private static String ERRORMSG = String.format(
-            "A SQL query was terminated after %.2f seconds", TIMEOUT / 1000.0);
+//    private static String ERRORMSG = String.format(
+//            "A SQL query was terminated after %.2f seconds", TIMEOUT / 1000.0);
 
+    // DEBUG build of EE runs much slower, so the timing part is not deterministic.
+    private static String ERRORMSG = "A SQL query was terminated after";
 
     private void loadData(Client client, String tb, int scale)
             throws NoConnectionsException, IOException, ProcCallException {
@@ -59,6 +61,11 @@ public class TestQueryTimeout extends RegressionSuite {
     }
 
     public void testReplicatedProcTimeout() throws IOException, ProcCallException, InterruptedException {
+        if (isValgrind()) {
+            // Disable the memcheck for this test, it takes too long
+            return;
+        }
+
         System.out.println("test replicated table procedures timeout...");
 
         Client client = this.getClient();
@@ -96,6 +103,11 @@ public class TestQueryTimeout extends RegressionSuite {
     }
 
     public void testPartitionedProcTimeout() throws IOException, ProcCallException, InterruptedException {
+        if (isValgrind()) {
+            // Disable the memcheck for this test, it takes too long
+            return;
+        }
+
         System.out.println("test partitioned table procedures timeout...");
 
         Client client = this.getClient();

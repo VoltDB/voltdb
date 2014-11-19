@@ -70,9 +70,11 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
     public void testGetTables() throws Exception
     {
         String schema =
-            "create table Table1 (Column1 varchar(10), Column2 integer);" +
+            "create table Table1 (Column1 varchar(10) not null, Column2 integer);" +
+            "partition table Table1 on column Column1;" +
             "create table Table2 (Column1 integer);" +
             "create view View1 (Column1, num) as select Column1, count(*) from Table1 group by Column1;" +
+            "create view View2 (Column2, num) as select Column2, count(*) from Table1 group by Column2;" +
             "create table Export1 (Column1 integer);" +
             "export table Export1;" +
             "create procedure sample as select * from Table1;";
@@ -83,13 +85,19 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         VoltTable tables = dut.getMetaData("tables");
         System.out.println(tables);
         assertEquals(10, tables.getColumnCount());
-        assertEquals(4, tables.getRowCount());
+        assertEquals(5, tables.getRowCount());
         assertTrue(VoltTableTestHelpers.moveToMatchingRow(tables, "TABLE_NAME", "Table1"));
         assertTrue(tables.get("TABLE_TYPE", VoltType.STRING).equals("TABLE"));
+        assertTrue(tables.get("REMARKS", VoltType.STRING).equals("{\"partitionColumn\":\"COLUMN1\"}"));
         assertTrue(VoltTableTestHelpers.moveToMatchingRow(tables, "TABLE_NAME", "Table2"));
         assertTrue(tables.get("TABLE_TYPE", VoltType.STRING).equals("TABLE"));
+        assertEquals(null, tables.get("REMARKS", VoltType.STRING));
         assertTrue(VoltTableTestHelpers.moveToMatchingRow(tables, "TABLE_NAME", "View1"));
         assertTrue(tables.get("TABLE_TYPE", VoltType.STRING).equals("VIEW"));
+        assertTrue(tables.get("REMARKS", VoltType.STRING).equals("{\"partitionColumn\":\"COLUMN1\",\"sourceTable\":\"TABLE1\"}"));
+        assertTrue(VoltTableTestHelpers.moveToMatchingRow(tables, "TABLE_NAME", "View2"));
+        assertTrue(tables.get("TABLE_TYPE", VoltType.STRING).equals("VIEW"));
+        assertTrue(tables.get("REMARKS", VoltType.STRING).equals("{\"partitionColumn\":\"COLUMN1\",\"sourceTable\":\"TABLE1\"}"));
         assertTrue(VoltTableTestHelpers.moveToMatchingRow(tables, "TABLE_NAME", "Export1"));
         assertTrue(tables.get("TABLE_TYPE", VoltType.STRING).equals("EXPORT"));
         assertFalse(VoltTableTestHelpers.moveToMatchingRow(tables, "TABLE_NAME", "NotATable"));
