@@ -191,7 +191,7 @@ public class HTTPAdminListener {
                     }
                 }
             }catch(Exception ex){
-                logger.error("Error servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage());
+                logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage());
             }
         }
     }
@@ -257,7 +257,7 @@ public class HTTPAdminListener {
                 }
 
             } catch(Exception ex){
-                logger.error("Error servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage());
+                logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage());
             }
         }
     }
