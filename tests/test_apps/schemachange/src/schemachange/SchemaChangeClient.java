@@ -211,8 +211,18 @@ public class SchemaChangeClient {
      */
     private class CatalogChangeTestDriver {
 
+        /*
+         * Data for tracking retry state.
+         * The count is how many times the current test has been retried.
+         * The stage is 0 for the drop batch and 1 for the create/alter batch.
+         */
         private int retryCount = 0;
         private int retryFromStage = 0;
+
+        /*
+         * These members have the remaining state related to tables and views
+         * that allows a retry attempt to perform the identical operation.
+         */
         private VoltTable t2 = null;
         private String currentName = null;
         private String newName = null;
