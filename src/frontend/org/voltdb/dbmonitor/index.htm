@@ -374,6 +374,96 @@
                 <div class="adminServer">
                 	<div class="serverName">Server</div>
                     <div class="setServer adminIcons" id="btnServerConfigAdmin"></div>
+                     <!-- server list -->
+                <div id="serverConfigAdmin" style="display:none;">
+        <div class="slide-pop-wrapper">
+        
+        <div class="slide-pop-title ">
+          <div class="icon-server searchLeft searchLeftAdmin">Servers</div>      
+          
+          <div class="searchRight">
+            <div class="search">
+             <!-- <input type="text" id="popServerSearchAdmin" class="icon-search icoSS" onclick="this.value='';" onblur="this.value=!this.value?'Search Server':this.value;" value="Search Server" placeholder="Search Server"> -->
+            </div>
+            </div>
+            <div class="clear"></div>
+          </div>
+          
+          <div class="slide-pop-content">
+            <div id="serverListWrapperAdmin">            
+              <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblshutdown">
+                    <tbody>
+                        <tr>
+                        <td class="configLabel" width="50%">Test Server Lorem </td>
+                        <td align="right">
+                        <div class="onIcon"></div>
+                        </td>
+                        <td>On</td>
+                        <td><a href="#shutdownPopupPop" id="shutdownPopupPopConfirmation" class="edit" title="Edit">&nbsp;</a></td>
+                        </tr>
+                           <tr>
+                        <td class="configLabel" width="50%">Test Server 2 Lorem </td>
+                        <td align="right">
+                        <div class="onIcon"></div>
+                        </td>
+                        <td>On</td>
+                        <td><a href="#shutdownPopupPop" id="shutdownPopupPopConfirmation" class="edit" title="Edit">&nbsp;</a></td>
+                        </tr>
+                        <tr>
+                        <td class="configLabel">Server Lorem Ispum </td>
+                        <td align="right">
+                        <div class="offIcon"></div>
+                        </td>
+                        <td>On</td>
+                        <td><a href="#shutdownPopupPop1" id="shutdownPopupPopConfirmation1" class="edit" title="Edit">&nbsp;</a></td>
+                        </tr>
+                          <tr>
+                        <td class="configLabel">Server 2 Lorem Ispum </td>
+                        <td align="right">
+                        <div class="offIcon"></div>
+                        </td>
+                        <td>On</td>
+                        <td><a href="#shutdownPopupPop1" id="shutdownPopupPopConfirmation1" class="edit" title="Edit">&nbsp;</a></td>
+                        </tr>
+                        <tr>
+                        <td class="configLabel" width="50%">Test Server 2 Lorem </td>
+                        <td align="right">
+                        <div class="onIcon"></div>
+                        </td>
+                        <td>On</td>
+                        <td><a href="#shutdownPopupPop" id="shutdownPopupPopConfirmation" class="edit" title="Edit">&nbsp;</a></td>
+                        </tr>
+                        <tr>
+                        <td class="configLabel">Server Lorem Ispum </td>
+                        <td align="right">
+                        <div class="offIcon"></div>
+                        </td>
+                        <td>On</td>
+                        <td><a href="#shutdownPopupPop1" id="shutdownPopupPopConfirmation1" class="edit" title="Edit">&nbsp;</a></td>
+                        </tr>
+                        <tr>
+                        <td class="configLabel" width="50%">Test Server 2 Lorem </td>
+                        <td align="right">
+                        <div class="onIcon"></div>
+                        </td>
+                        <td>On</td>
+                        <td><a href="#shutdownPopupPop" id="shutdownPopupPopConfirmation" class="edit" title="Edit">&nbsp;</a></td>
+                        </tr>
+                        <tr>
+                        <td class="configLabel">Server Lorem Ispum </td>
+                        <td align="right">
+                        <div class="offIcon"></div>
+                        </td>
+                        <td>On</td>
+                        <td><a href="#shutdownPopupPop1" id="shutdownPopupPopConfirmation1" class="edit" title="Edit">&nbsp;</a></td>
+                        </tr>
+				</tbody>
+            </table>
+            </div>
+          </div>
+        </div>
+      </div>
+                <!-- server list -->
                 </div>
                 <div class="clear"></div>
                 
@@ -800,10 +890,10 @@
         <div class="overlay-title icon-alert">Shutdown: Confirmation</div>
         <div class="clear"></div>
         <div class="overlay-content">            
-            <!--<p class="txt-bold">Are you sure you want to shutdown the cluster?</p>
+          <p class="txt-bold">Are you sure you want to shutdown the cluster?</p>
             <p>Any data not saved to a snapshot or command log will be lost.</p>
-            <p>Continue with the shutdown?</p>-->
-            
+            <p>Continue with the shutdown?</p>
+           <!-- 
             <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblshutdown">
                     <tr>
                     <td class="configLabel" width="50%">Test Node 1 </td>
@@ -835,7 +925,7 @@
                     </tr>
                     
                     
-			</table>
+			</table> -->
             
             
             
@@ -878,7 +968,7 @@
     
       <!-- POPUP shutdownPopupPop 2 -->
     <div id="shutdownPopupPop" style="display: none">
-        <div class="overlay-title icon-alert">Shutdown</div>
+        <div class="overlay-title icon-alert">Server</div>
         <div class="clear"></div>
         <div class="overlay-content">            
            <p class="txt-bold">Are you sure you want to shutdown this node?</p>
@@ -890,11 +980,11 @@
     <!-- POPUP shutdownPopupPop -->
       <!-- POPUP shutdownPopupPop -->
     <div id="shutdownPopupPop1" style="display: none">
-        <div class="overlay-title icon-alert">Shutdown</div>
+        <div class="overlay-title icon-alert">Server</div>
         <div class="clear"></div>
         <div class="overlay-content">            
-           <p class="txt-bold">Are you sure you want to shutdown this node?</p>
-            <p>Continue with the shutdown?</p>
+           <p class="txt-bold">Are you sure you want to enable this node?</p>
+            <p>Continue with the enable?</p>
             
         </div>
         <div class="overlay-btns"><a class="btn closeBtn" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Ok">Cancel</a></div>
