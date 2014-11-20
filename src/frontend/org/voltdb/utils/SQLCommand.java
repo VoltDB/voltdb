@@ -815,9 +815,10 @@ public class SQLCommand
                                                 ") :  must have an even number of hex characters to be valid.");
                                     }
                                 }
-                            } else {
-                                throw new Exception("Unsupported Data Type: " + paramType);
-                            }
+                                else {
+                                    throw new Exception("Unsupported Data Type: " + paramType);
+                                }
+                            } // else param is keyword "null", so leave objParam as null.
                             objectParams[i] = objParam;
                         }
                     } catch (NumberFormatException nfe) {
