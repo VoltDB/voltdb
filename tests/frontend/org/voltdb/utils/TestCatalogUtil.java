@@ -281,8 +281,8 @@ public class TestCatalogUtil extends TestCase {
             "<jsonapi enabled='true'/>" +
             "</httpd>" +
             "<users> " +
-            "<user name=\"joe\" password=\"aaa\" roles=\"lotre,lodue,louno\"/>" +
-            "<user name=\"jane\" password=\"bbb\" roles=\"launo,ladue,latre\"/>" +
+            "<user name=\"joe\" password=\"aaa\" roles=\"lotre,lodue,louno,dontexist\"/>" +
+            "<user name=\"jane\" password=\"bbb\" roles=\"launo,ladue,latre,dontexist\"/>" +
             "</users>" +
             "</deployment>";
 
@@ -304,6 +304,7 @@ public class TestCatalogUtil extends TestCase {
         assertNotNull(joe.getGroups().get("lodue"));
         assertNotNull(joe.getGroups().get("lotre"));
         assertNull(joe.getGroups().get("latre"));
+        assertNull(joe.getGroups().get("dontexist"));
 
         User jane = db.getUsers().get("jane");
         assertNotNull(jane);
@@ -311,6 +312,7 @@ public class TestCatalogUtil extends TestCase {
         assertNotNull(jane.getGroups().get("ladue"));
         assertNotNull(jane.getGroups().get("latre"));
         assertNull(jane.getGroups().get("lotre"));
+        assertNull(joe.getGroups().get("dontexist"));
     }
 
     public void testScrambledPasswords() throws Exception {

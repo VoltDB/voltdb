@@ -192,11 +192,8 @@ public class TestVoltDB extends TestCase {
     }
 
     /**
-     * ENG-639: Improve deployment.xml parser error reporting
-     *
-     * This test tries to assign a user in the deployment file to a group that does not exist and asserts that
-     * deployment file compilation fails.
-     * @throws IOException
+     * ENG-7088: Validate that deployment file users that want to belong to roles which
+     * don't yet exist don't render the deployment file invalid.
      */
     public void testCompileDeploymentAddUserToNonExistentGroup() throws IOException {
         TPCCProjectBuilder project = new TPCCProjectBuilder();
@@ -229,8 +226,8 @@ public class TestVoltDB extends TestCase {
         Catalog catalog = new Catalog();
         catalog.execute(serializedCatalog);
 
-        // this should fail because group "bar" does not exist
-        assertTrue("Deployment file shouldn't have been able to validate",
-                CatalogUtil.compileDeployment(catalog, project.getPathToDeployment(), true, true) < 0);
+        // this should succeed even though group "bar" does not exist
+        assertTrue("Deployment file should have been able to validate",
+                CatalogUtil.compileDeployment(catalog, project.getPathToDeployment(), true, true) == 1);
     }
 }
