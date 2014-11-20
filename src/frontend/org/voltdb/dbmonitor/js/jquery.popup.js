@@ -363,8 +363,17 @@
 		            
 		            var chkAutoSnapshot = $("#chkAutoSnapshot");
 		            chkAutoSnapshot.hide();
-		            var iconCss = chkAutoSnapshot.is(":checked") ? "onIcon" : "offIcon";
+		            var iconCss = chkAutoSnapshot.is(":checked") ? "onIcon" : "offIcon";					
 		            $("#autoSnapshotIcon").removeClass().addClass(iconCss).show();
+					if(chkAutoSnapshot.is(":checked")){
+						
+						$('.SnapshotsOn').show();
+						$('.SnapshotsOff').hide()
+						} else{
+							$('.SnapshotsOff').show()
+							$('.SnapshotsOn').hide();
+							}
+					
 		    });
 							
 		    }
