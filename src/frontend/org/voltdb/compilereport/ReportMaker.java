@@ -133,7 +133,7 @@ public class ReportMaker {
                 sb.append("<p>Used by procedures: ");
                 List<String> procs = new ArrayList<String>();
                 for (Procedure proc : annotation.proceduresThatUseThis) {
-                    procs.add("<a href='#p-" + proc.getTypeName() + "' class='togglex'>" + proc.getTypeName() + "</a>");
+                    procs.add("<a href='#p-" + proc.getTypeName() + "'>" + proc.getTypeName() + "</a>");
                 }
                 sb.append(StringUtils.join(procs, ", "));
                 sb.append("</p>");
@@ -279,7 +279,7 @@ public class ReportMaker {
                 sb.append("<p>Read-only by procedures: ");
                 List<String> procs = new ArrayList<String>();
                 for (Procedure proc : annotation.proceduresThatReadThis) {
-                    procs.add("<a href='#p-" + proc.getTypeName() + "' class='togglex'>" + proc.getTypeName() + "</a>");
+                    procs.add("<a href='#p-" + proc.getTypeName() + "'>" + proc.getTypeName() + "</a>");
                 }
                 sb.append(StringUtils.join(procs, ", "));
                 sb.append("</p>");
@@ -288,7 +288,7 @@ public class ReportMaker {
                 sb.append("<p>Read/Write by procedures: ");
                 List<String> procs = new ArrayList<String>();
                 for (Procedure proc : annotation.proceduresThatUpdateThis) {
-                    procs.add("<a href='#p-" + proc.getTypeName() + "' class='togglex'>" + proc.getTypeName() + "</a>");
+                    procs.add("<a href='#p-" + proc.getTypeName() + "'>" + proc.getTypeName() + "</a>");
                 }
                 sb.append(StringUtils.join(procs, ", "));
                 sb.append("</p>");
@@ -539,7 +539,7 @@ public class ReportMaker {
                 sb.append("<p>Read-only access to tables: ");
                 List<String> tables = new ArrayList<String>();
                 for (Table table : annotation.tablesRead) {
-                    tables.add("<a href='#s-" + table.getTypeName() + "' class='togglex'>" + table.getTypeName() + "</a>");
+                    tables.add("<a href='#s-" + table.getTypeName() + "'>" + table.getTypeName() + "</a>");
                 }
                 sb.append(StringUtils.join(tables, ", "));
                 sb.append("</p>");
@@ -548,7 +548,7 @@ public class ReportMaker {
                 sb.append("<p>Read/Write access to tables: ");
                 List<String> tables = new ArrayList<String>();
                 for (Table table : annotation.tablesUpdated) {
-                    tables.add("<a href='#s-" + table.getTypeName() + "' class='togglex'>" + table.getTypeName() + "</a>");
+                    tables.add("<a href='#s-" + table.getTypeName() + "'>" + table.getTypeName() + "</a>");
                 }
                 sb.append(StringUtils.join(tables, ", "));
                 sb.append("</p>");
@@ -558,7 +558,7 @@ public class ReportMaker {
                 List<String> indexes = new ArrayList<String>();
                 for (Index index : annotation.indexesUsed) {
                     Table table = (Table) index.getParent();
-                    indexes.add("<a href='#s-" + table.getTypeName() + "-" + index.getTypeName() + "' class='togglex'>" + index.getTypeName() + "</a>");
+                    indexes.add("<a href='#s-" + table.getTypeName() + "-" + index.getTypeName() + "'>" + index.getTypeName() + "</a>");
                 }
                 sb.append(StringUtils.join(indexes, ", "));
                 sb.append("</p>");
