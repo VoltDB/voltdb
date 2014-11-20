@@ -73,7 +73,10 @@ function catalog() {
 # Run a server with no catalog 
 function empty-server() {
     srccompile
-    echo "Compiling the application catalog with no DDL, Procedure classes will be added to ctalog."
+    echo "Starting an empty VoltDB database."
+    echo "After this is done run sqlcmd and at prompt type: file loadschema.sql;"
+    echo "This will load necessary tables/view/procedures from voter-procs.jar."
+    echo
     echo "To perform this action manually, use the command line: "
     echo
     echo "voltdb create -d deployment-noschema.xml -l $LICENSE -H $HOST"
