@@ -211,13 +211,8 @@ public class SchemaChangeClient {
      */
     private class CatalogChangeTestDriver {
 
-        /*
-         * Data for tracking retry state.
-         * The count is how many times the current test has been retried.
-         * The stage is 0 for the drop batch and 1 for the create/alter batch.
-         */
+        // Keep track of retries to limit how many occur.
         private int retryCount = 0;
-        private int retryFromStage = 0;
 
         /*
          * These members have the remaining state related to tables and views
@@ -229,6 +224,27 @@ public class SchemaChangeClient {
         private VoltTable versionT = null;
         private TableHelper.ViewRep newViewRep = null;
 
+        // Forces random failures.
+        class FailBot {
+            // Number of possible places to generate failures.
+            final int failPoints;
+            final boolean enabled;
+
+            FailBot(int failPoints, boolean enabled) {
+                this.failPoints = failPoints;
+                this.enabled = enabled;
+            }
+
+            boolean failHere(String desc) {
+                // Divide by the number of possible places to force failures.
+                if (this.enabled && (config.retryForcedPercent / this.failPoints) > rand.nextInt(100)) {
+                    log.info(_F("Forcing failure: %s", desc));
+                    return true;
+                }
+                return false;
+            }
+        }
+
         /**
          * Perform a schema change to a mutated version of the current table (80%) or
          * to a new table entirely (20%, drops and adds the new table).
@@ -239,8 +255,19 @@ public class SchemaChangeClient {
                 TableHelper.ViewRep viewIn,
                 boolean isRetry) throws Exception {
 
+            // There are 3 possible forced failure points. Don't force failures during
+            // the initial call.
+            FailBot failBot = new FailBot(3, t1 != null);
+
+            // A retry may skip the drops if they had succeeded.
+            boolean skipDrops = false;
+
             if (isRetry) {
-                if (++this.retryCount > config.retryLimit) {
+                log.info(_F("Catalog update retry #%d for V%d in %d seconds...",
+                            this.retryCount+1, schemaVersionNo+1, config.retrySleep));
+                Thread.sleep(config.retrySleep * 1000);
+
+                if (++this.retryCount >= config.retryLimit) {
                     throw new IOException("Retry limit reached");
                 }
                 assert(this.t2 != null);
@@ -248,12 +275,28 @@ public class SchemaChangeClient {
                 assert(this.newName != null);
                 assert(this.versionT != null);
                 // this.newViewRep can be null
-            } else {
+
+                // Figure out what we have to redo, if anything. Non-transaction-related
+                // problems can return errors while still completing the transation.
+                if (isSchemaVersionObservable(schemaVersionNo)) {
+                    // If V<previous> is present we need to repeat the drop batch.
+                    log.info(_F("The old version table V%d is present, enabling drop batch.", schemaVersionNo));
+                }
+                else {
+                    // If V<previous> is not present there is no need to repeat the drop batch.
+                    log.info(_F("The old version table V%d is not present, disabling drop batch.", schemaVersionNo));
+                    skipDrops = true;
+                }
+            }
+
+            // We may have determined that a retry isn't really necessary, e.g. if a
+            // batch succeeds but has a communication problem at the tail end.
+            if (this.retryCount == 0) {
                 this.t2 = null;
                 this.currentName = t1 == null ? "B" : TableHelper.getTableName(t1);
                 this.newName = this.currentName;
 
-                // add an empty table with the schema version number in it
+                // add an empty table with the schema version number in the name
                 this.versionT = TableHelper.quickTable(_F("V%d (BIGINT)", schemaVersionNo + 1));
 
                 if (newTable) {
@@ -276,16 +319,16 @@ public class SchemaChangeClient {
                 }
             }
 
-            // Do the drops as a separate batch. It's a NOP for the catalog update method.
-            // Skip if it's a retry attempt and this part already succeeded.
-            if (!isRetry || this.retryFromStage == 0) {
-                if (isRetry) {
-                    this.logRetryStage("drop");
-                }
+            // Do the drops as a separate batch because the UAC-based mechanism currently
+            // doesn't deal well with a batch dropping and re-creating an existing table.
+            // The catalog update implementation ignores this stage. The stage is skipped
+            // during retries when V# isn't found because the drop batch had succeeded.
+            if (!skipDrops) {
+                this.logStage("drop");
                 schemaChanger.beginBatch();
                 try {
-                    // Force failure? (t1 test avoids failing initial call)
-                    if (t1 != null && config.retryForcedPercent > rand.nextInt(100)) {
+                    // Force failure?
+                    if (failBot.failHere("in drop batch")) {
                         schemaChanger.addForcedFailure();
                     }
                     schemaChanger.dropTables(_F("V%d", schemaVersionNo));
@@ -313,20 +356,17 @@ public class SchemaChangeClient {
                     // This is a normal error return that is handled by the caller.
                     return null;
                 }
-                // If we fail don't repeat this successful stage.
-                this.retryFromStage++;
             }
 
             // Now do the creates and alters.
-            if (isRetry) {
-                this.logRetryStage("create/alter");
-            }
+            this.logStage("create/alter");
             schemaChanger.beginBatch();
             long count = 0;
             long start = 0;
+            Class<?> provisionalActiveVerifyProc = null;
             try {
-                // Force failure? (t1 test avoids failing initial call)
-                if (t1 != null && config.retryForcedPercent > rand.nextInt(100)) {
+                // Force failure?
+                if (failBot.failHere("in create/alter batch")) {
                     schemaChanger.addForcedFailure();
                 }
                 schemaChanger.createTables(this.versionT);
@@ -338,7 +378,6 @@ public class SchemaChangeClient {
                 else {
                     schemaChanger.updateTable(t1, this.t2);
                 }
-                Class<?> provisionalActiveVerifyProc;
                 if (partitioned) {
                     schemaChanger.addTablePartitionInfo(this.t2, this.newName);
                     provisionalActiveVerifyProc = VerifySchemaChangedA.class;
@@ -361,14 +400,22 @@ public class SchemaChangeClient {
                     log.info("Starting to change schema.");
                 }
 
-                if (!schemaChanger.executeBatch(client)) {
-                    return null;
+                boolean executionSucceeded = schemaChanger.executeBatch(client);
+
+                // Exercise the retry logic by simulating an occasional communication failure
+                // after a successful batch execution.
+                if (executionSucceeded && failBot.failHere("after create/alter batch")) {
+                    executionSucceeded = false;
                 }
 
-                if (newTable) {
-                    activeTableNames.add(this.newName);
+                // Execution may fail, but the update may still have finished.
+                // This can occur with a hardware failure.
+                if (!executionSucceeded) {
+                    if (!isSchemaVersionObservable(schemaVersionNo+1)) {
+                        return null;
+                    }
+                    log.info(_F("The new version table V%d is present, not retrying.", schemaVersionNo+1));
                 }
-                activeVerifyProc = provisionalActiveVerifyProc;
             }
             catch (IOException e) {
                 // All SchemaChanger problems become IOExceptions.
@@ -376,9 +423,13 @@ public class SchemaChangeClient {
                 return null;
             }
 
-            // Reset the retry data since the batch at least succeeded mechanically, if not logically.
+            if (newTable) {
+                activeTableNames.add(this.newName);
+            }
+            activeVerifyProc = provisionalActiveVerifyProc;
+
+            // We presumably succeeded, so it's no longer a retry situation.
             this.retryCount = 0;
-            this.retryFromStage = 0;
 
             // don't actually trust the call... manually verify
             int obsCatVersion = verifyAndGetSchemaVersion();
@@ -412,8 +463,11 @@ public class SchemaChangeClient {
             return new Pair<VoltTable,TableHelper.ViewRep>(this.t2, this.newViewRep, false);
         }
 
-        private void logRetryStage(final String action) {
-            log.info(_F("Retry #%d: stage %d (%s)", this.retryCount, this.retryFromStage+1, action));
+        private void logStage(final String action) {
+            // Only log with retries because a stage might be skipped.
+            if (this.retryCount > 0) {
+                log.info(_F("Retry #%d: %s", this.retryCount, action));
+            }
         }
     }
 
@@ -613,13 +667,7 @@ public class SchemaChangeClient {
             try {
                 if (ddl.length() > 0) {
                     log.info(_F("\n::: DDL Batch (BEGIN) :::\n%s\n::: DDL Batch (END) :::", ddlString));
-                    try {
-                        ClientResponse cr = client.callProcedure("@AdHoc", ddlString);
-                        success = (cr.getStatus() == ClientResponse.SUCCESS);
-                    }
-                    catch (ProcCallException e) {
-                        throw new IOException(e);
-                    }
+                    success = execLiveDDL(client, ddlString, false);
                 }
             }
             finally {
@@ -956,15 +1004,12 @@ public class SchemaChangeClient {
                 while (newT == null) {
                     Pair<VoltTable, TableHelper.ViewRep> schema = testDriver.catalogChange(t, isNewTable, v, isRetry);
                     if (schema == null) {
-                            log.info(_F("Retrying an unsuccessful catalog update (in %d seconds).", config.retrySleep));
-                            Thread.sleep(config.retrySleep * 1000);
-                            isRetry = true;
-                            continue;   // try again
+                        isRetry = true;
                     } else {
                         isRetry = false;
+                        newT = schema.getFirst();
+                        newV = schema.getSecond();
                     }
-                    newT = schema.getFirst();
-                    newV = schema.getSecond();
                 }
                 t = newT;
                 v = newV;
@@ -1048,6 +1093,57 @@ public class SchemaChangeClient {
         // Fail hard or allow retries?
         if (!success && hardFail) {
             String msg = (cr != null ? ((ClientResponseImpl)cr).toJSONString() : _F("Unknown %s failure", procName));
+            throw new IOException(msg);
+        }
+
+        return success;
+    }
+
+    /**
+     * Execute live DDL.
+     */
+    private static boolean execLiveDDL(Client client, String ddl, boolean hardFail) throws IOException
+    {
+        boolean success = false;
+        ClientResponse cr = null;
+        try {
+            cr = client.callProcedure("@AdHoc", ddl);
+            success = true;
+        }
+        catch (NoConnectionsException e) {
+        }
+        catch (ProcCallException e) {
+            log.error(_F("Procedure @AdHoc call exception: %s", e.getMessage()));
+            cr = e.getClientResponse();
+        }
+
+        if (success && cr != null) {
+            switch (cr.getStatus()) {
+            case ClientResponse.SUCCESS:
+                // hooray!
+                log.info("Live DDL execution was reported to be successful");
+                break;
+            case ClientResponse.CONNECTION_LOST:
+            case ClientResponse.CONNECTION_TIMEOUT:
+            case ClientResponse.RESPONSE_UNKNOWN:
+            case ClientResponse.SERVER_UNAVAILABLE:
+                // can try again after a break
+                success = false;
+                break;
+            case ClientResponse.UNEXPECTED_FAILURE:
+            case ClientResponse.GRACEFUL_FAILURE:
+            case ClientResponse.USER_ABORT:
+                // should never happen
+                log.error(_F("USER_ABORT in procedure call for live DDL"));
+                log.error(((ClientResponseImpl)cr).toJSONString());
+                assert(false);
+                System.exit(-1);
+            }
+        }
+
+        // Fail hard or allow retries?
+        if (!success && hardFail) {
+            String msg = (cr != null ? ((ClientResponseImpl)cr).toJSONString() : _F("Unknown @AdHoc failure"));
             throw new IOException(msg);
         }
 

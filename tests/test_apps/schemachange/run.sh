@@ -66,8 +66,18 @@ function client() {
         --duration=1800
 }
 
-# quick client run to exercise it fully, including failures, before checking in
+# quick client run
 function quick() {
+    srccompile
+    java -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
+        schemachange.SchemaChangeClient \
+        --servers=localhost \
+        --targetrowcount=1000 \
+        --duration=60
+}
+
+# quick smoke test, including forced failures
+function smoke() {
     srccompile
     java -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
         schemachange.SchemaChangeClient \
