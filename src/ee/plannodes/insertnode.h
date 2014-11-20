@@ -63,15 +63,9 @@ public:
     InsertPlanNode() : AbstractOperationPlanNode(), m_multiPartition(false), m_fieldMap() { }
     PlanNodeType getPlanNodeType() const;
 
-    bool isMultiPartition() const { return m_multiPartition; }
+    bool isMultiPartition() { return m_multiPartition; }
 
-    bool isUpsert() const { return m_isUpsert; }
-
-    bool isMultiRowInsert() const {
-        // Materialize nodes correspond to INSERT INTO ... VALUES syntax.
-        // Otherwise this may be a multi-row insert via INSERT INTO ... SELECT.
-        return m_children[0]->getPlanNodeType() != PLAN_NODE_TYPE_MATERIALIZE;
-    }
+    bool isUpsert() { return m_isUpsert; }
 
     void initTupleWithDefaultValues(VoltDBEngine* engine,
                                     Pool* pool,
