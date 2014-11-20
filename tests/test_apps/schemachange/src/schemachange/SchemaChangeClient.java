@@ -223,6 +223,10 @@ public class SchemaChangeClient {
         private String newName = null;
         private VoltTable versionT = null;
         private TableHelper.ViewRep newViewRep = null;
+        private long count = 0;
+        private long start = 0;
+        private Class<?> provisionalActiveVerifyProc = null;
+
 
         // Forces random failures.
         class FailBot {
@@ -274,10 +278,19 @@ public class SchemaChangeClient {
                 assert(this.currentName != null);
                 assert(this.newName != null);
                 assert(this.versionT != null);
+                assert(this.provisionalActiveVerifyProc != null);
                 // this.newViewRep can be null
 
                 // Figure out what we have to redo, if anything. Non-transaction-related
                 // problems can return errors while still completing the transation.
+
+                // If V<next> is present there is nothing to retry, just finish what we started.
+                // isSchemaVersionObservable() retries internally if the connection is still bad.
+                if (isSchemaVersionObservable(schemaVersionNo+1)) {
+                    log.info(_F("The new version table V%d is present, not retrying.", schemaVersionNo+1));
+                    return finishUpdate(newTable);
+                }
+
                 if (isSchemaVersionObservable(schemaVersionNo)) {
                     // If V<previous> is present we need to repeat the drop batch.
                     log.info(_F("The old version table V%d is present, enabling drop batch.", schemaVersionNo));
@@ -361,9 +374,9 @@ public class SchemaChangeClient {
             // Now do the creates and alters.
             this.logStage("create/alter");
             schemaChanger.beginBatch();
-            long count = 0;
-            long start = 0;
-            Class<?> provisionalActiveVerifyProc = null;
+            this.count = 0;
+            this.start = 0;
+            this.provisionalActiveVerifyProc = null;
             try {
                 // Force failure?
                 if (failBot.failHere("in create/alter batch")) {
@@ -380,18 +393,18 @@ public class SchemaChangeClient {
                 }
                 if (partitioned) {
                     schemaChanger.addTablePartitionInfo(this.t2, this.newName);
-                    provisionalActiveVerifyProc = VerifySchemaChangedA.class;
+                    this.provisionalActiveVerifyProc = VerifySchemaChangedA.class;
                 }
                 else {
-                    provisionalActiveVerifyProc = VerifySchemaChangedB.class;
+                    this.provisionalActiveVerifyProc = VerifySchemaChangedB.class;
                 }
-                schemaChanger.createProcedures(client, provisionalActiveVerifyProc);
+                schemaChanger.createProcedures(client, this.provisionalActiveVerifyProc);
                 if (activeViewRep != null) {
                     schemaChanger.createViews(activeViewRep);
                 }
 
-                count = tupleCount(t1);
-                start = System.nanoTime();
+                this.count = tupleCount(t1);
+                this.start = System.nanoTime();
 
                 if (newTable) {
                     log.info("Starting to swap tables.");
@@ -400,21 +413,14 @@ public class SchemaChangeClient {
                     log.info("Starting to change schema.");
                 }
 
-                boolean executionSucceeded = schemaChanger.executeBatch(client);
-
-                // Exercise the retry logic by simulating an occasional communication failure
-                // after a successful batch execution.
-                if (executionSucceeded && failBot.failHere("after create/alter batch")) {
-                    executionSucceeded = false;
+                if (!schemaChanger.executeBatch(client)) {
+                    return null;
                 }
 
-                // Execution may fail, but the update may still have finished.
-                // This can occur with a hardware failure.
-                if (!executionSucceeded) {
-                    if (!isSchemaVersionObservable(schemaVersionNo+1)) {
-                        return null;
-                    }
-                    log.info(_F("The new version table V%d is present, not retrying.", schemaVersionNo+1));
+                // Exercise the retry logic by simulating a communication failure after
+                // successfully executing the batch. (t1 test avoids failing initial call)
+                if (failBot.failHere("after create/alter batch")) {
+                    return null;
                 }
             }
             catch (IOException e) {
@@ -423,10 +429,15 @@ public class SchemaChangeClient {
                 return null;
             }
 
+            return finishUpdate(newTable);
+        }
+
+        private Pair<VoltTable, TableHelper.ViewRep> finishUpdate(boolean newTable)
+        {
             if (newTable) {
                 activeTableNames.add(this.newName);
             }
-            activeVerifyProc = provisionalActiveVerifyProc;
+            activeVerifyProc = this.provisionalActiveVerifyProc;
 
             // We presumably succeeded, so it's no longer a retry situation.
             this.retryCount = 0;
@@ -451,14 +462,14 @@ public class SchemaChangeClient {
             }
 
             long end = System.nanoTime();
-            double seconds = (end - start) / 1000000000.0;
+            double seconds = (end - this.start) / 1000000000.0;
 
             if (newTable) {
                 log.info(_F("Completed table swap in %.4f seconds", seconds));
             }
             else {
                 log.info(_F("Completed %d tuples in %.4f seconds (%d tuples/sec)",
-                            count, seconds, (long) (count / seconds)));
+                            this.count, seconds, (long) (this.count / seconds)));
             }
             return new Pair<VoltTable,TableHelper.ViewRep>(this.t2, this.newViewRep, false);
         }
