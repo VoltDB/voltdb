@@ -209,6 +209,17 @@ public class TestPlansDistinct extends PlannerTestCase {
         // distinct on expression with group by clause
         sql = "SELECT distinct sum(C3) from T3 group by A3, B3";
         pns = compileToFragments(sql);
+
+    }
+
+    public void testMaterializedViews_withGroupby()
+    {
+        // Partition view tables without partition key
+        String[] tbs = {"V_P1", "V_P1_ABS"};
+
+        for (String tb: tbs) {
+            compileToFragments("SELECT distinct V_SUM_C1 FROM " + tb + " GROUP by V_SUM_C1 LIMIT 5");
+        }
     }
 
     public void testTry() {

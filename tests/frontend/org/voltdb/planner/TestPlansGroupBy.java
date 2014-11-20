@@ -1036,9 +1036,6 @@ public class TestPlansGroupBy extends PlannerTestCase {
             checkMVFix_TopAgg_ReAgg("SELECT V_SUM_C1 FROM " + tb +
                     " GROUP by V_SUM_C1 LIMIT 5", 1, 0, 2, 1);
 
-            checkMVFix_TopAgg_ReAgg_with_TopProjection("SELECT distinct V_SUM_C1 FROM " + tb +
-                    " GROUP by V_SUM_C1 LIMIT 5", 1, 0, 2, 1);
-
             // Test set (2):
             checkMVFix_TopAgg_ReAgg("SELECT V_SUM_C1, sum(V_CNT) FROM " + tb +
                     " GROUP by V_SUM_C1", 1, 1, 2, 2);

@@ -774,12 +774,21 @@ public class PlanAssembler {
             root = handleAggregationOperators(root);
         }
 
-        // Add ORDER BY as the new root
-        root = handleOrderBy(root);
+        if (m_parsedSelect.hasComplexAgg()) {
+            AbstractPlanNode aggNode = root.getChild(0);
+            root.clearChildren();
+            aggNode.clearParents();
+            aggNode = handleOrderBy(aggNode);
+            root.addAndLinkChild(aggNode);
+        } else {
+            root = handleOrderBy(root);
+        }
 
         if (mvFixNeedsProjection || needProjectionNode(root)) {
             root = addProjection(root);
         }
+
+        root = handleDistinctWithGroupby(root);
 
         if (m_parsedSelect.hasLimitOrOffset())
         {
@@ -1263,12 +1272,8 @@ public class PlanAssembler {
         // when they enforce an ordering equivalent to the one requested in the ORDER BY clause.
         // Even an intervening non-hash aggregate will not interfere in this optimization.
         AbstractPlanNode nonAggPlan = root;
-        if (m_parsedSelect.hasComplexAgg() && root.getPlanNodeType() == PlanNodeType.PROJECTION) {
-            nonAggPlan = root.getChild(0);
-        }
-
-        if (root.getPlanNodeType() == PlanNodeType.AGGREGATE) {
-            nonAggPlan = root.getChild(0);
+        if (nonAggPlan.getPlanNodeType() == PlanNodeType.AGGREGATE) {
+            nonAggPlan = nonAggPlan.getChild(0);
         }
         if (nonAggPlan instanceof IndexScanPlanNode) {
             sortDirection = ((IndexScanPlanNode)nonAggPlan).getSortDirection();
@@ -1312,7 +1317,7 @@ public class PlanAssembler {
          */
         AbstractPlanNode sendNode = null;
         // Whether or not we can push the limit node down
-        boolean canPushDown = ! m_parsedSelect.hasDistinctNonTricky();
+        boolean canPushDown = ! m_parsedSelect.hasDistinctWithGroupBy();
         if (canPushDown) {
             sendNode = checkLimitPushDownViability(root);
             if (sendNode == null) {
@@ -1776,7 +1781,7 @@ public class PlanAssembler {
             root = pushDownAggregate(root, aggNode, topAggNode, m_parsedSelect);
         }
 
-        return handleDistinctWithGroupby(root);
+        return root;
     }
 
     // Turn sequential scan to index scan for group by if possible
@@ -1951,7 +1956,6 @@ public class PlanAssembler {
             coordNode.m_isCoordinatingAggregator = true;
         }
 
-        boolean isComplexAggProjNodeTheNewRoot = true;
         /*
          * Push this node down to partition if it's distributed. First remove
          * the send/receive pair, add the node, then put the send/receive pair
@@ -1977,7 +1981,6 @@ public class PlanAssembler {
             } else {
                 // Set post predicate for final distributed Aggregation node
                 distNode.setPostPredicate(m_parsedSelect.m_having);
-                isComplexAggProjNodeTheNewRoot = false;
             }
         } else {
             distNode.addAndLinkChild(root);
@@ -1988,14 +1991,9 @@ public class PlanAssembler {
 
         if (selectStmt.hasComplexAgg()) {
             ProjectionPlanNode proj = new ProjectionPlanNode();
+            proj.addAndLinkChild(root);
             proj.setOutputSchema(selectStmt.getFinalProjectionSchema());
-
-            if (isComplexAggProjNodeTheNewRoot) {
-                proj.addAndLinkChild(root);
-                root = proj;
-            } else {
-                proj.addAndLinkChild(distNode);
-            }
+            root = proj;
         }
         return root;
     }
@@ -2124,7 +2122,7 @@ public class PlanAssembler {
      * @return
      */
     AbstractPlanNode handleDistinctWithGroupby(AbstractPlanNode root) {
-        if (! m_parsedSelect.hasDistinctNonTricky()) {
+        if (! m_parsedSelect.hasDistinctWithGroupBy()) {
             return root;
         }
         assert(m_parsedSelect.isGrouped());
@@ -2135,26 +2133,37 @@ public class PlanAssembler {
         }
 
         AggregatePlanNode distinctAggNode = new HashAggregatePlanNode();
-        distinctAggNode.setOutputSchema(m_parsedSelect.getFinalProjectionSchemaForDistinct());
+        distinctAggNode.setOutputSchema(m_parsedSelect.getDistinctProjectionSchema());
 
         for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.m_distinctGroupByColumns) {
             distinctAggNode.addGroupByExpression(col.expression);
         }
 
-        boolean pushdownDistinctAgg = m_parsedSelect.hasPartitionColumnInDistinctGroupby();
+        boolean canPushdownDistinctAgg = m_parsedSelect.hasPartitionColumnInDistinctGroupby();
+        boolean pushedDown = false;
 
-        if (pushdownDistinctAgg) {
+        if (canPushdownDistinctAgg && !m_parsedSelect.m_mvFixInfo.needed()) {
             assert(m_parsedSelect.hasPartitionColumnInGroupby());
-            if (root instanceof ReceivePlanNode && !m_parsedSelect.m_mvFixInfo.needed()) {
-                // Temporarily strip send/receive pair
-                AbstractPlanNode accessPlanTemp = root;
-                accessPlanTemp = root.getChild(0).getChild(0);
-                root.getChild(0).unlinkChild(accessPlanTemp);
-
-                distinctAggNode.addAndLinkChild(accessPlanTemp);
-                root.getChild(0).addAndLinkChild(distinctAggNode);
+            AbstractPlanNode receive = root;
+            if (receive instanceof ProjectionPlanNode && receive.getChildCount() > 0) {
+                receive = receive.getChild(0);
             }
-        } else {
+            if (receive instanceof OrderByPlanNode && receive.getChildCount() > 0) {
+                receive = receive.getChild(0);
+            }
+            if (receive instanceof ReceivePlanNode) {
+                // Temporarily strip send/receive pair
+                AbstractPlanNode distNode = receive.getChild(0).getChild(0);
+                receive.getChild(0).unlinkChild(distNode);
+
+                distinctAggNode.addAndLinkChild(distNode);
+                receive.getChild(0).addAndLinkChild(distinctAggNode);
+
+                pushedDown = true;
+            }
+        }
+
+        if (! pushedDown) {
             // DISTINCT will be a new GROUP BY node on top of the current root.
             distinctAggNode.addAndLinkChild(root);
             root = distinctAggNode;

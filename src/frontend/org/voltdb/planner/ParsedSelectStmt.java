@@ -123,7 +123,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     // It will store the final projection node schema for this plan if it is needed.
     // Calculate once, and use it everywhere else.
     private NodeSchema m_projectSchema = null;
-    private NodeSchema m_projectSchemaForDistinct = null;
+    private NodeSchema m_distinctProjectSchema = null;
 
     // It may has the consistent element order as the displayColumns
     public ArrayList<ParsedColInfo> m_aggResultColumns = new ArrayList<ParsedColInfo>();
@@ -131,9 +131,13 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     private ArrayList<ParsedColInfo> m_avgPushdownDisplayColumns = null;
     private ArrayList<ParsedColInfo> m_avgPushdownAggResultColumns = null;
+    private ArrayList<ParsedColInfo> m_avgPushdownGroupByColumns = null;
+    private ArrayList<ParsedColInfo> m_avgPushdownDistinctGroupByColumns = null;
     private ArrayList<ParsedColInfo> m_avgPushdownOrderColumns = null;
     private AbstractExpression m_avgPushdownHaving = null;
-    private NodeSchema m_avgPushdownNewAggSchema;
+    private NodeSchema m_avgPushdownProjectSchema;
+    private NodeSchema m_avgPushdownFinalProjectSchema;
+
     private boolean m_hasPartitionColumnInGroupby = false;
     private boolean m_hasAggregateDistinct = false;
     private boolean m_hasPartitionColumnInDistinctGroupby = false;
@@ -171,8 +175,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     @Override
     void parse(VoltXMLElement stmtNode) {
         String node;
-        if ((node = stmtNode.attributes.get("distinct")) != null)
+        if ((node = stmtNode.attributes.get("distinct")) != null) {
             m_distinct = Boolean.parseBoolean(node);
+        }
 
         VoltXMLElement limitElement = null, offsetElement = null, havingElement = null;
         VoltXMLElement displayElement = null, orderbyElement = null, groupbyElement = null;
@@ -202,25 +207,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         assert(displayElement != null);
         parseDisplayColumns(displayElement, false);
 
-        // process DISTINCT clause
-        if (m_distinct) {
-            if (groupbyElement == null) {
-                // DISTINCT without GROUP BY
-                // Hsql guards against HAVING without GROUP BY.
-                assert(havingElement == null);
-
-                // Tricky: rewrote DISTINCT without GROUP BY with GROUP BY clause
-                if ( ! hasAggregateExpression()) {
-                    // attribute "id" is the only one that differs from a real GROUP BY query
-                    groupbyElement = displayElement.duplicate();
-                }
-                // When it is table aggregate, it's also safe to drop DISTINCT.
-                m_distinct = false;
-            } else {
-                // DISTINCT with GROUP BY
-                parseDistinctGroupByColumns();
-            }
-        }
+        // rewrite DISTINCT
+        // function may need to change the groupbyElement by rewriting.
+        groupbyElement = processDistinct(displayElement, groupbyElement, havingElement);
 
         if (groupbyElement != null) {
             parseGroupByColumns(groupbyElement);
@@ -252,43 +241,52 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         // Prepare for the AVG push-down optimization only if it might be required.
         if (mayNeedAvgPushdown()) {
-            processAvgPushdownOptimization(displayElement, orderbyElement, groupbyElement, havingElement);
+            processAvgPushdownOptimization(displayElement, groupbyElement, havingElement, orderbyElement);
         }
 
         prepareMVBasedQueryFix();
     }
 
     private void processAvgPushdownOptimization (VoltXMLElement displayElement,
-            VoltXMLElement orderbyElement, VoltXMLElement groupbyElement, VoltXMLElement havingElement) {
+            VoltXMLElement groupbyElement, VoltXMLElement havingElement, VoltXMLElement orderbyElement) {
 
         ArrayList<ParsedColInfo> tmpDisplayColumns = m_displayColumns;
         m_displayColumns = new ArrayList<ParsedColInfo>();
         ArrayList<ParsedColInfo> tmpAggResultColumns = m_aggResultColumns;
         m_aggResultColumns = new ArrayList<ParsedColInfo>();
+        ArrayList<ParsedColInfo> tmpGroupByColumns = m_groupByColumns;
+        m_groupByColumns = new ArrayList<ParsedColInfo>();
+        ArrayList<ParsedColInfo> tmpDistinctGroupByColumns = m_distinctGroupByColumns;
+        m_distinctGroupByColumns = new ArrayList<ParsedColInfo>();
         ArrayList<ParsedColInfo> tmpOrderColumns = m_orderColumns;
         m_orderColumns = new ArrayList<ParsedColInfo>();
         AbstractExpression tmpHaving = m_having;
 
-
         boolean tmpHasComplexAgg = hasComplexAgg();
-        NodeSchema tmpNodeSchema = m_projectSchema;
-
-        // Make final schema output null to get a new schema when calling placeTVEsinColumns().
-        m_projectSchema = null;
+        NodeSchema tmpProjectSchema = m_projectSchema;
+        NodeSchema tmpDistinctProjectSchema = m_distinctProjectSchema;
 
         m_aggregationList = new ArrayList<AbstractExpression>();
         assert(displayElement != null);
         parseDisplayColumns(displayElement, true);
 
+        // rewrite DISTINCT
+        // function may need to change the groupbyElement by rewriting.
+        groupbyElement = processDistinct(displayElement, groupbyElement, havingElement);
+
         if (groupbyElement != null) {
+            parseGroupByColumns(groupbyElement);
             insertToColumnList(m_aggResultColumns, m_groupByColumns);
         }
-        if (orderbyElement != null) {
-            parseOrderColumns(orderbyElement, true);
-        }
+
         if (havingElement != null) {
             parseHavingExpression(havingElement, true);
         }
+
+        if (orderbyElement != null) {
+            parseOrderColumns(orderbyElement, true);
+        }
+
         m_aggregationList = null;
         fillUpAggResultColumns();
         placeTVEsinColumns();
@@ -296,14 +294,20 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // Switch them back
         m_avgPushdownDisplayColumns = m_displayColumns;
         m_avgPushdownAggResultColumns = m_aggResultColumns;
+        m_avgPushdownGroupByColumns = m_groupByColumns;
+        m_avgPushdownDistinctGroupByColumns = m_distinctGroupByColumns;
         m_avgPushdownOrderColumns = m_orderColumns;
-        m_avgPushdownNewAggSchema = m_projectSchema;
+        m_avgPushdownProjectSchema = m_projectSchema;
+        m_avgPushdownFinalProjectSchema = m_distinctProjectSchema;
         m_avgPushdownHaving = m_having;
 
         m_displayColumns = tmpDisplayColumns;
         m_aggResultColumns = tmpAggResultColumns;
+        m_groupByColumns = tmpGroupByColumns;
+        m_distinctGroupByColumns = tmpDistinctGroupByColumns;
         m_orderColumns = tmpOrderColumns;
-        m_projectSchema = tmpNodeSchema;
+        m_projectSchema = tmpProjectSchema;
+        m_distinctProjectSchema = tmpDistinctProjectSchema;
         m_hasComplexAgg = tmpHasComplexAgg;
         m_having = tmpHaving;
     }
@@ -314,8 +318,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     public void switchOptimalSuiteForAvgPushdown () {
         m_displayColumns = m_avgPushdownDisplayColumns;
         m_aggResultColumns = m_avgPushdownAggResultColumns;
+        m_groupByColumns = m_avgPushdownGroupByColumns;
+        m_distinctGroupByColumns = m_avgPushdownDistinctGroupByColumns;
         m_orderColumns = m_avgPushdownOrderColumns;
-        m_projectSchema = m_avgPushdownNewAggSchema;
+        m_projectSchema = m_avgPushdownProjectSchema;
+        m_distinctProjectSchema = m_avgPushdownFinalProjectSchema;
         m_hasComplexAgg = true;
         m_having = m_avgPushdownHaving;
     }
@@ -430,7 +437,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         int index = 0;
         for (ParsedColInfo col: m_aggResultColumns) {
             aggTableIndexMap.put(col.expression, index);
-            if ( col.alias == null) {
+            if (col.alias == null) {
                 // hack any unique string
                 col.alias = "$$_" + col.expression.getExpressionType().symbol() + "_$$_" + index;
             }
@@ -439,16 +446,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
 
         // Replace TVE for display columns
-        if (m_projectSchema == null) {
-            m_projectSchema = new NodeSchema();
-            for (ParsedColInfo col : m_displayColumns) {
-                AbstractExpression expr = col.expression;
-                if (hasComplexAgg()) {
-                    expr = col.expression.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
-                }
-                SchemaColumn schema_col = new SchemaColumn(col.tableName, col.tableAlias, col.columnName, col.alias, expr);
-                m_projectSchema.addColumn(schema_col);
+        m_projectSchema = new NodeSchema();
+        for (ParsedColInfo col : m_displayColumns) {
+            AbstractExpression expr = col.expression;
+            if (hasComplexAgg()) {
+                expr = col.expression.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
             }
+            SchemaColumn schema_col = new SchemaColumn(col.tableName, col.tableAlias, col.columnName, col.alias, expr);
+            m_projectSchema.addColumn(schema_col);
         }
 
         // Replace TVE for order by columns
@@ -898,9 +903,30 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
     }
 
-    private void parseDistinctGroupByColumns() {
+    private VoltXMLElement processDistinct(VoltXMLElement displayElement,
+            VoltXMLElement groupbyElement, VoltXMLElement havingElement) {
+        // process DISTINCT clause
+        if (! m_distinct) {
+            return groupbyElement;
+        }
+
+        // DISTINCT without GROUP BY
+        if (groupbyElement == null) {
+            // Hsql guards against HAVING without GROUP BY.
+            assert(havingElement == null);
+
+            // Tricky: rewrote DISTINCT without GROUP BY with GROUP BY clause
+            if ( ! hasAggregateExpression()) {
+                // attribute "id" is the only one that differs from a real GROUP BY query
+                groupbyElement = displayElement.duplicate();
+            }
+            // When it is table aggregate, it's also safe to drop DISTINCT.
+            m_distinct = false;
+            return groupbyElement;
+        }
+        // DISTINCT with GROUP BY
         m_distinctGroupByColumns = new ArrayList<ParsedColInfo>();
-        m_projectSchemaForDistinct = new NodeSchema();
+        m_distinctProjectSchema = new NodeSchema();
 
         // Iterate in the Display code
         for (ParsedColInfo col: m_displayColumns) {
@@ -917,8 +943,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             // ParsedColInfo, TVE, SchemaColumn, NodeSchema ??? Could it be more complicated ???
             SchemaColumn schema_col = new SchemaColumn(
                     col.tableName, col.tableAlias, col.columnName, col.alias, tve);
-            m_projectSchemaForDistinct.addColumn(schema_col);
+            m_distinctProjectSchema.addColumn(schema_col);
         }
+
+        return groupbyElement;
     }
 
     private void prepareLimitPlanNode () {
@@ -1231,12 +1259,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return m_hasAggregateExpression || isGrouped();
     }
 
-    public NodeSchema getFinalProjectionSchema () {
+    public NodeSchema getFinalProjectionSchema() {
         return m_projectSchema;
     }
 
-    public NodeSchema getFinalProjectionSchemaForDistinct () {
-        return m_projectSchemaForDistinct;
+    public NodeSchema getDistinctProjectionSchema() {
+        return m_distinctProjectSchema;
     }
 
     public boolean hasComplexGroupby() {
@@ -1276,7 +1304,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      * DISTINCT with GROUP BY is not tricky, it needs another GROUP BY on the original GROUP BY.
      * @return true if query has a DISTINCT with GROUP BY
      */
-    public boolean hasDistinctNonTricky() {
+    public boolean hasDistinctWithGroupBy() {
         return m_distinct;
     }
 
