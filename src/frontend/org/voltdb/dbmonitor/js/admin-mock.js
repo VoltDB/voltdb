@@ -1,6 +1,29 @@
 // JavaScript Document
 
 $( document ).ready(function() { 
+
+
+$(".tblshutdown").find(".edit").on("click",function(){	
+	var $this=$(this).closest("tr");
+		
+	var tdVal=$this.find("td:nth-child(3)");;
+	var val=tdVal.text();
+	
+	
+	if(val=="On"){
+		$this.find("td:nth-child(2)").find("div").removeClass("onIcon").addClass("offIcon");
+		tdVal.text("Off");
+		}else{
+			$this.find("td:nth-child(2)").find("div").removeClass("offIcon").addClass("onIcon");
+			tdVal.text("On");
+			}
+			
+		
+	
+	
+	
+	
+	})
    // Make Expandable Rows.
     $('tr.parent > td:first-child' || 'tr.parent > td:fourth-child')
         .css("cursor", "pointer")
