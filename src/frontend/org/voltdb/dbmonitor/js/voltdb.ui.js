@@ -1406,7 +1406,7 @@ var adjustGraphSpacing = function () {
         this.SORT_STATES = {
             NONE: 0,
             SORTING: 1,
-            SORTED: 2,
+            SORTED: 2
         };
 
         this.DASHBOARD_PROGRESS_STATES = {
