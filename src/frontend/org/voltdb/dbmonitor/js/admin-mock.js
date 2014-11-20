@@ -183,6 +183,7 @@ $(".tblshutdown").find(".edit").on("click",function(){
 				$("#txtHrtTimeOutSpan").hide();
 				$("#hrtTimeOutSpan").html($("#txtHrtTimeOutSpan").val())
 			}
+			$("td.heartbeattd span").toggleClass("unit");
 			e.preventDefault();
 		});
 		
@@ -192,6 +193,7 @@ $(".tblshutdown").find(".edit").on("click",function(){
 			$('#btnEditHrtTimeOut').show();
 			$('#btnSaveHrtTimeOut').hide();
 			$("#hrtTimeOutSpan").html($("#txtHrtTimeOutSpan").val())
+			$("td.heartbeattd span").toggleClass("unit");
 		});
 		
 		$('#autoSnapshotEdit').click(function(){

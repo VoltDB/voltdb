@@ -801,13 +801,12 @@ ul.adminClusterList li a:hover{color:#000;}
 .headerAdminContent h1 {padding: 15px 0 0 10px; font-weight:bold;}
 .adminPorts { margin:0 0 10px 0; background:#f3f3f3;}
 .adminTbl { margin:0; padding:0;}
-.adminTbl1 tr td { margin:0; padding:10px 25px 13px 10px; border-left:1px solid #CCCCCC;}
-.adminTbl2 tr td { margin:0; padding:15px 25px 15px 10px; border-left:1px solid #CCCCCC;}
-.onIcon			 { background-position: -266px -58px; width: 31px; height: 17px;}
-.offIcon 		 { background-position:-266px -106px; width: 31px; height: 17px;}
-.edit 			 { background-position: -226px -64px; width: 31px; height: 17px; display:inline-block;}
-.arrow 			 { background-position: -316px -102px;width: 10px; height: 17px;}
-
+.adminTbl1 tr td { margin:0; padding:10px 25px 13px 10px; border-left:none; border-right:none;}
+.adminTbl2 tr td { margin:0; padding:15px 25px 15px 10px; border-left:none; border-right:none;}
+.onIcon			 { background-position: -266px -58px; width: 31px; height: 17px; position:relative; top:4px;}
+.offIcon 		 { background-position:-266px -106px; width: 31px; height: 17px; position:relative; top:5px;}
+.edit 			 { background-position: -226px -64px; width: 31px; height: 17px; display:inline-block; position:relative; top:-3px;}
+.arrow 			 { background-position: -316px -102px;width: 10px; height: 17px}
 
 .adminTbl1 tr td.configLabel{ padding-left:35px; font-weight:bold; white-space:nowrap;}
 .adminTbl1 tr.hasSubLabel td.configLabel{ padding-left:10px; font-weight:bold;}
@@ -823,7 +822,7 @@ ul.adminClusterList li a:hover{color:#000;}
 .txt-bold{font-weight:bold;}
 
 .btn-gray { background-color:#999; cursor:pointer; padding:8px 10px; text-align:center; color:#fff; font:14px Arial, Helvetica, sans-serif; text-shadow:none; text-decoration:none; border-radius:0; border:none;} 
-input.exitableTxtBx{width:30px; position:relative; top:-5px; padding:2px 3px;}
+input.exitableTxtBx{width:30px; position:relative; top:6px; padding:2px 3px;}
 .tblSave { border:none}
 .tblSave tr{border:1px solid #CCCCCC;}
 .tblSave tr td { padding:10px;border:none;}
@@ -838,6 +837,8 @@ input.exitableTxtBx{width:30px; position:relative; top:-5px; padding:2px 3px;}
 #serverListWrapperAdmin{ padding:15px 16px 0 15px;}
 #serverListWrapperAdmin table.tblshutdown{margin-bottom:30px;}
 .confirmationInfo{font-weight: bold;}
+td.heartbeattd span{position:relative; top:auto;}
+td.heartbeattd span.unit{position:relative; top:7px;left:1px;}
 
 
 /*********************************************media Qu********************/
