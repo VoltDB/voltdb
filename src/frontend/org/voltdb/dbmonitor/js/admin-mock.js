@@ -181,8 +181,15 @@ $( document ).ready(function() {
         });
     });	
 	
-	// Save Cluster 
-	
+	// Hides opened serverlist
+		$(document).on('click', function (e) {
+			if ( !$(event.target).hasClass('adminIcons')) {
+				if ($(e.target).closest("#serverConfigAdmin").length === 0) {
+					$("#serverConfigAdmin").hide();
+				}
+			}
+		}); 
+		
 
    
 });
