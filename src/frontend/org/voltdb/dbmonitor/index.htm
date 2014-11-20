@@ -1043,7 +1043,7 @@
     <div id="savePop" style="display: none">
         <div class="overlay-title icon-alert">Save</div>
         <div class="clear"></div>
-        <div class="saveInfo" >
+        <div class="saveInfo">
             <div class="overlay-content ">
                       
                 <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblSave">
@@ -1062,7 +1062,7 @@
             </div>
        
             <div class="overlay-btns">
-                <a class="btn closeBtn" title="Save">Save</a> 		
+                <a class="btn saveBtn" title="Save">Save</a> 		
                 <a class="btn btn-gray closeBtn" title="Cancel">Cancel</a>
             </div>
       
@@ -1074,7 +1074,7 @@
             </div>
             <div class="overlay-btns">
                     <a class="btn closeBtn" title="Yes">Yes</a> 		
-                    <a class="btn btn-gray closeBtn" title="No">No</a>
+                    <a class="btn btn-gray confirmNoSave" title="No">No</a>
                 </div>
              </div>
     </div>
@@ -1084,7 +1084,7 @@
     <div id="restorePop" style="display: none">
         <div class="overlay-title icon-alert">Restore</div>
         <div class="clear"></div>
-        <div class="restoreConfirmation">
+        <div class="restoreInfo">
             <div class="overlay-content"> 
                 <div style="float:right; margin:0 0 15px 0"><a href="#" class="btn">Upload New</a></div>   
                 <div class="clear"></div>        
@@ -1107,22 +1107,18 @@
                 </table>
   
             </div>
-            <div class="overlay-btns"><a href="#restoreConfirmation" class="btn restoreConfirmation" id="btnDone" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Cancel">Cancel</a></div>
+            <div class="overlay-btns"><a class="btn restoreBtn" title="Ok">Restore</a> <a class="btn btn-gray closeBtn" title="Cancel">Cancel</a></div>
         </div>
-    </div>
-    <div class="saveConfirmation" style="display:none;" >
+        <div class="restoreConfirmation" style="display:none;" >
             <div class="overlay-content ">
                 <div class="confirmationInfo">Are you sure you want to Restore?</div> 
                 
             </div>
             <div class="overlay-btns">
                     <a class="btn closeBtn" title="Yes">Yes</a> 		
-                    <a class="btn btn-gray closeBtn" title="No">No</a>
+                    <a class="btn btn-gray confirmNoRestore" title="No">No</a>
                 </div>
-             </div><div class="confirmationInfo">
-        
-        
-
+             </div>
     </div>
     <!-- POPUP restorePop -->
      <!-- POPUP restorePop -->
