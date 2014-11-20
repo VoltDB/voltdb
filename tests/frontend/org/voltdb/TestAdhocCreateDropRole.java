@@ -69,8 +69,9 @@ public class TestAdhocCreateDropRole extends AdhocDDLTestBase {
                 );
         builder.addPartitionInfo("FOO", "ID");
         dbuilder.setUseDDLSchema(true);
+        // Use random caps in role names to check case-insensitivity
         dbuilder.addUsers(new DeploymentBuilder.UserInfo[]
-                {new DeploymentBuilder.UserInfo("admin", "admin", new String[] {"ADMINISTRATOR"})});
+                {new DeploymentBuilder.UserInfo("admin", "admin", new String[] {"Administrator"})});
         dbuilder.setSecurityEnabled(true);
         dbuilder.setEnableCommandLogging(false);
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
@@ -152,7 +153,8 @@ public class TestAdhocCreateDropRole extends AdhocDDLTestBase {
 
             threw = false;
             try {
-                adminClient.callProcedure("@AdHoc", "create role ADMINISTRATOR with ALLPROC");
+                // Use random caps in role names to check case-insensitivity
+                adminClient.callProcedure("@AdHoc", "create role aDministrator with ALLPROC");
             }
             catch (ProcCallException pce) {
                 assertTrue(pce.getMessage().contains("already exists"));
@@ -169,6 +171,61 @@ public class TestAdhocCreateDropRole extends AdhocDDLTestBase {
                 threw = true;
             }
             assertTrue("Shouldn't be able to 'create' USER role", threw);
+
+            threw = false;
+            try {
+                adminClient.callProcedure("@AdHoc", "drop role NEWROLE;");
+            }
+            catch (ProcCallException pce) {
+                threw = true;
+                pce.printStackTrace();
+            }
+            assertTrue("Shouldn't be able to drop role NEWROLE while there are users with it", threw);
+
+            dbuilder.removeUser("user");
+            dbuilder.writeXML(pathToDeployment);
+            try {
+                adminClient.updateApplicationCatalog(null, new File(pathToDeployment));
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Should be able to remove a user");
+            }
+
+            try {
+                adminClient.callProcedure("@AdHoc", "drop role NEWROLE;");
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Should be able to drop role NEWROLE now that there are no users");
+            }
+
+            threw = false;
+            try {
+                adminClient.callProcedure("@AdHoc", "drop role USER;");
+            }
+            catch (ProcCallException pce) {
+                threw = true;
+                assertTrue(pce.getMessage().contains("You may not drop the built-in role"));
+                pce.printStackTrace();
+            }
+            assertTrue("Shouldn't be able to drop role USER", threw);
+
+            // CHeck the administrator error message, there should end up being multiple
+            // reasons why we can't get rid of this role (like, we will require you to always
+            // have a user with this role)
+            threw = false;
+            try {
+                // Use random caps in role names to check case-insensitivity
+                adminClient.callProcedure("@AdHoc", "drop role adMinistrator;");
+            }
+            catch (ProcCallException pce) {
+                threw = true;
+                assertTrue(pce.getMessage().contains("You may not drop the built-in role"));
+                pce.printStackTrace();
+            }
+            assertTrue("Shouldn't be able to drop role ADMINISTRATOR", threw);
+
         }
         finally {
             teardownSystem();
