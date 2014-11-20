@@ -1414,18 +1414,9 @@ public class SQLCommand
                 // Print out welcome message
                 System.out.printf("SQL Command :: %s%s:%d\n", (user == "" ? "" : user + "@"), serverList, port);
 
-                while (true) {
-                    try {
-                        queries = getQuery(true);
-                        if (queries == null) {
-                            break;
-                        }
-                        for (String query : queries) {
-                            executeQuery(query);
-                        }
-                    }
-                    catch (Exception x) {
-                        stopOrContinue(x);
+                while ((queries = getQuery(true)) != null) {
+                    for (String query : queries) {
+                        executeQuery(query);
                     }
                 }
             }
