@@ -854,13 +854,13 @@ public class VoltCompiler {
     private void addDefaultRoles()
     {
         // admin
-        m_catalog.execute("add /clusters[cluster]/databases[database] groups ADMINISTRATOR");
-        Permission.setPermissionsInGroup(getCatalogDatabase().getGroups().get("ADMINISTRATOR"),
+        m_catalog.execute("add /clusters[cluster]/databases[database] groups administrator");
+        Permission.setPermissionsInGroup(getCatalogDatabase().getGroups().get("administrator"),
                                          Permission.getPermissionsFromAliases(Arrays.asList("ADMIN")));
 
         // user
-        m_catalog.execute("add /clusters[cluster]/databases[database] groups USER");
-        Permission.setPermissionsInGroup(getCatalogDatabase().getGroups().get("USER"),
+        m_catalog.execute("add /clusters[cluster]/databases[database] groups user");
+        Permission.setPermissionsInGroup(getCatalogDatabase().getGroups().get("user"),
                                          Permission.getPermissionsFromAliases(Arrays.asList("SQL", "ALLPROC")));
     }
 
@@ -1093,16 +1093,6 @@ public class VoltCompiler {
                         setGroupedTablePartitionColumn(mvi, partitionCol);
                     }
                 }
-            } else {
-                // Replicated tables case.
-                for (Index index: table.getIndexes()) {
-                    if (index.getAssumeunique()) {
-                        String exceptionMsg = String.format(
-                                "ASSUMEUNIQUE is not valid for replicated tables. Please use UNIQUE instead");
-                        throw new VoltCompilerException(exceptionMsg);
-                    }
-                }
-
             }
         }
 
