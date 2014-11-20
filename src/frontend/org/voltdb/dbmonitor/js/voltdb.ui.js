@@ -317,12 +317,11 @@ var loadPage = function (serverName, portid) {
     var refreshClusterHealth = function () {
         //loads cluster health and other details on the top banner
         
-        voltDbRenderer.GetSystemInformation(function (hostName) {
+        voltDbRenderer.GetSystemInformation(function () {
             voltDbRenderer.GetClusterHealth(function (htmlData, alertHtmlData) {
                 $("#clusterHealth").html(htmlData).show();
                 $("#memoryAlertsList").html(alertHtmlData);
             });
-            voltDbRenderer.configureRequestedHost(hostName);
             
             voltDbRenderer.mapNodeInformationByStatus(function (htmlData) {
                 
