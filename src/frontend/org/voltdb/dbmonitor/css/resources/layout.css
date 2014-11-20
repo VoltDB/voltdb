@@ -412,7 +412,7 @@ a.hideServers{background-position:5px -587px; padding-left:25px; float:left;}
 .slide-pop-title {background-color:#fbfbfb; line-height:42px; padding:4px 4px 4px 15px; border-bottom:1px solid #dbdbdb; font-size:16px; font-weight:bold; color:#3e3a3a;}
 .icon-server{ background-position:15px -48px; padding-left:45px;}
 .slide-pop-content{background:#fff; color:#484848;}
-#serverListWrapper, #serverListWrapperAdmin{ padding:15px 0 15px 15px;}
+#serverListWrapper{ padding:15px 0 15px 15px;}
 ul.servers-list{ padding-right:20px; margin-bottom:10px;}
 .popup_content ul.servers-list{padding-right:0;}
 ul.servers-list li{border-bottom:1px solid #dbdbdb; padding:15px 10px 15px 30px;}
@@ -835,6 +835,8 @@ input.exitableTxtBx{width:30px; position:relative; top:-5px; padding:2px 3px;}
 
 .tblshutdown tr {border:1px solid #CCCCCC;}
 .tblshutdown tr td  { border:none;}
+#serverListWrapperAdmin{ padding:15px 16px 15px 15px;}
+#serverListWrapperAdmin table.tblshutdown{margin-bottom:30px;}
 
 
 /*********************************************media Qu********************/

@@ -165,6 +165,19 @@ $( document ).ready(function() {
 			$("#txtRetained").val($("#retainedSpan").html())
 		});
 		
+	 // Filters servers list
+    $('#popServerSearchAdmin').keyup(function () {
+        var that = this;
+        $.each($('.tblshutdown tbody tr'),
+        function (i, val) {
+            if ($(val).text().indexOf($(that).val().toLowerCase()) == -1) {
+                $('.tblshutdown tbody tr').eq(i).hide();
+            } else {
+                $('.tblshutdown tbody tr').eq(i).show();
+            }
+        });
+    });	
 
+   
 });
 
