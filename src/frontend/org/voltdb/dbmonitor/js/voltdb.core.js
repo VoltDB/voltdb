@@ -452,7 +452,7 @@
 
 jQuery.extend({
     postJSON: function (url, formData, callback) {
-        if (verifyURIRequest(formData)) {
+        if (verifyURIRequest(formData, "@SystemInformation", "OVERVIEW")) {
             jQuery.ajax({
                 type: 'POST',
                 url: url,
@@ -472,14 +472,16 @@ jQuery.extend({
     }
 });
 
-var verifyURIRequest = function (uriData) {
+
+//common methods
+var verifyURIRequest = function (uriData,procedure,parameter) {
     var result = false;
 
     var decodedUri = decodeURIComponent(uriData);
     var procedureName = decodedUri.substring(decodedUri.indexOf('@', 0), decodedUri.indexOf('&', 0));
     var parameterName = (decodedUri.split("[\""))[1].substring();
     parameterName = parameterName.substring(0, parameterName.indexOf("]") - 1);
-    if (procedureName == "@SystemInformation" && parameterName == "OVERVIEW")
+    if (procedureName == procedure && parameterName == parameter)
         result = true;
 
     return result;
@@ -489,7 +491,6 @@ var validateIPAddress = function (value) {
     if (/^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(value)) {
         return (true);
     }
-
     return (false);
 
 
