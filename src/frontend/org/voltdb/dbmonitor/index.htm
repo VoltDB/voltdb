@@ -1043,24 +1043,40 @@
     <div id="savePop" style="display: none">
         <div class="overlay-title icon-alert">Save</div>
         <div class="clear"></div>
-        <div class="overlay-content">            
-          <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblSave">
-  <tr>
-    <td>Directory:</td>
-    <td>D:</td>
-    <td><a href="#" class="edit" title="Edit">&nbsp;</a></td>
-  </tr>
-  <tr>
-    <td colspan="2">Snapshot Name:</td>
-    <td><input type="text" placeholder="VEMMANUAL_2014.11.13.21.19.24" /></td>
-  </tr>
-</table>
-
+        <div class="saveInfo" >
+            <div class="overlay-content ">
+                      
+                <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblSave">
+                    <tr>
+                        <td>Directory:</td>
+                        <td>D:</td>
+                        <td><a href="#" class="edit" title="Edit">&nbsp;</a></td>
+                    </tr>
+                    <tr>
+                        <td colspan="2">Snapshot Name:</td>
+                        <td><input type="text" placeholder="VEMMANUAL_2014.11.13.21.19.24" /></td>
+                    </tr>
+                </table>
+             
+           
+            </div>
+       
+            <div class="overlay-btns">
+                <a class="btn closeBtn" title="Save">Save</a> 		
+                <a class="btn btn-gray closeBtn" title="Cancel">Cancel</a>
+            </div>
+      
         </div>
-        <div class="overlay-btns">
-        <a href="#saveConfirmation" class="btn saveConfirmation" title="Save">Save</a> 		
-        <a class="btn btn-gray closeBtn" title="Cancel">Cancel</a>
-        </div>
+        <div class="saveConfirmation" style="display:none;" >
+            <div class="overlay-content ">
+                <div class="confirmationInfo">Are you sure you want to save?</div> 
+                
+            </div>
+            <div class="overlay-btns">
+                    <a class="btn closeBtn" title="Yes">Yes</a> 		
+                    <a class="btn btn-gray closeBtn" title="No">No</a>
+                </div>
+             </div>
     </div>
     <!-- POPUP savePop -->
     
@@ -1068,35 +1084,53 @@
     <div id="restorePop" style="display: none">
         <div class="overlay-title icon-alert">Restore</div>
         <div class="clear"></div>
-        <div class="overlay-content"> 
-        <div style="float:right; margin:0 0 15px 0"><a href="#" class="btn">Upload New</a></div>   
-        <div class="clear"></div>        
-          <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblRestore">
-  <tr>
-    <th align="left">Snapshot Name</th>
-    <th align="left" >Directory</th>
-    <th>&nbsp;</th>
-  </tr>
-  <tr>
-    <td>VEMMANUAL_2014.11.13.21.19.24</td>
-    <td>c:</td>
-     <td><input type="checkbox"></td>
-  </tr>
-  <tr>
-    <td>VEMMANUAL_2014.11.14.06.03.20</td>
-    <td>d:</td>
-    <td><input type="checkbox"></td>
-  </tr>
-</table>
+        <div class="restoreConfirmation">
+            <div class="overlay-content"> 
+                <div style="float:right; margin:0 0 15px 0"><a href="#" class="btn">Upload New</a></div>   
+                <div class="clear"></div>        
+                <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblRestore">
+                    <tr>
+                        <th align="left">Snapshot Name</th>
+                        <th align="left" >Directory</th>
+                        <th>&nbsp;</th>
+                    </tr>
+                    <tr>
+                        <td>VEMMANUAL_2014.11.13.21.19.24</td>
+                        <td>c:</td>
+                        <td><input type="checkbox"></td>
+                    </tr>
+                    <tr>
+                        <td>VEMMANUAL_2014.11.14.06.03.20</td>
+                        <td>d:</td>
+                        <td><input type="checkbox"></td>
+                    </tr>
+                </table>
   
+            </div>
+            <div class="overlay-btns"><a href="#restoreConfirmation" class="btn restoreConfirmation" id="btnDone" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Cancel">Cancel</a></div>
         </div>
-        <div class="overlay-btns"><a href="#restoreConfirmation" class="btn restoreConfirmation" id="btnDone" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Cancel">Cancel</a></div>
+    </div>
+    <div class="saveConfirmation" style="display:none;" >
+            <div class="overlay-content ">
+                <div class="confirmationInfo">Are you sure you want to Restore?</div> 
+                
+            </div>
+            <div class="overlay-btns">
+                    <a class="btn closeBtn" title="Yes">Yes</a> 		
+                    <a class="btn btn-gray closeBtn" title="No">No</a>
+                </div>
+             </div><div class="confirmationInfo">
+        
+        
+
     </div>
     <!-- POPUP restorePop -->
      <!-- POPUP restorePop -->
     <div id="HrtTimeOutPopup" style="display: none">
         <div class="overlay-title icon-alert">Heartbeat time out</div>
         <div class="clear"></div>
+        
+       
         <div class="overlay-content"> 
        <p class="txt-bold">Do you want to save the value?</p>
                 </div>

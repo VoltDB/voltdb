@@ -837,6 +837,10 @@ input.exitableTxtBx{width:30px; position:relative; top:-5px; padding:2px 3px;}
 .tblshutdown tr td  { border:none;}
 #serverListWrapperAdmin{ padding:15px 16px 15px 15px;}
 #serverListWrapperAdmin table.tblshutdown{margin-bottom:30px;}
+.confirmationInfo
+{
+    font-weight: bold;
+}
 
 
 /*********************************************media Qu********************/
