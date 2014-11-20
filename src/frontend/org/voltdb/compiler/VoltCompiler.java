@@ -494,7 +494,8 @@ public class VoltCompiler {
         FilteredCatalogDiffEngine diffEng = new FilteredCatalogDiffEngine(origCatalog, autoGenCatalog);
         String diffCmds = diffEng.commands();
         if (diffCmds != null && !diffCmds.equals("")) {
-            VoltDB.crashLocalVoltDB("Catalog Verification from Generated DDL failed!");
+            VoltDB.crashLocalVoltDB("Catalog Verification from Generated DDL failed! " +
+                    "The offending diffcmds were: " + diffCmds);
         }
         else {
             Log.info("Catalog verification completed successfuly.");
@@ -850,6 +851,10 @@ public class VoltCompiler {
     /**
      * Create default roles. These roles cannot be removed nor overridden in the DDL.
      * Make sure to omit these roles in the generated DDL in {@link org.voltdb.utils.CatalogSchemaTools}
+     * Also, make sure to prevent them from being dropped by DROP ROLE in the DDLCompiler
+     * !!!
+     * IF YOU ADD A THIRD ROLE TO THE DEFAULTS, IT'S TIME TO BUST THEM OUT INTO A CENTRAL
+     * LOCALE AND DO ALL THIS MAGIC PROGRAMATICALLY --izzy 11/20/2014
      */
     private void addDefaultRoles()
     {

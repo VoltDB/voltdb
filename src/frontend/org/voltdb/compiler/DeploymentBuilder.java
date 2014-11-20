@@ -206,6 +206,14 @@ public class DeploymentBuilder {
         }
     }
 
+    public void removeUser(String userName) {
+        for (UserInfo info : m_users) {
+            if (info.name.equals(userName)) {
+                m_users.remove(info);
+            }
+        }
+    }
+
     public void setHTTPDPort(int port) {
         m_httpdPortNo = port;
     }

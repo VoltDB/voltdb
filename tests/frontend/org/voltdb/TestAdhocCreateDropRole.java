@@ -169,6 +169,60 @@ public class TestAdhocCreateDropRole extends AdhocDDLTestBase {
                 threw = true;
             }
             assertTrue("Shouldn't be able to 'create' USER role", threw);
+
+            threw = false;
+            try {
+                adminClient.callProcedure("@AdHoc", "drop role NEWROLE;");
+            }
+            catch (ProcCallException pce) {
+                threw = true;
+                pce.printStackTrace();
+            }
+            assertTrue("Shouldn't be able to drop role NEWROLE while there are users with it", threw);
+
+            dbuilder.removeUser("user");
+            dbuilder.writeXML(pathToDeployment);
+            try {
+                adminClient.updateApplicationCatalog(null, new File(pathToDeployment));
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Should be able to remove a user");
+            }
+
+            try {
+                adminClient.callProcedure("@AdHoc", "drop role NEWROLE;");
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Should be able to drop role NEWROLE now that there are no users");
+            }
+
+            threw = false;
+            try {
+                adminClient.callProcedure("@AdHoc", "drop role USER;");
+            }
+            catch (ProcCallException pce) {
+                threw = true;
+                assertTrue(pce.getMessage().contains("You may not drop the built-in role"));
+                pce.printStackTrace();
+            }
+            assertTrue("Shouldn't be able to drop role USER", threw);
+
+            // CHeck the administrator error message, there should end up being multiple
+            // reasons why we can't get rid of this role (like, we will require you to always
+            // have a user with this role)
+            threw = false;
+            try {
+                adminClient.callProcedure("@AdHoc", "drop role ADMINISTRATOR;");
+            }
+            catch (ProcCallException pce) {
+                threw = true;
+                assertTrue(pce.getMessage().contains("You may not drop the built-in role"));
+                pce.printStackTrace();
+            }
+            assertTrue("Shouldn't be able to drop role ADMINISTRATOR", threw);
+
         }
         finally {
             teardownSystem();
