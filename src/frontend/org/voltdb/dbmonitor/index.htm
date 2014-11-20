@@ -967,7 +967,10 @@
 </table>
 
         </div>
-        <div class="overlay-btns"><a class="btn closeBtn" id="btnDone" title="Save">Save</a> <a class="btn btn-gray closeBtn" title="Cancel">Cancel</a></div>
+        <div class="overlay-btns">
+        <a href="#saveConfirmation" class="btn saveConfirmation" title="Save">Save</a> 		
+        <a class="btn btn-gray closeBtn" title="Cancel">Cancel</a>
+        </div>
     </div>
     <!-- POPUP savePop -->
     
@@ -997,7 +1000,7 @@
 </table>
   
         </div>
-        <div class="overlay-btns"><a class="btn closeBtn" id="btnDone" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Cancel">Cancel</a></div>
+        <div class="overlay-btns"><a href="#restoreConfirmation" class="btn restoreConfirmation" id="btnDone" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Cancel">Cancel</a></div>
     </div>
     <!-- POPUP restorePop -->
      <!-- POPUP restorePop -->
@@ -1010,6 +1013,29 @@
         <div class="overlay-btns"><a class="btn closeBtn" id="btnDone" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Cancel">Cancel</a></div>
     </div>
     <!-- POPUP restorePop -->
+    
+    
+      <!-- POPUP saveConfirmationPopup -->
+    <div id="saveConfirmation" style="display: none">
+        <div class="overlay-title icon-alert">Save Confirmation</div>
+        <div class="clear"></div>
+        <div class="overlay-content"> 
+       <p class="txt-bold">Do you want to save the value?</p>
+                </div>
+        <div class="overlay-btns"><a class="btn closeBtn" id="btnDone" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Cancel">Cancel</a></div>
+    </div>
+    <!-- POPUP saveConfirmationPopup -->
+    
+    <!-- POPUP RestoreConfirmationPopup -->
+    <div id="saveConfirmation" style="display: none">
+        <div class="overlay-title icon-alert">Restore Confirmation</div>
+        <div class="clear"></div>
+        <div class="overlay-content"> 
+       <p class="txt-bold">Do you want to save the value?</p>
+                </div>
+        <div class="overlay-btns"><a class="btn closeBtn" id="btnDone" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Cancel">Cancel</a></div>
+    </div>
+    <!-- POPUP RestoreConfirmationPopup -->
   
 
     <!-- Loading -->

@@ -100,6 +100,10 @@ $( document ).ready(function() {
 		 $('#shutdownPopupPopConfirmation').popup();
 		  $('#shutdownPopupPopConfirmation1').popup();
 		  $('#shutdownClusterPopupPopConfirmation').popup();
+		  $('.saveConfirmation').popup();
+		  $('.restoreConfirmation').popup();
+		  
+		  
 	
 	
 		 
