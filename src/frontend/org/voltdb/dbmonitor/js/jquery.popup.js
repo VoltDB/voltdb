@@ -328,7 +328,12 @@
 		        saveSnapshotBtn.unbind('click');
 		        saveSnapshotBtn.bind('click', function () {
 		            p.o.saveSnaps();
-					p.close();
+		            p.close();
+		            
+		            var chkAutoSnapshot = $("#chkAutoSnapshot");
+		            chkAutoSnapshot.hide();
+		            var iconCss = chkAutoSnapshot.is(":checked") ? "onIcon" : "offIcon";
+		            $("#autoSnapshotIcon").removeClass().addClass(iconCss).show();
 		    });
 		    }
 			

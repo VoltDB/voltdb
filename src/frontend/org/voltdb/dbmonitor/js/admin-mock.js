@@ -151,18 +151,21 @@ $( document ).ready(function() {
 		$('#autoSnapshotEdit').click(function(){
 			var parent = $(this).parent().parent();
             parent.siblings('.child-' + parent.attr("id")).show();
-			parent.find(".labelCollapsed").addClass("labelExpanded");
+            parent.find(".labelCollapsed").addClass("labelExpanded");
+
+            $("#autoSnapshotIcon").hide();
+            $("#chkAutoSnapshot").show();
 			
 			$("#autoSnapshotSave").show();
 			$("#autoSnapshotEdit").hide();
 			
 			$("#frequencySpan").hide();
 			$("#txtFrequency").show();
-			$("#txtFrequency").val($("#frequencySpan").html())
+		    $("#txtFrequency").val($("#frequencySpan").html());
 			
 			$("#retainedSpan").hide();
 			$("#txtRetained").show();
-			$("#txtRetained").val($("#retainedSpan").html())
+		    $("#txtRetained").val($("#retainedSpan").html());
 		});
 		
 	 // Filters servers list
