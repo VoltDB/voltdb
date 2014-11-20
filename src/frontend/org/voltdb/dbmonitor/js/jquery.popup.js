@@ -312,7 +312,31 @@
 		            p.close();
 		        });
 		    }
-
+			
+			//admin
+			var closeBtn = $(".closeBtn");
+		    if (closeBtn != undefined) {
+		        closeBtn.unbind('click');
+		        closeBtn.bind('click', function () {
+		            p.close();
+		    });
+		    }
+			
+			//admin
+			var saveSnapshotBtn = $("#btnSaveSnapshot");
+		    if (saveSnapshotBtn != undefined) {
+		        saveSnapshotBtn.unbind('click');
+		        saveSnapshotBtn.bind('click', function () {
+		            p.o.saveSnaps();
+		            p.close();
+		            
+		            var chkAutoSnapshot = $("#chkAutoSnapshot");
+		            chkAutoSnapshot.hide();
+		            var iconCss = chkAutoSnapshot.is(":checked") ? "onIcon" : "offIcon";
+		            $("#autoSnapshotIcon").removeClass().addClass(iconCss).show();
+		    });
+		    }
+			
 			// Get the content
 			content = ( content === undefined || content === '#' )
 				? p.o.content
