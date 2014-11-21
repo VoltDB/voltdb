@@ -628,24 +628,30 @@ public abstract class CatalogUtil {
      * @return Returns true if the deployment file is valid.
      */
     private static boolean validateDeployment(Catalog catalog, DeploymentType deployment) {
-        if (deployment.getUsers() == null) {
-            if (deployment.getSecurity() != null && deployment.getSecurity().isEnabled()) {
-                hostLog.error("Cannot enable security without defining users in the deployment file.");
+        if (deployment.getSecurity() != null && deployment.getSecurity().isEnabled()) {
+            if (deployment.getUsers() == null) {
+                hostLog.error("Cannot enable security without defining at least one user in the built-in ADMINISTRATOR role in the deployment file.");
                 return false;
             }
-            return true;
+
+            boolean foundAdminUser = false;
+            for (UsersType.User user : deployment.getUsers().getUser()) {
+                if (user.getGroups() == null && user.getRoles() == null)
+                    continue;
+
+                for (String group : mergeUserRoles(user)) {
+                    if (group.equalsIgnoreCase("ADMINISTRATOR")) {
+                        foundAdminUser = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!foundAdminUser) {
+                hostLog.error("Cannot enable security without defining at least one user in the built-in ADMINISTRATOR role in the deployment file.");
+                return false;
+            }
         }
-
-        // This is dead code ATM but I'm going to use it to check for ADMINISTRATOR in
-        // a future commit --izzy
-        for (UsersType.User user : deployment.getUsers().getUser()) {
-            if (user.getGroups() == null && user.getRoles() == null)
-                continue;
-
-            //for (String group : mergeUserRoles(user)) {
-            //}
-        }
-
         return true;
     }
 

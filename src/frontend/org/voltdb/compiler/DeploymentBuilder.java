@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.StringWriter;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 
 import javax.xml.bind.JAXBContext;
@@ -207,9 +208,11 @@ public class DeploymentBuilder {
     }
 
     public void removeUser(String userName) {
-        for (UserInfo info : m_users) {
+        Iterator<UserInfo> iter = m_users.iterator();
+        while (iter.hasNext()) {
+            UserInfo info = iter.next();
             if (info.name.equals(userName)) {
-                m_users.remove(info);
+                iter.remove();
             }
         }
     }
