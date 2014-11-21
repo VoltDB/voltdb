@@ -192,8 +192,8 @@ Running script files -----------------------------------------------------------
   contain one or several FILE statements. If the included file(s) perform a
   logical loop, the command utility will fail.
 
-+ Interactive mode commands such as RECALL, QUIT, and EXIT are ignored when
-  found in a script file.
++ Interactive mode commands such as RECALL, QUIT, and EXIT should not be used
+  in a script file.
 
 
 Controlling output format ------------------------------------------------------
