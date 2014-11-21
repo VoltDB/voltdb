@@ -143,9 +143,10 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     assert((targetTable == dynamic_cast<PersistentTable*>(targetTable)) ||
             (targetTable == dynamic_cast<StreamedTable*>(targetTable)));
 
-    PersistentTable* persistentTable = dynamic_cast<PersistentTable*>(targetTable);
+    PersistentTable* upsertTable = NULL;
     if (m_isUpsert) {
-        assert(persistentTable != NULL);
+        upsertTable = dynamic_cast<PersistentTable*>(targetTable);
+        assert(upsertTable != NULL);
     }
     TableTuple upsertTuple = TableTuple(targetTable->schema());
 
@@ -163,10 +164,6 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     for (it = m_nowFields.begin(); it != m_nowFields.end(); ++it) {
         templateTuple.setNValue(*it, NValue::callConstant<FUNC_CURRENT_TIMESTAMP>());
     }
-
-    bool isMultiRowInsert = m_node->isMultiRowInsert();
-    bool hasPurgeFragment = persistentTable != NULL ?
-        persistentTable->hasPurgeFragment() : false;
 
     //
     // An insert is quite simple really. We just loop through our m_inputTable
@@ -224,49 +221,8 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
             if (!isLocal) continue;
         }
 
-        bool isRealInsert = true;
-        if (m_isUpsert) {
-            // upsert execution logic
-            assert(persistentTable->primaryKeyIndex() != NULL);
-            TableTuple existsTuple = persistentTable->lookupTuple(templateTuple);
 
-            if (! existsTuple.isNullTuple()) {
-                // tuple exists already, try to update the tuple instead
-                upsertTuple.move(templateTuple.address());
-                TableTuple &tempTuple = persistentTable->getTempTupleInlined(upsertTuple);
-
-                if (!persistentTable->updateTupleWithSpecificIndexes(existsTuple, tempTuple,
-                        persistentTable->allIndexes())) {
-                    VOLT_INFO("Failed to update existsTuple from table '%s'",
-                            persistentTable->name().c_str());
-                    return false;
-                }
-
-                // This is not a real insert, it's an update.
-                isRealInsert = false;
-            }
-        }
-
-        if (isRealInsert) {
-
-            if (hasPurgeFragment && !isMultiRowInsert) {
-                int tupleLimit = persistentTable->tupleLimit();
-                int numTuples = persistentTable->visibleTupleCount();
-                assert(numTuples <= tupleLimit);
-                if (tupleLimit == numTuples) {
-                    // Next insert will fail: run the purge fragment
-                    // before trying to insert.
-                    int rc = m_engine->executePurgeFragment(persistentTable);
-                    if (rc != ENGINE_ERRORCODE_SUCCESS) {
-                        VOLT_ERROR("Unexpected error while attempting to purge "
-                                   "rows from table %s.  Row limit: %d",
-                                   persistentTable->name().c_str(),
-                                   tupleLimit);
-                        return false;
-                    }
-                }
-            }
-
+        if (! m_isUpsert) {
             // try to put the tuple into the target table
             if (!targetTable->insertTuple(templateTuple)) {
                 VOLT_ERROR("Failed to insert tuple from input table '%s' into"
@@ -275,9 +231,36 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
                         targetTable->name().c_str());
                 return false;
             }
+
+        } else {
+            // upsert execution logic
+            assert(upsertTable->primaryKeyIndex() != NULL);
+            TableTuple existsTuple = upsertTable->lookupTuple(templateTuple);
+
+            if (existsTuple.isNullTuple()) {
+                // try to put the tuple into the target table
+                if (!upsertTable->insertTuple(templateTuple)) {
+                    VOLT_ERROR("Failed to insert tuple from input table '%s' into"
+                            " target table '%s'",
+                            m_inputTable->name().c_str(),
+                            upsertTable->name().c_str());
+                    return false;
+                }
+            } else {
+                // tuple exists already, try to update the tuple instead
+                upsertTuple.move(templateTuple.address());
+                TableTuple &tempTuple = upsertTable->getTempTupleInlined(upsertTuple);
+
+                if (!upsertTable->updateTupleWithSpecificIndexes(existsTuple, tempTuple,
+                        upsertTable->allIndexes())) {
+                    VOLT_INFO("Failed to update existsTuple from table '%s'",
+                            upsertTable->name().c_str());
+                    return false;
+                }
+            }
         }
 
-        // successfully inserted or updated
+        // successfully inserted
         modifiedTuples++;
     }
 
