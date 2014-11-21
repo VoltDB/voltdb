@@ -43,9 +43,7 @@ import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestGroupByComplexSuite extends RegressionSuite {
 
-    private final static String[] procs = {"R1.insert", "P1.insert", "P2.insert", "P3.insert"};
-//    private final static String [] tbs = {"R1","P1","P2","P3"};
-    private final static String [] tbs = {"R1"};
+    private final static String [] tbs = {"R1","P1","P2","P3"};
 
     private void loadData(boolean extra) throws IOException, ProcCallException {
         Client client = this.getClient();
@@ -59,16 +57,17 @@ public class TestGroupByComplexSuite extends RegressionSuite {
 
         // Insert records into the table.
         // id, wage, dept, rate
-        for (String tb: procs) {
-            client.callProcedure(tb, 1,  10,  1 , "2013-06-18 02:00:00.123457");
-            client.callProcedure(tb, 2,  20,  1 , "2013-07-18 02:00:00.123457");
-            client.callProcedure(tb, 3,  30,  1 , "2013-07-18 10:40:01.123457");
-            client.callProcedure(tb, 4,  40,  2 , "2013-08-18 02:00:00.123457");
-            client.callProcedure(tb, 5,  50,  2 , "2013-09-18 02:00:00.123457");
+        for (String tb: tbs) {
+            String proc = tb + ".insert";
+            client.callProcedure(proc, 1,  10,  1 , "2013-06-18 02:00:00.123457");
+            client.callProcedure(proc, 2,  20,  1 , "2013-07-18 02:00:00.123457");
+            client.callProcedure(proc, 3,  30,  1 , "2013-07-18 10:40:01.123457");
+            client.callProcedure(proc, 4,  40,  2 , "2013-08-18 02:00:00.123457");
+            client.callProcedure(proc, 5,  50,  2 , "2013-09-18 02:00:00.123457");
 
             if (extra) {
-                cr = client.callProcedure(tb, 6,  10,  2 , "2013-07-18 02:00:00.123457");
-                cr = client.callProcedure(tb, 7,  40,  2 , "2013-09-18 02:00:00.123457");
+                cr = client.callProcedure(proc, 6,  10,  2 , "2013-07-18 02:00:00.123457");
+                cr = client.callProcedure(proc, 7,  40,  2 , "2013-09-18 02:00:00.123457");
             }
         }
     }
@@ -125,7 +124,7 @@ public class TestGroupByComplexSuite extends RegressionSuite {
         }
     }
 
-    public void notestComplexAggsSuite() throws IOException, ProcCallException {
+    public void testComplexAggsSuite() throws IOException, ProcCallException {
 
         complexAggs();
         complexAggsOrderbySuite();
@@ -293,7 +292,7 @@ public class TestGroupByComplexSuite extends RegressionSuite {
         }
     }
 
-    public void notestcomplexGroupbySuite() throws IOException, ProcCallException, ParseException{
+    public void testcomplexGroupbySuite() throws IOException, ProcCallException, ParseException{
         complexGroupby();
         complexGroupbyDistinctLimit();
         complexGroupbyOrderbySuite();
@@ -684,7 +683,7 @@ public class TestGroupByComplexSuite extends RegressionSuite {
         }
     }
 
-    public void notestOtherCases() throws IOException, ProcCallException {
+    public void testOtherCases() throws IOException, ProcCallException {
         strangeCasesAndOrderby();
 
         ENG4285();
@@ -942,7 +941,7 @@ public class TestGroupByComplexSuite extends RegressionSuite {
         }
     }
 
-    public void notestAggregateOnJoin() throws IOException, ProcCallException {
+    public void testAggregateOnJoin() throws IOException, ProcCallException {
         loadData(false);
 
         Client client = this.getClient();
@@ -960,7 +959,7 @@ public class TestGroupByComplexSuite extends RegressionSuite {
 
     }
 
-    public void notestHavingClause() throws IOException, ProcCallException {
+    public void testHavingClause() throws IOException, ProcCallException {
         System.out.println("test Having clause...");
         loadData(false);
 
@@ -1098,34 +1097,32 @@ public class TestGroupByComplexSuite extends RegressionSuite {
             sql = "SELECT wage, count(*) from " + tb + " GROUP BY abs(dept-2), wage "
                     + " ORDER BY 1, 2;";
             vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-            validateTableOfLongs(vt, new long[][] {{10,1}, {10,1}, {20,1}, {30,1}, {40,1}, {50,1}});
+            validateTableOfLongs(vt, new long[][] {{10,1}, {10,1}, {20,1}, {30,1}, {40,2}, {50,1}});
 
             // query with one column distinct
             sql = "SELECT DISTINCT count(*) from " + tb + " GROUP BY abs(dept-2), wage "
-                    + " ORDER BY 1, 2;";
+                    + " ORDER BY 1;";
             vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-            validateTableOfScalarLongs(vt, new long[]{1});
+            validateTableOfScalarLongs(vt, new long[]{1, 2});
 
             // query with multiple columns distinct
             sql = "SELECT DISTINCT wage, count(*) from " + tb + " GROUP BY abs(dept-2), wage "
                     + " ORDER BY 1, 2;";
             vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-            validateTableOfLongs(vt, new long[][] {{10,1}, {20,1}, {30,1}, {40,1}, {50,1}});
+            validateTableOfLongs(vt, new long[][] {{10,1}, {20,1}, {30,1}, {40,2}, {50,1}});
 
             // query with multiple expressions distinct
             sql = "SELECT DISTINCT wage, count(*)+1 from " + tb + " GROUP BY abs(dept-2), wage "
                     + " ORDER BY 1, 2;";
             vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-            validateTableOfLongs(vt, new long[][] {{10,2}, {20,2}, {30,2}, {40,2}, {50,2}});
+            validateTableOfLongs(vt, new long[][] {{10,2}, {20,2}, {30,2}, {40,3}, {50,2}});
         }
 
     }
 
-
     //
     // Suite builder boilerplate
     //
-
     public TestGroupByComplexSuite(String name) {
         super(name);
     }

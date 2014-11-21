@@ -2142,7 +2142,11 @@ public class PlanAssembler {
         boolean canPushdownDistinctAgg = m_parsedSelect.hasPartitionColumnInDistinctGroupby();
         boolean pushedDown = false;
 
-        canPushdownDistinctAgg = false; // disable pushdown
+        //
+        // disable pushdown, DISTINCT push down turns out complex
+        //
+        //
+        canPushdownDistinctAgg = false;
 
         if (canPushdownDistinctAgg && !m_parsedSelect.m_mvFixInfo.needed()) {
             assert(m_parsedSelect.hasPartitionColumnInGroupby());
