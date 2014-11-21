@@ -93,6 +93,7 @@ function alertNodeClicked(obj) {
         var maxLatencyIndex = 0;
         var avgLatencyIndex = 0;
         var perExecutionIndex = 0;
+        var gCurrentServer = "";
 
         var tableNameIndex = 5;
         var partitionIndex = 4;
@@ -297,7 +298,9 @@ function alertNodeClicked(obj) {
             VoltDBService.GetSystemInformation(function (connection) {
                 populateSystemInformation(connection);
                 getMemoryDetails(connection, systemMemory);
-                onInformationLoaded(connection.hostName);
+                if (gCurrentServer == "")
+                    configureRequestedHost(VoltDBCore.hostIP);
+                onInformationLoaded();
             });
         };
 
@@ -448,36 +451,27 @@ function alertNodeClicked(obj) {
 
             callback(html, alertHtml);
         };
-        
-        this.configureRequestedHost = function (hostName) {
-            var currentServer = "";
-            var counter = 0;
-            
-            if (validateIPAddress(hostName)) {
-                //loop through cluster Information and get current server ip
-                $.each(systemOverview, function (id, val) {
-                    if (val["IPADDRESS"] == hostName) {
-                        currentServer = val["HOSTNAME"];
-                        saveCookie("currentServer", val["HOSTNAME"]);
-                        return false;
 
-                    }
+        var configureRequestedHost = function(hostName) {
 
-                });
+            $.each(systemOverview, function(id, val) {
+                if (val["IPADDRESS"] == hostName) {
+                    gCurrentServer = val["HOSTNAME"];
+                    saveCookie("currentServer", val["HOSTNAME"]);
+                    return false;
 
-            }
-            else {
-                $.each(systemOverview, function (id, val) {
+                }
+                return true;
+            });
+
+            if (gCurrentServer == "") {
+                $.each(systemOverview, function(id, val) {
                     if (val["CLUSTERSTATE"] == "RUNNING") {
-                        if (counter == 0)
-                            currentServer = val["HOSTNAME"];
-                    }
-                    if (val["HOSTNAME"] == hostName) {
-                        currentServer = val["HOSTNAME"];
+                        gCurrentServer = val["HOSTNAME"];
                         saveCookie("currentServer", val["HOSTNAME"]);
                         return false;
                     }
-                    counter++;
+                    return true;
                 });
             }
 
@@ -863,16 +857,13 @@ function alertNodeClicked(obj) {
                     /*************************************************************************
                     //CLUSTERSTATE implies if server is running or joining
                     **************************************************************************/
-                    if (hostName != null && currentServerHtml == "" && val["CLUSTERSTATE"] == "RUNNING") {
+                    if (hostName != null && currentServer == hostName && val["CLUSTERSTATE"] == "RUNNING") {
                         if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
                             htmlMarkup = "<li class=\"active monitoring\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\"  href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
-                            currentServerHtml = hostName;
 
                         } else {
                             htmlMarkup = "<li class=\"active monitoring\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
-                            currentServerHtml = hostName;
                         }
-
                     } else if (hostName != null && currentServer != hostName &&  val["CLUSTERSTATE"] == "RUNNING") {
                         if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
                             htmlMarkup = "<li class=\"active\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span><span class=\"hostIdHidden\" style=\"display:none\">" + systemMemory[hostName]["HOST_ID"] + "</span></li>";
@@ -2234,10 +2225,8 @@ $(function () {
 });
 
 $(window).resize(function () {
-    //alert("resized");
     var windowWidth = $(window).width();
     if (windowWidth > 699) {
-        //alert(windowWidth);
         $("#nav").css('display', 'block');
 
     } else if (windowWidth < 699) {

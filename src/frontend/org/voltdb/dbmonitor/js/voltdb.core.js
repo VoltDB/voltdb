@@ -5,6 +5,7 @@
     var iVoltDbCore = (function () {
         this.connections = {};
         this.isServerConnected = true;
+        this.hostIP = "";
         DbConnection = function (aServer, aPort, aAdmin, aUser, aPassword, aIsHashPassword, aProcess) {
             this.server = aServer == null ? 'localhost' : $.trim(aServer);
             this.port = aPort == null ? '8080' : $.trim(aPort);
@@ -18,7 +19,6 @@
             this.Metadata = {};
             this.ready = false;
             this.procedureCommands = {};
-            this.hostName = "";
 
             this.getQueue = function () {
                 return (new iQueue(this));
@@ -158,17 +158,16 @@
                             (function (queue, item) {
                                 return function (response, headerInfo) {
                                     try {
-                                        if (validateIPAddress(headerInfo)) {
-                                            if (Connection.hostName == "") {
-                                                Connection.hostName = headerInfo;
-
-                                            }
+                                        
+                                        if (VoltDBCore.hostIP == "") {
+                                            VoltDBCore.hostIP = headerInfo;
                                         }
 
                                         if (response.status != 1)
                                             success = false;
                                         if (item[2] != null)
                                             item[2](response);
+                                        
                                         queue.EndExecute();
                                     } catch (x) {
                                         success = false;
@@ -452,14 +451,17 @@
 
 jQuery.extend({
     postJSON: function (url, formData, callback) {
-        if (verifyURIRequest(formData, "@SystemInformation", "OVERVIEW")) {
+        
+        if (VoltDBCore.hostIP == "") {
+        
             jQuery.ajax({
                 type: 'POST',
                 url: url,
                 data: formData,
                 dataType: 'jsonp',
                 success: function (data, textStatus, request) {
-                    callback(data, (request.getResponseHeader("Host").split(":"))[0]);                    
+                    var host = request.getResponseHeader("Host") != null ? request.getResponseHeader("Host").split(":")[0] : "-1";
+                    callback(data, host);
                 },
                 error: function (e) {
                     console.log(e.message);
@@ -471,29 +473,4 @@ jQuery.extend({
         }
     }
 });
-
-
-//common methods
-var verifyURIRequest = function (uriData,procedure,parameter) {
-    var result = false;
-
-    var decodedUri = decodeURIComponent(uriData);
-    var procedureName = decodedUri.substring(decodedUri.indexOf('@', 0), decodedUri.indexOf('&', 0));
-    var parameterName = (decodedUri.split("[\""))[1].substring();
-    parameterName = parameterName.substring(0, parameterName.indexOf("]") - 1);
-    if (procedureName == procedure && parameterName == parameter)
-        result = true;
-
-    return result;
-};
-
-var validateIPAddress = function (value) {
-    if (/^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(value)) {
-        return (true);
-    }
-    return (false);
-
-
-};
-
 
