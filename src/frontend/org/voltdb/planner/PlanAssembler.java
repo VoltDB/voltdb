@@ -2142,6 +2142,8 @@ public class PlanAssembler {
         boolean canPushdownDistinctAgg = m_parsedSelect.hasPartitionColumnInDistinctGroupby();
         boolean pushedDown = false;
 
+        canPushdownDistinctAgg = false; // disable pushdown
+
         if (canPushdownDistinctAgg && !m_parsedSelect.m_mvFixInfo.needed()) {
             assert(m_parsedSelect.hasPartitionColumnInGroupby());
             AbstractPlanNode receive = root;
