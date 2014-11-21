@@ -25,27 +25,6 @@ $(".tblshutdown").find(".edit").on("click",function(){
 	
 	})
 	
-	$(".adminTbl1").find(".edit").on("click",function(){	
-	var $this=$(this).closest("tr.security");
-		
-	var tdVal=$this.find("td:nth-child(3)");;
-	var val=tdVal.text();
-	
-	
-	if(val=="On"){
-		$this.find("td:nth-child(2)").find("div").removeClass("onIcon").addClass("offIcon");
-		tdVal.text("Off");
-		}else{
-			$this.find("td:nth-child(2)").find("div").removeClass("offIcon").addClass("onIcon");
-			tdVal.text("On");
-			}
-			
-		
-	
-	
-	
-	
-	})
 	
    // Make Expandable Rows.
     $('tr.parent > td:first-child' || 'tr.parent > td:fourth-child')
@@ -69,27 +48,69 @@ $(".tblshutdown").find(".edit").on("click",function(){
 		  height:'225px'	  
 		});
 		
-	
-		
-		$('#pauseConfirmation').click(function(){
-			$('#resumeConfirmation').show();
-			$(this).hide();
-		});
-		
-		$('#resumeConfirmation').click(function(){
-			$('#pauseConfirmation').show();
-			$(this).hide();
-		});
-		 
-		
-		
 		$('#shutDownConfirmation').popup();
+
+		$('#pauseConfirmation').popup({
+		    open: function (event, ui, ele) {
+		    },
+		    afterOpen: function() {
+
+		        $("#btnPauseConfirmationOk").unbind("click");
+		        $("#btnPauseConfirmationOk").on("click", function() {
+
+		            $("#pauseConfirmation").hide();
+		            $("#resumeConfirmation").show();
+
+		            //Close the popup
+		            $($(this).siblings()[0]).trigger("click");
+		        });
+		    }
+		});
+
+        $('#resumeConfirmation').popup({
+            open: function(event, ui, ele) {
+            },
+            afterOpen: function() {
+
+                $("#btnResumeConfirmationOk").unbind("click");
+                $("#btnResumeConfirmationOk").on("click", function() {
+
+                    $("#resumeConfirmation").hide();
+                    $("#pauseConfirmation").show();
+
+                    //Close the popup
+                    $($(this).siblings()[0]).trigger("click");
+                });
+            }
+        });
 		
-		$('#pauseConfirmation').popup();
-		
-		$('#resumeConfirmation').popup();
-		
-		 $('#securityEdit').popup();
+		 $('#securityEdit').popup({
+		     open: function (event, ui, ele) {
+		     },
+		     afterOpen: function () {
+
+		         $("#btnSecurityOk").unbind("click");
+		         $("#btnSecurityOk").on("click", function () {
+
+		             var securityRow = $("tr.security");
+
+		             var tdVal = securityRow.find("td:nth-child(3)");
+		                var val = tdVal.text();
+
+		                if (val == "On") {
+		                    securityRow.find("td:nth-child(2)").find("div").removeClass("onIcon").addClass("offIcon");
+		                    tdVal.text("Off");
+		                } else {
+		                    securityRow.find("td:nth-child(2)").find("div").removeClass("offIcon").addClass("onIcon");
+		                    tdVal.text("On");
+		                }
+
+		             //Close the popup
+		             $($(this).siblings()[0]).trigger("click");
+		         });
+		     }
+		 });
+    
 		 $('#autoSnapshotEdit').popup();
 		 $('#saveConfirmation').popup();
 		 $('#restoreConfirmation').popup();
