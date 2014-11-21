@@ -1266,7 +1266,8 @@ var saveUserPreferences = function (preferences) {
 var NavigationTabs = {
     DBMonitor: 1,
     Schema: 2,
-    SQLQuery: 3
+    SQLQuery: 3,
+    Admin: 4
 };
 
 var getCurrentTab = function () {
@@ -1278,8 +1279,12 @@ var getCurrentTab = function () {
 
     if (activeLinkId == "navSqlQuery")
         return NavigationTabs.SQLQuery;
+    
     else if (activeLinkId == "navSchema")
         return NavigationTabs.Schema;
+    
+    else if (activeLinkId == "navAdmin")
+        return NavigationTabs.Admin;
 
     return NavigationTabs.DBMonitor;
 };
