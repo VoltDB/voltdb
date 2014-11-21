@@ -522,7 +522,7 @@
                   </tr>
                     <tr class="hasSubLabel parent" id="row-2">
                     <td class="configLabel"><a href="#" class="labelCollapsed">Auto Snapshots</a> </td>
-                    <td align="right" id="autoSnapshotOption"><div id="autoSnapshotIcon" class="onIcon"></div><input style="display: none;" type="checkbox" id="chkAutoSnapshot" checked="checked"/></td>
+                    <td align="right" id="autoSnapshotOption"><div id="autoSnapshotIcon" class="onIcon"></div><input style="display: none;" type="checkbox" id="chkAutoSnapshot" checked="checked" class="snapshot"/></td>
                     <td>
                     <div class="SnapshotsOn">On</div>
                     <div class="SnapshotsOff" style="display:none;">Off</div>
@@ -1055,12 +1055,12 @@
                 <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblSave">
                     <tr>
                         <td>Directory:</td>
-                        <td>D:</td>
-                        <td><a href="#" class="edit" title="Edit">&nbsp;</a></td>
+                       
+                        <td><input type="text" value="D:/VoltDB/Snapshots/"  class="editDirLocation" /> <a href="#" class="edit editDirIcon" title="Edit" >&nbsp;</a></td>
                     </tr>
                     <tr>
-                        <td colspan="2">Snapshot Name:</td>
-                        <td><input type="text" placeholder="VEMMANUAL_2014.11.13.21.19.24" /></td>
+                        <td>Snapshot Name:</td>
+                        <td><input type="text" value="VEMMANUAL_2014.11.13.21.19.24" /></td>
                     </tr>
                 </table>
              
@@ -1102,12 +1102,12 @@
                     </tr>
                     <tr>
                         <td>VEMMANUAL_2014.11.13.21.19.24</td>
-                        <td>c:</td>
+                        <td>C:/</td>
                         <td><input type="checkbox"></td>
                     </tr>
                     <tr>
                         <td>VEMMANUAL_2014.11.14.06.03.20</td>
-                        <td>d:</td>
+                        <td>D:/</td>
                         <td><input type="checkbox"></td>
                     </tr>
                 </table>
