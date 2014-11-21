@@ -213,7 +213,7 @@ $(".tblshutdown").find(".edit").on("click",function(){
 		}); 
 	// Checkbox style
 	
-	  $('input').iCheck({
+	  $('input.snapshot').iCheck({
 		checkboxClass: 'icheckbox_square-aero',
 		//radioClass: 'iradio_square',
 		increaseArea: '20%' // optional
