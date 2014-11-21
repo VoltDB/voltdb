@@ -70,51 +70,6 @@ $(".tblshutdown").find(".edit").on("click",function(){
 		});
 		
 	
-	// Cluster Controls
-	$('.adminClusterList a').click(function(){
-			var theClass;
-			theClass = $(this).attr('class');	
-			
-			//alert(theClass);
-			
-					
-			
-			
-			/*if(theClass == 'resume'){
-				$(this).removeClass('resume').addClass('pause');
-				$(this).html('Resume');
-				$(this).attr('id','resumeConfirmation');
-				$(this).attr('href','#resumeConfirmationPop');
-				
-				
-			}
-			if(theClass == 'pause'){
-				$(this).removeClass('pause').addClass('resume');
-				$(this).html('Pause');
-				$(this).attr('id','pauseConfirmation');	
-				$(this).attr('href','#pauseConfirmationPop');			
-				
-				
-			}
-			if(theClass == 'restore'){
-				$(this).removeClass('restore').addClass('save');
-				$(this).html('Save');
-			}
-			
-			if(theClass == 'save'){
-				$(this).removeClass('save').addClass('restore');
-				$(this).html('Restore');
-			}
-			
-			if(theClass == 'stop'){
-				$(this).removeClass('stop').addClass('shutdown');
-				$(this).html('Shutdown');
-			}
-			if(theClass == 'shutdown'){
-				$(this).removeClass('shutdown').addClass('stop');
-				$(this).html('Stop');
-			}*/
-		})
 		
 		$('#pauseConfirmation').click(function(){
 			$('#resumeConfirmation').show();
@@ -127,17 +82,13 @@ $(".tblshutdown").find(".edit").on("click",function(){
 		});
 		 
 		
-		//$('a.shutdown').click(function(){
-			    $('#shutDownConfirmation').popup();
-		//});	
 		
-		//$('a.pause').click(function(){
-			    $('#pauseConfirmation').popup();
-		//});	
+		$('#shutDownConfirmation').popup();
 		
-		//$('a.resume').click(function(){
-			    $('#resumeConfirmation').popup();
-		//});
+		$('#pauseConfirmation').popup();
+		
+		$('#resumeConfirmation').popup();
+		
 		 $('#securityEdit').popup();
 		 $('#autoSnapshotEdit').popup();
 		 $('#saveConfirmation').popup();
@@ -154,7 +105,7 @@ $(".tblshutdown").find(".edit").on("click",function(){
 	
 		 
 		 $('#autoSnapshotSave').popup({
-		  	saveSnaps: function () {
+		  	saveSnaps: function () {					
 					$("#frequencySpan").show();
 					$("#txtFrequency").hide();
 					$("#frequencySpan").html($("#txtFrequency").val())
@@ -165,6 +116,7 @@ $(".tblshutdown").find(".edit").on("click",function(){
 					
 					$("#autoSnapshotSave").hide();
 					$("#autoSnapshotEdit").show();
+					$(".icheckbox_square-aero").removeClass('customCheckbox')
 					
 				}
 		 });
@@ -214,6 +166,7 @@ $(".tblshutdown").find(".edit").on("click",function(){
 			$("#retainedSpan").hide();
 			$("#txtRetained").show();
 		    $("#txtRetained").val($("#retainedSpan").html());
+			$(".icheckbox_square-aero").addClass('customCheckbox')
 		});
 		
 	 // Filters servers list
@@ -237,7 +190,14 @@ $(".tblshutdown").find(".edit").on("click",function(){
 				}
 			}
 		}); 
-		
+	// Checkbox style
+	
+	  $('input').iCheck({
+		checkboxClass: 'icheckbox_square-aero',
+		//radioClass: 'iradio_square',
+		increaseArea: '20%' // optional
+	
+		});		
 
    
 });

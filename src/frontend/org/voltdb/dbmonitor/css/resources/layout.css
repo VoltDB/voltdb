@@ -801,7 +801,7 @@ ul.adminClusterList li a:hover{color:#000;}
 .headerAdminContent h1 {padding: 15px 0 0 10px; font-weight:bold;}
 .adminPorts { margin:0 0 10px 0; background:#f3f3f3;}
 .adminTbl { margin:0; padding:0;}
-.adminTbl1 tr td { margin:0; padding:2px 2px 2px 2px; border-left:none; border-right:none; line-height:34px; height:30px;}
+.adminTbl1 tr td { margin:0; padding:2px 2px 2px 2px; border-left:none; border-right:none; line-height:38px; height:32px;}
 .adminTbl2 tr td { margin:0; padding:15px 25px 15px 10px; border-left:none; border-right:none;}
 .adminTbl1 tr td a.save {position:relative;top:4px}
 
@@ -842,6 +842,7 @@ input.exitableTxtBx{width:30px; /*position:relative; top:6px;*/ padding:2px 3px;
 .confirmationInfo{font-weight: bold;}
 td.heartbeattd span{position:relative; top:auto;}
 td.heartbeattd span.unit{position:relative;/* top:7px;left:1px;*/}
+.customCheckbox{display:inline-block !important;}
 
 
 /*********************************************media Qu********************/
