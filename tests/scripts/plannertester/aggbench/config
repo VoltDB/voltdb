@@ -1,0 +1,25 @@
+DDL:
+../../test_apps/aggbench/agg_ddl.sql
+
+SQL:
+select sum(bytes) from TB1;
+select TB2_id, count(TB2_id) from TB1 group by TB2_id limit 10;
+select TB1.TB2_id, count(TB1.TB2_id) imsi_count from TB1 group by TB2_id order by imsi_count desc limit 10;
+select TB2.userlabel label, t1.TB2_id, sum(imsi_count) imsi_count from (select TB2_id, count(TB2_id) imsi_count from TB1 group by TB2_id) t1, TB2 where TB2.TB2_id = t1.TB2_id group by t1.TB2_id, TB2.userlabel order by imsi_count desc limit 10;
+select coalesce( t2.userlabel, 'UNKNOWN' ) label, t1.TB2_id imsi, sum(t1.imsi_count) imsi_count from (select TB2_id, count(TB2_id) imsi_count from TB1 group by TB2_id) t1 LEFT OUTER JOIN TB2 t2 ON t1.TB2_id = t2.TB2_id group by t1.TB2_id, t2.userlabel order by imsi_count desc limit 10;
+select TB2_id imsi, sum( bytes ) volume from TB1 group by (TB2_id) order by volume desc limit 10;
+select TB2_id imsi, sum( bytes ) volume from TB1 group by (TB2_id) order by volume desc limit 10 offset 10;
+select TB2_id imsi, sum( bytes ) volume from TB1 group by (TB2_id) order by volume desc limit 20;
+select t1.TB2_id imsi, sum(sum_bytes) volume from (select TB2_id, sum(bytes) sum_bytes from TB1 group by TB2_id) t1 LEFT OUTER JOIN TB2 t2 ON t1.TB2_id = t2.TB2_id group by t1.TB2_id order by volume desc limit 20;
+select TB2.BILLING_TYPE BILLING_TYPE, sum(BYTES) VOLUME from TB1, TB2 where TB1.TB2_id = TB2.TB2_id AND TB2.BILLING_TYPE >= 90 group by (TB2.BILLING_TYPE);
+select hour( from_unixtime( TB1.timestamp_id / 1000 ) ) time_hour,  TB2.corporate corporate, sum(TB1.bytes) volume from TB1, TB2  where TB1.TB2_id = TB2.TB2_id AND TB2.corporate = '44' group by corporate, hour( from_unixtime( TB1.timestamp_id / 1000 ) );
+select hour( from_unixtime(TB1.timestamp_id / 1000  ) ) time_hour, minute( from_unixtime( TB1.timestamp_id / 1000 ) ) time_minute, TB2.corporate corporate, sum(TB1.bytes) volume from TB1, TB2 where TB1.TB2_id = TB2.TB2_id AND TB2.corporate = '44' group by corporate, hour( from_unixtime(TB1.timestamp_id / 1000  ) ), minute( from_unixtime( TB1.timestamp_id / 1000 ) );
+select concat( TB4.manufacturer, ' ', TB4.model ) model, count( model ) model_count, sum( bytes) volume  from (select TB4_id, sum( bytes) bytes from TB1 group by TB4_id) TB1, TB4  where TB1.TB4_id = TB4.TB4_id  group by concat( TB4.manufacturer, ' ', TB4.model )  order by volume, model_count desc limit 20;
+select * from TB1 where TB2_id = 213031002743386;
+select hour( from_unixtime( TB1.timestamp_id / 1000 ) ) time_hour from TB1 GROUP BY hour( from_unixtime( TB1.timestamp_id / 1000 ));
+SELECT HOUR( from_unixtime( TB1.timestamp_id / 1000  ) ) time_hour, minute( from_unixtime( TB1.timestamp_id / 1000  ) ) time_minute, TB1.TB2_id TB2_id, TB2.userlabel name, sum( TB1.bytes ) volume from TB1, TB2 WHERE TB1.TB2_id = TB2.TB2_id AND TB1.TB2_id = 213031002743386 AND TB1.timestamp_id >= 1396332000122 AND TB1.timestamp_id <= 1396335599360 GROUP BY HOUR( from_unixtime( TB1.timestamp_id / 1000  ) ),  minute( from_unixtime( TB1.timestamp_id / 1000  )), TB2_id, TB2.userlabel ORDER BY time_hour, time_minute LIMIT 60;
+select TB3_id, TB2_id from TB1 where TB2_id = 213031002743386 group by TB2_id, TB3_id limit 10;
+select coalesce( t2.userlabel, 'UNKNOWN') user_name, t1.TB2_id user_id, coalesce( t3.userlabel, 'UNKNOWN') app_name, t1.TB3_id app_id, sum( t1.bytes ) volume  from TB1 t1 LEFT OUTER JOIN TB2 t2 ON t1.TB2_id = t2.TB2_id  LEFT OUTER JOIN TB3 t3 ON t1.TB3_id = t3.TB3_id where  t1.TB2_id = 213031002743386 group by t1.TB3_id, t1.TB2_id, coalesce( t3.userlabel, 'UNKNOWN'), coalesce( t2.userlabel, 'UNKNOWN') order by volume desc limit 10;
+select coalesce( t2.userlabel, 'UNKNOWN') user_name, t1.TB2_id user_id,  coalesce( t3.userlabel, 'UNKNOWN') app_name, t1.TB3_id app_id, sum( t1.sum_bytes ) volume  from (select TB2_id, TB3_id, sum(bytes) sum_bytes from TB1 group by TB2_id, TB3_id ) t1 LEFT OUTER JOIN TB2 t2 ON t1.TB2_id = t2.TB2_id  LEFT OUTER JOIN TB3 t3 ON t1.TB3_id = t3.TB3_id group by t1.TB3_id, coalesce( t3.userlabel, 'UNKNOWN'), t1.TB2_id, coalesce( t2.userlabel,'UNKNOWN') order by volume desc limit 10;
+SELECT hour( from_unixtime( TB1.timestamp_id / 1000 ) ) time_hour, minute( from_unixtime( TB1.timestamp_id / 1000 ) ) time_minute,  coalesce( TB4.os, 'UNKNOWN') os,  sum( TB1.bytes ) volume  from TB1  LEFT OUTER JOIN TB4 TB4 ON TB1.TB4_id = TB4.TB4_id WHERE TB1.timestamp_id >= 1396332000122 AND TB1.timestamp_id <= 1396335599360 GROUP BY hour( from_unixtime( TB1.timestamp_id / 1000 ) ), minute( from_unixtime( TB1.timestamp_id / 1000 ) ), coalesce( TB4.os, 'UNKNOWN') ORDER BY time_hour, time_minute LIMIT 60;
+
