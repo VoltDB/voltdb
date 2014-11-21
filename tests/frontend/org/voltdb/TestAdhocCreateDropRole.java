@@ -30,15 +30,10 @@ import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
-import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb.compiler.DeploymentBuilder.UserInfo;
-import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.regressionsuites.LocalCluster;
-import org.voltdb.utils.InMemoryJarfile;
-import org.voltdb.utils.MiscUtils;
 
 public class TestAdhocCreateDropRole extends AdhocDDLTestBase {
 
@@ -233,6 +228,18 @@ public class TestAdhocCreateDropRole extends AdhocDDLTestBase {
             }
             assertTrue("Shouldn't be able to drop role ADMINISTRATOR", threw);
 
+            // Make sure that we can't get rid of the administrator user
+            dbuilder.removeUser("admin");
+            dbuilder.writeXML(pathToDeployment);
+            threw = false;
+            try {
+                adminClient.updateApplicationCatalog(null, new File(pathToDeployment));
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                threw = true;
+            }
+            assertTrue("Shouldn't be able to remove the last remaining ADMINSTRATOR user", threw);
         }
         finally {
             teardownSystem();

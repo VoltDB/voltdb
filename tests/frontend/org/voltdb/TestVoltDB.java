@@ -201,7 +201,7 @@ public class TestVoltDB extends TestCase {
         project.addDefaultPartitioning();
         project.addDefaultProcedures();
 
-        project.setSecurityEnabled(true);
+        project.setSecurityEnabled(true, true);
         GroupInfo groups[] = new GroupInfo[] {
                 new GroupInfo("foo", false, false, false, false, false, false),
                 new GroupInfo("blah", false, false, false, false, false, false)

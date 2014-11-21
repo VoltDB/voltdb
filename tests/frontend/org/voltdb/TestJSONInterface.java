@@ -643,7 +643,7 @@ public class TestJSONInterface extends TestCase {
         }
         builder.addUsers(ui);
 
-        builder.setSecurityEnabled(true);
+        builder.setSecurityEnabled(true, true);
 
         ProcedureInfo[] pi = new ProcedureInfo[2];
         pi[0] = new ProcedureInfo(new String[] { "foo" }, "Insert", "insert into HELLOWORLD values (?,?,?);", null);
@@ -739,7 +739,7 @@ public class TestJSONInterface extends TestCase {
         }
         builder2.addUsers(ui);
 
-        builder2.setSecurityEnabled(true);
+        builder2.setSecurityEnabled(true, true);
         builder2.addProcedures(pi);
         builder2.setHTTPDPort(8095);
 
