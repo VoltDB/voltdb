@@ -1034,7 +1034,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project.addUsers(users);
         project.addGroups(groups);
         project.addProcedures(procInfo);
-        project.setSecurityEnabled(true);
+        project.setSecurityEnabled(true, true);
         project.setDeadHostTimeout(6000);
         boolean compile = config.compile(project);
         assertTrue(compile);

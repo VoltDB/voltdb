@@ -59,7 +59,7 @@ public class TestAdhocProcedureRoles extends AdhocDDLTestBase {
                 System.out.println("================= Begin Test ==================");
             }
             this.builder = new VoltProjectBuilder();
-            this.builder.setSecurityEnabled(true);
+            this.builder.setSecurityEnabled(true, true);
             this.builder.setUseDDLSchema(true);
         }
 
