@@ -195,13 +195,13 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         throw std::exception();
     }
 
-    m_decodeBase64AndDecompressToBytes = m_jniEnv->GetStaticMethodID(
+    m_decodeBase64AndDecompressToBytesMID = m_jniEnv->GetStaticMethodID(
             m_encoderClass,
             "decodeBase64AndDecompressToBytes",
             "(Ljava/lang/String;)[B");
-    if (m_decodeBase64AndDecompressToBytes == NULL) {
+    if (m_decodeBase64AndDecompressToBytesMID == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(m_decodeBase64AndDecompressToBytes != NULL);
+        assert(m_decodeBase64AndDecompressToBytesMID != NULL);
         throw std::exception();
     }
 
@@ -212,7 +212,8 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         m_exportManagerClass == 0 ||
         m_fallbackToEEAllocatedBufferMID == 0 ||
         m_partitionDRGatewayClass == 0 ||
-        m_pushDRBufferMID == 0)
+        m_pushDRBufferMID == 0 ||
+        m_decodeBase64AndDecompressToBytesMID == 0)
     {
         throw std::exception();
     }
@@ -302,6 +303,33 @@ int64_t JNITopend::fragmentProgressUpdate(int32_t batchIndex,
     return (int64_t)nextStep;
 }
 
+// A local helper to convert a jbyteArray to an std::string.
+// Callers should be aware that an empty string may be returned if
+// jbuf is null.
+static std::string jbyteArrayToStdString(JNIEnv* jniEnv,
+                                         JNILocalFrameBarrier& jniFrame,
+                                         jbyteArray jbuf) {
+
+    if (!jbuf)
+        return "";
+
+    jsize length = jniEnv->GetArrayLength(jbuf);
+    if (length > 0) {
+        jboolean isCopy;
+        jbyte *bytes = jniEnv->GetByteArrayElements(jbuf, &isCopy);
+        jniFrame.addDependencyRef(isCopy, jbuf, bytes);
+
+        // make a null terminated copy
+        boost::scoped_array<char> strdata(new char[length + 1]);
+        memcpy(strdata.get(), bytes, length);
+        strdata.get()[length] = '\0';
+
+        return std::string(strdata.get());
+    }
+
+    return "";
+ }
+
 std::string JNITopend::planForFragmentId(int64_t fragmentId) {
     VOLT_DEBUG("fetching plan for id %d", (int) fragmentId);
 
@@ -314,29 +342,10 @@ std::string JNITopend::planForFragmentId(int64_t fragmentId) {
     jbyteArray jbuf = (jbyteArray)(m_jniEnv->CallObjectMethod(m_javaExecutionEngine,
                                                               m_planForFragmentIdMID,
                                                               fragmentId));
-
-    if (!jbuf) {
-        // this will be trapped later ;-)
-        return std::string("");
-    }
-
-    jsize length = m_jniEnv->GetArrayLength(jbuf);
-    if (length > 0) {
-        jboolean is_copy;
-        jbyte *bytes = m_jniEnv->GetByteArrayElements(jbuf, &is_copy);
-        // Add the plan buffer info to the stack object
-        // so it'll get cleaned up if loadTuplesFrom throws
-        jni_frame.addDependencyRef(is_copy, jbuf, bytes);
-
-        // make a null terminated copy
-        boost::scoped_array<char> strdata(new char[length + 1]);
-        memcpy(strdata.get(), bytes, length);
-        strdata.get()[length] = '\0';
-
-        return std::string(strdata.get());
-    }
-
-    return "";
+    // jbuf might be NULL or might have 0 length here.  In that case
+    // we'll return a 0-length string to the caller, who will return
+    // an appropriate error.
+    return jbyteArrayToStdString(m_jniEnv, jni_frame, jbuf);
 }
 
 std::string JNITopend::decodeBase64AndDecompress(const std::string& base64Str) {
@@ -353,30 +362,9 @@ std::string JNITopend::decodeBase64AndDecompress(const std::string& base64Str) {
     }
 
     jbyteArray jbuf = (jbyteArray)m_jniEnv->CallStaticObjectMethod(m_encoderClass,
-                                                                   m_decodeBase64AndDecompressToBytes,
+                                                                   m_decodeBase64AndDecompressToBytesMID,
                                                                    jBase64Str);
-    if (!jbuf) {
-        // this will be trapped later ;-)
-        return std::string("");
-    }
-
-    jsize length = m_jniEnv->GetArrayLength(jbuf);
-    if (length > 0) {
-        jboolean is_copy;
-        jbyte *bytes = m_jniEnv->GetByteArrayElements(jbuf, &is_copy);
-        // Add the plan buffer info to the stack object
-        // so it'll get cleaned up if loadTuplesFrom throws
-        jni_frame.addDependencyRef(is_copy, jbuf, bytes);
-
-        // make a null terminated copy
-        boost::scoped_array<char> strdata(new char[length + 1]);
-        memcpy(strdata.get(), bytes, length);
-        strdata.get()[length] = '\0';
-
-        return std::string(strdata.get());
-    }
-
-    return "";
+    return jbyteArrayToStdString(m_jniEnv, jni_frame, jbuf);
 }
 
 void JNITopend::crashVoltDB(FatalException e) {

@@ -50,7 +50,6 @@ public:
 
     void fallbackToEEAllocatedBuffer(char *buffer, size_t length);
 
-
     std::string decodeBase64AndDecompress(const std::string& buffer);
 
 private:
@@ -69,7 +68,7 @@ private:
     jmethodID m_pushExportBufferMID;
     jmethodID m_getQueuedExportBytesMID;
     jmethodID m_pushDRBufferMID;
-    jmethodID m_decodeBase64AndDecompressToBytes;
+    jmethodID m_decodeBase64AndDecompressToBytesMID;
     jclass m_exportManagerClass;
     jclass m_partitionDRGatewayClass;
     jclass m_encoderClass;

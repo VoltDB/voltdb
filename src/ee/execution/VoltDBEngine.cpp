@@ -921,18 +921,6 @@ static bool haveDifferentSchema(catalog::Table *t1, voltdb::Table *t2)
     return false;
 }
 
-static std::string getJsonPlanForLimitDelete(VoltDBEngine* engine,
-                                             catalog::Table* table) {
-    if (table->tuplelimitDeleteStmt().size() > 0) {
-        catalog::Statement* stmt = table->tuplelimitDeleteStmt().begin()->second;
-        const std::string hexString = stmt->fragments().begin()->second->plannodetree();
-        std::string jsonPlan = engine->getTopend()->decodeBase64AndDecompress(hexString);
-        std::cerr << "Here's a decoded limit delete plan:\n" << jsonPlan << std::endl;
-        return jsonPlan;
-    }
-    return "";
-}
-
 /*
  * Create catalog delegates for new catalog tables.
  * Create the tables themselves when new tables are needed.
@@ -1037,12 +1025,6 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
             // the new tuple limit.
             //
             persistenttable->setTupleLimit(catalogTable->tuplelimit());
-            std::string jsonPlanForLimitDelete = getJsonPlanForLimitDelete(this, catalogTable);
-            if (jsonPlanForLimitDelete.length() > 0) {
-              persistenttable->swapPurgeExecutorVector(ExecutorVector::fromJsonPlan(this,
-                                                                         jsonPlanForLimitDelete,
-                                                                         -1));
-            }
 
             //////////////////////////////////////////
             // find all of the indexes to add
@@ -1384,10 +1366,12 @@ void VoltDBEngine::initMaterializedViewsAndLimitDeletePlans() {
                 srcPTable->updateMaterializedViewTargetTable(destTable, catalogView);
             }
 
-            std::string jsonPlanForLimitDelete = getJsonPlanForLimitDelete(this, srcCatalogTable);
-            if (jsonPlanForLimitDelete.length() > 0) {
+            if (srcCatalogTable->tuplelimitDeleteStmt().size() > 0) {
+                catalog::Statement* stmt = srcCatalogTable->tuplelimitDeleteStmt().begin()->second;
+                const std::string hexString = stmt->fragments().begin()->second->plannodetree();
+                std::string jsonPlan = getTopend()->decodeBase64AndDecompress(hexString);
                 srcPTable->swapPurgeExecutorVector(ExecutorVector::fromJsonPlan(this,
-                                                                                jsonPlanForLimitDelete,
+                                                                                jsonPlan,
                                                                                 -1));
             }
         }
