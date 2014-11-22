@@ -313,6 +313,18 @@ public class DDLCompiler {
             );
 
     /**
+     * Regex to parse the DROP ROLE statement.
+     * Capture group is tagged as (1) in comments below.
+     */
+    static final Pattern dropRolePattern = Pattern.compile(
+            "(?i)" +                            // (ignore case)
+            "\\A" +                             // (start statement)
+            "DROP\\s+ROLE\\s+" +                // DROP ROLE
+            "([\\w.$]+)" +                      // (1) <role name>
+            ";\\z"                              // (end statement)
+            );
+
+    /**
      * Regex to match CREATE TABLE or CREATE VIEW statements.
      * Unlike the other matchers, this is just designed to pull out the
      * name of the table or view, not the whole statement.
@@ -964,6 +976,33 @@ public class DDLCompiler {
                             statement.substring(0,statement.length()-1), // remove trailing semicolon
                             Permission.toListString()));
                 }
+            }
+            return true;
+        }
+
+        // matches if it is DROP ROLE
+        // group 1 is role name
+        statementMatcher = dropRolePattern.matcher(statement);
+        if (statementMatcher.matches()) {
+            String roleName = statementMatcher.group(1).toUpperCase();
+            CatalogMap<Group> groupMap = db.getGroups();
+            if (groupMap.get(roleName) == null) {
+                throw m_compiler.new VoltCompilerException(String.format(
+                            "Role name \"%s\" in DROP ROLE statement does not exist.",
+                            roleName));
+            }
+            else {
+                // Hand-check against the two default roles which shall not be
+                // dropped.
+                if (roleName.equals("ADMINISTRATOR") || roleName.equals("USER")) {
+                    throw m_compiler.new VoltCompilerException(String.format(
+                                "You may not drop the built-in role \"%s\".",
+                                roleName));
+                }
+                // The constraint that there be no users with this role gets
+                // checked by the deployment validation.  *HOWEVER*, right now
+                // this ends up giving a confusing error message.
+                groupMap.delete(roleName);
             }
             return true;
         }
