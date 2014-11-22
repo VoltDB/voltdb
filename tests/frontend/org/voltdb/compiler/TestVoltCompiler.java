@@ -2986,6 +2986,15 @@ public class TestVoltCompiler extends TestCase {
         expectedError =
                 "Dropped Procedure \"insert\" is not defined";
         assertTrue(isFeedbackPresent(expectedError, fbs));
+
+        // check if exists
+        db = goodDDLAgainstSimpleSchema(
+                "create procedure p1 as select * from books;\n" +
+                "drop procedure p1 if exists;\n" +
+                "drop procedure p1 if exists;\n"
+                );
+        proc = db.getProcedures().get("p1");
+        assertNull(proc);
     }
 
     private ArrayList<Feedback> checkInvalidProcedureDDL(String ddl) {
@@ -3331,6 +3340,43 @@ public class TestVoltCompiler extends TestCase {
         badDDLAgainstSimpleSchema(".*group rx that does not exist.*",
                 "create role r1;",
                 "create procedure p1 allow r1, rx as select * from books;");
+    }
+
+    public void testDropRole() throws Exception
+    {
+        Database db = goodDDLAgainstSimpleSchema(
+                "create role r1;",
+                "drop role r1;");
+        CatalogMap<Group> groups = db.getGroups();
+        assertTrue(groups.get("r1") == null);
+
+        db = goodDDLAgainstSimpleSchema(
+                "create role r1;",
+                "drop role r1 if exists;");
+        groups = db.getGroups();
+        assertTrue(groups.get("r1") == null);
+
+        db = goodDDLAgainstSimpleSchema(
+                "create role r1;",
+                "drop role r1 if exists;",
+                "drop role r1 IF EXISTS;");
+        groups = db.getGroups();
+        assertTrue(groups.get("r1") == null);
+
+        badDDLAgainstSimpleSchema(".*does not exist.*",
+                "create role r1;",
+                "drop role r2;");
+
+        badDDLAgainstSimpleSchema(".*does not exist.*",
+                "create role r1;",
+                "drop role r1;",
+                "drop role r1;");
+
+        badDDLAgainstSimpleSchema(".*may not drop.*",
+                "drop role administrator;");
+
+        badDDLAgainstSimpleSchema(".*may not drop.*",
+                "drop role user;");
     }
 
     private ConnectorTableInfo getConnectorTableInfoFor( Database db, String tableName) {
