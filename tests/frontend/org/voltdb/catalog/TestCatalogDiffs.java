@@ -65,7 +65,7 @@ public class TestCatalogDiffs extends TestCase {
         builder.addDefaultSchema();
         builder.addDefaultPartitioning();
         builder.addProcedures(procList);
-        builder.setSecurityEnabled(securityEnabled);
+        builder.setSecurityEnabled(securityEnabled, true);
 
         if (gi != null && gi.length > 0)
             builder.addGroups(gi);
