@@ -332,6 +332,14 @@ enum ExpressionType {
 };
 
 // ------------------------------------------------------------------
+// Expression Quantifier Types
+// ------------------------------------------------------------------
+enum QuantifierType {
+    QUANTIFIER_TYPE_NONE    = 0,
+    QUANTIFIER_TYPE_ANY     = 1,
+    QUANTIFIER_TYPE_ALL     = 2,
+};
+// ------------------------------------------------------------------
 // Table Index Types
 // ------------------------------------------------------------------
 enum TableIndexType {

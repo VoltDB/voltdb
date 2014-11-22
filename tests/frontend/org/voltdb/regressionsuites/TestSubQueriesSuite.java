@@ -494,6 +494,13 @@ public class TestSubQueriesSuite extends RegressionSuite {
                             " UNION SELECT ID from R2 WHERE ID <= 2"
                             + " INTERSECT SELECT ID from R1 WHERE ID =1);").getResults()[0];
             validateTableOfLongs(vt, new long[][] {{1}, {4}, {5}});
+
+            vt = client.callProcedure("@AdHoc",
+                    "select ID from " + tb + " where ID in " +
+                            "( SELECT ID from R1 WHERE ID > 2 " +
+                            " EXCEPT SELECT ID from R2 WHERE ID <= 2);").getResults()[0];
+            System.out.println(vt.toString());
+            validateTableOfLongs(vt, new long[][] {{3}, {4}, {5}});
         }
     }
 
@@ -732,129 +739,143 @@ public class TestSubQueriesSuite extends RegressionSuite {
 
     }
 
-//    // Test scalar subqueries
-//    public void testSelectScalarSubSelects() throws NoConnectionsException, IOException, ProcCallException
-//    {
-//        Client client = getClient();
-//        loadData(client);
-//        VoltTable vt;
-//
-//        vt = client.callProcedure("@AdHoc",
-//                "select R1.ID, R1.DEPT, (SELECT ID FROM R2 where ID = 2) FROM R1 where R1.ID < 3 order by R1.ID desc;").getResults()[0];
-//        System.out.println(vt.toString());
-//        validateTableOfLongs(vt, new long[][] { {2, 1, 2}, {1, 1, 2} });
-//
-//        vt = client.callProcedure("@AdHoc",
-//                "select R1.ID, R1.DEPT, (SELECT ID FROM R2 where ID = ?) FROM R1 where R1.ID < 3 order by R1.ID desc;", 2).getResults()[0];
-//        System.out.println(vt.toString());
-//        validateTableOfLongs(vt, new long[][] { {2, 1, 2}, {1, 1, 2} });
-//
-//        vt = client.callProcedure("@AdHoc",
-//                "select R1.ID, R1.DEPT, (SELECT ID FROM R2 where R2.ID = R1.ID and R2.WAGE = 50) FROM R1 where R1.ID > 3 order by R1.ID desc;").getResults()[0];
-//        System.out.println(vt.toString());
-//        validateTableOfLongs(vt, new long[][] {  {5l, 2l, 5l}, {4l, 2l, Long.MIN_VALUE} });
-//
-//        // Seq scan
-//        vt = client.callProcedure("@AdHoc",
-//                "select R1.DEPT, (SELECT ID FROM R2 where R2.ID = 1) FROM R1 where R1.DEPT = 2;").getResults()[0];
-//        System.out.println(vt.toString());
-//        validateTableOfLongs(vt, new long[][] {  {2, 1}, {2, 1} });
-//
-//        try {
-//            vt = client.callProcedure("@AdHoc",
-//                    "select R1.ID, R1.DEPT, (SELECT ID FROM R2) FROM R1 where R1.ID > 3 order by R1.ID desc;").getResults()[0];
-//        } catch (ProcCallException ex) {
-//            System.out.println(ex.getMessage());
-//            String errMsg = (isHSQL()) ? "cardinality violation" :
-//                "More than one row returned by a scalar/row subquery";
-//            assertTrue(ex.getMessage().contains(errMsg));
-//        }
-//    }
-//
-//    public void testWhereScalarSubSelects() throws NoConnectionsException, IOException, ProcCallException
-//    {
-//        Client client = getClient();
-//        loadData(client);
-//        VoltTable vt;
-//
-//        // Index Scan
-//        vt = client.callProcedure("@AdHoc",
-//                "select R1.ID FROM R1 where R1.ID = (SELECT ID FROM R2 where ID = ?);", 2).getResults()[0];
-//        System.out.println(vt.toString());
-//        validateTableOfLongs(vt, new long[][] { {2} });
-//
-//        // Index Scan correlated
-//        vt = client.callProcedure("@AdHoc",
-//                "select R1.ID FROM R1 where R1.ID = (SELECT ID/2 FROM R2 where ID = R1.ID * 2);").getResults()[0];
-//        System.out.println(vt.toString());
-//        validateTableOfLongs(vt, new long[][] { {1}, {2} });
-//
-//        // Seq Scan
-//        vt = client.callProcedure("@AdHoc",
-//                "select R1.ID FROM R1 where R1.DEPT = (SELECT DEPT FROM R2 where ID = ?);", 1).getResults()[0];
-//                System.out.println(vt.toString());
-//        validateTableOfLongs(vt, new long[][] { {1}, {2}, {3} });
-//
-//        // Seq Scan correlated
-//        vt = client.callProcedure("@AdHoc",
-//                "select R1.ID FROM R1 where R1.DEPT = (SELECT DEPT FROM R2 where ID = R1.ID * 2);").getResults()[0];
-//                System.out.println(vt.toString());
-//        validateTableOfLongs(vt, new long[][] { {1} });
-//
-//        // NLIJ
-//        vt = client.callProcedure("@AdHoc",
-//                "select R1.ID, R2.ID FROM R1, R2 where R1.DEPT = R2.DEPT + (SELECT DEPT FROM R2 where ID = ?) limit 1;", 1).getResults()[0];
-//        System.out.println(vt.toString());
-//        validateTableOfLongs(vt, new long[][] { {4, 1} });
-//
-//        // @TODO NLIJ correlated
-//        vt = client.callProcedure("@AdHoc",
-//                "select R2.ID, R2.ID FROM R1, R2 where R2.ID = (SELECT id FROM R2 where ID = R1.ID);").getResults()[0];
-//        System.out.println(vt.toString());
-//        validateTableOfLongs(vt, new long[][] { {1, 1}, {2,2}, {3,3}, {4,4}, {5,5} });
-//
-//        // NLJ
-//        vt = client.callProcedure("@AdHoc",
-//                "select R1.ID, R2.ID FROM R1, R2 where R1.DEPT = R2.DEPT + (SELECT DEPT FROM R2 where ID = ?) limit 1;", 1).getResults()[0];
-//        System.out.println(vt.toString());
-//        validateTableOfLongs(vt, new long[][] { {4, 1} });
-//
-//        // NLJ correlated
-//        vt = client.callProcedure("@AdHoc",
-//                "select R1.ID, R2.ID FROM R1, R2 where R2.DEPT = (SELECT DEPT FROM R2 where ID = R1.ID + 4);").getResults()[0];
-//        System.out.println(vt.toString());
-//        validateTableOfLongs(vt, new long[][] { {1, 4}, {1,5} });
-//
-//        // Having
-//        vt = client.callProcedure("@AdHoc",
-//                "select max(R1.ID) FROM R1 group by R1.DEPT having count(*) = " +
-//                        "(select R2.ID from R2 where R2.ID = ?);", 2).getResults()[0];
-//        System.out.println(vt.toString());
-//        validateTableOfLongs(vt, new long[][] { {5} });
-//
-//        // Having correlated -- parent TVE in the aggregated child expression
-//        try {
-//            vt = client.callProcedure("@AdHoc",
-//                    "select max(R1.ID) FROM R1 group by R1.DEPT having count(*) = " +
-//                    "(select R2.ID from R2 where R2.ID = R1.DEPT);").getResults()[0];
-//            System.out.println(vt.toString());
-//            validateTableOfLongs(vt, new long[][] { {5} });
-//        } catch (ProcCallException ex) {
-//            System.out.println(ex.getMessage());
-//            String errMsg = "java.lang.NullPointerException";
-//            assertTrue(ex.getMessage().contains(errMsg));
-//        }
-//
-//        try {
-//            vt = client.callProcedure("@AdHoc",
-//                    "select R1.ID FROM R1 where R1.ID = (SELECT ID FROM R2);").getResults()[0];
-//        } catch (ProcCallException ex) {
-//            System.out.println(ex.getMessage());
-//            String errMsg = (isHSQL()) ? "cardinality violation" :
-//                "More than one row returned by a scalar/row subquery";
-//            assertTrue(ex.getMessage().contains(errMsg));
-//        }
-//    }
+    // Test scalar subqueries
+    public void testSelectScalarSubSelects() throws NoConnectionsException, IOException, ProcCallException
+    {
+        Client client = getClient();
+        loadData(client);
+        VoltTable vt;
+
+        vt = client.callProcedure("@AdHoc",
+                "select R1.ID, R1.DEPT, (SELECT ID FROM R2 where ID = 2) FROM R1 where R1.ID < 3 order by R1.ID desc;").getResults()[0];
+        System.out.println(vt.toString());
+        validateTableOfLongs(vt, new long[][] { {2, 1, 2}, {1, 1, 2} });
+
+        vt = client.callProcedure("@AdHoc",
+                "select R1.ID, R1.DEPT, (SELECT ID FROM R2 where ID = ?) FROM R1 where R1.ID < 3 order by R1.ID desc;", 2).getResults()[0];
+        System.out.println(vt.toString());
+        validateTableOfLongs(vt, new long[][] { {2, 1, 2}, {1, 1, 2} });
+
+        vt = client.callProcedure("@AdHoc",
+                "select R1.ID, R1.DEPT, (SELECT ID FROM R2 where R2.ID = R1.ID and R2.WAGE = 50) FROM R1 where R1.ID > 3 order by R1.ID desc;").getResults()[0];
+        System.out.println(vt.toString());
+        validateTableOfLongs(vt, new long[][] {  {5l, 2l, 5l}, {4l, 2l, Long.MIN_VALUE} });
+
+        // Seq scan
+        vt = client.callProcedure("@AdHoc",
+                "select R1.DEPT, (SELECT ID FROM R2 where R2.ID = 1) FROM R1 where R1.DEPT = 2;").getResults()[0];
+        System.out.println(vt.toString());
+        validateTableOfLongs(vt, new long[][] {  {2, 1}, {2, 1} });
+
+        try {
+            vt = client.callProcedure("@AdHoc",
+                    "select R1.ID, R1.DEPT, (SELECT ID FROM R2) FROM R1 where R1.ID > 3 order by R1.ID desc;").getResults()[0];
+        } catch (ProcCallException ex) {
+            System.out.println(ex.getMessage());
+            String errMsg = (isHSQL()) ? "cardinality violation" :
+                "More than one row returned by a scalar/row subquery";
+            assertTrue(ex.getMessage().contains(errMsg));
+        }
+    }
+
+    public void testWhereScalarSubSelects() throws NoConnectionsException, IOException, ProcCallException
+    {
+        Client client = getClient();
+        loadData(client);
+        VoltTable vt;
+
+        // Index Scan
+        vt = client.callProcedure("@AdHoc",
+                "select R1.ID FROM R1 where R1.ID = (SELECT ID FROM R2 where ID = ?);", 2).getResults()[0];
+        System.out.println(vt.toString());
+        validateTableOfLongs(vt, new long[][] { {2} });
+
+        // Index Scan correlated
+        vt = client.callProcedure("@AdHoc",
+                "select R1.ID FROM R1 where R1.ID = (SELECT ID/2 FROM R2 where ID = R1.ID * 2);").getResults()[0];
+        System.out.println(vt.toString());
+        validateTableOfLongs(vt, new long[][] { {1}, {2} });
+
+        // Seq Scan
+        vt = client.callProcedure("@AdHoc",
+                "select R1.ID FROM R1 where R1.DEPT = (SELECT DEPT FROM R2 where ID = ?);", 1).getResults()[0];
+                System.out.println(vt.toString());
+        validateTableOfLongs(vt, new long[][] { {1}, {2}, {3} });
+
+        // Seq Scan correlated
+        vt = client.callProcedure("@AdHoc",
+                "select R1.ID FROM R1 where R1.DEPT = (SELECT DEPT FROM R2 where ID = R1.ID * 2);").getResults()[0];
+                System.out.println(vt.toString());
+        validateTableOfLongs(vt, new long[][] { {1} });
+
+        // NLIJ
+        vt = client.callProcedure("@AdHoc",
+                "select R1.ID, R2.ID FROM R1, R2 where R1.DEPT = R2.DEPT + (SELECT DEPT FROM R2 where ID = ?) limit 1;", 1).getResults()[0];
+        System.out.println(vt.toString());
+        validateTableOfLongs(vt, new long[][] { {4, 1} });
+
+        // @TODO NLIJ correlated
+        vt = client.callProcedure("@AdHoc",
+                "select R2.ID, R2.ID FROM R1, R2 where R2.ID = (SELECT id FROM R2 where ID = R1.ID);").getResults()[0];
+        System.out.println(vt.toString());
+        validateTableOfLongs(vt, new long[][] { {1, 1}, {2,2}, {3,3}, {4,4}, {5,5} });
+
+        // NLJ
+        vt = client.callProcedure("@AdHoc",
+                "select R1.ID, R2.ID FROM R1, R2 where R1.DEPT = R2.DEPT + (SELECT DEPT FROM R2 where ID = ?) limit 1;", 1).getResults()[0];
+        System.out.println(vt.toString());
+        validateTableOfLongs(vt, new long[][] { {4, 1} });
+
+        // NLJ correlated
+        vt = client.callProcedure("@AdHoc",
+                "select R1.ID, R2.ID FROM R1, R2 where R2.DEPT = (SELECT DEPT FROM R2 where ID = R1.ID + 4);").getResults()[0];
+        System.out.println(vt.toString());
+        validateTableOfLongs(vt, new long[][] { {1, 4}, {1,5} });
+
+        // Having
+        vt = client.callProcedure("@AdHoc",
+                "select max(R1.ID) FROM R1 group by R1.DEPT having count(*) = " +
+                        "(select R2.ID from R2 where R2.ID = ?);", 2).getResults()[0];
+        System.out.println(vt.toString());
+        validateTableOfLongs(vt, new long[][] { {5} });
+
+        // Having correlated -- parent TVE in the aggregated child expression
+        try {
+            vt = client.callProcedure("@AdHoc",
+                    "select max(R1.ID) FROM R1 group by R1.DEPT having count(*) = " +
+                    "(select R2.ID from R2 where R2.ID = R1.DEPT);").getResults()[0];
+            System.out.println(vt.toString());
+            validateTableOfLongs(vt, new long[][] { {5} });
+        } catch (ProcCallException ex) {
+            System.out.println(ex.getMessage());
+            String errMsg = "java.lang.NullPointerException";
+            assertTrue(ex.getMessage().contains(errMsg));
+        }
+
+        try {
+            vt = client.callProcedure("@AdHoc",
+                    "select R1.ID FROM R1 where R1.ID = (SELECT ID FROM R2);").getResults()[0];
+        } catch (ProcCallException ex) {
+            System.out.println(ex.getMessage());
+            String errMsg = (isHSQL()) ? "cardinality violation" :
+                "More than one row returned by a scalar/row subquery";
+            assertTrue(ex.getMessage().contains(errMsg));
+        }
+    }
+
+    public void testWhereRowSubSelects() throws NoConnectionsException, IOException, ProcCallException
+    {
+        Client client = getClient();
+        loadData(client);
+        VoltTable vt;
+
+        if (!isHSQL()) {
+            vt = client.callProcedure("@AdHoc",
+                    "select R1.ID FROM R1 where (R1.DEPT, R1.WAGE) = (SELECT DEPT, WAGE FROM R2 where ID = ?);", 2).getResults()[0];
+            System.out.println(vt.toString());
+            validateTableOfLongs(vt, new long[][] { {2} });
+        }
+    }
 
     static public junit.framework.Test suite()
     {

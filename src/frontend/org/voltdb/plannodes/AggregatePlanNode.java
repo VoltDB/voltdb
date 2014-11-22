@@ -27,6 +27,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.ExpressionType;
@@ -184,8 +185,10 @@ public class AggregatePlanNode extends AbstractPlanNode {
             // aggregate's output schema is pre-determined, don't touch
         }
         // Possible subquery expressions
-        ExpressionUtil.generateSubqueryExpressionOutputSchema(m_postPredicate, db);
-        ExpressionUtil.generateSubqueryExpressionOutputSchema(m_prePredicate, db);
+        Collection<AbstractExpression> exprs = findAllExpressionsOfClass(AbstractSubqueryExpression.class);
+        for (AbstractExpression expr: exprs) {
+            ExpressionUtil.generateSubqueryExpressionOutputSchema(expr, db);
+        }
         return;
     }
 
@@ -263,8 +266,10 @@ public class AggregatePlanNode extends AbstractPlanNode {
         }
 
         // Possible subquery expressions
-        ExpressionUtil.resolveSubqueryExpressionColumnIndexes(m_prePredicate);
-        ExpressionUtil.resolveSubqueryExpressionColumnIndexes(m_postPredicate);
+        Collection<AbstractExpression> exprs = findAllExpressionsOfClass(AbstractSubqueryExpression.class);
+        for (AbstractExpression expr: exprs) {
+            ExpressionUtil.resolveSubqueryExpressionColumnIndexes(expr);
+        }
     }
 
     /**

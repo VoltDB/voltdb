@@ -32,6 +32,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.AggregateExpression;
+import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.FunctionExpression;
@@ -50,6 +51,7 @@ import org.voltdb.planner.parseinfo.TableLeafNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
+import org.voltdb.types.QuantifierType;
 
 public abstract class AbstractParsedStmt {
 
@@ -550,6 +552,16 @@ public abstract class AbstractParsedStmt {
         if (exprType == ExpressionType.OPERATOR_CASE_WHEN || exprType == ExpressionType.OPERATOR_ALTERNATIVE) {
             String valueType = exprNode.attributes.get("valuetype");
             expr.setValueType(VoltType.typeFromString(valueType));
+        }
+
+        if (expr instanceof ComparisonExpression) {
+            String opsubtype = exprNode.attributes.get("opsubtype");
+            if (opsubtype != null) {
+                QuantifierType quantifier = QuantifierType.get(opsubtype);
+                if (quantifier != QuantifierType.NONE) {
+                    ((ComparisonExpression)expr).setQuantifier(quantifier);
+                }
+            }
         }
 
         // get the first (left) node that is an element

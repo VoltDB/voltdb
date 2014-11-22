@@ -692,6 +692,30 @@ ExpressionType stringToExpression(string str )
     return EXPRESSION_TYPE_INVALID;
 }
 
+string quantifiernToString(QuantifierType type)
+{
+    switch (type) {
+    case QUANTIFIER_TYPE_NONE: {
+        return "NONE";
+    }
+    case QUANTIFIER_TYPE_ANY: {
+        return "ANY";
+    }
+    case QUANTIFIER_TYPE_ALL: {
+        return "ALL";
+    }
+    }
+}
+QuantifierType stringToQunatifier(string str )
+{
+    if (str == "ANY") {
+        return QUANTIFIER_TYPE_ANY;
+    } else if (str == "ALL") {
+        return QUANTIFIER_TYPE_ALL;
+    }
+    return QUANTIFIER_TYPE_NONE;
+}
+
 string indexLookupToString(IndexLookupType type)
 {
     switch (type) {

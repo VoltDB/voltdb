@@ -30,6 +30,7 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
@@ -317,7 +318,10 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         }
 
         // Generate the output schema for subqueries
-        ExpressionUtil.generateSubqueryExpressionOutputSchema(m_predicate, db);
+        Collection<AbstractExpression> exprs = findAllExpressionsOfClass(AbstractSubqueryExpression.class);
+        for (AbstractExpression expr: exprs) {
+            ExpressionUtil.generateSubqueryExpressionOutputSchema(expr, db);
+        }
 
         AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(this);
         if (aggNode != null) {
@@ -386,7 +390,10 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             limit.m_hasSignificantOutputSchema = false; // It's just another cheap knock-off
         }
         // Resolve subquery expression indexes
-        ExpressionUtil.resolveSubqueryExpressionColumnIndexes(m_predicate);
+        Collection<AbstractExpression> exprs = findAllExpressionsOfClass(AbstractSubqueryExpression.class);
+        for (AbstractExpression expr: exprs) {
+            ExpressionUtil.resolveSubqueryExpressionColumnIndexes(expr);
+        }
 
         AggregatePlanNode aggNode = AggregatePlanNode.getInlineAggregationNode(this);
 

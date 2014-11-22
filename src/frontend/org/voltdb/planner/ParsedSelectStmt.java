@@ -47,7 +47,6 @@ import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.RowSubqueryExpression;
-import org.voltdb.expressions.ScalarValueExpression;
 import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.BranchNode;
@@ -665,17 +664,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 }
                 col.tableName = scalarSubqueryExpr.getTable().getTableName();
                 col.tableAlias = scalarSubqueryExpr.getTable().getTableAlias();
-                // Need to insert a ScalarValueExpression on top of the subquery expression
-                // to be able to extract the subquery expression results which is a subquery id
-                // and convert them into NValue.
-                AbstractExpression scalarExpr = new ScalarValueExpression();
-                scalarExpr.setLeft(scalarSubqueryExpr);
-                scalarExpr.setValueType(scalarSubqueryExpr.getValueType());
-                scalarExpr.setValueSize(scalarSubqueryExpr.getValueSize());
-                // reset scalarSubqueryExpr type to BIGINT
-                scalarSubqueryExpr.setValueType(VoltType.BIGINT);
-                scalarSubqueryExpr.setValueSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
-                col.expression = scalarExpr;
+                // Need to add a ScalarValueExpression on top of the subquery expression
+                // to be able to extract the subquery expression result
+                col.expression = ExpressionUtil.addScalarValueExpression(scalarSubqueryExpr);
             } else {
                 col.expression = colExpr;
                 // XXX hacky, assume all non-column refs come from a temp table

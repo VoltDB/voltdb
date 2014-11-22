@@ -27,6 +27,7 @@ import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
@@ -1251,6 +1252,12 @@ public abstract class SubPlanAssembler {
                 replaceInListFilterWithEqualityFilter(path.endExprs, expr2, elemExpr);
                 // Set up the similar VectorValue --> TVE replacement of the search key expression.
                 expr2 = elemExpr;
+            }
+            if (expr2 instanceof AbstractSubqueryExpression) {
+                // The AbstractSubqueryExpression must be wrapped up into a
+                // ScalarValueExpression which extracts the actual row/column from
+                // the subquery
+                expr2 = ExpressionUtil.addScalarValueExpression((AbstractSubqueryExpression)expr2);
             }
             scanNode.addSearchKeyExpression(expr2);
         }

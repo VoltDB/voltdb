@@ -1627,9 +1627,9 @@ public class Expression {
 
         // Add expresion sub type
         if (exprSubType == OpTypes.ANY_QUANTIFIED) {
-            exp.attributes.put("opsubtype", "anyquantified");
+            exp.attributes.put("opsubtype", "any");
         } else if (exprSubType == OpTypes.ALL_QUANTIFIED) {
-            exp.attributes.put("opsubtype", "allquantified");
+            exp.attributes.put("opsubtype", "all");
         }
 
         for (Expression expr : nodes) {

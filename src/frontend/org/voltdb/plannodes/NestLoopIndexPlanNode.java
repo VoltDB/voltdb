@@ -17,6 +17,7 @@
 
 package org.voltdb.plannodes;
 
+import java.util.Collection;
 import java.util.TreeMap;
 
 import org.json_voltpatches.JSONException;
@@ -26,6 +27,9 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AbstractSubqueryExpression;
+import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
@@ -66,6 +70,11 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         m_hasSignificantOutputSchema = true;
 
         generateRealOutputSchema(db);
+
+        // Generate the output schema for subqueries
+        ExpressionUtil.generateSubqueryExpressionOutputSchema(m_preJoinPredicate, db);
+        ExpressionUtil.generateSubqueryExpressionOutputSchema(m_joinPredicate, db);
+        ExpressionUtil.generateSubqueryExpressionOutputSchema(m_wherePredicate, db);
     }
 
     @Override
@@ -104,6 +113,12 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         resolvePredicate(m_preJoinPredicate, outer_schema, index_schema);
         resolvePredicate(m_joinPredicate, outer_schema, index_schema);
         resolvePredicate(m_wherePredicate, outer_schema, index_schema);
+
+        // resolve subqueries
+        Collection<AbstractExpression> exprs = findAllExpressionsOfClass(AbstractSubqueryExpression.class);
+        for (AbstractExpression expr: exprs) {
+            ExpressionUtil.resolveSubqueryExpressionColumnIndexes(expr);
+        }
 
         // need to resolve the indexes of the output schema and
         // order the combined output schema coherently

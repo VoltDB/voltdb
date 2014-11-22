@@ -72,7 +72,7 @@ public class SQLCommand
     private static final Pattern AutoSplit = Pattern.compile("(\\s|((\\(\\s*)+))(alter|create|drop|select|insert|update|upsert|delete|truncate|exec|execute|explain|explainproc)\\s", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     private static final Pattern SetOp = Pattern.compile("(\\s|\\))\\s*(union|except|intersect)(\\s\\s*all)?((\\s*\\({0,1}\\s*)*)select", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     private static final Pattern Subquery =
-            Pattern.compile("(\\s*)(,|(?:\\s(?:from|in|exists|join)))((\\s*\\(\\s*)*)select",
+            Pattern.compile("(\\s*)(,|(?:\\s(?:from|in|exists|join|=|!=|<>|>|>=|<|<=|ALL|ANY)))((\\s*\\(\\s*)*)select",
                             Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
 
     private static final String quotedIdPattern = "\"(?:[^\"]|\"\")+\""; // double-quoted ID, " escaped with ""

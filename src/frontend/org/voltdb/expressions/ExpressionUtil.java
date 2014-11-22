@@ -28,8 +28,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
 
+import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
-import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.ExpressionType;
 
 /**
@@ -463,4 +463,19 @@ public abstract class ExpressionUtil {
         }
     }
 
+    /**
+     * Add a ScalarValueExpression on top of the SubqueryExpression
+     * @param expr - subquery expression
+     * return ScalarValueExpression
+     */
+    public static AbstractExpression addScalarValueExpression(AbstractSubqueryExpression expr) {
+        AbstractExpression scalarExpr = new ScalarValueExpression();
+        scalarExpr.setLeft(expr);
+        scalarExpr.setValueType(expr.getValueType());
+        scalarExpr.setValueSize(expr.getValueSize());
+        // reset scalarSubqueryExpr type to BIGINT
+        expr.setValueType(VoltType.BIGINT);
+        expr.setValueSize(VoltType.BIGINT.getLengthInBytesForFixedTypes());
+        return scalarExpr;
+    }
 }
