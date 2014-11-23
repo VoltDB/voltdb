@@ -561,6 +561,7 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
     case (EXPRESSION_TYPE_COMPARE_LIKE):
     case (EXPRESSION_TYPE_COMPARE_IN):
         ret = comparisonFactory(obj, et, lc, rc);
+    break;
     case (EXPRESSION_TYPE_COMPARE_IN_SUBQUERY):
         ret = getInSelectComparison(lc, rc);
     break;
