@@ -20,41 +20,36 @@
 
 namespace voltdb {
 
-SubqueryValueExtractor::SubqueryValueExtractor(NValue value) :
-    m_tuple()
-{
-    int subqueryId = ValuePeeker::peekInteger(value);
-    ExecutorContext* exeContext = ExecutorContext::getExecutorContext();
-    Table* table = exeContext->getSubqueryOutputTable(subqueryId);
-    assert(table != NULL);
-    if (table->activeTupleCount() > 1) {
-        // throw runtime exception
-        char message[256];
-        snprintf(message, 256, "More than one row returned by a scalar/row subquery");
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
-    }
-    if (table->activeTupleCount() != 0) {
-        m_tuple.setSchema(table->schema());
-        TableIterator& iterator = table->iterator();
-        iterator.next(m_tuple);
-    }
-}
-
-bool SubqueryValueExtractor::isNUllOrEmpty() const
-{
-    if (m_tuple.isNullTuple() == false)
+template <>
+bool TupleExtractor::compare<CmpEq>(CmpEq comp, const TableTuple& tuple) const
     {
-        int size = m_tuple.getSchema()->columnCount();
-        for (int i = 0; i < size; ++i)
+        assert(m_tuple.getSchema()->columnCount() == tuple.getSchema()->columnCount());
+        int schemaSize = m_tuple.getSchema()->columnCount();
+        // Lexicographical compare two sequences
+        for (int columnIdx = 0; columnIdx < schemaSize; ++columnIdx)
         {
-            if (m_tuple.isNull(i) == true)
+            if (comp.cmp(m_tuple.getNValue(columnIdx), tuple.getNValue(columnIdx)).isFalse())
             {
-                    return true;
+                return false;
             }
         }
-        return false;
+        return true;
     }
-    return true;
-}
+
+template <>
+bool TupleExtractor::compare<CmpNe>(CmpNe comp, const TableTuple& tuple) const
+    {
+        assert(m_tuple.getSchema()->columnCount() == tuple.getSchema()->columnCount());
+        int schemaSize = m_tuple.getSchema()->columnCount();
+        // Lexicographical compare two sequences
+        for (int columnIdx = 0; columnIdx < schemaSize; ++columnIdx)
+        {
+            if (comp.cmp(m_tuple.getNValue(columnIdx), tuple.getNValue(columnIdx)).isFalse())
+            {
+                return false;
+            }
+        }
+        return true;
+    }
 
 }

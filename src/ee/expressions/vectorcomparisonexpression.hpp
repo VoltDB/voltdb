@@ -43,8 +43,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTOREINCOMPARISONEXPRESSION_H
-#define HSTOREINCOMPARISONEXPRESSION_H
+#ifndef HSTOREVECTORCOMPARISONEXPRESSION_H
+#define HSTOREVECTORCOMPARISONEXPRESSION_H
 
 #include "common/common.h"
 #include "common/executorcontext.hpp"
@@ -176,40 +176,10 @@ struct TupleExtractor
         return isNullValue(m_tuple);
     }
 
-    bool isNullValue(const ValueType& value) const
-    {
-        if (!value.isNullTuple()){
-            int schemaSize = m_tuple.getSchema()->columnCount();
-            for (int columnIdx = 0; columnIdx < schemaSize; ++columnIdx)
-            {
-                if (m_tuple.isNull(columnIdx)) {
-                    return true;
-                }
-            }
-            return false;
-        }
-        return true;
-    }
+    bool isNullValue(const ValueType& value) const;
 
     template<typename OP>
-    bool compare(OP comp, const TableTuple& tuple) const
-    {
-        assert(m_tuple.getSchema()->columnCount() == tuple.getSchema()->columnCount());
-        int schemaSize = m_tuple.getSchema()->columnCount();
-        // Lexicographical compare two sequences
-        for (int columnIdx = 0; columnIdx < schemaSize; ++columnIdx)
-        {
-            if (comp.cmp(m_tuple.getNValue(columnIdx), tuple.getNValue(columnIdx)).isTrue())
-            {
-                return true;
-            }
-            if (comp.cmp(tuple.getNValue(columnIdx), m_tuple.getNValue(columnIdx)).isTrue())
-            {
-                return false;
-            }
-        }
-        return false;
-    }
+    bool compare(OP comp, const TableTuple& tuple) const;
 
     template<typename OP>
     bool compare(OP comp, const NValue& nvalue) const
@@ -318,6 +288,30 @@ NValue VectorComparisonExpression<OP, ValueExtractorOuter, ValueExtractorInner>:
         }
         return retval;
     }
+}
+
+// Compares two tuples column by column using lexicographical compare. The OP predicate
+// must satisfy the following condition
+// X and Y are equivalent if both OP(x, y) and OP(y, x) are false
+// CmpEq and CmpNe are handled separately because they don't satisfy the above requirement.
+template<typename OP>
+bool TupleExtractor::compare(OP comp, const TableTuple& tuple) const
+{
+    assert(m_tuple.getSchema()->columnCount() == tuple.getSchema()->columnCount());
+    int schemaSize = m_tuple.getSchema()->columnCount();
+    // Lexicographical compare two sequences
+    for (int columnIdx = 0; columnIdx < schemaSize; ++columnIdx)
+    {
+        if (comp.cmp(m_tuple.getNValue(columnIdx), tuple.getNValue(columnIdx)).isTrue())
+        {
+            return true;
+        }
+        if (comp.cmp(tuple.getNValue(columnIdx), m_tuple.getNValue(columnIdx)).isTrue())
+        {
+            return false;
+        }
+    }
+    return false;
 }
 
 }

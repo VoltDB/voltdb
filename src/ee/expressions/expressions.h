@@ -52,7 +52,6 @@
 
 #include "expressions/operatorexpression.h"
 #include "expressions/comparisonexpression.h"
-#include "expressions/incomparisonexpression.hpp"
 #include "expressions/conjunctionexpression.h"
 #include "expressions/constantvalueexpression.h"
 #include "expressions/functionexpression.h"
@@ -62,5 +61,6 @@
 #include "expressions/hashrangeexpression.h"
 #include "expressions/subqueryexpression.h"
 #include "expressions/scalarvalueexpression.h"
+#include "expressions/vectorcomparisonexpression.hpp"
 
 #endif
