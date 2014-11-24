@@ -2121,23 +2121,20 @@ public class PlanAssembler {
      */
     AbstractPlanNode handleDistinct(AbstractPlanNode root) {
         if (m_parsedSelect.hasDistinct()) {
-            //TODO: The long-term goal to fix all the ills of Distinct is to implement distinct as
-            // a final GROUP BY all columns and eliminate Distinct as separately implemented
-            // PlanNode and Executor class types.
-            // The riskiest edge case in this approach to Distinct is when the distinct is applied
-            // on top of a GROUP BY -- either explicit in the query or implied by a materialized view --
-            // AND not all the GROUP BY expressions are in the result columns.
-            // If all the GROUP BY expressions are in the result columns, the result is already Distinct.
-            // We currently can't handle DISTINCT of multiple columns.
+            // DISTINCT is basically rewrote with GROUP BY to benefit all kinds of GROUP BY OPTIMIZATIONS.
+            // We only get here if we have a GROUP BY clause, since SELECT DISTINCT is converted to
+            // grouping by all columns in the select list prior to planning if no GROUP BY is present or is optimized out.
+            // In the non-trivial case, where an existing GROUP BY column is NOT in the select list,
+            // a final aggregation (never pushed down) can be added to the top of the plan.
+            // This should perform approximately on par with the current DISTINCT implementation.
+
+            // Right now, we currently can't handle DISTINCT of multiple columns with GROUP BY clause.
             // Throw a planner error if this is attempted.
             if (m_parsedSelect.m_displayColumns.size() > 1) {
-                throw new PlanningErrorException("Multiple DISTINCT columns currently unsupported");
+                throw new PlanningErrorException("Multiple DISTINCT columns with GROUP BY clause currently unsupported");
             }
             AbstractExpression distinctExpr = null;
             for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.m_displayColumns) {
-                // Distinct can in theory handle any expression now, but it's
-                // untested so we'll balk on anything other than a TVE here
-                // --izzy
                 if (col.expression instanceof TupleValueExpression)
                 {
                     assert(distinctExpr == null);
@@ -2145,7 +2142,7 @@ public class PlanAssembler {
                 }
                 else
                 {
-                    throw new PlanningErrorException("DISTINCT of an expression currently unsupported");
+                    throw new PlanningErrorException("DISTINCT of an expression with GROUP BY clause currently unsupported");
                 }
             }
             // Add a distinct node to the plan.
@@ -2155,7 +2152,6 @@ public class PlanAssembler {
             // the other aggregates do this inherently but distinct may need a
             // projection node.
             root = addProjection(root);
-
         }
 
         return root;

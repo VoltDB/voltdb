@@ -189,6 +189,15 @@ public class VoltProjectBuilder {
             this.allproc = allproc;
         }
 
+        public static GroupInfo[] fromTemplate(final GroupInfo other, final String... names) {
+            GroupInfo[] groups = new GroupInfo[names.length];
+            for (int i = 0; i < names.length; ++i) {
+                groups[i] = new GroupInfo(names[i], other.sql, other.sqlread, other.admin,
+                                other.defaultproc, other.defaultprocread, other.allproc);
+            }
+            return groups;
+        }
+
         @Override
         public int hashCode() {
             return name.hashCode();
@@ -521,8 +530,12 @@ public class VoltProjectBuilder {
         m_jsonApiEnabled = enabled;
     }
 
-    public void setSecurityEnabled(final boolean enabled) {
+    public void setSecurityEnabled(final boolean enabled, boolean createAdminUser) {
         m_securityEnabled = enabled;
+        if (createAdminUser) {
+            addUsers(new UserInfo[]
+                    {new UserInfo("defaultadmin", "admin", new String[] {"ADMINISTRATOR"})});
+        }
     }
 
     public void setSecurityProvider(final String provider) {
@@ -939,7 +952,9 @@ public class VoltProjectBuilder {
             systemSettingType.setElastic(elastic);
         }
         if (m_queryTimeout != null) {
-            factory.createSystemSettingsTypeQuery().setTimeout(m_queryTimeout);
+            SystemSettingsType.Query query = factory.createSystemSettingsTypeQuery();
+            query.setTimeout(m_queryTimeout);
+            systemSettingType.setQuery(query);
         }
 
         deployment.setSystemsettings(systemSettingType);

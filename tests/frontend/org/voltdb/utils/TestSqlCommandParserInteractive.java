@@ -482,4 +482,16 @@ public class TestSqlCommandParserInteractive extends TestCase {
         assertEquals(1, result.get().size());
         assertEquals(upsert, result.get().get(0));
     }
+
+    public void testCreateRole() throws Exception
+    {
+        CommandStuff cmd = new CommandStuff();
+        Future<List<String>> result = cmd.openQuery();
+        String create = "create role goats with ADMINISTRATOR";
+        cmd.submitText(create + ";\n");
+        cmd.waitOnResult();
+        System.out.println("RESULT: " + result.get());
+        assertEquals(1, result.get().size());
+        assertEquals(create, result.get().get(0));
+    }
 }

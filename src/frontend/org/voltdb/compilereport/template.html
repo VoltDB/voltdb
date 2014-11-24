@@ -1,248 +1,255 @@
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <title>VoltDB Catalog Report</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="">
-    <meta name="author" content="">
-
-    <!-- Le styles -->
-    <link href="http://assets.voltdb.com/b/css/bootstrap.min.css" rel="stylesheet">
-    <style type="text/css">
-      body {
-        padding-top: 60px;
-        padding-bottom: 40px;
-      }
-      .invert {
-        background-color: #0079BB;
-      }
-      td.invert>p {
-        color: white;
-      }
-      td.invert>p>a {
-        color: #eeeeee;
-      }
-      .table th.right-cell, .table td.right-cell {
-		text-align: right;
-      }
-      .table th.calculated-cell, .table td.calculated-cell {
-        font-weight: bold;
-        background-color: #e6ebf0;
-      }
-      .table th.min-max-header {
-        font-size: smaller;
-      }
-      td.table-view-name {
-        font-weight: bold;
-      }
-      table.size-summary-table {
-        width: auto;
-      }
-      input.count-input {
-        width: 100px;
-        text-align: right;
-      }
-    </style>
-    <link href="http://assets.voltdb.com/b/css/bootstrap-responsive.css" rel="stylesheet">
-    <link href="http://assets.voltdb.com/t/css/theme.bootstrap.css" rel="stylesheet">
-
-    <!-- HTML5 shim, for IE6-8 support of HTML5 elements -->
-    <!--[if lt IE 9]>
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>VoltDB Management Center</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="">
+<meta name="author" content="">
+<link href="http://assets.voltdb.com/css/resources/schema/bootstrap.min.css" rel="stylesheet">
+<link href="http://assets.voltdb.com/css/resources/schema/bootstrap-responsive.css" rel="stylesheet">
+<link href="http://assets.voltdb.com/css/resources/schema/theme.bootstrap.css" rel="stylesheet">
+<link href="http://assets.voltdb.com/css/resources/layout.css" rel="stylesheet" />
+<!-- HTML5 shim, for IE6-8 support of HTML5 elements -->
+<!--[if lt IE 9]>
       <script src="http://assets.voltdb.com/b/js/html5shiv.js"></script>
     <![endif]-->
-
-    <!-- Fav and touch icons -->
-    <link rel="apple-touch-icon-precomposed" sizes="144x144" href="../assets/ico/apple-touch-icon-144-precomposed.png">
-    <link rel="apple-touch-icon-precomposed" sizes="114x114" href="../assets/ico/apple-touch-icon-114-precomposed.png">
-      <link rel="apple-touch-icon-precomposed" sizes="72x72" href="../assets/ico/apple-touch-icon-72-precomposed.png">
-                    <link rel="apple-touch-icon-precomposed" href="../assets/ico/apple-touch-icon-57-precomposed.png">
-                                   <link rel="shortcut icon" href="../assets/ico/favicon.png">
-  </head>
-
-  <body>
-    <iframe name="versioncheck" id="versioncheck" style="display:none;" width="1" height="1" frameborder="0" src="about:blank"></iframe>
-    <div class="navbar navbar-inverse navbar-fixed-top">
-      <div class="navbar-inner">
-        <div class="container">
-          <button type="button" class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
-            <span class="icon-bar"></span>
-            <span class="icon-bar"></span>
-            <span class="icon-bar"></span>
-          </button>
-          <a class="brand" href="#o">VoltDB Catalog Report</a>
-          <div class="nav-collapse collapse">
-            <ul class="nav">
-              <li id='o-nav'> <a href="#o">Overview</a></li>
-              <li id='s-nav'> <a href="#s">Schema</a></li>
-              <li id='p-nav'> <a href="#p">Procedures &amp; SQL</a></li>
-              <li id='r-nav'> <a href="#r">System Report</a></li>
-              <li id='z-nav'> <a href="#z">Size Worksheet</a></li>
-              <li id='d-nav'> <a href="#d">DDL Source</a></li>
-            <!--##RESOURCES
-              <li id='m-nav'> <a href='/memory/'>Memory Report</a></li>
-            ##RESOURCES-->
-            </ul>
-          </div><!--/.nav-collapse -->
+<!-- Fav and touch icons -->
+<link rel="apple-touch-icon-precomposed" sizes="144x144" href="../assets/ico/apple-touch-icon-144-precomposed.png">
+<link rel="apple-touch-icon-precomposed" sizes="114x114" href="../assets/ico/apple-touch-icon-114-precomposed.png">
+<link rel="apple-touch-icon-precomposed" sizes="72x72" href="../assets/ico/apple-touch-icon-72-precomposed.png">
+<link rel="apple-touch-icon-precomposed" href="../assets/ico/apple-touch-icon-57-precomposed.png">
+<link rel="shortcut icon" href="../assets/ico/favicon.png">
+<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js"></script>
+    <script type="text/javascript">
+        $(document).ready(function () {
+            $("#schemaLinkSqlQuery").on("click", function () {
+                //For opening the SQL Query Tab
+                $.cookie("current-tab", 3, { path: '/', domain: window.location.hostname });
+            });
+        });
+    </script>
+</head>
+<body>
+<div id="wrapper">
+    <div class="catalogContainer" id="catalogContainer">
+        <div class="catalogMenu" id="MenuCatalog">
+            <div class="nav-collapse collapse">
+                <ul class="catalogNav" id="catalogNavlist">
+                    <li id='o-nav'> <a href="#o">Overview</a></li>
+                    <li id='s-nav'> <a href="#s">Schema</a></li>
+                    <li id='p-nav'> <a href="#p">Procedures &amp; SQL</a></li>
+                    <!--        <li id='r-nav'> <a href="#r">System Report</a></li> -->
+                    <li id='z-nav'> <a href="#z">Size Worksheet</a></li>
+                    <li id='d-nav'> <a href="#d">DDL Source</a></li>
+                    <!--        <li id='m-nav'> <a href='/memory/'>Memory Report</a></li> -->
+                </ul>
+                <div class="clear"></div>
+            </div>
         </div>
-      </div>
+
+        <!-- /container -->
+        <div class="container" id="containerCatalog">
+            <div id='o' class='reportpage'>
+                <div class="dataBlock">
+                    <!--<div class="dataBlockHeading"> <a name='o'></a>
+                        <h1>Overview</h1>
+                    </div>-->
+                    <div class="dataBlockContent">
+                        <p>This report was generated by the VoltDB compiler. It shows the <span class="prop"><a href='#s' id="sch">schema</a></span> and <span class="prop"><a href='#p' id="procedures">procedures</a></span> that comprise a
+                            compiled VoltDB application catalog.</p>
+                    </div>
+                </div>
+                <div class="dataBlock">
+                    <div class="dataBlockContent systemOver" style="padding:0;">
+                        <!--##CLUSTER##-->
+                    </div>
+                </div>
+                <div class="dataBlock">
+                    <div class="dataBlockHeading" style="border-bottom:none;">
+                        <h3>Catalog Overview Statistics</h3>
+                    </div>
+                    <div class="dataBlockContent" style="padding:0;"> ##STATS## </div>
+                </div>
+            </div>
+            <div id='s' class='reportpage' style='display: none;'>
+                <div class="dataBlock">
+                    <div class="dataBlockHeading"> <a name='s'></a>
+                        <h1>Schema</h1>
+                    </div>
+                    <div class="dataBlockContent">
+                        <div class="tblScroll">
+                        <div class="checkbox">
+                         <label>
+                          <input type="checkbox" class="cb"> Expand All
+                         </label>
+                        </div>
+                        <table class="table tableL1 tablesorter" id='schematable'>
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Partitioning</th>
+                                    <th>Columns</th>
+                                    <th>Indexes</th>
+                                    <th>PKey</th>
+                                    <th>TupleLimit</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+
+                                ##SCHEMA##
+                            </tbody>
+
+                        </table>
+                        </div>
+                        <br/>
+                        <br/>
+                        <span class="prop"><a href = '#d' id="ddlSource">View the DDL Source</a></span> </div>
+                </div>
+            </div>
+            <div id='d' class='reportpage' style='display: none;'>
+                <div class="dataBlock">
+                    <div class="dataBlockHeading"> <a name='d'></a>
+                  <h1>DDL Source <a class="btn" id="downloadDDL" download="ddl.sql" href="/ddl/" style="padding:5px;">Download</a> </h1>
+                    </div>
+                    <div class="dataBlockContent">
+                        <pre>##DDL##</pre>
+                    </div>
+                </div>
+            </div>
+            <div id='p' class='reportpage' style='display: none;'>
+                <div class="dataBlock">
+                    <div class="dataBlockHeading"> <a name='p'></a>
+                        <h1>Procedures &amp; SQL</h1>
+                    </div>
+                    <div class="dataBlockContent">
+                        <div class="tblScroll">
+                        <div class="checkbox">
+                        <label>
+                         <input type="checkbox" class="cb"> Expand All
+                        </label>
+                       </div>
+                        <table class="table tableL1 tablesorter" id='proctable'>
+                            <thead>
+                                <tr>
+                                    <th>Procedure Name</th>
+                                    <th>Parameters</th>
+                                    <th>Partitioning</th>
+                                    <th>R/W</th>
+                                    <th>Access</th>
+                                    <th>Attributes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+
+                                ##PROCS##
+                            </tbody>
+
+                        </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id='r' class='reportpage' style='display: none;'>
+                <div class="dataBlock">
+                    <div class="dataBlockHeading">
+                        <h1>System Report</h1>
+                    </div>
+                    <div class="dataBlockContent">
+                        <!--##PLATFORM2##-->
+                    </div>
+                </div>
+                <div class="dataBlock">
+                    <div class="dataBlockHeading">
+                        <h4>VoltDB Compiler Platform:</h4>
+                    </div>
+                    <div class="dataBlockContent">
+                        <p>##PLATFORM##</p>
+                    </div>
+                </div>
+            </div>
+            <div id='z' class='reportpage' style='display: none;'>
+                <div class="dataBlock">
+                    <div class="dataBlockHeading"> <a name='z'></a>
+                        <h1>Estimate Memory Used by User Data</h1>
+                    </div>
+                    <div class="dataBlockContent">
+                        <table class="z-table" id="zTbl">
+                            <tr>
+                                <td width='40%'> This sizing worksheet is designed to help VoltDB application developers
+                                    estimate the amount of memory the user data will require in an application.
+                                    These estimates include user data and most of the per-row data structure
+                                    overhead for that data. Memory use that is not proportional to the amount
+                                    of data (e.g., the Java heap and any temporary buffers
+                                    and caches) is not included. </td>
+                                <td width='*'><small>
+                                                  <ul>
+                                                      <li>Sizes without units are in bytes.</li>
+                                                      <li>For more useful results replace row counts with better estimates.</li>
+                                                      <li>All calculated fields update after leaving any input field.</li>
+                                                      <li>Warning: Page refresh resets all input fields.</li>
+                                                      <li> VARCHAR columns are measured in UTF-8 characters by default. VARCHAR
+                                                          columns of up to 16 characters are stored in-line at 4 bytes per character.
+                                                          Columns of 16 characters or more are stored in pooled memory via pointers. </li>
+                                                  </ul>
+                                              </small></td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="dataBlockContent">
+                        <div class="tblScroll">
+                        <table class="table tableL3 tablesorter" id='sizetable'>
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Count</th>
+                                    <th class='min-max-header'>Row Min</th>
+                                    <th class='min-max-header'>Row Max</th>
+                                    <th class='min-max-header'>Index Min</th>
+                                    <th class='min-max-header'>Index Max</th>
+                                    <th class='min-max-header'>Table Min</th>
+                                    <th class='min-max-header'>Table Max</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+
+                                ##SIZES##
+                            </tbody>
+
+                        </table>
+                        </div>
+                    </div>
+                </div>
+                <div class="dataBlock">
+                    <div class="dataBlockHeading">
+                        <h3>Size Analysis Summary</h3>
+                    </div>
+                    <div class="dataBlockContent">
+                        <div class="tblScroll">
+                        ##SIZESUMMARY##
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+        <div class="documentation"> <a href="http://voltdb.com/docs" class="icon-document" id="iconDoc">VoltDB Documentation</a> <span>Generated by VoltDB ##VERSION## on ##TIMESTAMP##</span>
+            <div class="clear"></div>
+        </div>
     </div>
-
-    <div class="container">
-
-        <div id='o' class='reportpage'>
-            <a name='o'></a><h1>Overview</h1><br/>
-            <div class='well text-center' style='font-size: 18px;'>
-                <p>This report was generated by the VoltDB compiler. It shows the
-                <a href='#s'>schema</a> and <a href='#p'>procedures</a> that comprise a
-                compiled VoltDB application catalog.</p>
-            <!--##RESOURCES
-                <p>Use <strong><a href='/studio/'> VoltDB Studio</a></strong><small><a href='/studio/'> (/studio/)</a></small> to issue SQL queries and call stored procedures against the database. </p>
-            ##RESOURCES-->
-            </div><br/>
-
-            <!--##CLUSTER##-->
-            <h4>Catalog Overview Statistics</h4>
-            ##STATS##
-        </div>
-
-        <div id='s' class='reportpage' style='display: none;'>
-          <a name='s'></a><h1>Schema</h1><br/>
-
-          <table class="table tableL1 tablesorter" id='schematable'>
-                <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Type</th>
-                    <th>Partitioning</th>
-                    <th>Columns</th>
-                    <th>Indexes</th>
-                    <th>PKey</th>
-                    <th>TupleLimit</th>
-                </tr>
-                </thead>
-                <tbody>
-                ##SCHEMA##
-                </tbody>
-            </table>
-            <a href = '#d'>View the DDL Source</a>
-        </div>
-        
-        <div id='d' class='reportpage' style='display: none;'>
-          <a name='d'></a><h1>DDL Source
-          <a href = '/ddl/' class = "btn" download = "ddl.sql">Download</a></h1><br/>
-          <pre>##DDL##</pre>
-        </div>
-
-        <div id='p' class='reportpage' style='display: none;'>
-          <a name='p'></a><h1>Procedures &amp; SQL</h1><br/>
-
-          <table class="table tableL1 tablesorter" id='proctable'>
-                <thead>
-                <tr>
-                    <th>Procedure Name</th>
-                    <th>Parameters</th>
-                    <th>Partitioning</th>
-                    <th>R/W</th>
-                    <th>Access</th>
-                    <th>Attributes</th>
-                </tr>
-                </thead>
-                <tbody>
-                ##PROCS##
-                </tbody>
-            </table>
-
-        </div>
-
-        <div id='r' class='reportpage' style='display: none;'>
-            <h1>System Report</h1><br/>
-            <!--##PLATFORM2##-->
-            <h4>VoltDB Compiler Platform:</h4>
-            <p>##PLATFORM##</p>
-        </div>
-
-        <div id='z' class='reportpage' style='display: none;'>
-            <a name='z'></a><h1>Estimate Memory Used by User Data</h1><br/>
-
-            <table><tr>
-
-            <td width='60%'>
-                This sizing worksheet is designed to help VoltDB application developers
-                estimate the amount of memory the user data will require in an application.
-                These estimates include user data and most of the per-row data structure
-                overhead for that data. Memory use that is not proportional to the amount
-                of data (e.g., the Java heap and any temporary buffers
-                and caches) is not included.
-            </td>
-
-            <td width='*'>
-            <small><ul>
-                <li>Sizes without units are in bytes.</li>
-                <li>For more useful results replace row counts with better estimates.</li>
-                <li>All calculated fields update after leaving any input field.</li>
-                <li>Warning: Page refresh resets all input fields.</li>
-                <li>
-                    VARCHAR columns are measured in UTF-8 characters by default. VARCHAR
-                    columns of up to 16 characters are stored in-line at 4 bytes per character.
-                    Columns of 16 characters or more are stored in pooled memory via pointers.
-                </li>
-            </ul></small>
-            </td>
-
-            </tr></table>
-            <br/>
-
-            <table class="table tableL3 tablesorter" id='sizetable'>
-                <thead>
-	                <tr>
-	                    <th>Name</th>
-	                    <th>Type</th>
-                        <th>Count</th>
-	                    <th class='min-max-header'>Row Min</th>
-	                    <th class='min-max-header'>Row Max</th>
-	                    <th class='min-max-header'>Index Min</th>
-	                    <th class='min-max-header'>Index Max</th>
-	                    <th class='min-max-header'>Table Min</th>
-	                    <th class='min-max-header'>Table Max</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ##SIZES##
-                </tbody>
-            </table>
-            <br/>
-
-            <h4>Size Analysis Summary</h4>
-            ##SIZESUMMARY##
-
-        </div>
-
-      <hr>
-
-      <footer>
-        <div class='row'>
-        <div class='span6 text-left'>
-            <a href='http://voltdb.com/docs'><i class='icon-book'></i> VoltDB Documentation</a>
-        </div>
-        <div class='span6 text-right'>
-            Generated by VoltDB ##VERSION## on ##TIMESTAMP##
-        </div>
-        </div>
-      </footer>
-
-    </div> <!-- /container -->
-
-    <!-- Le javascript
+    </div>
+<!-- Le javascript
     ================================================== -->
-    <!-- Placed at the end of the document so the pages load faster -->
-    <script src="http://assets.voltdb.com/get.py?a=KEY&b=r&f=jquery-1.9.1.min.js"></script>
-    <script src="http://assets.voltdb.com/b/js/bootstrap.js"></script>
-    <script src="http://assets.voltdb.com/t/js/jquery.tablesorter.js"></script>
-    <script src="http://assets.voltdb.com/t/js/jquery.tablesorter.widgets.js"></script>
+<!-- Placed at the end of the document so the pages load faster -->
+<script src="http://assets.voltdb.com/js/bootstrap.js"></script>
+<script src="http://assets.voltdb.com/js/jquery.tablesorter.js"></script>
+<script src="http://assets.voltdb.com/js/jquery.tablesorter.widgets.js"></script>
 
     <script>
         $('#versioncheck').attr('src', 'http://community.voltdb.com/versioncheck?app=catreport&ver=##VERSION##');
-
         function navigate(hash) {
             console.log(hash);
             if (hash.length == 0) hash = '#o';
@@ -250,7 +257,6 @@
             var anchor = hash.substring(1);
             var parts = anchor.split('-');
             var toppage = parts[0];
-
             // reset everything
             $('.tablesorter-childRow>td').hide();
             $('.dropdown2>td').hide();
@@ -259,41 +265,31 @@
             // make arrows point the right way
             $('.icon-chevron-down').removeClass('icon-chevron-down').addClass('icon-chevron-right');
             $('.primaryrow').css('background-color', '#ffffff');
-
             $('.nav-collapse ul li').removeClass('active');
             $('div.reportpage').hide();
             $('#' + toppage + '-nav').addClass('active');
             $('#' + toppage).show();
-
             if (parts.length > 1) {
                 var primary = parts[1];
                 console.log("primary = " + primary);
-
                 var iconid = "#" + toppage + "-" + primary + "--icon";
                 var dropdownid = "#" + toppage + "-" + primary + "--dropdown";
-
                 $(dropdownid).show();
                 $(iconid).parentsUntil("tbody", 'tr').css('background-color', '#dddddd');
                 $(iconid).removeClass('icon-chevron-right').addClass('icon-chevron-down');
-
                 if (parts.length > 2) {
                     var secondary = parts[2];
                     console.log("secondary = " + secondary);
-
                     var iconid2 = "#" + toppage + "-" + primary + "-" + secondary + "--icon";
                     var dropdownid2 = "#" + toppage + "-" + primary + "-" + secondary + "--dropdown";
-
                     $(dropdownid2).show();
                     $(iconid2).removeClass('icon-chevron-right').addClass('icon-chevron-down');
                 }
             }
-
             location.hash = hash;
         }
-
         $( document ).ready(function() {
             console.log("ready!");
-
             $.extend($.tablesorter.themes.bootstrap, {
                 // these classes are added to the table. To see other table classes available,
                 // look here: http://twitter.github.com/bootstrap/base-css.html#tables
@@ -311,7 +307,6 @@
                 even       : '', // odd row zebra striping
                 odd        : ''  // even row zebra striping
             });
-
             $(".tableL1").tablesorter({
                 theme : 'bootstrap',
                 widthFixed: true,
@@ -323,12 +318,10 @@
                 },
                 cssChildRow: "tablesorter-childRow"
             });
-
             $('.tableL1').delegate('.togglex', 'click' ,function(){
                 var id = $(this).attr('id');
                 var toppage = id.split('-')[0];
                 var dropdownid = "#" + id + "--dropdown";
-
                 var hash = "#" + id;
                 if ($(dropdownid).is(":visible")) {
                     hash = "#" + toppage;
@@ -337,17 +330,13 @@
                 navigate(hash);
                 return false;
             });
-
             $('.tableL2').delegate('.togglex', 'click' ,function(){
                 var id = $(this).attr('id');
-
                 console.log("l2click: " + id);
-
                 var parts = id.split('-');
                 var toppage = parts[0];
                 var primary = parts[1];
                 var dropdownid = "#" + id + "--dropdown";
-
                 var hash = "#" + id;
                 if ($(dropdownid).is(":visible")) {
                     console.log("l2clickVISIBLE");
@@ -360,7 +349,6 @@
                 navigate(hash);
                 return false;
             });
-
             $(".tableL3").tablesorter({
                 theme : 'bootstrap',
                 widthFixed: true,
@@ -372,12 +360,10 @@
                 },
                 cssChildRow: "tablesorter-childRow"
             });
-
             $('.tableL3').delegate('.togglex', 'click' ,function(){
                 var id = $(this).attr('id');
                 var toppage = id.split('-')[0];
                 var dropdownid = "#" + id + "--dropdown";
-
                 var hash = "#" + id;
                 if ($(dropdownid).is(":visible")) {
                     hash = "#" + toppage;
@@ -386,13 +372,10 @@
                 navigate(hash);
                 return false;
             });
-
             navigate($(location).attr('hash'));
-
             $(window).bind('hashchange', function () { //detect hash change
                 navigate(window.location.hash);
             });
-
             // tooltips
             $('.l-Table').popover({trigger:'focus hover',delay:{show:500,hide:100},placement:'top',content:
                 'Persistent Relational Table'});
@@ -425,54 +408,45 @@
                 'This statement or procedure could potentially use SQL that outputs non-deterministic ' +
                 'results which then may be used to modify state. If this happens, the cluster will ' +
                 'halt. Consider adding an ORDER BY clause to make a SELECT statement deterministic.'});
-
             sizes_update_all();
         });
-
         function numberWithCommas(n) {
             n = Math.round(n / 1000.0);
             var parts=n.toString().split(".");
             return parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (parts[1] ? "." + parts[1] : "") + " K";
         }
-
         function size_table_element(name, nrow) {
         	var id = "s-size-".concat(nrow, '-', name);
             var e = document.getElementById(id);
             return e;
         }
-
         function size_table_value(name, nrow) {
         	var elem = size_table_element(name, nrow);
         	var value = Math.floor(name == "count" ? elem.value : elem.innerHTML);
         	return value;
         }
-
         function size_table_update(name, nrow, value) {
             var elem = size_table_element(name, nrow);
             if (elem != null) {
                 elem.innerHTML = numberWithCommas(value);
             }
         }
-
         function size_summary_element(type, name) {
             var id = "s-size-summary-".concat(type, '-', name);
             var e = document.getElementById(id);
             return e;
         }
-
         function size_summary_value(type, name) {
             var elem = size_summary_element(type, name);
             var value = Math.floor(elem.innerHTML);
             return value;
         }
-
         function size_summary_update(type, name, value) {
             var elem = size_summary_element(type, name);
             if (elem != null) {
                 elem.innerHTML = numberWithCommas(value);
             }
         }
-
         function sizes_get_row(nrow) {
             return {
                 "count": size_table_value("count", nrow),
@@ -484,14 +458,12 @@
                 "tmax": size_table_value("tmax", nrow)
             };
         }
-
         // Do the size worksheet calculations for a single row.
         function sizes_update_row(nrow) {
         	var v = sizes_get_row(nrow);
             size_table_update("tmin", nrow, (v["rmin"] + v["imin"]) * v["count"]);
             size_table_update("tmax", nrow, (v["rmax"] + v["imax"]) * v["count"]);
         }
-
         /*
          * Update the size worksheet summary.
          */
@@ -528,7 +500,6 @@
             size_summary_update("total", "min", tmin + vmin + imin);
             size_summary_update("total", "max", tmax + vmax + imax);
         }
-
         /*
          * Do all the size worksheet calculations at once.
          * Call sizes_update_row() when a single row is changed.
@@ -542,8 +513,7 @@
             }
             sizes_update_summary();
         }
-
     </script>
 
-  </body>
+</body>
 </html>
