@@ -303,6 +303,7 @@ function alertNodeClicked(obj) {
                 onInformationLoaded();
             });
         };
+        
 
         this.getProceduresInformation = function (onProceduresDataLoaded) {
             var procedureMetadata = "";
@@ -329,7 +330,7 @@ function alertNodeClicked(obj) {
         this.getTablesInformation = function (onTableDataLoaded) {
             VoltDBService.GetDataTablesInformation(function (inestConnection) {
                 populateTableTypes(inestConnection);
-                populateTablesInformation(inestConnection);               
+                populateTablesInformation(inestConnection);
                 onTableDataLoaded(inestConnection.Metadata['@Statistics_TABLE'].data);
             });
 
@@ -452,9 +453,9 @@ function alertNodeClicked(obj) {
             callback(html, alertHtml);
         };
 
-        var configureRequestedHost = function(hostName) {
+        var configureRequestedHost = function (hostName) {
 
-            $.each(systemOverview, function(id, val) {
+            $.each(systemOverview, function (id, val) {
                 if (val["IPADDRESS"] == hostName) {
                     gCurrentServer = val["HOSTNAME"];
                     saveCookie("currentServer", val["HOSTNAME"]);
@@ -465,7 +466,7 @@ function alertNodeClicked(obj) {
             });
 
             if (gCurrentServer == "") {
-                $.each(systemOverview, function(id, val) {
+                $.each(systemOverview, function (id, val) {
                     if (val["CLUSTERSTATE"] == "RUNNING") {
                         gCurrentServer = val["HOSTNAME"];
                         saveCookie("currentServer", val["HOSTNAME"]);
@@ -822,7 +823,7 @@ function alertNodeClicked(obj) {
                     schemaCatalogTableTypes[tableName] = {};
                     schemaCatalogTableTypes[tableName]['TABLE_NAME'] = entry[tableNameIndex];
                     schemaCatalogTableTypes[tableName]['TABLE_TYPE'] = entry[tableTypeIndex];
-                    if(entry[remarksIndex]!=null)
+                    if (entry[remarksIndex] != null)
                         schemaCatalogTableTypes[tableName]['REMARKS'] = jQuery.parseJSON(entry[remarksIndex]).partitionColumn != null ? "PARTITIONED" : "REPLICATED";
                     else {
                         schemaCatalogTableTypes[tableName]['REMARKS'] = "REPLICATED";
@@ -831,13 +832,13 @@ function alertNodeClicked(obj) {
             });
 
         };
-       
+
         this.mapNodeInformationByStatus = function (callback) {
             var counter = 0;
             var memoryThreshold = $.cookie("alert-threshold") != '' ? $.cookie("alert-threshold") : -1;
             var htmlMarkups = { "ServerInformation": [] };
             var htmlMarkup;
-            var currentServerHtml="";
+            var currentServerHtml = "";
 
             if (systemOverview == null || systemOverview == undefined) {
                 alert("Error: Unable to extract Node Status");
@@ -864,7 +865,7 @@ function alertNodeClicked(obj) {
                         } else {
                             htmlMarkup = "<li class=\"active monitoring\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
                         }
-                    } else if (hostName != null && currentServer != hostName &&  val["CLUSTERSTATE"] == "RUNNING") {
+                    } else if (hostName != null && currentServer != hostName && val["CLUSTERSTATE"] == "RUNNING") {
                         if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
                             htmlMarkup = "<li class=\"active\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span><span class=\"hostIdHidden\" style=\"display:none\">" + systemMemory[hostName]["HOST_ID"] + "</span></li>";
                         } else {
@@ -894,7 +895,7 @@ function alertNodeClicked(obj) {
                         }
                     }
 
-                    if (hostName != null && currentServerHtml != hostName  && val["CLUSTERSTATE"] == "RUNNING") {
+                    if (hostName != null && currentServerHtml != hostName && val["CLUSTERSTATE"] == "RUNNING") {
                         if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
                             htmlMarkup = htmlMarkup + "<li class=\"active\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
 
@@ -1633,6 +1634,20 @@ function alertNodeClicked(obj) {
 
         };
 
+        this.getSiteCountByHost = function (connection) {
+            var sitesCount = 0;
+
+            if (connection != "" || connection != null) {
+                if (connection.Metadata['@SystemInformation_DEPLOYMENT'] != null) {
+                    connection.Metadata['@SystemInformation_DEPLOYMENT'].data.forEach(function (columnInfo) {
+                        if (columnInfo[0] == 'sitesperhost')
+                             sitesCount = columnInfo[1];
+                    });
+                }
+            }
+            return sitesCount;
+        };
+
         function getTableData(connection, tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData, processName) {
             var suffix = "";
             if (processName == "TABLE_INFORMATION") {
@@ -1745,6 +1760,13 @@ function alertNodeClicked(obj) {
         }
 
 
+        //Admin Tab
+        this.getAdminconfiguration = function (onInformationLoaded) {
+            VoltDBService.GetSystemInformationDeployment(function (connection) {
+                onInformationLoaded(connection);
+            });
+        };
+
         //common methods
         var formatTableNoData = function (listName) {
             if (listName == "PROCEDURE") {
@@ -1759,7 +1781,7 @@ function alertNodeClicked(obj) {
             }
 
         };
-              
+
         var formatTableData = function (connection) {
             var i = 0;
             var tableMetadata = [];
@@ -1769,7 +1791,7 @@ function alertNodeClicked(obj) {
             var tupleCountPartitions = [];
             var partitionData = {};
             var averageRowCount = 0;
-            
+
             if (voltDbRenderer.refreshTables) {
                 if (connection.Metadata["@Statistics_TABLE"] != undefined || connection.Metadata["@Statistics_TABLE"] != null) {
                     if (connection.Metadata["@Statistics_TABLE"].data != "" &&
@@ -1799,8 +1821,8 @@ function alertNodeClicked(obj) {
                                             }
 
                                         }
-                                        if (partitionEntryCount == partitionData[tupleData[tableNameIndex]].length && !duplicatePartition) {                                            
-                                            partitionData[tupleData[tableNameIndex]].push(tupleData);                                                                                        
+                                        if (partitionEntryCount == partitionData[tupleData[tableNameIndex]].length && !duplicatePartition) {
+                                            partitionData[tupleData[tableNameIndex]].push(tupleData);
                                             return false;
 
                                         }
@@ -1812,7 +1834,7 @@ function alertNodeClicked(obj) {
                         //formulate max, min, average for each table
                         $.each(partitionData, function (key, data) {
                             totalTupleCount = 0;
-                            
+
                             if (!tableData.hasOwnProperty(key)) {
                                 tableData[key] = {};
                             }
@@ -1822,7 +1844,7 @@ function alertNodeClicked(obj) {
                                 tupleCountPartitions[i] = data[i][tupleCountIndex];
                             }
 
-                            
+
                             tableData[key] = {
                                 "TABLE_NAME": key,
                                 "MAX_ROWS": Math.max.apply(null, tupleCountPartitions),
