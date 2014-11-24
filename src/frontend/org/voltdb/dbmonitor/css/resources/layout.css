@@ -498,7 +498,7 @@ a.icon-document{background-position: left -942px; padding-left:20px;
  font-size:13px; font-weight:bold; height:30px; line-height:32px; 
 display:inline-block; width:auto;color:#000000;}
 a.icon-document:hover{color:#76bd1d;}
-#schema, #sqlQuery{ display:none;}
+#schema, #sqlQuery, #admin{ display:none;}
 
 /*  Overrides bootstrap */
 .dataBlock .btn{background:#aa1f2f;}
