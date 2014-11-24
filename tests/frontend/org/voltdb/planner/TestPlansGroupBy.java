@@ -31,7 +31,6 @@ import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
-import org.voltdb.plannodes.DistinctPlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
@@ -1480,10 +1479,6 @@ public class TestPlansGroupBy extends PlannerTestCase {
         if (p instanceof OrderByPlanNode) {
             p = p.getChild(0);
         }
-        if (p instanceof DistinctPlanNode) {
-            p = p.getChild(0);
-        }
-
         HashAggregatePlanNode reAggNode = null;
 
         List<AbstractPlanNode> nodes = p.findAllNodesOfType(PlanNodeType.RECEIVE);

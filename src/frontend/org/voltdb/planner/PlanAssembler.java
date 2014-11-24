@@ -810,7 +810,6 @@ public class PlanAssembler {
 
     private boolean needProjectionNode (AbstractPlanNode root) {
         if ( root instanceof AggregatePlanNode ||
-             root.getPlanNodeType() == PlanNodeType.DISTINCT ||
              root.getPlanNodeType() == PlanNodeType.PROJECTION) {
             return false;
         }
