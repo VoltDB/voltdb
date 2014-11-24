@@ -1913,9 +1913,6 @@ public class TestVoltCompiler extends TestCase {
     private static final String msgPR =
             "ASSUMEUNIQUE is not valid for an index that includes the partitioning column. " +
             "Please use UNIQUE instead";
-    private static final String msgR =
-            "ASSUMEUNIQUE is not valid for replicated tables. " +
-            "Please use UNIQUE instead";
 
     public void testColumnUniqueGiveException()
     {
@@ -1924,12 +1921,12 @@ public class TestVoltCompiler extends TestCase {
         // (1) ****** Replicate tables
         // A unique index on the non-primary key for replicated table gets no error.
         schema = "create table t0 (id bigint not null, name varchar(32) not null UNIQUE, age integer,  primary key (id));\n";
-        checkValidUniqueAndAssumeUnique(schema, null, msgR);
+        checkValidUniqueAndAssumeUnique(schema, null, null);
 
         // Similar to above, but use a different way to define unique column.
         schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  " +
                 "primary key (id), UNIQUE (name) );\n";
-        checkValidUniqueAndAssumeUnique(schema, null, msgR);
+        checkValidUniqueAndAssumeUnique(schema, null, null);
 
 
         // (2) ****** Partition Table: UNIQUE valid, ASSUMEUNIQUE not valid
@@ -1997,6 +1994,17 @@ public class TestVoltCompiler extends TestCase {
                 "PARTITION TABLE t0 ON COLUMN name;\n";
         // 1) unique index, 2) primary key
         checkValidUniqueAndAssumeUnique(schema, msgP, msgP);
+
+        // unique/assumeunique constraint added via ALTER TABLE to replicated table
+        schema = "create table t0 (id bigint not null, name varchar(32) not null);\n" +
+                "ALTER TABLE t0 ADD UNIQUE(name);";
+        checkValidUniqueAndAssumeUnique(schema, null, null);
+
+        // unique/assumeunique constraint added via ALTER TABLE to partitioned table
+        schema = "create table t0 (id bigint not null, name varchar(32) not null);\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "ALTER TABLE t0 ADD UNIQUE(name);";
+        checkValidUniqueAndAssumeUnique(schema, msgP, null);
     }
 
     private void checkDDLErrorMessage(String ddl, String errorMsg) {
@@ -2039,7 +2047,7 @@ public class TestVoltCompiler extends TestCase {
         // A unique index on the non-primary key for replicated table gets no error.
         schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
                 "CREATE UNIQUE INDEX user_index0 ON t0 (name) ;";
-        checkValidUniqueAndAssumeUnique(schema, null, msgR);
+        checkValidUniqueAndAssumeUnique(schema, null, null);
 
 
         // (2) ****** Partition Table: UNIQUE valid, ASSUMEUNIQUE not valid

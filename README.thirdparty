@@ -2438,3 +2438,45 @@ Eric Meyer's Reset CSS v2.0
 Site: http://meyerweb.com/eric/tools/css/reset/
 License: None http://www.cssreset.com/terms/
 ===============================================================================
+bootstrap.js
+/* ===================================================
+ * bootstrap-transition.js v2.3.1
+ * http://twitter.github.com/bootstrap/javascript.html#transitions
+ * ===================================================
+ * Copyright 2012 Twitter, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * ========================================================== */
+===============================================================================
+jquery.tablesorter.js
+/*!
+* TableSorter 2.10.0 - Client-side table sorting with ease!
+* @requires jQuery v1.2.6+
+*
+* Copyright (c) 2007 Christian Bach
+* Examples and docs at: http://tablesorter.com
+* Dual licensed under the MIT and GPL licenses:
+* http://www.opensource.org/licenses/mit-license.php
+* http://www.gnu.org/licenses/gpl.html
+*
+* @type jQuery
+* @name tablesorter
+* @cat Plugins/Tablesorter
+* @author Christian Bach/christian.bach@polyester.se
+* @contributor Rob Garrison/https://github.com/Mottie/tablesorter
+*/
+/*jshint browser:true, jquery:true, unused:false, expr: true */
+/*global console:false, alert:false */
+===============================================================================
+
+
