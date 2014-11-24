@@ -93,7 +93,7 @@ public class TestMaxSuite extends RegressionSuite {
 				sb.append(",");
 			}
 		}
-		sb.append(" from max_column_table;");
+		sb.append(" from max_column_table order by column0;");
 		resp = client.callProcedure("@AdHoc", sb.toString());
 		assertEquals(ClientResponse.SUCCESS, resp.getStatus());
 
