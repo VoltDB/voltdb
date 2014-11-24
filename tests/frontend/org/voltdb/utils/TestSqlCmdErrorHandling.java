@@ -144,6 +144,10 @@ public class TestSqlCmdErrorHandling extends TestCase {
         return "exec myfussy_" + type + "_proc " + id + " '" + badValue + "'\n";
     }
 
+    private static String execWithNullCommand(String type, int id) {
+        return "exec myfussy_" + type + "_proc " + id + " null\n";
+    }
+
     public String badFileCommand()
     {
         return "file 'ButThereIsNoSuchFileAsThis'\n";
@@ -371,4 +375,19 @@ public class TestSqlCmdErrorHandling extends TestCase {
         assertFalse("did a post-error write", checkIfWritten(id));
     }
 
+    public void test125ExecWithNulls() throws Exception
+    {
+        int id = 125;
+        String[] types = new String[] {"integer", "varbinary", "decimal", "float"};
+        for (String type : types) {
+            subtestExecWithNull(type, id++);
+        }
+    }
+
+    private void subtestExecWithNull(String type, int id) throws Exception {
+        assertFalse("pre-condition violated", checkIfWritten(id));
+        String inputText = execWithNullCommand(type, id);
+        assertEquals("sqlcmd was expected to succeed, but failed", 0, callSQLcmd(true, inputText));
+        assertTrue("did not write row as expected", checkIfWritten(id));
+    }
 }
