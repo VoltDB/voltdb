@@ -194,6 +194,25 @@ public class TestAdhocCreateDropRole extends AdhocDDLTestBase {
                 fail("Should be able to drop role NEWROLE");
             }
 
+            // Can't drop twice
+            try {
+                adminClient.callProcedure("@AdHoc", "drop role NEWROLE;");
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                threw = true;
+            }
+            assertTrue("Can't vanilla DROP a role which doesn't exist", threw);
+
+            // unless you use IF EXISTS
+            try {
+                adminClient.callProcedure("@AdHoc", "drop role NEWROLE if exists;");
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Should be able to drop role NEWROLE if exists");
+            }
+
             // Make sure the user doesn't actually have DEFAULTPROC permissions any more
             threw = false;
             try {

@@ -278,6 +278,7 @@ public class DDLCompiler {
             "PROCEDURE" +                           // PROCEDURE token
             "\\s+" +                                // one or more spaces
             "([\\w$.]+)" +                          // (1) class name or procedure name
+            "(\\s+IF EXISTS)?" +                    // (2) <optional IF EXISTS>
             "\\s*" +                                // zero or more spaces
             ";" +                                   // semi-colon terminator
             "\\z"                                   // end of statement
@@ -321,6 +322,7 @@ public class DDLCompiler {
             "\\A" +                             // (start statement)
             "DROP\\s+ROLE\\s+" +                // DROP ROLE
             "([\\w.$]+)" +                      // (1) <role name>
+            "(\\s+IF EXISTS)?" +                // (2) <optional IF EXISTS>
             ";\\z"                              // (end statement)
             );
 
@@ -819,7 +821,8 @@ public class DDLCompiler {
         statementMatcher = procedureDropPattern.matcher(statement);
         if (statementMatcher.matches()) {
             String classOrProcName = checkIdentifierStart(statementMatcher.group(1), statement);
-            m_tracker.removeProcedure(classOrProcName);
+            // Extract the ifExists bool from group 2
+            m_tracker.removeProcedure(classOrProcName, (statementMatcher.group(2) != null));
 
             return true;
         }
@@ -985,11 +988,17 @@ public class DDLCompiler {
         statementMatcher = dropRolePattern.matcher(statement);
         if (statementMatcher.matches()) {
             String roleName = statementMatcher.group(1).toUpperCase();
+            boolean ifExists = (statementMatcher.group(2) != null);
             CatalogMap<Group> groupMap = db.getGroups();
             if (groupMap.get(roleName) == null) {
-                throw m_compiler.new VoltCompilerException(String.format(
-                            "Role name \"%s\" in DROP ROLE statement does not exist.",
-                            roleName));
+                if (!ifExists) {
+                    throw m_compiler.new VoltCompilerException(String.format(
+                                "Role name \"%s\" in DROP ROLE statement does not exist.",
+                                roleName));
+                }
+                else {
+                    return true;
+                }
             }
             else {
                 // Hand-check against the two default roles which shall not be
