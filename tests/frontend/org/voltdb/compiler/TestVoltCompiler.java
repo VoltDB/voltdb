@@ -2005,6 +2005,13 @@ public class TestVoltCompiler extends TestCase {
                 "PARTITION TABLE t0 ON COLUMN id;\n" +
                 "ALTER TABLE t0 ADD UNIQUE(name);";
         checkValidUniqueAndAssumeUnique(schema, msgP, null);
+
+        // ENG-7242
+        schema = "create table t0 (id bigint not null, name varchar(32) not null, val integer);\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "ALTER TABLE t0 ADD UNIQUE(name);\n" +
+                "ALTER TABLE t0 DROP COLUMN val;\n";
+        checkValidUniqueAndAssumeUnique(schema, msgP, null);
     }
 
     private void checkDDLErrorMessage(String ddl, String errorMsg) {
