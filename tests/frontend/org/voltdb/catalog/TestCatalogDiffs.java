@@ -633,7 +633,7 @@ public class TestCatalogDiffs extends TestCase {
         builder.compile(testDir + File.separator + "testAddNonNullity2.jar");
         Catalog catUpdated = catalogForJar(testDir + File.separator + "testAddNonNullity2.jar");
 
-        verifyDiffRejected(catOriginal, catUpdated);
+        verifyDiffIfEmptyTable(catOriginal, catUpdated);
     }
 
     public void testDropNonNullity() throws IOException {
@@ -921,7 +921,7 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiffRejected(catOriginal, catUpdated);
     }
 
-    public void testModifyMaterializedViewStructureRejected() throws IOException {
+    public void testModifyMaterializedViewStructureRejectedIfEmpty() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 
         // with a view
@@ -945,7 +945,7 @@ public class TestCatalogDiffs extends TestCase {
         builder.compile(testDir + File.separator + "modmatview2.jar");
         Catalog catUpdated = catalogForJar(testDir + File.separator + "modmatview2.jar");
 
-        verifyDiffRejected(catOriginal, catUpdated);
+        verifyDiffIfEmptyTable(catOriginal, catUpdated);
     }
 
     public void testModifyMaterializedViewAddPredicateRejected() throws IOException {
@@ -1026,7 +1026,7 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiffRejected(catOriginal, catUpdated);
     }
 
-    public void testModifyMaterializedViewSourceRejected() throws IOException {
+    public void testModifyMaterializedViewSourceRejectedIfEmpty() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 
         // with a view
@@ -1039,7 +1039,7 @@ public class TestCatalogDiffs extends TestCase {
         builder.compile(testDir + File.separator + "resrcmatview1.jar");
         Catalog catOriginal = catalogForJar(testDir + File.separator + "resrcmatview1.jar");
 
-        // without a view
+        // without an added column (should work with empty table)
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL, C3 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS " +
@@ -1049,7 +1049,7 @@ public class TestCatalogDiffs extends TestCase {
         builder.compile(testDir + File.separator + "resrcmatview2.jar");
         Catalog catUpdated = catalogForJar(testDir + File.separator + "resrcmatview2.jar");
 
-        verifyDiffRejected(catOriginal, catUpdated);
+        verifyDiffIfEmptyTable(catOriginal, catUpdated);
     }
 
     public void testRemoveTableAndMaterializedView() throws IOException {
