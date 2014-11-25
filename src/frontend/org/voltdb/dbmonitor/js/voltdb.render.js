@@ -303,18 +303,23 @@ function alertNodeClicked(obj) {
                 onInformationLoaded();
             });
         };
-        
 
-        this.getProceduresInformation = function (onProceduresDataLoaded) {
+
+        this.GetProceduresInfoNAdminConfiguration = function (onProceduresDataLoaded) {
             var procedureMetadata = "";
 
             VoltDBService.GetSystemInformationDeployment(function (connection) {
+                if (adminConfiguration != null && adminConfiguration.options.isAdmin && adminConfiguration.options.refresh) {
+                    adminConfiguration.getAdminConfiguration(connection);
+                }
+
                 setKFactor(connection);
                 VoltDBService.GetProceduresInformation(function (nestConnection) {
                     populateProceduresInformation(nestConnection);
                     procedureMetadata = procedureData;
                     onProceduresDataLoaded(procedureMetadata);
                 });
+                
             });
 
             var setKFactor = function (connection) {
@@ -1632,21 +1637,39 @@ function alertNodeClicked(obj) {
             sysTransaction["CurrentTimedTransactionCount"] = currentTimedTransactionCount;
             sysTransaction["currentTimerTick"] = currentTimerTick;
 
-        };
+        };        
 
-        this.getSiteCountByHost = function (connection) {
-            var sitesCount = 0;
+        this.getAdminConfigurationItems = function (connection) {
+            var adminConfigValues = [];
 
             if (connection != "" || connection != null) {
                 if (connection.Metadata['@SystemInformation_DEPLOYMENT'] != null) {
                     connection.Metadata['@SystemInformation_DEPLOYMENT'].data.forEach(function (columnInfo) {
-                        if (columnInfo[0] == 'sitesperhost')
-                             sitesCount = columnInfo[1];
+                        switch (columnInfo[0]) {
+                            case 'sitesperhost':
+                                adminConfigValues['sitesperhost'] = columnInfo[1];
+                                break;
+                                
+                            case 'kfactor':
+                                adminConfigValues['kSafety'] = columnInfo[1];
+                                break;
+                                
+                            case 'partitiondetection':
+                                adminConfigValues['partitionDetection'] = columnInfo[1];
+                                break;
+                                
+                                
+                            default:
+
+
+                        }
                     });
                 }
             }
-            return sitesCount;
+            return adminConfigValues;
+
         };
+
 
         function getTableData(connection, tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData, processName) {
             var suffix = "";
