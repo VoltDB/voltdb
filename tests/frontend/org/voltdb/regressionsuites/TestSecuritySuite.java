@@ -424,7 +424,8 @@ public class TestSecuritySuite extends RegressionSuite {
                 new GroupInfo("GroupWithDefaultProcReadPerm", false, false, false, false, true, false)
         };
         project.addGroups(groups);
-        project.setSecurityEnabled(true);
+        // suite defines its own ADMINISTRATOR user
+        project.setSecurityEnabled(true, false);
 
         // export disabled in community
         if (MiscUtils.isPro()) {

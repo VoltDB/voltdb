@@ -29,7 +29,6 @@ import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
-import java.util.regex.Pattern;
 
 import junit.framework.TestCase;
 
@@ -324,8 +323,7 @@ public class RegressionSuite extends TestCase {
 
     public void validateTableOfLongs(VoltTable vt, long[][] expected) {
         assertNotNull(expected);
-        assertEquals("Wrong number of rows in table.  ",
-                        expected.length, vt.getRowCount());
+        assertEquals(expected.length, vt.getRowCount());
         int len = expected.length;
         for (int i=0; i < len; i++) {
             validateRowOfLongs(vt, expected[i]);
@@ -414,11 +412,11 @@ public class RegressionSuite extends TestCase {
         assertFalse(prefix + "too many actual rows; expected only " + i, actualRows.advanceRow());
     }
 
-    static public void verifyStmtFails(Client client, String stmt, String expectedPattern) throws IOException {
-        verifyProcFails(client, expectedPattern, "@AdHoc", stmt);
+    static public void verifyStmtFails(Client client, String stmt, String expectedMsg) throws IOException {
+        verifyProcFails(client, expectedMsg, "@AdHoc", stmt);
     }
 
-    static public void verifyProcFails(Client client, String expectedPattern, String storedProc, Object... args) throws IOException {
+    static public void verifyProcFails(Client client, String expectedMsg, String storedProc, Object... args) throws IOException {
 
         String what;
         if (storedProc.compareTo("@AdHoc") == 0) {
@@ -433,15 +431,14 @@ public class RegressionSuite extends TestCase {
         }
         catch (ProcCallException pce) {
             String msg = pce.getMessage();
-            String diagnostic = "Expected " + what + " to throw an exception matching the pattern \"" +
-                    expectedPattern + "\", but instead it threw an exception containing \"" + msg + "\".";
-            Pattern pattern = Pattern.compile(expectedPattern, Pattern.MULTILINE);
-            assertTrue(diagnostic, pattern.matcher(msg).find());
+            String diagnostic = "Expected " + what + " to throw an exception containing the message \"" +
+                    expectedMsg + "\", but instead it threw an exception containing \"" + msg + "\".";
+            assertTrue(diagnostic, msg.contains(expectedMsg));
             return;
         }
 
-        String diagnostic = "Expected " + what + " to throw an exception matching the pattern \"" +
-                expectedPattern + "\", but instead it threw nothing.";
+        String diagnostic = "Expected " + what + " to throw an exception containing the message \"" +
+                expectedMsg + "\", but instead it threw nothing.";
         fail(diagnostic);
     }
 
@@ -504,5 +501,20 @@ public class RegressionSuite extends TestCase {
                 if (foundTargetTuple) break;
             }
         }
+    }
+
+    static public void checkDeploymentPropertyValue(Client client, String key, String value)
+            throws IOException, ProcCallException, InterruptedException {
+        boolean found = false;
+
+        VoltTable result = client.callProcedure("@SystemInformation", "DEPLOYMENT").getResults()[0];
+        while (result.advanceRow()) {
+            if (result.getString("PROPERTY").equalsIgnoreCase(key)) {
+                found = true;
+                assertEquals(value, result.getString("VALUE"));
+                break;
+            }
+        }
+        assertTrue(found);
     }
 }

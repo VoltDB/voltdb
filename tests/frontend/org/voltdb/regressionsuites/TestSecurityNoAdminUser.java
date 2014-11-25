@@ -35,11 +35,11 @@ import junit.framework.TestCase;
 import org.voltdb.BackendTarget;
 import org.voltdb.compiler.VoltProjectBuilder;
 
-public class TestSecurityNoUsers extends TestCase {
+public class TestSecurityNoAdminUser extends TestCase {
 
     PipeToFile pf;
 
-    public TestSecurityNoUsers(String name) {
+    public TestSecurityNoAdminUser(String name) {
         super(name);
     }
 
@@ -49,7 +49,7 @@ public class TestSecurityNoUsers extends TestCase {
             //Build the catalog
             VoltProjectBuilder builder = new VoltProjectBuilder();
             builder.addLiteralSchema("");
-            builder.setSecurityEnabled(true);
+            builder.setSecurityEnabled(true, false);
             String catalogJar = "dummy.jar";
 
             LocalCluster config = new LocalCluster(catalogJar, 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
@@ -77,7 +77,7 @@ public class TestSecurityNoUsers extends TestCase {
         BufferedReader bi = new BufferedReader(new FileReader(new File(pf.m_filename)));
         String line;
         boolean failed = true;
-        final CharSequence cs = "Cannot enable security without defining users in the deployment file";
+        final CharSequence cs = "Cannot enable security without defining at least one user in the built-in ADMINISTRATOR role in the deployment file.";
         while ((line = bi.readLine()) != null) {
             System.out.println(line);
             if (line.contains(cs)) {

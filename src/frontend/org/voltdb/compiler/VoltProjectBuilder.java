@@ -530,8 +530,12 @@ public class VoltProjectBuilder {
         m_jsonApiEnabled = enabled;
     }
 
-    public void setSecurityEnabled(final boolean enabled) {
+    public void setSecurityEnabled(final boolean enabled, boolean createAdminUser) {
         m_securityEnabled = enabled;
+        if (createAdminUser) {
+            addUsers(new UserInfo[]
+                    {new UserInfo("defaultadmin", "admin", new String[] {"ADMINISTRATOR"})});
+        }
     }
 
     public void setSecurityProvider(final String provider) {

@@ -894,21 +894,6 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         System.out.println("-----\n\n");
     }
 
-    private void checkDeploymentPropertyValue(Client client, String key, String value)
-            throws IOException, ProcCallException, InterruptedException {
-        boolean found = false;
-
-        VoltTable result = client.callProcedure("@SystemInformation", "DEPLOYMENT").getResults()[0];
-        while (result.advanceRow()) {
-            if (result.getString("PROPERTY").equalsIgnoreCase(key)) {
-                found = true;
-                assertEquals(value, result.getString("VALUE"));
-                break;
-            }
-        }
-        assertTrue(found);
-    }
-
     public void testSystemSettingsUpdateTimeout() throws IOException, ProcCallException, InterruptedException  {
         Client client = getClient();
         String newCatalogURL, deploymentURL;
@@ -1049,7 +1034,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project.addUsers(users);
         project.addGroups(groups);
         project.addProcedures(procInfo);
-        project.setSecurityEnabled(true);
+        project.setSecurityEnabled(true, true);
         project.setDeadHostTimeout(6000);
         boolean compile = config.compile(project);
         assertTrue(compile);

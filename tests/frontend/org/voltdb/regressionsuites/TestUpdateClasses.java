@@ -178,16 +178,16 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
         builder.addLiteralSchema("-- Don't care");
         builder.setUseDDLSchema(true);
         GroupInfo groups[] = new GroupInfo[] {
-            new GroupInfo("adhoc", true, false, false, false, false, false),
-            new GroupInfo("sysproc", false, false, true, false, false, false)
+            new GroupInfo("adhoc", true, false, false, false, false, false)
         };
         UserInfo users[] = new UserInfo[] {
             new UserInfo("adhocuser", "adhocuser", new String[] {"adhoc"}),
-            new UserInfo("sysuser", "sysuser", new String[] {"sysproc"})
+            new UserInfo("sysuser", "sysuser", new String[] {"ADMINISTRATOR"})
         };
         builder.addGroups(groups);
         builder.addUsers(users);
-        builder.setSecurityEnabled(true);
+        // Test defines its own ADMIN user
+        builder.setSecurityEnabled(true, false);
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);

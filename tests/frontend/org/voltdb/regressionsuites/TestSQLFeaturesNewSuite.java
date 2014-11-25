@@ -23,8 +23,6 @@
 
 package org.voltdb.regressionsuites;
 
-import java.io.IOException;
-
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
@@ -32,6 +30,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.BatchedMultiPartitionTest;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.TruncateTable;
@@ -143,6 +142,7 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         System.out.println("STARTING TABLE LIMIT AND PERCENTAGE FULL TEST......");
         Client client = getClient();
         VoltTable vt = null;
+        Exception e = null;
         if(isHSQL()) {
             return;
         }
@@ -153,9 +153,16 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         vt = client.callProcedure("@AdHoc", "select count(*) from CAPPED0").getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {0});
 
-        verifyProcFails(client, "CONSTRAINT VIOLATION\\s*Table CAPPED0 exceeds table maximum row count 0",
-                "CAPPED0.insert", 0, 0, 0);
-
+        e = null;
+        try {
+            vt = client.callProcedure("CAPPED0.insert", 0, 0, 0).getResults()[0];
+        } catch (ProcCallException ex) {
+            e = ex;
+            assertTrue(ex.getMessage().contains("CONSTRAINT VIOLATION"));
+            assertTrue(ex.getMessage().contains("Table CAPPED0 exceeds table maximum row count 0"));
+        } finally {
+            assertNotNull(e);
+        }
         vt = client.callProcedure("@AdHoc", "select count(*) from CAPPED0").getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {0});
 
@@ -170,9 +177,16 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         validateTableOfScalarLongs(vt, new long[] {1});
         validStatisticsForTableLimitAndPercentage(client, "CAPPED2", 2, 100);
 
-        verifyProcFails(client, "CONSTRAINT VIOLATION\\s*Table CAPPED2 exceeds table maximum row count 2",
-                "CAPPED2.insert", 2, 2, 2);
-
+        e = null;
+        try {
+            vt = client.callProcedure("CAPPED2.insert", 2, 2, 2).getResults()[0];
+        } catch (ProcCallException ex) {
+            e = ex;
+            assertTrue(ex.getMessage().contains("CONSTRAINT VIOLATION"));
+            assertTrue(ex.getMessage().contains("Table CAPPED2 exceeds table maximum row count 2"));
+        } finally {
+            assertNotNull(e);
+        }
         vt = client.callProcedure("@AdHoc", "select count(*) from CAPPED2").getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {2});
 
@@ -196,18 +210,22 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         validateTableOfScalarLongs(vt, new long[] {1});
         validStatisticsForTableLimitAndPercentage(client, "CAPPED3", 3, 100);
 
-        verifyProcFails(client, "CONSTRAINT VIOLATION\\s*Table CAPPED3 exceeds table maximum row count 3",
-                "CAPPED3.insert", 3, 3, 3);
-
-        // This should also fail if attempting to insert a row via INSERT INTO ... SELECT.
-        verifyStmtFails(client, "insert into capped3 select * from capped2",
-                "CONSTRAINT VIOLATION\\s*Table CAPPED3 exceeds table maximum row count 3");
-
+        e = null;
+        try {
+            vt = client.callProcedure("CAPPED3.insert", 3, 3, 3).getResults()[0];
+        } catch (ProcCallException ex) {
+            e = ex;
+            assertTrue(ex.getMessage().contains("CONSTRAINT VIOLATION"));
+            assertTrue(ex.getMessage().contains("Table CAPPED3 exceeds table maximum row count 3"));
+        } finally {
+            assertNotNull(e);
+        }
         vt = client.callProcedure("@AdHoc", "select count(*) from CAPPED3").getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {3});
 
     }
 
+<<<<<<< HEAD
     public void testTableLimitPartitionRowsExec() throws IOException, ProcCallException {
 
         if (isHSQL())
@@ -359,6 +377,8 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         validateTableOfLongs(vt, new long[][] {{1, 40, 80}});
     }
 
+=======
+>>>>>>> master
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.

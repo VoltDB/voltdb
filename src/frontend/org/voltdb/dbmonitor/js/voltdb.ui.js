@@ -316,13 +316,15 @@ var loadPage = function (serverName, portid) {
 
     var refreshClusterHealth = function () {
         //loads cluster health and other details on the top banner
+        
         voltDbRenderer.GetSystemInformation(function () {
             voltDbRenderer.GetClusterHealth(function (htmlData, alertHtmlData) {
                 $("#clusterHealth").html(htmlData).show();
                 $("#memoryAlertsList").html(alertHtmlData);
             });
-
+            
             voltDbRenderer.mapNodeInformationByStatus(function (htmlData) {
+                
                 var currentServer = getCurrentServer();
                 if (currentServer == undefined) {
                     saveCurrentServer(htmlData.ServerInformation[1].CurrentServer);
@@ -1234,6 +1236,8 @@ var configureUserPreferences = function () {
 //common methods
 /*******************************************************************************************/
 
+
+
 //Dummy wrapper for console.log for IE9
 if (!(window.console && console.log)) {
     console = {
@@ -1401,7 +1405,7 @@ var adjustGraphSpacing = function () {
         this.SORT_STATES = {
             NONE: 0,
             SORTING: 1,
-            SORTED: 2,
+            SORTED: 2
         };
 
         this.DASHBOARD_PROGRESS_STATES = {
