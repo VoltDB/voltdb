@@ -41,6 +41,7 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientConfigForTest;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ConnectionUtil;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.common.Constants;
 
@@ -413,6 +414,54 @@ public class RegressionSuite extends TestCase {
         }
         assertFalse(prefix + "too many actual rows; expected only " + i, actualRows.advanceRow());
     }
+
+    static private Object widenToLong(Object o) {
+        if (o instanceof Long
+                || o instanceof Integer
+                || o instanceof Short
+                || o instanceof Byte)
+        return ((Number)o).longValue();
+
+        return o;
+    }
+
+    /**
+     * Triggers an assertion if two tables are not equal, where expected values may be passed
+     * as an array of Objects.
+     *
+     * This method is incomplete and may not give the correct answer for all data types and values.
+     * Please add to it as needed.
+     *
+     * @param expectedValues  2-dimensional array of objects expected in VoltTable
+     * @param vt              Actual result produced by query
+     */
+    static public void assertTablesAreEqual(String prefix, Object[][] expectedValues, VoltTable vt) {
+        assertEquals(prefix, expectedValues.length, vt.getRowCount());
+
+        if (expectedValues.length > 0) {
+            assertEquals(prefix, expectedValues[0].length, vt.getColumnCount());
+        }
+
+        for (int j = 0; j < expectedValues.length; ++j) { // for each row
+            vt.advanceRow();
+            for (int i = 0; i < expectedValues.length; ++i) { // for each column
+                VoltType vtype = vt.getColumnType(i);
+                Object actual = widenToLong(vt.get(i, vtype));
+                Object expected = widenToLong(expectedValues[j][i]);
+
+                // This assertion may not work right for null values.
+                // Please update it when this functionality is needed
+                assertEquals(prefix + "Expected type: " + expected.getClass() + ", actual: " + actual.getClass(),
+                        expected, actual);
+            }
+        }
+    }
+
+    public static void assertQueryProduces(String prefix, Client client, Object[][] expectedTableValues, String query) throws NoConnectionsException, IOException, ProcCallException {
+        VoltTable actual = client.callProcedure("@AdHoc", query).getResults()[0];
+        assertTablesAreEqual(prefix, expectedTableValues, actual);
+    }
+
 
     static public void verifyStmtFails(Client client, String stmt, String expectedPattern) throws IOException {
         verifyProcFails(client, expectedPattern, "@AdHoc", stmt);

@@ -331,7 +331,7 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
     public void testTableLimitPartitionRowsExecUpsert() throws Exception {
 
         if (isHSQL())
-                return;
+            return;
 
         Client client = getClient();
 
@@ -350,6 +350,80 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         client.callProcedure("@AdHoc", "UPSERT INTO CAPPED3_LIMIT_ROWS_EXEC VALUES(1, 40, 80)");
         vt = client.callProcedure("@AdHoc", selectAll).getResults()[0];
         validateTableOfLongs(vt, new long[][] {{1, 40, 80}});
+    }
+
+    public void testTableLimitPartitionRowsComplex() throws Exception {
+
+        if (isHSQL())
+            return;
+
+        // CREATE TABLE capped3_limit_exec_complex (
+        //   wage INTEGER NOT NULL PRIMARY KEY,
+        //   dept INTEGER NOT NULL,
+        //   may_be_purged TINYINT DEFAULT 0 NOT NULL,
+        //   relevance VARCHAR(255),
+        //   priority SMALLINT,
+        //   CONSTRAINT tblimit3_exec_complex LIMIT PARTITION ROWS 3
+        //     EXECUTE (DELETE FROM capped3_limit_exec_complex
+        //              WHERE may_be_purged = 0
+        //              AND relevance IN ('irrelevant', 'worthless', 'moot')
+        //              AND priority < 16384)
+        //   );
+
+        Client client = getClient();
+
+        VoltTable vt;
+
+        // Load the table
+        vt = client.callProcedure("CAPPED3_LIMIT_EXEC_COMPLEX.insert", 37, 1, 0, "important", 17000).getResults()[0];
+        assertTablesAreEqual("Insert 1 " ,new Object[][] {{1}}, vt);
+        vt = client.callProcedure("CAPPED3_LIMIT_EXEC_COMPLEX.insert", 37, 2, 0, "important", 17000).getResults()[0];
+        assertTablesAreEqual("Insert 2 ", new Object[][] {{1}}, vt);
+        vt = client.callProcedure("CAPPED3_LIMIT_EXEC_COMPLEX.insert", 37, 3, 0, "important", 17000).getResults()[0];
+        assertTablesAreEqual("Insert 3 ", new Object[][] {{1}}, vt);
+
+        // no rows match purge criteria
+        verifyProcFails(client,
+                "exceeds table maximum row count 3",
+                "CAPPED3_LIMIT_EXEC_COMPLEX.insert", 37, 4, 0, "important", 17000);
+
+        // Make sure that all three predicates in the DELETE's WHERE clause must be true
+        // for rows to be purged.
+
+        vt = client.callProcedure("@AdHoc", "UPDATE CAPPED3_LIMIT_EXEC_COMPLEX SET relevance='moot' WHERE dept = 2").getResults()[0];
+        assertTablesAreEqual("Updated rows ", new Object[][] {{1}}, vt);
+
+        // Insert still fails!
+        verifyProcFails(client,
+                "exceeds table maximum row count 3",
+                "CAPPED3_LIMIT_EXEC_COMPLEX.insert", 37, 4, 0, "important", 17000);
+
+        vt = client.callProcedure("@AdHoc", "UPDATE CAPPED3_LIMIT_EXEC_COMPLEX SET priority=100 WHERE dept = 2").getResults()[0];
+                assertTablesAreEqual("Updated rows ", new Object[][] {{1}}, vt);
+
+        // Insert still fails!
+        verifyProcFails(client,
+                "exceeds table maximum row count 3",
+                "CAPPED3_LIMIT_EXEC_COMPLEX.insert", 37, 4, 0, "important", 17000);
+
+        vt = client.callProcedure("@AdHoc", "UPDATE CAPPED3_LIMIT_EXEC_COMPLEX SET may_be_purged=1 WHERE dept = 2").getResults()[0];
+        assertTablesAreEqual("Updated rows ", new Object[][] {{1}}, vt);
+
+        // now the insert succeeds!
+        vt = client.callProcedure("CAPPED3_LIMIT_EXEC_COMPLEX.insert", 37, 4, 1, "moot", 500).getResults()[0];
+        assertTablesAreEqual("Insert with purge ", new Object[][] {{1}}, vt);
+
+        assertQueryProduces("Table contents mismatch ", client, new Object[][] {
+                {37, 1, 0, "important", 32000},
+                {37, 3, 0, "important", 32000},
+                {37, 4, 1, "moot", 500}},
+                "SELECT * FROM CAPPED3_LIMIT_EXEC_COMPLEX ORDER BY dept");
+
+        // Insert a bunch of purgable rows in loop
+        for (int i = 5; i < 100; ++i) {
+            vt = client.callProcedure("CAPPED3_LIMIT_EXEC_COMPLEX.insert", 37, i, 1, "irrelevant", i + 10).getResults()[0];
+            assertTablesAreEqual("Loop insert ", new Object[][] {{1}}, vt);
+        }
     }
 
     /**

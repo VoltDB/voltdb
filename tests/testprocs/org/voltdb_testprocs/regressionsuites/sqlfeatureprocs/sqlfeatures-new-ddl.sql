@@ -33,6 +33,23 @@ CONSTRAINT tblimit3_exec LIMIT PARTITION ROWS 3
   EXECUTE (DELETE FROM capped3_limit_rows_exec WHERE purge_me <> 0)
 );
 
+CREATE TABLE capped3_limit_exec_complex (
+wage INTEGER NOT NULL,
+dept INTEGER NOT NULL PRIMARY KEY,
+may_be_purged TINYINT DEFAULT 0 NOT NULL,
+relevance VARCHAR(255),
+priority SMALLINT,
+CONSTRAINT tblimit3_exec_complex LIMIT PARTITION ROWS 3
+  EXECUTE (DELETE FROM capped3_limit_exec_complex
+           WHERE may_be_purged = 1
+           AND relevance IN ('irrelevant', 'worthless', 'moot')
+           AND priority < 16384)
+);
+
+-- DELETE statement above will use this index.
+CREATE INDEX CAPPED3_COMPLEX_INDEX
+       ON CAPPED3_LIMIT_EXEC_COMPLEX (may_be_purged);
+
 CREATE TABLE RTABLE (
     ID INTEGER DEFAULT 0 NOT NULL,
     AGE INTEGER NOT NULL,
