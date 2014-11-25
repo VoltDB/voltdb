@@ -357,6 +357,11 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         cfg.parse(CSVLoader.class.getName(), args);
 
         config = cfg;
+
+        if(config.customNullString != ""){
+            config.blank = "empty";
+        }
+
         configuration();
         final Tokenizer tokenizer;
         ICsvListReader listReader = null;

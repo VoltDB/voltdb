@@ -472,6 +472,7 @@ public class TestCSVLoader {
                 "2,2,1,11111111,\"test\",1.10,1.11,",
                 "3,3,1,11111111,testme,1.10,1.11,",
                 "4,4,1,11111111,iamtest,1.10,1.11,",
+                "5,5,5,5,\\N,1.10,1.11,7777-12-25 14:35:26",
         };
         int invalidLineCnt = 0;
         int validLineCnt = myData.length - invalidLineCnt;
@@ -481,6 +482,9 @@ public class TestCSVLoader {
         while (ts_table.advanceRow()) {
             String value = ts_table.getString(4);
             if(i < 2) {
+                assertEquals(value, null);
+            } else if(i == 4){
+                // this test case should fail once we stop replacing the \N as NULL
                 assertEquals(value, null);
             } else {
                 assertNotNull(value);
