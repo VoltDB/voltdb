@@ -51,6 +51,7 @@ import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.IndexType;
 import org.voltdb.types.JoinType;
+import org.voltdb.types.QuantifierType;
 import org.voltdb.types.SortDirectionType;
 import org.voltdb.utils.CatalogUtil;
 
@@ -229,8 +230,18 @@ public abstract class SubPlanAssembler {
 
         // Track the running list of filter expressions that remain as each is either cherry-picked
         // for optimized coverage via the index keys.
+        // Filter out comparison expressions with quantifiers (ALL/ANY) - currently the index scan
+        // does not support them
         List<AbstractExpression> filtersToCover = new ArrayList<AbstractExpression>();
-        filtersToCover.addAll(exprs);
+        for (AbstractExpression expr : exprs) {
+            if (ComparisonExpression.reverses.containsKey(expr.getExpressionType())) {
+                assert(expr instanceof ComparisonExpression);
+                if (((ComparisonExpression) expr).getQuantifier() != QuantifierType.NONE) {
+                    continue;
+                }
+            }
+            filtersToCover.add(expr);
+        }
 
         String exprsjson = index.getExpressionsjson();
         // This list remains null if the index is just on simple columns.

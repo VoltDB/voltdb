@@ -23,6 +23,7 @@ import java.util.List;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ConjunctionExpression;
 import org.voltdb.expressions.SelectSubqueryExpression;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
@@ -192,7 +193,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
     protected static AbstractExpression breakUpSetOpSubquery(AbstractExpression expr) {
         assert(expr != null);
         SelectSubqueryExpression subqueryExpr = null;
-        if (expr.getExpressionType() == ExpressionType.COMPARE_IN_SUBQUERY &&
+        if (expr.getExpressionType() == ExpressionType.COMPARE_EQUAL &&
                 expr.getRight() instanceof SelectSubqueryExpression) {
             subqueryExpr = (SelectSubqueryExpression) expr.getRight();
         } else if (expr.getExpressionType() == ExpressionType.OPERATOR_EXISTS &&
@@ -237,9 +238,11 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
                 throw new RuntimeException(e.getMessage(), e);
             }
             newExpr.setExpressionType(expr.getExpressionType());
-            if (ExpressionType.COMPARE_IN_SUBQUERY == expr.getExpressionType()) {
+            if (ExpressionType.COMPARE_EQUAL == expr.getExpressionType()) {
                 newExpr.setLeft((AbstractExpression) expr.getLeft().clone());
                 newExpr.setRight(childSubqueryExpr);
+                assert(newExpr instanceof ComparisonExpression);
+                ((ComparisonExpression)newExpr).setQuantifier(((ComparisonExpression)expr).getQuantifier());
             } else {
                 newExpr.setLeft(childSubqueryExpr);
             }

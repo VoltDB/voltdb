@@ -599,12 +599,8 @@ public abstract class AbstractParsedStmt {
                 expr.setValueSize(voltType.getMaxLengthInBytes());
             }
         }
-        if ((exprType == ExpressionType.COMPARE_IN && expr.getRight() instanceof AbstractSubqueryExpression) ||
+        if ((exprType == ExpressionType.COMPARE_EQUAL && QuantifierType.ANY == ((ComparisonExpression) expr).getQuantifier()) ||
                 exprType == ExpressionType.OPERATOR_EXISTS) {
-            if (ExpressionType.COMPARE_IN == exprType) {
-                // To differentiate from IN (LIST)
-                expr.setExpressionType(ExpressionType.COMPARE_IN_SUBQUERY);
-            }
             // Break up UNION/INTERSECT (ALL) set ops into individual selects connected by
             // AND/OR operator
             // col IN ( queryA UNION queryB ) - > col IN (queryA) OR col IN (queryB)
@@ -629,10 +625,13 @@ public abstract class AbstractParsedStmt {
             AbstractExpression optimizedRight = optimizeSubqueryExpression(expr.getRight());
             expr.setRight(optimizedRight);
         }
-        if (ExpressionType.COMPARE_IN_SUBQUERY == expr.getExpressionType()) {
-            expr = optimizeInExpression(expr);
-            // Do not return here because the original IN expressions
-            // is converted to EXISTS and can be optimized farther.
+        if (expr instanceof ComparisonExpression) {
+            QuantifierType quantifer = ((ComparisonExpression)expr).getQuantifier();
+            if (ExpressionType.COMPARE_EQUAL == expr.getExpressionType() && quantifer == QuantifierType.ANY) {
+                expr = optimizeInExpression(expr);
+                // Do not return here because the original IN expressions
+                // is converted to EXISTS and can be optimized farther.
+            }
         }
         if (ExpressionType.OPERATOR_EXISTS == expr.getExpressionType()) {
             expr = optimizeExistsExpression(expr);
@@ -712,7 +711,7 @@ public abstract class AbstractParsedStmt {
      * @return existsExpr
      */
     private AbstractExpression optimizeInExpression(AbstractExpression inExpr) {
-        assert(ExpressionType.COMPARE_IN_SUBQUERY == inExpr.getExpressionType());
+        assert(ExpressionType.COMPARE_EQUAL == inExpr.getExpressionType());
 
         if (canConvertInToExistsExpression(inExpr)) {
             AbstractExpression inColumns = inExpr.getLeft();

@@ -27,6 +27,7 @@ import java.util.List;
 
 import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.TupleValueExpression;
@@ -43,6 +44,7 @@ import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
+import org.voltdb.types.QuantifierType;
 
 public class TestPlansInExistsSubQueries extends PlannerTestCase {
 
@@ -232,7 +234,8 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         AbstractExpression r = e.getRight();
         assertEquals(ExpressionType.CONJUNCTION_AND, r.getExpressionType());
         l = r.getLeft();
-        assertEquals(ExpressionType.COMPARE_IN_SUBQUERY, l.getExpressionType());
+        assertEquals(ExpressionType.COMPARE_EQUAL, l.getExpressionType());
+        assertEquals(QuantifierType.ANY, ((ComparisonExpression) l).getQuantifier());
         r = r.getRight();
         assertEquals(ExpressionType.OPERATOR_EXISTS, r.getExpressionType());
     }
@@ -244,7 +247,8 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
         AbstractScanPlanNode spl = (AbstractScanPlanNode) pn;
         // Check param indexes
         AbstractExpression e = spl.getPredicate();
-        assertEquals(ExpressionType.COMPARE_IN_SUBQUERY, e.getExpressionType());
+        assertEquals(ExpressionType.COMPARE_EQUAL, e.getExpressionType());
+        assertEquals(QuantifierType.ANY, ((ComparisonExpression) e).getQuantifier());
     }
 
     public void testInToExistsComplex() {
@@ -377,7 +381,8 @@ public class TestPlansInExistsSubQueries extends PlannerTestCase {
             assertTrue(pn instanceof NestLoopPlanNode);
             AbstractExpression pred = ((NestLoopPlanNode) pn).getJoinPredicate();
             assertTrue(pred != null);
-            assertEquals(ExpressionType.COMPARE_IN_SUBQUERY, pred.getExpressionType());
+            assertEquals(ExpressionType.COMPARE_EQUAL, pred.getExpressionType());
+            assertEquals(QuantifierType.ANY, ((ComparisonExpression) pred).getQuantifier());
             TupleValueExpression tve = (TupleValueExpression) pred.getLeft();
             assertEquals("R1", tve.getTableName());
             assertEquals("A", tve.getColumnName());

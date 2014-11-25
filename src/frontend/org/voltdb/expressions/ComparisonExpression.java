@@ -33,12 +33,10 @@ import org.voltdb.types.QuantifierType;
 public class ComparisonExpression extends AbstractExpression {
 
     public enum Members {
-        QUANTIFIER,
-        LEFT_QUANTIFIER;
+        QUANTIFIER;
     }
 
     private QuantifierType m_qunatifier = QuantifierType.NONE;
-    private Boolean m_leftQuantifier = true;
 
     public ComparisonExpression(ExpressionType type) {
         super(type);
@@ -80,14 +78,13 @@ public class ComparisonExpression extends AbstractExpression {
 
     @Override
     public int hashCode() {
-        return super.hashCode() + m_qunatifier.hashCode() + m_leftQuantifier.hashCode();
+        return super.hashCode() + m_qunatifier.hashCode();
     }
 
     @Override
     public Object clone() {
         ComparisonExpression clone = (ComparisonExpression) super.clone();
         clone.m_qunatifier = m_qunatifier;
-        clone.m_leftQuantifier= m_leftQuantifier;
         return clone;
     }
 
@@ -96,9 +93,6 @@ public class ComparisonExpression extends AbstractExpression {
         super.loadFromJSONObject(obj);
        if (obj.has(Members.QUANTIFIER.name())) {
            m_qunatifier = QuantifierType.get(obj.getInt(Members.QUANTIFIER.name()));
-           if (obj.has(Members.LEFT_QUANTIFIER.name())) {
-               m_leftQuantifier = true;
-           }
        } else {
            m_qunatifier = QuantifierType.NONE;
        }
@@ -109,9 +103,6 @@ public class ComparisonExpression extends AbstractExpression {
         super.toJSONString(stringer);
         if (m_qunatifier != QuantifierType.NONE) {
             stringer.key(Members.QUANTIFIER.name()).value(m_qunatifier.getValue());
-            if (m_leftQuantifier) {
-                stringer.key(Members.LEFT_QUANTIFIER.name()).value(m_leftQuantifier);
-            }
         }
     }
 
@@ -129,9 +120,6 @@ public class ComparisonExpression extends AbstractExpression {
         ExpressionType reverseType = reverses.get(this.m_type);
         // Left and right exprs are reversed on purpose
         ComparisonExpression reversed = new ComparisonExpression(reverseType, m_right, m_left);
-        if (m_qunatifier != QuantifierType.NONE) {
-            reversed.m_leftQuantifier = !m_leftQuantifier;
-        }
         return reversed;
     }
 

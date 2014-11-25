@@ -69,10 +69,9 @@ public:
     VectorComparisonExpression(ExpressionType et,
                            AbstractExpression *left,
                            AbstractExpression *right,
-                           QuantifierType quantifier,
-                           bool leftQuantifier)
+                           QuantifierType quantifier)
         : AbstractExpression(et, left, right),
-          m_quantifier(quantifier), m_leftQuantifier(leftQuantifier)
+          m_quantifier(quantifier)
     {
         assert(left != NULL);
         assert(right != NULL);
@@ -86,7 +85,6 @@ public:
 
 private:
     QuantifierType m_quantifier;
-    bool m_leftQuantifier;
 };
 
 struct NValueExtractor
