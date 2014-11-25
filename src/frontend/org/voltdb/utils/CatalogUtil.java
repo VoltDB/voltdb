@@ -882,7 +882,12 @@ public abstract class CatalogUtil {
                 for( PropertyType configProp: configProperties) {
                     ConnectorProperty prop = catconn.getConfig().add(configProp.getName());
                     prop.setName(configProp.getName());
-                    prop.setValue(configProp.getValue());
+                    if (!configProp.getName().equalsIgnoreCase("password")) {
+                        prop.setValue(configProp.getValue().trim());
+                    } else {
+                        //Dont trim passwords
+                        prop.setValue(configProp.getValue());
+                    }
                 }
             }
         }
