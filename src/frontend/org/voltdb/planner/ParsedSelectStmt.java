@@ -123,7 +123,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     // It will store the final projection node schema for this plan if it is needed.
     // Calculate once, and use it everywhere else.
     private NodeSchema m_projectSchema = null;
-    private NodeSchema m_distinctProjectSchema = null;
 
     // It may has the consistent element order as the displayColumns
     public ArrayList<ParsedColInfo> m_aggResultColumns = new ArrayList<ParsedColInfo>();
@@ -136,7 +135,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private ArrayList<ParsedColInfo> m_avgPushdownOrderColumns = null;
     private AbstractExpression m_avgPushdownHaving = null;
     private NodeSchema m_avgPushdownProjectSchema;
-    private NodeSchema m_avgPushdownFinalProjectSchema;
 
     private boolean m_hasPartitionColumnInGroupby = false;
     private boolean m_hasAggregateDistinct = false;
@@ -264,7 +262,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         boolean tmpHasComplexAgg = hasComplexAgg();
         NodeSchema tmpProjectSchema = m_projectSchema;
-        NodeSchema tmpDistinctProjectSchema = m_distinctProjectSchema;
 
         m_aggregationList = new ArrayList<AbstractExpression>();
         assert(displayElement != null);
@@ -298,7 +295,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         m_avgPushdownDistinctGroupByColumns = m_distinctGroupByColumns;
         m_avgPushdownOrderColumns = m_orderColumns;
         m_avgPushdownProjectSchema = m_projectSchema;
-        m_avgPushdownFinalProjectSchema = m_distinctProjectSchema;
         m_avgPushdownHaving = m_having;
 
         m_displayColumns = tmpDisplayColumns;
@@ -307,7 +303,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         m_distinctGroupByColumns = tmpDistinctGroupByColumns;
         m_orderColumns = tmpOrderColumns;
         m_projectSchema = tmpProjectSchema;
-        m_distinctProjectSchema = tmpDistinctProjectSchema;
         m_hasComplexAgg = tmpHasComplexAgg;
         m_having = tmpHaving;
     }
@@ -322,7 +317,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         m_distinctGroupByColumns = m_avgPushdownDistinctGroupByColumns;
         m_orderColumns = m_avgPushdownOrderColumns;
         m_projectSchema = m_avgPushdownProjectSchema;
-        m_distinctProjectSchema = m_avgPushdownFinalProjectSchema;
         m_hasComplexAgg = true;
         m_having = m_avgPushdownHaving;
     }
@@ -445,40 +439,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             index++;
         }
 
-        // Replace TVE for display columns
-        m_projectSchema = new NodeSchema();
-        for (ParsedColInfo col : m_displayColumns) {
-            AbstractExpression expr = col.expression;
-            if (hasComplexAgg()) {
-                expr = col.expression.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
-            }
-            SchemaColumn schema_col = new SchemaColumn(col.tableName, col.tableAlias, col.columnName, col.alias, expr);
-            m_projectSchema.addColumn(schema_col);
-        }
-
-        // Replace TVE for order by columns
-        for (ParsedColInfo orderCol : m_orderColumns) {
-            AbstractExpression expr = orderCol.expression.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
-
-            if (hasComplexAgg()) {
-                orderCol.expression = expr;
-            } else {
-                // This if case checking is to rule out cases like: select PKEY + A_INT from O1 order by PKEY + A_INT,
-                // This case later needs a projection node on top of sort node to make it work.
-
-                // Assuming the restrictions: Order by columns are (1) columns from table
-                // (2) tag from display columns (3) actual expressions from display columns
-                // Currently, we do not allow order by complex expressions that are not in display columns
-
-                // If there is a complexGroupby at his point, it means that Display columns contain all the order by columns.
-                // In that way, this plan does not require another projection node on top of sort node.
-                if (orderCol.expression.hasAnySubexpressionOfClass(AggregateExpression.class) ||
-                        hasComplexGroupby()) {
-                    orderCol.expression = expr;
-                }
-            }
-        }
-
         // Replace TVE for group by columns
         m_groupByExpressions = new HashMap<String, AbstractExpression>();
         for (ParsedColInfo groupbyCol: m_groupByColumns) {
@@ -493,6 +453,47 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             ExpressionUtil.finalizeValueTypes(m_having);
         }
 
+        // Replace TVE for display columns
+        m_projectSchema = new NodeSchema();
+        for (ParsedColInfo col : m_displayColumns) {
+            AbstractExpression expr = col.expression;
+            if (hasComplexAgg()) {
+                expr = col.expression.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
+            }
+            SchemaColumn schema_col = new SchemaColumn(col.tableName, col.tableAlias, col.columnName, col.alias, expr);
+            m_projectSchema.addColumn(schema_col);
+        }
+
+        if (hasDistinctWithGroupBy() && m_distinctGroupByColumns != null) {
+            for (ParsedColInfo col: m_distinctGroupByColumns) {
+                AbstractExpression expr = col.expression.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
+                col.expression = expr;
+            }
+        }
+
+        // place TVEs for ORDER BY
+        placeTVEsForOrderby();
+    }
+
+    private void placeTVEsForOrderby() {
+        Map <AbstractExpression, Integer> displayIndexMap = new HashMap <AbstractExpression,Integer>();
+        Map <Integer, ParsedColInfo> indexToColumnMap = new HashMap <Integer, ParsedColInfo>();
+
+        int index = 0;
+
+        for (ParsedColInfo col : m_displayColumns) {
+
+            displayIndexMap.put(col.expression, index);
+            assert(col.alias != null);
+            indexToColumnMap.put(index, col);
+            index++;
+        }
+
+        // place the TVEs from Display columns in the ORDER BY expression
+        for (ParsedColInfo orderCol : m_orderColumns) {
+            AbstractExpression expr = orderCol.expression.replaceWithTVE(displayIndexMap, indexToColumnMap);
+            orderCol.expression = expr;
+        }
     }
 
     /**
@@ -926,24 +927,16 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
         // DISTINCT with GROUP BY
         m_distinctGroupByColumns = new ArrayList<ParsedColInfo>();
-        m_distinctProjectSchema = new NodeSchema();
 
         // Iterate in the Display code
         for (ParsedColInfo col: m_displayColumns) {
-            TupleValueExpression tve = new TupleValueExpression(
-                    col.tableName, col.tableAlias, col.columnName, col.alias, col.index);
             ParsedColInfo pcol = new ParsedColInfo();
             pcol.tableName = col.tableName;
             pcol.tableAlias = col.tableAlias;
             pcol.columnName = col.columnName;
             pcol.alias = col.alias;
-            pcol.expression = tve;
+            pcol.expression = (AbstractExpression) col.expression.clone();
             m_distinctGroupByColumns.add(pcol);
-
-            // ParsedColInfo, TVE, SchemaColumn, NodeSchema ??? Could it be more complicated ???
-            SchemaColumn schema_col = new SchemaColumn(
-                    col.tableName, col.tableAlias, col.columnName, col.alias, tve);
-            m_distinctProjectSchema.addColumn(schema_col);
         }
 
         return groupbyElement;
@@ -1261,10 +1254,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     public NodeSchema getFinalProjectionSchema() {
         return m_projectSchema;
-    }
-
-    public NodeSchema getDistinctProjectionSchema() {
-        return m_distinctProjectSchema;
     }
 
     public boolean hasComplexGroupby() {

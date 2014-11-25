@@ -529,8 +529,8 @@ public class TestPlansGroupBy extends PlannerTestCase {
     public void testEdgeComplexRelatedCases() {
         pns = compileToFragments("select PKEY+A1 from T1 Order by PKEY+A1");
         AbstractPlanNode p = pns.get(0).getChild(0);
-        assertTrue(p instanceof ProjectionPlanNode);
-        assertTrue(p.getChild(0) instanceof OrderByPlanNode);
+        assertTrue(p instanceof OrderByPlanNode);
+        assertTrue(p.getChild(0) instanceof ProjectionPlanNode);
         assertTrue(p.getChild(0).getChild(0) instanceof ReceivePlanNode);
 
         p = pns.get(1).getChild(0);
@@ -552,10 +552,9 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         // ENG-5066: now Limit is pushed under Projection
         // Limit is also inlined with Orderby node
-        assertTrue(p instanceof ProjectionPlanNode);
-        assertTrue(p.getChild(0) instanceof OrderByPlanNode);
-        assertNotNull(p.getChild(0).getInlinePlanNode(PlanNodeType.LIMIT));
-        assertTrue(p.getChild(0).getChild(0) instanceof AggregatePlanNode);
+        assertTrue(p instanceof OrderByPlanNode);
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.LIMIT));
+        assertTrue(p.getChild(0) instanceof AggregatePlanNode);
 
         p = pns.get(1).getChild(0);
         // inline aggregate
@@ -565,18 +564,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
         pns = compileToFragments("SELECT F_D1, count(*) as tag FROM RF group by F_D1 order by tag");
         p = pns.get(0).getChild(0);
         /*/ to debug */ System.out.println("DEBUG: " + p.toExplainPlanString());
-        assertTrue(p instanceof ProjectionPlanNode);
-        assertTrue(p.getChild(0) instanceof OrderByPlanNode);
-        p = p.getChild(0).getChild(0);
+        assertTrue(p instanceof OrderByPlanNode);
+        p = p.getChild(0);
         assertTrue(p instanceof IndexScanPlanNode);
         assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
 
         pns = compileToFragments("SELECT F_D1, count(*) FROM RF group by F_D1 order by 2");
         p = pns.get(0).getChild(0);
         /*/ to debug */ System.out.println("DEBUG: " + p.toExplainPlanString());
-        assertTrue(p instanceof ProjectionPlanNode);
+        assertTrue(p instanceof OrderByPlanNode);
         //assertTrue(p.getChild(0) instanceof LimitPlanNode);
-        assertTrue(p.getChild(0) instanceof OrderByPlanNode);
+        assertTrue(p.getChild(0) instanceof ProjectionPlanNode);
         p = p.getChild(0).getChild(0);
         assertTrue(p instanceof IndexScanPlanNode);
         assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));

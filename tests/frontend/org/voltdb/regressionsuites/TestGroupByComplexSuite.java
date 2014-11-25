@@ -956,7 +956,6 @@ public class TestGroupByComplexSuite extends RegressionSuite {
 
         vt = client.callProcedure("@AdHoc", sql).getResults()[0];
         validateTableOfLongs(vt, new long[][] {{1,3}, {2,2}});
-
     }
 
     public void testHavingClause() throws IOException, ProcCallException {
@@ -1089,9 +1088,16 @@ public class TestGroupByComplexSuite extends RegressionSuite {
         VoltTable vt;
 
         for (String tb: tbs) {
-            sql = "SELECT DISTINCT ID, COUNT(DEPT) FROM " + tb + " GROUP BY ID, WAGE ORDER BY 1, 2 ";
+            sql = "SELECT DISTINCT ID, COUNT(DEPT) FROM " + tb + " GROUP BY ID, WAGE ORDER BY ID, 2  ";
             vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            System.err.println(vt);
             validateTableOfLongs(vt, new long[][] {{1,1}, {2,1}, {3,1}, {4,1}, {5,1}, {6,1}, {7,1}});
+
+            // expression on the DISTINCT
+            sql = "SELECT DISTINCT ID, COUNT(DEPT) + 1 FROM " + tb + " GROUP BY ID, WAGE ORDER BY ID, 2  ";
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            System.err.println(vt);
+            validateTableOfLongs(vt, new long[][] {{1,2}, {2,2}, {3,2}, {4,2}, {5,2}, {6,2}, {7,2}});
 
             // (1) base query without distinct
             sql = "SELECT wage, count(*) from " + tb + " GROUP BY abs(dept-2), wage "
@@ -1117,7 +1123,6 @@ public class TestGroupByComplexSuite extends RegressionSuite {
             vt = client.callProcedure("@AdHoc", sql).getResults()[0];
             validateTableOfLongs(vt, new long[][] {{10,2}, {20,2}, {30,2}, {40,3}, {50,2}});
         }
-
     }
 
     //
@@ -1195,16 +1200,16 @@ public class TestGroupByComplexSuite extends RegressionSuite {
         assertTrue(success);
         builder.addServerConfig(config);
 
-        config = new LocalCluster("groupByComplex-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-
-        // Cluster
-        config = new LocalCluster("groupByComplex-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
+//        config = new LocalCluster("groupByComplex-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+//        success = config.compile(project);
+//        assertTrue(success);
+//        builder.addServerConfig(config);
+//
+//        // Cluster
+//        config = new LocalCluster("groupByComplex-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+//        success = config.compile(project);
+//        assertTrue(success);
+//        builder.addServerConfig(config);
 
         return builder;
     }

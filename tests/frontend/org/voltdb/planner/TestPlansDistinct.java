@@ -222,8 +222,8 @@ public class TestPlansDistinct extends PlannerTestCase {
         sql2 = "SELECT A3, B3 from T3 group by A3, B3, C3 ORDER BY A3, B3";
         checkDistinctWithGroupbyPlans(sql1, sql2);
 
-        // LIMIT/OFFSET is tricky, we can not push down ORDER BY/LIMIT with DISTINCT
-        // ORDER BY/LIMIT will get pushed down for certain cases and hard to test
+        // LIMIT/OFFSET is tricky,
+        // a lot of PUSH DOWN can happen: ORDER BY/LIMIT, DISTINCT
 
     }
 
@@ -240,10 +240,6 @@ public class TestPlansDistinct extends PlannerTestCase {
             boolean hasLimit) {
         List<AbstractPlanNode> pns1 = compileToFragments(distinctSQL);
         List<AbstractPlanNode> pns2 = compileToFragments(groupbySQL);
-
-        printExplainPlan(pns1);
-
-        printExplainPlan(pns2);
         // Distributed DISTINCT GROUP BY
         if (pns1.size() > 1) {
             assertEquals(pns1.get(1).toExplainPlanString(), pns2.get(1).toExplainPlanString());
