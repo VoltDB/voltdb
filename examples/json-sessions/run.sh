@@ -2,6 +2,9 @@
 
 APPNAME="json"
 
+#set -o nounset #exit if an unset variable is used
+set -o errexit #exit on any single command fail
+
 # find voltdb binaries in either installation or distribution directory.
 if [ -n "$(which voltdb 2> /dev/null)" ]; then
     VOLTDB_BIN=$(dirname "$(which voltdb)")
@@ -35,65 +38,51 @@ HOST="localhost"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar voltdbroot voltdbroot
+    rm -rf debugoutput $APPNAME-procs.jar voltdbroot catalog-report.html statement-plans \
+    	log client/jsonsessions/*.class procedures/jsonsessions/*.class 
 }
 
 # compile the source code for procedures and the client
 function srccompile() {
-    mkdir -p obj
-    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH:gson-2.2.2.jar -d obj \
-        src/json/*.java \
-        src/json/procedures/*.java
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
-}
-
-# build an application catalog
-function catalog() {
-    srccompile
-    echo "Compiling the json-session application catalog."
-    echo "To perform this action manually, use the command line: "
-    echo
-    echo "voltdb compile --classpath obj -o $APPNAME.jar ddl.sql"
-    echo
-    $VOLTDB compile --classpath obj -o $APPNAME.jar ddl.sql
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
+    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH:gson-2.2.2.jar \
+        client/jsonsessions/*.java \
+        procedures/jsonsessions/*.java
+    jar cf $APPNAME-procs.jar -C procedures jsonsessions
 }
 
 # run the voltdb server locally
 function server() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
     echo "Starting the VoltDB server."
     echo "To perform this action manually, use the command line: "
     echo
-    echo "$VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar"
+    echo "$VOLTDB create -d deployment.xml -l $LICENSE -H $HOST"
     echo
-    $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
+    $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST
+}
+
+# load schema and procedures
+function init() {
+    srccompile
+    $VOLTDB_BIN/sqlcmd < ddl.sql
 }
 
 # run the client that drives the example
 function client() {
-    json-client
+    srccompile
+    java -classpath client:$APPCLASSPATH:gson-2.2.2.jar \
+    	-Dlog4j.configuration=file://$LOG4J jsonsessions.JSONClient
 }
 
 # JSON client sample
 # Use this target for argument help
-function json-client-help() {
+function client-help() {
     srccompile
-    java -classpath obj:$APPCLASSPATH:obj json.JSONClient --help
+    java -classpath client:$APPCLASSPATH jsonsessions.JSONClient --help
 }
-
-function json-client() {
-    srccompile
-    java -classpath obj:$APPCLASSPATH:obj:gson-2.2.2.jar -Dlog4j.configuration=file://$LOG4J json.JSONClient
-}
-
 
 function help() {
-     echo "Usage: ./run.sh {clean|catalog|server|client}"
+     echo "Usage: ./run.sh {clean|srccompile|server|init|client|client-help}"
 }
 
 # Run the target passed as the first arg on the command line
