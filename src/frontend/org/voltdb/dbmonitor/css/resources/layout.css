@@ -748,7 +748,8 @@ ul.helpSchemaList li { list-style:disc; line-height:25px!important; padding:0; m
 .adminIcons, 
 .pause, 
 .resume, 
-.save, 
+.save,
+.saveme, 
 .promote, 
 .promote-disabled,
 .restore, 
@@ -774,10 +775,12 @@ ul.adminClusterList li a.resume { display:inline-block; background-position:-20p
 ul.adminClusterList li a.promote { display:inline-block; background-position:-70px -12px;width:40px; height:36px;}
 ul.adminClusterList li a.promote-disabled, ul.adminClusterList li a.promote-disabled:hover{ display:inline-block; background-position:-70px -56px;width:40px; height:36px; color:#bbb;}
 ul.adminClusterList li a.restore { display:inline-block;background-position:-120px -12px; width:40px; height:36px;}
-ul.adminClusterList li a.save, .save { display:inline-block;background-position:-120px -57px; width:40px; height:26px;}
+ul.adminClusterList li a.saveme { display:inline-block;background-position:-120px -57px; width:40px; height:26px;}
+.save { display:inline-block;background-position:-348px -57px; width:40px; height:26px;}
+
 
 ul.adminClusterList li a.stop { display:inline-block;background-position:-580px -12px; width:40px; height:36px;}
-ul.adminClusterList li a.shutdown { display:inline-block;background-position:-581px -56px; width:40px; height:36px;}
+ul.adminClusterList li a.shutdown{ display:inline-block;background-position:-581px -56px; width:40px; height:36px;}
 ul.adminClusterList li a:hover{color:#000;}
 .adminTxt01 { margin:0 0 0 6px;}
 .adminTxt02 { margin:0 0 0 2px;}
@@ -790,7 +793,7 @@ ul.adminClusterList li a:hover{color:#000;}
 .adminD {float:left;background:#c70000; color:#FFFFFF; padding:8px; font-weight:bold;}  
 .adminE {float:left;background:#76bd1d; color:#FFFFFF; padding:8px; font-weight:bold;}  
 .adminServer { float:left}
-.serverName { float:left; background:#dfdfdf; padding:8px; font-weight:bold; } 
+.serverName { float:left; background:#dfdfdf/*#c70000*/; padding:8px; font-weight:bold; /*color:#FFFFFF;*/ } 
 .setServer {float:left;}
 .adminIcons { background-position:-224px -13px; width:30px; height:28px; }
 .adminContainer { margin:0; padding:20px 20px; background:#FFFFFF;}
@@ -829,6 +832,7 @@ input.exitableTxtBx{width:30px; /*position:relative; top:6px;*/ padding:2px 3px;
 .tblSave { border:none}
 .tblSave tr{border:1px solid #CCCCCC;}
 .tblSave tr td { padding:10px;border:none;}
+.tblSave tr td input[type="text"]{ width:300px}
 .browseBtn {}
 .tblRestore { border:none}
 .tblRestore tr{border:1px solid #CCCCCC}
@@ -837,12 +841,27 @@ input.exitableTxtBx{width:30px; /*position:relative; top:6px;*/ padding:2px 3px;
 
 .tblshutdown tr {border:1px solid #CCCCCC;}
 .tblshutdown tr td  { border:none;}
+.tblshutdown tr td a { display:inline-block;background-position:-581px -56px; width:40px; height:36px;line-height:39px;}
+.shutdownServer { position:relative; top:15px; right:5px;}
 #serverListWrapperAdmin{ padding:15px 16px 0 15px;}
 #serverListWrapperAdmin table.tblshutdown{margin-bottom:30px;}
 .confirmationInfo{font-weight: bold;}
-td.heartbeattd span{position:relative; top:auto;}
-td.heartbeattd span.unit{position:relative;/* top:7px;left:1px;*/}
+td.heartbeattd span, td.queryTimeOut span{position:relative; top:auto;}
+td.heartbeattd span.unit, td.queryTimeOut span.unit{position:relative;/* top:7px;left:1px;*/}
 .customCheckbox{display:inline-block !important;}
+
+.btnSave { background-color: #aa1f2f;
+			cursor: pointer;
+			padding: 4px 8px;
+			text-align: center;
+			color: #FFFFFF;
+			font: 12px Arial, Helvetica, sans-serif;
+			text-shadow: none;
+			text-decoration: none;
+			border-radius: 0;
+			border: none;
+			margin-left: 10px;} 
+.btnSave:hover{background-color:#76bd1d; color:#fff;}
 
 
 /*********************************************media Qu********************/

@@ -53,9 +53,10 @@
                         <nav id="nav">
                             <ul>
                                 <li id="navDbmonitor" class="active"><a href="#" class="linkFirst">DB Monitor</a></li>
+                                <li id="navAdmin"><a href="#">Admin</a></li>
                                 <li id="navSchema"><a href="#o">Schema</a></li>
                                 <li id="navSqlQuery"><a href="#">SQL Query</a></li>
-                                 <li id="navAdmin"><a href="#">Admin</a></li>
+                                 
                             </ul>
                         </nav>
                     </div>
@@ -269,87 +270,8 @@
                     </div>
                 </div>
             </div>
-
-            <!--Schema Tab-->
-            <div id="schema" class="contents">
-            </div>
-
-            <!--Sql Query Tab-->
-            <div id="sqlQuery" class="containerStudio contents">
-                <div class="blockWrapper" id="BlockContainer01">
-                    <div class="objectExplorer">
-                        <div class="explorer">
-                            <!--tab-->
-                            <div class="tabContant" id="tabMain">
-                                <ul class="tabs">
-                                    <li><a href="#tab1">Tables</a></li>
-                                    <li><a href="#tab2">Views</a></li>
-                                    <li><a href="#tab3">Stored Procedures</a></li>
-                                </ul>
-                                <div class="tab_container">
-                                    <div id="tabScroller">
-                                        <div id="tab1" class="tab_content">
-                                            <div id="accordionTable">
-                                            </div>
-                                        </div>
-                                        <div id="tab2" class="tab_content">
-                                            <div id="accordionViews">
-                                            </div>
-                                        </div>
-                                        <div id="tab3" class="tab_content">
-                                            <div id="accordionProcedures">
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="clear"></div>
-                    </div>
-                    <div class="queryInput" id="inputQuery">
-                        <ul class="btnList" id="queryBtnList">
-                            <li>
-                                <button class="btnStudio" id="runBTn">Run</button>
-                            </li>
-                            <li>
-                                <button class="btnStudio" id="clearQuery">Clear</button>
-                            </li>
-                        </ul>
-                        <h1 class="theHeading icon-query">Query</h1>
-                        <div class="query">
-                            <form name="" id="queryForm">
-                                <div class="textWritingArea">
-                                    <textarea id="theQueryText"></textarea>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                    <div class="clear"></div>
-                </div>
-                <div class="blockWrapper" id="blockContainer02">
-                    <div class="exportType">
-                        <form name="" id="queryResult">
-                            <select id="exportType">
-                                <option selected="selected">HTML</option>
-                                <option>CSV</option>
-                                <option>Monospace</option>
-                            </select>
-                        </form>
-                    </div>
-                    <h1 class="theHeading icon-queryResult">Query Result</h1>
-                    <div class="queryResult">
-                        <div id="resultHtml" style="display: block;" class="resultHtml"></div>
-                        <div id="resultCsv" style="display: none;" class="resultCsv"></div>
-                        <div id="resultMonospace" style="display: none;" class="resultMonospace">
-                            <pre>
-                    </pre>
-                        </div>
-                    </div>
-                    <div id="queryResults" class="queryStatus"></div>
-                </div>
-            </div>
-
-		 <!--Admin-->
+            
+             <!--Admin-->
              
               <div id="admin" class="container contents">
              <div class="adminWrapper">
@@ -363,7 +285,7 @@
             </li>
            
             <li><a href="#" class="promote-disabled">Promote</a></li>
-            <li><a href="#savePop" id="saveConfirmation" class="save">Save</a></li>
+            <li><a href="#savePop" id="saveConfirmation" class="saveme">Save</a></li>
             <li><a href="#restorePop" id="restoreConfirmation" class="restore">Restore</a></li>
             <li><a href="#shutDownConfirmationPop" class="shutdown" id="shutDownConfirmation">Shutdown</a></li>
            </ul>
@@ -393,7 +315,7 @@
           
           <div class="slide-pop-content" style="padding:0 0 15px 0;">
             <div id="serverListWrapperAdmin">            
-              <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblshutdown">
+              <!--<table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblshutdown">
                     <tbody>
                         <tr>
                         <td class="configLabel" width="50%">Test Server Lorem </td>
@@ -460,6 +382,58 @@
                         <td><a href="#shutdownPopupPop1" id="shutdownPopupPopConfirmation1" class="edit" title="Edit">&nbsp;</a></td>
                         </tr>
 				</tbody>
+            </table>-->
+            <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblshutdown">
+                    <tbody>
+                        <tr>
+                        <td class="configLabel" width="50%">Test Server Lorem </td>
+                        <td  align="right">
+                       <a href="#stopConfirmationPop" class="shutdown " id="stopConfirmation"><span class="shutdownServer">stop</span></a>
+                        </td>
+                        </tr>
+                           <tr>
+                        <td class="configLabel" width="50%">Test Server 2 Lorem </td>
+                        <td align="right">
+                        <a href="#" class="shutdown "><span class="shutdownServer">stop</span></a>
+                        </td>
+                        </tr>
+                        <tr>
+                        <td class="configLabel">Server Lorem Ispum </td>
+                        <td align="right">
+                        <a href="#" class="shutdown "><span class="shutdownServer">stop</span></a>
+                        </td>
+                        </tr>
+                          <tr>
+                        <td class="configLabel">Server 2 Lorem Ispum </td>
+                        <td align="right">
+                         <a href="#" class="shutdown "><span class="shutdownServer">stop</span></a>
+                        </td>
+                        </tr>
+                        <tr>
+                        <td class="configLabel" width="50%">Test Server 2 Lorem </td>
+                        <td align="right">
+                        <a href="#" class="shutdown "><span class="shutdownServer">stop</span></a>
+                        </td>
+                        </tr>
+                        <tr>
+                        <td class="configLabel">Server Lorem Ispum </td>
+                        <td align="right">
+                         <a href="#" class="shutdown "><span class="shutdownServer">stop</span></a>
+                        </td>
+                        </tr>
+                        <tr>
+                        <td class="configLabel" width="50%">Test Server 2 Lorem </td>
+                        <td align="right">
+                        <a href="#" class="shutdown "><span class="shutdownServer">stop</span></a>
+                        </td>
+                        </tr>
+                        <tr>
+                        <td class="configLabel">Server Lorem Ispum </td>
+                        <td align="right">
+                        <a href="#" class="shutdown "><span class="shutdownServer">stop</span></a>
+                        </td>
+                        </tr>
+				</tbody>
             </table>
             </div>
           </div>
@@ -522,7 +496,10 @@
                   </tr>
                     <tr class="hasSubLabel parent" id="row-2">
                     <td class="configLabel"><a href="#" class="labelCollapsed">Auto Snapshots</a> </td>
-                    <td align="right" id="autoSnapshotOption"><div id="autoSnapshotIcon" class="onIcon"></div><input style="display: none;" type="checkbox" id="chkAutoSnapshot" checked="checked" class="snapshot"/></td>
+                    <td align="right" id="autoSnapshotOption">
+                    <div id="autoSnapshotIcon" class="onIcon"></div>
+                  <input style="display: none;" type="checkbox" id="chkAutoSnapshot" checked="checked" class="snapshot"/>
+                    </td>
                     <td>
                     <div class="SnapshotsOn">On</div>
                     <div class="SnapshotsOff" style="display:none;">Off</div>
@@ -616,6 +593,15 @@
                     <td><a id="btnEditHrtTimeOut" href="#" class="edit" title="Edit">&nbsp;</a>
                     <a id="btnSaveHrtTimeOut" href="#HrtTimeOutPopup" class="save" title="Save" style="display:none;">&nbsp;</a></td>
                   </tr>
+                  
+                  
+                  <tr class="child-row-5 subLabelRow">
+                  	<td class="configLabel">Query time out</td>
+                    <td align="right" class="queryTimeOut"><span id="queryTimeOutSpan">500</span><input id="txtQryTimeOutSpan" class="exitableTxtBx" type="text" style="display:none" /> <span>ms</span></td>
+                    <td>&nbsp;</td>
+                    <td><a id="btnEditQueryTimeOut" href="#" class="edit" title="Edit">&nbsp;</a>
+                    <a id="btnSaveQueryTimeOut" href="#QueryTimeOutPopup" class="save" title="Save" style="display:none;">&nbsp;</a></td>
+                  </tr>
                   <tr class="child-row-5 subLabelRow">
                   	<td class="configLabel">Max temp table memory</td>
                     <td align="right">256 MB</td>
@@ -636,7 +622,7 @@
              <div class="adminContentRight">
              <div class="adminPorts">
              <div class="headerAdminContent">
-              <h1>Ports</h1>             
+              <h1>Network Interfaces</h1>             
              </div>
              <table width="100%" border="0" cellspacing="0" cellpadding="0" class="adminTbl2">
   <tr>
@@ -698,6 +684,87 @@
              </div>
              
             </div>
+
+            <!--Schema Tab-->
+            <div id="schema" class="contents">
+            </div>
+
+            <!--Sql Query Tab-->
+            <div id="sqlQuery" class="containerStudio contents">
+                <div class="blockWrapper" id="BlockContainer01">
+                    <div class="objectExplorer">
+                        <div class="explorer">
+                            <!--tab-->
+                            <div class="tabContant" id="tabMain">
+                                <ul class="tabs">
+                                    <li><a href="#tab1">Tables</a></li>
+                                    <li><a href="#tab2">Views</a></li>
+                                    <li><a href="#tab3">Stored Procedures</a></li>
+                                </ul>
+                                <div class="tab_container">
+                                    <div id="tabScroller">
+                                        <div id="tab1" class="tab_content">
+                                            <div id="accordionTable">
+                                            </div>
+                                        </div>
+                                        <div id="tab2" class="tab_content">
+                                            <div id="accordionViews">
+                                            </div>
+                                        </div>
+                                        <div id="tab3" class="tab_content">
+                                            <div id="accordionProcedures">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="clear"></div>
+                    </div>
+                    <div class="queryInput" id="inputQuery">
+                        <ul class="btnList" id="queryBtnList">
+                            <li>
+                                <button class="btnStudio" id="runBTn">Run</button>
+                            </li>
+                            <li>
+                                <button class="btnStudio" id="clearQuery">Clear</button>
+                            </li>
+                        </ul>
+                        <h1 class="theHeading icon-query">Query</h1>
+                        <div class="query">
+                            <form name="" id="queryForm">
+                                <div class="textWritingArea">
+                                    <textarea id="theQueryText"></textarea>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    <div class="clear"></div>
+                </div>
+                <div class="blockWrapper" id="blockContainer02">
+                    <div class="exportType">
+                        <form name="" id="queryResult">
+                            <select id="exportType">
+                                <option selected="selected">HTML</option>
+                                <option>CSV</option>
+                                <option>Monospace</option>
+                            </select>
+                        </form>
+                    </div>
+                    <h1 class="theHeading icon-queryResult">Query Result</h1>
+                    <div class="queryResult">
+                        <div id="resultHtml" style="display: block;" class="resultHtml"></div>
+                        <div id="resultCsv" style="display: none;" class="resultCsv"></div>
+                        <div id="resultMonospace" style="display: none;" class="resultMonospace">
+                            <pre>
+                    </pre>
+                        </div>
+                    </div>
+                    <div id="queryResults" class="queryStatus"></div>
+                </div>
+            </div>
+
+		
 			
         </div>
     </div>
@@ -958,6 +1025,17 @@
         <div class="overlay-btns"><a class="btn closeBtn" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Ok">Cancel</a></div>
     </div>
     <!-- POPUP shutDownConfirmationPop -->
+     <!-- POPUP stopConfirmationPop -->
+    <div id="stopConfirmationPop" style="display: none">
+        <div class="overlay-title icon-alert">Stop: Confirmation</div>
+        <div class="clear"></div>
+        <div class="overlay-content">            
+          <p class="txt-bold">Are you sure you want to stop the Server?</p>  
+          </div>
+        <div class="overlay-btns"><a class="btn closeBtn" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Ok">Cancel</a></div>
+    </div>
+    <!-- POPUP stopConfirmationPop -->
+    
     
      <!-- POPUP pauseConfirmationPop 1 -->
     <div id="pauseConfirmationPop" style="display: none">
@@ -1015,7 +1093,7 @@
         <div class="overlay-title icon-alert">Resume: Confirmation</div>
         <div class="clear"></div>
         <div class="overlay-content">            
-            <p class="txt-bold">Do you want to exit admin mode and resume the cluster?</p>
+            <p class="txt-bold">Do you want to resume the cluster and exit admin mode?</p>
         </div>
         <div class="overlay-btns"><a id="btnResumeConfirmationOk" class="btn closeBtn" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Ok">Cancel</a></div>
     </div>
@@ -1056,11 +1134,12 @@
                     <tr>
                         <td>Directory:</td>
                        
-                        <td><input type="text" value="D:/VoltDB/Snapshots/"  class="editDirLocation" /> <a href="#" class="edit editDirIcon" title="Edit" >&nbsp;</a></td>
+                        <td><input type="text" value="D:/VoltDB/Snapshots/"  class="editDirLocation" /> 
+                        <!--<a href="#" class="edit editDirIcon" title="Edit" >&nbsp;</a></td>-->
                     </tr>
                     <tr>
                         <td>Snapshot Name:</td>
-                        <td><input type="text" value="VEMMANUAL_2014.11.13.21.19.24" /></td>
+                        <td><input type="text" value="SNAPSHOT_yyyy.mm.dd.hh.mm " /></td>
                     </tr>
                 </table>
              
@@ -1092,8 +1171,8 @@
         <div class="clear"></div>
         <div class="restoreInfo">
             <div class="overlay-content"> 
-                <div style="float:right; margin:0 0 15px 0"><a href="#" class="btn">Upload New</a></div>   
-                <div class="clear"></div>        
+               <!-- <div style="float:right; margin:0 0 15px 0"><a href="#" class="btn">Upload New</a></div>   
+                <div class="clear"></div>-->        
                 <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblRestore">
                     <tr>
                         <th align="left">Snapshot Name</th>
@@ -1101,14 +1180,14 @@
                         <th>&nbsp;</th>
                     </tr>
                     <tr>
-                        <td>VEMMANUAL_2014.11.13.21.19.24</td>
+                        <td><input type="text" value="VEMMANUAL_2014.11.13.21.19.24" /><a href="#" class="btnSave">Save</a></td>
                         <td>C:/</td>
-                        <td><input type="checkbox"></td>
+                        <td><input type="radio" value="1" name="vemmanual"></td>
                     </tr>
                     <tr>
-                        <td>VEMMANUAL_2014.11.14.06.03.20</td>
+                        <td><input type="text" value="VEMMANUAL_2014.11.13.21.19.24" /><a href="#" class="btnSave">Save</a></td>
                         <td>D:/</td>
-                        <td><input type="checkbox"></td>
+                        <td><input type="radio" value="2" name="vemmanual"></td>
                     </tr>
                 </table>
   
@@ -1140,7 +1219,18 @@
     </div>
     <!-- POPUP restorePop -->
     
-    
+     <!-- POPUP Query time out Popup -->
+    <div id="QueryTimeOutPopup" style="display: none">
+        <div class="overlay-title icon-alert">Query time out</div>
+        <div class="clear"></div>
+        
+       
+        <div class="overlay-content"> 
+       <p class="txt-bold">Do you want to save the value?</p>
+                </div>
+        <div class="overlay-btns"><a class="btn closeBtn" id="btnDone" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Cancel">Cancel</a></div>
+    </div>
+    <!-- POPUP Query time out Popup -->
       <!-- POPUP saveConfirmationPopup -->
     <div id="saveConfirmation" style="display: none">
         <div class="overlay-title icon-alert">Save Confirmation</div>
