@@ -102,6 +102,11 @@ SELECT DISTINCT @onefun(A._variable[@columntype]) AS C56, A._variable FROM @from
 SELECT DISTINCT COUNT(*) FROM @fromtables A 
 SELECT DISTINCT @agg( A._variable[@columntype] ), COUNT(*)  FROM   @fromtables A 
 
+-- DISTINCT on GROUP BY
+SELECT DISTINCT   @agg(@optionalfn(A._variable[@columntype]))                                 FROM @fromtables A GROUP BY         A.__[#GB]
+SELECT DISTINCT   A._variable[#GB1 @columntype],  @agg(     A._variable[@columntype])         FROM @fromtables A GROUP BY         A.__[#GB1], A.__[#GB2]
+SELECT DISTINCT   A._variable[#GB1 @columntype],  @agg(     A._variable[@columntype])         FROM @fromtables A GROUP BY         A.__[#GB1], A.__[#GB2] ORDER BY 1, 2 LIMIT 5
+
 -- update
 -- compare two cols
 -- UPDATE @fromtables A SET @updatecolumn = @updatevalue WHERE @optionalfn(A._variable[@columntype]) _somecmp @optionalfn(A._variable[@columntype])

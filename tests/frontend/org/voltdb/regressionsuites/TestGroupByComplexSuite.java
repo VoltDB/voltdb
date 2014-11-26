@@ -43,10 +43,9 @@ import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestGroupByComplexSuite extends RegressionSuite {
 
-    private final static String[] procs = {"R1.insert", "P1.insert", "P2.insert", "P3.insert"};
     private final static String [] tbs = {"R1","P1","P2","P3"};
 
-    private void loadData() throws IOException, ProcCallException {
+    private void loadData(boolean extra) throws IOException, ProcCallException {
         Client client = this.getClient();
         ClientResponse cr = null;
 
@@ -58,18 +57,23 @@ public class TestGroupByComplexSuite extends RegressionSuite {
 
         // Insert records into the table.
         // id, wage, dept, rate
-        for (String tb: procs) {
-            cr = client.callProcedure(tb, 1,  10,  1 , "2013-06-18 02:00:00.123457");
-            cr = client.callProcedure(tb, 2,  20,  1 , "2013-07-18 02:00:00.123457");
-            cr = client.callProcedure(tb, 3,  30,  1 , "2013-07-18 10:40:01.123457");
-            cr = client.callProcedure(tb, 4,  40,  2 , "2013-08-18 02:00:00.123457");
-            cr = client.callProcedure(tb, 5,  50,  2 , "2013-09-18 02:00:00.123457");
+        for (String tb: tbs) {
+            String proc = tb + ".insert";
+            client.callProcedure(proc, 1,  10,  1 , "2013-06-18 02:00:00.123457");
+            client.callProcedure(proc, 2,  20,  1 , "2013-07-18 02:00:00.123457");
+            client.callProcedure(proc, 3,  30,  1 , "2013-07-18 10:40:01.123457");
+            client.callProcedure(proc, 4,  40,  2 , "2013-08-18 02:00:00.123457");
+            client.callProcedure(proc, 5,  50,  2 , "2013-09-18 02:00:00.123457");
+
+            if (extra) {
+                cr = client.callProcedure(proc, 6,  10,  2 , "2013-07-18 02:00:00.123457");
+                cr = client.callProcedure(proc, 7,  40,  2 , "2013-09-18 02:00:00.123457");
+            }
         }
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
     }
 
     private void strangeCasesAndOrderby() throws IOException, ProcCallException {
-        loadData();
+        loadData(false);
 
         Client client = this.getClient();
         ClientResponse cr;
@@ -129,7 +133,7 @@ public class TestGroupByComplexSuite extends RegressionSuite {
     }
 
     private void complexAggs() throws IOException, ProcCallException {
-        loadData();
+        loadData(false);
 
         Client client = this.getClient();
         ClientResponse cr;
@@ -173,7 +177,7 @@ public class TestGroupByComplexSuite extends RegressionSuite {
     }
 
     private void complexAggsOrderbySuite() throws IOException, ProcCallException {
-        loadData();
+        loadData(false);
 
         Client client = this.getClient();
         ClientResponse cr;
@@ -254,18 +258,12 @@ public class TestGroupByComplexSuite extends RegressionSuite {
     }
 
     private void complexAggsDistinctLimit() throws IOException, ProcCallException {
-        loadData();
+        loadData(true);
 
         Client client = this.getClient();
         ClientResponse cr = null;
         VoltTable vt;
         long[][] expected;
-
-        for (String tb: procs) {
-            cr = client.callProcedure(tb, 6,  10,  2 , "2013-07-18 02:00:00.123457");
-            cr = client.callProcedure(tb, 7,  40,  2 , "2013-07-18 02:00:00.123457");
-        }
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
         for (String tb: tbs) {
             // Test distinct with complex aggregations.
@@ -301,17 +299,12 @@ public class TestGroupByComplexSuite extends RegressionSuite {
     }
 
     private void complexGroupby() throws IOException, ProcCallException, ParseException{
-        loadData();
+        loadData(true);
 
         Client client = this.getClient();
         ClientResponse cr = null;
         VoltTable vt;
         long[][] expected;
-
-        for (String tb: procs) {
-            cr = client.callProcedure(tb, 6,  10,  2 , "2013-07-18 02:00:00.123457");
-            cr = client.callProcedure(tb, 7,  40,  2 , "2013-09-18 02:00:00.123457");
-        }
 
         for (String tb: tbs) {
             // (1) Without extra aggregation expression
@@ -438,17 +431,12 @@ public class TestGroupByComplexSuite extends RegressionSuite {
     }
 
     private void complexGroupbyDistinctLimit() throws IOException, ProcCallException, ParseException {
-        loadData();
+        loadData(true);
 
         Client client = this.getClient();
         ClientResponse cr = null;
         VoltTable vt;
         long[][] expected;
-
-        for (String tb: procs) {
-            cr = client.callProcedure(tb, 6,  10,  2 , "2013-07-18 02:00:00.123457");
-            cr = client.callProcedure(tb, 7,  40,  2 , "2013-09-18 02:00:00.123457");
-        }
 
         for (String tb: tbs) {
             // (1) Without extra aggregation expression
@@ -534,17 +522,12 @@ public class TestGroupByComplexSuite extends RegressionSuite {
 
 
     private void complexGroupbyOrderbySuite() throws IOException, ProcCallException {
-        loadData();
+        loadData(true);
 
         Client client = this.getClient();
         ClientResponse cr = null;
         VoltTable vt;
         long[][] expected;
-
-        for (String tb: procs) {
-            cr = client.callProcedure(tb, 6,  10,  2 , "2013-07-18 02:00:00.123457");
-            cr = client.callProcedure(tb, 7,  40,  2 , "2013-09-18 02:00:00.123457");
-        }
 
         for (String tb: tbs) {
             //(1) Test complex group-by with no extra aggregation expressions.
@@ -713,7 +696,7 @@ public class TestGroupByComplexSuite extends RegressionSuite {
     }
 
     private void ENG4285() throws IOException, ProcCallException {
-        loadData();
+        loadData(false);
 
         Client client = this.getClient();
         ClientResponse cr = null;
@@ -755,7 +738,7 @@ public class TestGroupByComplexSuite extends RegressionSuite {
 
     // Test group by columns do not have to be in display columns.
     private void ENG5016() throws IOException, ProcCallException {
-        loadData();
+        loadData(false);
 
         Client client = this.getClient();
         ClientResponse cr = null;
@@ -800,7 +783,7 @@ public class TestGroupByComplexSuite extends RegressionSuite {
     }
 
     private void supportedCases() throws IOException, ProcCallException {
-        loadData();
+        loadData(false);
 
         Client client = this.getClient();
         ClientResponse cr = null;
@@ -855,10 +838,9 @@ public class TestGroupByComplexSuite extends RegressionSuite {
         }
     }
 
-    // TODO(XIN): make the following un-taged order by cases work, ENG-4958
-    // Test group by column not in display columns
+    // Test unsupported order by column not in display columns
     private void unsupportedCases() throws IOException, ProcCallException {
-        loadData();
+        loadData(false);
 
         Client client = this.getClient();
         ClientResponse cr = null;
@@ -960,7 +942,7 @@ public class TestGroupByComplexSuite extends RegressionSuite {
     }
 
     public void testAggregateOnJoin() throws IOException, ProcCallException {
-        loadData();
+        loadData(false);
 
         Client client = this.getClient();
         VoltTable vt;
@@ -979,7 +961,7 @@ public class TestGroupByComplexSuite extends RegressionSuite {
 
     public void testHavingClause() throws IOException, ProcCallException {
         System.out.println("test Having clause...");
-        loadData();
+        loadData(false);
 
         Client client = this.getClient();
         ClientResponse cr;
@@ -1098,11 +1080,49 @@ public class TestGroupByComplexSuite extends RegressionSuite {
         validateTableOfLongs(vt, expected);
     }
 
+    public void testDistinctWithGroupby() throws IOException, ProcCallException {
+        System.out.println("Test Distinct...");
+        loadData(true);
+        Client client = this.getClient();
+
+        String sql;
+        VoltTable vt;
+
+        for (String tb: tbs) {
+            sql = "SELECT DISTINCT ID, COUNT(DEPT) FROM " + tb + " GROUP BY ID, WAGE ORDER BY 1, 2 ";
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{1,1}, {2,1}, {3,1}, {4,1}, {5,1}, {6,1}, {7,1}});
+
+            // (1) base query without distinct
+            sql = "SELECT wage, count(*) from " + tb + " GROUP BY abs(dept-2), wage "
+                    + " ORDER BY 1, 2;";
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{10,1}, {10,1}, {20,1}, {30,1}, {40,2}, {50,1}});
+
+            // query with one column distinct
+            sql = "SELECT DISTINCT count(*) from " + tb + " GROUP BY abs(dept-2), wage "
+                    + " ORDER BY 1;";
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[]{1, 2});
+
+            // query with multiple columns distinct
+            sql = "SELECT DISTINCT wage, count(*) from " + tb + " GROUP BY abs(dept-2), wage "
+                    + " ORDER BY 1, 2;";
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{10,1}, {20,1}, {30,1}, {40,2}, {50,1}});
+
+            // query with multiple expressions distinct
+            sql = "SELECT DISTINCT wage, count(*)+1 from " + tb + " GROUP BY abs(dept-2), wage "
+                    + " ORDER BY 1, 2;";
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{10,2}, {20,2}, {30,2}, {40,3}, {50,2}});
+        }
+
+    }
 
     //
     // Suite builder boilerplate
     //
-
     public TestGroupByComplexSuite(String name) {
         super(name);
     }
@@ -1170,18 +1190,18 @@ public class TestGroupByComplexSuite extends RegressionSuite {
         }
         boolean success;
 
-        config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("groupByComplex-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
 
-        config = new LocalCluster("plansgroupby-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+        config = new LocalCluster("groupByComplex-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
 
         // Cluster
-        config = new LocalCluster("plansgroupby-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("groupByComplex-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);

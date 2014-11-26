@@ -27,6 +27,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.HashAggregatePlanNode;
+import org.voltdb.plannodes.LimitPlanNode;
+import org.voltdb.plannodes.SendPlanNode;
 
 public class TestPlansDistinct extends PlannerTestCase {
     @Override
@@ -42,7 +45,7 @@ public class TestPlansDistinct extends PlannerTestCase {
 
     List<AbstractPlanNode> pns = new ArrayList<AbstractPlanNode>();
 
-    public void testMultipleColumns()
+    public void testMultipleColumns_withoutGroupby()
     {
         String sql1, sql2;
 
@@ -71,17 +74,17 @@ public class TestPlansDistinct extends PlannerTestCase {
 
         // Distinct on table aggregation
         // single table aggregate select
-        sql1 = "SELECT distinct count(*), SUM(A3) from T3";
-        sql2 = "SELECT count(*), SUM(A3) from T3";
-        checkQueriesPlansAreTheSame(sql1, sql2);
-
-        // multiple table aggregate select
         sql1 = "SELECT distinct SUM(A3) from T3";
         sql2 = "SELECT SUM(A3) from T3";
         checkQueriesPlansAreTheSame(sql1, sql2);
+
+        // multiple table aggregate select
+        sql1 = "SELECT distinct count(*), SUM(A3) from T3";
+        sql2 = "SELECT count(*), SUM(A3) from T3";
+        checkQueriesPlansAreTheSame(sql1, sql2);
     }
 
-    public void testMultipleExpressions()
+    public void testMultipleExpressions_withoutGroupby()
     {
         String sql1, sql2;
         // distinct with expression
@@ -100,7 +103,7 @@ public class TestPlansDistinct extends PlannerTestCase {
         checkQueriesPlansAreTheSame(sql1, sql2);
     }
 
-    public void testMaterializedViews()
+    public void testMaterializedViews_withoutGroupby()
     {
         String sql1, sql2;
         // View: V_P1_NO_FIX_NEEDED
@@ -163,24 +166,122 @@ public class TestPlansDistinct extends PlannerTestCase {
         sql = "SELECT distinct A3, B3, C3 from T3 group by A3, B3";
         failToCompile(sql, "expression not in aggregate or GROUP BY columns: PUBLIC.T3.C3");
 
-        // Group by with multiple columns distinct
-
-        // PKEY, A3 is the primary key or contains the unique key.
-        sql = "SELECT distinct B3, C3 from T3 group by PKEY, A3";
-        failToCompile(sql, "Multiple DISTINCT columns with GROUP BY clause currently unsupported");
-
-        // edge case because grouping by primary key
-        sql = "SELECT distinct A3, B3, sum(C3) from T3 group by A3, B3";
-        failToCompile(sql, "Multiple DISTINCT columns with GROUP BY clause currently unsupported");
-
-        sql = "SELECT distinct A3, B3 from T3 group by A3, B3, C3";
-        failToCompile(sql, "Multiple DISTINCT columns with GROUP BY clause currently unsupported");
-
         sql = "SELECT distinct A3 from T3 group by A3, B3, C3";
         compileToFragments(sql); // make sure the DISTINCT with GROUP BY is still working
 
-        // distinct on expression with group by clause
-        sql = "SELECT distinct sum(C3) from T3 group by A3, B3";
-        failToCompile(sql, "DISTINCT of an expression with GROUP BY clause currently unsupported");
+        // invalid ORDER BY expression
+        // (1) without GROUP BY
+        sql = "SELECT distinct B3 from T3 order by A3";
+        failToCompile(sql, "invalid ORDER BY expression");
+
+        sql = "SELECT distinct A3, B3 from T3 order by C3";
+        failToCompile(sql, "invalid ORDER BY expression");
+
+        // (2) with GROUP BY
+        sql = "SELECT distinct A3 from T3 group by A3, B3, C3 ORDER BY B3";
+        failToCompile(sql, "invalid ORDER BY expression");
+    }
+
+    public void testMultipleColumns_withGroupby()
+    {
+        String sql1, sql2;
+        // Group by with multiple columns distinct
+
+        // PKEY, A3 is the primary key or contains the unique key.
+        sql1 = "SELECT distinct B3, C3 from T3 group by PKEY, A3";
+        sql2 = "SELECT B3, C3 from T3 group by PKEY, A3";
+        checkDistinctWithGroupbyPlans(sql1, sql2);
+
+        // single column distinct
+        sql1 = "SELECT distinct SUM(C3) from T3 group by A3, B3";
+        sql2 = "SELECT SUM(C3) from T3 group by A3, B3";
+        checkDistinctWithGroupbyPlans(sql1, sql2);
+
+        // multiple columns distinct
+        sql1 = "SELECT distinct B3, SUM(C3), COUNT(*) from T3 group by A3, B3";
+        sql2 = "SELECT B3, SUM(C3), COUNT(*) from T3 group by A3, B3";
+        checkDistinctWithGroupbyPlans(sql1, sql2);
+
+        // variance on select list and group by list
+        sql1 = "SELECT distinct A3, sum(C3) from T3 group by A3, B3";
+        sql2 = "SELECT A3, sum(C3) from T3 group by A3, B3";
+        checkDistinctWithGroupbyPlans(sql1, sql2);
+
+        sql1 = "SELECT distinct A3, B3 from T3 group by A3, B3, C3";
+        sql2 = "SELECT A3, B3 from T3 group by A3, B3, C3";
+        checkDistinctWithGroupbyPlans(sql1, sql2);
+
+        // distinct on expression
+        sql1 = "SELECT distinct sum(C3)/count(C3) from T3 group by A3, B3";
+        sql2 = "SELECT sum(C3)/count(C3) from T3 group by A3, B3";
+        checkDistinctWithGroupbyPlans(sql1, sql2);
+
+
+        // order by
+        sql1 = "SELECT distinct A3, B3 from T3 group by A3, B3, C3 ORDER BY A3, B3";
+        sql2 = "SELECT A3, B3 from T3 group by A3, B3, C3 ORDER BY A3, B3";
+        checkDistinctWithGroupbyPlans(sql1, sql2);
+
+        // LIMIT/OFFSET is tricky, we can not push down ORDER BY/LIMIT with DISTINCT
+        // ORDER BY/LIMIT will get pushed down for certain cases and hard to test
+
+    }
+
+    protected void checkDistinctWithGroupbyPlans(String distinctSQL, String groupbySQL) {
+        checkDistinctWithGroupbyPlans(distinctSQL, groupbySQL, false);
+    }
+
+    /**
+     *
+     * @param distinctSQL Group by query with distinct
+     * @param groupbySQL Group by query without distinct
+     */
+    protected void checkDistinctWithGroupbyPlans(String distinctSQL, String groupbySQL,
+            boolean hasLimit) {
+        List<AbstractPlanNode> pns1 = compileToFragments(distinctSQL);
+        List<AbstractPlanNode> pns2 = compileToFragments(groupbySQL);
+
+        printExplainPlan(pns1);
+
+        printExplainPlan(pns2);
+        // Distributed DISTINCT GROUP BY
+        if (pns1.size() > 1) {
+            assertEquals(pns1.get(1).toExplainPlanString(), pns2.get(1).toExplainPlanString());
+        }
+        assertTrue(pns1.get(0) instanceof SendPlanNode);
+        assertTrue(pns2.get(0) instanceof SendPlanNode);
+
+        AbstractPlanNode apn1, apn2;
+        apn1 = pns1.get(0).getChild(0);
+        apn2 = pns2.get(0).getChild(0);
+
+        // DISTINCT plan node is rewrote with GROUP BY and adds to the top level plan node
+        if (hasLimit) {
+            assertTrue(apn1 instanceof LimitPlanNode);
+            apn1 = apn1.getChild(0);
+
+            assertTrue(apn2 instanceof LimitPlanNode);
+            apn2 = apn2.getChild(0);
+        }
+        assertTrue(apn1 instanceof HashAggregatePlanNode);
+        assertEquals(0, ((HashAggregatePlanNode)apn1).getAggregateTypesSize());
+        assertEquals(pns1.get(0).getOutputSchema().getColumns().size(),
+                ((HashAggregatePlanNode)apn1).getGroupByExpressionsSize());
+
+        apn1 = apn1.getChild(0);
+        assertEquals(apn1.toExplainPlanString(), apn2.toExplainPlanString());
+    }
+
+    public void testMaterializedViews_withGroupby()
+    {
+        String sql1, sql2;
+        // Partition view tables without partition key
+        String[] tbs = {"V_P1", "V_P1_ABS"};
+
+        for (String tb: tbs) {
+            sql1 = "SELECT distinct V_SUM_C1 FROM " + tb + " GROUP by V_SUM_C1 LIMIT 5";
+            sql2 = "SELECT V_SUM_C1 FROM " + tb + " GROUP by V_SUM_C1 LIMIT 5";
+            checkDistinctWithGroupbyPlans(sql1, sql2, true);
+        }
     }
 }

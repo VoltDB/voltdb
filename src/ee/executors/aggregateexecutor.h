@@ -176,7 +176,8 @@ public:
             const TupleSchema * schema, TempTable* newTempTable = NULL);
 
     /**
-     * Return true when limit has been met. By default, return false.
+     * Return true when LIMIT has been met, the caller may stop executing.
+     * By default, return false.
      */
     virtual bool p_execute_tuple(const TableTuple& nextTuple) = 0;
 
@@ -233,6 +234,8 @@ protected:
     std::vector<AbstractExpression*> m_outputColumnExpressions;
     AbstractExpression* m_prePredicate;    // ENG-1565: for enabling max() using index purpose only
     AbstractExpression* m_postPredicate;
+
+    bool m_noAggregation;
 
     ProgressMonitorProxy* m_pmp;
     PoolBackedTupleStorage m_nextGroupByKeyStorage;
