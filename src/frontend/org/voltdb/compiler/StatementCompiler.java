@@ -149,7 +149,10 @@ public abstract class StatementCompiler {
         planDescription.append("\nPLAN:\n");
         planDescription.append(plan.explainedPlan);
         String planString = planDescription.toString();
-        BuildDirectoryUtils.writeFile(null, name + ".txt", planString, false);
+        // only write to disk if compiler is in standalone mode
+        if (compiler.standaloneCompiler) {
+            BuildDirectoryUtils.writeFile(null, name + ".txt", planString, false);
+        }
         compiler.captureDiagnosticContext(planString);
 
         // Stuff the explain plan in an annotation for report generation.
