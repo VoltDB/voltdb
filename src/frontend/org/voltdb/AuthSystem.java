@@ -62,6 +62,8 @@ import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import java.util.EnumSet;
+import java.util.concurrent.TimeUnit;
+import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.common.Permission;
 
 
@@ -283,6 +285,10 @@ public class AuthSystem {
                 }
             }
             return false;
+        }
+
+        public boolean isAuthEnabled() {
+            return true;
         }
 
         private void finish() {
@@ -509,7 +515,7 @@ public class AuthSystem {
         }
 
         if (matched) {
-            authLogger.l7dlog(Level.INFO, LogKeys.auth_AuthSystem_AuthenticatedUser.name(), new Object[] {username}, null);
+            logAuthSuccess(username);
             return true;
         } else {
             authLogger.l7dlog(Level.INFO, LogKeys.auth_AuthSystem_AuthFailedPasswordMistmatch.name(), new String[] {username}, null);
@@ -536,6 +542,12 @@ public class AuthSystem {
         public boolean authorizeConnector(String connectorName) {
             return true;
         }
+
+        @Override
+        public boolean isAuthEnabled() {
+            return false;
+        }
+
     }
 
     private final AuthUser m_authDisabledUser = new AuthDisabledUser();
@@ -606,14 +618,22 @@ public class AuthSystem {
             }
 
             if (matched) {
-                authLogger.l7dlog(Level.INFO, LogKeys.auth_AuthSystem_AuthenticatedUser.name(), new Object[] {m_user}, null);
                 m_authenticatedUser = m_user;
+                logAuthSuccess(m_authenticatedUser);
                 return true;
             } else {
                 authLogger.l7dlog(Level.INFO, LogKeys.auth_AuthSystem_AuthFailedPasswordMistmatch.name(), new String[] {m_user}, null);
                 return false;
             }
         }
+    }
+
+    private static void logAuthSuccess(String user) {
+        //Make sure its logged per user
+        String format = "Authenticated user " + user + "%s";
+        RateLimitedLogger.tryLogForMessage(System.currentTimeMillis(), 60, TimeUnit.SECONDS,
+            authLogger, Level.INFO, format, ". This message is rate limited to once every 60 seconds.");
+
     }
 
     public class KerberosAuthenticationRequest extends AuthenticationRequest {
@@ -744,7 +764,7 @@ public class AuthSystem {
                     return false;
                 }
                 m_authenticatedUser = authenticatedUser;
-                authLogger.l7dlog(Level.INFO, LogKeys.auth_AuthSystem_AuthenticatedUser.name(), new Object[] {authenticatedUser}, null);
+                logAuthSuccess(m_authenticatedUser);
             }
 
             return true;

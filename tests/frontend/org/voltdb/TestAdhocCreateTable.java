@@ -149,7 +149,8 @@ public class TestAdhocCreateTable extends AdhocDDLTestBase {
                 m_client.callProcedure("@AdHoc",
                         "create table FOO (\n" +
                         "ID int default 0 not null,\n" +
-                        "VAL varchar(32 bytes)\n" +
+                        "VAL varchar(32 bytes),\n" +
+                        "VAL2 bigint not null assumeunique\n" +
                         ");\n" +
                         "partition table FOO on column ID;\n"
                         );
@@ -172,7 +173,11 @@ public class TestAdhocCreateTable extends AdhocDDLTestBase {
                 m_client.callProcedure("@AdHoc",
                         "create table BAR (\n" +
                         "ID int default 0 not null,\n" +
-                        "VAL varchar(32 bytes)\n" +
+                        "VAL varchar(32 bytes),\n" +
+                        // check that we can create a table with assumeunique
+                        // (starts replicated) and partition it in a separate @AdHoc call
+                        "VAL2 bigint not null assumeunique,\n" +
+                        "constraint blerg assumeunique(VAL)\n" +
                         ");\n");
                 m_client.callProcedure("@AdHoc",
                         "partition table BAR on column ID;\n"

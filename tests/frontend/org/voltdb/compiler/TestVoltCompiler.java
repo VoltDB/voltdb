@@ -1913,9 +1913,6 @@ public class TestVoltCompiler extends TestCase {
     private static final String msgPR =
             "ASSUMEUNIQUE is not valid for an index that includes the partitioning column. " +
             "Please use UNIQUE instead";
-    private static final String msgR =
-            "ASSUMEUNIQUE is not valid for replicated tables. " +
-            "Please use UNIQUE instead";
 
     public void testColumnUniqueGiveException()
     {
@@ -1924,12 +1921,12 @@ public class TestVoltCompiler extends TestCase {
         // (1) ****** Replicate tables
         // A unique index on the non-primary key for replicated table gets no error.
         schema = "create table t0 (id bigint not null, name varchar(32) not null UNIQUE, age integer,  primary key (id));\n";
-        checkValidUniqueAndAssumeUnique(schema, null, msgR);
+        checkValidUniqueAndAssumeUnique(schema, null, null);
 
         // Similar to above, but use a different way to define unique column.
         schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  " +
                 "primary key (id), UNIQUE (name) );\n";
-        checkValidUniqueAndAssumeUnique(schema, null, msgR);
+        checkValidUniqueAndAssumeUnique(schema, null, null);
 
 
         // (2) ****** Partition Table: UNIQUE valid, ASSUMEUNIQUE not valid
@@ -1997,6 +1994,17 @@ public class TestVoltCompiler extends TestCase {
                 "PARTITION TABLE t0 ON COLUMN name;\n";
         // 1) unique index, 2) primary key
         checkValidUniqueAndAssumeUnique(schema, msgP, msgP);
+
+        // unique/assumeunique constraint added via ALTER TABLE to replicated table
+        schema = "create table t0 (id bigint not null, name varchar(32) not null);\n" +
+                "ALTER TABLE t0 ADD UNIQUE(name);";
+        checkValidUniqueAndAssumeUnique(schema, null, null);
+
+        // unique/assumeunique constraint added via ALTER TABLE to partitioned table
+        schema = "create table t0 (id bigint not null, name varchar(32) not null);\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "ALTER TABLE t0 ADD UNIQUE(name);";
+        checkValidUniqueAndAssumeUnique(schema, msgP, null);
     }
 
     private void checkDDLErrorMessage(String ddl, String errorMsg) {
@@ -2039,7 +2047,7 @@ public class TestVoltCompiler extends TestCase {
         // A unique index on the non-primary key for replicated table gets no error.
         schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
                 "CREATE UNIQUE INDEX user_index0 ON t0 (name) ;";
-        checkValidUniqueAndAssumeUnique(schema, null, msgR);
+        checkValidUniqueAndAssumeUnique(schema, null, null);
 
 
         // (2) ****** Partition Table: UNIQUE valid, ASSUMEUNIQUE not valid
@@ -2978,6 +2986,15 @@ public class TestVoltCompiler extends TestCase {
         expectedError =
                 "Dropped Procedure \"insert\" is not defined";
         assertTrue(isFeedbackPresent(expectedError, fbs));
+
+        // check if exists
+        db = goodDDLAgainstSimpleSchema(
+                "create procedure p1 as select * from books;\n" +
+                "drop procedure p1 if exists;\n" +
+                "drop procedure p1 if exists;\n"
+                );
+        proc = db.getProcedures().get("p1");
+        assertNull(proc);
     }
 
     private ArrayList<Feedback> checkInvalidProcedureDDL(String ddl) {
@@ -3179,8 +3196,8 @@ public class TestVoltCompiler extends TestCase {
     }
 
     public void testRoleDDL() throws Exception {
-        goodRoleDDL("create role r1;", new TestRole("r1"));
-        goodRoleDDL("create role r1;create role r2;", new TestRole("r1"), new TestRole("r2"));
+        goodRoleDDL("create role R1;", new TestRole("r1"));
+        goodRoleDDL("create role r1;create role r2;", new TestRole("r1"), new TestRole("R2"));
         goodRoleDDL("create role r1 with adhoc;", new TestRole("r1", true, true, false, true, true, false));
         goodRoleDDL("create role r1 with sql;", new TestRole("r1", true, true, false, true, true, false));
         goodRoleDDL("create role r1 with sqlread;", new TestRole("r1", false, true, false, false, true, false));
@@ -3325,6 +3342,43 @@ public class TestVoltCompiler extends TestCase {
                 "create procedure p1 allow r1, rx as select * from books;");
     }
 
+    public void testDropRole() throws Exception
+    {
+        Database db = goodDDLAgainstSimpleSchema(
+                "create role r1;",
+                "drop role r1;");
+        CatalogMap<Group> groups = db.getGroups();
+        assertTrue(groups.get("r1") == null);
+
+        db = goodDDLAgainstSimpleSchema(
+                "create role r1;",
+                "drop role r1 if exists;");
+        groups = db.getGroups();
+        assertTrue(groups.get("r1") == null);
+
+        db = goodDDLAgainstSimpleSchema(
+                "create role r1;",
+                "drop role r1 if exists;",
+                "drop role r1 IF EXISTS;");
+        groups = db.getGroups();
+        assertTrue(groups.get("r1") == null);
+
+        badDDLAgainstSimpleSchema(".*does not exist.*",
+                "create role r1;",
+                "drop role r2;");
+
+        badDDLAgainstSimpleSchema(".*does not exist.*",
+                "create role r1;",
+                "drop role r1;",
+                "drop role r1;");
+
+        badDDLAgainstSimpleSchema(".*may not drop.*",
+                "drop role administrator;");
+
+        badDDLAgainstSimpleSchema(".*may not drop.*",
+                "drop role user;");
+    }
+
     private ConnectorTableInfo getConnectorTableInfoFor( Database db, String tableName) {
         Connector connector =  db.getConnectors().get("0");
         if( connector == null) return null;
@@ -3352,7 +3406,7 @@ public class TestVoltCompiler extends TestCase {
 
     public void testBadExportTable() throws Exception {
 
-        badDDLAgainstSimpleSchema(".+\\sexport, table non_existant was not present in the catalog.*",
+        badDDLAgainstSimpleSchema(".+\\sEXPORT statement: table non_existant was not present in the catalog.*",
                 "export table non_existant;"
                 );
 
@@ -3386,12 +3440,6 @@ public class TestVoltCompiler extends TestCase {
                 "create table view_source( id integer, f1 varchar(16), f2 varchar(12));",
                 "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;",
                 "export table my_view;"
-                );
-
-        badDDLAgainstSimpleSchema("Table \"E1\" is already exported.*",
-                "create table e1( id integer, f1 varchar(16), f2 varchar(12));",
-                "export table e1;",
-                "export table E1;"
                 );
     }
 

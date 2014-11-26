@@ -133,8 +133,6 @@ def copyCommunityFilesToReleaseDir(releaseDir, version, operatingsys):
         "%s/%s-voltdb-%s.tar.gz" % (releaseDir, operatingsys, version))
     get("%s/voltdb/obj/release/voltdb-client-java-%s.tar.gz" % (builddir, version),
         "%s/voltdb-client-java-%s.tar.gz" % (releaseDir, version))
-    get("%s/voltdb/obj/release/voltdb-studio.web-%s.zip" % (builddir, version),
-        "%s/voltdb-studio.web-%s.zip" % (releaseDir, version))
     get("%s/voltdb/obj/release/voltdb-tools-%s.tar.gz" % (builddir, version),
         "%s/voltdb-tools-%s.tar.gz" % (releaseDir, version))
 
