@@ -31,7 +31,6 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -882,7 +881,7 @@ public abstract class CatalogUtil {
                 for( PropertyType configProp: configProperties) {
                     ConnectorProperty prop = catconn.getConfig().add(configProp.getName());
                     prop.setName(configProp.getName());
-                    if (!configProp.getName().equalsIgnoreCase("password")) {
+                    if (!configProp.getName().toLowerCase().contains("password")) {
                         prop.setValue(configProp.getValue().trim());
                     } else {
                         //Dont trim passwords
@@ -900,7 +899,7 @@ public abstract class CatalogUtil {
             if (exportConfiguration != null && exportConfiguration.getProperty() != null) {
                 hostLog.info("Export configuration properties are: ");
                 for (PropertyType configProp : exportConfiguration.getProperty()) {
-                    if (!configProp.getName().equalsIgnoreCase("password")) {
+                    if (!configProp.getName().toLowerCase().contains("password")) {
                         hostLog.info("Export Configuration Property NAME=" + configProp.getName() + " VALUE=" + configProp.getValue());
                     }
                 }
