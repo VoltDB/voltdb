@@ -1,6 +1,5 @@
 Key-Value application
 ===========================
-
 This example application demonstrates how to create a "Key-Value" store using VoltDB and the automatic stored procedures created for each table.
 
 Many attributes of the application are customizable through arguments passed to the client, including:
@@ -16,20 +15,8 @@ Many attributes of the application are customizable through arguments passed to 
 
 These attributes can be adjusted by modifying the arguments to the "async-benchmark" and "sync-benchmark" targets in run.sh.
 
-Additional arguments allow the client to automatically tune itself for optimal performance ("client" target only).
-
-  - Whether auto-tuning should be turned on, allowing the benchmark to determine an optimal TPS for a given target latency
-  - Target average transaction call latency (in milliseconds)
-
-Logging
-------------------------------------------------
-
-This application supports logging using log4j and is delivered with log4j configuration files for both the client (log-client.xml) and server (log-server.xml).
-
-
 Interpreting the Results
 ------------------------
-
 The default client configuration will allow the system to automatically tune itself for optimal performance, regardless of your underlying hardware and cluster deployment.
 
 The client starts "fire-hosing" the VoltDB server by attempting to submit transactions faster than the server can possibly process them (1 billion transactions per second, or 1B TPS).  Within 5 seconds, the automated tuning should be able to figure out an optimized throughput (TPS) that maintains transaction latency within 6 ms.
@@ -48,24 +35,24 @@ For more on benchmarking and tips on application tuning, make sure you visit the
 
 Calling stored procedures
 -------------------------
-
 This example makes use of the built-in stored procedures that are automatically created for each table. Client applications use stored procedures to make query calls to the database. However, they can use the builtin procedures to make basic query calls to the server instead of writing custom stored procedures. For example, a Get query uses the builtin STORE.select procedure call and a Put query (insert or update) uses the builtin STORE.upsert.
+
+Quickstart
+-----------
+VoltDB Examples come with a run.sh script that sets up some environment and saves some of the typing needed to work with Java clients. It should be fairly readable to show what is precisely being run to accomplish a given task.
+
+1. Make sure "bin" inside the VoltDB kit is in your path.
+2. Type "voltdb create" to start an empty, single-node VoltDB server.
+3. Type "sqlcmd < ddl.sql" to load the schema and the jarfile of procedures into VoltDB.
+4. Type "./run.sh client" to run the client code.
 
 run.sh actions described
 ---------------------
-
-run.sh                 : compile all Java clients and stored procedures, build the catalog, and start the server
-
-run.sh server          : start the server
-
-run.sh client          : start the async client benchmark, initialize the given number of key-value pairs (puts) if needed, and begin normal client processing (gets and puts)
-
-run.sh async-benchmark : same as run.sh client
-
-run.sh sync-benchmark  : start the multi-threaded sync client,  initialize the given number of key-value pairs (puts) if needed, and begin normal client processing (gets and puts)
-
-run.sh jdbc-benchmark  : start the JDBC client benchmark
-
-run.sh catalog         : compile sources and build the catalog
-
-run.sh clean           : remove compiled files
+- *run.sh* : start the server
+- *run.sh server* : start the server
+- *run.sh init* : compile stored procedures and load the schema and stored procedures
+- *run.sh client* : start the async client benchmark, initialize the given number of key-value pairs (puts) if needed, and begin normal client processing (gets and puts)
+- *run.sh async-benchmark* : same as run.sh client
+- *run.sh sync-benchmark* : start the multi-threaded sync client,  initialize the given number of key-value pairs (puts) if needed, and begin normal client processing (gets and puts)
+- *run.sh jdbc-benchmark* : start the JDBC client benchmark
+- *run.sh clean* : remove compiled and other runtime artifacts

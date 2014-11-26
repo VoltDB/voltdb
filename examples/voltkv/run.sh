@@ -42,15 +42,13 @@ HOST="localhost"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME-procs.jar voltdbroot log \
+    rm -rf client/voltkv/*.class debugoutput voltdbroot log \
     	catalog-report.html statement-plans
 }
 
 # compile the source code for procedures and the client
 function srccompile() {
-    mkdir -p obj
-    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH -d obj \
-        src/voltkv/*.java
+    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH client/voltkv/*.java
 }
 
 # run the voltdb server locally
@@ -65,7 +63,6 @@ function server() {
 
 # load schema and procedures
 function init() {
-    srccompile
 	$VOLTDB_BIN/sqlcmd < ddl.sql
 }
 
@@ -78,7 +75,7 @@ function client() {
 # Use this target for argument help
 function async-benchmark-help() {
     srccompile
-    java -classpath obj:$APPCLASSPATH:obj voltkv.AsyncBenchmark --help
+    java -classpath client:$APPCLASSPATH voltkv.AsyncBenchmark --help
 }
 
 # latencyreport: default is OFF
@@ -86,7 +83,7 @@ function async-benchmark-help() {
 # Disable the comments to get latency report
 function async-benchmark() {
     srccompile
-    java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    java -classpath client:$APPCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         voltkv.AsyncBenchmark \
         --displayinterval=5 \
         --duration=120 \
@@ -107,12 +104,12 @@ function async-benchmark() {
 # Use this target for argument help
 function sync-benchmark-help() {
     srccompile
-    java -classpath obj:$APPCLASSPATH:obj voltkv.SyncBenchmark --help
+    java -classpath client:$APPCLASSPATH voltkv.SyncBenchmark --help
 }
 
 function sync-benchmark() {
     srccompile
-    java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    java -classpath client:$APPCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         voltkv.SyncBenchmark \
         --displayinterval=5 \
         --duration=120 \
@@ -130,12 +127,12 @@ function sync-benchmark() {
 # Use this target for argument help
 function jdbc-benchmark-help() {
     srccompile
-    java -classpath obj:$APPCLASSPATH:obj voltkv.JDBCBenchmark --help
+    java -classpath client:$APPCLASSPATH voltkv.JDBCBenchmark --help
 }
 
 function jdbc-benchmark() {
     srccompile
-    java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    java -classpath client:$APPCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         voltkv.JDBCBenchmark \
         --displayinterval=5 \
         --duration=120 \
