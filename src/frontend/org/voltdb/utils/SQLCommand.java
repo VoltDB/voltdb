@@ -622,6 +622,7 @@ public class SQLCommand
                         query = new StringBuilder();
                         line = null;
                         m_returningToPromptAfterError = false;
+                        continue;
                     }
                     // else treat the line(s) from the file(s) as regular database commands
                 }
@@ -815,9 +816,10 @@ public class SQLCommand
                                                 ") :  must have an even number of hex characters to be valid.");
                                     }
                                 }
-                            } else {
-                                throw new Exception("Unsupported Data Type: " + paramType);
-                            }
+                                else {
+                                    throw new Exception("Unsupported Data Type: " + paramType);
+                                }
+                            } // else param is keyword "null", so leave objParam as null.
                             objectParams[i] = objParam;
                         }
                     } catch (NumberFormatException nfe) {
@@ -1389,19 +1391,19 @@ public class SQLCommand
             // Removed code to prevent Ctrl-C from exiting. The original code is visible
             // in Git history hash 837df236c059b5b4362ffca7e7a5426fba1b7f20.
 
-            boolean interactive = true;
+            m_interactive = true;
             if (queries != null && !queries.isEmpty()) {
                 // If queries are provided via command line options run them in
                 // non-interactive mode.
                 //TODO: Someday we should honor batching.
-                interactive = false;
+                m_interactive = false;
                 for (String query : queries) {
                     executeQuery(query);
                 }
             }
             if (System.in.available() > 0) {
                 // If Standard input comes loaded with data, run in non-interactive mode
-                interactive = false;
+                m_interactive = false;
                 queries = getQuery(false);
                 if (queries != null) {
                     for (String query : queries) {
@@ -1409,7 +1411,7 @@ public class SQLCommand
                     }
                 }
             }
-            if (interactive) {
+            if (m_interactive) {
                 // Print out welcome message
                 System.out.printf("SQL Command :: %s%s:%d\n", (user == "" ? "" : user + "@"), serverList, port);
 

@@ -428,7 +428,7 @@ public class TestUpdateDeployment extends RegressionSuite {
         project.addDefaultSchema();
         project.addDefaultPartitioning();
         project.addProcedures(BASEPROCS);
-        project.setSecurityEnabled(true);
+        project.setSecurityEnabled(true, false);
         // build the jarfile
         compile = config.compile(project);
         assertTrue(compile);

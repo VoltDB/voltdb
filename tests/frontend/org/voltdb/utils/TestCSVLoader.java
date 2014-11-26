@@ -535,8 +535,11 @@ public class TestCSVLoader {
                 "2,2,2,2,a word,1.10,1.11,7777-12-25 14:35:26",
                 "3,3,3,3,a word,1.10,1.11,7777-12-25 14:35:26",
                 "\"4\",\"1\",\"1\",\"1\",\"a word\",\"1.10\",\"1.11\",\"7777-12-25 14:35:26\"",
+                "5,\"5\",\"5\",\"5\",,,,",
+                "\"5\",5,\"5\",\"5\",,,,",
+                "\"5\",\"5\",,,,,,",
         };
-        int invalidLineCnt = 2;
+        int invalidLineCnt = 4;
         int validLineCnt = myData.length - invalidLineCnt;
         test_Interface(myOptions, myData, invalidLineCnt, validLineCnt );
     }

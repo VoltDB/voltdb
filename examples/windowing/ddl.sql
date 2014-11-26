@@ -31,6 +31,9 @@ CREATE VIEW agg_by_second
 AS SELECT TRUNCATE(SECOND, update_ts), COUNT(*), SUM(val)
    FROM timedata
    GROUP BY TRUNCATE(SECOND, update_ts);
+   
+-- Update classes from jar to that server will know about classes but not procedures yet.
+exec @UpdateClasses windowing-procs.jar ''
 
 -- stored procedures
 CREATE PROCEDURE FROM CLASS windowing.DeleteAfterDate;
