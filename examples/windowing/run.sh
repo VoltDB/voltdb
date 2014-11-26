@@ -46,8 +46,8 @@ HOST="localhost"
 
 # remove build artifacts
 function clean() {
-	rm -rf procedures/windowing/*.class client/windowing/*.class debugoutput \
-		   $APPNAME-procs.jar voltdbroot log catalog-report.html statement-plans
+    rm -rf procedures/windowing/*.class client/windowing/*.class debugoutput \
+           $APPNAME-procs.jar voltdbroot log catalog-report.html statement-plans
 }
 
 # compile the source code for procedures and the client
@@ -72,7 +72,7 @@ function server() {
 # load schema and procedures
 function init() {
     srccompile
-	$VOLTDB_BIN/sqlcmd < ddl.sql
+    $VOLTDB_BIN/sqlcmd < ddl.sql
 }
 
 # Use this target for argument help

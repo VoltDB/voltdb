@@ -1,9 +1,7 @@
-# Windowing Example Application #
+Windowing Example Application
+==============
 
-
-## Overview ##
-
-App that does four simultaneous things on a single-table schema:
+This app does four simultaneous things on a single-table schema:
 
 * Insert random, timestamped tuples at a high rate.
 * Continuously delete tuples that are either too old or over a table size limit.
@@ -16,26 +14,29 @@ threadpool. All inter-task communication is done via the main instance of
 this class.
 
 
-## How to Run ##
+Quickstart
+--------------
+VoltDB Examples come with a run.sh script that sets up some environment and saves some of the typing needed to work with Java clients. It should be fairly readable to show what is precisely being run to accomplish a given task.
 
-To run the VoltDB server with the Windowing application (schema & procedures) loaded, open a terminal, change to the windowing example directory and type `run.sh server`. You can also just type `run.sh` as "server" is the default target.
-
-To run the Windowing client-side code, open a second terminal in the Windowing example directory and type `run.sh client`.
+1. Make sure "bin" inside the VoltDB kit is in your path.
+2. Type "./run.sh srccompile" to compile the client and build a jarfile of procedures.
+3. Type "voltdb create" to start an empty, single-node VoltDB server.
+4. Type "sqlcmd < ddl.sql" to load the schema and the jarfile of procedures into VoltDB.
+5. Type "./run.sh client" to run the client code.
 
 The default settings for the client have it keep 30 seconds worth of tuples, deleting older tuples as an ongoing process. See the section below on *run.sh Client Options* for how to run in other modes.
 
-### run.sh Actions ###
+Other run.sh Actions
+--------------
+- *run.sh* : start the server
+- *run.sh server* : start the server
+- *run.sh init* : compile stored procedures and load the schema and stored procedures
+- *run.sh srccompile* : compile all Java clients and stored procedures
+- *run.sh client* : start the client
+- *run.sh clean* : remove compiled files and artifacts
 
-    run.sh               : compile all Java clients and stored procedures,
-                           build the catalog, and start the server
-    run.sh srccompile    : compile all Java clients and stored procedures
-    run.sh server        : start the server
-    run.sh client        : start the client
-    run.sh catalog       : build the catalog
-    run.sh clean         : remove compiled files and artifacts
-
-### run.sh Client Options ###
-
+run.sh Client Options
+--------------
 Near the bottom of the run.sh bash script is the section run when you type `run.sh client`. In that section is the actual shell command to run the client code, reproduced below:
 
     java -classpath client:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
@@ -53,13 +54,13 @@ Near the bottom of the run.sh bash script is the section run when you type `run.
 
 Changing these settings changes the behavior of the app. The three key options that change the *mode* the app runs in are *maxrows*, *historyseconds* and *inline*. 
 
-* If *maxrows* is non-zero, then the app will try to keep the most recent *maxrows* in the database by deleting older rows as newer rows are added.
-* If *historyseconds* is non-zero, then the app will try to keep rows from the most recent *historyseconds* seconds in the database by deleting rows as they age out.
-* The app won't start if both *historyseconds* and *maxrows* are non-zero. It wouldn't be too hard to support both constraints, but this functionality is omitted from this example avoid further complexity.
-* If *inline* mode is enabled, the app will delete rows in the same transaction that it inserts them in. If not enabled, the app will delete rows as an independant process from inserting rows. Both operations could even be broken into separate unix processes and run separately without much additional work.
+- If *maxrows* is non-zero, then the app will try to keep the most recent *maxrows* in the database by deleting older rows as newer rows are added.
+- If *historyseconds* is non-zero, then the app will try to keep rows from the most recent *historyseconds* seconds in the database by deleting rows as they age out.
+- The app won't start if both *historyseconds* and *maxrows* are non-zero. It wouldn't be too hard to support both constraints, but this functionality is omitted from this example avoid further complexity.
+- If *inline* mode is enabled, the app will delete rows in the same transaction that it inserts them in. If not enabled, the app will delete rows as an independant process from inserting rows. Both operations could even be broken into separate unix processes and run separately without much additional work.
 
-
-## What do the Queries Do? ##
+What do the Queries Do?
+--------------
 
 There are two primary kinds of read operations being run by this app.
 
@@ -90,11 +91,13 @@ Note that the reporting sends 5 different procedure calls to VoltDB to get the 5
 Currently, the distribution of random data is pretty boring, just a gaussian with a mean of zero. Therefore the average for all windows is close to zero, with less variance as the window gets bigger. That may be improved as we improve this example.
 
 
-## How do the Deletes Work? ##
+How do the Deletes Work?
+--------------
 
 The easiest way to delete all rows that are older than 30 seconds would be to run the following query:
 
-`DELETE FROM timedata WHERE SINCE_EPOCH(SECOND, update_ts) < (SINCE_EPOCH(SECOND, NOW) - 30);`
+    DELETE FROM timedata 
+    WHERE SINCE_EPOCH(SECOND, update_ts) < (SINCE_EPOCH(SECOND, NOW) - 30);`
 
 The issue with this query is that the number of rows to delete is unbounded. 
 A query that ended up deleting a half million rows might take hundreds of milliseconds, while using extra memory to store all of the necessary *undo* information to make that operation transactional.
@@ -109,7 +112,9 @@ To perform this operation deterministically, we break the delete into two steps.
 
 Then, we delete all rows with timestamps at least as old as the retrieved timestamp, and also older than original 30s age target:
 
-`DELETE FROM timedata WHERE SINCE_EPOCH(SECOND, update_ts) < (SINCE_EPOCH(SECOND, NOW) - 30) AND update_ts <= ?;`
+    DELETE FROM timedata 
+    WHERE SINCE_EPOCH(SECOND, update_ts) < (SINCE_EPOCH(SECOND, NOW) - 30) 
+    AND update_ts <= ?;`
 
 This will always delete oldest tuples first, and it will always delete an identical set of tuples. Note that it might delete more than 1000 tuples if the 1000th oldest timstamp is non-unique. In the worst case, this will delete all rows if all timestamps are identical. The alternative is to use strictly less than when comparing candidates to the 1000th oldest timstamp. That might delete 0 rows in the worst case. In this example we err on the side of making progress and consider millions of duplicate timestamps to be an outlier case.
 
