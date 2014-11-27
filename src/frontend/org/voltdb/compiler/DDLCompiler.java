@@ -24,6 +24,8 @@ import java.io.Reader;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -54,6 +56,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Group;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.MaterializedViewInfo;
+import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Permission;
 import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
@@ -450,6 +453,10 @@ public class DDLCompiler {
     // There's specifically no cleanup here because I don't think
     // any is needed.
     Map<String, String> m_tableNameToDDL = new TreeMap<String, String>();
+
+    /** A cache of the XML used to do validation on LIMIT DELETE statements
+     * Preserved here to avoid having to re-parse for planning */
+    private final Map<Statement, VoltXMLElement> m_limitDeleteStmtToXml = new HashMap<>();
 
     // Resolve classes using a custom loader. Needed for catalog version upgrade.
     final ClassLoader m_classLoader;
@@ -1927,10 +1934,49 @@ public class DDLCompiler {
         return stringer.toString();
     }
 
+    /** Makes sure that the DELETE statement on a LIMIT PARTITION ROWS EXECUTE (DELETE ...)
+     * - Contains no parse errors
+     * - Is actually a DELETE statement
+     * - Targets the table being constrained
+     * Throws VoltCompilerException if any of these does not hold
+     * @param catStmt     The catalog statement whose sql text field is the DELETE to be validated
+     **/
+    private void validateTupleLimitDeleteStmt(Statement catStmt) throws VoltCompilerException {
+        String tableName = catStmt.getParent().getTypeName();
+        String msgPrefix = "Error: Table " + tableName + " has invalid DELETE statement for LIMIT PARTITION ROWS constraint: ";
+        VoltXMLElement deleteXml = null;
+        try {
+            // We parse the statement here and cache the XML below if the statement passes
+            // validation.
+            deleteXml = m_hsql.getXMLCompiledStatement(catStmt.getSqltext());
+        }
+        catch (HSQLInterface.HSQLParseException e) {
+            throw m_compiler.new VoltCompilerException(msgPrefix + "parse error: " + e.getMessage());
+        }
+
+        if (! deleteXml.name.equals("delete")) {
+            // Could in theory allow TRUNCATE TABLE here too.
+            throw m_compiler.new VoltCompilerException(msgPrefix + "not a DELETE statement");
+        }
+
+        String deleteTarget = deleteXml.attributes.get("table");
+        if (! deleteTarget.equals(tableName)) {
+            throw m_compiler.new VoltCompilerException(msgPrefix + "target of DELETE must be " + tableName);
+        }
+
+        m_limitDeleteStmtToXml.put(catStmt, deleteXml);
+    }
+
+    /** Accessor */
+    public Collection<Map.Entry<Statement, VoltXMLElement>> getLimitDeleteStmtToXmlEntries() {
+        return Collections.unmodifiableCollection(m_limitDeleteStmtToXml.entrySet());
+    }
+
     /**
      * Add a constraint on a given table to the catalog
-     * @param table
-     * @param node
+     * @param table                The table on which the constraint will be enforced
+     * @param node                 The XML node representing the constraint
+     * @param indexReplacementMap
      * @throws VoltCompilerException
      */
     void addConstraintToCatalog(Table table, VoltXMLElement node, Map<String, String> indexReplacementMap)
@@ -1941,31 +1987,38 @@ public class DDLCompiler {
         String name = node.attributes.get("name");
         String typeName = node.attributes.get("constrainttype");
         ConstraintType type = ConstraintType.valueOf(typeName);
+        String tableName = table.getTypeName();
 
         if (type == ConstraintType.LIMIT) {
             int tupleLimit = Integer.parseInt(node.attributes.get("rowslimit"));
             if (tupleLimit < 0) {
                 throw m_compiler.new VoltCompilerException("Invalid constraint limit number '" + tupleLimit + "'");
             }
-            if (tableLimitConstraintCounter.contains(table.getTypeName())) {
-                throw m_compiler.new VoltCompilerException("Too many table limit constraints for table " + table.getTypeName());
+            if (tableLimitConstraintCounter.contains(tableName)) {
+                throw m_compiler.new VoltCompilerException("Too many table limit constraints for table " + tableName);
             } else {
-                tableLimitConstraintCounter.add(table.getTypeName());
+                tableLimitConstraintCounter.add(tableName);
             }
 
             table.setTuplelimit(tupleLimit);
+            String deleteStmt = node.attributes.get("rowslimitdeletestmt");
+            if (deleteStmt != null) {
+                Statement catStmt = table.getTuplelimitdeletestmt().add("limit_delete");
+                catStmt.setSqltext(deleteStmt);
+                validateTupleLimitDeleteStmt(catStmt);
+            }
             return;
         }
 
         if (type == ConstraintType.CHECK) {
             String msg = "VoltDB does not enforce check constraints. ";
-            msg += "Constraint on table " + table.getTypeName() + " will be ignored.";
+            msg += "Constraint on table " + tableName + " will be ignored.";
             m_compiler.addWarn(msg);
             return;
         }
         else if (type == ConstraintType.FOREIGN_KEY) {
             String msg = "VoltDB does not enforce foreign key references and constraints. ";
-            msg += "Constraint on table " + table.getTypeName() + " will be ignored.";
+            msg += "Constraint on table " + tableName + " will be ignored.";
             m_compiler.addWarn(msg);
             return;
         }

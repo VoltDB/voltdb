@@ -1496,7 +1496,13 @@ public abstract class CatalogUtil {
     }
 
     private static void updateTableUsageAnnotation(Table table, Statement stmt, boolean read) {
-        Procedure proc = (Procedure) stmt.getParent();
+        if (!(stmt.getParent() instanceof Procedure)) {
+            // if parent of statement is not a procedure
+            // it could be a table with a LIMIT ROWS DELETE
+            return;
+        }
+
+        Procedure proc = (Procedure)stmt.getParent();
         // skip CRUD generated procs
         if (proc.getDefaultproc()) {
             return;

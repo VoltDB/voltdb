@@ -5056,6 +5056,44 @@ public class ParserDDL extends ParserRoutine {
 
         int rowsLimit = readInteger();
         c.rowsLimit = rowsLimit;
+
+        // The optional EXECUTE (DELETE ...) clause
+        if (readIfThis(Tokens.EXECUTE)) {
+            // Capture the statement between parentheses following the EXECUTE keyword,
+            // as in
+            //
+            // LIMIT PARTITION ROWS 10 EXECUTE (DELETE FROM tbl WHERE b = 1)
+            //
+            readThis(Tokens.OPENBRACKET);
+            int position = getPosition();
+            int numOpenBrackets = 1;
+            while (numOpenBrackets > 0) {
+                switch(token.tokenType) {
+                case Tokens.OPENBRACKET:
+                    numOpenBrackets++;
+                    read();
+                    break;
+
+                case Tokens.CLOSEBRACKET:
+                    numOpenBrackets--;
+                    if (numOpenBrackets > 0) {
+                        // don't want the final parenthesis
+                        read();
+                    }
+                    break;
+
+                case Tokens.X_ENDPARSE:
+                    throw unexpectedToken();
+
+                default:
+                    read();
+                }
+            }
+
+            // This captures the DELETE statement exactly, including embedded whitespace, etc.
+            c.rowsLimitDeleteStmt = getLastPart(position);
+            readThis(Tokens.CLOSEBRACKET);
+        }
     }
 
     /// A VoltDB extension to the parsing behavior of the "readColumnList/readColumnNames" functions,
