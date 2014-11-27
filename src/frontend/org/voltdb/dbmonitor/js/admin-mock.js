@@ -43,6 +43,10 @@ $( document ).ready(function() {
 			$('#serverConfigAdmin').slideToggle("slide");
 		});
 		
+		$('#serverName').click(function(){
+			$('#serverConfigAdmin').slideToggle("slide");
+		});
+		
 	// Implements Scroll in Server List div
 		$('#serverListWrapperAdmin').slimscroll({
 		  disableFadeOut: true,
@@ -285,13 +289,33 @@ $( document ).ready(function() {
 	
 	// Hides opened serverlist
 		$(document).on('click', function (e) {
-			if ( !$(event.target).hasClass('adminIcons')) {
+			if ( !$(event.target).hasClass('adminIcons') && !$(event.target).hasClass('serverName')) {
 				if ($(e.target).closest("#serverConfigAdmin").length === 0) {
 					$("#serverConfigAdmin").hide();
 				}
 			}
+		});
+		
+		
+		//server icon
+		/*$('.adminServer').click(function(){			
+					$("#serverConfigAdmin").toggle();			
 		}); 
+		$(document).mouseup(function (e)
+			{
+			var container = $("#serverConfigAdmin");
+			
+			if (!container.is(e.target) // if the target of the click isn't the container...
+			&& container.has(e.target).length === 0) // ... nor a descendant of the container
+			{
+			container.hide();
+			}
+		});
+		
+		*/
+		
 	// Checkbox style
+	
 	
 	  $('input.snapshot').iCheck({
 		checkboxClass: 'icheckbox_square-aero',
