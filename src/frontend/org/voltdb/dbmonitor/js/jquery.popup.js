@@ -347,6 +347,9 @@
 					$('.saveInfo').show();
 					$('.restoreConfirmation').hide();
 					$('.restoreInfo').show();
+					$('.editOk').hide();
+					$('.editCancel').hide();
+		            $('.edit').show();
 		            p.close();
 					
 		    });
@@ -368,7 +371,7 @@
 					if(chkAutoSnapshot.is(":checked")){
 						
 						$('.SnapshotsOn').show();
-						$('.SnapshotsOff').hide()
+						$('.SnapshotsOff').hide();
 						} else{
 							$('.SnapshotsOff').show()
 							$('.SnapshotsOn').hide();

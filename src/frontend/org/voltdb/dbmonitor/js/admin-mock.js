@@ -1,29 +1,30 @@
 // JavaScript Document
 
-$( document ).ready(function() { 
+$( document ).ready(function() {
 
+    var adminEditObjects = {
+        btnEditSecurityOk : $("#btnEditSecurityOk"),
+        btnEditSecurityCancel: $("#btnEditSecurityCancel"),
+        LinkSecurityEdit: $("#securityEdit"),
+        chkSecurity: $("#chkSecurity"),
+        chkSecurityValue: false,
+        iconSecurityOption: $("#securityOptionIcon")
+    };
 
-$(".tblshutdown").find(".edit").on("click",function(){	
-	var $this=$(this).closest("tr");
-		
-	var tdVal=$this.find("td:nth-child(3)");;
-	var val=tdVal.text();
-	
-	
-	if(val=="On"){
-		$this.find("td:nth-child(2)").find("div").removeClass("onIcon").addClass("offIcon");
-		tdVal.text("Off");
-		}else{
-			$this.find("td:nth-child(2)").find("div").removeClass("offIcon").addClass("onIcon");
-			tdVal.text("On");
-			}
-			
-		
-	
-	
-	
-	
-	})
+    $(".tblshutdown").find(".edit").on("click", function() {
+        var $this = $(this).closest("tr");
+
+        var tdVal = $this.find("td:nth-child(3)");
+        var val = tdVal.text();
+
+        if (val == "On") {
+            $this.find("td:nth-child(2)").find("div").removeClass("onIcon").addClass("offIcon");
+            tdVal.text("Off");
+        } else {
+            $this.find("td:nth-child(2)").find("div").removeClass("offIcon").addClass("onIcon");
+            tdVal.text("On");
+        }
+    });
 	
 	
    // Make Expandable Rows.
@@ -83,33 +84,77 @@ $(".tblshutdown").find(".edit").on("click",function(){
                 });
             }
         });
+    
+        var toggleSecurityEdit = function (showEdit) {
+
+            if (adminEditObjects.chkSecurityValue) {
+                adminEditObjects.chkSecurity.iCheck('check');
+            } else {
+                adminEditObjects.chkSecurity.iCheck('uncheck');
+            }
+            
+            if (showEdit) {
+                adminEditObjects.chkSecurity.parent().removeClass("customCheckbox");
+                adminEditObjects.btnEditSecurityOk.hide();
+                adminEditObjects.btnEditSecurityCancel.hide();
+                adminEditObjects.LinkSecurityEdit.show();
+                adminEditObjects.iconSecurityOption.show();
+            } else {
+                adminEditObjects.iconSecurityOption.hide();
+                adminEditObjects.LinkSecurityEdit.hide();
+                adminEditObjects.btnEditSecurityOk.show();
+                adminEditObjects.btnEditSecurityCancel.show();
+                adminEditObjects.chkSecurity.parent().addClass("customCheckbox");
+            }
+        };
+
+        adminEditObjects.LinkSecurityEdit.on("click", function () {
+            toggleSecurityEdit(false);
+        });
+    
+        adminEditObjects.btnEditSecurityCancel.on("click", function () {
+            toggleSecurityEdit(true);
+        });
 		
-		 $('#securityEdit').popup({
+        adminEditObjects.btnEditSecurityOk.popup({
 		     open: function (event, ui, ele) {
 		     },
 		     afterOpen: function () {
 
 		         $("#btnSecurityOk").unbind("click");
-		         $("#btnSecurityOk").on("click", function () {
+		         $("#btnSecurityOk").on("click", function() {
 
 		             var securityRow = $("tr.security");
-
 		             var tdVal = securityRow.find("td:nth-child(3)");
-		                var val = tdVal.text();
 
-		                if (val == "On") {
-		                    securityRow.find("td:nth-child(2)").find("div").removeClass("onIcon").addClass("offIcon");
-		                    tdVal.text("Off");
-		                } else {
-		                    securityRow.find("td:nth-child(2)").find("div").removeClass("offIcon").addClass("onIcon");
-		                    tdVal.text("On");
-		                }
-
+		             if (adminEditObjects.chkSecurity.is(':checked')) {
+		                 tdVal.text("On");
+		                 adminEditObjects.iconSecurityOption.removeClass().addClass("onIcon");
+		                 adminEditObjects.chkSecurityValue = true;
+		             } else {
+		                 tdVal.text("Off");
+		                 adminEditObjects.iconSecurityOption.removeClass().addClass("offIcon");
+		                 adminEditObjects.chkSecurityValue = false;
+		             }
+		             
 		             //Close the popup
 		             $($(this).siblings()[0]).trigger("click");
 		         });
+		         
+		         $("#btnPopupSecurityCancel").on("click", function () {
+		             toggleSecurityEdit(true);
+		         });
+
+		         $(".popup_back").on("click", function () {
+		             toggleSecurityEdit(true);
+		         });
+		         
+		         $(".popup_close").on("click", function () {
+		             toggleSecurityEdit(true);
+		         });
 		     }
 		 });
+        
     
 		 $('#autoSnapshotEdit').popup();
 		 $('#saveConfirmation').popup();
@@ -131,17 +176,17 @@ $(".tblshutdown").find(".edit").on("click",function(){
 		  	saveSnaps: function () {					
 					$("#frequencySpan").show();
 					$("#txtFrequency").hide();
-					$("#frequencySpan").html($("#txtFrequency").val())
+		  	        $("#frequencySpan").html($("#txtFrequency").val());
 					
 					$("#retainedSpan").show();
 					$("#txtRetained").hide();
-					$("#retainedSpan").html($("#txtRetained").val())
+		  	        $("#retainedSpan").html($("#txtRetained").val());
 					
 					$("#autoSnapshotSave").hide();
 					$("#autoSnapshotEdit").show();
-					$(".icheckbox_square-aero").removeClass('customCheckbox')
-					
-				}
+		  	    $(".icheckbox_square-aero .snapshot").parent().removeClass('customCheckbox');
+
+		  	}
 		 });
 
 		 //Heartbeat time out
@@ -222,7 +267,7 @@ $(".tblshutdown").find(".edit").on("click",function(){
 			$("#retainedSpan").hide();
 			$("#txtRetained").show();
 		    $("#txtRetained").val($("#retainedSpan").html());
-			$(".icheckbox_square-aero").addClass('customCheckbox')
+		    $(".icheckbox_square-aero .snapshot").parent().addClass('customCheckbox');
 		});
 		
 	 // Filters servers list
@@ -250,11 +295,13 @@ $(".tblshutdown").find(".edit").on("click",function(){
 	
 	  $('input.snapshot').iCheck({
 		checkboxClass: 'icheckbox_square-aero',
-		//radioClass: 'iradio_square',
 		increaseArea: '20%' // optional
 	
-		});		
+		});
 
-   
+	  $('#chkSecurity').iCheck({
+	      checkboxClass: 'icheckbox_square-aero',
+	      increaseArea: '20%' // optional
+	  });
 });
 
