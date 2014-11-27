@@ -842,7 +842,7 @@ input.exitableTxtBx{width:30px; /*position:relative; top:6px;*/ padding:2px 3px;
 .tblSave { border:none}
 .tblSave tr{border:1px solid #CCCCCC;}
 .tblSave tr td { padding:10px;border:none;}
-.tblSave tr td input[type="text"]{ width:300px; padding:6px 4px;}
+.tblSave tr td input[type="text"]{ width:300px; padding:6px 4px 7px 4px;}
 .tblRestore tr td input[type="text"]{ width:300px; padding:6px 4px;}
 .restoreTxt {border: 1px solid #CCCCCC;padding: 9px; /* margin: 1px 0 0 0; */ position: relative; top: 2px;}
 .browseBtn {}
