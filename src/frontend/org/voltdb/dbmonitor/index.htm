@@ -485,7 +485,7 @@
                                 <table width="100%" border="0" cellspacing="0" cellpadding="0" class="adminTbl1">
                                     <tr>
                                         <td width="72%" class="configLabel" >Site per host</td>
-                                        <td id="site_per_host" width="20%" align="right">8</td>
+                                        <td id="sitePerHost" width="20%" align="right">8</td>
                                         <td width="4%">&nbsp;</td>
                                         <td width="4%">&nbsp;</td>
                                     </tr>
@@ -498,7 +498,7 @@
                                     <tr>
                                         <td class="configLabel" name="partition_detection">Partition detection </td>
                                         <td align="right">
-                                            <div id="partitionDetection" class="onIcon"></div>
+                                            <div id="partitionDetectionIcon" class="onIcon"></div>
                                         </td>
                                         <td>On</td>
                                         <td>&nbsp;</td>
@@ -516,7 +516,7 @@
                                     <tr class="hasSubLabel parent" id="row-1">
                                         <td class="configLabel"><a href="#" class="labelCollapsed">HTTP Access</a></td>
                                         <td align="right">
-                                            <div class="onIcon"></div>
+                                            <div id="httpAccessIcon" class="onIcon"></div>
                                         </td>
                                         <td>On</td>
                                         <td>&nbsp;</td>
@@ -524,7 +524,7 @@
                                     <tr class="child-row-1 subLabelRow">
                                         <td class="configLabel">JSON API</td>
                                         <td align="right">
-                                            <div class="onIcon"></div>
+                                            <div id="jsonAPIIcon" class="onIcon"></div>
                                         </td>
                                         <td>On</td>
                                         <td>&nbsp;</td>
@@ -562,7 +562,7 @@
                                     <tr class="hasSubLabel parent" id="row-3">
                                         <td class="configLabel"><a href="#" class="labelCollapsed">Command Logging</a></td>
                                         <td align="right">
-                                            <div class="offIcon"></div>
+                                            <div id="commandLogIcon"class="offIcon"></div>
                                         </td>
                                         <td>Off</td>
                                         <td>&nbsp;</td>
@@ -570,14 +570,14 @@
 
                                     <tr class="child-row-3 subLabelRow">
                                         <td class="configLabel">Log Frequency, time </td>
-                                        <td align="right">800 ms</td>
+                                        <td id="commandlogfreqtime" align="right">800 ms</td>
                                         <td>&nbsp;</td>
                                         <td>&nbsp;</td>
                                     </tr>
 
                                     <tr class="child-row-3 subLabelRow">
                                         <td class="configLabel">Log Frequency, transactions </td>
-                                        <td align="right">50</td>
+                                        <td id="commandlogfreqtxns" align="right">50</td>
                                         <td>&nbsp;</td>
                                         <td>&nbsp;</td>
                                     </tr>
@@ -623,7 +623,7 @@
                                     </tr>
                                     <tr class="child-row-5 subLabelRow">
                                         <td class="configLabel">Heartbeat time out </td>
-                                        <td align="right"><span id="hrtTimeOutSpan">500</span><input id="txtHrtTimeOutSpan" class="exitableTxtBx" type="text" style="display: none" />
+                                        <td align="right"><span id="heartbeattimeoutSpan">500</span><input id="txtHrtTimeOutSpan" class="exitableTxtBx" type="text" style="display: none" />
                                             ms</td>
                                         <td>&nbsp;</td>
                                         <td><a id="btnEditHrtTimeOut" href="#" class="edit" title="Edit">&nbsp;</a>
@@ -631,13 +631,13 @@
                                     </tr>
                                     <tr class="child-row-5 subLabelRow">
                                         <td class="configLabel">Max temp table memory</td>
-                                        <td align="right">256 MB</td>
+                                        <td align="right"><span id="temptablesmaxsize">256</span> MB</td>
                                         <td>&nbsp;</td>
                                         <td>&nbsp;</td>
                                     </tr>
                                     <tr class="child-row-5 subLabelRow">
                                         <td class="configLabel">Snapshot priority</td>
-                                        <td align="right">8</td>
+                                        <td id="snapshotpriority" align="right">8</td>
                                         <td>&nbsp;</td>
                                         <td>&nbsp;</td>
                                     </tr>
@@ -654,27 +654,27 @@
                                 <table width="100%" border="0" cellspacing="0" cellpadding="0" class="adminTbl2">
                                     <tr>
                                         <td width="76%">Client Port</td>
-                                        <td width="24%">1020</td>
+                                        <td id="clientport" width="24%">1020</td>
                                     </tr>
                                     <tr>
                                         <td>Admin Port</td>
-                                        <td>5020</td>
+                                        <td id="adminport">5020</td>
                                     </tr>
                                     <tr>
                                         <td>HTTP Port</td>
-                                        <td>3020</td>
+                                        <td id="httpport">3020</td>
                                     </tr>
                                     <tr>
                                         <td>Internal Port</td>
-                                        <td>6323</td>
+                                        <td id="internalPort">6323</td>
                                     </tr>
                                     <tr>
                                         <td>Zookeeper Port</td>
-                                        <td>2313</td>
+                                        <td id="zookeeperPort">2313</td>
                                     </tr>
                                     <tr>
                                         <td>Replication Port</td>
-                                        <td>4120</td>
+                                        <td id="replicationPort">4120</td>
                                     </tr>
                                 </table>
                             </div>
@@ -685,11 +685,11 @@
                                 <table width="100%" border="0" cellspacing="0" cellpadding="0" class="adminTbl2">
                                     <tr>
                                         <td width="76%">Root (Destination)</td>
-                                        <td width="24%">xxxxxx</td>
+                                        <td id="voltdbroot" width="24%">xxxxxx</td>
                                     </tr>
                                     <tr>
                                         <td>Snapshot</td>
-                                        <td>xxxxxx</td>
+                                        <td id="snapshotpath">xxxxxx</td>
                                     </tr>
                                     <tr>
                                         <td>Export Overflow</td>
@@ -697,11 +697,11 @@
                                     </tr>
                                     <tr>
                                         <td>Command Logs</td>
-                                        <td>xxxxxx</td>
+                                        <td id="commandlogpath">xxxxxx</td>
                                     </tr>
                                     <tr>
                                         <td>Command log Snapshots</td>
-                                        <td>xxxxxx</td>
+                                        <td id="commandlogsnapshotpath">xxxxxx</td>
                                     </tr>
 
                                 </table>

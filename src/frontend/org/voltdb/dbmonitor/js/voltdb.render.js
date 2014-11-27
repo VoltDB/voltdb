@@ -296,11 +296,14 @@ function alertNodeClicked(obj) {
 
         this.GetSystemInformation = function (onInformationLoaded) {
             VoltDBService.GetSystemInformation(function (connection) {
+                adminConfiguration.displayPortConfiguration(connection, "OVERVIEW");
                 populateSystemInformation(connection);
                 getMemoryDetails(connection, systemMemory);
+
                 if (gCurrentServer == "")
                     configureRequestedHost(VoltDBCore.hostIP);
                 onInformationLoaded();
+                
             });
         };
 
@@ -310,7 +313,9 @@ function alertNodeClicked(obj) {
 
             VoltDBService.GetSystemInformationDeployment(function (connection) {
                 if (adminConfiguration != null && adminConfiguration.options.isAdmin && adminConfiguration.options.refresh) {
-                    adminConfiguration.getAdminConfiguration(connection);
+                    adminConfiguration.displayAdminConfiguration(connection);
+                    adminConfiguration.displayPortConfiguration(connection, "DEPLOYMENT");
+                    adminConfiguration.displayDirectoryConfiguration(connection);
                 }
 
                 setKFactor(connection);
@@ -319,7 +324,7 @@ function alertNodeClicked(obj) {
                     procedureMetadata = procedureData;
                     onProceduresDataLoaded(procedureMetadata);
                 });
-                
+
             });
 
             var setKFactor = function (connection) {
@@ -1637,7 +1642,7 @@ function alertNodeClicked(obj) {
             sysTransaction["CurrentTimedTransactionCount"] = currentTimedTransactionCount;
             sysTransaction["currentTimerTick"] = currentTimerTick;
 
-        };        
+        };
 
         this.getAdminConfigurationItems = function (connection) {
             var adminConfigValues = [];
@@ -1649,16 +1654,51 @@ function alertNodeClicked(obj) {
                             case 'sitesperhost':
                                 adminConfigValues['sitesperhost'] = columnInfo[1];
                                 break;
-                                
+
                             case 'kfactor':
                                 adminConfigValues['kSafety'] = columnInfo[1];
                                 break;
-                                
+
                             case 'partitiondetection':
                                 adminConfigValues['partitionDetection'] = columnInfo[1];
                                 break;
-                                
-                                
+
+                            case 'httpenabled':
+                                adminConfigValues['httpEnabled'] = columnInfo[1];
+                                break;
+
+                            case 'jsonenabled':
+                                adminConfigValues['jsonEnabled'] = columnInfo[1];
+                                break;
+
+                            case 'snapshotenabled':
+                                adminConfigValues['snapshotEnabled'] = columnInfo[1];
+                                break;
+
+                            case 'commandlogenabled':
+                                adminConfigValues['commandLogEnabled'] = columnInfo[1];
+                                break;
+
+                            case 'commandlogfreqtime':
+                                adminConfigValues['commandlogfreqtime'] = columnInfo[1];
+                                break;
+
+                            case 'commandlogfreqtxns':
+                                adminConfigValues['commandLogFrequencyTransactions'] = columnInfo[1];
+                                break;
+
+                            case 'heartbeattimeout':
+                                adminConfigValues['heartBeatTimeout'] = columnInfo[1];
+                                break;
+
+                            case 'temptablesmaxsize':
+                                adminConfigValues['tempTablesMaxSize'] = columnInfo[1];
+                                break;
+
+                            case 'snapshotpriority':
+                                adminConfigValues['snapshotPriority'] = columnInfo[1];
+                                break;
+
                             default:
 
 
@@ -1670,6 +1710,71 @@ function alertNodeClicked(obj) {
 
         };
 
+        this.getPortConfigurationItems = function (connection, configHeaderName) {
+            var portConfigValues = [];
+
+
+            if (connection != "" || connection != null) {
+                if (configHeaderName == 'DEPLOYMENT') {
+                    if (connection.Metadata['@SystemInformation_DEPLOYMENT'] != null) {
+                        connection.Metadata['@SystemInformation_DEPLOYMENT'].data.forEach(function (columnInfo) {
+                            switch (columnInfo[0]) {
+                                case 'adminport':
+                                    portConfigValues['adminPort'] = columnInfo[1];
+                                    break;
+
+                                case 'httpport':
+                                    portConfigValues['httpPort'] = columnInfo[1];
+                                    break;
+                            }
+                        });
+                    }
+                }
+                
+                else if (configHeaderName == 'OVERVIEW') {
+                    if (connection.Metadata['@SystemInformation_OVERVIEW'] != null) {
+                        connection.Metadata['@SystemInformation_OVERVIEW'].data.forEach(function (columnInfo) {
+                            if (columnInfo[1] == 'CLIENTPORT') {
+                                portConfigValues['clientPort'] = columnInfo[2];
+                            }
+                        });
+                    }
+                }
+            }
+            return portConfigValues;
+
+        };
+
+        this.getDirectoryConfigurationItems = function (connection) {
+            var directoryConfigValues = [];
+
+            if (connection != "" || connection != null) {
+                if (connection.Metadata['@SystemInformation_DEPLOYMENT'] != null) {
+                    connection.Metadata['@SystemInformation_DEPLOYMENT'].data.forEach(function (columnInfo) {
+                        switch (columnInfo[0]) {
+                            case 'voltdbroot':
+                                directoryConfigValues['voltdbRoot'] = columnInfo[1];
+                                break;
+
+                            case 'snapshotpath':
+                                directoryConfigValues['snapshotPath'] = columnInfo[1];
+                                break;
+
+                            case 'commandlogpath':
+                                directoryConfigValues['commandLogPath'] = columnInfo[1];
+                                break;
+
+                            case 'commandlogsnapshotpath':
+                                directoryConfigValues['commandLogSnapshotPath'] = columnInfo[1];
+                                break;
+
+                        }
+                    });
+                }
+            }
+            return directoryConfigValues;
+
+        };
 
         function getTableData(connection, tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData, processName) {
             var suffix = "";
