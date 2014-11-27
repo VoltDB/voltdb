@@ -42,6 +42,10 @@ $(".tblshutdown").find(".edit").on("click",function(){
 			$('#serverConfigAdmin').slideToggle("slide");
 		});
 		
+		$('#serverName').click(function(){
+			$('#serverConfigAdmin').slideToggle("slide");
+		});
+		
 	// Implements Scroll in Server List div
 		$('#serverListWrapperAdmin').slimscroll({
 		  disableFadeOut: true,
@@ -240,12 +244,13 @@ $(".tblshutdown").find(".edit").on("click",function(){
 	
 	// Hides opened serverlist
 		$(document).on('click', function (e) {
-			if ( !$(event.target).hasClass('adminIcons')) {
+			if ( !$(event.target).hasClass('adminIcons') && !$(event.target).hasClass('serverName')) {
 				if ($(e.target).closest("#serverConfigAdmin").length === 0) {
 					$("#serverConfigAdmin").hide();
 				}
 			}
 		});
+		
 		
 		//server icon
 		/*$('.adminServer').click(function(){			
