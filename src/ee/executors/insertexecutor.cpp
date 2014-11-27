@@ -221,54 +221,6 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
             if (!isLocal) continue;
         }
 
-<<<<<<< HEAD
-        bool isRealInsert = true;
-        if (m_isUpsert) {
-            // upsert execution logic
-            assert(persistentTable->primaryKeyIndex() != NULL);
-            TableTuple existsTuple = persistentTable->lookupTuple(templateTuple);
-
-            if (! existsTuple.isNullTuple()) {
-                // tuple exists already, try to update the tuple instead
-                upsertTuple.move(templateTuple.address());
-                TableTuple &tempTuple = persistentTable->getTempTupleInlined(upsertTuple);
-
-                if (!persistentTable->updateTupleWithSpecificIndexes(existsTuple, tempTuple,
-                        persistentTable->allIndexes())) {
-                    VOLT_INFO("Failed to update existsTuple from table '%s'",
-                            persistentTable->name().c_str());
-                    return false;
-                }
-
-                // This is not a real insert, it's an update.
-                isRealInsert = false;
-            }
-        }
-
-        if (isRealInsert) {
-
-            if (hasPurgeFragment && !isMultiRowInsert) {
-                int tupleLimit = persistentTable->tupleLimit();
-                int numTuples = persistentTable->visibleTupleCount();
-                // It's possible that the number of tuples is greater
-                // than the limit.  This can happen because snapshot
-                // restore and rebalancing will not enforce the
-                // constraint.
-                if (numTuples >= tupleLimit) {
-                    // Next insert will fail: run the purge fragment
-                    // before trying to insert.
-                    int rc = m_engine->executePurgeFragment(persistentTable);
-                    if (rc != ENGINE_ERRORCODE_SUCCESS) {
-                        VOLT_ERROR("Unexpected error while attempting to purge "
-                                   "rows from table %s.  Row limit: %d",
-                                   persistentTable->name().c_str(),
-                                   tupleLimit);
-                        return false;
-                    }
-                }
-            }
-=======
->>>>>>> master
 
         if (! m_isUpsert) {
             // try to put the tuple into the target table
