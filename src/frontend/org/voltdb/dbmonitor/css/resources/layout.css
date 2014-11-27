@@ -32,7 +32,8 @@ li.joiningIcon,
 li.missingIcon,
 li.alertIcon, 
 a.alertIcon,
-input.icon-search, 
+input.icon-search,
+a.save-search, 
 a.icon-search,
 ul.servers-list li.active, 
 ul.servers-list li.joining,
@@ -398,6 +399,14 @@ td.txt-center{text-align:center;}
 .icon-tables{ background-position:left -1043px;}
 input.search-box{ border:1px solid #dbdbdb; padding:0 5px 0 5px; height:40px; width:200px; color:#a3a3a3; font-weight:bold;}
 a.icon-search{ background-position:right -684px; border:1px solid #dbdbdb;line-height: 40px;display: inline-block;padding: 0 4px; width:35px; text-indent:-999em; cursor:default;}
+a.save-search{ background-position: -10px -1403px;
+border: 1px solid #CCCCCC;
+line-height: 30px;
+display: inline-block;
+/* padding: 0 2px; */
+width: 33px;
+text-indent: -999em;
+cursor: pointer;}
 
 /* Server Popups */
 input.icon-search{ background-position:right -684px; border:1px solid #dbdbdb; padding:0 45px 0 5px; height:40px; width:200px; color:#a3a3a3; font-weight:bold;}
@@ -792,7 +801,7 @@ ul.adminClusterList li a:hover{color:#000;}
 .adminM { float:left;background:#dfdfdf; padding:8px; font-weight:bold;}
 .adminD {float:left;background:#c70000; color:#FFFFFF; padding:8px; font-weight:bold;}  
 .adminE {float:left;background:#76bd1d; color:#FFFFFF; padding:8px; font-weight:bold;}  
-.adminServer { float:left}
+.adminServer { float:left; cursor:pointer;}
 .serverName { float:left; background:#D0D2D2/*#c70000*/; padding:8px; font-weight:bold; /*color:#FFFFFF;*/ } 
 .setServer {float:left;}
 .adminIcons { background-position:-225px -13px; width:30px; height:28px; }
@@ -833,7 +842,9 @@ input.exitableTxtBx{width:30px; /*position:relative; top:6px;*/ padding:2px 3px;
 .tblSave { border:none}
 .tblSave tr{border:1px solid #CCCCCC;}
 .tblSave tr td { padding:10px;border:none;}
-.tblSave tr td input[type="text"]{ width:300px}
+.tblSave tr td input[type="text"]{ width:300px; padding:6px 4px;}
+.tblRestore tr td input[type="text"]{ width:300px; padding:6px 4px;}
+.restoreTxt {border: 1px solid #CCCCCC;padding: 9px; /* margin: 1px 0 0 0; */ position: relative; top: 2px;}
 .browseBtn {}
 .tblRestore { border:none}
 .tblRestore tr{border:1px solid #CCCCCC}

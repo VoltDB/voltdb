@@ -245,8 +245,27 @@ $(".tblshutdown").find(".edit").on("click",function(){
 					$("#serverConfigAdmin").hide();
 				}
 			}
+		});
+		
+		//server icon
+		/*$('.adminServer').click(function(){			
+					$("#serverConfigAdmin").toggle();			
 		}); 
+		$(document).mouseup(function (e)
+			{
+			var container = $("#serverConfigAdmin");
+			
+			if (!container.is(e.target) // if the target of the click isn't the container...
+			&& container.has(e.target).length === 0) // ... nor a descendant of the container
+			{
+			container.hide();
+			}
+		});
+		
+		*/
+		
 	// Checkbox style
+	
 	
 	  $('input.snapshot').iCheck({
 		checkboxClass: 'icheckbox_square-aero',
