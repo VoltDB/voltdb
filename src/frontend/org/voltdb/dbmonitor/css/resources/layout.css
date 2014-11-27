@@ -842,14 +842,14 @@ input.exitableTxtBx{width:30px; /*position:relative; top:6px;*/ padding:2px 3px;
 .tblSave { border:none}
 .tblSave tr{border:1px solid #CCCCCC;}
 .tblSave tr td { padding:10px;border:none;}
-.tblSave tr td input[type="text"]{ width:300px; padding:6px 4px 7px 4px;}
-.tblRestore tr td input[type="text"]{ width:300px; padding:6px 4px;}
+.tblSave tr td input[type="text"]{ width:267px; padding:6px 4px 7px 4px;}
+.tblRestore tr td input[type="text"]{ width:185px; padding:6px 4px;}
 .restoreTxt {border: 1px solid #CCCCCC;padding: 9px; /* margin: 1px 0 0 0; */ position: relative; top: 2px;}
 .browseBtn {}
 .tblRestore { border:none}
 .tblRestore tr{border:1px solid #CCCCCC}
 .tblRestore th { padding:10px; font-weight:bold;}
-.tblRestore tr td { padding:10px;border:none;}
+.tblRestore tr td { padding:10px 5px;border:none;}
 
 .tblshutdown tr {border:1px solid #CCCCCC;}
 .tblshutdown tr td  { border:none;}
@@ -960,8 +960,8 @@ ul.catalogNav li.active a, ul.catalogNav li.active a:hover{background:#76bd1d; d
 .errorValue{color:red}
 
 h3.systemHeader{}
-
-
+.editOk, .editCancel { background-color:#aa1f2f; cursor:pointer; padding:4px 6px; text-align:center; color:#FFFFFF; font:12px Arial, Helvetica, sans-serif; text-shadow:none; text-decoration:none; border-radius:0; border:none;}
+.editOk:hover, .editCancel:hover{background-color:#76bd1d; color:#fff;}
 
 @media (width: 640px) {
 	
