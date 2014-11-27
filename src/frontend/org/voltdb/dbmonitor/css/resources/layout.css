@@ -875,6 +875,9 @@ td.heartbeattd span.unit, td.queryTimeOut span.unit{position:relative;/* top:7px
 			margin-left: 10px;} 
 .btnSave:hover{background-color:#76bd1d; color:#fff;}
 
+.editOk, .editCancel {
+    display: none;
+}
 
 /*********************************************media Qu********************/
 @media (max-width: 479px) {

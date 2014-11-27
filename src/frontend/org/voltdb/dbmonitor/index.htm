@@ -476,11 +476,16 @@
                   </tr>
                   <tr class="security">
                     <td class="configLabel">Security</td>
-                    <td align="right"><div class="offIcon"></div></td>
+                      <td align="right">
+                          <div id="securityOptionIcon" class="offIcon"></div>
+                          <input type="checkbox" id="chkSecurity" class="chkSecurity"/>
+                      </td>
                     <td>Off</td>
-                    <td>
-                    <a href="#securityPop" id="securityEdit" class="edit" title="Edit">&nbsp;</a>
-                    </td>
+                      <td>
+                          <a id="btnEditSecurityOk" href="#securityPop" class="editOk" title="Save" style="">Ok</a>
+                          <a id="btnEditSecurityCancel" href="#securityPop" class="editCancel" title="Cancel" style="">Cancel</a>
+                          <a href="#securityPop" id="securityEdit" class="edit" title="Edit">&nbsp;</a>
+                      </td>
                   </tr>
                  <tr class="hasSubLabel parent" id="row-1">
                     <td class="configLabel"><a href="#" class="labelCollapsed">HTTP Access</a></td>
@@ -1114,12 +1119,12 @@
     
      <!-- POPUP securityPop -->
     <div id="securityPop" style="display: none">
-        <div class="overlay-title icon-alert">Security: Confirmation!</div>
+        <div class="overlay-title icon-alert">Security: Confirmation</div>
         <div class="clear"></div>
         <div class="overlay-content">            
             <p class="txt-bold">Do you want to change Security?</p>
         </div>
-        <div class="overlay-btns"><a class="btn closeBtn" id="btnSecurityOk" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Cancel">Cancel</a></div>
+        <div class="overlay-btns"><a class="btn closeBtn" id="btnSecurityOk" title="Ok">Ok</a> <a id="btnPopupSecurityCancel" class="btn btn-gray closeBtn" title="Cancel">Cancel</a></div>
     </div>
     <!-- POPUP securityPop -->
     
