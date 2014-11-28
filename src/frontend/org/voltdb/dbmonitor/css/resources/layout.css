@@ -763,7 +763,8 @@ ul.helpSchemaList li { list-style:disc; line-height:25px!important; padding:0; m
 .promote-disabled,
 .restore, 
 .stop,
-.shutdown, 
+.shutdown,
+.startServ, 
 .onIcon, 
 .offIcon, 
 .edit, 
@@ -853,8 +854,10 @@ input.exitableTxtBx{width:30px; /*position:relative; top:6px;*/ padding:2px 3px;
 
 .tblshutdown tr {border:1px solid #CCCCCC;}
 .tblshutdown tr td  { border:none;}
-.tblshutdown tr td a.shutdown { display:inline-block;background-position:-669px -56px; width:40px; height:36px;line-height:39px; }
-.shutdownServer { position:relative; top:15px; right:5px;}
+.tblshutdown tr td a.shutdown { display:inline-block;background-position:-669px -105px; width:40px; height:36px;line-height:39px; }
+.tblshutdown tr td a.startServ { display:inline-block;background-position:-669px -56px; width:40px; height:36px;line-height:39px; }
+.shutdownServer { position:relative; top:17px; right:2px;}
+.startServer { position:relative; top:17px; right:2px;}
 #serverListWrapperAdmin{ padding:15px 16px 0 15px;}
 #serverListWrapperAdmin table.tblshutdown{margin-bottom:30px;}
 .confirmationInfo{font-weight: bold;}

@@ -388,49 +388,53 @@
                         <tr>
                         <td class="configLabel" width="50%"><a href="#">Test Server Lorem</a> </td>
                         <td  align="right">
-                       <a href="#stopConfirmationPop" class="shutdown " id="stopConfirmation"><span class="shutdownServer">stop</span></a>
+                       <a href="#stopConfirmationPop" class="shutdown " id="stopConfirmation">
+                       <span class="shutdownServer">stop</span>
+                        <a href="#startConfirmationPop" class="startServ " id="startConfirmation" style="display:none;">
+                        <span class="startServer">Start</span>
+                       </a>
                         </td>
                         </tr>
                            <tr>
                         <td class="configLabel" width="50%"><a href="#">Test Server 2 Lorem </a></td>
                         <td align="right">
-                        <a href="#" class="shutdown "><span class="shutdownServer">stop</span></a>
+                        <a href="#" class="shutdown "><span class="shutdownServer">Stop</span></a>
                         </td>
                         </tr>
                         <tr>
                         <td class="configLabel"><a href="#">Server Lorem Ispum</a> </td>
                         <td align="right">
-                        <a href="#" class="shutdown "><span class="shutdownServer">stop</span></a>
+                        <a href="#" class="shutdown "><span class="shutdownServer">Stop</span></a>
                         </td>
                         </tr>
                           <tr>
                         <td class="configLabel"><a href="#">Server 2 Lorem Ispum </a></td>
                         <td align="right">
-                         <a href="#" class="shutdown "><span class="shutdownServer">stop</span></a>
+                         <a href="#" class="shutdown "><span class="shutdownServer">Stop</span></a>
                         </td>
                         </tr>
                         <tr>
                         <td class="configLabel" width="50%"><a href="#">Test Server 2 Lorem </a></td>
                         <td align="right">
-                        <a href="#" class="shutdown "><span class="shutdownServer">stop</span></a>
+                        <a href="#" class="shutdown "><span class="shutdownServer">Stop</span></a>
                         </td>
                         </tr>
                         <tr>
                         <td class="configLabel"><a href="#">Server Lorem Ispum</a> </td>
                         <td align="right">
-                         <a href="#" class="shutdown "><span class="shutdownServer">stop</span></a>
+                         <a href="#" class="shutdown "><span class="shutdownServer">Stop</span></a>
                         </td>
                         </tr>
                         <tr>
                         <td class="configLabel" width="50%"><a href="#">Test Server 2 Lorem </a></td>
                         <td align="right">
-                        <a href="#" class="shutdown "><span class="shutdownServer">stop</span></a>
+                        <a href="#" class="shutdown "><span class="shutdownServer">Stop</span></a>
                         </td>
                         </tr>
                         <tr>
                         <td class="configLabel"><a href="#">Server Lorem Ispum</a> </td>
                         <td align="right">
-                        <a href="#" class="shutdown "><span class="shutdownServer">stop</span></a>
+                        <a href="#" class="shutdown "><span class="shutdownServer">Stop</span></a>
                         </td>
                         </tr>
 				</tbody>
@@ -1038,7 +1042,18 @@
         <div class="overlay-content">            
           <p class="txt-bold">Are you sure you want to stop the Server?</p>  
           </div>
-        <div class="overlay-btns"><a class="btn closeBtn" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Ok">Cancel</a></div>
+        <div class="overlay-btns"><a id="StoptConfirmOK" class="btn closeBtn" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Ok">Cancel</a></div>
+    </div>
+    <!-- POPUP stopConfirmationPop -->
+    
+     <!-- POPUP stopConfirmationPop -->
+    <div id="startConfirmationPop" style="display: none">
+        <div class="overlay-title icon-alert">Start: Confirmation</div>
+        <div class="clear"></div>
+        <div class="overlay-content">            
+          <p class="txt-bold">Are you sure you want to start the Server?</p>  
+          </div>
+        <div class="overlay-btns"><a id="startConfirmOk" class="btn closeBtn" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Ok">Cancel</a></div>
     </div>
     <!-- POPUP stopConfirmationPop -->
     

@@ -186,7 +186,40 @@ $( document ).ready(function() {
 		 $('#shutdownPopupPopConfirmation').popup();
 		  $('#shutdownPopupPopConfirmation1').popup();
 		  $('#shutdownClusterPopupPopConfirmation').popup();
-		   $('#stopConfirmation').popup();
+		 $('#stopConfirmation').popup({
+		    open: function (event, ui, ele) {
+		    },
+		    afterOpen: function() {
+
+		        $("#StoptConfirmOK").unbind("click");
+		        $("#StoptConfirmOK").on("click", function() {
+
+		            $("#stopConfirmation").hide();
+		            $("#startConfirmation").show();
+
+		            //Close the popup
+		            $($(this).siblings()[0]).trigger("click");
+		        });
+		    }
+		});
+		
+		
+		$('#startConfirmation').popup({
+            open: function(event, ui, ele) {
+            },
+            afterOpen: function() {
+
+                $("#startConfirmOk").unbind("click");
+                $("#startConfirmOk").on("click", function() {
+
+                    $("#startConfirmation").hide();
+                    $("#stopConfirmation").show();
+
+                    //Close the popup
+                    $($(this).siblings()[0]).trigger("click");
+                });
+            }
+        });
 		 // $('.saveConfirmation').popup();
 		 // $('.restoreConfirmation').popup();
 
