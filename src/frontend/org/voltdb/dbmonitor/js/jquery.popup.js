@@ -347,38 +347,8 @@
 					$('.saveInfo').show();
 					$('.restoreConfirmation').hide();
 					$('.restoreInfo').show();
-					$('.editOk').hide();
-					$('.editCancel').hide();
-		            $('.edit').show();
 		            p.close();
-					
 		    });
-		    }
-			
-			//admin
-			var saveSnapshotBtn = $("#btnSaveSnapshot");
-		    if (saveSnapshotBtn != undefined) {
-		        saveSnapshotBtn.unbind('click');
-		        saveSnapshotBtn.bind('click', function () {
-		            p.o.saveSnaps();
-		            p.close();
-					
-		            
-		            var chkAutoSnapshot = $("#chkAutoSnapshot");
-		            chkAutoSnapshot.hide();
-		            var iconCss = chkAutoSnapshot.is(":checked") ? "onIcon" : "offIcon";					
-		            $("#autoSnapshotIcon").removeClass().addClass(iconCss).show();
-					if(chkAutoSnapshot.is(":checked")){
-						
-						$('.SnapshotsOn').show();
-						$('.SnapshotsOff').hide();
-						} else{
-							$('.SnapshotsOff').show()
-							$('.SnapshotsOn').hide();
-							}
-					
-		    });
-							
 		    }
 			
 			// Get the content
