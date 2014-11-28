@@ -1268,9 +1268,9 @@ var saveUserPreferences = function (preferences) {
 
 var NavigationTabs = {
     DBMonitor: 1,
-    Schema: 2,
-    SQLQuery: 3,
-    Admin: 4
+	Admin: 2,
+    Schema: 3,
+    SQLQuery: 4
 };
 
 var getCurrentTab = function () {

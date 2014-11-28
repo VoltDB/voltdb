@@ -313,27 +313,41 @@
 		        });
 		    }
 			
+			//save cluster
+			$('.saveBtn').click(function(){
+				$('.saveInfo').hide();
+				$('.saveConfirmation').show();
+			});
+			
+			$('.confirmNoSave').click(function(){
+				$('.saveConfirmation').hide();
+				$('.saveInfo').show();
+			});
+			
+				
+			
+				//restore cluster
+			$('.restoreBtn').click(function(){
+				$('.restoreInfo').hide();
+				$('.restoreConfirmation').show();
+			});
+			
+			$('.confirmNoRestore').click(function(){
+				$('.restoreConfirmation').hide();
+				$('.restoreInfo').show();
+			});
+			
+			
 			//admin
 			var closeBtn = $(".closeBtn");
 		    if (closeBtn != undefined) {
 		        closeBtn.unbind('click');
 		        closeBtn.bind('click', function () {
+					$('.saveConfirmation').hide();
+					$('.saveInfo').show();
+					$('.restoreConfirmation').hide();
+					$('.restoreInfo').show();
 		            p.close();
-		    });
-		    }
-			
-			//admin
-			var saveSnapshotBtn = $("#btnSaveSnapshot");
-		    if (saveSnapshotBtn != undefined) {
-		        saveSnapshotBtn.unbind('click');
-		        saveSnapshotBtn.bind('click', function () {
-		            p.o.saveSnaps();
-		            p.close();
-		            
-		            var chkAutoSnapshot = $("#chkAutoSnapshot");
-		            chkAutoSnapshot.hide();
-		            var iconCss = chkAutoSnapshot.is(":checked") ? "onIcon" : "offIcon";
-		            $("#autoSnapshotIcon").removeClass().addClass(iconCss).show();
 		    });
 		    }
 			
