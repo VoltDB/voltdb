@@ -27,20 +27,20 @@
             }
         };
 
-        this.CheckServerConnection = function(checkConnection) {
+        this.CheckServerConnection = function (checkConnection) {
             try {
-                VoltDBCore.CheckServerConnection(server, port, admin, user, password, isHashedPassword, "DATABASE_LOGIN",checkConnection);
-            } catch(e) {
+                VoltDBCore.CheckServerConnection(server, port, admin, user, password, isHashedPassword, "DATABASE_LOGIN", checkConnection);
+            } catch (e) {
                 console.log(e.message);
             }
         };
 
-        this.SetUserCredentials = function(lUsername, lPassword, lAdmin) {
+        this.SetUserCredentials = function (lUsername, lPassword, lAdmin) {
             user = lUsername;
             password = lPassword;
             admin = lAdmin;
         };
-        
+
         this.ChangeServerConfiguration = function (serverName, portId, userName, pw, isHashPw, isAdmin) {
             server = serverName != null ? serverName : server;
             port = portId != null ? portId : port;
@@ -48,7 +48,7 @@
             password = pw != undefined ? pw : "";
             isHashedPassword = isHashPw;
             admin = isAdmin != undefined ? isAdmin : true;
-                        
+
         };
 
         this.GetSystemInformation = function (onConnectionAdded) {
@@ -62,20 +62,20 @@
                     VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
                         if (result == true) {
                             updateTips("Connection successful.");
-                                                       
+
                             VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
                                 onConnectionAdded(connection, status);
                             });
                         } else updateTips("Unable to connect.");
 
                     });
-                    
+
                 } else {
                     VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
                         onConnectionAdded(connection, status);
-                        
+
                     });
-                    
+
                 }
             } catch (e) {
                 console.log(e.message);
@@ -90,9 +90,9 @@
                 }, 500);
             }
 
-            
+
         };
-        
+
         this.GetSystemInformationDeployment = function (onConnectionAdded) {
             try {
                 var processName = "SYSTEM_INFORMATION_DEPLOYMENT";
@@ -135,7 +135,7 @@
 
         };
 
-        this.GetDataTablesInformation = function(onConnectionAdded) {
+        this.GetDataTablesInformation = function (onConnectionAdded) {
             try {
                 var processName = "DATABASE_INFORMATION";
                 var procedureNames = ['@Statistics', '@SystemCatalog', '@SystemCatalog'];
@@ -148,38 +148,7 @@
                             VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
                                 onConnectionAdded(connection, status);
                             });
-                        } 
-
-                    });
-
-                } else {
-                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        onConnectionAdded(connection, status);
-
-                    });
-
-                }
-
-            } catch(e) {
-                console.log(e.message);
-            } 
-
-        };
-        
-        this.GetProceduresInformation = function (onConnectionAdded) {
-            try {
-                var processName = "DATABASE_INFORMATION";
-                var procedureNames = ['@Statistics'];
-                var parameters = ["PROCEDUREPROFILE"];
-                var values = ['0'];
-                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
-                if (_connection == null) {
-                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {                            
-                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                onConnectionAdded(connection, status);
-                            });
-                        } 
+                        }
 
                     });
 
@@ -196,7 +165,38 @@
             }
 
         };
-        
+
+        this.GetProceduresInformation = function (onConnectionAdded) {
+            try {
+                var processName = "DATABASE_INFORMATION";
+                var procedureNames = ['@Statistics'];
+                var parameters = ["PROCEDUREPROFILE"];
+                var values = ['0'];
+                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
+                if (_connection == null) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
+                        if (result == true) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                                onConnectionAdded(connection, status);
+                            });
+                        }
+
+                    });
+
+                } else {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
+                        onConnectionAdded(connection, status);
+
+                    });
+
+                }
+
+            } catch (e) {
+                console.log(e.message);
+            }
+
+        };
+
         this.getProcedureContextForSorting = function () {
             try {
                 var processName = "DATABASE_INFORMATION";
@@ -213,14 +213,14 @@
                         }
 
                     });
-                } 
+                }
                 return lconnection;
 
             } catch (e) {
                 console.log(e.message);
             }
         };
-        
+
         this.getTablesContextForSorting = function () {
             try {
                 var processName = "DATABASE_INFORMATION";
@@ -250,7 +250,7 @@
                 console.log(e.message);
             }
         };
-        
+
         this.GetMemoryInformation = function (onConnectionAdded) {
             try {
                 var processName = "GRAPH_MEMORY";
@@ -281,7 +281,7 @@
             }
 
         };
-        
+
         this.GetGraphLatencyInformation = function (onConnectionAdded) {
             try {
                 var processName = "GRAPH_LATENCY";
@@ -312,7 +312,7 @@
             }
 
         };
-        
+
         this.GetCPUInformation = function (onConnectionAdded) {
             try {
                 //GRAPH_CPU
@@ -376,7 +376,7 @@
             }
 
         };
-    
+
         this.GetTableInformation = function (onConnectionAdded) {
             try {
                 var processName = "TABLE_INFORMATION";
@@ -408,9 +408,64 @@
             }
 
         };
+
+        //admin configuration
+        this.editConfigurationItem = function (configGroup, configMember,configValue,onConnectionSucceeded) {
+            try {
+                var processName = "ADMIN_".concat(configGroup);
+                var procedureNames = [];
+                var parameters = [];
+                var values = [];
+                var isAdmin = true;
+
+                switch (configGroup) {
+                    case 'OVERVIEW':
+                        procedureNames = ['@SystemInformation'];
+                        parameters = [configMember];
+                        values = [configValue];
+                        break;
+
+                    case 'PORT':
+                        procedureNames = ['@SystemInformation'];
+                        parameters = [configMember];
+                        values = [configValue];
+                        break;
+
+                    case 'DIRECTORIES':
+                        procedureNames = ['@SystemInformation'];
+                        parameters = [configMember];
+                        values = [configValue];
+                        break;
+
+                }
+                
+                _connection = VoltDBCore.HasConnection(server, port, isAdmin, user, processName);
+                if (_connection == null) {
+                    VoltDBCore.TestConnection(server, port, isAdmin, user, password, isHashedPassword, processName, function (result) {
+                        if (result == true) {
+                            VoltDBCore.AddConnection(server, port, isAdmin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                                onConnectionSucceeded(connection, status);
+                            });
+                        }
+
+                    });
+
+                } else {
+                    VoltDBCore.updateConnection(server, port, isAdmin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
+                        onConnectionSucceeded(connection, status);
+
+                    });
+
+                }
+
+            }
+            catch (e) {
+
+            }
+        };
     });
 
     window.VoltDBService = VoltDBService = new iVoltDbService();
-    
+
 })(window);
 

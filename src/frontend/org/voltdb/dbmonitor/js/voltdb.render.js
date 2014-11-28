@@ -1643,7 +1643,8 @@ function alertNodeClicked(obj) {
             sysTransaction["currentTimerTick"] = currentTimerTick;
 
         };
-
+        
+        //admin Configuration
         this.getAdminConfigurationItems = function (connection) {
             var adminConfigValues = [];
 
@@ -1775,6 +1776,13 @@ function alertNodeClicked(obj) {
             return directoryConfigValues;
 
         };
+
+        this.editConfigurationItem = function (configGroup, configMember, configValue,onConfigurationUpdated) {
+            VoltDBService.editConfigurationItem(configGroup, configMember,configValue,function() {
+                onConfigurationUpdated();
+            });
+        };
+
 
         function getTableData(connection, tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData, processName) {
             var suffix = "";

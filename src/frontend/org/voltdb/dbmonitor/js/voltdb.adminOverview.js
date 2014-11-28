@@ -2,7 +2,7 @@
     var adminOverviewFunctions = function (options) {
         this.options = options;
         
-        //inner functions
+        //display configuration members
         this.displayAdminConfiguration = function(connection) {            
             var adminConfigValues = voltDbRenderer.getAdminConfigurationItems(connection);            
             configureAdminValues(adminConfigValues);
@@ -20,6 +20,21 @@
             configureDirectoryValues(directoryConfigValues);
             
         };
+        
+        //edit configuration members
+        this.editConfigurationItem = function (configGroup, configMember, configValue) {
+            voltDbRenderer.editConfigurationItem(configGroup, configMember,configValue,function() {
+                toggleConfigurationItems();
+                
+            });
+
+            var toggleConfigurationItems = function() {
+
+            };
+
+        };
+        
+        
 
         var configureAdminValues = function (adminConfigValues) {
             options.siteNumberHeader.text(adminConfigValues.sitesperhost);
@@ -84,18 +99,18 @@
 
     };
 
-        var options = $.extend({}, adminDOMObjects, option);
+    var options = $.extend({}, adminDOMObjects, option);
 
-        //write blocks and function calls that are to be executed during load operation
-        $(document).ready(function () {
-            //site per host
-            //$("#navAdmin").on("click", function () {
-            //    displayAdminConfiguration();
-
-            //});
+    //write blocks and function calls that are to be executed during load operation
+    $(document).ready(function () {
+        //site per host
+        $("#partitionDetection").on("click", function () {
+            editConfigurationItem("OVERVIEW","DEPLOYMENT",true);
 
         });
-        return new adminOverviewFunctions(options);
+
+    });
+    return new adminOverviewFunctions(options);
         
     };
 
