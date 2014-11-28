@@ -483,7 +483,7 @@
                     <td>Off</td>
                       <td>
                           <a id="btnEditSecurityOk" href="#securityPop" class="editOk" title="Save" style="">Ok</a>
-                          <a id="btnEditSecurityCancel" href="#securityPop" class="editCancel" title="Cancel" style="">Cancel</a>
+                          <a id="btnEditSecurityCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a>
                           <a href="#securityPop" id="securityEdit" class="edit" title="Edit">&nbsp;</a>
                       </td>
                   </tr>
@@ -506,12 +506,13 @@
                   <input style="display: none;" type="checkbox" id="chkAutoSnapshot" checked="checked" class="snapshot"/>
                     </td>
                     <td>
-                    <div class="SnapshotsOn">On</div>
-                    <div class="SnapshotsOff" style="display:none;">Off</div>
+                    <div id="txtAutoSnapshot" class="SnapshotsOn">On</div>
                     </td>
-                    <td><a href="#" id="autoSnapshotEdit" class="edit" title="Edit">&nbsp;</a>
-                    <a href="#autoSnapshotPop" id="autoSnapshotSave" class="save" title="Save" style="display:none">&nbsp;</a>
-                    </td>
+                        <td>
+                            <a id="btnEditAutoSnapshotOk" href="#autoSnapshotPop" class="editOk" title="Save" style="">Ok</a>
+                            <a id="btnEditAutoSnapshotCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a>
+                            <a href="javascript:void(0)" id="autoSnapshotEdit" class="edit" title="Edit">&nbsp;</a>
+                        </td>
                   </tr>
                     <tr class="child-row-2 subLabelRow">
                   	<td class="configLabel">Frequency </td>
@@ -1112,7 +1113,7 @@
          <p class="txt-bold">Do you want to save the value?</p>
         </div>
         <div class="overlay-btns"><a id="btnSaveSnapshot" class="btn" title="Ok">Ok</a> 
-        <a class="btn btn-gray closeBtn" title="Ok">Cancel</a></div>
+        <a id="btnPopupAutoSnapshotCancel" class="btn btn-gray closeBtn" title="Ok">Cancel</a></div>
     </div>
     <!-- POPUP autoSnapshotyPop -->
     

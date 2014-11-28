@@ -3,12 +3,31 @@
 $( document ).ready(function() {
 
     var adminEditObjects = {
-        btnEditSecurityOk : $("#btnEditSecurityOk"),
+        //Edit Security objects
+        btnEditSecurityOk: $("#btnEditSecurityOk"),
         btnEditSecurityCancel: $("#btnEditSecurityCancel"),
         LinkSecurityEdit: $("#securityEdit"),
         chkSecurity: $("#chkSecurity"),
-        chkSecurityValue: false,
-        iconSecurityOption: $("#securityOptionIcon")
+        chkSecurityValue: $("#chkSecurity").is(":checked"),
+        iconSecurityOption: $("#securityOptionIcon"),
+
+        //Edit Auto Snapshot objects
+        btnEditAutoSnapshotOk: $("#btnEditAutoSnapshotOk"),
+        btnEditAutoSnapshotCancel: $("#btnEditAutoSnapshotCancel"),
+        LinkAutoSnapshotEdit: $("#autoSnapshotEdit"),
+        chkAutoSnapsot: $("#chkAutoSnapshot"),
+        chkAutoSnapshotValue: $("#chkAutoSnapshot").is(":checked"),
+        iconAutoSnapshotOption: $("#autoSnapshotIcon"),
+        txtAutoSnapshot: $("#txtAutoSnapshot"),
+        //Frequency objects
+        tBoxAutoSnapshotFreq: $("#txtFrequency"),
+        tBoxAutoSnapshotFreqValue: $("#frequencySpan").text(),
+        spanAutoSnapshotFreq: $("#frequencySpan"),
+        //Retained objects
+        tBoxAutoSnapshotRetained: $("#txtRetained"),
+        tBoxAutoSnapshotRetainedValue: $("#retainedSpan").text(),
+        spanAutoSnapshotRetained: $("#retainedSpan"),
+        
     };
 
     $(".tblshutdown").find(".edit").on("click", function() {
@@ -31,7 +50,7 @@ $( document ).ready(function() {
     $('tr.parent > td:first-child' || 'tr.parent > td:fourth-child')
         .css("cursor", "pointer")
         .attr("title", "Click to expand/collapse")
-        .click(function () {
+        .click(function() {
             var parent = $(this).parent();
             parent.siblings('.child-' + parent.attr("id")).toggle();
             parent.find(".labelCollapsed").toggleClass("labelExpanded");
@@ -160,7 +179,6 @@ $( document ).ready(function() {
 		 });
         
     
-		 $('#autoSnapshotEdit').popup();
 		 $('#saveConfirmation').popup();
 		 $('#restoreConfirmation').popup();
 		 $('#btnSaveHrtTimeOut').popup();
@@ -171,27 +189,96 @@ $( document ).ready(function() {
 		   $('#stopConfirmation').popup();
 		 // $('.saveConfirmation').popup();
 		 // $('.restoreConfirmation').popup();
-		  
-		  
-	
-	
-		 
-		 $('#autoSnapshotSave').popup({
-		  	saveSnaps: function () {					
-					$("#frequencySpan").show();
-					$("#txtFrequency").hide();
-		  	        $("#frequencySpan").html($("#txtFrequency").val());
-					
-					$("#retainedSpan").show();
-					$("#txtRetained").hide();
-		  	        $("#retainedSpan").html($("#txtRetained").val());
-					
-					$("#autoSnapshotSave").hide();
-					$("#autoSnapshotEdit").show();
-		  	    $(".icheckbox_square-aero .snapshot").parent().removeClass('customCheckbox');
 
-		  	}
-		 });
+
+    var toggleAutoSnapshotEdit = function(showEdit) {
+
+        if (adminEditObjects.chkAutoSnapshotValue) {
+            adminEditObjects.chkAutoSnapsot.iCheck('check');
+        } else {
+            adminEditObjects.chkAutoSnapsot.iCheck('uncheck');
+        }
+        
+        adminEditObjects.tBoxAutoSnapshotFreq.val(adminEditObjects.tBoxAutoSnapshotFreqValue);
+        adminEditObjects.tBoxAutoSnapshotRetained.val(adminEditObjects.tBoxAutoSnapshotRetainedValue);
+
+        if (showEdit) {
+            adminEditObjects.chkAutoSnapsot.parent().removeClass("customCheckbox");
+            adminEditObjects.btnEditAutoSnapshotOk.hide();
+            adminEditObjects.btnEditAutoSnapshotCancel.hide();
+            adminEditObjects.LinkAutoSnapshotEdit.show();
+            adminEditObjects.iconAutoSnapshotOption.show();
+
+            adminEditObjects.tBoxAutoSnapshotFreq.hide();
+            adminEditObjects.tBoxAutoSnapshotRetained.hide();
+            adminEditObjects.spanAutoSnapshotFreq.show();
+            adminEditObjects.spanAutoSnapshotRetained.show();
+        } else {
+            adminEditObjects.iconAutoSnapshotOption.hide();
+            adminEditObjects.LinkAutoSnapshotEdit.hide();
+            adminEditObjects.btnEditAutoSnapshotOk.show();
+            adminEditObjects.btnEditAutoSnapshotCancel.show();
+            adminEditObjects.chkAutoSnapsot.parent().addClass("customCheckbox");
+            
+            adminEditObjects.spanAutoSnapshotFreq.hide();
+            adminEditObjects.spanAutoSnapshotRetained.hide();
+            adminEditObjects.tBoxAutoSnapshotFreq.show();
+            adminEditObjects.tBoxAutoSnapshotRetained.show();
+        }
+    };
+
+    adminEditObjects.btnEditAutoSnapshotCancel.on("click", function () {
+        toggleAutoSnapshotEdit(true);
+    });
+
+    adminEditObjects.btnEditAutoSnapshotOk.popup({
+        open: function (event, ui, ele) {
+        },
+        afterOpen: function () {
+
+            $("#btnSaveSnapshot").unbind("click");
+            $("#btnSaveSnapshot").on("click", function () {
+
+                if (adminEditObjects.chkAutoSnapsot.is(':checked')) {
+                    adminEditObjects.txtAutoSnapshot.text("On");
+                    adminEditObjects.iconAutoSnapshotOption.removeClass().addClass("onIcon");
+                    adminEditObjects.chkAutoSnapshotValue = true;
+                } else {
+                    adminEditObjects.txtAutoSnapshot.text("Off");
+                    adminEditObjects.iconAutoSnapshotOption.removeClass().addClass("offIcon");
+                    adminEditObjects.chkAutoSnapshotValue = false;
+                }
+                
+                adminEditObjects.tBoxAutoSnapshotFreqValue = adminEditObjects.tBoxAutoSnapshotFreq.val();
+                adminEditObjects.tBoxAutoSnapshotRetainedValue = adminEditObjects.tBoxAutoSnapshotRetained.val();
+                
+                adminEditObjects.spanAutoSnapshotFreq.html(adminEditObjects.tBoxAutoSnapshotFreqValue);
+                adminEditObjects.spanAutoSnapshotRetained.html(adminEditObjects.tBoxAutoSnapshotRetainedValue);
+
+                //Close the popup
+                $($(this).siblings()[0]).trigger("click");
+            });
+
+            $("#btnPopupAutoSnapshotCancel").on("click", function () {
+                toggleAutoSnapshotEdit(true);
+            });
+
+            $(".popup_back").on("click", function () {
+                toggleAutoSnapshotEdit(true);
+            });
+
+            $(".popup_close").on("click", function () {
+                toggleAutoSnapshotEdit(true);
+            });
+        }
+    });
+
+    adminEditObjects.LinkAutoSnapshotEdit.click(function () {
+        var parent = $(this).parent().parent();
+        parent.siblings('.child-' + parent.attr("id")).show();
+        parent.find(".labelCollapsed").addClass("labelExpanded");
+        toggleAutoSnapshotEdit(false);
+    });
 
 		 //Heartbeat time out
 		 	
@@ -247,31 +334,6 @@ $( document ).ready(function() {
 			$('#btnSaveQueryTimeOut').hide();
 			$("#queryTimeOutSpan").html($("#txtQryTimeOutSpan").val())
 			$("td.queryTimeOut span").toggleClass("unit");
-		});
-		
-		
-		
-		
-		
-		$('#autoSnapshotEdit').click(function(){
-			var parent = $(this).parent().parent();
-            parent.siblings('.child-' + parent.attr("id")).show();
-            parent.find(".labelCollapsed").addClass("labelExpanded");
-
-            $("#autoSnapshotIcon").hide();
-            $("#chkAutoSnapshot").show();
-			
-			$("#autoSnapshotSave").show();
-			$("#autoSnapshotEdit").hide();
-			
-			$("#frequencySpan").hide();
-			$("#txtFrequency").show();
-		    $("#txtFrequency").val($("#frequencySpan").html());
-			
-			$("#retainedSpan").hide();
-			$("#txtRetained").show();
-		    $("#txtRetained").val($("#retainedSpan").html());
-		    $(".icheckbox_square-aero .snapshot").parent().addClass('customCheckbox');
 		});
 		
 	 // Filters servers list
