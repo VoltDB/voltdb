@@ -3,6 +3,7 @@
 $( document ).ready(function() {
 
     var adminEditObjects = {
+
         //Edit Security objects
         btnEditSecurityOk: $("#btnEditSecurityOk"),
         btnEditSecurityCancel: $("#btnEditSecurityCancel"),
@@ -10,6 +11,7 @@ $( document ).ready(function() {
         chkSecurity: $("#chkSecurity"),
         chkSecurityValue: $("#chkSecurity").is(":checked"),
         iconSecurityOption: $("#securityOptionIcon"),
+        spanSecurity: $("#spanSecurity"),
 
         //Edit Auto Snapshot objects
         btnEditAutoSnapshotOk: $("#btnEditAutoSnapshotOk"),
@@ -47,6 +49,18 @@ $( document ).ready(function() {
         tBoxQueryTimeoutValue: $("#queryTimeOutSpan").text(),
         spanqueryTimeOut: $("#queryTimeOutSpan"),
     };
+
+    var getOnOffText = function(isChecked) {
+        return (isChecked) ? "On" : "Off";
+    };
+    
+    adminEditObjects.chkSecurity.on('ifChanged', function () {
+        adminEditObjects.spanSecurity.text(getOnOffText(adminEditObjects.chkSecurity.is(":checked")));
+    });
+    
+    adminEditObjects.chkAutoSnapsot.on('ifChanged', function () {
+        adminEditObjects.txtAutoSnapshot.text(getOnOffText(adminEditObjects.chkAutoSnapsot.is(":checked")));
+    });
 
     $(".tblshutdown").find(".edit").on("click", function() {
         var $this = $(this).closest("tr");
@@ -133,6 +147,7 @@ $( document ).ready(function() {
             } else {
                 adminEditObjects.chkSecurity.iCheck('uncheck');
             }
+            adminEditObjects.spanSecurity.text(getOnOffText(adminEditObjects.chkSecurityValue));
             
             if (showEdit) {
                 adminEditObjects.chkSecurity.parent().removeClass("customCheckbox");
@@ -165,15 +180,10 @@ $( document ).ready(function() {
 		         $("#btnSecurityOk").unbind("click");
 		         $("#btnSecurityOk").on("click", function() {
 
-		             var securityRow = $("tr.security");
-		             var tdVal = securityRow.find("td:nth-child(3)");
-
 		             if (adminEditObjects.chkSecurity.is(':checked')) {
-		                 tdVal.text("On");
 		                 adminEditObjects.iconSecurityOption.removeClass().addClass("onIcon");
 		                 adminEditObjects.chkSecurityValue = true;
 		             } else {
-		                 tdVal.text("Off");
 		                 adminEditObjects.iconSecurityOption.removeClass().addClass("offIcon");
 		                 adminEditObjects.chkSecurityValue = false;
 		             }
@@ -249,6 +259,7 @@ $( document ).ready(function() {
         adminEditObjects.tBoxAutoSnapshotFreq.val(adminEditObjects.tBoxAutoSnapshotFreqValue);
         adminEditObjects.tBoxAutoSnapshotRetained.val(adminEditObjects.tBoxAutoSnapshotRetainedValue);
         adminEditObjects.ddlAutoSnapshotFreqUnit.val(adminEditObjects.ddlAutoSnapshotFreqUnitValue);
+        adminEditObjects.txtAutoSnapshot.text(getOnOffText(adminEditObjects.chkAutoSnapshotValue));
 
         if (showEdit) {
             adminEditObjects.chkAutoSnapsot.parent().removeClass("customCheckbox");
@@ -292,11 +303,9 @@ $( document ).ready(function() {
             $("#btnSaveSnapshot").on("click", function () {
 
                 if (adminEditObjects.chkAutoSnapsot.is(':checked')) {
-                    adminEditObjects.txtAutoSnapshot.text("On");
                     adminEditObjects.iconAutoSnapshotOption.removeClass().addClass("onIcon");
                     adminEditObjects.chkAutoSnapshotValue = true;
                 } else {
-                    adminEditObjects.txtAutoSnapshot.text("Off");
                     adminEditObjects.iconAutoSnapshotOption.removeClass().addClass("offIcon");
                     adminEditObjects.chkAutoSnapshotValue = false;
                 }
