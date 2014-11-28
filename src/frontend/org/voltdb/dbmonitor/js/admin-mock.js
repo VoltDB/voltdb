@@ -23,11 +23,29 @@ $( document ).ready(function() {
         tBoxAutoSnapshotFreq: $("#txtFrequency"),
         tBoxAutoSnapshotFreqValue: $("#frequencySpan").text(),
         spanAutoSnapshotFreq: $("#frequencySpan"),
+        ddlAutoSnapshotFreqUnit: $("#ddlfrequencyUnit"),
+        ddlAutoSnapshotFreqUnitValue: $("#spanFrequencyUnit").text(),
+        spanAutoSnapshotFreqUnit: $("#spanFrequencyUnit"),
         //Retained objects
         tBoxAutoSnapshotRetained: $("#txtRetained"),
         tBoxAutoSnapshotRetainedValue: $("#retainedSpan").text(),
         spanAutoSnapshotRetained: $("#retainedSpan"),
         
+        //Heartbeat Timeout
+        btnEditHeartbeatTimeoutOk: $("#btnEditHeartbeatTimeoutOk"),
+        btnEditHeartbeatTimeoutCancel: $("#btnEditHeartbeatTimeoutCancel"),
+        LinkHeartbeatEdit: $("#btnEditHrtTimeOut"),
+        tBoxHeartbeatTimeout: $("#txtHrtTimeOut"),
+        tBoxHeartbeatTimeoutValue: $("#hrtTimeOutSpan").text(),
+        spanHeartbeatTimeOut: $("#hrtTimeOutSpan"),
+        
+        //Query Timeout
+        btnEditQueryTimeoutOk: $("#btnEditQueryTimeoutOk"),
+        btnEditQueryTimeoutCancel: $("#btnEditQueryTimeoutCancel"),
+        LinkQueryTimeoutEdit: $("#btnEditQueryTimeout"),
+        tBoxQueryTimeout: $("#txtQueryTimeout"),
+        tBoxQueryTimeoutValue: $("#queryTimeOutSpan").text(),
+        spanqueryTimeOut: $("#queryTimeOutSpan"),
     };
 
     $(".tblshutdown").find(".edit").on("click", function() {
@@ -181,12 +199,10 @@ $( document ).ready(function() {
     
 		 $('#saveConfirmation').popup();
 		 $('#restoreConfirmation').popup();
-		 $('#btnSaveHrtTimeOut').popup();
-		 $('#btnSaveQueryTimeOut').popup();
 		 $('#shutdownPopupPopConfirmation').popup();
 		  $('#shutdownPopupPopConfirmation1').popup();
 		  $('#shutdownClusterPopupPopConfirmation').popup();
-		 $('#stopConfirmation').popup({
+		  $('#stopConfirmation').popup({
 		    open: function (event, ui, ele) {
 		    },
 		    afterOpen: function() {
@@ -220,8 +236,6 @@ $( document ).ready(function() {
                 });
             }
         });
-		 // $('.saveConfirmation').popup();
-		 // $('.restoreConfirmation').popup();
 
 
     var toggleAutoSnapshotEdit = function(showEdit) {
@@ -234,6 +248,7 @@ $( document ).ready(function() {
         
         adminEditObjects.tBoxAutoSnapshotFreq.val(adminEditObjects.tBoxAutoSnapshotFreqValue);
         adminEditObjects.tBoxAutoSnapshotRetained.val(adminEditObjects.tBoxAutoSnapshotRetainedValue);
+        adminEditObjects.ddlAutoSnapshotFreqUnit.val(adminEditObjects.ddlAutoSnapshotFreqUnitValue);
 
         if (showEdit) {
             adminEditObjects.chkAutoSnapsot.parent().removeClass("customCheckbox");
@@ -243,8 +258,10 @@ $( document ).ready(function() {
             adminEditObjects.iconAutoSnapshotOption.show();
 
             adminEditObjects.tBoxAutoSnapshotFreq.hide();
+            adminEditObjects.ddlAutoSnapshotFreqUnit.hide();
             adminEditObjects.tBoxAutoSnapshotRetained.hide();
             adminEditObjects.spanAutoSnapshotFreq.show();
+            adminEditObjects.spanAutoSnapshotFreqUnit.show();
             adminEditObjects.spanAutoSnapshotRetained.show();
         } else {
             adminEditObjects.iconAutoSnapshotOption.hide();
@@ -253,9 +270,11 @@ $( document ).ready(function() {
             adminEditObjects.btnEditAutoSnapshotCancel.show();
             adminEditObjects.chkAutoSnapsot.parent().addClass("customCheckbox");
             
+            adminEditObjects.spanAutoSnapshotFreqUnit.hide();
             adminEditObjects.spanAutoSnapshotFreq.hide();
             adminEditObjects.spanAutoSnapshotRetained.hide();
             adminEditObjects.tBoxAutoSnapshotFreq.show();
+            adminEditObjects.ddlAutoSnapshotFreqUnit.show();
             adminEditObjects.tBoxAutoSnapshotRetained.show();
         }
     };
@@ -283,9 +302,11 @@ $( document ).ready(function() {
                 }
                 
                 adminEditObjects.tBoxAutoSnapshotFreqValue = adminEditObjects.tBoxAutoSnapshotFreq.val();
+                adminEditObjects.ddlAutoSnapshotFreqUnitValue = adminEditObjects.ddlAutoSnapshotFreqUnit.val();
                 adminEditObjects.tBoxAutoSnapshotRetainedValue = adminEditObjects.tBoxAutoSnapshotRetained.val();
                 
                 adminEditObjects.spanAutoSnapshotFreq.html(adminEditObjects.tBoxAutoSnapshotFreqValue);
+                adminEditObjects.spanAutoSnapshotFreqUnit.html(adminEditObjects.ddlAutoSnapshotFreqUnitValue);
                 adminEditObjects.spanAutoSnapshotRetained.html(adminEditObjects.tBoxAutoSnapshotRetainedValue);
 
                 //Close the popup
@@ -312,62 +333,126 @@ $( document ).ready(function() {
         parent.find(".labelCollapsed").addClass("labelExpanded");
         toggleAutoSnapshotEdit(false);
     });
+    
+    //Heartbeat time out
+    var toggleHeartbeatTimeoutEdit = function (showEdit) {
+        
+        adminEditObjects.tBoxHeartbeatTimeout.val(adminEditObjects.tBoxHeartbeatTimeoutValue);
 
-		 //Heartbeat time out
-		 	
-		$('#btnEditHrtTimeOut').click(function(e){
-			if(  $("#hrtTimeOutSpan").is(":visible") == true ){
-				$('#btnEditHrtTimeOut').hide();
-				$('#btnSaveHrtTimeOut').show();
-				$("#hrtTimeOutSpan").hide();
-				$("#txtHrtTimeOutSpan").show();
-				$("#txtHrtTimeOutSpan").val($("#hrtTimeOutSpan").html())
-			}else{
-				$("#hrtTimeOutSpan").show();
-				$("#txtHrtTimeOutSpan").hide();
-				$("#hrtTimeOutSpan").html($("#txtHrtTimeOutSpan").val())
-			}
-			$("td.heartbeattd span").toggleClass("unit");
-			e.preventDefault();
-		});
-		
-		$('#btnSaveHrtTimeOut').click(function(e){
-			$("#hrtTimeOutSpan").show();
-			$("#txtHrtTimeOutSpan").hide();
-			$('#btnEditHrtTimeOut').show();
-			$('#btnSaveHrtTimeOut').hide();
-			$("#hrtTimeOutSpan").html($("#txtHrtTimeOutSpan").val())
-			$("td.heartbeattd span").toggleClass("unit");
-		});
-		
-		
-		
-		 //Query time out
-		 	
-		$('#btnEditQueryTimeOut').click(function(e){
-			if(  $("#queryTimeOutSpan").is(":visible") == true ){
-				$('#btnEditQueryTimeOut').hide();
-				$('#btnSaveQueryTimeOut').show();
-				$("#queryTimeOutSpan").hide();
-				$("#txtQryTimeOutSpan").show();
-				$("#txtQryTimeOutSpan").val($("#queryTimeOutSpan").html())
-			}else{
-				$("#queryTimeOutSpan").show();
-				$("#txtQryTimeOutSpan").hide();
-				$("#queryTimeOutSpan").html($("#txtQryTimeOutSpan").val())
-			}
-			$("td.queryTimeOut span").toggleClass("unit");
-			e.preventDefault();
-		});
-		
-		$('#btnSaveQueryTimeOut').click(function(e){
-			$("#queryTimeOutSpan").show();
-			$("#txtQryTimeOutSpan").hide();
-			$('#btnEditQueryTimeOut').show();
-			$('#btnSaveQueryTimeOut').hide();
-			$("#queryTimeOutSpan").html($("#txtQryTimeOutSpan").val())
-			$("td.queryTimeOut span").toggleClass("unit");
-		});
+        if (showEdit) {
+            adminEditObjects.btnEditHeartbeatTimeoutOk.hide();
+            adminEditObjects.btnEditHeartbeatTimeoutCancel.hide();
+            adminEditObjects.LinkHeartbeatEdit.show();
+
+            adminEditObjects.tBoxHeartbeatTimeout.hide();
+            adminEditObjects.spanHeartbeatTimeOut.show();
+        } else {
+            adminEditObjects.LinkHeartbeatEdit.hide();
+            adminEditObjects.btnEditHeartbeatTimeoutOk.show();
+            adminEditObjects.btnEditHeartbeatTimeoutCancel.show();
+            
+            adminEditObjects.spanHeartbeatTimeOut.hide();
+            adminEditObjects.tBoxHeartbeatTimeout.show();
+        }
+    };
+    
+    adminEditObjects.LinkHeartbeatEdit.on("click", function () {
+        toggleHeartbeatTimeoutEdit(false);
+        $("td.heartbeattd span").toggleClass("unit");
+    });
+
+    adminEditObjects.btnEditHeartbeatTimeoutCancel.on("click", function () {
+        toggleHeartbeatTimeoutEdit(true);
+    });
+    
+    adminEditObjects.btnEditHeartbeatTimeoutOk.popup({
+        open: function (event, ui, ele) {
+        },
+        afterOpen: function () {
+
+            $("#btnPopupHeartbeatTimeoutOk").unbind("click");
+            $("#btnPopupHeartbeatTimeoutOk").on("click", function () {
+
+                adminEditObjects.tBoxHeartbeatTimeoutValue = adminEditObjects.tBoxHeartbeatTimeout.val();
+                adminEditObjects.spanHeartbeatTimeOut.html(adminEditObjects.tBoxHeartbeatTimeoutValue);
+
+                //Close the popup
+                $($(this).siblings()[0]).trigger("click");
+            });
+
+            $("#btnPopupHeartbeatTimeoutCancel").on("click", function () {
+                toggleHeartbeatTimeoutEdit(true);
+            });
+
+            $(".popup_back").on("click", function () {
+                toggleHeartbeatTimeoutEdit(true);
+            });
+
+            $(".popup_close").on("click", function () {
+                toggleHeartbeatTimeoutEdit(true);
+            });
+        }
+    });
+    
+    //Query time out
+    var toggleQueryTimeoutEdit = function (showEdit) {
+
+        adminEditObjects.tBoxQueryTimeout.val(adminEditObjects.tBoxQueryTimeoutValue);
+
+        if (showEdit) {
+            adminEditObjects.btnEditQueryTimeoutOk.hide();
+            adminEditObjects.btnEditQueryTimeoutCancel.hide();
+            adminEditObjects.LinkQueryTimeoutEdit.show();
+
+            adminEditObjects.tBoxQueryTimeout.hide();
+            adminEditObjects.spanqueryTimeOut.show();
+        } else {
+            adminEditObjects.LinkQueryTimeoutEdit.hide();
+            adminEditObjects.btnEditQueryTimeoutOk.show();
+            adminEditObjects.btnEditQueryTimeoutCancel.show();
+
+            adminEditObjects.spanqueryTimeOut.hide();
+            adminEditObjects.tBoxQueryTimeout.show();
+        }
+    };
+    
+    adminEditObjects.LinkQueryTimeoutEdit.on("click", function () {
+        toggleQueryTimeoutEdit(false);
+        $("td.queryTimeOut span").toggleClass("unit");
+    });
+
+    adminEditObjects.btnEditQueryTimeoutCancel.on("click", function () {
+        toggleQueryTimeoutEdit(true);
+    });
+    
+    adminEditObjects.btnEditQueryTimeoutOk.popup({
+        open: function (event, ui, ele) {
+        },
+        afterOpen: function () {
+
+            $("#btnPopupQueryTimeoutOk").unbind("click");
+            $("#btnPopupQueryTimeoutOk").on("click", function () {
+
+                adminEditObjects.tBoxQueryTimeoutValue= adminEditObjects.tBoxQueryTimeout.val();
+                adminEditObjects.spanqueryTimeOut.html(adminEditObjects.tBoxQueryTimeoutValue);
+
+                //Close the popup
+                $($(this).siblings()[0]).trigger("click");
+            });
+
+            $("#btnPopupQueryTimeoutCancel").on("click", function () {
+                toggleQueryTimeoutEdit(true);
+            });
+
+            $(".popup_back").on("click", function () {
+                toggleQueryTimeoutEdit(true);
+            });
+
+            $(".popup_close").on("click", function () {
+                toggleQueryTimeoutEdit(true);
+            });
+        }
+    });
 		
 	 // Filters servers list
     $('#popServerSearchAdmin').keyup(function () {
@@ -390,24 +475,6 @@ $( document ).ready(function() {
 				}
 			}
 		});
-		
-		
-		//server icon
-		/*$('.adminServer').click(function(){			
-					$("#serverConfigAdmin").toggle();			
-		}); 
-		$(document).mouseup(function (e)
-			{
-			var container = $("#serverConfigAdmin");
-			
-			if (!container.is(e.target) // if the target of the click isn't the container...
-			&& container.has(e.target).length === 0) // ... nor a descendant of the container
-			{
-			container.hide();
-			}
-		});
-		
-		*/
 		
 	// Checkbox style
 	

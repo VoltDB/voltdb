@@ -524,7 +524,14 @@
                     <span id="frequencySpan">500</span>
                     <input id="txtFrequency" class="exitableTxtBx" type="text" style="display:none">
                     </td>
-                    <td>&nbsp;</td>
+                        <td>
+                            <span id="spanFrequencyUnit">Hrs</span>
+                            <select id="ddlfrequencyUnit" style="display: none;">
+                                <option>Hrs</option>
+                                <option>Min</option>
+                                <option>Sec</option>    
+                            </select>
+                        </td>
                     <td>&nbsp;</td>
                   </tr>
                   
@@ -598,19 +605,27 @@
                   </tr>
                   <tr class="child-row-5 subLabelRow">
                   	<td class="configLabel">Heartbeat time out </td>
-                    <td align="right" class="heartbeattd"><span id="hrtTimeOutSpan">500</span><input id="txtHrtTimeOutSpan" class="exitableTxtBx" type="text" style="display:none" /> <span>ms</span></td>
+                      <td align="right" class="heartbeattd">
+                          <span id="hrtTimeOutSpan">500</span>
+                          <input id="txtHrtTimeOut" class="exitableTxtBx" type="text" style="display:none" /> <span>ms</span>
+                      </td>
                     <td>&nbsp;</td>
-                    <td><a id="btnEditHrtTimeOut" href="#" class="edit" title="Edit">&nbsp;</a>
-                    <a id="btnSaveHrtTimeOut" href="#HrtTimeOutPopup" class="save" title="Save" style="display:none;">&nbsp;</a></td>
+                      <td>
+                          <a id="btnEditHeartbeatTimeoutOk" href="#HrtTimeOutPopup" class="editOk" title="Ok" style="">Ok</a>
+                          <a id="btnEditHeartbeatTimeoutCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a>
+                          <a id="btnEditHrtTimeOut" href="javascript:void(0)" class="edit" title="Edit">&nbsp;</a>
+                      </td>
                   </tr>
-                  
                   
                   <tr class="child-row-5 subLabelRow">
                   	<td class="configLabel">Query time out</td>
-                    <td align="right" class="queryTimeOut"><span id="queryTimeOutSpan">500</span><input id="txtQryTimeOutSpan" class="exitableTxtBx" type="text" style="display:none" /> <span>ms</span></td>
+                    <td align="right" class="queryTimeOut"><span id="queryTimeOutSpan">500</span><input id="txtQueryTimeout" class="exitableTxtBx" type="text" style="display:none" /> <span>ms</span></td>
                     <td>&nbsp;</td>
-                    <td><a id="btnEditQueryTimeOut" href="#" class="edit" title="Edit">&nbsp;</a>
-                    <a id="btnSaveQueryTimeOut" href="#QueryTimeOutPopup" class="save" title="Save" style="display:none;">&nbsp;</a></td>
+                      <td>
+                          <a id="btnEditQueryTimeoutOk" href="#QueryTimeOutPopup" class="editOk" title="Ok" style="">Ok</a>
+                          <a id="btnEditQueryTimeoutCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a>
+                          <a id="btnEditQueryTimeout" href="javascript:void(0)" class="edit" title="Edit">&nbsp;</a>
+                      </td>
                   </tr>
                   <tr class="child-row-5 subLabelRow">
                   	<td class="configLabel">Max temp table memory</td>
@@ -1255,7 +1270,10 @@
         <div class="overlay-content"> 
        <p class="txt-bold">Do you want to save the value?</p>
                 </div>
-        <div class="overlay-btns"><a class="btn closeBtn" id="btnDone" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Cancel">Cancel</a></div>
+        <div class="overlay-btns">
+            <a class="btn closeBtn" id="btnPopupHeartbeatTimeoutOk" title="Ok">Ok</a> 
+            <a class="btn btn-gray closeBtn" id="btnPopupHeartbeatTimeoutCancel" title="Cancel">Cancel</a>
+        </div>
     </div>
     <!-- POPUP restorePop -->
     
@@ -1268,7 +1286,10 @@
         <div class="overlay-content"> 
        <p class="txt-bold">Do you want to save the value?</p>
                 </div>
-        <div class="overlay-btns"><a class="btn closeBtn" id="btnDone" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Cancel">Cancel</a></div>
+        <div class="overlay-btns">
+            <a class="btn closeBtn" id="btnPopupQueryTimeoutOk" title="Ok">Ok</a> 
+            <a class="btn btn-gray closeBtn" id="btnPopupQueryTimeoutCancel" title="Cancel">Cancel</a>
+        </div>
     </div>
     <!-- POPUP Query time out Popup -->
       <!-- POPUP saveConfirmationPopup -->
