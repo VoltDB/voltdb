@@ -105,7 +105,7 @@ SELECT DISTINCT @agg( A._variable[@columntype] ), COUNT(*)  FROM   @fromtables A
 -- DISTINCT on GROUP BY
 SELECT DISTINCT   @agg(@optionalfn(A._variable[@columntype]))                                 FROM @fromtables A GROUP BY         A.__[#GB]
 SELECT DISTINCT   A._variable[#GB1 @columntype],  @agg(     A._variable[@columntype])         FROM @fromtables A GROUP BY         A.__[#GB1], A.__[#GB2]
-SELECT DISTINCT   A._variable[#GB1 @columntype],  @agg(     A._variable[@columntype])         FROM @fromtables A GROUP BY         A.__[#GB1], A.__[#GB2] ORDER BY 1, 2 LIMIT 5
+SELECT DISTINCT   A._variable[#GB1 @columntype],  @agg(     A._variable[@columntype])         FROM @fromtables A GROUP BY         A.__[#GB1], A.__[#GB2] ORDER BY 1, 2 LIMIT 1
 
 -- update
 -- compare two cols

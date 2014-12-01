@@ -1368,6 +1368,12 @@ public class PlanAssembler {
         // In future, inline LIMIT for join, Receive
         // Then we do not need to distinguish the order by node.
 
+        if (m_parsedSelect.hasDistinctWithGroupBy()) {
+            topLimit.addAndLinkChild(root);
+            root = topLimit;
+            return root;
+        }
+
         // Switch if has Complex aggregations
         if (m_parsedSelect.hasComplexAgg()) {
             AbstractPlanNode child = root.getChild(0);
