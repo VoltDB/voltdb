@@ -110,7 +110,7 @@
 					$popup
 						.animate({opacity : 1}, plugin.o.speed, function(){
 						    $('body').css("height", $(window).height()); $('body').css("overflow", "hidden");
-						    $('body').css("position", "fixed");
+						    //$('body').css("position", "fixed");
 						    $('body').css("width", "100%");
 							//$('body').bind('touchmove', function(e){e.preventDefault()});//mobile
 							// Call the open callback

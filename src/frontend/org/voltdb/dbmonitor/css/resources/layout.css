@@ -776,7 +776,7 @@ ul.helpSchemaList li { list-style:disc; line-height:25px!important; padding:0; m
 
 .adminWrapper{ margin:0; padding:15px 20px;background:#FFFFFF; border-bottom:1px solid #CCCCCC;}
 		  
-.adminLeft { float:left; width:50%;}
+.adminLeft { float:left; width:80%;}
 .adminLeft h1 { float:left; padding-right:20px;}
 .adminClusterProperties { /*float:left;*/}
 ul.adminClusterList { margin:0; padding:0; /*width:366px;*/ height:40px;}
@@ -846,6 +846,7 @@ input.exitableTxtBx{width:30px; /*position:relative; top:6px;*/ padding:2px 3px;
 .tblSave tr{border:1px solid #CCCCCC;}
 .tblSave tr td { padding:10px;border:none;}
 .tblSave tr td input[type="text"]{ width:267px; padding:6px 4px 7px 4px;}
+.tblRestore th {}
 .tblRestore tr td input[type="text"]{ width:185px; padding:6px 4px 7px 4px;}
 .restoreTxt {border: 1px solid #CCCCCC;padding: 9px; /* margin: 1px 0 0 0; */ position: relative; top: 2px;}
 .browseBtn {}
@@ -883,7 +884,7 @@ td.heartbeattd span.unit, td.queryTimeOut span.unit{position:relative;/* top:7px
 .editOk, .editCancel {
     display: none;
 }
-.restoreInfo .overlay-content { height:200px;}
+.restoreInfo .overlay-content { height:320px;}
 
 /*********************************************media Qu********************/
 @media (max-width: 479px) {
@@ -968,8 +969,16 @@ ul.catalogNav li.active a, ul.catalogNav li.active a:hover{background:#76bd1d; d
 h3.systemHeader{}
 .editOk, .editCancel { background-color:#aa1f2f; cursor:pointer; padding:4px 6px; text-align:center; color:#FFFFFF; font:12px Arial, Helvetica, sans-serif; text-shadow:none; text-decoration:none; border-radius:0; border:none;}
 .editOk:hover, .editCancel:hover{background-color:#76bd1d; color:#fff;}
-
+.editOkIcon {}
+.editCancelIcon {}
 .restoreRadio {border: 1px solid #CCCCCC;padding: 8px 9px 9px; /* margin: 1px 0 0 0; */ position: relative; top: 2px; width:13px;}
+ul.okCal { margin:0; padding:0;}
+ul.okCal li {margin:0;
+padding: 6px 2px 0 0;
+float: left;
+display: inline-block;
+position: relative;
+top: 3px;}
 
 @media (width: 640px) {
 	
@@ -981,6 +990,8 @@ h3.systemHeader{}
 	.overlay-content { min-width:320px;}
 	 .adminMode {margin-top:10px}
 	.adminServer {margin-top:10px}
+	.adminLeft { float:none; width:100%}
+	#serverConfigAdmin{ top:98px;}
 }
 @media (min-width: 320px) and (max-width: 479px) {
 	#popServerList {width: 100%;position: absolute;right:-1px;top:205px;}
@@ -996,16 +1007,18 @@ h3.systemHeader{}
  .adminServer {margin-top:10px}
  .adminClusterProperties { float:left; margin:10px 0;}
  .overviewTbl { overflow:auto; width:222px;}
+ .adminLeft { float:none; width:100%}
 ul.adminClusterList { width:250px;}/*admin*/
-ul.adminClusterList li { margin:0; padding:0; float:left; width:61px; height:100%; line-height:75px;}/*admin*/
-
+ul.adminClusterList li { margin:0; padding-top:15px; float:left; width:67px; height:100%; line-height:75px;}/*admin*/
+#serverConfigAdmin{ top:214px;}	
 	 }
 
 @media (width: 320px) {
 
  input.icon-search { width:182px;}
- #serverConfigAdmin{ top:182px;}	
+ 
   input.icoSS { width:135px!important;}
+  
  
  }
 @media screen and (orientation:landscape) {
