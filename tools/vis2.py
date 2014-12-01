@@ -35,7 +35,7 @@ def get_stats(hostname, port, days):
     """
 
     conn = FastSerializer(hostname, port)
-    proc = VoltProcedure(conn, 'CenterAverageOfPeriod',
+    proc = VoltProcedure(conn, 'AverageOfPeriod',
                          [FastSerializer.VOLTTYPE_SMALLINT])
     resp = proc.call([days])
     conn.close()
@@ -137,7 +137,7 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
             pl.plot(u[0], u[1], mc[b][0], mc[b][1], b, '-')
 
             ma = [None]
-            if len(u[0]) >= 10:
+            if b == 'master' and len(u[0]) >= 10:
                 (ma,mstd) = moving_average(u[1], 10)
                 pl.plot(u[0], ma, mc[b][0], None, None, ":")
                 failed = 0
@@ -145,13 +145,13 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
                     polarity = 1
                     cv = np.nanmin(ma)
                     rp = (u[0][np.nanargmin(ma)], cv)
-                    if ma[-1] > cv * 1.05:
+                    if b == 'master' and ma[-1] > cv * 1.05:
                         failed = 1
                 else:
                     polarity = -1
                     cv = np.nanmax(ma)
                     rp = (u[0][np.nanargmax(ma)], cv)
-                    if ma[-1] < cv * 0.95:
+                    if b == 'master' and ma[-1] < cv * 0.95:
                         failed = 1
 
                 twosigma = np.sum([np.convolve(mstd, polarity*2), ma], axis=0)
