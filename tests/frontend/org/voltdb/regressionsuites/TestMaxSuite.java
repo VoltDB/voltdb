@@ -41,6 +41,28 @@ public class TestMaxSuite extends RegressionSuite {
         super(name);
     }
 
+    public void testSQLText() throws Exception {
+        Client client = this.getClient();
+        int maxInForSQLTextTest = PARAMETERS_MAX_IN * 2;
+
+        StringBuilder stringBuilder = new StringBuilder(
+                "select * from max_in_table where column0 in(");
+        for (int i = 0; i < maxInForSQLTextTest; i++) {
+            stringBuilder.append(i);
+            if (i != maxInForSQLTextTest - 1) {
+                stringBuilder.append(",");
+            }
+        }
+        stringBuilder.append(") order by column0;");
+
+        try {
+            client.callProcedure("@AdHoc", stringBuilder.toString());
+            fail();
+        } catch(Exception ex) {
+            assertTrue(ex.getMessage().contains("SQL text exceeds the length limitation 32767"));
+        }
+    }
+
     public void testMaxIn() throws Exception {
         final Client client = this.getClient();
 

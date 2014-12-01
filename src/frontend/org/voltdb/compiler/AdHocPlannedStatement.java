@@ -127,6 +127,10 @@ public class AdHocPlannedStatement {
 
         // sql bytes
         short sqlLength = buf.getShort();
+        if (sqlLength < 0) {
+            throw new RuntimeException("SQL text exceeds the length limitation " + Short.MAX_VALUE);
+        }
+
         byte[] sql = new byte[sqlLength];
         buf.get(sql);
 
