@@ -88,27 +88,8 @@
 
         //write blocks and function calls that are to be executed during load operation
         $(document).ready(function () {
-            //site per host
-            $("#partitionDetectionIcon").on("click", function () {
-                voltDbRenderer.editConfigurationItem("OVERVIEW", "DEPLOYMENT", true, function () {
-                    toggleConfigurationItemState($("#partitionDetectionIcon"), $("#partitionDetectionStateLabel"));
-                    
-                });
-
-            });
-
-            var toggleConfigurationItemState = function (id,displayLabel) {
-                if (id.attr('class') == 'onIcon') {
-                    id.removeClass('onIcon');
-                    id.addClass('offIcon');
-                    displayLabel.text("Off");
-
-                } else if (id.attr('class') == 'offIcon') {
-                    id.removeClass('offIcon');
-                    id.addClass('onIcon');
-                    displayLabel.text("On");
-                }
-            };
+            //site per host           
+            
 
         });
         return new adminOverviewFunctions(options);
