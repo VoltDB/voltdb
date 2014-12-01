@@ -573,9 +573,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         p = pns.get(0).getChild(0);
         /*/ to debug */ System.out.println("DEBUG: " + p.toExplainPlanString());
         assertTrue(p instanceof OrderByPlanNode);
-        //assertTrue(p.getChild(0) instanceof LimitPlanNode);
-        assertTrue(p.getChild(0) instanceof ProjectionPlanNode);
-        p = p.getChild(0).getChild(0);
+        p = p.getChild(0);
         assertTrue(p instanceof IndexScanPlanNode);
         assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
     }
@@ -584,12 +582,15 @@ public class TestPlansGroupBy extends PlannerTestCase {
         assertTrue(pns.size() > 0);
         boolean isDistributed = pns.size() > 1 ? true: false;
 
-        for ( AbstractPlanNode nd : pns) {
-            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
-        }
-
         AbstractPlanNode p = pns.get(0).getChild(0);
+        if (p instanceof LimitPlanNode) {
+            p = p.getChild(0);
+        }
+        if (p instanceof OrderByPlanNode) {
+            p = p.getChild(0);
+        }
         assertTrue(p instanceof ProjectionPlanNode);
+
         while ( p.getChildCount() > 0) {
             p = p.getChild(0);
             assertFalse(p instanceof ProjectionPlanNode);
@@ -607,9 +608,9 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         // Test limit is not pushed down
         AbstractPlanNode p = pns.get(0).getChild(0);
-        assertTrue(p instanceof ProjectionPlanNode);
-        assertTrue(p.getChild(0) instanceof OrderByPlanNode);
-        assertNotNull(p.getChild(0).getInlinePlanNode(PlanNodeType.LIMIT));
+        assertTrue(p instanceof OrderByPlanNode);
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.LIMIT));
+        assertTrue(p.getChild(0) instanceof ProjectionPlanNode);
         assertTrue(p.getChild(0).getChild(0) instanceof AggregatePlanNode);
 
         p = pns.get(1).getChild(0);

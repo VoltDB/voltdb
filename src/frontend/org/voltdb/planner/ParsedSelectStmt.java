@@ -1437,6 +1437,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return false;
     }
 
+
+    /**
+     * Order by Columns or expressions has to operate on the display columns or expressions.
+     * @return
+     */
     private boolean orderByColumnsCoverUniqueKeys()
     {
         // In theory, if EVERY table in the query has a uniqueness constraint
@@ -1446,7 +1451,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // so this check is plan-independent.
         HashMap<String, List<AbstractExpression> > baseTableAliases =
                 new HashMap<String, List<AbstractExpression> >();
-        for (ParsedColInfo col : m_orderColumns) {
+
+        for (ParsedColInfo col : m_displayColumns) {
+            if (col.orderBy == false) {
+                continue;
+            }
+
             AbstractExpression expr = col.expression;
             List<AbstractExpression> baseTVEs = expr.findBaseTVEs();
             if (baseTVEs.size() != 1) {
@@ -1454,6 +1464,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 // Neither are (nonsense) constant (table-less) expressions.
                 continue;
             }
+
             // This loops exactly once.
             AbstractExpression baseTVE = baseTVEs.get(0);
             String nextTableAlias = ((TupleValueExpression)baseTVE).getTableAlias();
@@ -1469,8 +1480,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         if (m_tableAliasMap.size() > baseTableAliases.size()) {
             // FIXME: This would be one of the tricky cases where the goal would be to prove that the
             // row with no ORDER BY component came from the right side of a 1-to-1 or many-to-1 join.
+            // like Unique Index nested loop join, etc.
             return false;
         }
+
         boolean allScansAreDeterministic = true;
         for (Entry<String, List<AbstractExpression>> orderedAlias : baseTableAliases.entrySet()) {
             List<AbstractExpression> orderedAliasExprs = orderedAlias.getValue();
@@ -1523,7 +1536,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 }
 
                 // If the sort covers the index, then it's a unique sort.
-                //TODO: The statement's equivalence sets would be handy here to recognize cases like
+                // TODO: The statement's equivalence sets would be handy here to recognize cases like
                 //    WHERE B.unique_id = A.b_id
                 //    ORDER BY A.unique_id, A.b_id
                 if (orderedAliasExprs.containsAll(indexExpressions)) {
