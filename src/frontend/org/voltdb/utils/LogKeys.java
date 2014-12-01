@@ -65,7 +65,6 @@ public enum LogKeys {
     auth_ClientInterface_LackingPermissionForSysproc,
     auth_ClientInterface_LackingPermissionForDefaultproc,
     auth_AuthSystem_NoSuchAlgorithm,
-    auth_AuthSystem_AuthenticatedUser,
     auth_AuthSystem_NoSuchUser,
     auth_AuthSystem_AuthFailedPasswordMistmatch,
 

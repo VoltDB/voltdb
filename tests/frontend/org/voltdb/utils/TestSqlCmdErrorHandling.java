@@ -78,6 +78,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(simpleSchema);
+        builder.setUseDDLSchema(false);
         String catalogPath = Configuration.getPathToCatalogForTest("sqlcmderror.jar");
         assertTrue(builder.compile(catalogPath, 1, 1, 0));
 

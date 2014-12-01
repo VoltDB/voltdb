@@ -2,6 +2,9 @@
 
 APPNAME="windowing"
 
+#set -o nounset #exit if an unset variable is used
+set -o errexit #exit on any single command fail
+
 # find voltdb binaries in either installation or distribution directory.
 if [ -n "$(which voltdb 2> /dev/null)" ]; then
     VOLTDB_BIN=$(dirname "$(which voltdb)")
@@ -43,9 +46,8 @@ HOST="localhost"
 
 # remove build artifacts
 function clean() {
-    rm -rf debugoutput log $APPNAME.jar voltdbroot \
-           procedures/windowing/*.class \
-           client/windowing/*.class
+	rm -rf procedures/windowing/*.class client/windowing/*.class debugoutput \
+		   $APPNAME-procs.jar voltdbroot log catalog-report.html statement-plans
 }
 
 # compile the source code for procedures and the client
@@ -53,34 +55,24 @@ function srccompile() {
     javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH \
         procedures/windowing/*.java \
         client/windowing/*.java
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
-}
-
-# build an application catalog
-function catalog() {
-    srccompile
-    echo "Compiling the voter application catalog."
-    echo "To perform this action manually, use the command line: "
-    echo
-    echo "voltdb compile -o $APPNAME.jar ddl.sql"
-    echo
-    $VOLTDB compile -o $APPNAME.jar ddl.sql
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
+    jar cf $APPNAME-procs.jar -C procedures windowing
 }
 
 # run the voltdb server locally
 function server() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
     echo "Starting the VoltDB server."
     echo "To perform this action manually, use the command line: "
     echo
-    echo "$VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar"
+    echo "$VOLTDB create -d deployment.xml -l $LICENSE -H $HOST"
     echo
-    $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
+    $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST
+}
+
+# load schema and procedures
+function init() {
+    srccompile
+	$VOLTDB_BIN/sqlcmd < ddl.sql
 }
 
 # Use this target for argument help
@@ -127,7 +119,7 @@ function client() {
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|catalog|server|client|client-help}"
+    echo "Usage: ./run.sh {clean|server|init|client|client-help}"
 }
 
 # Run the target passed as the first arg on the command line
