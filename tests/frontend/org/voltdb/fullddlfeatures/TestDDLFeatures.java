@@ -342,4 +342,205 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         vt.advanceToRow(0);
         assertEquals(vt.get(0, VoltType.BIGINT), 1l);
     }
+    
+    @Test
+    public void testDropView() throws Exception
+    {
+        assertFalse(findTableInSystemCatalogResults("VT000"));
+        assertFalse(findTableInSystemCatalogResults("VT30A"));
+        assertFalse(findTableInSystemCatalogResults("VT30B"));
+    }
+
+    @Test
+    public void testDropIndex() throws Exception
+    {
+        assertFalse(findTableInSystemCatalogResults("abs_T31A_idx"));
+        assertFalse(findIndexInSystemCatalogResults("abs_T000_idx"));
+    }
+    
+    @Test
+    public void testDropProcedure() throws Exception
+    {
+        assertFalse(findProcedureInSystemCatalog("T32A"));
+        assertFalse(findProcedureInSystemCatalog("T32B"));
+    }
+    
+    @Test
+    public void testDropTable() throws Exception
+    {
+        assertFalse(findIndexInSystemCatalogResults("T33"));
+        assertFalse(findIndexInSystemCatalogResults("T34"));
+        assertFalse(findTableInSystemCatalogResults("VT34A"));
+        assertFalse(findIndexInSystemCatalogResults("abs_T34A_idx"));
+    }
+    
+    @Test
+    public void testAlterTableDropConstraint() throws Exception {
+        ClientResponse resp;
+        boolean threw;
+        VoltTable vt;
+
+        // Test for T35
+        assertTrue(findTableInSystemCatalogResults("T35"));
+        resp = m_client.callProcedure("T35.insert", 1, 2);
+        assertEquals(resp.getResults()[0].getRowCount(), 1);
+
+        threw = false;
+        try {
+            m_client.callProcedure("T35.insert", 1, 3);
+        } catch (ProcCallException pce) {
+            threw = true;
+        }
+        assertFalse("Shouldn't violate PRIMARY KEY constraint", threw);
+
+        threw = false;
+        try {
+            m_client.callProcedure("T35.insert", 2, 2);
+        } catch (ProcCallException pce) {
+            threw = true;
+        }
+        assertTrue("Shouldn't violate UNIQUE constraint", threw);
+        assertEquals(indexedColumnCount("T35"), 1);
+        
+        // Test for T35A
+        assertTrue(findTableInSystemCatalogResults("T35A"));
+        resp = m_client.callProcedure("T35A.insert", 1);
+        assertEquals(resp.getResults()[0].getRowCount(), 1);
+
+        threw = false;
+        try {
+            m_client.callProcedure("T35A.insert", 1);
+        } catch (ProcCallException pce) {
+            threw = true;
+        }
+        assertFalse("Shouldn't violate LIMIT PARTITION ROWS constraint", threw);
+        assertEquals(indexedColumnCount("T35A"), 0);
+        
+        // Test for T36
+        assertTrue(findTableInSystemCatalogResults("T36"));
+        resp = m_client.callProcedure("T36.insert", 1);
+        assertEquals(resp.getResults()[0].getRowCount(), 1);
+
+        threw = false;
+        try {
+            m_client.callProcedure("T36.insert", 1);
+        } catch (ProcCallException pce) {
+            threw = true;
+        }
+        assertFalse("Shouldn't violate PRIMARY KEY constraint", threw);
+        assertEquals(indexedColumnCount("T36"), 0);
+        
+        // Test for T37
+        assertTrue(findTableInSystemCatalogResults("T37"));
+        resp = m_client.callProcedure("T37.insert", 1);
+        assertEquals(resp.getResults()[0].getRowCount(), 1);
+
+        threw = false;
+        try {
+            m_client.callProcedure("T37.insert", 1);
+        } catch (ProcCallException pce) {
+            threw = true;
+        }
+        assertFalse("Shouldn't violate UNIQUE constraint", threw);
+        assertEquals(indexedColumnCount("T37"), 0);
+
+        // Test for T38
+        assertTrue(findTableInSystemCatalogResults("T38"));
+        resp = m_client.callProcedure("T38.insert", 1);
+        assertEquals(resp.getResults()[0].getRowCount(), 1);
+
+        threw = false;
+        try {
+            m_client.callProcedure("T38.insert", 1);
+        } catch (ProcCallException pce) {
+            threw = true;
+        }
+        assertFalse("Shouldn't violate UNIQUE constraint", threw);
+        assertEquals(indexedColumnCount("T38"), 0);
+
+        // Test for T39
+        assertTrue(findTableInSystemCatalogResults("T39"));
+        resp = m_client.callProcedure("T39.insert", 1);
+        assertEquals(resp.getResults()[0].getRowCount(), 1);
+
+        threw = false;
+        try {
+            m_client.callProcedure("T39.insert", 2);
+        } catch (ProcCallException pce) {
+            pce.printStackTrace();
+            threw = true;
+        }
+        assertFalse("Shouldn't violate LIMIT PARTITION ROW constraint", threw);
+        assertEquals(indexedColumnCount("T39"), 0);
+    }
+    
+    @Test
+    public void testAlterTableAddConstraint() throws Exception {
+        ClientResponse resp;
+        boolean threw;
+        VoltTable vt;
+
+        // Test for T40
+        assertTrue(findTableInSystemCatalogResults("T40"));
+        resp = m_client.callProcedure("T40.insert", 1, 2);
+        assertEquals(resp.getResults()[0].getRowCount(), 1);
+
+        threw = false;
+        try {
+            m_client.callProcedure("T40.insert", 1, 2);
+        } catch (ProcCallException pce) {
+            threw = true;
+        }
+        assertTrue("Shouldn't violate UNIQUE constraint", threw);
+//        assertEquals(indexedColumnCount("T40"), 1); //2
+
+        
+        // Test for T41
+        assertTrue(findTableInSystemCatalogResults("T41"));
+        resp = m_client.callProcedure("T41.insert", 1, 2);
+        assertEquals(resp.getResults()[0].getRowCount(), 1);
+
+        threw = false;
+        try {
+            m_client.callProcedure("T41.insert", 1, 3);
+        } catch (ProcCallException pce) {
+            threw = true;
+        }
+        assertTrue("Shouldn't violate PRIMARY KEY constraint", threw);
+//        assertEquals(indexedColumnCount("T41"), 1);
+        
+        // Test for T42
+		assertTrue(findTableInSystemCatalogResults("T42"));
+		resp = m_client.callProcedure("T42.insert", 1, 2);
+		assertEquals(resp.getResults()[0].getRowCount(), 1);
+		
+		threw = false;
+		try {
+		    m_client.callProcedure("T42.insert", 1, 2);
+		} catch (ProcCallException pce) {
+		    threw = true;
+		}
+		assertTrue("Shouldn't violate ASSUMEUNIQUE constraint", threw);
+//        assertEquals(indexedColumnCount("T42"), 1); //2
+       
+
+
+
+        // Test for T43
+		assertTrue(findTableInSystemCatalogResults("T43"));
+		resp = m_client.callProcedure("T43.insert", 1);
+		assertEquals(resp.getResults()[0].getRowCount(), 1);
+		
+		threw = false;
+		try {
+		    m_client.callProcedure("T43.insert", 2);
+		} catch (ProcCallException pce) {
+		    threw = true;
+		}
+		assertTrue("Shouldn't violate LIMIT PARTITION ROW constraint", threw);
+        assertEquals(indexedColumnCount("T43"), 0);
+
+    }
+    
+    
 }
