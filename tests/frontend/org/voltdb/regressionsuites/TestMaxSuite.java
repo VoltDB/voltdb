@@ -34,7 +34,9 @@ import org.voltdb.compiler.VoltProjectBuilder;
 public class TestMaxSuite extends RegressionSuite {
 
     static final Class<?>[] PROCEDURES = {};
-
+    private static int PARAMETERS_MAX_JOIN = 100;
+    private static int PARAMETERS_MAX_COLUMN = 1024;
+    private static int PARAMETERS_MAX_IN = 6000;
     public TestMaxSuite(String name) {
         super(name);
     }
@@ -50,9 +52,9 @@ public class TestMaxSuite extends RegressionSuite {
 
         StringBuilder stringBuilder = new StringBuilder(
                 "select * from max_in_table where column0 in(");
-        for (int i = 0; i < 6000; i++) {
+        for (int i = 0; i < PARAMETERS_MAX_IN; i++) {
             stringBuilder.append(i);
-            if (i != 5999) {
+            if (i != PARAMETERS_MAX_IN - 1) {
                 stringBuilder.append(",");
             }
         }
@@ -75,10 +77,11 @@ public class TestMaxSuite extends RegressionSuite {
 
         ClientResponse resp = null;
 
-        StringBuilder sb = new StringBuilder("insert into max_column_table values(");
-        for (int i = 0; i < 1000; i++) {
+        StringBuilder sb = new StringBuilder(
+                "insert into max_column_table values(");
+        for (int i = 0; i < PARAMETERS_MAX_COLUMN; i++) {
             sb.append(i);
-            if (i != 999) {
+            if (i != PARAMETERS_MAX_COLUMN - 1) {
                 sb.append(",");
             }
         }
@@ -86,10 +89,10 @@ public class TestMaxSuite extends RegressionSuite {
         resp = client.callProcedure("@AdHoc", sb.toString());
 
         sb = new StringBuilder("select  ");
-        for (int i = 0; i < 1000; i++) {
+        for (int i = 0; i < PARAMETERS_MAX_COLUMN; i++) {
             sb.append("column");
             sb.append(i);
-            if (i != 999) {
+            if (i != PARAMETERS_MAX_COLUMN - 1) {
                 sb.append(",");
             }
         }
@@ -101,7 +104,7 @@ public class TestMaxSuite extends RegressionSuite {
         VoltTable results = resp.getResults()[0];
 
         assertEquals(1, results.getRowCount());
-        assertEquals(1000, results.getColumnCount());
+        assertEquals(PARAMETERS_MAX_COLUMN, results.getColumnCount());
         assertEquals(0, results.fetchRow(0).getLong(0));
     }
 
@@ -111,16 +114,16 @@ public class TestMaxSuite extends RegressionSuite {
         ClientResponse resp = null;
 
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < 100; i++) {
+        for (int i = 0; i < PARAMETERS_MAX_JOIN; i++) {
             resp = client.callProcedure("MAX_JOIN_TABLE" + i + ".insert", 1, 1);
             assertEquals(ClientResponse.SUCCESS, resp.getStatus());
         }
 
         sb = new StringBuilder("select * from ");
-        for (int i = 0; i < 100; i++) {
+        for (int i = 0; i < PARAMETERS_MAX_JOIN; i++) {
             sb.append("max_join_table");
             sb.append(i);
-            if (i != 99) {
+            if (i != PARAMETERS_MAX_JOIN - 1) {
                 sb.append(",");
             }
         }
@@ -132,7 +135,7 @@ public class TestMaxSuite extends RegressionSuite {
         VoltTable results = resp.getResults()[0];
 
         assertEquals(1, results.getRowCount());
-        assertEquals(200, results.getColumnCount());
+        assertEquals(PARAMETERS_MAX_JOIN * 2, results.getColumnCount());
         assertEquals(1, results.fetchRow(0).getLong(0));
     }
 
@@ -147,7 +150,7 @@ public class TestMaxSuite extends RegressionSuite {
             /** for max column */
             StringBuilder sb = new StringBuilder(
                     "CREATE TABLE max_column_table(");
-            for (int i = 0; i < 1000; i++) {
+            for (int i = 0; i < PARAMETERS_MAX_COLUMN; i++) {
                 sb.append("column");
                 sb.append(i);
                 sb.append(" INTEGER NOT NULL,");
@@ -158,7 +161,7 @@ public class TestMaxSuite extends RegressionSuite {
 
             /** for max join */
             sb = new StringBuilder();
-            for (int i = 0; i < 100; i++) {
+            for (int i = 0; i < PARAMETERS_MAX_JOIN; i++) {
                 sb.append("create table max_join_table");
                 sb.append(i);
                 sb.append("(column0 INTEGER NOT NULL, column1 INTEGER NOT NULL, PRIMARY KEY (column0));");
