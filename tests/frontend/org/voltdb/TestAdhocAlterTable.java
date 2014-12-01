@@ -892,4 +892,60 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             teardownSystem();
         }
     }
+
+    public void testAddNotNullColumnToNonEmptyTable() throws Exception
+    {
+        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(
+                "create table FOO (" +
+                "ID integer not null," +
+                "VAL bigint, " +
+                "constraint pk_tree primary key (ID)" +
+                ");\n"
+                );
+        builder.addPartitionInfo("FOO", "ID");
+        builder.setUseDDLSchema(true);
+        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
+        assertTrue("Schema compilation failed", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = pathToCatalog;
+        config.m_pathToDeployment = pathToDeployment;
+
+        try {
+            startSystem(config);
+
+            // Adding NOT NULL column without a default fails for a non-empty table.
+            m_client.callProcedure("FOO.insert", 0, 0);
+            boolean threw = false;
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "alter table FOO add column NEWCOL varchar(50) not null;");
+            }
+            catch (ProcCallException pce) {
+                assertTrue("Expected \"is not empty\" error.", pce.getMessage().contains("is not empty"));
+                threw = true;
+            }
+            assertTrue(threw);
+
+            // Adding NOT NULL column with a default succeeds for a non-empty table.
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "alter table FOO add column NEWCOL varchar(50) default 'default' not null;");
+            }
+            catch (ProcCallException pce) {
+                fail("Should be able to add NOT NULL column with default to a non-empty table.");
+            }
+            assertTrue(verifyTableColumnType("FOO", "NEWCOL", "VARCHAR"));
+            assertTrue(verifyTableColumnSize("FOO", "NEWCOL", 50));
+            assertFalse(isColumnNullable("FOO", "NEWCOL"));
+        }
+        finally {
+            teardownSystem();
+        }
+    }
 }
