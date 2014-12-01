@@ -431,7 +431,7 @@ function alertNodeClicked(obj) {
 
             var html =
                 '<li class="activeIcon">Active <span id="activeCount">(' + activeCount + ')</span></li>' +
-                    '<li class="joiningIcon">Joining <span id="joiningCount">(' + joiningCount + ')</span></li>' +
+                    '<!--<li class="joiningIcon">Joining <span id="joiningCount">(' + joiningCount + ')</span></li>-->' +
                     '<li class="missingIcon">Missing <span id="missingCount">(' + missingCount + ')</span></li>';
 
             var alertHtml = "";

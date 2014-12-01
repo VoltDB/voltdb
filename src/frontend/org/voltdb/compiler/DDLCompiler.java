@@ -24,6 +24,8 @@ import java.io.Reader;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -54,6 +56,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Group;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.MaterializedViewInfo;
+import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Permission;
 import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
@@ -278,6 +281,7 @@ public class DDLCompiler {
             "PROCEDURE" +                           // PROCEDURE token
             "\\s+" +                                // one or more spaces
             "([\\w$.]+)" +                          // (1) class name or procedure name
+            "(\\s+IF EXISTS)?" +                    // (2) <optional IF EXISTS>
             "\\s*" +                                // zero or more spaces
             ";" +                                   // semi-colon terminator
             "\\z"                                   // end of statement
@@ -309,6 +313,19 @@ public class DDLCompiler {
             "(?:\\s+WITH\\s+" +                 // (start optional WITH clause block)
                 "(\\w+(?:\\s*,\\s*\\w+)*)" +    //   (2) <comma-separated argument string>
             ")?" +                              // (end optional WITH clause block)
+            ";\\z"                              // (end statement)
+            );
+
+    /**
+     * Regex to parse the DROP ROLE statement.
+     * Capture group is tagged as (1) in comments below.
+     */
+    static final Pattern dropRolePattern = Pattern.compile(
+            "(?i)" +                            // (ignore case)
+            "\\A" +                             // (start statement)
+            "DROP\\s+ROLE\\s+" +                // DROP ROLE
+            "([\\w.$]+)" +                      // (1) <role name>
+            "(\\s+IF EXISTS)?" +                // (2) <optional IF EXISTS>
             ";\\z"                              // (end statement)
             );
 
@@ -436,6 +453,10 @@ public class DDLCompiler {
     // There's specifically no cleanup here because I don't think
     // any is needed.
     Map<String, String> m_tableNameToDDL = new TreeMap<String, String>();
+
+    /** A cache of the XML used to do validation on LIMIT DELETE statements
+     * Preserved here to avoid having to re-parse for planning */
+    private final Map<Statement, VoltXMLElement> m_limitDeleteStmtToXml = new HashMap<>();
 
     // Resolve classes using a custom loader. Needed for catalog version upgrade.
     final ClassLoader m_classLoader;
@@ -807,7 +828,8 @@ public class DDLCompiler {
         statementMatcher = procedureDropPattern.matcher(statement);
         if (statementMatcher.matches()) {
             String classOrProcName = checkIdentifierStart(statementMatcher.group(1), statement);
-            m_tracker.removeProcedure(classOrProcName);
+            // Extract the ifExists bool from group 2
+            m_tracker.removeProcedure(classOrProcName, (statementMatcher.group(2) != null));
 
             return true;
         }
@@ -964,6 +986,39 @@ public class DDLCompiler {
                             statement.substring(0,statement.length()-1), // remove trailing semicolon
                             Permission.toListString()));
                 }
+            }
+            return true;
+        }
+
+        // matches if it is DROP ROLE
+        // group 1 is role name
+        statementMatcher = dropRolePattern.matcher(statement);
+        if (statementMatcher.matches()) {
+            String roleName = statementMatcher.group(1).toUpperCase();
+            boolean ifExists = (statementMatcher.group(2) != null);
+            CatalogMap<Group> groupMap = db.getGroups();
+            if (groupMap.get(roleName) == null) {
+                if (!ifExists) {
+                    throw m_compiler.new VoltCompilerException(String.format(
+                                "Role name \"%s\" in DROP ROLE statement does not exist.",
+                                roleName));
+                }
+                else {
+                    return true;
+                }
+            }
+            else {
+                // Hand-check against the two default roles which shall not be
+                // dropped.
+                if (roleName.equals("ADMINISTRATOR") || roleName.equals("USER")) {
+                    throw m_compiler.new VoltCompilerException(String.format(
+                                "You may not drop the built-in role \"%s\".",
+                                roleName));
+                }
+                // The constraint that there be no users with this role gets
+                // checked by the deployment validation.  *HOWEVER*, right now
+                // this ends up giving a confusing error message.
+                groupMap.delete(roleName);
             }
             return true;
         }
@@ -1879,10 +1934,49 @@ public class DDLCompiler {
         return stringer.toString();
     }
 
+    /** Makes sure that the DELETE statement on a LIMIT PARTITION ROWS EXECUTE (DELETE ...)
+     * - Contains no parse errors
+     * - Is actually a DELETE statement
+     * - Targets the table being constrained
+     * Throws VoltCompilerException if any of these does not hold
+     * @param catStmt     The catalog statement whose sql text field is the DELETE to be validated
+     **/
+    private void validateTupleLimitDeleteStmt(Statement catStmt) throws VoltCompilerException {
+        String tableName = catStmt.getParent().getTypeName();
+        String msgPrefix = "Error: Table " + tableName + " has invalid DELETE statement for LIMIT PARTITION ROWS constraint: ";
+        VoltXMLElement deleteXml = null;
+        try {
+            // We parse the statement here and cache the XML below if the statement passes
+            // validation.
+            deleteXml = m_hsql.getXMLCompiledStatement(catStmt.getSqltext());
+        }
+        catch (HSQLInterface.HSQLParseException e) {
+            throw m_compiler.new VoltCompilerException(msgPrefix + "parse error: " + e.getMessage());
+        }
+
+        if (! deleteXml.name.equals("delete")) {
+            // Could in theory allow TRUNCATE TABLE here too.
+            throw m_compiler.new VoltCompilerException(msgPrefix + "not a DELETE statement");
+        }
+
+        String deleteTarget = deleteXml.attributes.get("table");
+        if (! deleteTarget.equals(tableName)) {
+            throw m_compiler.new VoltCompilerException(msgPrefix + "target of DELETE must be " + tableName);
+        }
+
+        m_limitDeleteStmtToXml.put(catStmt, deleteXml);
+    }
+
+    /** Accessor */
+    public Collection<Map.Entry<Statement, VoltXMLElement>> getLimitDeleteStmtToXmlEntries() {
+        return Collections.unmodifiableCollection(m_limitDeleteStmtToXml.entrySet());
+    }
+
     /**
      * Add a constraint on a given table to the catalog
-     * @param table
-     * @param node
+     * @param table                The table on which the constraint will be enforced
+     * @param node                 The XML node representing the constraint
+     * @param indexReplacementMap
      * @throws VoltCompilerException
      */
     void addConstraintToCatalog(Table table, VoltXMLElement node, Map<String, String> indexReplacementMap)
@@ -1893,31 +1987,38 @@ public class DDLCompiler {
         String name = node.attributes.get("name");
         String typeName = node.attributes.get("constrainttype");
         ConstraintType type = ConstraintType.valueOf(typeName);
+        String tableName = table.getTypeName();
 
         if (type == ConstraintType.LIMIT) {
             int tupleLimit = Integer.parseInt(node.attributes.get("rowslimit"));
             if (tupleLimit < 0) {
                 throw m_compiler.new VoltCompilerException("Invalid constraint limit number '" + tupleLimit + "'");
             }
-            if (tableLimitConstraintCounter.contains(table.getTypeName())) {
-                throw m_compiler.new VoltCompilerException("Too many table limit constraints for table " + table.getTypeName());
+            if (tableLimitConstraintCounter.contains(tableName)) {
+                throw m_compiler.new VoltCompilerException("Too many table limit constraints for table " + tableName);
             } else {
-                tableLimitConstraintCounter.add(table.getTypeName());
+                tableLimitConstraintCounter.add(tableName);
             }
 
             table.setTuplelimit(tupleLimit);
+            String deleteStmt = node.attributes.get("rowslimitdeletestmt");
+            if (deleteStmt != null) {
+                Statement catStmt = table.getTuplelimitdeletestmt().add("limit_delete");
+                catStmt.setSqltext(deleteStmt);
+                validateTupleLimitDeleteStmt(catStmt);
+            }
             return;
         }
 
         if (type == ConstraintType.CHECK) {
             String msg = "VoltDB does not enforce check constraints. ";
-            msg += "Constraint on table " + table.getTypeName() + " will be ignored.";
+            msg += "Constraint on table " + tableName + " will be ignored.";
             m_compiler.addWarn(msg);
             return;
         }
         else if (type == ConstraintType.FOREIGN_KEY) {
             String msg = "VoltDB does not enforce foreign key references and constraints. ";
-            msg += "Constraint on table " + table.getTypeName() + " will be ignored.";
+            msg += "Constraint on table " + tableName + " will be ignored.";
             m_compiler.addWarn(msg);
             return;
         }

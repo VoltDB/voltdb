@@ -148,6 +148,10 @@ public class QueryPlanner {
         AbstractPlanNode.resetPlanNodeIds();
 
         // determine the type of the query
+        //
+        // (Hmmm...  seems like this pre-processing of the SQL text
+        // and subsequent placement of UPSERT_TAG should be pushed down
+        // into getXMLCompiledStatement)
         m_sql = m_sql.trim();
         String queryPrefix = m_sql.substring(0,6).toUpperCase();
         if (queryPrefix.startsWith("UPSERT")) {
@@ -168,6 +172,22 @@ public class QueryPlanner {
             assert(m_xmlSQL.name.equalsIgnoreCase("INSERT"));
             // for AdHoc cache distinguish purpose which is based on the XML
             m_xmlSQL.attributes.put(UPSERT_TAG, "true");
+        }
+
+        m_planSelector.outputCompiledStatement(m_xmlSQL);
+    }
+
+    /**
+     * This method behaves similarly to parse(), but allows the caller to pass in XML
+     * to avoid re-parsing SQL text that has already gone through HSQL.
+     *
+     * @param  xmlSql  XML produced by previous invocation of HSQL
+     * */
+    public void parseFromXml(VoltXMLElement xmlSQL) {
+        m_recentErrorMsg = null;
+        m_xmlSQL = xmlSQL;
+        if (m_xmlSQL.attributes.containsKey(UPSERT_TAG)) {
+            m_isUpsert = true;
         }
 
         m_planSelector.outputCompiledStatement(m_xmlSQL);

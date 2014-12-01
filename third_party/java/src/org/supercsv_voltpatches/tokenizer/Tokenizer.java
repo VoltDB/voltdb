@@ -126,7 +126,7 @@ public class Tokenizer extends AbstractTokenizer {
 	int quoteScopeStartingLine = -1; // the line number where a potential multi-line cell starts
 	int potentialSpaces = 0; // keep track of spaces (so leading/trailing space can be removed if required)
 	int charIndex = 0;
-	boolean espectQuote = false;
+	boolean espectQuote = this.strictQuotes;
 	boolean isEscape = false;
 	boolean sawNewLineInQuote = false;
 

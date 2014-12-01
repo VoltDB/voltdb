@@ -290,7 +290,11 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
             procInfoMap.put(procedureName, info);
         }
         info.processInvocation((int)TimeUnit.NANOSECONDS.toMillis(deltaNanos), status);
-        m_latencyInfo.recordValue(Math.max(1, Math.min(TimeUnit.NANOSECONDS.toMicros(deltaNanos), m_latencyInfo.getHighestTrackableValue())));
+        // ENG-7209 This is to not log the latency value for a snapshot restore, as this just creates
+        // a large initial value in the graph which is not actually relevant to the user.
+        if (!procedureName.equals("@SnapshotRestore")) {
+            m_latencyInfo.recordValue(Math.max(1, Math.min(TimeUnit.NANOSECONDS.toMicros(deltaNanos), m_latencyInfo.getHighestTrackableValue())));
+        }
         if (needToInsert) {
             m_connectionStates.put(connectionId, procInfoMap);
         }
