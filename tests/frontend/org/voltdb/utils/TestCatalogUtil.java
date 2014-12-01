@@ -208,18 +208,37 @@ public class TestCatalogUtil extends TestCase {
             "   <security enabled=\"false\"/>" +
             "</deployment>";
 
+        final String secOnWithNoAdmin =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+            "<deployment>" +
+            "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
+            "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
+            "   <security enabled=\"true\"/>" +
+            "   <users>" +
+            "      <user name=\"joe\" password=\"aaa\"/>" +
+            "   </users>" +
+            "</deployment>";
+
         final String secOn =
             "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
             "<deployment>" +
             "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
             "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
             "   <security enabled=\"true\"/>" +
+            "   <users>" +
+            "      <user name=\"joe\" password=\"aaa\" roles=\"administrator\"/>" +
+            "   </users>" +
             "</deployment>";
 
         final File tmpSecOff = VoltProjectBuilder.writeStringToTempFile(secOff);
         CatalogUtil.compileDeployment(catalog, tmpSecOff.getPath(), true, false);
         Cluster cluster =  catalog.getClusters().get("cluster");
         assertFalse(cluster.getSecurityenabled());
+
+        setUp();
+        final File tmpSecOnWithNoAdmin = VoltProjectBuilder.writeStringToTempFile(secOnWithNoAdmin);
+        long result = CatalogUtil.compileDeployment(catalog, tmpSecOnWithNoAdmin.getPath(), true, false);
+        assertEquals(-1, result);
 
         setUp();
         final File tmpSecOn = VoltProjectBuilder.writeStringToTempFile(secOn);
@@ -236,6 +255,9 @@ public class TestCatalogUtil extends TestCase {
             "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
             "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
             "   <security enabled=\"true\"/>" +
+            "   <users>" +
+            "      <user name=\"joe\" password=\"aaa\" roles=\"administrator\"/>" +
+            "   </users>" +
             "</deployment>";
 
         final String secOn =
@@ -244,6 +266,9 @@ public class TestCatalogUtil extends TestCase {
             "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
             "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
             "   <security enabled=\"true\" provider=\"kerberos\"/>" +
+            "   <users>" +
+            "      <user name=\"joe\" password=\"aaa\" roles=\"administrator\"/>" +
+            "   </users>" +
             "</deployment>";
 
         final File tmpSecOff = VoltProjectBuilder.writeStringToTempFile(secOff);
@@ -272,8 +297,9 @@ public class TestCatalogUtil extends TestCase {
             "<jsonapi enabled='true'/>" +
             "</httpd>" +
             "<users> " +
-            "<user name=\"joe\" password=\"aaa\" roles=\"lotre,lodue,louno\"/>" +
-            "<user name=\"jane\" password=\"bbb\" roles=\"launo,ladue,latre\"/>" +
+            "<user name=\"admin\" password=\"admin\" roles=\"administrator\"/>" +
+            "<user name=\"joe\" password=\"aaa\" roles=\"lotre,lodue,louno,dontexist\"/>" +
+            "<user name=\"jane\" password=\"bbb\" roles=\"launo,ladue,latre,dontexist\"/>" +
             "</users>" +
             "</deployment>";
 
@@ -295,6 +321,7 @@ public class TestCatalogUtil extends TestCase {
         assertNotNull(joe.getGroups().get("lodue"));
         assertNotNull(joe.getGroups().get("lotre"));
         assertNull(joe.getGroups().get("latre"));
+        assertNull(joe.getGroups().get("dontexist"));
 
         User jane = db.getUsers().get("jane");
         assertNotNull(jane);
@@ -302,6 +329,7 @@ public class TestCatalogUtil extends TestCase {
         assertNotNull(jane.getGroups().get("ladue"));
         assertNotNull(jane.getGroups().get("latre"));
         assertNull(jane.getGroups().get("lotre"));
+        assertNull(joe.getGroups().get("dontexist"));
     }
 
     public void testScrambledPasswords() throws Exception {
@@ -314,7 +342,7 @@ public class TestCatalogUtil extends TestCase {
             "<jsonapi enabled='true'/>" +
             "</httpd>" +
             "<users> " +
-            "<user name=\"joe\" password=\"1E4E888AC66F8DD41E00C5A7AC36A32A9950D271\" plaintext=\"false\" roles=\"louno\"/>" +
+            "<user name=\"joe\" password=\"1E4E888AC66F8DD41E00C5A7AC36A32A9950D271\" plaintext=\"false\" roles=\"louno,administrator\"/>" +
             "<user name=\"jane\" password=\"AAF4C61DDCC5E8A2DABEDE0F3B482CD9AEA9434D\" plaintext=\"false\" roles=\"launo\"/>" +
             "</users>" +
             "</deployment>";
@@ -757,25 +785,25 @@ public class TestCatalogUtil extends TestCase {
         final String adhocSchema =
             "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
             "<deployment>" +
-            "   <cluster hostcount='3' kfactor='1' sitesperhost='2' schema='adhoc'/>" +
+            "   <cluster hostcount='3' kfactor='1' sitesperhost='2' schema='ddl'/>" +
             "</deployment>";
 
         final File tmpDefSchema = VoltProjectBuilder.writeStringToTempFile(defSchema);
         CatalogUtil.compileDeployment(catalog, tmpDefSchema.getPath(), true, false);
         Cluster cluster =  catalog.getClusters().get("cluster");
-        assertFalse(cluster.getUseadhocschema());
+        assertTrue(cluster.getUseddlschema());
 
         setUp();
         final File tmpCatalogSchema = VoltProjectBuilder.writeStringToTempFile(catalogSchema);
         CatalogUtil.compileDeployment(catalog, tmpCatalogSchema.getPath(), true, false);
         cluster =  catalog.getClusters().get("cluster");
-        assertFalse(cluster.getUseadhocschema());
+        assertFalse(cluster.getUseddlschema());
 
         setUp();
         final File tmpAdhocSchema = VoltProjectBuilder.writeStringToTempFile(adhocSchema);
         CatalogUtil.compileDeployment(catalog, tmpAdhocSchema.getPath(), true, false);
         cluster =  catalog.getClusters().get("cluster");
-        assertTrue(cluster.getUseadhocschema());
+        assertTrue(cluster.getUseddlschema());
     }
 
     public void testProcedureReadWriteAccess() {

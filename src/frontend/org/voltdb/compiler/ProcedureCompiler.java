@@ -396,7 +396,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
             StatementPartitioning partitioning =
                 info.singlePartition ? StatementPartitioning.forceSP() :
                                        StatementPartitioning.forceMP();
-            StatementCompiler.compile(compiler, hsql, catalog, db,
+            StatementCompiler.compileFromSqlTextAndUpdateCatalog(compiler, hsql, catalog, db,
                     estimates, catalogStmt, stmt.getText(), stmt.getJoinOrder(),
                     detMode, partitioning);
 
@@ -680,7 +680,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
             info.singlePartition ? StatementPartitioning.forceSP() :
                                    StatementPartitioning.forceMP();
         // default to FASTER detmode because stmt procs can't feed read output into writes
-        StatementCompiler.compile(compiler, hsql, catalog, db,
+        StatementCompiler.compileFromSqlTextAndUpdateCatalog(compiler, hsql, catalog, db,
                 estimates, catalogStmt, procedureDescriptor.m_singleStmt,
                 procedureDescriptor.m_joinOrder, DeterminismMode.FASTER, partitioning);
 

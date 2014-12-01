@@ -2,6 +2,9 @@
 
 APPNAME="voltkv"
 
+#set -o nounset #exit if an unset variable is used
+set -o errexit #exit on any single command fail
+
 # find voltdb binaries in either installation or distribution directory.
 if [ -n "$(which voltdb 2> /dev/null)" ]; then
     VOLTDB_BIN=$(dirname "$(which voltdb)")
@@ -39,7 +42,8 @@ HOST="localhost"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar voltdbroot voltdbroot
+    rm -rf obj debugoutput $APPNAME-procs.jar voltdbroot log \
+    	catalog-report.html statement-plans
 }
 
 # compile the source code for procedures and the client
@@ -47,34 +51,22 @@ function srccompile() {
     mkdir -p obj
     javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH -d obj \
         src/voltkv/*.java
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
-}
-
-# build an application catalog
-function catalog() {
-    srccompile
-    echo "Compiling the voltkv application catalog."
-    echo "To perform this action manually, use the command line: "
-    echo
-    echo "voltdb compile --classpath obj -o $APPNAME.jar ddl.sql"
-    echo
-    $VOLTDB compile --classpath obj -o $APPNAME.jar ddl.sql
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
 }
 
 # run the voltdb server locally
 function server() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
-    # run the server
     echo "Starting the VoltDB server."
     echo "To perform this action manually, use the command line: "
     echo
-    echo "$VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar"
+    echo "$VOLTDB create -d deployment.xml -l $LICENSE -H $HOST"
     echo
-    $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
+    $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST
+}
+
+# load schema and procedures
+function init() {
+    srccompile
+	$VOLTDB_BIN/sqlcmd < ddl.sql
 }
 
 # run the client that drives the example
@@ -159,7 +151,7 @@ function jdbc-benchmark() {
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|catalog|server|async-benchmark|aysnc-benchmark-help|...}"
+    echo "Usage: ./run.sh {clean|server|init|client|async-benchmark|aysnc-benchmark-help|...}"
     echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark|jdbc-benchmark-help}"
 }
 

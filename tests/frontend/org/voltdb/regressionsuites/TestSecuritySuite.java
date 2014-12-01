@@ -110,15 +110,12 @@ public class TestSecuritySuite extends RegressionSuite {
         }
         assertTrue(exceptionThrown);
 
-        // user2 can run sysprocs due to his group
+        // user2 can run adhoc due to his group
         m_username = "user2";
         client = getClient();
         modCount = client.callProcedure("@AdHoc", "INSERT INTO NEW_ORDER VALUES (4, 4, 4);").getResults()[0];
         assertTrue(modCount.getRowCount() == 1);
         assertTrue(modCount.asScalarLong() == 1);
-        results = client.callProcedure("@Quiesce").getResults();
-        // one aggregate table returned
-        assertTrue(results.length == 1);
 
         // user3 can only run adhoc due to his group
         m_username = "user3";
@@ -222,6 +219,35 @@ public class TestSecuritySuite extends RegressionSuite {
             exceptionThrown = true;
         }
         assertTrue(exceptionThrown);
+
+        //"userWithAllProc" should be able to call any user procs but not RW sysprocs
+        m_username = "userWithAllProc";
+        client = getClient();
+        client.callProcedure("DoNothing1", 1);
+        client.callProcedure("DoNothing2", 1);
+        client.callProcedure("DoNothing3", 1);
+
+        //We should not be able to call RW sysproc
+        exceptionThrown = false;
+        try {
+            client.callProcedure("@Quiesce").getResults();
+        } catch (ProcCallException e) {
+            e.printStackTrace();
+            exceptionThrown = true;
+        }
+        assertTrue(exceptionThrown);
+
+        // users shouldn't gleam much info from a made up proc
+        exceptionThrown = false;
+        try {
+            client.callProcedure("RyanLikesTheYankees", 1);
+        } catch (ProcCallException e) {
+            assertFalse(e.getMessage().contains("lost before a response was received"));
+            e.printStackTrace();
+            exceptionThrown = true;
+        }
+        assertTrue(exceptionThrown);
+
     }
 
     // Tests permissions applied to auto-generated default CRUD procedures.
@@ -305,6 +331,51 @@ public class TestSecuritySuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, result);
     }
 
+    public void testAdmin() throws Exception {
+        m_username = "user4";
+        m_password = "password";
+        Client client = getClient();
+
+        // adhoc
+        VoltTable modCount = client.callProcedure("@AdHoc", "INSERT INTO NEW_ORDER VALUES (4, 4, 4);").getResults()[0];
+        assertTrue(modCount.getRowCount() == 1);
+        assertTrue(modCount.asScalarLong() == 1);
+
+        // sysproc
+        assertEquals(ClientResponse.SUCCESS, client.callProcedure("@Quiesce").getStatus());
+
+        // default proc
+        assertEquals(ClientResponse.SUCCESS, client.callProcedure("NEW_ORDER.insert", 100, 100, 100).getStatus());
+
+        // user proc
+        assertEquals(ClientResponse.SUCCESS, client.callProcedure("DoNothing3", 1).getStatus());
+    }
+
+    public void testDefaultUser() throws Exception
+    {
+        m_username = "userWithDefaultUserPerm";
+        m_password = "password";
+        Client client = getClient();
+
+        // adhoc
+        VoltTable modCount = client.callProcedure("@AdHoc", "INSERT INTO NEW_ORDER VALUES (4, 4, 4);").getResults()[0];
+        assertTrue(modCount.getRowCount() == 1);
+        assertTrue(modCount.asScalarLong() == 1);
+        // read-only adhoc
+        modCount = client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM NEW_ORDER;").getResults()[0];
+        assertTrue(modCount.getRowCount() == 1);
+        assertTrue(modCount.asScalarLong() == 1);
+
+        // user proc
+        assertEquals(ClientResponse.SUCCESS, client.callProcedure("DoNothing3", 1).getStatus());
+
+        // sysproc
+        try {
+            client.callProcedure("@Quiesce").getStatus();
+            fail("Should not allow RW sysproc");
+        } catch (ProcCallException e) {}
+    }
+
     /**
      * Build a list of the tests that will be run when TestSecuritySuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
@@ -330,27 +401,31 @@ public class TestSecuritySuite extends RegressionSuite {
         project.addProcedures(procedures);
 
         UserInfo users[] = new UserInfo[] {
-                new UserInfo("user1", "password", new String[] {"group1"}),
-                new UserInfo("user2", "password", new String[] {"group2"}),
-                new UserInfo("user3", "password", new String[] {"group3"}),
-                new UserInfo("user4", "password", new String[] {"group4"}),
+                new UserInfo("user1", "password", new String[] {"grouP1"}),
+                new UserInfo("user2", "password", new String[] {"grouP2"}),
+                new UserInfo("user3", "password", new String[] {"grouP3"}),
+                new UserInfo("user4", "password", new String[] {"AdMINISTRATOR"}),
+                new UserInfo("userWithDefaultUserPerm", "password", new String[] {"User"}),
+                new UserInfo("userWithAllProc", "password", new String[] {"GroupWithAllProcPerm"}),
                 new UserInfo("userWithDefaultProcPerm", "password", new String[] {"groupWithDefaultProcPerm"}),
-                new UserInfo("userWithoutDefaultProcPerm", "password", new String[] {"groupWithoutDefaultProcPerm"}),
-                new UserInfo("userWithDefaultProcReadPerm", "password", new String[] {"groupWithDefaultProcReadPerm"})
+                new UserInfo("userWithoutDefaultProcPerm", "password", new String[] {"groupWiThoutDefaultProcPerm"}),
+                new UserInfo("userWithDefaultProcReadPerm", "password", new String[] {"groupWiThDefaultProcReadPerm"})
         };
         project.addUsers(users);
 
         GroupInfo groups[] = new GroupInfo[] {
-                new GroupInfo("group1", false, false, false, false),
-                new GroupInfo("group2", false, true, true, false),
-                new GroupInfo("group3", true, false, false, false),
-                new GroupInfo("group4", true, true, true, false),
-                new GroupInfo("groupWithDefaultProcPerm", false, false, true, false),
-                new GroupInfo("groupWithoutDefaultProcPerm", false, false, false, false),
-                new GroupInfo("groupWithDefaultProcReadPerm", false, false, false, true)
+                new GroupInfo("Group1", false, false, false, false, false, false),
+                new GroupInfo("Group2", true, false, false, false, false, false),
+                new GroupInfo("Group3", true, false, false, false, false, false),
+                new GroupInfo("GroupWithDefaultUserPerm", true, false, false, false, false, true),
+                new GroupInfo("GroupWithAllProcPerm", false, false, false, false, false, true),
+                new GroupInfo("GroupWithDefaultProcPerm", false, false, false, true, false, false),
+                new GroupInfo("GroupWithoutDefaultProcPerm", false, false, false, false, false, false),
+                new GroupInfo("GroupWithDefaultProcReadPerm", false, false, false, false, true, false)
         };
         project.addGroups(groups);
-        project.setSecurityEnabled(true);
+        // suite defines its own ADMINISTRATOR user
+        project.setSecurityEnabled(true, false);
 
         // export disabled in community
         if (MiscUtils.isPro()) {

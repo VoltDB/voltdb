@@ -33,7 +33,7 @@ public class PermissionValidator {
 
     public PermissionValidator() {
         m_permissionpolicies.add(new InvocationSysprocPermissionPolicy());
-        m_permissionpolicies.add(new InvocationAdHocPermissionPolicy());
+        m_permissionpolicies.add(new InvocationSqlPermissionPolicy());
         m_permissionpolicies.add(new InvocationDefaultProcPermissionPolicy());
         m_permissionpolicies.add(new InvocationUserDefinedProcedurePermissionPolicy());
     }
@@ -43,26 +43,30 @@ public class PermissionValidator {
     public ClientResponseImpl shouldAccept(String name, AuthSystem.AuthUser user,
                                   final StoredProcedureInvocation task,
                                   final Procedure catProc) {
-        InvocationPermissionPolicy deniedPolicy = null;
-        InvocationPermissionPolicy.PolicyResult res = InvocationPermissionPolicy.PolicyResult.DENY;
-        for (InvocationPermissionPolicy policy : m_permissionpolicies) {
-            res = policy.shouldAccept(user, task, catProc);
-            if (res == InvocationPermissionPolicy.PolicyResult.ALLOW) {
-                deniedPolicy = null;
-                break;
-            }
-            if (res == InvocationPermissionPolicy.PolicyResult.DENY) {
-                if (deniedPolicy == null) {
-                    //Take first denied response only.
-                    deniedPolicy = policy;
+        if (user.isAuthEnabled()) {
+            InvocationPermissionPolicy deniedPolicy = null;
+            InvocationPermissionPolicy.PolicyResult res = InvocationPermissionPolicy.PolicyResult.DENY;
+            for (InvocationPermissionPolicy policy : m_permissionpolicies) {
+                res = policy.shouldAccept(user, task, catProc);
+                if (res == InvocationPermissionPolicy.PolicyResult.ALLOW) {
+                    deniedPolicy = null;
+                    break;
+                }
+                if (res == InvocationPermissionPolicy.PolicyResult.DENY) {
+                    if (deniedPolicy == null) {
+                        //Take first denied response only.
+                        deniedPolicy = policy;
+                    }
                 }
             }
+            if (deniedPolicy != null) {
+                return deniedPolicy.getErrorResponse(user, task, catProc);
+            }
+            //We must have an explicit allow on of the policy must grant access.
+            assert(res == InvocationPermissionPolicy.PolicyResult.ALLOW);
+            return null;
         }
-        if (deniedPolicy != null) {
-            return deniedPolicy.getErrorResponse(user, task, catProc);
-        }
-        //We must have an explicit allow on of the policy must grant access.
-        assert(res == InvocationPermissionPolicy.PolicyResult.ALLOW);
+        //User authentication is disabled. (auth disabled user)
         return null;
     }
 }

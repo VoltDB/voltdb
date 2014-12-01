@@ -62,7 +62,8 @@ import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import java.util.EnumSet;
-import org.voltdb.catalog.Group;
+import java.util.concurrent.TimeUnit;
+import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.common.Permission;
 
 
@@ -183,7 +184,7 @@ public class AuthSystem {
      * clear text password.
      *
      */
-    class AuthUser {
+    public static class AuthUser {
         /**
          * SHA-1 double hashed copy of the users clear text password
          */
@@ -203,6 +204,8 @@ public class AuthSystem {
          * Fast iterable list of groups this user is a member of.
          */
         private List<AuthGroup> m_groups = new ArrayList<AuthGroup>();
+
+        private EnumSet<Permission> m_permissions = EnumSet.noneOf(Permission.class);
 
         /**
          * Fast membership check set of stored procedures this user has permission to invoke.
@@ -244,7 +247,7 @@ public class AuthSystem {
             if (proc == null) {
                 return false;
             }
-            return m_authorizedProcedures.contains(proc);
+            return hasPermission(Permission.ALLPROC) || m_authorizedProcedures.contains(proc);
         }
 
         /**
@@ -253,10 +256,8 @@ public class AuthSystem {
          */
         public boolean hasPermission(Permission... perms) {
             for (int i = 0; i < perms.length;i++) {
-                for (AuthGroup group : m_groups) {
-                    if (group.m_permissions.contains(perms[i])) {
-                        return true;
-                    }
+                if (m_permissions.contains(perms[i])) {
+                    return true;
                 }
             }
             return false;
@@ -284,6 +285,10 @@ public class AuthSystem {
                 }
             }
             return false;
+        }
+
+        public boolean isAuthEnabled() {
+            return true;
         }
 
         private void finish() {
@@ -411,6 +416,9 @@ public class AuthSystem {
                 } else {
                     group = m_groups.get(catalogGroup.getTypeName());
                 }
+
+                user.m_permissions.addAll(group.m_permissions);
+
                 group.m_users.add(user);
                 user.m_groups.add(group);
             }
@@ -507,7 +515,7 @@ public class AuthSystem {
         }
 
         if (matched) {
-            authLogger.l7dlog(Level.INFO, LogKeys.auth_AuthSystem_AuthenticatedUser.name(), new Object[] {username}, null);
+            logAuthSuccess(username);
             return true;
         } else {
             authLogger.l7dlog(Level.INFO, LogKeys.auth_AuthSystem_AuthFailedPasswordMistmatch.name(), new String[] {username}, null);
@@ -515,7 +523,11 @@ public class AuthSystem {
         }
     }
 
-    private final AuthUser m_authDisabledUser = new AuthUser(null, null, null) {
+    public static class AuthDisabledUser extends AuthUser {
+        public AuthDisabledUser() {
+            super(null, null, null);
+        }
+
         @Override
         public boolean hasUserDefinedProcedurePermission(Procedure proc) {
             return true;
@@ -530,7 +542,15 @@ public class AuthSystem {
         public boolean authorizeConnector(String connectorName) {
             return true;
         }
-    };
+
+        @Override
+        public boolean isAuthEnabled() {
+            return false;
+        }
+
+    }
+
+    private final AuthUser m_authDisabledUser = new AuthDisabledUser();
 
     AuthUser getUser(String name) {
         if (!m_enabled) {
@@ -598,14 +618,22 @@ public class AuthSystem {
             }
 
             if (matched) {
-                authLogger.l7dlog(Level.INFO, LogKeys.auth_AuthSystem_AuthenticatedUser.name(), new Object[] {m_user}, null);
                 m_authenticatedUser = m_user;
+                logAuthSuccess(m_authenticatedUser);
                 return true;
             } else {
                 authLogger.l7dlog(Level.INFO, LogKeys.auth_AuthSystem_AuthFailedPasswordMistmatch.name(), new String[] {m_user}, null);
                 return false;
             }
         }
+    }
+
+    private static void logAuthSuccess(String user) {
+        //Make sure its logged per user
+        String format = "Authenticated user " + user + "%s";
+        RateLimitedLogger.tryLogForMessage(System.currentTimeMillis(), 60, TimeUnit.SECONDS,
+            authLogger, Level.INFO, format, ". This message is rate limited to once every 60 seconds.");
+
     }
 
     public class KerberosAuthenticationRequest extends AuthenticationRequest {
@@ -736,7 +764,7 @@ public class AuthSystem {
                     return false;
                 }
                 m_authenticatedUser = authenticatedUser;
-                authLogger.l7dlog(Level.INFO, LogKeys.auth_AuthSystem_AuthenticatedUser.name(), new Object[] {authenticatedUser}, null);
+                logAuthSuccess(m_authenticatedUser);
             }
 
             return true;

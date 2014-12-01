@@ -64,7 +64,7 @@ public class TestHttpPort extends TestCase {
             LocalCluster config = new LocalCluster(catalogJar, 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
 
             config.portGenerator.enablePortProvider();
-            config.portGenerator.pprovider.setAdmin(rport);
+            config.portGenerator.pprovider.setHttp(rport);
             config.setHasLocalServer(false);
             //We expect it to crash
             config.setExpectedToCrash(true);

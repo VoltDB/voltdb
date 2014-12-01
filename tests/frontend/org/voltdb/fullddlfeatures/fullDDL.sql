@@ -8,9 +8,9 @@ CREATE TABLE T1
 ,   volume INTEGER
 );
 
-CREATE UNIQUE INDEX area 
-ON 
-T1 
+CREATE UNIQUE INDEX area
+ON
+T1
 (
     width * length
 );
@@ -23,14 +23,14 @@ CREATE TABLE T2
 ,   volume INTEGER
 );
 
-PARTITION TABLE T2 
-ON 
-COLUMN 
+PARTITION TABLE T2
+ON
+COLUMN
     area
 ;
 
-CREATE ASSUMEUNIQUE INDEX absVal 
-ON 
+CREATE ASSUMEUNIQUE INDEX absVal
+ON
 T2
 (
     ABS(area * 2)
@@ -46,27 +46,27 @@ CREATE TABLE T3
 ,   id INTEGER
 );
 
-CREATE UNIQUE INDEX abs_Hash_idx 
-ON 
-T3 
+CREATE UNIQUE INDEX abs_Hash_idx
+ON
+T3
 (
     ABS(val)
 );
 
-CREATE UNIQUE INDEX nomeaninghashweirdidx 
-ON 
-T3 
+CREATE UNIQUE INDEX nomeaninghashweirdidx
+ON
+T3
 (
     ABS(id)
 );
 
 -- function in index definition
 
-CREATE INDEX strMatch 
-ON 
-T3 
+CREATE INDEX strMatch
+ON
+T3
 (
-    FIELD 
+    FIELD
     (
         str
     ,   'arbitrary'
@@ -80,13 +80,8 @@ T3
 
 CREATE ROLE guest;
 
-CREATE ROLE user 
-WITH 
-    adhoc
-,   defaultproc;
-
-CREATE ROLE admin 
-WITH 
+CREATE ROLE admin
+WITH
     sysproc
 ,   adhoc
 ,   defaultproc;
@@ -95,54 +90,52 @@ WITH
 -- CREATE PROCEDURE AS
 -- as sql stmt
 
-CREATE TABLE User 
+CREATE TABLE User
 (
     age INTEGER
 ,   name VARCHAR(20)
 );
 
-CREATE PROCEDURE p1 
-ALLOW 
+CREATE PROCEDURE p1
+ALLOW
     admin
-AS 
+AS
     SELECT COUNT(*)
-         , name 
-    FROM User 
+         , name
+    FROM User
     WHERE age = ?
-    GROUP BY name
-;
+    GROUP BY name;
 
-CREATE PROCEDURE p2 
-ALLOW 
+CREATE PROCEDURE p2
+ALLOW
     admin
-AS 
-    INSERT INTO User 
-    VALUES (?, ?)
-;
+AS
+    INSERT INTO User
+    VALUES (?, ?);
 
 -- as source code
 
-CREATE PROCEDURE p3 
-ALLOW 
-    admin 
-AS 
-    ###
-    stmt = new SQLStmt('SELECT age, name FROM User WHERE age = ?')
-    transactOn = { int key -> 
-                   voltQueueSQL(stmt,key)
-                   voltExecuteSQL(true)
-	             }
-    ### LANGUAGE GROOVY
-;
+--CREATE PROCEDURE p3
+--ALLOW
+--    admin
+--AS
+--    ###
+--    stmt = new SQLStmt('SELECT age, name FROM User WHERE age = ?')
+--    transactOn = { int key ->
+--                   voltQueueSQL(stmt,key)
+--                   voltExecuteSQL(true)
+--	             }
+--    ### LANGUAGE GROOVY
+--;
 
 
 -- CREATE PROCEDURE FROM CLASS
 -- basic
 
-CREATE PROCEDURE 
-ALLOW 
-    admin 
-FROM CLASS 
+CREATE PROCEDURE
+ALLOW
+    admin
+FROM CLASS
     org.voltdb_testprocs.fullddlfeatures.testCreateProcFromClassProc
 ;
 
@@ -150,7 +143,7 @@ FROM CLASS
 -- CREATE TABLE
 -- test all supported SQL datatypes
 
-CREATE TABLE T4 
+CREATE TABLE T4
 (
     C1 TINYINT DEFAULT 127 NOT NULL
 ,   C2 SMALLINT DEFAULT 32767 NOT NULL
@@ -162,7 +155,7 @@ CREATE TABLE T4
 ,   C8 VARBINARY(32) NOT NULL
 ,   C9 TIMESTAMP DEFAULT NOW NOT NULL
 ,   C10 TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-,   PRIMARY KEY 
+,   PRIMARY KEY
     (
         C1
     ,   C9
@@ -171,40 +164,40 @@ CREATE TABLE T4
 
 -- test maximum varchar size
 
-CREATE TABLE T5 
+CREATE TABLE T5
 (
     C VARCHAR(1048576 BYTES)
 );
 
-CREATE TABLE T6 
+CREATE TABLE T6
 (
     C VARCHAR(262144)
 );
 
 -- test maximum varbinary size
 
-CREATE TABLE T7 
+CREATE TABLE T7
 (
     C VARBINARY(1048576)
 );
 
 -- test maximum limit partition rows
 
-CREATE TABLE T8 
-(   
+CREATE TABLE T8
+(
     C INTEGER
 ,   LIMIT PARTITION ROWS 2147483647
 );
 
 -- column constraint
 
-CREATE TABLE T9 
-(   
+CREATE TABLE T9
+(
     C1 INTEGER PRIMARY KEY NOT NULL
 ,   C2 SMALLINT UNIQUE NOT NULL
 );
 
-CREATE TABLE T10 
+CREATE TABLE T10
 (
     C INTEGER DEFAULT 123 NOT NULL
 ,   CONSTRAINT con UNIQUE
@@ -213,7 +206,7 @@ CREATE TABLE T10
     )
 );
 
-CREATE TABLE T11 
+CREATE TABLE T11
 (
     C INTEGER DEFAULT 123 NOT NULL
 ,   CONSTRAINT pk1 PRIMARY KEY
@@ -222,8 +215,7 @@ CREATE TABLE T11
     )
 );
 
-PARTITION TABLE T12 ON COLUMN C1;
-CREATE TABLE T12 
+CREATE TABLE T12
 (
     C1 INTEGER NOT NULL
 ,   C2 INTEGER DEFAULT 123 NOT NULL
@@ -232,11 +224,12 @@ CREATE TABLE T12
         C2
     )
 );
+PARTITION TABLE T12 ON COLUMN C1;
 
 -- table constraints
 
-CREATE TABLE T13 
-(   
+CREATE TABLE T13
+(
     C INTEGER
 ,   CONSTRAINT pk2 PRIMARY KEY
     (
@@ -244,7 +237,7 @@ CREATE TABLE T13
     )
 );
 
-CREATE TABLE T14 
+CREATE TABLE T14
 (
     C INTEGER
 ,   CONSTRAINT uni1 UNIQUE
@@ -253,8 +246,7 @@ CREATE TABLE T14
     )
 );
 
-PARTITION TABLE T15 ON COLUMN C2;
-CREATE TABLE T15 
+CREATE TABLE T15
 (
     C INTEGER
 ,   C2 TINYINT NOT NULL
@@ -263,35 +255,35 @@ CREATE TABLE T15
         C
     )
 );
+PARTITION TABLE T15 ON COLUMN C2;
 
-CREATE TABLE T16 
-(   
+CREATE TABLE T16
+(
     C INTEGER
 ,   CONSTRAINT lpr1 LIMIT PARTITION ROWS 1
 );
 
 -- table constraint without keyword
 
-CREATE TABLE T17 
+CREATE TABLE T17
 (
     C INTEGER
 ,   PRIMARY KEY
-    (   
+    (
         C
     )
 );
 
-CREATE TABLE T18 
-(   
+CREATE TABLE T18
+(
     C INTEGER
 ,   UNIQUE
-    (   
+    (
         C
     )
 );
 
-PARTITION TABLE T19 ON COLUMN C2;
-CREATE TABLE T19 
+CREATE TABLE T19
 (
     C INTEGER
 ,   C2 TINYINT NOT NULL
@@ -300,8 +292,9 @@ CREATE TABLE T19
         C
     )
 );
+PARTITION TABLE T19 ON COLUMN C2;
 
-CREATE TABLE T20 
+CREATE TABLE T20
 (
     C INTEGER
 ,   LIMIT PARTITION ROWS 123
@@ -310,8 +303,7 @@ CREATE TABLE T20
 
 -- both column and table constraints
 
-PARTITION TABLE T21 ON COLUMN C3;
-CREATE TABLE T21 
+CREATE TABLE T21
 (
     C1 TINYINT DEFAULT 127 NOT NULL
 ,   C2 SMALLINT DEFAULT 32767 NOT NULL
@@ -323,14 +315,15 @@ CREATE TABLE T21
 ,   C8 VARBINARY(32) NOT NULL
 ,   C9 TIMESTAMP DEFAULT NOW NOT NULL
 ,   C10 TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-,   ASSUMEUNIQUE 
+,   ASSUMEUNIQUE
     (
         C1
     ,   C9
     )
 );
+PARTITION TABLE T21 ON COLUMN C3;
 
-CREATE TABLE T22 
+CREATE TABLE T22
 (
     C1 TINYINT DEFAULT 127 NOT NULL UNIQUE
 ,   C2 SMALLINT DEFAULT 32767 NOT NULL
@@ -342,14 +335,14 @@ CREATE TABLE T22
 ,   C8 VARBINARY(32) NOT NULL
 ,   C9 TIMESTAMP DEFAULT NOW NOT NULL
 ,   C10 TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-,   UNIQUE 
+,   UNIQUE
     (
         C1
     ,   C9
     )
 );
 
-CREATE TABLE T23 
+CREATE TABLE T23
 (
     C1 INTEGER NOT NULL
 ,   C2 SMALLINT UNIQUE
@@ -360,7 +353,7 @@ CREATE TABLE T23
 ,   C7 FLOAT NOT NULL
 ,   C8 DECIMAL NOT NULL
 ,   C9 INTEGER
-,   CONSTRAINT hash_pk PRIMARY KEY 
+,   CONSTRAINT hash_pk PRIMARY KEY
     (
         C1
     ,   C5
@@ -369,7 +362,7 @@ CREATE TABLE T23
     (
         C1
     ,   C7
-    ), 
+    ),
     CONSTRAINT lpr2 LIMIT PARTITION ROWS 123
 );
 
@@ -377,43 +370,43 @@ CREATE TABLE T23
 -- CREATE VIEW
 -- basic
 
-CREATE TABLE T24 
+CREATE TABLE T24
 (
     C1 INTEGER
 ,   C2 INTEGER
 );
 
-CREATE VIEW VT1 
+CREATE VIEW VT1
 (
     C1
 ,   C2
 ,   TOTAL
-) 
-AS 
+)
+AS
     SELECT C1
         ,  C2
-        ,  COUNT(*) 
-    FROM T24 
+        ,  COUNT(*)
+    FROM T24
     GROUP BY C1
           ,  C2
 ;
 
-CREATE VIEW VT2 
+CREATE VIEW VT2
 (
     C1
 ,   C2
 ,   TOTAL
 ,   SUMUP
-) 
-AS 
+)
+AS
     SELECT C1
         ,  C2
         ,  COUNT(*)
-        ,  SUM(C2) 
-    AS 
-        newTble 
-    FROM T24 
-    WHERE T24.C1 < 1000 
+        ,  SUM(C2)
+    AS
+        newTble
+    FROM T24
+    WHERE T24.C1 < 1000
     GROUP BY C1
           ,  C2
 ;
@@ -422,7 +415,7 @@ AS
 -- EXPORT TABLE
 -- basic
 
-CREATE TABLE T25 
+CREATE TABLE T25
 (
     id INTEGER NOT NULL
 );
@@ -432,44 +425,44 @@ EXPORT TABLE T25;
 -- IMPORT CLASS
 -- basic
 
-IMPORT CLASS org.voltdb_testprocs.fullddlfeatures.NoMeaningClass;
-CREATE PROCEDURE FROM CLASS org.voltdb_testprocs.fullddlfeatures.testImportProc;
+-- IMPORT CLASS org.voltdb_testprocs.fullddlfeatures.NoMeaningClass;
+-- CREATE PROCEDURE FROM CLASS org.voltdb_testprocs.fullddlfeatures.testImportProc;
 
 
 -- PARTITION PROCEDURE
 -- basic
 
-CREATE TABLE T26 
+CREATE TABLE T26
 (
     age BIGINT NOT NULL
 ,   gender TINYINT
 );
 
-CREATE PROCEDURE p4 
-ALLOW 
-    admin 
-AS 
-    SELECT COUNT(*) 
-    FROM T26 
+CREATE PROCEDURE p4
+ALLOW
+    admin
+AS
+    SELECT COUNT(*)
+    FROM T26
     WHERE age = ?;
-    
+
 PARTITION TABLE T26 ON COLUMN age;
 
-PARTITION PROCEDURE p4 
-ON 
-TABLE 
-    T26 
-COLUMN 
-    age 
-PARAMETER 
+PARTITION PROCEDURE p4
+ON
+TABLE
+    T26
+COLUMN
+    age
+PARAMETER
     0
 ;
 
-PARTITION PROCEDURE testCreateProcFromClassProc 
-ON 
-TABLE 
-    T26 
-COLUMN 
+PARTITION PROCEDURE testCreateProcFromClassProc
+ON
+TABLE
+    T26
+COLUMN
     age
 ;
 
@@ -477,10 +470,70 @@ COLUMN
 -- PARTITION TABLE
 -- basic
 
-CREATE TABLE T27 
+CREATE TABLE T27
 (
     C INTEGER NOT NULL
 );
 
 PARTITION TABLE T27 ON COLUMN C;
 
+-- CREATE PROCEDURE
+-- Verify that the sqlcmd parsing survives two consecutive create procedures
+
+CREATE TABLE T28
+(
+    C1 BIGINT
+,   C2 BIGINT
+);
+
+CREATE TABLE T29
+(
+    C1 INTEGER
+,   LIMIT PARTITION ROWS 5 EXECUTE (DELETE FROM T29 WHERE C1 > 0)
+);
+
+CREATE TABLE T30
+(
+    C1 INTEGER
+,   CONSTRAINT lpr5exec
+    LIMIT PARTITION ROWS 5 EXECUTE (DELETE FROM T30 WHERE C1 > 0)
+);
+
+CREATE PROCEDURE FOO1 AS SELECT * FROM T28;
+CREATE PROCEDURE FOO2 AS SELECT COUNT(*) FROM T28;
+
+-- Verify that consecutive procedure/view statements survive sqlcmd parsing
+CREATE PROCEDURE FOO3 AS SELECT * FROM T28;
+
+CREATE VIEW VT3
+(
+    C1
+,   C2
+,   TOTAL
+)
+AS
+    SELECT C1
+        ,  C2
+        ,  COUNT(*)
+    FROM T28
+    GROUP BY C1
+          ,  C2
+;
+
+CREATE PROCEDURE FOO4 AS SELECT * FROM VT3;
+
+-- Verify that create procedure with INSERT INTO SELECT
+-- survives sqlcmd
+CREATE PROCEDURE INS_T1_SELECT_T1 AS
+    INSERT INTO T1 SELECT * FROM T1;
+
+CREATE PROCEDURE INS_T1_COLS_SELECT_T1 AS
+    INSERT INTO T1 (WIDTH, LENGTH, VOLUME)
+        SELECT WIDTH, LENGTH, VOLUME FROM T1;
+
+CREATE PROCEDURE UPS_T4_SELECT_T4 AS
+    INSERT INTO T4 SELECT * FROM T4 ORDER BY C1, C9;
+
+CREATE PROCEDURE UPS_T4_COLS_SELECT_T4 AS
+    INSERT INTO T4 (C9, C1, C4, C5, C8, C6, C7)
+        SELECT C9, C1, C4, C5, C8, C6, C7 FROM T4;

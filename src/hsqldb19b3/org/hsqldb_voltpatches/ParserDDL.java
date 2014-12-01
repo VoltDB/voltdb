@@ -822,6 +822,9 @@ public class ParserDDL extends ParserRoutine {
                             SchemaObject.CONSTRAINT);
                 }
 
+                // A VoltDB extension to support the assume unique attribute
+                boolean assumeUnique = false;
+                // End of VoltDB extension
                 switch (token.tokenType) {
 
                     case Tokens.FOREIGN :
@@ -831,10 +834,20 @@ public class ParserDDL extends ParserRoutine {
                         return compileAlterTableAddForeignKeyConstraint(t,
                                 cname);
 
+                    // A VoltDB extension to support the assume unique attribute
+                    case Tokens.ASSUMEUNIQUE:
+                        assumeUnique = true;
+                        // $FALL-THROUGH$
+                    // End of VoltDB extension
                     case Tokens.UNIQUE :
                         read();
 
+                        // A VoltDB extension to support the assume unique attribute
+                        return compileAlterTableAddUniqueConstraint(t, cname, assumeUnique);
+                        /* disable 1 line ...
                         return compileAlterTableAddUniqueConstraint(t, cname);
+                        ... disabled 1 line */
+                        // End of VoltDB extension
 
                     case Tokens.CHECK :
                         read();
@@ -3543,8 +3556,14 @@ public class ParserDDL extends ParserRoutine {
         // End of VoltDB extension
     }
 
+    // A VoltDB extension to support the assume unique attribute
+    Statement compileAlterTableAddUniqueConstraint(Table table,
+            HsqlName name, boolean assumeUnique) {
+    /* disable 2 lines ...
     Statement compileAlterTableAddUniqueConstraint(Table table,
             HsqlName name) {
+    ... disabled 2 lines */
+    // End of VoltDB extension
 
         if (name == null) {
             name = database.nameManager.newAutoName("CT",
@@ -3554,9 +3573,17 @@ public class ParserDDL extends ParserRoutine {
 
         int[]    cols = this.readColumnList(table, false);
         String   sql  = getLastPart();
+        // A VoltDB extension to support the assume unique attribute
+        Object[] args = new Object[] {
+            cols, name,
+            Boolean.valueOf(assumeUnique)
+        };
+        /* disable 3 lines ...
         Object[] args = new Object[] {
             cols, name
         };
+        .. disabled 3 lines */
+        // End of VoltDB extension
 
         return new StatementSchema(sql, StatementTypes.ALTER_TABLE, args,
                                    null, table.getName());
@@ -5029,6 +5056,44 @@ public class ParserDDL extends ParserRoutine {
 
         int rowsLimit = readInteger();
         c.rowsLimit = rowsLimit;
+
+        // The optional EXECUTE (DELETE ...) clause
+        if (readIfThis(Tokens.EXECUTE)) {
+            // Capture the statement between parentheses following the EXECUTE keyword,
+            // as in
+            //
+            // LIMIT PARTITION ROWS 10 EXECUTE (DELETE FROM tbl WHERE b = 1)
+            //
+            readThis(Tokens.OPENBRACKET);
+            int position = getPosition();
+            int numOpenBrackets = 1;
+            while (numOpenBrackets > 0) {
+                switch(token.tokenType) {
+                case Tokens.OPENBRACKET:
+                    numOpenBrackets++;
+                    read();
+                    break;
+
+                case Tokens.CLOSEBRACKET:
+                    numOpenBrackets--;
+                    if (numOpenBrackets > 0) {
+                        // don't want the final parenthesis
+                        read();
+                    }
+                    break;
+
+                case Tokens.X_ENDPARSE:
+                    throw unexpectedToken();
+
+                default:
+                    read();
+                }
+            }
+
+            // This captures the DELETE statement exactly, including embedded whitespace, etc.
+            c.rowsLimitDeleteStmt = getLastPart(position);
+            readThis(Tokens.CLOSEBRACKET);
+        }
     }
 
     /// A VoltDB extension to the parsing behavior of the "readColumnList/readColumnNames" functions,

@@ -20,6 +20,7 @@ package org.voltdb.utils;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -40,7 +41,9 @@ import org.voltdb.catalog.Group;
 import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
+import org.voltdb.common.Permission;
 import org.voltdb.compilereport.ProcedureAnnotation;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.expressions.AbstractExpression;
@@ -225,11 +228,6 @@ public abstract class CatalogSchemaTools {
                         }
                         sb.append(")");
                     }
-                    else
-                    if (const_type == ConstraintType.LIMIT) {
-                        sb.append("LIMIT PARTITION ROWS " + String.valueOf(catalog_tbl.getTuplelimit()) );
-                    }
-
                 }
                 if (catalog_idx.getTypeName().startsWith(HSQLInterface.AUTO_GEN_PREFIX) ||
                         catalog_idx.getTypeName().startsWith(HSQLInterface.AUTO_GEN_MATVIEW) ) {
@@ -263,6 +261,16 @@ public abstract class CatalogSchemaTools {
 
         if (catalog_tbl.getTuplelimit() != Integer.MAX_VALUE) {
             sb.append(add + spacer + "LIMIT PARTITION ROWS " + String.valueOf(catalog_tbl.getTuplelimit()) );
+            CatalogMap<Statement> deleteMap = catalog_tbl.getTuplelimitdeletestmt();
+            if (deleteMap.size() > 0) {
+                assert(deleteMap.size() == 1);
+                String deleteStmt = deleteMap.iterator().next().getSqltext();
+                if (deleteStmt.endsWith(";")) {
+                    // StatementCompiler appends the semicolon, we don't want it here.
+                    deleteStmt = deleteStmt.substring(0, deleteStmt.length() - 1);
+                }
+                sb.append(" EXECUTE (" + deleteStmt + ")");
+            }
         }
 
         if (viewQuery != null) {
@@ -336,42 +344,21 @@ public abstract class CatalogSchemaTools {
      * @param Group
      */
     public static void toSchema(StringBuilder sb, Group grp) {
-        if (grp.getAdhoc() || grp.getDefaultproc() || grp.getSysproc() || grp.getDefaultprocread()) {
-            sb.append("CREATE ROLE " + grp.getTypeName() + " WITH ");
-            if (grp.getAdhoc()) {
-                if (grp.getDefaultproc() || grp.getSysproc() || grp.getDefaultprocread()) {
-                    sb.append("ADHOC, ");
-                }
-                else {
-                    sb.append("ADHOC;\n");
-                    return;
-                }
-            }
-            if (grp.getDefaultproc()) {
-                if (grp.getSysproc() || grp.getDefaultprocread()) {
-                    sb.append("DEFAULTPROC, ");
-                }
-                else {
-                    sb.append("DEFAULTPROC;\n");
-                    return;
-                }
-            }
-            if (grp.getSysproc()) {
-                if (grp.getDefaultprocread()) {
-                    sb.append("SYSPROC, ");
-                }
-                else {
-                    sb.append("SYSPROC;\n");
-                    return;
-                }
-            }
-            if (grp.getDefaultprocread()) {
-                sb.append("DEFAULTPROCREAD;\n");
-            }
+        // Don't output the default roles because user cannot change them.
+        if (grp.getTypeName().equalsIgnoreCase("ADMINISTRATOR") || grp.getTypeName().equalsIgnoreCase("USER")) {
+            return;
         }
-        else {
-            sb.append("CREATE ROLE " + grp.getTypeName() + ";\n");
+
+        final EnumSet<Permission> permissions = Permission.getPermissionSetForGroup(grp);
+        sb.append("CREATE ROLE ").append(grp.getTypeName());
+
+        String delimiter = " WITH ";
+        for (Permission permission : permissions) {
+            sb.append(delimiter).append(permission.name());
+            delimiter = ", ";
         }
+
+        sb.append(";\n");
     }
 
     /**

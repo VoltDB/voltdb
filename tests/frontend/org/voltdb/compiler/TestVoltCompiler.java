@@ -1913,9 +1913,6 @@ public class TestVoltCompiler extends TestCase {
     private static final String msgPR =
             "ASSUMEUNIQUE is not valid for an index that includes the partitioning column. " +
             "Please use UNIQUE instead";
-    private static final String msgR =
-            "ASSUMEUNIQUE is not valid for replicated tables. " +
-            "Please use UNIQUE instead";
 
     public void testColumnUniqueGiveException()
     {
@@ -1924,12 +1921,12 @@ public class TestVoltCompiler extends TestCase {
         // (1) ****** Replicate tables
         // A unique index on the non-primary key for replicated table gets no error.
         schema = "create table t0 (id bigint not null, name varchar(32) not null UNIQUE, age integer,  primary key (id));\n";
-        checkValidUniqueAndAssumeUnique(schema, null, msgR);
+        checkValidUniqueAndAssumeUnique(schema, null, null);
 
         // Similar to above, but use a different way to define unique column.
         schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  " +
                 "primary key (id), UNIQUE (name) );\n";
-        checkValidUniqueAndAssumeUnique(schema, null, msgR);
+        checkValidUniqueAndAssumeUnique(schema, null, null);
 
 
         // (2) ****** Partition Table: UNIQUE valid, ASSUMEUNIQUE not valid
@@ -1997,6 +1994,17 @@ public class TestVoltCompiler extends TestCase {
                 "PARTITION TABLE t0 ON COLUMN name;\n";
         // 1) unique index, 2) primary key
         checkValidUniqueAndAssumeUnique(schema, msgP, msgP);
+
+        // unique/assumeunique constraint added via ALTER TABLE to replicated table
+        schema = "create table t0 (id bigint not null, name varchar(32) not null);\n" +
+                "ALTER TABLE t0 ADD UNIQUE(name);";
+        checkValidUniqueAndAssumeUnique(schema, null, null);
+
+        // unique/assumeunique constraint added via ALTER TABLE to partitioned table
+        schema = "create table t0 (id bigint not null, name varchar(32) not null);\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "ALTER TABLE t0 ADD UNIQUE(name);";
+        checkValidUniqueAndAssumeUnique(schema, msgP, null);
     }
 
     private void checkDDLErrorMessage(String ddl, String errorMsg) {
@@ -2039,7 +2047,7 @@ public class TestVoltCompiler extends TestCase {
         // A unique index on the non-primary key for replicated table gets no error.
         schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
                 "CREATE UNIQUE INDEX user_index0 ON t0 (name) ;";
-        checkValidUniqueAndAssumeUnique(schema, null, msgR);
+        checkValidUniqueAndAssumeUnique(schema, null, null);
 
 
         // (2) ****** Partition Table: UNIQUE valid, ASSUMEUNIQUE not valid
@@ -2124,6 +2132,18 @@ public class TestVoltCompiler extends TestCase {
                 "create view my_view2 (num, total, sumwage) " +
                 "as select num, count(*), sum(sumwage) from my_view1 group by num; ";
         checkDDLErrorMessage(ddl, "A materialized view (MY_VIEW2) can not be defined on another view (MY_VIEW1)");
+
+        ddl = "create table t(id integer not null, num integer);\n" +
+                "create view my_view as select num, count(*) from t group by num limit 1;";
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with LIMIT or OFFSET clause is not supported.");
+
+        ddl = "create table t(id integer not null, num integer);\n" +
+                "create view my_view as select num, count(*) from t group by num limit 1 offset 10;";
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with LIMIT or OFFSET clause is not supported.");
+
+        ddl = "create table t(id integer not null, num integer);\n" +
+                "create view my_view as select num, count(*) from t group by num having count(*) > 3;";
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with HAVING clause is not supported.");
     }
 
     public void testDDLCompilerTableLimit()
@@ -2966,6 +2986,15 @@ public class TestVoltCompiler extends TestCase {
         expectedError =
                 "Dropped Procedure \"insert\" is not defined";
         assertTrue(isFeedbackPresent(expectedError, fbs));
+
+        // check if exists
+        db = goodDDLAgainstSimpleSchema(
+                "create procedure p1 as select * from books;\n" +
+                "drop procedure p1 if exists;\n" +
+                "drop procedure p1 if exists;\n"
+                );
+        proc = db.getProcedures().get("p1");
+        assertNull(proc);
     }
 
     private ArrayList<Feedback> checkInvalidProcedureDDL(String ddl) {
@@ -3068,21 +3097,26 @@ public class TestVoltCompiler extends TestCase {
 
     class TestRole {
         final String name;
-        boolean adhoc = false;
+        boolean sql = false;
+        boolean sqlread = false;
         boolean sysproc = false;
         boolean defaultproc = false;
         boolean defaultprocread = false;
+        boolean allproc = false;
 
         public TestRole(String name) {
             this.name = name;
         }
 
-        public TestRole(String name, boolean adhoc, boolean sysproc, boolean defaultproc, boolean defaultprocread) {
+        public TestRole(String name, boolean sql, boolean sqlread, boolean sysproc,
+                        boolean defaultproc, boolean defaultprocread, boolean allproc) {
             this.name = name;
-            this.adhoc = adhoc;
+            this.sql = sql;
+            this.sqlread = sqlread;
             this.sysproc = sysproc;
             this.defaultproc = defaultproc;
             this.defaultprocread = defaultprocread;
+            this.allproc = allproc;
         }
     }
 
@@ -3123,15 +3157,17 @@ public class TestVoltCompiler extends TestCase {
             }
 
             assertNotNull(groups);
-            assertEquals(roles.length, groups.size());
+            assertTrue(roles.length <= groups.size());
 
             for (TestRole role : roles) {
                 Group group = groups.get(role.name);
                 assertNotNull(String.format("Missing role \"%s\"", role.name), group);
-                assertEquals(String.format("Role \"%s\" adhoc flag mismatch:", role.name), role.adhoc, group.getAdhoc());
-                assertEquals(String.format("Role \"%s\" sysproc flag mismatch:", role.name), role.sysproc, group.getSysproc());
+                assertEquals(String.format("Role \"%s\" sql flag mismatch:", role.name), role.sql, group.getSql());
+                assertEquals(String.format("Role \"%s\" sqlread flag mismatch:", role.name), role.sqlread, group.getSqlread());
+                assertEquals(String.format("Role \"%s\" admin flag mismatch:", role.name), role.sysproc, group.getAdmin());
                 assertEquals(String.format("Role \"%s\" defaultproc flag mismatch:", role.name), role.defaultproc, group.getDefaultproc());
                 assertEquals(String.format("Role \"%s\" defaultprocread flag mismatch:", role.name), role.defaultprocread, group.getDefaultprocread());
+                assertEquals(String.format("Role \"%s\" allproc flag mismatch:", role.name), role.allproc, group.getAllproc());
             }
         }
         else {
@@ -3160,17 +3196,26 @@ public class TestVoltCompiler extends TestCase {
     }
 
     public void testRoleDDL() throws Exception {
-        goodRoleDDL("create role r1;", new TestRole("r1"));
-        goodRoleDDL("create role r1;create role r2;", new TestRole("r1"), new TestRole("r2"));
-        goodRoleDDL("create role r1 with adhoc;", new TestRole("r1", true, false, false, false));
-        goodRoleDDL("create role r1 with sysproc;", new TestRole("r1", false, true, false, false));
-        goodRoleDDL("create role r1 with defaultproc;", new TestRole("r1", false, false, true, false));
-        goodRoleDDL("create role r1 with adhoc,sysproc,defaultproc;", new TestRole("r1", true, true, true, false));
-        goodRoleDDL("create role r1 with adhoc,sysproc,sysproc;", new TestRole("r1", true, true, false, false));
-        goodRoleDDL("create role r1 with AdHoc,SysProc,DefaultProc;", new TestRole("r1", true, true, true, false));
+        goodRoleDDL("create role R1;", new TestRole("r1"));
+        goodRoleDDL("create role r1;create role r2;", new TestRole("r1"), new TestRole("R2"));
+        goodRoleDDL("create role r1 with adhoc;", new TestRole("r1", true, true, false, true, true, false));
+        goodRoleDDL("create role r1 with sql;", new TestRole("r1", true, true, false, true, true, false));
+        goodRoleDDL("create role r1 with sqlread;", new TestRole("r1", false, true, false, false, true, false));
+        goodRoleDDL("create role r1 with sysproc;", new TestRole("r1", true, true, true, true, true, true));
+        goodRoleDDL("create role r1 with defaultproc;", new TestRole("r1", false, false, false, true, true, false));
+        goodRoleDDL("create role r1 with adhoc,sysproc,defaultproc;", new TestRole("r1", true, true, true, true, true, true));
+        goodRoleDDL("create role r1 with adhoc,sysproc,sysproc;", new TestRole("r1", true, true, true, true, true, true));
+        goodRoleDDL("create role r1 with AdHoc,SysProc,DefaultProc;", new TestRole("r1", true, true, true, true, true, true));
         //Defaultprocread.
-        goodRoleDDL("create role r1 with defaultprocread;", new TestRole("r1", false, false, false, true));
-        goodRoleDDL("create role r1 with AdHoc,SysProc,DefaultProc,DefaultProcRead;", new TestRole("r1", true, true, true, true));
+        goodRoleDDL("create role r1 with defaultprocread;", new TestRole("r1", false, false, false, false, true, false));
+        goodRoleDDL("create role r1 with AdHoc,SysProc,DefaultProc,DefaultProcRead;", new TestRole("r1", true, true, true, true, true, true));
+        goodRoleDDL("create role r1 with AdHoc,Admin,DefaultProc,DefaultProcRead;", new TestRole("r1", true, true, true, true, true, true));
+        goodRoleDDL("create role r1 with allproc;", new TestRole("r1", false, false, false, false, false, true));
+
+        // Check default roles: ADMINISTRATOR, USER
+        goodRoleDDL("",
+                    new TestRole("ADMINISTRATOR", true, true, true, true, true, true),
+                    new TestRole("USER", true, true, false, true, true, true));
     }
 
     public void testBadRoleDDL() throws Exception {
@@ -3180,6 +3225,10 @@ public class TestVoltCompiler extends TestCase {
         badRoleDDL("create role r1 with blah;", ".*Invalid permission \"BLAH\".*");
         badRoleDDL("create role r1 with adhoc sysproc;", ".*Invalid CREATE ROLE statement.*");
         badRoleDDL("create role r1 with adhoc, blah;", ".*Invalid permission \"BLAH\".*");
+
+        // cannot override default roles
+        badRoleDDL("create role ADMINISTRATOR;", ".*already exists.*");
+        badRoleDDL("create role USER;", ".*already exists.*");
     }
 
     private Database checkDDLAgainstSimpleSchema(String errorRegex, String... ddl) throws Exception {
@@ -3293,6 +3342,43 @@ public class TestVoltCompiler extends TestCase {
                 "create procedure p1 allow r1, rx as select * from books;");
     }
 
+    public void testDropRole() throws Exception
+    {
+        Database db = goodDDLAgainstSimpleSchema(
+                "create role r1;",
+                "drop role r1;");
+        CatalogMap<Group> groups = db.getGroups();
+        assertTrue(groups.get("r1") == null);
+
+        db = goodDDLAgainstSimpleSchema(
+                "create role r1;",
+                "drop role r1 if exists;");
+        groups = db.getGroups();
+        assertTrue(groups.get("r1") == null);
+
+        db = goodDDLAgainstSimpleSchema(
+                "create role r1;",
+                "drop role r1 if exists;",
+                "drop role r1 IF EXISTS;");
+        groups = db.getGroups();
+        assertTrue(groups.get("r1") == null);
+
+        badDDLAgainstSimpleSchema(".*does not exist.*",
+                "create role r1;",
+                "drop role r2;");
+
+        badDDLAgainstSimpleSchema(".*does not exist.*",
+                "create role r1;",
+                "drop role r1;",
+                "drop role r1;");
+
+        badDDLAgainstSimpleSchema(".*may not drop.*",
+                "drop role administrator;");
+
+        badDDLAgainstSimpleSchema(".*may not drop.*",
+                "drop role user;");
+    }
+
     private ConnectorTableInfo getConnectorTableInfoFor( Database db, String tableName) {
         Connector connector =  db.getConnectors().get("0");
         if( connector == null) return null;
@@ -3320,7 +3406,7 @@ public class TestVoltCompiler extends TestCase {
 
     public void testBadExportTable() throws Exception {
 
-        badDDLAgainstSimpleSchema(".+\\sexport, table non_existant was not present in the catalog.*",
+        badDDLAgainstSimpleSchema(".+\\sEXPORT statement: table non_existant was not present in the catalog.*",
                 "export table non_existant;"
                 );
 
@@ -3354,12 +3440,6 @@ public class TestVoltCompiler extends TestCase {
                 "create table view_source( id integer, f1 varchar(16), f2 varchar(12));",
                 "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;",
                 "export table my_view;"
-                );
-
-        badDDLAgainstSimpleSchema("Table \"E1\" is already exported.*",
-                "create table e1( id integer, f1 varchar(16), f2 varchar(12));",
-                "export table e1;",
-                "export table E1;"
                 );
     }
 
