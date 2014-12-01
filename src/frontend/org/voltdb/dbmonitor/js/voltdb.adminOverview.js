@@ -1,40 +1,25 @@
 ﻿(function ($) {
     var adminOverviewFunctions = function (options) {
         this.options = options;
-        
+
         //display configuration members
-        this.displayAdminConfiguration = function(connection) {            
-            var adminConfigValues = voltDbRenderer.getAdminConfigurationItems(connection);            
+        this.displayAdminConfiguration = function (connection) {
+            var adminConfigValues = voltDbRenderer.getAdminConfigurationItems(connection);
             configureAdminValues(adminConfigValues);
-         
+
         };
 
-        this.displayPortConfiguration = function(connection,configHeaderName) {
+        this.displayPortConfiguration = function (connection, configHeaderName) {
             var portConfigValues = voltDbRenderer.getPortConfigurationItems(connection, configHeaderName);
             configurePortValues(portConfigValues);
-            
+
         };
 
-        this.displayDirectoryConfiguration = function(connection) {
+        this.displayDirectoryConfiguration = function (connection) {
             var directoryConfigValues = voltDbRenderer.getDirectoryConfigurationItems(connection);
             configureDirectoryValues(directoryConfigValues);
-            
-        };
-        
-        //edit configuration members
-        this.editConfigurationItem = function (configGroup, configMember, configValue) {
-            voltDbRenderer.editConfigurationItem(configGroup, configMember,configValue,function() {
-                toggleConfigurationItems();
-                
-            });
 
-            var toggleConfigurationItems = function() {
-
-            };
-
-        };
-        
-        
+        };        
 
         var configureAdminValues = function (adminConfigValues) {
             options.siteNumberHeader.text(adminConfigValues.sitesperhost);
@@ -49,10 +34,10 @@
             options.heartBeatTimeout.text(adminConfigValues.heartBeatTimeout);
             options.tempTablesMaxSize.text(adminConfigValues.tempTablesMaxSize);
             options.snapshotPriority.text(adminConfigValues.snapshotPriority);
-            
+
         };
-        
-        var configurePortValues = function(portConfigValues) {
+
+        var configurePortValues = function (portConfigValues) {
             options.clientPort.text(portConfigValues.clientPort);
             options.adminPort.text(portConfigValues.adminPort);
             options.httpPort.text(portConfigValues.httpPort);
@@ -60,8 +45,8 @@
             options.zookeeperPort.text(portConfigValues.zookeeperPort);
             options.replicationPort.text(portConfigValues.replicationPort);
         };
-        
-        var configureDirectoryValues = function(directoryConfigValues) {
+
+        var configureDirectoryValues = function (directoryConfigValues) {
             options.root.text(directoryConfigValues.voltdbRoot);
             options.snapShot.text(directoryConfigValues.snapshotPath);
             options.commandLogs.text(directoryConfigValues.commandLogPath);
@@ -83,7 +68,7 @@
             commandLog: $("#commandLogIcon"),
             commandLogFrequencyTime: $("#commandlogfreqtime"),
             commandlogFrequencyTransactions: $("#commandlogfreqtxns"),
-            heartBeatTimeout: $("#heartbeattimeoutSpan"),
+            heartBeatTimeout: $("#hrtTimeOutSpan"),
             tempTablesMaxSize: $("#temptablesmaxsize"),
             snapshotPriority: $("#snapshotpriority"),
             clientPort: $('#clientport'),
@@ -91,27 +76,43 @@
             httpPort: $('#httpport'),
             internalPort: $('#internalPort'),
             zookeeperPort: $('#zookeeperPort'),
-            replicationPort:$('#replicationPort'),
+            replicationPort: $('#replicationPort'),
             root: $('#voltdbroot'),
             snapShot: $('#snapshotpath'),
             commandLogs: $('#commandlogpath'),
             commandLogSnapShots: $('#commandlogsnapshotpath')
 
-    };
+        };
 
-    var options = $.extend({}, adminDOMObjects, option);
+        var options = $.extend({}, adminDOMObjects, option);
 
-    //write blocks and function calls that are to be executed during load operation
-    $(document).ready(function () {
-        //site per host
-        $("#partitionDetection").on("click", function () {
-            editConfigurationItem("OVERVIEW","DEPLOYMENT",true);
+        //write blocks and function calls that are to be executed during load operation
+        $(document).ready(function () {
+            //site per host
+            $("#partitionDetectionIcon").on("click", function () {
+                voltDbRenderer.editConfigurationItem("OVERVIEW", "DEPLOYMENT", true, function () {
+                    toggleConfigurationItemState($("#partitionDetectionIcon"), $("#partitionDetectionStateLabel"));
+                    
+                });
+
+            });
+
+            var toggleConfigurationItemState = function (id,displayLabel) {
+                if (id.attr('class') == 'onIcon') {
+                    id.removeClass('onIcon');
+                    id.addClass('offIcon');
+                    displayLabel.text("Off");
+
+                } else if (id.attr('class') == 'offIcon') {
+                    id.removeClass('offIcon');
+                    id.addClass('onIcon');
+                    displayLabel.text("On");
+                }
+            };
 
         });
+        return new adminOverviewFunctions(options);
 
-    });
-    return new adminOverviewFunctions(options);
-        
     };
 
 

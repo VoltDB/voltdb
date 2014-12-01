@@ -406,20 +406,20 @@
             <table width="100%" border="0" cellspacing="0" cellpadding="0" class="adminTbl1">
               <tr>
                 <td width="62%" class="configLabel">Site per host</td>
-                <td width="20%" align="right">8</td>
+                <td id="sitePerHost" width="20%" align="right">8</td>
                 <td width="2%">&nbsp;</td>
                 <td width="16%">&nbsp;</td>
               </tr>
               <tr>
                 <td class="configLabel">K-safety </td>
-                <td align="right">3</td>
+                <td id="kSafety" align="right">3</td>
                 <td>&nbsp;</td>
                 <td>&nbsp;</td>
               </tr>
               <tr>
                 <td class="configLabel">Partition detection </td>
-                <td align="right"><div class="onIcon"></div></td>
-                <td>On</td>
+                <td align="right"><div id="partitionDetectionIcon" class="onIcon"></div></td>
+                <td id="partitionDetectionStateLabel">On</td>
                 <td>&nbsp;</td>
               </tr>
               <tr class="security">
@@ -431,7 +431,7 @@
               </tr>
               <tr class="hasSubLabel parent" id="row-1">
                 <td class="configLabel"><a href="#" class="labelCollapsed">HTTP Access</a></td>
-                <td align="right"><div class="onIcon"></div></td>
+                <td align="right"><div id="httpAccessIcon" class="onIcon"></div></td>
                 <td>On</td>
                 <td>&nbsp;</td>
               </tr>
@@ -471,19 +471,19 @@
               </tr>
               <tr class="hasSubLabel parent" id="row-3">
                 <td class="configLabel"><a href="#" class="labelCollapsed">Command Logging</a></td>
-                <td align="right"><div class="offIcon"></div></td>
+                <td align="right"><div id="commandLogIcon" class="offIcon"></div></td>
                 <td>Off</td>
                 <td>&nbsp;</td>
               </tr>
               <tr class="child-row-3 subLabelRow">
                 <td class="configLabel">Log Frequency, time </td>
-                <td align="right">800 ms</td>
+                <td id="commandlogfreqtime" align="right">800 ms</td>
                 <td>&nbsp;</td>
                 <td>&nbsp;</td>
               </tr>
               <tr class="child-row-3 subLabelRow">
                 <td class="configLabel">Log Frequency, transactions </td>
-                <td align="right">50</td>
+                <td id="commandlogfreqtxns" align="right">50</td>
                 <td>&nbsp;</td>
                 <td>&nbsp;</td>
               </tr>
@@ -541,13 +541,13 @@
               </tr>
               <tr class="child-row-5 subLabelRow">
                 <td class="configLabel">Max temp table memory</td>
-                <td align="right">256 MB</td>
+                <td  id="temptablesmaxsize"> align="right">256 MB</td>
                 <td>&nbsp;</td>
                 <td>&nbsp;</td>
               </tr>
               <tr class="child-row-5 subLabelRow">
                 <td class="configLabel">Snapshot priority</td>
-                <td align="right">8</td>
+                <td id="snapshotpriority" align="right">8</td>
                 <td>&nbsp;</td>
                 <td>&nbsp;</td>
               </tr>
@@ -563,27 +563,27 @@
             <table width="100%" border="0" cellspacing="0" cellpadding="0" class="adminTbl2">
               <tr>
                 <td width="76%">Client Port</td>
-                <td width="24%">1020</td>
+                <td id="clientport" width="24%">1020</td>
               </tr>
               <tr>
-                <td>Admin Port</td>
+                <td id="adminport">Admin Port</td>
                 <td>5020</td>
               </tr>
               <tr>
                 <td>HTTP Port</td>
-                <td>3020</td>
+                <td id="httpport">3020</td>
               </tr>
               <tr>
-                <td>Internal Port</td>
+                <td id="internalPort">Internal Port</td>
                 <td>6323</td>
               </tr>
               <tr>
                 <td>Zookeeper Port</td>
-                <td>2313</td>
+                <td id="zookeeperPort">2313</td>
               </tr>
               <tr>
                 <td>Replication Port</td>
-                <td>4120</td>
+                <td id="replicationPort">4120</td>
               </tr>
             </table>
           </div>
@@ -594,11 +594,11 @@
             <table width="100%" border="0" cellspacing="0" cellpadding="0" class="adminTbl2">
               <tr>
                 <td width="76%">Root (Destination)</td>
-                <td width="24%">xxxxxx</td>
+                <td id="voltdbroot" width="24%">xxxxxx</td>
               </tr>
               <tr>
                 <td>Snapshot</td>
-                <td>xxxxxx</td>
+                <td id="snapshotpath">xxxxxx</td>
               </tr>
               <tr>
                 <td>Export Overflow</td>
@@ -606,11 +606,11 @@
               </tr>
               <tr>
                 <td>Command Logs</td>
-                <td>xxxxxx</td>
+                <td id="commandlogpath">xxxxxx</td>
               </tr>
               <tr>
                 <td>Command log Snapshots</td>
-                <td>xxxxxx</td>
+                <td id="commandlogsnapshotpath">xxxxxx</td>
               </tr>
             </table>
           </div>
