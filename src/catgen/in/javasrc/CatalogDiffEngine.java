@@ -782,6 +782,22 @@ public class CatalogDiffEngine {
             }
         }
 
+        if (prevType instanceof Index) {
+            Table table = (Table) prevType.getParent();
+            Index index = (Index)prevType;
+
+            // capture the table name
+            retval[0] = table.getTypeName();
+            if (field.equalsIgnoreCase("expressionsjson")) {
+                // error message
+                retval[1] = String.format(
+                        "Unable to alter table %s with expression-based index %s becase table %s is not empty.",
+                        retval[0], index.getTypeName(), retval[0]);
+                return retval;
+            }
+
+        }
+
         return null;
     }
 
