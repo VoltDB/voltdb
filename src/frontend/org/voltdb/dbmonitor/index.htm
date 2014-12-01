@@ -352,7 +352,7 @@
                           <td class="configLabel" width="85%"><a href="#">Test Server Lorem</a></td>
                           <td  align="right">
                           <a href="#stopConfirmationPop" class="shutdown " id="stopConfirmation">
-                           <span class="shutdownServer">stop</span></a> 
+                           <span class="shutdownServer">Stop</span></a> 
                     <a href="#startConfirmationPop" class="startServ " id="startConfirmation" style="display:none;"> 
                     <span class="startServer">Start</span> </a></td>
                         </tr>
@@ -1060,7 +1060,7 @@
   <div class="clear"></div>
   <div class="restoreInfo">
     <div class="overlay-content">
-      <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblRestore">
+      <!--<table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblRestore">
         <tr>
           <th align="left">Snapshot Name</th>
           <th align="left" >Directory</th>
@@ -1083,24 +1083,35 @@
               <input type="radio" value="2" name="vemmanual">
             </div></td>
         </tr>
+      </table>-->
+       <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblRestore">
+      <tr>
+          <th align="left">Directory</th>
+          <td align="left"><input type="text" value="D:/VoltDB/Snapshots/" /></th>
+          <td align="left"><a id="searchStoredProc2" class="save-search" title="Search" href="javascript:void(0)">Search</a></th>
+        </tr>
       </table>
-      <!--<table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblRestore">
-                    <tr>
-                        <th align="left">Snapshot Name</th>
-                        <th align="left" >Directory</th>
-                        <th>&nbsp;</th>
-                    </tr>
-                    <tr>
-                        <td>VEMMANUAL_2014.11.13.21.19.24</td>
-                        <td><input type="text" value="D:/VoltDB/Snapshots/" /></td>
-                        <td><div class="restoreTxt"><input type="radio" value="1" name="vemmanual"></div></td>
-                    </tr>
-                    <tr>
-                        <td>VEMMANUAL_2014.11.13.21.19.24</td>
-                        <td><input type="text" value="D:/VoltDB/Snapshots/" /></td>
-                        <td><div class="restoreTxt"><input type="radio" value="2" name="vemmanual"></div></td>
-                    </tr>
-                </table>--> 
+     
+      <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblRestore" style="position:relative; top:-1px">
+        
+        <tr>
+          <th align="left">Snapshot Name</th>
+          <th align="left" >&nbsp;</th>
+        </tr>
+        <tr>
+          <td>VEMMANUAL_2014.11.13.21.19.24</td>
+          <td><div class="restoreRadio">
+            <input type="radio" value="1" name="vemmanual">
+          </div></td>
+        </tr>
+        <tr>
+          <td>VEMMANUAL_2014.11.13.21.19.24</td>
+          <td><div class="restoreRadio">
+            <input type="radio" value="2" name="vemmanual">
+          </div></td>
+        </tr>
+      </table>
+     
       
     </div>
     <div class="overlay-btns"><a class="btn restoreBtn" title="Ok">Restore</a> <a class="btn btn-gray closeBtn" title="Cancel">Cancel</a></div>

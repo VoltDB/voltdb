@@ -399,14 +399,16 @@ td.txt-center{text-align:center;}
 .icon-tables{ background-position:left -1043px;}
 input.search-box{ border:1px solid #dbdbdb; padding:0 5px 0 5px; height:40px; width:200px; color:#a3a3a3; font-weight:bold;}
 a.icon-search{ background-position:right -684px; border:1px solid #dbdbdb;line-height: 40px;display: inline-block;padding: 0 4px; width:35px; text-indent:-999em; cursor:default;}
-a.save-search{ background-position: -10px -1403px;
+a.save-search{background-position: -10px -1403px;
 border: 1px solid #CCCCCC;
 line-height: 30px;
 display: inline-block;
 /* padding: 0 2px; */
 width: 33px;
 text-indent: -999em;
-cursor: pointer;}
+cursor: pointer;
+position: relative;
+right: 18px;}
 
 /* Server Popups */
 input.icon-search{ background-position:right -684px; border:1px solid #dbdbdb; padding:0 45px 0 5px; height:40px; width:200px; color:#a3a3a3; font-weight:bold;}
@@ -881,6 +883,7 @@ td.heartbeattd span.unit, td.queryTimeOut span.unit{position:relative;/* top:7px
 .editOk, .editCancel {
     display: none;
 }
+.restoreInfo .overlay-content { height:200px;}
 
 /*********************************************media Qu********************/
 @media (max-width: 479px) {
@@ -966,7 +969,7 @@ h3.systemHeader{}
 .editOk, .editCancel { background-color:#aa1f2f; cursor:pointer; padding:4px 6px; text-align:center; color:#FFFFFF; font:12px Arial, Helvetica, sans-serif; text-shadow:none; text-decoration:none; border-radius:0; border:none;}
 .editOk:hover, .editCancel:hover{background-color:#76bd1d; color:#fff;}
 
-.restoreRadio {border: 1px solid #CCCCCC;padding: 8px 9px 9px; /* margin: 1px 0 0 0; */ position: relative; top: 2px;}
+.restoreRadio {border: 1px solid #CCCCCC;padding: 8px 9px 9px; /* margin: 1px 0 0 0; */ position: relative; top: 2px; width:13px;}
 
 @media (width: 640px) {
 	
