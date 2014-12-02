@@ -37,6 +37,7 @@ public class TestMaxSuite extends RegressionSuite {
     private static int PARAMETERS_MAX_JOIN = 100;
     private static int PARAMETERS_MAX_COLUMN = 1024;
     private static int PARAMETERS_MAX_IN = 6000;
+
     public TestMaxSuite(String name) {
         super(name);
     }
@@ -183,6 +184,12 @@ public class TestMaxSuite extends RegressionSuite {
                 BackendTarget.NATIVE_EE_JNI);
         boolean t1 = config.compile(project);
         assertTrue(t1);
+        builder.addServerConfig(config);
+
+        config = new LocalCluster("testMax-hsql.jar", 1, 1, 0,
+                BackendTarget.HSQLDB_BACKEND);
+        boolean success = config.compile(project);
+        assertTrue(success);
         builder.addServerConfig(config);
 
         // CLUSTER
