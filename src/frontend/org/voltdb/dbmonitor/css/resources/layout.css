@@ -885,6 +885,7 @@ td.heartbeattd span.unit, td.queryTimeOut span.unit{position:relative;/* top:7px
     display: none;
 }
 .restoreInfo .overlay-content { }
+.overviewTbl table td{white-space:nowrap !important}
 
 /*********************************************media Qu********************/
 @media (max-width: 479px) {
@@ -1006,7 +1007,7 @@ top: 3px;}
  .adminMode {margin-top:10px}
  .adminServer {margin-top:10px}
  .adminClusterProperties { float:left; margin:10px 0;}
- .overviewTbl { overflow:auto; width:222px;}
+ .overviewTbl { overflow:auto; width:auto;}
  .adminLeft { float:none; width:100%}
 ul.adminClusterList { width:250px;}/*admin*/
 ul.adminClusterList li { margin:0; padding-top:15px; float:left; width:67px; height:100%; line-height:75px;}/*admin*/
