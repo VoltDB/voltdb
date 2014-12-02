@@ -1,6 +1,7 @@
-﻿
-$(document).ready(function () {
+﻿var adminConfiguration = null;
 
+$(document).ready(function () {
+    
     if ($.cookie("username") != undefined && $.cookie("username") != 'null') {
         $("#logOut").css('display', 'block');
     } else {
@@ -240,6 +241,9 @@ $(document).ready(function () {
     //If security is enabled, then it displays login popup. After user is verified, it calls loadPage().
     //If security is not enabled, then it simply calls loadPage().
     voltDbRenderer.HandleLogin(serverName, portid, function () { loadPage(serverName, portid); });
+    adminConfiguration= $('#navAdmin').adminOverview({ 'refresh': true ,'isAdmin':true});
+
+
 });
 
 function logout() {
@@ -412,7 +416,7 @@ var loadPage = function (serverName, portid) {
         });
 
 
-        voltDbRenderer.getProceduresInformation(function(procedureMetadata) {
+        voltDbRenderer.GetProceduresInfoNAdminConfiguration(function (procedureMetadata) {
             if ((procedureMetadata != "" && procedureMetadata != undefined)) {
                 voltDbRenderer.mapProcedureInformation(currentProcedureAction, priorProcedureAction, function(traverse, htmlData) {
                     if (!voltDbRenderer.isProcedureSearch) {
@@ -459,7 +463,7 @@ var loadPage = function (serverName, portid) {
 
             }
 
-        });
+        },adminConfiguration);
         
         voltDbRenderer.getTablesInformation(function (tableMetadata) {
             if (tableMetadata != "" && tableMetadata != undefined) {
@@ -725,7 +729,6 @@ var loadPage = function (serverName, portid) {
         });
 
     };
-
 
     var setPaginationIndicesOfProcedures = function (isProcedureSearch) {
         if (isProcedureSearch) {
@@ -1265,8 +1268,9 @@ var saveUserPreferences = function (preferences) {
 
 var NavigationTabs = {
     DBMonitor: 1,
-    Schema: 2,
-    SQLQuery: 3
+	Admin: 2,
+    Schema: 3,
+    SQLQuery: 4
 };
 
 var getCurrentTab = function () {
@@ -1278,8 +1282,12 @@ var getCurrentTab = function () {
 
     if (activeLinkId == "navSqlQuery")
         return NavigationTabs.SQLQuery;
+    
     else if (activeLinkId == "navSchema")
         return NavigationTabs.Schema;
+    
+    else if (activeLinkId == "navAdmin")
+        return NavigationTabs.Admin;
 
     return NavigationTabs.DBMonitor;
 };

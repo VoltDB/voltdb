@@ -296,24 +296,35 @@ function alertNodeClicked(obj) {
 
         this.GetSystemInformation = function (onInformationLoaded) {
             VoltDBService.GetSystemInformation(function (connection) {
+                adminConfiguration.displayPortConfiguration(connection, "OVERVIEW");
                 populateSystemInformation(connection);
                 getMemoryDetails(connection, systemMemory);
+
                 if (gCurrentServer == "")
                     configureRequestedHost(VoltDBCore.hostIP);
                 onInformationLoaded();
+                
             });
         };
 
-        this.getProceduresInformation = function (onProceduresDataLoaded) {
+
+        this.GetProceduresInfoNAdminConfiguration = function (onProceduresDataLoaded) {
             var procedureMetadata = "";
 
             VoltDBService.GetSystemInformationDeployment(function (connection) {
+                if (adminConfiguration != null && adminConfiguration.options.isAdmin && adminConfiguration.options.refresh) {
+                    adminConfiguration.displayAdminConfiguration(connection);
+                    adminConfiguration.displayPortConfiguration(connection, "DEPLOYMENT");
+                    adminConfiguration.displayDirectoryConfiguration(connection);
+                }
+
                 setKFactor(connection);
                 VoltDBService.GetProceduresInformation(function (nestConnection) {
                     populateProceduresInformation(nestConnection);
                     procedureMetadata = procedureData;
                     onProceduresDataLoaded(procedureMetadata);
                 });
+
             });
 
             var setKFactor = function (connection) {
@@ -329,7 +340,7 @@ function alertNodeClicked(obj) {
         this.getTablesInformation = function (onTableDataLoaded) {
             VoltDBService.GetDataTablesInformation(function (inestConnection) {
                 populateTableTypes(inestConnection);
-                populateTablesInformation(inestConnection);               
+                populateTablesInformation(inestConnection);
                 onTableDataLoaded(inestConnection.Metadata['@Statistics_TABLE'].data);
             });
 
@@ -452,9 +463,9 @@ function alertNodeClicked(obj) {
             callback(html, alertHtml);
         };
 
-        var configureRequestedHost = function(hostName) {
+        var configureRequestedHost = function (hostName) {
 
-            $.each(systemOverview, function(id, val) {
+            $.each(systemOverview, function (id, val) {
                 if (val["IPADDRESS"] == hostName) {
                     gCurrentServer = val["HOSTNAME"];
                     saveCookie("currentServer", val["HOSTNAME"]);
@@ -465,7 +476,7 @@ function alertNodeClicked(obj) {
             });
 
             if (gCurrentServer == "") {
-                $.each(systemOverview, function(id, val) {
+                $.each(systemOverview, function (id, val) {
                     if (val["CLUSTERSTATE"] == "RUNNING") {
                         gCurrentServer = val["HOSTNAME"];
                         saveCookie("currentServer", val["HOSTNAME"]);
@@ -822,7 +833,7 @@ function alertNodeClicked(obj) {
                     schemaCatalogTableTypes[tableName] = {};
                     schemaCatalogTableTypes[tableName]['TABLE_NAME'] = entry[tableNameIndex];
                     schemaCatalogTableTypes[tableName]['TABLE_TYPE'] = entry[tableTypeIndex];
-                    if(entry[remarksIndex]!=null)
+                    if (entry[remarksIndex] != null)
                         schemaCatalogTableTypes[tableName]['REMARKS'] = jQuery.parseJSON(entry[remarksIndex]).partitionColumn != null ? "PARTITIONED" : "REPLICATED";
                     else {
                         schemaCatalogTableTypes[tableName]['REMARKS'] = "REPLICATED";
@@ -831,13 +842,13 @@ function alertNodeClicked(obj) {
             });
 
         };
-       
+
         this.mapNodeInformationByStatus = function (callback) {
             var counter = 0;
             var memoryThreshold = $.cookie("alert-threshold") != '' ? $.cookie("alert-threshold") : -1;
             var htmlMarkups = { "ServerInformation": [] };
             var htmlMarkup;
-            var currentServerHtml="";
+            var currentServerHtml = "";
 
             if (systemOverview == null || systemOverview == undefined) {
                 alert("Error: Unable to extract Node Status");
@@ -864,7 +875,7 @@ function alertNodeClicked(obj) {
                         } else {
                             htmlMarkup = "<li class=\"active monitoring\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
                         }
-                    } else if (hostName != null && currentServer != hostName &&  val["CLUSTERSTATE"] == "RUNNING") {
+                    } else if (hostName != null && currentServer != hostName && val["CLUSTERSTATE"] == "RUNNING") {
                         if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
                             htmlMarkup = "<li class=\"active\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span><span class=\"hostIdHidden\" style=\"display:none\">" + systemMemory[hostName]["HOST_ID"] + "</span></li>";
                         } else {
@@ -894,7 +905,7 @@ function alertNodeClicked(obj) {
                         }
                     }
 
-                    if (hostName != null && currentServerHtml != hostName  && val["CLUSTERSTATE"] == "RUNNING") {
+                    if (hostName != null && currentServerHtml != hostName && val["CLUSTERSTATE"] == "RUNNING") {
                         if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
                             htmlMarkup = htmlMarkup + "<li class=\"active\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
 
@@ -1632,6 +1643,146 @@ function alertNodeClicked(obj) {
             sysTransaction["currentTimerTick"] = currentTimerTick;
 
         };
+        
+        //admin Configuration
+        this.getAdminConfigurationItems = function (connection) {
+            var adminConfigValues = [];
+
+            if (connection != "" || connection != null) {
+                if (connection.Metadata['@SystemInformation_DEPLOYMENT'] != null) {
+                    connection.Metadata['@SystemInformation_DEPLOYMENT'].data.forEach(function (columnInfo) {
+                        switch (columnInfo[0]) {
+                            case 'sitesperhost':
+                                adminConfigValues['sitesperhost'] = columnInfo[1];
+                                break;
+
+                            case 'kfactor':
+                                adminConfigValues['kSafety'] = columnInfo[1];
+                                break;
+
+                            case 'partitiondetection':
+                                adminConfigValues['partitionDetection'] = columnInfo[1];
+                                break;
+
+                            case 'httpenabled':
+                                adminConfigValues['httpEnabled'] = columnInfo[1];
+                                break;
+
+                            case 'jsonenabled':
+                                adminConfigValues['jsonEnabled'] = columnInfo[1];
+                                break;
+
+                            case 'snapshotenabled':
+                                adminConfigValues['snapshotEnabled'] = columnInfo[1];
+                                break;
+
+                            case 'commandlogenabled':
+                                adminConfigValues['commandLogEnabled'] = columnInfo[1];
+                                break;
+
+                            case 'commandlogfreqtime':
+                                adminConfigValues['commandlogfreqtime'] = columnInfo[1];
+                                break;
+
+                            case 'commandlogfreqtxns':
+                                adminConfigValues['commandLogFrequencyTransactions'] = columnInfo[1];
+                                break;
+
+                            case 'heartbeattimeout':
+                                adminConfigValues['heartBeatTimeout'] = columnInfo[1];
+                                break;
+
+                            case 'temptablesmaxsize':
+                                adminConfigValues['tempTablesMaxSize'] = columnInfo[1];
+                                break;
+
+                            case 'snapshotpriority':
+                                adminConfigValues['snapshotPriority'] = columnInfo[1];
+                                break;
+
+                            default:
+
+
+                        }
+                    });
+                }
+            }
+            return adminConfigValues;
+
+        };
+
+        this.getPortConfigurationItems = function (connection, configHeaderName) {
+            var portConfigValues = [];
+
+
+            if (connection != "" || connection != null) {
+                if (configHeaderName == 'DEPLOYMENT') {
+                    if (connection.Metadata['@SystemInformation_DEPLOYMENT'] != null) {
+                        connection.Metadata['@SystemInformation_DEPLOYMENT'].data.forEach(function (columnInfo) {
+                            switch (columnInfo[0]) {
+                                case 'adminport':
+                                    portConfigValues['adminPort'] = columnInfo[1];
+                                    break;
+
+                                case 'httpport':
+                                    portConfigValues['httpPort'] = columnInfo[1];
+                                    break;
+                            }
+                        });
+                    }
+                }
+                
+                else if (configHeaderName == 'OVERVIEW') {
+                    if (connection.Metadata['@SystemInformation_OVERVIEW'] != null) {
+                        connection.Metadata['@SystemInformation_OVERVIEW'].data.forEach(function (columnInfo) {
+                            if (columnInfo[1] == 'CLIENTPORT') {
+                                portConfigValues['clientPort'] = columnInfo[2];
+                            }
+                        });
+                    }
+                }
+            }
+            return portConfigValues;
+
+        };
+
+        this.getDirectoryConfigurationItems = function (connection) {
+            var directoryConfigValues = [];
+
+            if (connection != "" || connection != null) {
+                if (connection.Metadata['@SystemInformation_DEPLOYMENT'] != null) {
+                    connection.Metadata['@SystemInformation_DEPLOYMENT'].data.forEach(function (columnInfo) {
+                        switch (columnInfo[0]) {
+                            case 'voltdbroot':
+                                directoryConfigValues['voltdbRoot'] = columnInfo[1];
+                                break;
+
+                            case 'snapshotpath':
+                                directoryConfigValues['snapshotPath'] = columnInfo[1];
+                                break;
+
+                            case 'commandlogpath':
+                                directoryConfigValues['commandLogPath'] = columnInfo[1];
+                                break;
+
+                            case 'commandlogsnapshotpath':
+                                directoryConfigValues['commandLogSnapshotPath'] = columnInfo[1];
+                                break;
+
+                        }
+                    });
+                }
+            }
+            return directoryConfigValues;
+
+        };
+
+        this.editConfigurationItem = function (configGroup, configMember, configValue,onConfigurationUpdated) {
+            VoltDBService.editConfigurationItem(configGroup, configMember,configValue,function() {
+                onConfigurationUpdated();
+            });
+        };
+
 
         function getTableData(connection, tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData, processName) {
             var suffix = "";
@@ -1745,6 +1896,13 @@ function alertNodeClicked(obj) {
         }
 
 
+        //Admin Tab
+        this.getAdminconfiguration = function (onInformationLoaded) {
+            VoltDBService.GetSystemInformationDeployment(function (connection) {
+                onInformationLoaded(connection);
+            });
+        };
+
         //common methods
         var formatTableNoData = function (listName) {
             if (listName == "PROCEDURE") {
@@ -1759,7 +1917,7 @@ function alertNodeClicked(obj) {
             }
 
         };
-              
+
         var formatTableData = function (connection) {
             var i = 0;
             var tableMetadata = [];
@@ -1769,7 +1927,7 @@ function alertNodeClicked(obj) {
             var tupleCountPartitions = [];
             var partitionData = {};
             var averageRowCount = 0;
-            
+
             if (voltDbRenderer.refreshTables) {
                 if (connection.Metadata["@Statistics_TABLE"] != undefined || connection.Metadata["@Statistics_TABLE"] != null) {
                     if (connection.Metadata["@Statistics_TABLE"].data != "" &&
@@ -1799,8 +1957,8 @@ function alertNodeClicked(obj) {
                                             }
 
                                         }
-                                        if (partitionEntryCount == partitionData[tupleData[tableNameIndex]].length && !duplicatePartition) {                                            
-                                            partitionData[tupleData[tableNameIndex]].push(tupleData);                                                                                        
+                                        if (partitionEntryCount == partitionData[tupleData[tableNameIndex]].length && !duplicatePartition) {
+                                            partitionData[tupleData[tableNameIndex]].push(tupleData);
                                             return false;
 
                                         }
@@ -1812,7 +1970,7 @@ function alertNodeClicked(obj) {
                         //formulate max, min, average for each table
                         $.each(partitionData, function (key, data) {
                             totalTupleCount = 0;
-                            
+
                             if (!tableData.hasOwnProperty(key)) {
                                 tableData[key] = {};
                             }
@@ -1822,7 +1980,7 @@ function alertNodeClicked(obj) {
                                 tupleCountPartitions[i] = data[i][tupleCountIndex];
                             }
 
-                            
+
                             tableData[key] = {
                                 "TABLE_NAME": key,
                                 "MAX_ROWS": Math.max.apply(null, tupleCountPartitions),

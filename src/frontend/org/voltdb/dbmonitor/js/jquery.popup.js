@@ -110,7 +110,7 @@
 					$popup
 						.animate({opacity : 1}, plugin.o.speed, function(){
 						    $('body').css("height", $(window).height()); $('body').css("overflow", "hidden");
-						    $('body').css("position", "fixed");
+						    //$('body').css("position", "fixed");
 						    $('body').css("width", "100%");
 							//$('body').bind('touchmove', function(e){e.preventDefault()});//mobile
 							// Call the open callback
@@ -312,7 +312,45 @@
 		            p.close();
 		        });
 		    }
-
+			
+			//save cluster
+			$('.saveBtn').click(function(){
+				$('.saveInfo').hide();
+				$('.saveConfirmation').show();
+			});
+			
+			$('.confirmNoSave').click(function(){
+				$('.saveConfirmation').hide();
+				$('.saveInfo').show();
+			});
+			
+				
+			
+				//restore cluster
+			$('.restoreBtn').click(function(){
+				$('.restoreInfo').hide();
+				$('.restoreConfirmation').show();
+			});
+			
+			$('.confirmNoRestore').click(function(){
+				$('.restoreConfirmation').hide();
+				$('.restoreInfo').show();
+			});
+			
+			
+			//admin
+			var closeBtn = $(".closeBtn");
+		    if (closeBtn != undefined) {
+		        closeBtn.unbind('click');
+		        closeBtn.bind('click', function () {
+					$('.saveConfirmation').hide();
+					$('.saveInfo').show();
+					$('.restoreConfirmation').hide();
+					$('.restoreInfo').show();
+		            p.close();
+		    });
+		    }
+			
 			// Get the content
 			content = ( content === undefined || content === '#' )
 				? p.o.content
