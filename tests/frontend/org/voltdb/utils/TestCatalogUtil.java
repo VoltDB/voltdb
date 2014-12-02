@@ -877,7 +877,7 @@ public class TestCatalogUtil extends TestCase {
 
         assertTrue(good_deployment.getExport().getConfiguration().get(0).isEnabled());
         assertEquals(good_deployment.getExport().getConfiguration().get(0).getTarget(), ServerExportEnum.FILE);
-        
+
         assertTrue(good_deployment.getExport().getConfiguration().get(1).isEnabled());
         assertEquals(good_deployment.getExport().getConfiguration().get(1).getTarget(), ServerExportEnum.FILE);
     }
