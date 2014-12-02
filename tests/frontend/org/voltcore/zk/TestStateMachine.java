@@ -9,6 +9,7 @@ import java.nio.ByteBuffer;
 import java.util.Set;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.junit.After;
 import org.junit.Before;
@@ -52,19 +53,25 @@ public class TestStateMachine extends ZKTestBase {
 
     public void addStateMachinesFor(int Site) {
         String siteString = "zkClient" + Integer.toString(Site);
-        SynchronizedStatesManager ssm1 = new SynchronizedStatesManager(m_messengers.get(Site).getZK(),
-                "stateManager1", siteString, 1);
-        m_stateMachineGroup1[Site] = ssm1;
-        BooleanStateMachine bsm1 = new BooleanStateMachine(ssm1, "machine1", bsm_states[0]);
-        m_booleanStateMachinesForGroup1[Site] = bsm1;
+        try {
+            SynchronizedStatesManager ssm1 = new SynchronizedStatesManager(m_messengers.get(Site).getZK(),
+                    "stateManager1", siteString, 1);
+            m_stateMachineGroup1[Site] = ssm1;
+            BooleanStateMachine bsm1 = new BooleanStateMachine(ssm1, "machine1");
+            m_booleanStateMachinesForGroup1[Site] = bsm1;
 
-        SynchronizedStatesManager ssm2 = new SynchronizedStatesManager(m_messengers.get(Site).getZK(),
-                        "stateManager2", siteString, stateMachines.values().length);
-        m_stateMachineGroup2[Site] = ssm2;
-        BooleanStateMachine bsm2 = new BooleanStateMachine(ssm2, "machine1", bsm_states[0]);
-        m_booleanStateMachinesForGroup2[Site] = bsm2;
-        ByteStateMachine msm2 = new ByteStateMachine(ssm2, "machine2", msm_states[0]);
-        m_byteStateMachinesForGroup2[Site] = msm2;
+            SynchronizedStatesManager ssm2 = new SynchronizedStatesManager(m_messengers.get(Site).getZK(),
+                    "stateManager2", siteString, stateMachines.values().length);
+            m_stateMachineGroup2[Site] = ssm2;
+            BooleanStateMachine bsm2 = new BooleanStateMachine(ssm2, "machine1");
+            m_booleanStateMachinesForGroup2[Site] = bsm2;
+            ByteStateMachine msm2 = new ByteStateMachine(ssm2, "machine2");
+            m_byteStateMachinesForGroup2[Site] = msm2;
+        }
+        catch (KeeperException | InterruptedException e) {
+            //  Auto-generated catch block
+            e.printStackTrace();
+        }
     }
 
     public void removeStateMachinesFor(int Site) {
@@ -73,6 +80,15 @@ public class TestStateMachine extends ZKTestBase {
         m_byteStateMachinesForGroup2[Site] = null;
         m_stateMachineGroup1[Site] = null;
         m_stateMachineGroup2[Site] = null;
+    }
+
+    public void registerGroup1BoolFor(int Site) {
+        try {
+            m_stateMachineGroup1[Site].registerStateMachine(m_booleanStateMachinesForGroup1[Site], bsm_states[0]);
+        }
+        catch (KeeperException | InterruptedException e) {
+            fail("Exception occured during test.");
+        }
     }
 
     @Before
@@ -138,8 +154,8 @@ public class TestStateMachine extends ZKTestBase {
             return ByteBuffer.wrap(str.getBytes());
         }
 
-        public BooleanStateMachine(SynchronizedStatesManager ssm, String instanceName, ByteBuffer requestedInitialState) {
-            ssm.super(instanceName, requestedInitialState, log);
+        public BooleanStateMachine(SynchronizedStatesManager ssm, String instanceName) {
+            ssm.super(instanceName, log);
             assertFalse(isLocalStateLocked());
         }
 
@@ -216,8 +232,8 @@ public class TestStateMachine extends ZKTestBase {
             return ByteBuffer.wrap(arr);
         }
 
-        public ByteStateMachine(SynchronizedStatesManager ssm, String instanceName, ByteBuffer requestedInitialState) {
-            ssm.super(instanceName, requestedInitialState, log);
+        public ByteStateMachine(SynchronizedStatesManager ssm, String instanceName) {
+            ssm.super(instanceName, log);
             assertFalse(isLocalStateLocked());
         }
 
@@ -332,7 +348,7 @@ public class TestStateMachine extends ZKTestBase {
         log.info("Starting testSimpleSuccess");
         try {
             for (int ii = 0; ii < NUM_AGREEMENT_SITES; ii++) {
-                m_stateMachineGroup1[ii].registerStateMachine(m_booleanStateMachinesForGroup1[ii]);
+                registerGroup1BoolFor(ii);
             }
 
             while (!boolsInitialized(m_booleanStateMachinesForGroup1)) {
@@ -351,6 +367,7 @@ public class TestStateMachine extends ZKTestBase {
             assertTrue(i0.state == newVal);
         }
         catch (InterruptedException e) {
+            fail("Exception occured during test.");
         }
     }
 
@@ -362,7 +379,7 @@ public class TestStateMachine extends ZKTestBase {
             BooleanStateMachine i1 = m_booleanStateMachinesForGroup1[1];
 
             for (int ii = 0; ii < NUM_AGREEMENT_SITES; ii++) {
-                m_stateMachineGroup1[ii].registerStateMachine(m_booleanStateMachinesForGroup1[ii]);
+                registerGroup1BoolFor(ii);
             }
 
             while (!boolsInitialized(m_booleanStateMachinesForGroup1)) {
@@ -381,6 +398,7 @@ public class TestStateMachine extends ZKTestBase {
             assertFalse(i0.state == newVal);
         }
         catch (InterruptedException e) {
+            fail("Exception occured during test.");
         }
     }
 
@@ -394,7 +412,7 @@ public class TestStateMachine extends ZKTestBase {
             BooleanStateMachine i3 = m_booleanStateMachinesForGroup1[3];
 
             for (int ii = 0; ii < NUM_AGREEMENT_SITES; ii++) {
-                m_stateMachineGroup1[ii].registerStateMachine(m_booleanStateMachinesForGroup1[ii]);
+                registerGroup1BoolFor(ii);
             }
 
             while (!boolsInitialized(m_booleanStateMachinesForGroup1)) {
@@ -415,6 +433,7 @@ public class TestStateMachine extends ZKTestBase {
             assertFalse(i0.state == newVal);
         }
         catch (InterruptedException e) {
+            fail("Exception occured during test.");
         }
     }
 
@@ -425,7 +444,7 @@ public class TestStateMachine extends ZKTestBase {
             BooleanStateMachine i0 = m_booleanStateMachinesForGroup1[0];
 
             for (int ii = 0; ii < NUM_AGREEMENT_SITES; ii++) {
-                m_stateMachineGroup1[ii].registerStateMachine(m_booleanStateMachinesForGroup1[ii]);
+                registerGroup1BoolFor(ii);
             }
 
             while (!boolsInitialized(m_booleanStateMachinesForGroup1)) {
@@ -444,6 +463,7 @@ public class TestStateMachine extends ZKTestBase {
             assertTrue(i0.state == newVal);
         }
         catch (InterruptedException e) {
+            fail("Exception occured during test.");
         }
     }
 
@@ -454,9 +474,9 @@ public class TestStateMachine extends ZKTestBase {
             BooleanStateMachine i0 = m_booleanStateMachinesForGroup1[0];
             BooleanStateMachine i1 = m_booleanStateMachinesForGroup1[1];
             m_booleanStateMachinesForGroup1[1] = null;
-            m_stateMachineGroup1[0].registerStateMachine(m_booleanStateMachinesForGroup1[0]);
-            m_stateMachineGroup1[2].registerStateMachine(m_booleanStateMachinesForGroup1[2]);
-            m_stateMachineGroup1[3].registerStateMachine(m_booleanStateMachinesForGroup1[3]);
+            registerGroup1BoolFor(0);
+            registerGroup1BoolFor(2);
+            registerGroup1BoolFor(3);
 
             while (!boolsInitialized(m_booleanStateMachinesForGroup1)) {
                 Thread.sleep(500);
@@ -474,7 +494,7 @@ public class TestStateMachine extends ZKTestBase {
 
             // Initialize last state machine
             m_booleanStateMachinesForGroup1[1] = i1;
-            m_stateMachineGroup1[1].registerStateMachine(i1);
+            registerGroup1BoolFor(1);
             for (int ii = 0; ii < 10; ii++) {
                 if (boolsInitialized(m_booleanStateMachinesForGroup1)) {
                     break;
@@ -487,6 +507,7 @@ public class TestStateMachine extends ZKTestBase {
             assertTrue(boolsSynchronized(m_booleanStateMachinesForGroup1));
         }
         catch (InterruptedException e) {
+            fail("Exception occured during test.");
         }
     }
 
@@ -501,7 +522,8 @@ public class TestStateMachine extends ZKTestBase {
             m_booleanStateMachinesForGroup1[0] = null;
             m_booleanStateMachinesForGroup1[2] = null;
             m_booleanStateMachinesForGroup1[3] = null;
-            m_stateMachineGroup1[1].registerStateMachine(i1);
+
+            registerGroup1BoolFor(1);
 
             while (!boolsInitialized(m_booleanStateMachinesForGroup1)) {
                 Thread.sleep(500);
@@ -521,9 +543,9 @@ public class TestStateMachine extends ZKTestBase {
             m_booleanStateMachinesForGroup1[0] = i0;
             m_booleanStateMachinesForGroup1[2] = i2;
             m_booleanStateMachinesForGroup1[3] = i3;
-            m_stateMachineGroup1[0].registerStateMachine(i0);
-            m_stateMachineGroup1[2].registerStateMachine(i2);
-            m_stateMachineGroup1[3].registerStateMachine(i3);
+            registerGroup1BoolFor(0);
+            registerGroup1BoolFor(2);
+            registerGroup1BoolFor(3);
             for (int ii = 0; ii < 10; ii++) {
                 if (boolsInitialized(m_booleanStateMachinesForGroup1)) {
                     break;
@@ -537,6 +559,7 @@ public class TestStateMachine extends ZKTestBase {
             assertTrue(i0.state == newVal);
         }
         catch (InterruptedException e) {
+            fail("Exception occured during test.");
         }
     }
 
@@ -547,7 +570,7 @@ public class TestStateMachine extends ZKTestBase {
             BooleanStateMachine i0 = m_booleanStateMachinesForGroup1[0];
             BooleanStateMachine i1 = m_booleanStateMachinesForGroup1[1];
             for (int ii = 0; ii < NUM_AGREEMENT_SITES; ii++) {
-                m_stateMachineGroup1[ii].registerStateMachine(m_booleanStateMachinesForGroup1[ii]);
+                m_stateMachineGroup1[ii].registerStateMachine(m_booleanStateMachinesForGroup1[ii], bsm_states[0]);
             }
 
             while (!boolsInitialized(m_booleanStateMachinesForGroup1)) {
@@ -575,6 +598,7 @@ public class TestStateMachine extends ZKTestBase {
             assertFalse(i1.waitOnLockAck);
         }
         catch (Exception e) {
+            fail("Exception occured during test.");
         }
     }
 
@@ -589,8 +613,8 @@ public class TestStateMachine extends ZKTestBase {
 
             // For any site all state machine instances must be registered before it participates with other sites
             for (int ii = 0; ii < NUM_AGREEMENT_SITES; ii++) {
-                m_stateMachineGroup2[ii].registerStateMachine(m_booleanStateMachinesForGroup2[ii]);
-                m_stateMachineGroup2[ii].registerStateMachine(m_byteStateMachinesForGroup2[ii]);
+                m_stateMachineGroup2[ii].registerStateMachine(m_booleanStateMachinesForGroup2[ii], bsm_states[0]);
+                m_stateMachineGroup2[ii].registerStateMachine(m_byteStateMachinesForGroup2[ii], msm_states[0]);
             }
 
             while (!bytesInitialized(m_byteStateMachinesForGroup2)) {
@@ -620,6 +644,7 @@ public class TestStateMachine extends ZKTestBase {
             assertTrue(i2.state == rawByteStates[2]);
         }
         catch (Exception e) {
+            fail("Exception occured during test.");
         }
     }
 
@@ -633,8 +658,8 @@ public class TestStateMachine extends ZKTestBase {
 
             // For any site all state machine instances must be registered before it participates with other sites
             for (int ii = 0; ii < NUM_AGREEMENT_SITES; ii++) {
-                m_stateMachineGroup2[ii].registerStateMachine(m_booleanStateMachinesForGroup2[ii]);
-                m_stateMachineGroup2[ii].registerStateMachine(m_byteStateMachinesForGroup2[ii]);
+                m_stateMachineGroup2[ii].registerStateMachine(m_booleanStateMachinesForGroup2[ii], bsm_states[0]);
+                m_stateMachineGroup2[ii].registerStateMachine(m_byteStateMachinesForGroup2[ii], msm_states[0]);
             }
 
             while (!boolsInitialized(m_booleanStateMachinesForGroup2)) {
@@ -654,7 +679,7 @@ public class TestStateMachine extends ZKTestBase {
             g2j0.switchState();
 
             for (int ii = 0; ii < NUM_AGREEMENT_SITES; ii++) {
-                m_stateMachineGroup1[ii].registerStateMachine(m_booleanStateMachinesForGroup1[ii]);
+                m_stateMachineGroup1[ii].registerStateMachine(m_booleanStateMachinesForGroup1[ii], bsm_states[0]);
             }
             while(!g1i0.initialized) {
                 Thread.yield();
@@ -690,6 +715,7 @@ public class TestStateMachine extends ZKTestBase {
             assertFalse(g2j0.state == oldByteVal);
         }
         catch (Exception e) {
+            fail("Exception occured during test.");
         }
     }
 }
