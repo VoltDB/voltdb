@@ -639,8 +639,14 @@ public abstract class CatalogUtil {
 
             // move any deprecated standalone export elements to the group
             ExportType export = deployment.getExport();
-            if ((export != null) && (export.isEnabled() != null)) {
-                ExportConfigurationType exportConfig = export.getConfiguration().get(0);
+            if (export != null) {
+                ExportConfigurationType exportConfig;
+                if (export.getConfiguration() == null || export.getConfiguration().isEmpty()) {
+                    exportConfig = new ExportConfigurationType();
+                }
+                else {
+                    exportConfig = export.getConfiguration().get(0);
+                }
                 exportConfig.setEnabled(export.isEnabled());
                 exportConfig.setTarget(export.getTarget());
                 exportConfig.setExportconnectorclass(export.getExportconnectorclass());
@@ -868,6 +874,7 @@ public abstract class CatalogUtil {
         if (exportType == null) {
             return;
         }
+        List<String> groupList = new ArrayList<String>();
 
         for (ExportConfigurationType exportConfiguration : exportType.getConfiguration()) {
 
@@ -876,6 +883,16 @@ public abstract class CatalogUtil {
             // Should default to Constants.DEFAULT_EXPORT_CONNECTOR_NAME if not specified
             String groupName = exportConfiguration.getGroup();
             boolean defaultConnector = groupName.equals(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
+
+            if (connectorEnabled) {
+                if (groupList.contains(groupName)) {
+                    VoltDB.crashLocalVoltDB("Multiple connectors can not be assigned to single export group: " +
+                            groupName + ".", false, null);
+                }
+                else {
+                    groupList.add(groupName);
+                }
+            }
 
             Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
 
@@ -896,7 +913,7 @@ public abstract class CatalogUtil {
                                      "Export group " + groupName + " will be disabled.");
                     }
                 }
-                return;
+                continue;
             }
 
             // on-server export always uses the guest processor
@@ -921,12 +938,11 @@ public abstract class CatalogUtil {
                     catch (ClassNotFoundException ex) {
                         hostLog.error(
                                 "Custom Export failed to configure, failed to load " +
-                                " export plugin class: " + exportConfiguration.getExportconnectorclass() +
-                                " Disabling export.");
+                                "export plugin class: " + exportConfiguration.getExportconnectorclass() +
+                                " disabling export.");
                         exportConfiguration.setEnabled(false);
-                    return;
-                }
-                break;
+                        continue;
+                    } break;
             }
 
             // this is OK as the deployment file XML schema does not allow for

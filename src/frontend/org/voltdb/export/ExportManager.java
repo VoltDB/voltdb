@@ -116,7 +116,7 @@ public class ExportManager
 
     // this used to be flexible, but no longer - now m_loaderClass is just null or default value
     private static final String DEFAULT_LOADER_CLASS = "org.voltdb.export.processors.GuestProcessor";
-    private String m_loaderClass = DEFAULT_LOADER_CLASS;
+    private String m_loaderClass = null;
 
     private volatile Map<String, Pair<Properties, Set<String>>> m_processorConfig = new HashMap<>();
 
@@ -345,6 +345,7 @@ public class ExportManager
         updateProcessorConfig(connectors);
 
         exportLog.info(String.format("Export is enabled and can overflow to %s.", cluster.getExportoverflow()));
+        m_loaderClass = DEFAULT_LOADER_CLASS;
     }
 
     private synchronized void createInitialExportProcessor(

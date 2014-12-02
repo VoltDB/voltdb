@@ -259,7 +259,7 @@
   <!-- <export> -->
   <xs:complexType name="exportType">
     <xs:sequence>
-      <xs:element name="configuration" type="ExportConfigurationType" maxOccurs="unbounded"/>
+      <xs:element name="configuration" type="ExportConfigurationType" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
     <xs:attribute name="enabled" type="xs:boolean"/>
     <xs:attribute name="target" type="ServerExportEnum"/>
@@ -270,7 +270,7 @@
     <xs:sequence>
       <xs:element name="property" type="PropertyType" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
-    <xs:attribute name="group" type="xs:string" default="0"/>
+    <xs:attribute name="group" type="xs:string" default="DefaultExportGroup"/>
     <xs:attribute name="enabled" type="xs:boolean" default="true"/>
     <xs:attribute name="target" type="ServerExportEnum" default="file"/>
     <xs:attribute name="exportconnectorclass" type="xs:string" default=""/>
