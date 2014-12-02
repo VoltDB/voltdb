@@ -1,25 +1,16 @@
 ﻿(function ($) {
     var adminOverviewFunctions = function (options) {
         this.options = options;
-
-        //display configuration members
-        this.displayAdminConfiguration = function (connection) {
-            var adminConfigValues = voltDbRenderer.getAdminConfigurationItems(connection);
+        
+        this.displayAdminConfiguration = function (adminConfigValues) {
             configureAdminValues(adminConfigValues);
-
+            configurePortValues(adminConfigValues);
+            configureDirectoryValues(adminConfigValues);
         };
 
-        this.displayPortConfiguration = function (connection, configHeaderName) {
-            var portConfigValues = voltDbRenderer.getPortConfigurationItems(connection, configHeaderName);
-            configurePortValues(portConfigValues);
-
-        };
-
-        this.displayDirectoryConfiguration = function (connection) {
-            var directoryConfigValues = voltDbRenderer.getDirectoryConfigurationItems(connection);
-            configureDirectoryValues(directoryConfigValues);
-
-        };        
+        this.displayClientPort = function (clientPortValue) {
+            configureClientPortValue(clientPortValue);
+        };   
 
         var configureAdminValues = function (adminConfigValues) {
             options.siteNumberHeader.text(adminConfigValues.sitesperhost);
@@ -38,12 +29,15 @@
         };
 
         var configurePortValues = function (portConfigValues) {
-            options.clientPort.text(portConfigValues.clientPort);
             options.adminPort.text(portConfigValues.adminPort);
             options.httpPort.text(portConfigValues.httpPort);
             options.internalPort.text(portConfigValues.internalPort);
             options.zookeeperPort.text(portConfigValues.zookeeperPort);
             options.replicationPort.text(portConfigValues.replicationPort);
+        };
+
+        var configureClientPortValue = function (clientPortValue) {
+            options.clientPort.text(clientPortValue.clientPort);
         };
 
         var configureDirectoryValues = function (directoryConfigValues) {

@@ -241,7 +241,7 @@ $(document).ready(function () {
     //If security is enabled, then it displays login popup. After user is verified, it calls loadPage().
     //If security is not enabled, then it simply calls loadPage().
     voltDbRenderer.HandleLogin(serverName, portid, function () { loadPage(serverName, portid); });
-    adminConfiguration= $('#navAdmin').adminOverview({ 'refresh': true ,'isAdmin':true});
+    adminConfiguration= $('#navAdmin').adminOverview({ 'isAdmin':true});
 
 
 });
@@ -320,15 +320,15 @@ var loadPage = function (serverName, portid) {
 
     var refreshClusterHealth = function () {
         //loads cluster health and other details on the top banner
-        
-        voltDbRenderer.GetSystemInformation(function () {
+
+        var loadClusterHealth = function () {
             voltDbRenderer.GetClusterHealth(function (htmlData, alertHtmlData) {
                 $("#clusterHealth").html(htmlData).show();
                 $("#memoryAlertsList").html(alertHtmlData);
             });
-            
+
             voltDbRenderer.mapNodeInformationByStatus(function (htmlData) {
-                
+
                 var currentServer = getCurrentServer();
                 if (currentServer == undefined) {
                     saveCurrentServer(htmlData.ServerInformation[1].CurrentServer);
@@ -391,8 +391,13 @@ var loadPage = function (serverName, portid) {
 
             var lUserPreferences = getUserPreferences();
             showHideGraph(lUserPreferences);
-
-        });
+        };
+        
+        var loadAdminTabClientPort = function(clientPortValue) {
+            adminConfiguration.displayClientPort(clientPortValue);
+        };
+            
+        voltDbRenderer.GetSystemInformation(loadClusterHealth, adminConfiguration, loadAdminTabClientPort);
 
 
     };
@@ -415,8 +420,7 @@ var loadPage = function (serverName, portid) {
             MonitorGraphUI.RefreshCpu(cpuDetails, getCurrentServer(), graphView, currentTab);
         });
 
-
-        voltDbRenderer.GetProceduresInfoNAdminConfiguration(function (procedureMetadata) {
+        var loadProcedureInformations = function(procedureMetadata) {
             if ((procedureMetadata != "" && procedureMetadata != undefined)) {
                 voltDbRenderer.mapProcedureInformation(currentProcedureAction, priorProcedureAction, function(traverse, htmlData) {
                     if (!voltDbRenderer.isProcedureSearch) {
@@ -463,7 +467,13 @@ var loadPage = function (serverName, portid) {
 
             }
 
-        },adminConfiguration);
+        };
+
+        var loadAdminConfigurations = function (adminConfigValues) {
+            adminConfiguration.displayAdminConfiguration(adminConfigValues);
+        };
+
+        voltDbRenderer.GetProceduresInfoNAdminConfiguration(loadProcedureInformations, adminConfiguration, loadAdminConfigurations);
         
         voltDbRenderer.getTablesInformation(function (tableMetadata) {
             if (tableMetadata != "" && tableMetadata != undefined) {
