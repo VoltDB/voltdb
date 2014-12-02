@@ -590,7 +590,7 @@ table.storeTbl .sorttable_sorted {
 div.popup {background: #fff;box-shadow: 0 3px 10px #222;}
 .preloader {left: 50%;margin: -10px 0 0 -25px;position: fixed;top: 50%;}
 
-.overlay-title{background:#fbfbfb; height:42px; line-height:42px; padding:4px 4px 4px 20px; border-bottom:1px solid #dbdbdb; font-size:16px; font-weight:bold; color:#3e3a3a;}
+.overlay-title{background:#fbfbfb; height:42px; line-height:42px; padding:4px 4px 4px 20px; border-bottom:1px solid #dbdbdb; font-size:16px;/* font-weight:bold;*/ color:#3e3a3a;}
 .overlay-content{ padding:20px; min-width:450px;height:200px; overflow:auto; line-height:18px;}
 .overlay-btns{ text-align:right; padding:5px 20px 20px 20px;}
 
@@ -848,6 +848,7 @@ input.exitableTxtBx{width:30px; /*position:relative; top:6px;*/ padding:2px 3px;
 .tblSave tr td input[type="text"]{ width:267px; padding:6px 4px 7px 4px;}
 .tblRestore th {}
 .tblRestore tr td input[type="text"]{ width:185px; padding:6px 4px 7px 4px;}
+.restoreCont {overflow:auto; height:200px}
 .restoreTxt {border: 1px solid #CCCCCC;padding: 9px; /* margin: 1px 0 0 0; */ position: relative; top: 2px;}
 .browseBtn {}
 .tblRestore { border:none}
@@ -1012,7 +1013,8 @@ top: 3px;}
  .adminLeft { float:none; width:100%}
 ul.adminClusterList { width:250px;}/*admin*/
 ul.adminClusterList li { margin:0; padding-top:15px; float:left; width:67px; height:100%; line-height:75px;}/*admin*/
-#serverConfigAdmin{ top:214px;}	
+#serverConfigAdmin{ top:214px;}
+.restoreCont {overflow:auto; height:146px}		
 	 }
 
 @media (width: 320px) {
@@ -1020,7 +1022,7 @@ ul.adminClusterList li { margin:0; padding-top:15px; float:left; width:67px; hei
  input.icon-search { width:182px;}
  
   input.icoSS { width:135px!important;}
-  
+  .restoreCont {overflow:auto; height:146px}	
  
  }
 @media screen and (orientation:landscape) {
