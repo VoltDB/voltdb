@@ -433,9 +433,11 @@ public class CatalogDiffEngine {
             return retval;
         }
 
+        CatalogType parent = suspect.getParent();
+
         // handle changes to columns in an index - presumably drops and presumably unique
-        if ((suspect instanceof ColumnRef) && (suspect.getParent() instanceof Index)) {
-            Index idx = (Index) suspect.getParent();
+        if ((suspect instanceof ColumnRef) && (parent instanceof Index)) {
+            Index idx = (Index) parent;
             assert(idx.getUnique());
             assert(changeType == ChangeType.DELETION);
             Table table = (Table) idx.getParent();
@@ -444,6 +446,16 @@ public class CatalogDiffEngine {
             retval[1] = String.format(
                     "Unable to remove column %s from unique index %s because table %s is not empty.",
                     suspect.getTypeName(), idx.getTypeName(), retval[0]);
+            return retval;
+        }
+
+        if ((suspect instanceof Column) && (parent instanceof Table) && (changeType == ChangeType.ADDITION)) {
+            Column column = (Column)suspect;
+            String nullness = column.getNullable() ? "NULL" : "NOT NULL";
+            retval[0] = parent.getTypeName();
+            retval[1] = String.format(
+                    "Unable to add %s column %s because table %s is not empty.",
+                    nullness, suspect.getTypeName(), retval[0]);
             return retval;
         }
 
@@ -729,9 +741,10 @@ public class CatalogDiffEngine {
             }
         }
 
-        // handle narrowing columns
+        // handle narrowing columns and some modifications on empty tables
         if (prevType instanceof Column) {
             Table table = (Table) prevType.getParent();
+            Column column = (Column)prevType;
             Database db = (Database) table.getParent();
 
             // for now, no changes to export tables
@@ -755,6 +768,16 @@ public class CatalogDiffEngine {
                 retval[1] = String.format(
                         "Unable to narrow the width of column %s in table %s because it is not empty.",
                         prevType.getTypeName(), retval[0]);
+                return retval;
+            }
+
+            // Nullability changes are allowed on empty tables.
+            if (field.equalsIgnoreCase("nullable")) {
+                // Would be flipping the nullability, so invert the state for the message.
+                String alteredNullness = column.getNullable() ? "NOT NULL" : "NULL";
+                retval[1] = String.format(
+                        "Unable to change column %s null constraint to %s in table %s because it is not empty.",
+                        prevType.getTypeName(), alteredNullness, retval[0]);
                 return retval;
             }
         }
