@@ -34,7 +34,6 @@ import org.eclipse.jetty.server.AsyncContinuation;
 import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.server.bio.SocketConnector;
 import org.eclipse.jetty.server.handler.AbstractHandler;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
@@ -47,8 +46,18 @@ import org.voltdb.compilereport.ReportMaker;
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.io.Resources;
 import java.net.InetAddress;
+import org.codehaus.jackson.annotate.JsonIgnore;
+import org.codehaus.jackson.map.JsonMappingException;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jackson.schema.JsonSchema;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
+import org.eclipse.jetty.server.bio.SocketConnector;
+import org.voltdb.ClientResponseImpl;
+import org.voltdb.VoltTable;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.UsersType;
 
 public class HTTPAdminListener {
 
@@ -89,6 +98,13 @@ public class HTTPAdminListener {
             return m_hostHeader;
         }
 
+        public boolean authenticate(Request request) throws Exception {
+            try {
+                return httpClientInterface.authenticate(request);
+            } catch (Exception ex) {
+            }
+            return false;
+        }
 
         @Override
         public void handle(String string, Request rqst, HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
@@ -231,6 +247,77 @@ public class HTTPAdminListener {
 
     }
 
+    abstract class IgnorePasswordMixIn {
+        @JsonIgnore abstract String getPassword();
+    }
+
+
+    class DeploymentRequestHandler extends VoltRequestHandler {
+
+        final ObjectMapper m_mapper;
+        String m_schema = "";
+        public DeploymentRequestHandler() {
+            m_mapper = new ObjectMapper();
+            m_mapper.getSerializationConfig().addMixInAnnotations(UsersType.User.class, IgnorePasswordMixIn.class);
+            m_mapper.getDeserializationConfig().addMixInAnnotations(UsersType.User.class, IgnorePasswordMixIn.class);
+            try {
+                JsonSchema schema = m_mapper.generateJsonSchema(DeploymentType.class);
+                m_schema = schema.toString();
+            } catch (JsonMappingException ex) {
+
+            }
+
+        }
+
+        @Override
+        public void handle(String target,
+                           Request baseRequest,
+                           HttpServletRequest request,
+                           HttpServletResponse response)
+                           throws IOException, ServletException {
+
+            super.handle(target, baseRequest, request, response);
+            String jsonp = request.getParameter("jsonp");
+
+            try {
+                if (baseRequest.getRequestURI().contains("/schema")) {
+                    String msg = m_schema;
+                    if (jsonp != null) {
+                        msg = String.format("%s( %s )", jsonp, m_schema);
+                    }
+                    response.getWriter().print(msg);
+                    response.setStatus(HttpServletResponse.SC_OK);
+                    baseRequest.setHandled(true);
+                    return;
+                }
+
+                if (!authenticate(baseRequest)) {
+                    String msg = "Incorrect authorization credentials.";
+                    ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg);
+                    msg = rimpl.toJSONString();
+                    if (jsonp != null) {
+                        msg = String.format("%s( %s )", jsonp, msg);
+                    }
+                    response.setStatus(HttpServletResponse.SC_OK);
+                    response.getWriter().print(msg);
+                    baseRequest.setHandled(true);
+                } else {
+                    DeploymentType d = VoltDB.instance().getDeployment();
+                    String msg = m_mapper.writeValueAsString(d);
+                    if (jsonp != null) {
+                        msg = String.format("%s( %s )", jsonp, msg);
+                    }
+                    response.getWriter().print(msg);
+                    response.setStatus(HttpServletResponse.SC_OK);
+                    baseRequest.setHandled(true);
+                }
+            } catch (Exception ex) {
+              logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage());
+            }
+        }
+
+    }
+
     class APIRequestHandler extends VoltRequestHandler {
 
         @Override
@@ -354,11 +441,17 @@ public class HTTPAdminListener {
             ContextHandler ddlRequestHandler = new ContextHandler("/ddl");
             ddlRequestHandler.setHandler(new DDLRequestHandler());
 
+            ///deployment
+            ContextHandler deploymentRequestHandler = new ContextHandler("/deployment");
+            DeploymentRequestHandler dh = new DeploymentRequestHandler();
+            deploymentRequestHandler.setHandler(dh);
+
             ContextHandlerCollection handlers = new ContextHandlerCollection();
             handlers.setHandlers(new Handler[] {
                     apiRequestHandler,
                     catalogRequestHandler,
                     ddlRequestHandler,
+                    deploymentRequestHandler,
                     dbMonitorHandler
             });
 

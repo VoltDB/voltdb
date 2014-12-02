@@ -61,6 +61,7 @@ import org.voltdb.licensetool.LicenseApi;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
+import org.voltdb.compiler.deploymentfile.DeploymentType;
 
 public class MockVoltDB implements VoltDBInterface
 {
@@ -624,4 +625,9 @@ public class MockVoltDB implements VoltDBInterface
     public void halt() {
         assert (true);
     }
+
+    public DeploymentType getDeployment() {
+        return null;
+    }
+
 }
