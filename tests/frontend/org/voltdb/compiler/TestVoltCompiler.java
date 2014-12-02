@@ -53,6 +53,7 @@ import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler.Feedback;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.types.IndexType;
@@ -419,7 +420,7 @@ public class TestVoltCompiler extends TestCase {
             cat.execute(catalogContents);
 
             Connector connector = cat.getClusters().get("cluster").getDatabases().
-                get("database").getConnectors().get("0");
+                get("database").getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
             assertFalse(connector.getEnabled());
 
         } finally {
@@ -452,7 +453,7 @@ public class TestVoltCompiler extends TestCase {
             cat.execute(catalogContents);
             CatalogUtil.compileDeployment(cat, project.getPathToDeployment(), true, false);
             Connector connector = cat.getClusters().get("cluster").getDatabases().
-                get("database").getConnectors().get("0");
+                get("database").getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
             assertTrue(connector.getEnabled());
             // Assert that all tables exist in the connector section of catalog
             assertNotNull(connector.getTableinfo().getIgnoreCase("a"));
@@ -3326,7 +3327,7 @@ public class TestVoltCompiler extends TestCase {
     }
 
     private ConnectorTableInfo getConnectorTableInfoFor( Database db, String tableName) {
-        Connector connector =  db.getConnectors().get("0");
+        Connector connector =  db.getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
         if( connector == null) return null;
         return connector.getTableinfo().getIgnoreCase(tableName);
     }
