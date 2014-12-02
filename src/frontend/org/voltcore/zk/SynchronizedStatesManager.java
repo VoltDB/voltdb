@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.Set;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -19,54 +18,69 @@ import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.Watcher.Event.KeeperState;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.apache.zookeeper_voltpatches.data.Stat;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 
 import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Sets;
-import com.google_voltpatches.common.util.concurrent.ListeningScheduledExecutorService;
-import com.google_voltpatches.common.util.concurrent.MoreExecutors;
+import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
 /*
- * This state machine coexists with other state machines under a single system node used to track
- * the participant count. When the
+ * This state machine coexists with other SynchronizedStateManagers by using different branches of the
+ * ZooKeeper tree. This class provides a service to the StateMachineInstance class that reports changes
+ * to the topology. The ZooKeeper tree hierarchy is (quoted are reserved node names):
+ *     |- rootNode
+ *     |\
+ *     | |- 'MEMBERS'
+ *     |  \
+ *     |   |- memberId
+ *     \
+ *      |- instanceName
+ *      |\
+ *      | |- 'LOCK_CONTENDERS'
+ *      |\
+ *      | |- 'BARRIER_PARTICIPANTS'
+ *       \
+ *        |- 'BARRIER_RESULTS'
+ *
+ * This hierarchy supports multiple topologies so one SynchronizedStatesManager could be used to track
+ * cluster membership while another could be used to track partition membership. Each SynchronizedStatesManager
+ * instance has a memberId that must be unique to the topology it is participating in. As the
+ * SynchronizedStatesManager is a shared service that can provide topology changes of other StateMachineInstances
+ * joining or leaving the topology, all instances are considered tightly bound to the SynchronizedStatesManager.
+ * This means that the SynchronizedStatesManager will not join a topology until all instances using that manager
+ * have registered with the SynchronizedStatesManager. Thus when a SynchronizedStatesManager informs its
+ * instances that a new member has joined the topology, the instance can be assured that it's peer instance is
+ * also there. This implies that StateMachineInstances can only coexist in the same SynchronizedStatesManager if
+ * all instances can be initialized (registered) before any individual instance needs to access the shared state.
  */
 public class SynchronizedStatesManager {
     private final AtomicBoolean m_done = new AtomicBoolean(false);
+    private final static String m_memberNode = "MEMBERS";
     private Set<String> m_members = new HashSet<String>();
     private final StateMachineInstance m_registeredStateMachines [];
     private int m_registeredStateMachineInstances = 0;
-    private static final ScheduledThreadPoolExecutor m_esBase =
-            new ScheduledThreadPoolExecutor(1,
-                    CoreUtils.getThreadFactory(null, "SMI Daemon", CoreUtils.SMALL_STACK_SIZE, false, null),
-                                            new java.util.concurrent.ThreadPoolExecutor.DiscardPolicy());
-    private static final ListeningScheduledExecutorService m_shared_es = MoreExecutors.listeningDecorator(m_esBase);
+    private static final ListeningExecutorService m_shared_es = CoreUtils.getListeningExecutorService("SMI Daemon", 1);
     // We assume that we are far enough along that the HostMessenger is up and running. Otherwise add to constructor.
     private final ZooKeeper m_zk;
     private final String m_stateMachineRoot;
     private final String m_stateMachineMemberPath;
     private final String m_memberId;
 
-    protected static boolean addIfMissing(ZooKeeper zk, String absolutePath, CreateMode createMode, byte[] data) {
+    protected static boolean addIfMissing(ZooKeeper zk, String absolutePath, CreateMode createMode, byte[] data)
+            throws KeeperException, InterruptedException {
         try {
-            Stat s = zk.exists(absolutePath, false);
-            if (s == null) {
-                zk.create(absolutePath, data, Ids.OPEN_ACL_UNSAFE, createMode);
-                return true;
-            }
+            zk.create(absolutePath, data, Ids.OPEN_ACL_UNSAFE, createMode);
         } catch (KeeperException.NodeExistsException e) {
-        } catch (Exception e) {
-            VoltDB.crashGlobalVoltDB("Failed to create Zookeeper node: " + e.getMessage(),
-                    false, e);
+            return false;
         }
-        return false;
+        return true;
     }
 
-    protected boolean addIfMissing(String absolutePath, CreateMode createMode, byte[] data) {
+    protected boolean addIfMissing(String absolutePath, CreateMode createMode, byte[] data)
+            throws KeeperException, InterruptedException {
         return addIfMissing(m_zk, absolutePath, createMode, data);
     }
 
@@ -110,9 +124,9 @@ public class SynchronizedStatesManager {
      *    processed the previous outcome
      */
 
-    abstract class StateMachineInstance {
+    public abstract class StateMachineInstance {
         private final String m_stateMachineId;
-        private Set<String> m_knownMembers;
+        protected Set<String> m_knownMembers;
         private final String m_statePath;
         private final String m_lockPath;
         private final String m_barrierResultsPath;
@@ -201,7 +215,8 @@ public class SynchronizedStatesManager {
 
         private final BarrierResultsWatcher m_barrierResultsWatcher = new BarrierResultsWatcher();
 
-        public StateMachineInstance(String instanceName, ByteBuffer requestedInitialState, VoltLogger logger) {
+        public StateMachineInstance(String instanceName, VoltLogger logger) {
+            assert(!instanceName.equals(m_memberNode));
             m_statePath = ZKUtil.joinZKPath(m_stateMachineRoot, instanceName);
             m_lockPath = ZKUtil.joinZKPath(m_statePath, "LOCK_CONTENDERS");
             m_barrierResultsPath = ZKUtil.joinZKPath(m_statePath, "BARRIER_RESULTS");
@@ -209,12 +224,11 @@ public class SynchronizedStatesManager {
             m_barrierParticipantsPath = ZKUtil.joinZKPath(m_statePath, "BARRIER_PARTICIPANTS");
             m_myPartiticpantsPath = ZKUtil.joinZKPath(m_barrierParticipantsPath, m_memberId);
             m_log = logger;
-            m_requestedInitialState = requestedInitialState;
             m_stateMachineId = "SMI " + m_memberId + "/" + instanceName;
             m_log.debug(m_stateMachineId + " created.");
         }
 
-        private void initializeStateMachine(Set<String> knownMembers) {
+        private void initializeStateMachine(Set<String> knownMembers) throws KeeperException, InterruptedException {
             addIfMissing(m_statePath, CreateMode.PERSISTENT, null);
             addIfMissing(m_lockPath, CreateMode.PERSISTENT, null);
             addIfMissing(m_barrierParticipantsPath, CreateMode.PERSISTENT, null);
@@ -771,15 +785,20 @@ public class SynchronizedStatesManager {
             unlockLocalState();
             return currentState;
         }
+
+        protected String getMemberId() {
+            return m_memberId;
+        }
     };
 
-    public SynchronizedStatesManager(ZooKeeper zk, String rootNode, String memberId, int registeredInstances) {
+    public SynchronizedStatesManager(ZooKeeper zk, String rootNode, String memberId, int registeredInstances)
+            throws KeeperException, InterruptedException {
         m_zk = zk;
-        // We will not add ourselves as members in zookeeper until all StateMachineInstances have registered
+        // We will not add ourselves as members in ZooKeeper until all StateMachineInstances have registered
         m_registeredStateMachines = new StateMachineInstance[registeredInstances];
         m_stateMachineRoot = ZKUtil.joinZKPath(VoltZK.syncStateMachine, rootNode);
         addIfMissing(m_stateMachineRoot, CreateMode.PERSISTENT, null);
-        m_stateMachineMemberPath = ZKUtil.joinZKPath(m_stateMachineRoot, "members");
+        m_stateMachineMemberPath = ZKUtil.joinZKPath(m_stateMachineRoot, m_memberNode);
         m_memberId = memberId;
     }
 
@@ -820,8 +839,10 @@ public class SynchronizedStatesManager {
         }
     }
 
-    public synchronized void registerStateMachine(StateMachineInstance machine) {
+    public synchronized void registerStateMachine(StateMachineInstance machine, ByteBuffer requestedInitialState) throws KeeperException, InterruptedException {
         assert(m_registeredStateMachineInstances < m_registeredStateMachines.length);
+        assert(machine.getMemberId() == m_memberId);
+        machine.m_requestedInitialState = requestedInitialState;
         m_registeredStateMachines[m_registeredStateMachineInstances] = machine;
         m_registeredStateMachineInstances++;
         if (m_registeredStateMachineInstances == m_registeredStateMachines.length) {
