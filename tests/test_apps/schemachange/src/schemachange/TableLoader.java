@@ -42,13 +42,13 @@ class TableLoader {
 
     static VoltLogger log = new VoltLogger("HOST");
 
-    final SchemaChangeClient scc;
     final VoltTable table;
     final Client client;
     final Random rand;
     final int pkeyColIndex;
     final String deleteCRUD;
     final String insertCRUD;
+    final int timeout;
 
     final AtomicBoolean hadError = new AtomicBoolean(false);
     final SortedSet<Long> outstandingPkeys = Collections.synchronizedSortedSet(new TreeSet<Long>());
@@ -59,11 +59,11 @@ class TableLoader {
         return String.format(str, parameters);
     }
 
-    TableLoader(SchemaChangeClient scc, VoltTable t, Random rand) {
-        this.scc = scc;
+    TableLoader(Client client, VoltTable t, Random rand, int timeout) {
         this.table = t;
-        this.client = scc.client;
+        this.client = client;
         this.rand = rand;
+        this.timeout = timeout;
 
         // find the primary key
         pkeyColIndex = TableHelper.getBigintPrimaryKeyIndexIfExists(table);
@@ -120,7 +120,7 @@ class TableLoader {
     }
 
     long countKeys(long max) {
-        return scc.callROProcedureWithRetry("@AdHoc",
+        return SchemaChangeUtility.callROProcedureWithRetry(this.client, "@AdHoc", this.timeout,
                 String.format("select count(*) from %s where pkey <= %d;",
                         TableHelper.getTableName(table), max)).getResults()[0].asScalarLong();
     }

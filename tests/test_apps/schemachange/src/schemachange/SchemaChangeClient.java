@@ -24,8 +24,6 @@
 package schemachange;
 
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.util.HashSet;
 import java.util.Random;
 import java.util.Set;
@@ -33,7 +31,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.utils.Pair;
 import org.voltdb.CLIConfig;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.TableHelper;
@@ -82,13 +79,6 @@ public class SchemaChangeClient {
         return String.format(str, parameters);
     }
 
-    static void logStackTrace(Throwable t) {
-        StringWriter sw = new StringWriter();
-        PrintWriter pw = new PrintWriter(sw, true);
-        t.printStackTrace(pw);
-        log.error(sw.toString());
-    }
-
     /**
      * Uses included {@link CLIConfig} class to
      * declaratively state command line options with defaults
@@ -127,83 +117,30 @@ public class SchemaChangeClient {
     }
 
     /**
-     * Call a procedure and check the return code.
-     * Success just returns the result to the caller.
-     * Unpossible errors end the process.
-     * Some errors will retry the call until the global progress timeout with various waits.
-     * After the global progress timeout, the process is killed.
+     * Call a R/O procedure with retries and check the return code. See SchemaChangeUtility for more info.
      */
     ClientResponse callROProcedureWithRetry(String procName, Object... params) {
-        long startTime = System.currentTimeMillis();
-        long now = startTime;
-
-        while (now - startTime < (config.noProgressTimeout * 1000)) {
-            ClientResponse cr = null;
-
-            try {
-                cr = client.callProcedure(procName, params);
-            }
-            catch (ProcCallException e) {
-                log.debug("callROProcedureWithRetry operation exception:", e);
-                cr = e.getClientResponse();
-            }
-            catch (NoConnectionsException e) {
-                log.debug("callROProcedureWithRetry operation exception:", e);
-                // wait a bit to retry
-                try { Thread.sleep(1000); } catch (InterruptedException e1) {}
-            }
-            catch (IOException e) {
-                log.debug("callROProcedureWithRetry operation exception:", e);
-                // IOException is not cool man
-                logStackTrace(e);
-                System.exit(-1);
-            }
-
-            if (cr != null) {
-                if (cr.getStatus() != ClientResponse.SUCCESS) {
-                    log.debug("callROProcedureWithRetry operation failed: " + ((ClientResponseImpl)cr).toJSONString());
-                }
-                switch (cr.getStatus()) {
-                case ClientResponse.SUCCESS:
-                    // hooray!
-                    return cr;
-                case ClientResponse.CONNECTION_LOST:
-                case ClientResponse.CONNECTION_TIMEOUT:
-                    // can retry after a delay
-                    try { Thread.sleep(5 * 1000); } catch (Exception e) {}
-                    break;
-                case ClientResponse.RESPONSE_UNKNOWN:
-                    // can try again immediately - cluster is up but a node died
-                    break;
-                case ClientResponse.SERVER_UNAVAILABLE:
-                    // shouldn't be in admin mode (paused) in this app, but can retry after a delay
-                    try { Thread.sleep(30 * 1000); } catch (Exception e) {}
-                    break;
-                case ClientResponse.GRACEFUL_FAILURE:
-                    //log.error(_F("GRACEFUL_FAILURE response in procedure call for: %s", procName));
-                    //log.error(((ClientResponseImpl)cr).toJSONString());
-                    //logStackTrace(new Throwable());
-                    return cr; // caller should always check return status
-                case ClientResponse.UNEXPECTED_FAILURE:
-                case ClientResponse.USER_ABORT:
-                    log.error(_F("Error in procedure call for: %s", procName));
-                    log.error(((ClientResponseImpl)cr).toJSONString());
-                    // for starters, I'm assuming these errors can't happen for reads in a sound system
-                    assert(false);
-                    System.exit(-1);
-                }
-            }
-
-            now = System.currentTimeMillis();
-        }
-
-        log.error(_F("Error no progress timeout reached, terminating"));
-        System.exit(-1);
-        return null;
+        return SchemaChangeUtility.callROProcedureWithRetry(client, procName, config.noProgressTimeout, params);
     }
 
     SchemaChangeClient(SchemaChangeConfig config) {
         this.config = config;
+    }
+
+    private class CatalogChangeSchema
+    {
+        VoltTable table;
+        TableHelper.ViewRep view;
+
+        CatalogChangeSchema() {
+            this.table = null;
+            this.view = null;
+        }
+
+        void updateFrom(final CatalogChangeSchema other) {
+            this.table = other.table;
+            this.view = other.view;
+        }
     }
 
     /**
@@ -211,18 +148,15 @@ public class SchemaChangeClient {
      */
     private class CatalogChangeTestDriver {
 
-        // Keep track of retries to limit how many occur.
-        private int retryCount = 0;
-
         /*
          * These members have the remaining state related to tables and views
          * that allows a retry attempt to perform the identical operation.
          */
-        private VoltTable t2 = null;
+        private CatalogChangeSchema currentSchema = new CatalogChangeSchema();
+        private CatalogChangeSchema newSchema = new CatalogChangeSchema();
         private String currentName = null;
         private String newName = null;
         private VoltTable versionT = null;
-        private TableHelper.ViewRep newViewRep = null;
         private long count = 0;
         private long start = 0;
         private Class<?> provisionalActiveVerifyProc = null;
@@ -250,31 +184,107 @@ public class SchemaChangeClient {
         }
 
         /**
+         * Add rows until RSS or rowcount target met.
+         * Delete some rows rows (triggers compaction).
+         * Re-add odd rows until RSS or rowcount target met (makes buffers out of order).
+         */
+        void loadTable() {
+            // if #partitions is odd, delete every 2 - if even, delete every 3
+            //int n = 3 - (topo.partitions % 2);
+
+            int redundancy = topo.sites / topo.partitions;
+            long realRowCount = (config.targetrowcount * topo.hosts) / redundancy;
+            String tableName = this.getTableName();
+            // if replicated
+            if (tableName.equals("B")) {
+                realRowCount /= topo.partitions;
+            }
+
+            long max = this.maxId();
+
+            TableLoader loader = new TableLoader(client, this.currentSchema.table, rand, config.noProgressTimeout);
+
+            log.info(_F("Loading table %s", tableName));
+            loader.load(max + 1, realRowCount);
+        }
+
+        /**
+         * Grab some random rows that aren't on the first EE page for the table.
+         */
+        private VoltTable sample(long offset) {
+            VoltTable t2 = this.currentSchema.table.clone(4096 * 1024);
+
+            ClientResponse cr = callROProcedureWithRetry("@AdHoc",
+                    String.format("select * from %s where pkey >= %d order by pkey limit 100;",
+                            TableHelper.getTableName(this.currentSchema.table), offset));
+            assert(cr.getStatus() == ClientResponse.SUCCESS);
+            VoltTable result = cr.getResults()[0];
+            result.resetRowPosition();
+            while (result.advanceRow()) {
+                t2.add(result);
+            }
+
+            return t2;
+        }
+
+        class SampleResults {
+            VoltTable table = null;
+            long sampleOffset = -1;
+        }
+
+        // deterministically sample some rows
+        SampleResults sampleRows() {
+            SampleResults results = new SampleResults();
+            long max = this.maxId();
+            if (max > 0) {
+                if (max <= 100)
+                    results.sampleOffset = 0;
+                else
+                    results.sampleOffset = Math.min((long) (max * .75), max - 100);
+                assert(max >= 0);
+                results.table = this.sample(results.sampleOffset);
+                assert(results.table.getRowCount() > 0);
+                log.info(_F("Sampled table %s from offset %d limit 100 and found %d rows.",
+                        this.getTableName(), results.sampleOffset, results.table.getRowCount()));
+            }
+            return results;
+        }
+
+        String getTableName() {
+            return TableHelper.getTableName(this.currentSchema.table);
+        }
+
+        long maxId() {
+            return SchemaChangeUtility.maxId(client, this.currentSchema.table, config.noProgressTimeout);
+        }
+
+        void catalogChange(boolean newTable) throws Exception {
+            for (int retryCount = 0; retryCount < config.retryLimit; ++retryCount) {
+                if (this.catalogChangeInternal(newTable, retryCount)) {
+                    return;
+                }
+                log.info(_F("Catalog update retry #%d for V%d in %d seconds...",
+                        retryCount+1, schemaVersionNo+1, config.retrySleep));
+                Thread.sleep(config.retrySleep * 1000);
+            }
+            throw new IOException(_F("Retry limit (%d) reached", config.retryLimit));
+        }
+
+        /**
          * Perform a schema change to a mutated version of the current table (80%) or
          * to a new table entirely (20%, drops and adds the new table).
          */
-        Pair<VoltTable,TableHelper.ViewRep> catalogChange(
-                VoltTable t1,
-                boolean newTable,
-                TableHelper.ViewRep viewIn,
-                boolean isRetry) throws Exception {
+        private boolean catalogChangeInternal(boolean newTable, int retryCount) throws Exception {
 
             // There are 3 possible forced failure points. Don't force failures during
             // the initial call.
-            FailBot failBot = new FailBot(3, t1 != null);
+            FailBot failBot = new FailBot(3, this.currentSchema.table != null);
 
             // A retry may skip the drops if they had succeeded.
             boolean skipDrops = false;
 
-            if (isRetry) {
-                log.info(_F("Catalog update retry #%d for V%d in %d seconds...",
-                            this.retryCount+1, schemaVersionNo+1, config.retrySleep));
-                Thread.sleep(config.retrySleep * 1000);
-
-                if (++this.retryCount >= config.retryLimit) {
-                    throw new IOException("Retry limit reached");
-                }
-                assert(this.t2 != null);
+            if (retryCount > 0) {
+                assert(this.newSchema.table != null);
                 assert(this.currentName != null);
                 assert(this.newName != null);
                 assert(this.versionT != null);
@@ -288,7 +298,8 @@ public class SchemaChangeClient {
                 // isSchemaVersionObservable() retries internally if the connection is still bad.
                 if (isSchemaVersionObservable(schemaVersionNo+1)) {
                     log.info(_F("The new version table V%d is present, not retrying.", schemaVersionNo+1));
-                    return finishUpdate(newTable);
+                    finishUpdate(newTable);
+                    return true;
                 }
 
                 if (isSchemaVersionObservable(schemaVersionNo)) {
@@ -304,9 +315,11 @@ public class SchemaChangeClient {
 
             // We may have determined that a retry isn't really necessary, e.g. if a
             // batch succeeds but has a communication problem at the tail end.
-            if (this.retryCount == 0) {
-                this.t2 = null;
-                this.currentName = t1 == null ? "B" : TableHelper.getTableName(t1);
+            if (retryCount == 0) {
+                this.newSchema.table = null;
+                this.currentName = this.currentSchema.table == null
+                                            ? "B"
+                                            : TableHelper.getTableName(this.currentSchema.table);
                 this.newName = this.currentName;
 
                 // add an empty table with the schema version number in the name
@@ -314,20 +327,20 @@ public class SchemaChangeClient {
 
                 if (newTable) {
                     this.newName = this.currentName.equals("A") ? "B" : "A";
-                    this.t2 = TableHelper.getTotallyRandomTable(this.newName, rand, false);
+                    this.newSchema.table = TableHelper.getTotallyRandomTable(this.newName, rand, false);
                 }
                 else {
-                    this.t2 = TableHelper.mutateTable(t1, true, rand);
+                    this.newSchema.table = TableHelper.mutateTable(this.currentSchema.table, true, rand);
                 }
 
                 // handle views
-                this.newViewRep = viewIn;
-                if (this.newViewRep == null) {
-                    this.newViewRep = TableHelper.ViewRep.viewRepForTable("MV", this.t2, rand);
+                this.newSchema.view = this.currentSchema.view;
+                if (this.newSchema.view == null) {
+                    this.newSchema.view = TableHelper.ViewRep.viewRepForTable("MV", this.newSchema.table, rand);
                 }
                 else {
-                    if (!this.newViewRep.compatibleWithTable(this.t2)) {
-                        this.newViewRep = null;
+                    if (!this.newSchema.view.compatibleWithTable(this.newSchema.table)) {
+                        this.newSchema.view = null;
                     }
                 }
             }
@@ -337,7 +350,10 @@ public class SchemaChangeClient {
             // The catalog update implementation ignores this stage. The stage is skipped
             // during retries when V# isn't found because the drop batch had succeeded.
             if (!skipDrops) {
-                this.logStage("drop");
+                // Only log with retries because a stage might be skipped.
+                if (retryCount > 0) {
+                    log.info(_F("Retry #%d: drop", retryCount));
+                }
                 schemaChanger.beginBatch();
                 try {
                     // Force failure?
@@ -348,7 +364,7 @@ public class SchemaChangeClient {
                     if (activeViewRep != null) {
                         schemaChanger.dropViews(activeViewRep.viewName);
                     }
-                    activeViewRep = this.newViewRep;
+                    activeViewRep = this.newSchema.view;
                     if (activeVerifyProc != null) {
                         schemaChanger.dropProcedures(activeVerifyProc.getName());
                     }
@@ -359,7 +375,7 @@ public class SchemaChangeClient {
                         }
                     }
                     if (!schemaChanger.executeBatch(client)) {
-                        return null;
+                        return false;
                     }
                     activeViewRep = null;
                     activeVerifyProc = null;
@@ -367,12 +383,15 @@ public class SchemaChangeClient {
                 catch (IOException e) {
                     // All SchemaChanger problems become IOExceptions.
                     // This is a normal error return that is handled by the caller.
-                    return null;
+                    return false;
                 }
             }
 
             // Now do the creates and alters.
-            this.logStage("create/alter");
+            // Only log with retries because a stage might be skipped.
+            if (retryCount > 0) {
+                log.info(_F("Retry #%d: create/alter", retryCount));
+            }
             schemaChanger.beginBatch();
             this.count = 0;
             this.start = 0;
@@ -386,13 +405,13 @@ public class SchemaChangeClient {
                 // make tables name A partitioned and tables named B replicated
                 boolean partitioned = this.newName.equalsIgnoreCase("A");
                 if (newTable) {
-                    schemaChanger.createTables(this.t2);
+                    schemaChanger.createTables(this.newSchema.table);
                 }
                 else {
-                    schemaChanger.updateTable(t1, this.t2);
+                    schemaChanger.updateTable(this.currentSchema.table, this.newSchema.table);
                 }
                 if (partitioned) {
-                    schemaChanger.addTablePartitionInfo(this.t2, this.newName);
+                    schemaChanger.addTablePartitionInfo(this.newSchema.table, this.newName);
                     this.provisionalActiveVerifyProc = VerifySchemaChangedA.class;
                 }
                 else {
@@ -403,7 +422,7 @@ public class SchemaChangeClient {
                     schemaChanger.createViews(activeViewRep);
                 }
 
-                this.count = tupleCount(t1);
+                this.count = tupleCount(this.currentSchema.table);
                 this.start = System.nanoTime();
 
                 if (newTable) {
@@ -414,33 +433,31 @@ public class SchemaChangeClient {
                 }
 
                 if (!schemaChanger.executeBatch(client)) {
-                    return null;
+                    return false;
                 }
 
                 // Exercise the retry logic by simulating a communication failure after
                 // successfully executing the batch. (t1 test avoids failing initial call)
                 if (failBot.failHere("after create/alter batch")) {
-                    return null;
+                    return false;
                 }
             }
             catch (IOException e) {
                 // All SchemaChanger problems become IOExceptions.
                 // This is a normal error return that is handled by the caller.
-                return null;
+                return false;
             }
 
-            return finishUpdate(newTable);
+            finishUpdate(newTable);
+            return true;
         }
 
-        private Pair<VoltTable, TableHelper.ViewRep> finishUpdate(boolean newTable)
+        private void finishUpdate(boolean newTable)
         {
             if (newTable) {
                 activeTableNames.add(this.newName);
             }
             activeVerifyProc = this.provisionalActiveVerifyProc;
-
-            // We presumably succeeded, so it's no longer a retry situation.
-            this.retryCount = 0;
 
             // don't actually trust the call... manually verify
             int obsCatVersion = verifyAndGetSchemaVersion();
@@ -471,14 +488,29 @@ public class SchemaChangeClient {
                 log.info(_F("Completed %d tuples in %.4f seconds (%d tuples/sec)",
                             this.count, seconds, (long) (this.count / seconds)));
             }
-            return new Pair<VoltTable,TableHelper.ViewRep>(this.t2, this.newViewRep, false);
+            this.currentSchema.updateFrom(this.newSchema);
         }
 
-        private void logStage(final String action) {
-            // Only log with retries because a stage might be skipped.
-            if (this.retryCount > 0) {
-                log.info(_F("Retry #%d: %s", this.retryCount, action));
+        /**
+         * Check sample and return error string on failure.
+         */
+        String checkSample(SampleResults sampleResults) throws Exception {
+            VoltTable guessT = this.currentSchema.table.clone(4096 * 1024);
+            //log.info(_F("Empty clone:\n%s", guessT.toFormattedString()));
+
+            TableHelper.migrateTable(sampleResults.table, guessT);
+            //log.info(_F("Java migration:\n%s", guessT.toFormattedString()));
+
+            // deterministically sample the same rows
+            assert(sampleResults.sampleOffset >= 0);
+            ClientResponse cr = callROProcedureWithRetry("VerifySchemaChanged" + this.getTableName(),
+                                                         sampleResults.sampleOffset, guessT);
+            assert(cr.getStatus() == ClientResponse.SUCCESS);
+            VoltTable result = cr.getResults()[0];
+            if (result.fetchRow(0).getLong(0) != 1) {
+                return result.fetchRow(0).getString(1);
             }
+            return null;
         }
     }
 
@@ -776,65 +808,6 @@ public class SchemaChangeClient {
     }
 
     /**
-     * Find the largest pkey value in the table.
-     */
-    public long maxId(VoltTable t) {
-        if (t == null) {
-            return 0;
-        }
-        ClientResponse cr = callROProcedureWithRetry("@AdHoc",
-                String.format("select pkey from %s order by pkey desc limit 1;", TableHelper.getTableName(t)));
-        assert(cr.getStatus() == ClientResponse.SUCCESS);
-        VoltTable result = cr.getResults()[0];
-        return result.getRowCount() > 0 ? result.asScalarLong() : 0;
-    }
-
-    /**
-     * Add rows until RSS or rowcount target met.
-     * Delete some rows rows (triggers compaction).
-     * Re-add odd rows until RSS or rowcount target met (makes buffers out of order).
-     */
-    private void loadTable(VoltTable t) {
-        // if #partitions is odd, delete every 2 - if even, delete every 3
-        //int n = 3 - (topo.partitions % 2);
-
-        int redundancy = topo.sites / topo.partitions;
-        long realRowCount = (config.targetrowcount * topo.hosts) / redundancy;
-        // if replicated
-        if (TableHelper.getTableName(t).equals("B")) {
-            realRowCount /= topo.partitions;
-        }
-
-        long max = maxId(t);
-
-        TableLoader loader = new TableLoader(this, t, rand);
-
-        log.info(_F("loading table"));
-        loader.load(max + 1, realRowCount);
-    }
-
-    /**
-     * Grab some random rows that aren't on the first EE page for the table.
-     */
-    private VoltTable sample(long offset, VoltTable t) {
-        VoltTable t2 = t.clone(4096 * 1024);
-
-        ClientResponse cr = callROProcedureWithRetry("@AdHoc",
-                String.format("select * from %s where pkey >= %d order by pkey limit 100;",
-                        TableHelper.getTableName(t), offset));
-        assert(cr.getStatus() == ClientResponse.SUCCESS);
-        VoltTable result = cr.getResults()[0];
-        result.resetRowPosition();
-        while (result.advanceRow()) {
-            t2.add(result);
-        }
-
-        return t2;
-    }
-
-
-
-    /**
      * Connect to a single server with retry. Limited exponential backoff. No
      * timeout. This will run until the process is killed if it's not able to
      * connect.
@@ -970,77 +943,29 @@ public class SchemaChangeClient {
         // The ad hoc DDL mechanism requires the procs be available on the server.
         schemaChanger.addProcedureClasses(client, VerifySchemaChangedA.class, VerifySchemaChangedB.class);
 
-        CatalogChangeTestDriver testDriver = new CatalogChangeTestDriver();
-
         // kick this off with a random schema
-        VoltTable t = null;
-        TableHelper.ViewRep v = null;
-        while (t == null) {
-            Pair<VoltTable, TableHelper.ViewRep> schema = testDriver.catalogChange(null, true, null, false);
-            t = schema.getFirst();
-            v = schema.getSecond();
-        }
+        CatalogChangeTestDriver testDriver = new CatalogChangeTestDriver();
+        testDriver.catalogChange(true);
 
+        // Main test loop. Exits by exception.
         while (true) {
 
             // make sure the table is full and mess around with it
-            loadTable(t);
+            testDriver.loadTable();
 
             for (int j = 0; j < 3; j++) {
-
-                String tableName = TableHelper.getTableName(t);
-
                 // deterministically sample some rows
-                VoltTable preT = null;
-                long max = maxId(t);
-                long sampleOffset = -1;
-                if (max > 0) {
-                    if (max <= 100)
-                        sampleOffset = 0;
-                    else
-                        sampleOffset = Math.min((long) (max * .75), max - 100);
-                    assert(max >= 0);
-                    preT = sample(sampleOffset, t);
-                    assert(preT.getRowCount() > 0);
-                    log.info(_F("Sampled table %s from offset %d limit 100 and found %d rows.",
-                            tableName, sampleOffset, preT.getRowCount()));
-                }
+                CatalogChangeTestDriver.SampleResults sampleResults = testDriver.sampleRows();
                 //log.info(_F("First sample:\n%s", preT.toFormattedString()));
 
                 // move to an entirely new table or migrated schema
-                VoltTable newT = null;
-                TableHelper.ViewRep newV = null;
                 boolean isNewTable = (j == 0) && (rand.nextInt(5) == 0);
-                boolean isRetry = false;
-                while (newT == null) {
-                    Pair<VoltTable, TableHelper.ViewRep> schema = testDriver.catalogChange(t, isNewTable, v, isRetry);
-                    if (schema == null) {
-                        isRetry = true;
-                    } else {
-                        isRetry = false;
-                        newT = schema.getFirst();
-                        newV = schema.getSecond();
-                    }
-                }
-                t = newT;
-                v = newV;
+                testDriver.catalogChange(isNewTable);
 
-                // if the table has been migrated, check the data
-                if (!isNewTable && (preT != null)) {
-                    VoltTable guessT = t.clone(4096 * 1024);
-                    //log.info(_F("Empty clone:\n%s", guessT.toFormattedString()));
-
-                    TableHelper.migrateTable(preT, guessT);
-                    //log.info(_F("Java migration:\n%s", guessT.toFormattedString()));
-
-                    // deterministically sample the same rows
-                    assert(sampleOffset >= 0);
-                    ClientResponse cr = callROProcedureWithRetry("VerifySchemaChanged" + tableName, sampleOffset, guessT);
-                    assert(cr.getStatus() == ClientResponse.SUCCESS);
-                    VoltTable result = cr.getResults()[0];
-                    boolean success = result.fetchRow(0).getLong(0) == 1;
-                    String err = result.fetchRow(0).getString(1);
-                    if (!success) {
+                // if the table has been migrated, check the sampled data
+                if (!isNewTable && (sampleResults.table != null)) {
+                    String err = testDriver.checkSample(sampleResults);
+                    if (err != null) {
                         log.error(_F(err));
                         assert(false);
                     }

@@ -2,29 +2,11 @@
 
 APPNAME="schemachange"
 
-# find voltdb binaries in either installation or distribution directory.
-if [ -n "$(which voltdb 2> /dev/null)" ]; then
-    VOLTDB_BIN=$(dirname "$(which voltdb)")
-else
-    VOLTDB_BIN="$(pwd)/../../../bin"
-fi
-# installation layout has all libraries in $VOLTDB_ROOT/lib/voltdb
-if [ -d "$VOLTDB_BIN/../lib/voltdb" ]; then
-    VOLTDB_BASE=$(dirname "$VOLTDB_BIN")
-    VOLTDB_LIB="$VOLTDB_BASE/lib/voltdb"
-    VOLTDB_VOLTDB="$VOLTDB_LIB"
-# distribution layout has libraries in separate lib and voltdb directories
-else
-    VOLTDB_LIB="`pwd`/../../../lib"
-    VOLTDB_VOLTDB="`pwd`/../../../voltdb"
-fi
+# Sets env. vars and provides voltdb_daemon_start()
+source ../../scripts/run_tools.sh
 
-CLASSPATH=$(ls -x "$VOLTDB_VOLTDB"/voltdb-*.jar | tr '[:space:]' ':')$(ls -x "$VOLTDB_LIB"/*.jar | egrep -v 'voltdb[a-z0-9.-]+\.jar' | tr '[:space:]' ':')
-VOLTDB="$VOLTDB_BIN/voltdb"
-LOG4J="$VOLTDB_VOLTDB/log4j.xml"
-CLIENTLOG4J="$VOLTDB_VOLTDB/../tests/log4j-allconsole.xml"
-LICENSE="$VOLTDB_VOLTDB/license.xml"
-HOST="localhost"
+# run_tools.sh assumes there is no deployment
+DEPLOYMENT=deployment.xml
 
 # remove build artifacts
 function clean() {
@@ -76,9 +58,15 @@ function quick() {
         --duration=60
 }
 
-# quick smoke test, including forced failures
+# Quick smoke test automatically starts the server and includes forced
+# failures to test retry logic.
+# The voltdb_daemon_start() function sourced from test_daemon_server.sh
+# starts a daemon server, waits for initialization to complete, and sets
+# a trap to kill it whenever this script exits.
 function smoke() {
-    srccompile
+    srccompile || exit 1
+    catalog || exit 1
+    voltdb_daemon_start $APPNAME.jar $HOST deployment.xml $LICENSE || exit 1
     java -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
         schemachange.SchemaChangeClient \
         --servers=localhost \
@@ -90,7 +78,7 @@ function smoke() {
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|catalog|server|client}"
+    echo "Usage: ./run.sh {clean|catalog|server|client|quick|smoke}"
 }
 
 # Run the target passed as the first arg on the command line
