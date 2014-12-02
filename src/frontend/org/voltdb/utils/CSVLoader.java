@@ -241,7 +241,7 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         int maxerrors = 100;
 
         @Option(desc = "different ways to handle blank items: {error|null|empty} (default: null)")
-        String blank = "null";
+        String blank = "foo";
 
         @Option(desc = "delimiter to use for separating entries")
         char separator = DEFAULT_SEPARATOR;
@@ -316,6 +316,12 @@ public class CSVLoader implements BulkLoaderErrorHandler {
             if (batch < 0) {
                 exitWithMessageAndUsage("batch size number must be >= 0");
             }
+            if(!customNullString.isEmpty() && blank.equals("foo")){
+                blank = "empty";
+            }
+            if(blank.equals("foo")) {
+                blank = "null";
+            }
             if (!blank.equalsIgnoreCase("error") &&
                 !blank.equalsIgnoreCase("null") &&
                 !blank.equalsIgnoreCase("empty")) {
@@ -355,12 +361,7 @@ public class CSVLoader implements BulkLoaderErrorHandler {
 
         final CSVConfig cfg = new CSVConfig();
         cfg.parse(CSVLoader.class.getName(), args);
-
         config = cfg;
-
-        if(config.customNullString != ""){
-            config.blank = "empty";
-        }
 
         configuration();
         final Tokenizer tokenizer;

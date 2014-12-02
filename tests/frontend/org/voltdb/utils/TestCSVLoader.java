@@ -479,18 +479,22 @@ public class TestCSVLoader {
         test_Interface(myOptions, myData, invalidLineCnt, validLineCnt );
         VoltTable ts_table = client.callProcedure("@AdHoc", "SELECT * FROM BLAH ORDER BY clm_integer;").getResults()[0];
         int i = 0;
+        int nulls = 0;
         while (ts_table.advanceRow()) {
             String value = ts_table.getString(4);
             if(i < 2) {
                 assertEquals(value, null);
+                nulls++;
             } else if(i == 4){
                 // this test case should fail once we stop replacing the \N as NULL
                 assertEquals(value, null);
+                nulls++;
             } else {
                 assertNotNull(value);
             }
             i++;
         }
+        assertEquals(nulls, 3);
     }
 
     @Test
