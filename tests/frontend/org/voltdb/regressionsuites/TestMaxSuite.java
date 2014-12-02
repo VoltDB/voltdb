@@ -33,165 +33,172 @@ import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestMaxSuite extends RegressionSuite {
 
-	static final Class<?>[] PROCEDURES = {};
-	private static int PARAMETERS_MAX_JOIN = 100;
-	private static int PARAMETERS_MAX_COLUMN = 1024;
-	private static int PARAMETERS_MAX_IN = 6000;
-	public TestMaxSuite(String name) {
-		super(name);
-	}
+    static final Class<?>[] PROCEDURES = {};
+    private static int PARAMETERS_MAX_JOIN = 100;
+    private static int PARAMETERS_MAX_COLUMN = 1024;
+    private static int PARAMETERS_MAX_IN = 6000;
 
-	public void testMaxIn() throws Exception {
-		final Client client = this.getClient();
+    public TestMaxSuite(String name) {
+        super(name);
+    }
 
-		ClientResponse resp = null;
-		for (int i = 0; i < 10; i++) {
-			resp = client.callProcedure("MAX_IN_TABLE.insert", i, i);
-			assertEquals(ClientResponse.SUCCESS, resp.getStatus());
-		}
+    public void testMaxIn() throws Exception {
+        final Client client = this.getClient();
 
-		StringBuilder stringBuilder = new StringBuilder(
-				"select * from max_in_table where column0 in(");
-		for (int i = 0; i < PARAMETERS_MAX_IN; i++) {
-			stringBuilder.append(i);
-			if (i != PARAMETERS_MAX_IN - 1) {
-				stringBuilder.append(",");
-			}
-		}
-		stringBuilder.append(") order by column0;");
-		resp = client.callProcedure("@AdHoc", stringBuilder.toString());
-		assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        ClientResponse resp = null;
+        for (int i = 0; i < 10; i++) {
+            resp = client.callProcedure("MAX_IN_TABLE.insert", i, i);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        }
 
-		assertEquals(1, resp.getResults().length);
-		VoltTable results = resp.getResults()[0];
-		int rowCount = results.getRowCount();
-		assertEquals(10, rowCount);
-		assertEquals(2, results.getColumnCount());
-		for (int i = 0; i < rowCount; i++) {
-			assertEquals(i, results.fetchRow(i).getLong(0));
-		}
-	}
+        StringBuilder stringBuilder = new StringBuilder(
+                "select * from max_in_table where column0 in(");
+        for (int i = 0; i < PARAMETERS_MAX_IN; i++) {
+            stringBuilder.append(i);
+            if (i != PARAMETERS_MAX_IN - 1) {
+                stringBuilder.append(",");
+            }
+        }
+        stringBuilder.append(") order by column0;");
+        resp = client.callProcedure("@AdHoc", stringBuilder.toString());
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
 
-	public void testMaxColumn() throws Exception {
-		final Client client = this.getClient();
+        assertEquals(1, resp.getResults().length);
+        VoltTable results = resp.getResults()[0];
+        int rowCount = results.getRowCount();
+        assertEquals(10, rowCount);
+        assertEquals(2, results.getColumnCount());
+        for (int i = 0; i < rowCount; i++) {
+            assertEquals(i, results.fetchRow(i).getLong(0));
+        }
+    }
 
-		ClientResponse resp = null;
+    public void testMaxColumn() throws Exception {
+        final Client client = this.getClient();
 
-		StringBuilder sb = new StringBuilder(
-				"insert into max_column_table values(");
-		for (int i = 0; i < PARAMETERS_MAX_COLUMN; i++) {
-			sb.append(i);
-			if (i != PARAMETERS_MAX_COLUMN - 1) {
-				sb.append(",");
-			}
-		}
-		sb.append(");");
-		resp = client.callProcedure("@AdHoc", sb.toString());
+        ClientResponse resp = null;
 
-		sb = new StringBuilder("select  ");
-		for (int i = 0; i < PARAMETERS_MAX_COLUMN; i++) {
-			sb.append("column");
-			sb.append(i);
-			if (i != PARAMETERS_MAX_COLUMN - 1) {
-				sb.append(",");
-			}
-		}
-		sb.append(" from max_column_table order by column0;");
-		resp = client.callProcedure("@AdHoc", sb.toString());
-		assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        StringBuilder sb = new StringBuilder(
+                "insert into max_column_table values(");
+        for (int i = 0; i < PARAMETERS_MAX_COLUMN; i++) {
+            sb.append(i);
+            if (i != PARAMETERS_MAX_COLUMN - 1) {
+                sb.append(",");
+            }
+        }
+        sb.append(");");
+        resp = client.callProcedure("@AdHoc", sb.toString());
 
-		assertEquals(1, resp.getResults().length);
-		VoltTable results = resp.getResults()[0];
+        sb = new StringBuilder("select  ");
+        for (int i = 0; i < PARAMETERS_MAX_COLUMN; i++) {
+            sb.append("column");
+            sb.append(i);
+            if (i != PARAMETERS_MAX_COLUMN - 1) {
+                sb.append(",");
+            }
+        }
+        sb.append(" from max_column_table order by column0;");
+        resp = client.callProcedure("@AdHoc", sb.toString());
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
 
-		assertEquals(1, results.getRowCount());
-		assertEquals(PARAMETERS_MAX_COLUMN, results.getColumnCount());
-		assertEquals(0, results.fetchRow(0).getLong(0));
-	}
+        assertEquals(1, resp.getResults().length);
+        VoltTable results = resp.getResults()[0];
 
-	public void testMaxJoin() throws Exception {
-		final Client client = this.getClient();
+        assertEquals(1, results.getRowCount());
+        assertEquals(PARAMETERS_MAX_COLUMN, results.getColumnCount());
+        assertEquals(0, results.fetchRow(0).getLong(0));
+    }
 
-		ClientResponse resp = null;
+    public void testMaxJoin() throws Exception {
+        final Client client = this.getClient();
 
-		StringBuilder sb = new StringBuilder();
-		for (int i = 0; i < PARAMETERS_MAX_JOIN; i++) {
-			resp = client.callProcedure("MAX_JOIN_TABLE" + i + ".insert", 1, 1);
-			assertEquals(ClientResponse.SUCCESS, resp.getStatus());
-		}
+        ClientResponse resp = null;
 
-		sb = new StringBuilder("select * from ");
-		for (int i = 0; i < PARAMETERS_MAX_JOIN; i++) {
-			sb.append("max_join_table");
-			sb.append(i);
-			if (i != PARAMETERS_MAX_JOIN - 1) {
-				sb.append(",");
-			}
-		}
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < PARAMETERS_MAX_JOIN; i++) {
+            resp = client.callProcedure("MAX_JOIN_TABLE" + i + ".insert", 1, 1);
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        }
 
-		resp = client.callProcedure("@AdHoc", sb.toString());
-		assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        sb = new StringBuilder("select * from ");
+        for (int i = 0; i < PARAMETERS_MAX_JOIN; i++) {
+            sb.append("max_join_table");
+            sb.append(i);
+            if (i != PARAMETERS_MAX_JOIN - 1) {
+                sb.append(",");
+            }
+        }
 
-		assertEquals(1, resp.getResults().length);
-		VoltTable results = resp.getResults()[0];
+        resp = client.callProcedure("@AdHoc", sb.toString());
+        assertEquals(ClientResponse.SUCCESS, resp.getStatus());
 
-		assertEquals(1, results.getRowCount());
-		assertEquals(PARAMETERS_MAX_JOIN * 2, results.getColumnCount());
-		assertEquals(1, results.fetchRow(0).getLong(0));
-	}
+        assertEquals(1, resp.getResults().length);
+        VoltTable results = resp.getResults()[0];
 
-	static public junit.framework.Test suite() {
-		VoltServerConfig config = null;
-		final MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(
-				TestMaxSuite.class);
+        assertEquals(1, results.getRowCount());
+        assertEquals(PARAMETERS_MAX_JOIN * 2, results.getColumnCount());
+        assertEquals(1, results.fetchRow(0).getLong(0));
+    }
 
-		final VoltProjectBuilder project = new VoltProjectBuilder();
+    static public junit.framework.Test suite() {
+        VoltServerConfig config = null;
+        final MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(
+                TestMaxSuite.class);
 
-		try {
-			/** for max column */
-			StringBuilder sb = new StringBuilder(
-					"CREATE TABLE max_column_table(");
-			for (int i = 0; i < PARAMETERS_MAX_COLUMN; i++) {
-				sb.append("column");
-				sb.append(i);
-				sb.append(" INTEGER NOT NULL,");
-			}
-			sb.append("PRIMARY KEY(column0));");
-			project.addLiteralSchema(sb.toString());
-			project.addPartitionInfo("max_column_table", "column0");
+        final VoltProjectBuilder project = new VoltProjectBuilder();
 
-			/** for max join */
-			sb = new StringBuilder();
-			for (int i = 0; i < PARAMETERS_MAX_JOIN; i++) {
-				sb.append("create table max_join_table");
-				sb.append(i);
-				sb.append("(column0 INTEGER NOT NULL, column1 INTEGER NOT NULL, PRIMARY KEY (column0));");
-				project.addLiteralSchema(sb.toString());
-				// project.addPartitionInfo("p1", "b1");
-				sb.setLength(0);
-			}
+        try {
+            /** for max column */
+            StringBuilder sb = new StringBuilder(
+                    "CREATE TABLE max_column_table(");
+            for (int i = 0; i < PARAMETERS_MAX_COLUMN; i++) {
+                sb.append("column");
+                sb.append(i);
+                sb.append(" INTEGER NOT NULL,");
+            }
+            sb.append("PRIMARY KEY(column0));");
+            project.addLiteralSchema(sb.toString());
+            project.addPartitionInfo("max_column_table", "column0");
 
-			/** for max in */
-			project.addLiteralSchema("CREATE TABLE max_in_table(column0 INTEGER NOT NULL, column1 INTEGER NOT NULL, PRIMARY KEY (column0));");
-			project.addPartitionInfo("max_in_table", "column0");
+            /** for max join */
+            sb = new StringBuilder();
+            for (int i = 0; i < PARAMETERS_MAX_JOIN; i++) {
+                sb.append("create table max_join_table");
+                sb.append(i);
+                sb.append("(column0 INTEGER NOT NULL, column1 INTEGER NOT NULL, PRIMARY KEY (column0));");
+                project.addLiteralSchema(sb.toString());
+                // project.addPartitionInfo("p1", "b1");
+                sb.setLength(0);
+            }
 
-		} catch (IOException error) {
-			fail(error.getMessage());
-		}
+            /** for max in */
+            project.addLiteralSchema("CREATE TABLE max_in_table(column0 INTEGER NOT NULL, column1 INTEGER NOT NULL, PRIMARY KEY (column0));");
+            project.addPartitionInfo("max_in_table", "column0");
 
-		// JNI
-		config = new LocalCluster("testMax-onesite.jar", 1, 1, 0,
-				BackendTarget.NATIVE_EE_JNI);
-		boolean t1 = config.compile(project);
-		assertTrue(t1);
-		builder.addServerConfig(config);
+        } catch (IOException error) {
+            fail(error.getMessage());
+        }
 
-		// CLUSTER
-		config = new LocalCluster("testMax-cluster.jar", 2, 3, 1,
-				BackendTarget.NATIVE_EE_JNI);
-		boolean t2 = config.compile(project);
-		assertTrue(t2);
-		builder.addServerConfig(config);
+        // JNI
+        config = new LocalCluster("testMax-onesite.jar", 1, 1, 0,
+                BackendTarget.NATIVE_EE_JNI);
+        boolean t1 = config.compile(project);
+        assertTrue(t1);
+        builder.addServerConfig(config);
 
-		return builder;
-	}
+        config = new LocalCluster("testMax-hsql.jar", 1, 1, 0,
+                BackendTarget.HSQLDB_BACKEND);
+        boolean success = config.compile(project);
+        assertTrue(success);
+        builder.addServerConfig(config);
+
+        // CLUSTER
+        config = new LocalCluster("testMax-cluster.jar", 2, 3, 1,
+                BackendTarget.NATIVE_EE_JNI);
+        boolean t2 = config.compile(project);
+        assertTrue(t2);
+        builder.addServerConfig(config);
+
+        return builder;
+    }
 }
