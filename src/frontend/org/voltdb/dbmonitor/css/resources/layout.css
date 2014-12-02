@@ -591,7 +591,7 @@ div.popup {background: #fff;box-shadow: 0 3px 10px #222;}
 .preloader {left: 50%;margin: -10px 0 0 -25px;position: fixed;top: 50%;}
 
 .overlay-title{background:#fbfbfb; height:42px; line-height:42px; padding:4px 4px 4px 20px; border-bottom:1px solid #dbdbdb; font-size:16px; font-weight:bold; color:#3e3a3a;}
-.overlay-content{ padding:20px; margin-bottom:15px; min-width:450px;height:200px; overflow:auto; line-height:18px;}
+.overlay-content{ padding:20px; min-width:450px;height:200px; overflow:auto; line-height:18px;}
 .overlay-btns{ text-align:right; padding:5px 20px 20px 20px;}
 
 
@@ -787,7 +787,7 @@ ul.adminClusterList li a.resume { display:inline-block; background-position:-20p
 ul.adminClusterList li a.promote { display:inline-block; background-position:-70px -12px;width:40px; height:36px;}
 ul.adminClusterList li a.promote-disabled, ul.adminClusterList li a.promote-disabled:hover{ display:inline-block; background-position:-70px -56px;width:40px; height:36px; color:#bbb;}
 ul.adminClusterList li a.restore { display:inline-block;background-position:-120px -12px; width:40px; height:36px;}
-ul.adminClusterList li a.saveme { display:inline-block;background-position:-120px -57px; width:40px; height:26px;}
+ul.adminClusterList li a.saveme { display:inline-block;background-position:-120px -57px; width:40px; height:36px;}
 .save { display:inline-block;background-position:-313px -57px; width:40px; height:26px;}
 
 
@@ -813,7 +813,7 @@ ul.adminClusterList li a:hover{color:#000;}
 .adminContentRight { float:left;width:49%; background:#FFFFFF;  }
 .headerAdminContent {background: #d0d2d2;border-bottom: 1px solid #CCCCCC;height:45px;position: relative;}
 .adminDirectories { background:#f3f3f3;}
-.headerAdminContent h1 {padding: 15px 0 0 10px; font-weight:bold;}
+.headerAdminContent h1 {padding: 15px 0 0 10px;}
 .adminPorts { margin:0 0 10px 0; background:#f3f3f3;}
 .adminTbl { margin:0; padding:0;}
 .adminTbl1 tr td { margin:0; padding:2px 2px 2px 2px; border-left:none; border-right:none; line-height:38px; height:32px;}
@@ -884,7 +884,7 @@ td.heartbeattd span.unit, td.queryTimeOut span.unit{position:relative;/* top:7px
 .editOk, .editCancel {
     display: none;
 }
-.restoreInfo .overlay-content { height:320px;}
+.restoreInfo .overlay-content { }
 
 /*********************************************media Qu********************/
 @media (max-width: 479px) {
@@ -989,7 +989,7 @@ top: 3px;}
 	#popServerList {width:100%;position: absolute;right:0;top: 160px;}
 	.overlay-content { min-width:320px;}
 	 .adminMode {margin-top:10px}
-	.adminServer {margin-top:10px}
+	.adminServer {}
 	.adminLeft { float:none; width:100%}
 	#serverConfigAdmin{ top:98px;}
 }
@@ -1028,7 +1028,7 @@ ul.adminClusterList li { margin:0; padding-top:15px; float:left; width:67px; hei
 	 
 	 @media screen and (orientation:landscape) {
 		 
-		.overlay-content {height: 150px;}
+		.overlay-content {/*height: 150px;*/height:20%;}
 		
 		
 		 }
