@@ -100,7 +100,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             catch (ProcCallException pce) {
                 threw = true;
             }
-            assertTrue("Shouldn't be able to add a not null column without default", threw);
+            assertFalse("Should be able to add a not null column to an empty table without default", threw);
 
             // but we're good with a default
             try {
@@ -346,18 +346,55 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
         try {
             startSystem(config);
 
+            // Setting to not null should work if the table is empty.
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "alter table FOO alter VAL set not null;");
+            }
+            catch (ProcCallException pce) {
+                fail(String.format(
+                        "Should be able to declare not null on existing column of an empty table. "
+                        + "Exception: %s", pce.getLocalizedMessage()));
+            }
+            assertFalse(isColumnNullable("FOO", "VAL"));
+
+            // Make nullable again.
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "alter table FOO alter VAL set null;");
+            }
+            catch (ProcCallException pce) {
+                fail(String.format(
+                        "Should be able to make an existing column nullable. "
+                        + "Exception: %s", pce.getLocalizedMessage()));
+            }
+            assertTrue(isColumnNullable("FOO", "VAL"));
+
+            // Specify a default.
             assertTrue(verifyTableColumnDefault("FOO", "VAL", null));
             try {
                 m_client.callProcedure("@AdHoc",
                         "alter table FOO alter VAL set default 'goats';");
             }
             catch (ProcCallException pce) {
-                fail("Shouldn't fail");
+                fail(String.format("Shouldn't fail. Exception: %s", pce.getLocalizedMessage()));
             }
             assertTrue(verifyTableColumnDefault("FOO", "VAL", "'goats'"));
             assertTrue(isColumnNullable("FOO", "VAL"));
-            // Can't just make something not null (for the moment, empty table
-            // check to come later?)
+
+            // Change the default back to null
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "alter table FOO alter VAL set default NULL;");
+            }
+            catch (ProcCallException pce) {
+                fail("Shouldn't fail");
+            }
+            assertTrue(verifyTableColumnDefault("FOO", "VAL", null));
+            assertTrue(isColumnNullable("FOO", "VAL"));
+
+            // Setting to not null should fail if the table is not empty.
+            m_client.callProcedure("FOO.insert", 0, "whatever");
             boolean threw = false;
             try {
                 m_client.callProcedure("@AdHoc",
@@ -367,9 +404,17 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
                 pce.printStackTrace();
                 threw = true;
             }
-            assertTrue("Shouldn't be able to declare not null on existing column", threw);
+            assertTrue("Shouldn't be able to declare not null on existing column of a non-empty table", threw);
             assertTrue(isColumnNullable("FOO", "VAL"));
-            // Now change the default back to null
+
+            // Clear the table and reset VAL default (by setting to NULL)
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "delete from FOO;");
+            }
+            catch (ProcCallException pce) {
+                fail("Shouldn't fail");
+            }
             try {
                 m_client.callProcedure("@AdHoc",
                         "alter table FOO alter VAL set default NULL;");
@@ -800,6 +845,104 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
                 indexes = m_client.callProcedure("@Statistics", "INDEX", 0).getResults()[0];
             }
             while (indexes.getRowCount() != 0);
+        }
+        finally {
+            teardownSystem();
+        }
+    }
+
+    public void testAddNotNullColumnToEmptyTable() throws Exception
+    {
+        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(
+                "create table FOO (" +
+                "ID integer not null," +
+                "VAL bigint, " +
+                "constraint pk_tree primary key (ID)" +
+                ");\n"
+                );
+        builder.addPartitionInfo("FOO", "ID");
+        builder.setUseDDLSchema(true);
+        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
+        assertTrue("Schema compilation failed", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = pathToCatalog;
+        config.m_pathToDeployment = pathToDeployment;
+
+        try {
+            startSystem(config);
+
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "alter table FOO add column NEWCOL varchar(50) not null;");
+            }
+            catch (ProcCallException pce) {
+                fail(pce.getLocalizedMessage());
+            }
+            assertTrue(verifyTableColumnType("FOO", "NEWCOL", "VARCHAR"));
+            assertTrue(verifyTableColumnSize("FOO", "NEWCOL", 50));
+            assertFalse(isColumnNullable("FOO", "NEWCOL"));
+        }
+        finally {
+            teardownSystem();
+        }
+    }
+
+    public void testAddNotNullColumnToNonEmptyTable() throws Exception
+    {
+        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(
+                "create table FOO (" +
+                "ID integer not null," +
+                "VAL bigint, " +
+                "constraint pk_tree primary key (ID)" +
+                ");\n"
+                );
+        builder.addPartitionInfo("FOO", "ID");
+        builder.setUseDDLSchema(true);
+        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
+        assertTrue("Schema compilation failed", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = pathToCatalog;
+        config.m_pathToDeployment = pathToDeployment;
+
+        try {
+            startSystem(config);
+
+            // Adding NOT NULL column without a default fails for a non-empty table.
+            m_client.callProcedure("FOO.insert", 0, 0);
+            boolean threw = false;
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "alter table FOO add column NEWCOL varchar(50) not null;");
+            }
+            catch (ProcCallException pce) {
+                assertTrue("Expected \"is not empty\" error.", pce.getMessage().contains("is not empty"));
+                threw = true;
+            }
+            assertTrue(threw);
+
+            // Adding NOT NULL column with a default succeeds for a non-empty table.
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "alter table FOO add column NEWCOL varchar(50) default 'default' not null;");
+            }
+            catch (ProcCallException pce) {
+                fail("Should be able to add NOT NULL column with default to a non-empty table.");
+            }
+            assertTrue(verifyTableColumnType("FOO", "NEWCOL", "VARCHAR"));
+            assertTrue(verifyTableColumnSize("FOO", "NEWCOL", 50));
+            assertFalse(isColumnNullable("FOO", "NEWCOL"));
         }
         finally {
             teardownSystem();
