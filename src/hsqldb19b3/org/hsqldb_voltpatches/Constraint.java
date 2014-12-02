@@ -180,12 +180,11 @@ public final class Constraint implements SchemaObject {
         // A VoltDB extension to support the assume unique attribute
         copy.assumeUnique       = assumeUnique;
         // End of VoltDB extension
-        // A VoltDB extension to support indexed expressions
+        // A VoltDB extension to support LIMIT PARTITION ROWS syntax
         copy.rowsLimit          = rowsLimit;
         copy.rowsLimitDeleteStmt = rowsLimitDeleteStmt;
         // End of VoltDB extension
-        // A VoltDB extension to support LIMIT PARTITION ROWS syntax
-        // Does this need a deeper copy? --izzy
+        // A VoltDB extension to support indexed expressions
         copy.indexExprs         = indexExprs;
         // End of VoltDB extension
 
