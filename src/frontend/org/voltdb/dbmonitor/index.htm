@@ -364,7 +364,7 @@
                   <a href="#securityPop" id="securityEdit" class="edit" title="Edit">&nbsp;</a></td>
               </tr>
               <tr class="hasSubLabel parent" id="row-1">
-                <td class="configLabel"><a href="#" class="labelCollapsed">HTTP Access</a></td>
+                <td class="configLabel"><a href="javascript:vold(0)" class="labelCollapsed">HTTP Access</a></td>
                 <td align="right"><div id="httpAccessIcon" class="onIcon"></div></td>
                 <td>On</td>
                 <td>&nbsp;</td>
@@ -376,7 +376,7 @@
                 <td>&nbsp;</td>
               </tr>
               <tr class="hasSubLabel parent" id="row-2">
-                <td class="configLabel"><a href="#" class="labelCollapsed">Auto Snapshots</a></td>
+                <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Auto Snapshots</a></td>
                 <td align="right" id="autoSnapshotOption"><div id="autoSnapshotIcon" class="onIcon"></div>
                   <input style="display: none;" type="checkbox" id="chkAutoSnapshot" checked="checked" class="snapshot"/></td>
                 <td><div id="txtAutoSnapshot" class="SnapshotsOn">On</div></td>
@@ -404,7 +404,7 @@
                 <td>&nbsp;</td>
               </tr>
               <tr class="hasSubLabel parent" id="row-3">
-                <td class="configLabel"><a href="#" class="labelCollapsed">Command Logging</a></td>
+                <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Command Logging</a></td>
                 <td align="right"><div id="commandLogIcon" class="offIcon"></div></td>
                 <td>Off</td>
                 <td>&nbsp;</td>
@@ -428,7 +428,7 @@
                 <td>&nbsp;</td>
               </tr>
               <tr class="hasSubLabel parent" id="row-4">
-                <td class="configLabel"><a href="#" class="labelCollapsed">Export</a></td>
+                <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Export</a></td>
                 <td align="right"><div class="offIcon"></div></td>
                 <td>Off</td>
                 <td>&nbsp;</td>
@@ -446,7 +446,7 @@
                 <td>&nbsp;</td>
               </tr>
               <tr class="hasSubLabel parent" id="row-5">
-                <td class="configLabel"><a href="#" class="labelCollapsed">Advanced</a></td>
+                <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Advanced</a></td>
                 <td>&nbsp;</td>
                 <td>&nbsp;</td>
                 <td>&nbsp;</td>
@@ -475,7 +475,7 @@
               </tr>
               <tr class="child-row-5 subLabelRow">
                 <td class="configLabel">Max temp table memory</td>
-                <td  id="temptablesmaxsize"> align="right">256 MB</td>
+                <td  id="temptablesmaxsize" align="right">256 MB</td>
                 <td>&nbsp;</td>
                 <td>&nbsp;</td>
               </tr>
@@ -889,7 +889,7 @@
 <div id="autoSnapshotPop" style="display: none">
   <div class="overlay-title icon-alert">Auto Snapshots</div>
   <div class="clear"></div>
-  <div class="overlay-content">
+  <div class="overlay-content confirmationHeight">
     <p class="txt-bold">Do you want to save the value?</p>
   </div>
   <div class="overlay-btns"><a id="btnSaveSnapshot" class="btn" title="Ok">Ok</a> <a id="btnPopupAutoSnapshotCancel" class="btn btn-gray closeBtn" title="Ok">Cancel</a></div>
@@ -900,7 +900,7 @@
 <div id="securityPop" style="display: none">
   <div class="overlay-title icon-alert">Security: Confirmation</div>
   <div class="clear"></div>
-  <div class="overlay-content">
+  <div class="overlay-content confirmationHeight">
     <p class="txt-bold">Do you want to change Security?</p>
   </div>
   <div class="overlay-btns"><a class="btn closeBtn" id="btnSecurityOk" title="Ok">Ok</a> <a id="btnPopupSecurityCancel" class="btn btn-gray closeBtn" title="Cancel">Cancel</a></div>
@@ -941,7 +941,7 @@
   <div class="clear"></div>
   <div class="restoreInfo">
     <div class="overlay-content">
-     <div style="overflow:auto; height:300px">
+     <div class="restoreCont">
       <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblRestore">
       <tr>
           <th align="left">Directory</th>
@@ -1002,7 +1002,7 @@
 <div id="HrtTimeOutPopup" style="display: none">
   <div class="overlay-title icon-alert">Heartbeat time out</div>
   <div class="clear"></div>
-  <div class="overlay-content">
+  <div class="overlay-content confirmationHeight">
     <p class="txt-bold">Do you want to save the value?</p>
   </div>
   <div class="overlay-btns"> <a class="btn closeBtn" id="btnPopupHeartbeatTimeoutOk" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" id="btnPopupHeartbeatTimeoutCancel" title="Cancel">Cancel</a> </div>
@@ -1013,7 +1013,7 @@
 <div id="QueryTimeOutPopup" style="display: none">
   <div class="overlay-title icon-alert">Query time out</div>
   <div class="clear"></div>
-  <div class="overlay-content">
+  <div class="overlay-content confirmationHeight">
     <p class="txt-bold">Do you want to save the value?</p>
   </div>
   <div class="overlay-btns"> <a class="btn closeBtn" id="btnPopupQueryTimeoutOk" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" id="btnPopupQueryTimeoutCancel" title="Cancel">Cancel</a> </div>
