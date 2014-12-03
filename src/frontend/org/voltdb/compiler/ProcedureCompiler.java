@@ -396,7 +396,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
             StatementPartitioning partitioning =
                 info.singlePartition ? StatementPartitioning.forceSP() :
                                        StatementPartitioning.forceMP();
-            StatementCompiler.compile(compiler, hsql, catalog, db,
+            StatementCompiler.compileFromSqlTextAndUpdateCatalog(compiler, hsql, catalog, db,
                     estimates, catalogStmt, stmt.getText(), stmt.getJoinOrder(),
                     detMode, partitioning);
 
@@ -413,7 +413,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
                 // Only consider statements that are capable of running SP with a partitioning parameter that does not seem to
                 // conflict with the partitioning of prior statements.
                 if (partitioning.getCountOfIndependentlyPartitionedTables() == 1) {
-                    AbstractExpression statementPartitionExpression = partitioning.singlePartitioningExpression();
+                    AbstractExpression statementPartitionExpression = partitioning.singlePartitioningExpressionForReport();
                     if (statementPartitionExpression != null) {
                         if (commonPartitionExpression == null) {
                             commonPartitionExpression = statementPartitionExpression;
@@ -474,7 +474,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
                 String valueDescription = null;
                 if (exampleSPvalue == null) {
                     // Statements partitioned on a runtime constant. This is likely to be cryptic, but hopefully gets the idea across.
-                    valueDescription = "of " + commonPartitionExpression.toString();
+                    valueDescription = "of " + commonPartitionExpression.explain("");
                 } else {
                     valueDescription = exampleSPvalue.toString(); // A simple constant value COULD have been a parameter.
                 }
@@ -680,7 +680,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
             info.singlePartition ? StatementPartitioning.forceSP() :
                                    StatementPartitioning.forceMP();
         // default to FASTER detmode because stmt procs can't feed read output into writes
-        StatementCompiler.compile(compiler, hsql, catalog, db,
+        StatementCompiler.compileFromSqlTextAndUpdateCatalog(compiler, hsql, catalog, db,
                 estimates, catalogStmt, procedureDescriptor.m_singleStmt,
                 procedureDescriptor.m_joinOrder, DeterminismMode.FASTER, partitioning);
 
@@ -723,7 +723,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
             // message that the passed parameter is assumed to be equal to that constant (expression).
         } else {
             if (partitioning.getCountOfIndependentlyPartitionedTables() == 1) {
-                AbstractExpression statementPartitionExpression = partitioning.singlePartitioningExpression();
+                AbstractExpression statementPartitionExpression = partitioning.singlePartitioningExpressionForReport();
                 if (statementPartitionExpression != null) {
                     // The planner has uncovered an overlooked opportunity to run the statement SP.
                     String msg = null;
@@ -735,7 +735,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
                         Object partitionValue = partitioning.getInferredPartitioningValue();
                         if (partitionValue == null) {
                             // Statement partitioned on a runtime constant. This is likely to be cryptic, but hopefully gets the idea across.
-                            valueDescription = "of " + statementPartitionExpression.toString();
+                            valueDescription = "of " + statementPartitionExpression.explain("");
                         } else {
                             valueDescription = partitionValue.toString(); // A simple constant value COULD have been a parameter.
                         }

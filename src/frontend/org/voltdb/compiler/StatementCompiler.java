@@ -19,9 +19,9 @@ package org.voltdb.compiler;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.List;
 
 import org.hsqldb_voltpatches.HSQLInterface;
+import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.PlanFragment;
@@ -30,9 +30,9 @@ import org.voltdb.catalog.StmtParameter;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compilereport.StatementAnnotation;
 import org.voltdb.planner.CompiledPlan;
-import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.QueryPlanner;
+import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.planner.TrivialCostModel;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
@@ -40,8 +40,6 @@ import org.voltdb.plannodes.DeletePlanNode;
 import org.voltdb.plannodes.InsertPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.plannodes.UpdatePlanNode;
-import org.voltdb.plannodes.UpsertPlanNode;
-import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
@@ -58,9 +56,32 @@ public abstract class StatementCompiler {
 
     public static final int DEFAULT_MAX_JOIN_TABLES = 5;
 
-    static void compile(VoltCompiler compiler, HSQLInterface hsql,
+    /**
+     * This static method conveniently does a few things for its caller:
+     * - Formats the statement by replacing newlines with spaces
+     *     and appends a semicolon if needed
+     * - Updates the catalog Statement with metadata about the statement
+     * - Plans the statement and puts the serialized plan in the catalog Statement
+     * - Updates the catalog Statment with info about the statement's parameters
+     * Upon successful completion, catalog statement will have been updated with
+     * plan fragments needed to execute the statement.
+     *
+     * @param  compiler     The VoltCompiler instance
+     * @param  hsql         Pass through parameter to QueryPlanner
+     * @param  catalog      Pass through parameter to QueryPlanner
+     * @param  db           Pass through parameter to QueryPlanner
+     * @param  estimates    Pass through parameter to QueryPlanner
+     * @param  catalogStmt  Catalog statement to be updated with plan
+     * @param  xml          XML for statement, if it has been previously parsed
+     *                      (may be null)
+     * @param  stmt         Text of statement to be compiled
+     * @param  joinOrder    Pass through parameter to QueryPlanner
+     * @param  detMode      Pass through parameter to QueryPlanner
+     * @param  partitioning Partition info for statement
+    */
+    static void compileStatementAndUpdateCatalog(VoltCompiler compiler, HSQLInterface hsql,
             Catalog catalog, Database db, DatabaseEstimates estimates,
-            Statement catalogStmt, String stmt, String joinOrder,
+            Statement catalogStmt, VoltXMLElement xml, String stmt, String joinOrder,
             DeterminismMode detMode, StatementPartitioning partitioning)
     throws VoltCompiler.VoltCompilerException {
 
@@ -92,17 +113,18 @@ public abstract class StatementCompiler {
         TrivialCostModel costModel = new TrivialCostModel();
 
         CompiledPlan plan = null;
-
-        if (qtype == QueryType.UPSERT) {
-            sql = "INSERT" + sql.substring(6);
-        }
-
         QueryPlanner planner = new QueryPlanner(
                 sql, stmtName, procName,  catalog.getClusters().get("cluster"), db,
                 partitioning, hsql, estimates, false, DEFAULT_MAX_JOIN_TABLES,
                 costModel, null, joinOrder, detMode);
         try {
-            planner.parse();
+            if (xml != null) {
+                planner.parseFromXml(xml);
+            }
+            else {
+                planner.parse();
+            }
+
             plan = planner.plan();
             assert(plan != null);
         } catch (PlanningErrorException e) {
@@ -123,14 +145,6 @@ public abstract class StatementCompiler {
             throw compiler.new VoltCompilerException(
                 "The statement's parameter count " + plan.parameters.length +
                 " must not exceed the maximum " + CompiledPlan.MAX_PARAM_COUNT);
-        }
-
-        if (qtype == QueryType.UPSERT) {
-            plan.rootPlanGraph = replaceInsertPlanNodeWithUpsert(plan.rootPlanGraph);
-            plan.subPlanGraph  = replaceInsertPlanNodeWithUpsert(plan.subPlanGraph);
-
-            // TODO(xin): more work to get formated explain plan
-            plan.explainedPlan = plan.explainedPlan.replace("INSERT", "UPSERT");
         }
 
         // Check order determinism before accessing the detail which it caches.
@@ -220,6 +234,15 @@ public abstract class StatementCompiler {
         assert(validType != QueryType.INVALID.getValue());
     }
 
+    static void compileFromSqlTextAndUpdateCatalog(VoltCompiler compiler, HSQLInterface hsql,
+            Catalog catalog, Database db, DatabaseEstimates estimates,
+            Statement catalogStmt, String sqlText, String joinOrder,
+            DeterminismMode detMode, StatementPartitioning partitioning)
+    throws VoltCompiler.VoltCompilerException {
+        compileStatementAndUpdateCatalog(compiler, hsql, catalog, db, estimates, catalogStmt,
+                null, sqlText, joinOrder, detMode, partitioning);
+    }
+
     /**
      * Update the plan fragment and return the bytes of the plan
      */
@@ -264,30 +287,4 @@ public abstract class StatementCompiler {
         return false;
     }
 
-    private static AbstractPlanNode replaceInsertPlanNodeWithUpsert(AbstractPlanNode root) {
-        if (root == null) return null;
-
-        List<AbstractPlanNode> inserts = root.findAllNodesOfType(PlanNodeType.INSERT);
-        if (inserts.size() == 1) {
-            InsertPlanNode insertNode = (InsertPlanNode)inserts.get(0);
-
-            UpsertPlanNode upsertNode = new UpsertPlanNode(insertNode);
-
-            assert(insertNode.getParentCount() <= 1);
-            if (insertNode == root) {
-                root = upsertNode;
-            } else {
-                AbstractPlanNode parent = insertNode.getParent(0);
-                parent.clearChildren();
-                parent.addAndLinkChild(upsertNode);
-            }
-
-            assert(insertNode.getChildCount() == 1);
-            AbstractPlanNode child = insertNode.getChild(0);
-            child.clearParents();
-            upsertNode.addAndLinkChild(child);
-        }
-
-        return root;
-    }
 }

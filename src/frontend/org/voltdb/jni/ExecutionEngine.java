@@ -91,13 +91,17 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     private int m_cacheMisses = 0;
     private int m_eeCacheSize = 0;
 
-    /** Context information of the current running procedure*/
+    /** Context information of the current running procedure,
+     * for logging "long running query" messages */
+    private static long INITIAL_LOG_DURATION = 1000; // in milliseconds,
+                                                     // not final to allow unit testing
     String m_currentProcedureName = null;
     int m_currentBatchIndex = 0;
     private boolean m_readOnly;
     private long m_startTime;
     private long m_lastMsgTime;
-    private long m_logDuration = 1000;
+    private long m_logDuration = INITIAL_LOG_DURATION;
+    private String[] m_sqlTexts = null;
 
     /** information about EE calls back to JAVA. For test.*/
     public int m_callsFromEE = 0;
@@ -323,6 +327,11 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     }
 
     static final long LONG_OP_THRESHOLD = 10000;
+    private static int TIME_OUT_MILLIS = 0; // No time out
+
+    public void setTimeoutLatency(int newLatency) {
+        TIME_OUT_MILLIS = newLatency;
+    }
 
     public long fragmentProgressUpdate(int batchIndex,
             String planNodeName,
@@ -342,6 +351,16 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             m_startTime = m_lastMsgTime = currentTime;
             return LONG_OP_THRESHOLD;
         }
+        long latency = currentTime - m_startTime;
+
+        if (m_readOnly && TIME_OUT_MILLIS > 0 && latency > TIME_OUT_MILLIS) {
+            String msg = getLongRunningQueriesMessage(latency, planNodeName, true);
+            log.info(msg);
+
+            // timing out the long running queries
+            return -1 * latency;
+        }
+
         if (currentTime <= (m_logDuration + m_lastMsgTime)) {
             // The callback was triggered earlier than we were ready to log.
             // If this keeps happening, it might makes sense to ramp up the threshold
@@ -360,9 +379,22 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             // future callbacks per log entry, ideally so that one callback arrives just in time to log.
             return LONG_OP_THRESHOLD;
         }
+        String msg = getLongRunningQueriesMessage(latency, planNodeName, false);
+        log.info(msg);
+
+        m_logDuration = (m_logDuration < 30000) ? (2 * m_logDuration) : 30000;
+        m_lastMsgTime = currentTime;
+        // Return 0 if we want to interrupt ee. Otherwise return the number of tuple operations to let
+        // pass before the next call. For now, this is a fixed number. Ideally the threshold would vary
+        // to try to get one callback to arrive just after the log duration interval expires.
+        return LONG_OP_THRESHOLD;
+    }
+
+    private String getLongRunningQueriesMessage(long latency, String planNodeName, boolean timeout) {
+        String status = timeout ? "timed out at" : "taking a long time to execute -- at least";
         String msg = String.format(
-                "Procedure %s is taking a long time to execute -- at least " +
-                        "%.1f seconds spent accessing " +
+                "Procedure %s is %s " +
+                        "%.2f seconds spent accessing " +
                         "%d tuples. Current plan fragment " +
                         "%s in call " +
                         "%d to voltExecuteSQL on site " +
@@ -370,20 +402,19 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                         "%d bytes memory, and the peak usage of memory for temp table is " +
                         "%d bytes.",
                         m_currentProcedureName,
-                        (currentTime - m_startTime) / 1000.0,
-                        tuplesProcessed,
+                        status,
+                        latency / 1000.0,
+                        m_lastTuplesAccessed,
                         planNodeName,
                         m_currentBatchIndex,
                         CoreUtils.hsIdToString(m_siteId),
-                        currMemoryInBytes,
-                        peakMemoryInBytes);
-        log.info(msg);
-        m_logDuration = (m_logDuration < 30000) ? (2 * m_logDuration) : 30000;
-        m_lastMsgTime = currentTime;
-        // Return 0 if we want to interrupt ee. Otherwise return the number of tuple operations to let
-        // pass before the next call. For now, this is a fixed number. Ideally the threshold would vary
-        // to try to get one callback to arrive just after the log duration interval expires.
-        return LONG_OP_THRESHOLD;
+                        m_currMemoryInBytes,
+                        m_peakMemoryInBytes);
+        if (m_sqlTexts != null) {
+            msg += "  Executing SQL statement is \"" + m_sqlTexts[m_currentBatchIndex] + "\".";
+        }
+
+        return msg;
     }
 
     /**
@@ -456,6 +487,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                             long[] planFragmentIds,
                                             long[] inputDepIds,
                                             Object[] parameterSets,
+                                            String[] sqlTexts,
                                             long txnId,
                                             long spHandle,
                                             long lastCommittedSpHandle,
@@ -468,7 +500,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
             // reset context for progress updates
             m_startTime = 0;
-            m_logDuration = 1000;
+            m_logDuration = INITIAL_LOG_DURATION;
+            m_sqlTexts = sqlTexts;
 
             VoltTable[] results = coreExecutePlanFragments(numFragmentIds, planFragmentIds, inputDepIds,
                     parameterSets, txnId, spHandle, lastCommittedSpHandle, uniqueId, undoQuantumToken);
@@ -481,6 +514,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             // will still be used to estimate the cache size, but it's hard to count cache hits
             // during an exception, so we don't count cache misses either to get the right ratio.
             m_cacheMisses = 0;
+
+            m_sqlTexts = null;
         }
     }
 
@@ -905,4 +940,25 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         }
     }
 
+    /**
+     * Useful in unit tests.  Allows one to supply a mocked logger
+     * to verify that something was logged.
+     *
+     * @param vl  The new logger to install
+     */
+    @Deprecated
+    public static void setVoltLoggerForTest(VoltLogger vl) {
+        log = vl;
+    }
+
+    /**
+     * Useful in unit tests.  Sets the starting frequency with which
+     * the long-running query info message will be logged.
+     *
+     * @param newDuration  The duration in milliseconds before the first message is logged
+     */
+    @Deprecated
+    public void setInitialLogDurationForTest(long newDuration) {
+        INITIAL_LOG_DURATION = newDuration;
+    }
 }

@@ -23,13 +23,7 @@ import numpy as np
 
 STATS_SERVER = 'volt2'
 
-def COLORS(k):
-    return (((k ** 3) % 255) / 255.0,
-            ((k * 100) % 255) / 255.0,
-            ((k * k) % 255) / 255.0)
-
-#COLORS = plt.cm.Spectral(numpy.linspace(0, 1, 10)).tolist()
-COLORS = ['b','g','r','c','m','y','k']
+COLORS = ['b','g','c','m','k']
 
 MARKERS = ['+', '*', '<', '>', '^', '_',
            'D', 'H', 'd', 'h', 'o', 'p']
@@ -41,7 +35,7 @@ def get_stats(hostname, port, days):
     """
 
     conn = FastSerializer(hostname, port)
-    proc = VoltProcedure(conn, 'CenterAverageOfPeriod',
+    proc = VoltProcedure(conn, 'AverageOfPeriod',
                          [FastSerializer.VOLTTYPE_SMALLINT])
     resp = proc.call([days])
     conn.close()
@@ -68,13 +62,14 @@ def get_stats(hostname, port, days):
 class Plot:
     DPI = 100.0
 
-    def __init__(self, title, xlabel, ylabel, filename, w, h, xmin, xmax):
+    def __init__(self, title, xlabel, ylabel, filename, w, h, xmin, xmax, series):
         self.filename = filename
         self.legends = {}
         w = w == None and 2000 or w
         h = h == None and 1000 or h
         self.xmax = xmax
         self.xmin = xmin
+        self.series = series
 
         self.fig = plt.figure(figsize=(w / self.DPI, h / self.DPI),
                          dpi=self.DPI)
@@ -101,7 +96,11 @@ class Plot:
         self.ax.yaxis.set_major_formatter(y_formatter)
         ymin, ymax = plt.ylim()
         plt.xlim((self.xmin.toordinal(), (self.xmax+datetime.timedelta(1)).replace(minute=0, hour=0, second=0, microsecond=0).toordinal()))
-        plt.legend(prop={'size': 16}, loc=2)
+        if self.series.startswith('lat'):
+            lloc = 2
+        else:
+            lloc = 3
+        plt.legend(prop={'size': 12}, loc=lloc)
         plt.savefig(self.filename, format="png", transparent=False,
                     bbox_inches="tight", pad_inches=0.2)
         plt.close('all')
@@ -124,7 +123,7 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
     if len(plot_data) == 0:
         return
 
-    pl = Plot(title, xlabel, ylabel, filename, width, height, mindate, maxdate)
+    pl = Plot(title, xlabel, ylabel, filename, width, height, mindate, maxdate, series)
 
     flag = dict()
     for b,bd in plot_data.items():
@@ -138,7 +137,7 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
             pl.plot(u[0], u[1], mc[b][0], mc[b][1], b, '-')
 
             ma = [None]
-            if len(u[0]) >= 10:
+            if b == 'master' and len(u[0]) >= 10:
                 (ma,mstd) = moving_average(u[1], 10)
                 pl.plot(u[0], ma, mc[b][0], None, None, ":")
                 failed = 0
@@ -146,13 +145,13 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
                     polarity = 1
                     cv = np.nanmin(ma)
                     rp = (u[0][np.nanargmin(ma)], cv)
-                    if ma[-1] > cv * 1.05:
+                    if b == 'master' and ma[-1] > cv * 1.05:
                         failed = 1
                 else:
                     polarity = -1
                     cv = np.nanmax(ma)
                     rp = (u[0][np.nanargmax(ma)], cv)
-                    if ma[-1] < cv * 0.95:
+                    if b == 'master' and ma[-1] < cv * 0.95:
                         failed = 1
 
                 twosigma = np.sum([np.convolve(mstd, polarity*2), ma], axis=0)
@@ -374,9 +373,9 @@ def main():
         fns.append(flags)
         filenames.append(tuple(fns))
 
-    filenames.append(("KVBenchmark-five9s-latency", "", "", "http://ci/view/system%20tests-elastic/job/performance-nextrelease-5nines/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/5nines-histograms.png", iorder))
-    filenames.append(("KVBenchmark-five9s-nofail-latency", "", "", "http://ci/view/system%20tests-elastic/job/performance-nextrelease-5nines-nofail/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/5nines-histograms.png", iorder))
-    filenames.append(("KVBenchmark-five9s-nofail-nocl-latency", "", "", "http://ci/view/system%20tests-elastic/job/performance-nextrelease-5nines-nofail-nocl/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/5nines-histograms.png", iorder))
+    filenames.append(("KVBenchmark-five9s-latency", "", "", "http://ci/job/performance-nextrelease-5nines/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/5nines-histograms.png", iorder))
+    filenames.append(("KVBenchmark-five9s-nofail-latency", "", "", "http://ci/job/performance-nextrelease-5nines-nofail/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/5nines-histograms.png", iorder))
+    filenames.append(("KVBenchmark-five9s-nofail-nocl-latency", "", "", "http://ci/job/performance-nextrelease-5nines-nofail-nocl/lastSuccessfulBuild/artifact/pro/tests/apptests/savedlogs/5nines-histograms.png", iorder))
 
     # generate index file
     index_file = open(root_path + '-index.html', 'w')

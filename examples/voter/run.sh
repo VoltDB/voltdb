@@ -2,6 +2,9 @@
 
 APPNAME="voter"
 
+#set -o nounset #exit if an unset variable is used
+set -o errexit #exit on any single command fail
+
 # find voltdb binaries in either installation or distribution directory.
 if [ -n "$(which voltdb 2> /dev/null)" ]; then
     VOLTDB_BIN=$(dirname "$(which voltdb)")
@@ -43,7 +46,8 @@ HOST="localhost"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar voltdbroot voltdbroot
+    rm -rf obj debugoutput $APPNAME-procs.jar voltdbroot log \
+    	catalog-report.html statement-plans
 }
 
 # compile the source code for procedures and the client
@@ -52,47 +56,34 @@ function srccompile() {
     javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH -d obj \
         src/voter/*.java \
         src/voter/procedures/*.java
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
-}
-
-# build an application catalog
-function catalog() {
-    srccompile
-    echo "Compiling the voter application catalog."
-    echo "To perform this action manually, use the command line: "
-    echo
-    echo "voltdb compile --classpath obj -o $APPNAME.jar ddl.sql"
-    echo
-    $VOLTDB compile --classpath obj -o $APPNAME.jar ddl.sql
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
+    jar cf $APPNAME-procs.jar -C obj voter/procedures
 }
 
 # run the voltdb server locally
 function server() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
-    # run the server
     echo "Starting the VoltDB server."
     echo "To perform this action manually, use the command line: "
     echo
-    echo "$VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar"
+    echo "voltdb create -d deployment.xml -l $LICENSE -H $HOST"
     echo
-    $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
+    $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST
+}
+
+# load schema and procedures
+function init() {
+    srccompile
+	$VOLTDB_BIN/sqlcmd < ddl.sql
 }
 
 function nohup_server() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    srccompile
     # run the server
     nohup $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar > nohup.log 2>&1 &
+    $VOLTDB_BIN/sqlcmd < ddl.sql
 }
 
 # run the voltdb server locally
 function rejoin() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
     $VOLTDB rejoin -H $HOST -d deployment.xml -l $LICENSE
 }
@@ -191,7 +182,7 @@ function demo() {
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|catalog|server|async-benchmark|aysnc-benchmark-help|...}"
+    echo "Usage: ./run.sh {clean|server|init|client|async-benchmark|aysnc-benchmark-help|...}"
     echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark|jdbc-benchmark-help}"
 }
 

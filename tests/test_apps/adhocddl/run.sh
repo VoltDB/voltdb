@@ -48,7 +48,7 @@ function srccompile() {
 # build an application catalog
 function catalog() {
     srccompile
-    java -classpath obj:$CLASSPATH:obj Initializer \
+    java -classpath obj:$CLASSPATH adhocddl.Initializer \
          --numOfTables=0 \
          --numOfSPs=4 \
          --numOfCols=5 \
@@ -69,7 +69,7 @@ function server() {
 # run the client that drives the example
 function client() {
     srccompile
-    java -classpath obj:$CLASSPATH:obj AdHocDDLBenchmark \
+    java -classpath obj:$CLASSPATH:obj adhocddl.AdHocDDLBenchmark \
         --servers=localhost \
         --numOfTests=5 \
         --numOfCols=5 \

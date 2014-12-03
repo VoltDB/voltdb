@@ -251,9 +251,9 @@ public class AdHocCompilerCache implements Serializable {
             if (matched != null) {
                 // if a different core is found, reuse it
                 // this is useful when updating the literal cache
-                if (unmatched.core != matched.core) {
-                    plan = new AdHocPlannedStatement(planIn, matched.core);
-                    plan.setBoundConstants(matched.constants);
+                if (unmatched.m_core != matched.m_core) {
+                    plan = new AdHocPlannedStatement(planIn, matched.m_core);
+                    plan.setBoundConstants(matched.m_constants);
                 }
             }
         }

@@ -182,6 +182,22 @@ public class TestPlansDML extends PlannerTestCase {
         assertEquals(1, pns.size());
     }
 
+    public void testInsertSingleRowPlan() {
+        System.out.println("\n\n\nRUNNING testInsertSingleRowPlan\n\n");
+
+        // These test cases are from ENG-5929.
+
+        // This should be inferred as single-partition:
+        pns = compileToFragments("INSERT INTO P1 (a, c) values(100, cast(? + 1 as integer))");
+        // One fragment means a single-partition plan
+        assertEquals(1, pns.size());
+
+        // But this should be multi-partition:
+        // Cannot evaluate expression except in EE.
+        pns = compileToFragments("INSERT INTO P1 (a, c) values(cast(? + 1 as integer), 100)");
+        assertEquals(2, pns.size());
+    }
+
     private void checkTruncateFlag() {
         assertTrue(pns.size() == 2);
 

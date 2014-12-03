@@ -31,7 +31,6 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -623,37 +622,37 @@ public abstract class CatalogUtil {
     }
 
     /**
-     * Validate the contents of the deployment.xml file. This is for things like making sure users aren't being added to
-     * non-existent groups, not for validating XML syntax.
+     * Validate the contents of the deployment.xml file.
+     * This is for validating VoltDB requirements, not XML schema correctness
      * @param catalog Catalog to be validated against.
      * @param deployment Reference to root <deployment> element of deployment file to be validated.
      * @return Returns true if the deployment file is valid.
      */
     private static boolean validateDeployment(Catalog catalog, DeploymentType deployment) {
-        if (deployment.getUsers() == null) {
-            return true;
-        }
+        if (deployment.getSecurity() != null && deployment.getSecurity().isEnabled()) {
+            if (deployment.getUsers() == null) {
+                hostLog.error("Cannot enable security without defining at least one user in the built-in ADMINISTRATOR role in the deployment file.");
+                return false;
+            }
 
-        Cluster cluster = catalog.getClusters().get("cluster");
-        Database database = cluster.getDatabases().get("database");
-        Set<String> validGroups = new HashSet<String>();
-        for (Group group : database.getGroups()) {
-            validGroups.add(group.getTypeName());
-        }
+            boolean foundAdminUser = false;
+            for (UsersType.User user : deployment.getUsers().getUser()) {
+                if (user.getGroups() == null && user.getRoles() == null)
+                    continue;
 
-        for (UsersType.User user : deployment.getUsers().getUser()) {
-            if (user.getGroups() == null && user.getRoles() == null)
-                continue;
-
-            for (String group : mergeUserRoles(user)) {
-                if (!validGroups.contains(group)) {
-                    hostLog.error("Cannot assign user \"" + user.getName() + "\" to non-existent group \"" + group +
-                            "\"");
-                    return false;
+                for (String group : mergeUserRoles(user)) {
+                    if (group.equalsIgnoreCase("ADMINISTRATOR")) {
+                        foundAdminUser = true;
+                        break;
+                    }
                 }
             }
-        }
 
+            if (!foundAdminUser) {
+                hostLog.error("Cannot enable security without defining at least one user in the built-in ADMINISTRATOR role in the deployment file.");
+                return false;
+            }
+        }
         return true;
     }
 
@@ -733,13 +732,13 @@ public abstract class CatalogUtil {
 
             // copy schema modification behavior from xml to catalog
             if (cluster.getSchema() != null) {
-                catCluster.setUseadhocschema(cluster.getSchema() == SchemaType.ADHOC);
+                catCluster.setUseddlschema(cluster.getSchema() == SchemaType.DDL);
             }
             else {
                 // Don't think we can get here, deployment schema guarantees a default value
                 hostLog.warn("Schema modification setting not found. " +
                         "Forcing default behavior of UpdateCatalog to modify database schema.");
-                catCluster.setUseadhocschema(false);
+                catCluster.setUseddlschema(false);
             }
         }
     }
@@ -750,31 +749,39 @@ public abstract class CatalogUtil {
         // Create catalog Systemsettings
         Systemsettings syssettings =
             catDeployment.getSystemsettings().add("systemsettings");
-        int maxtemptablesize = 100;
-        int snapshotpriority = 6;
-        int elasticPauseTime = 50;
+        int temptableMaxSize = 100;
+        int snapshotPriority = 6;
+        int elasticDuration = 50;
         int elasticThroughput = 2;
+        int queryTimeout = 0;
         if (deployment.getSystemsettings() != null)
         {
             Temptables temptables = deployment.getSystemsettings().getTemptables();
             if (temptables != null)
             {
-                maxtemptablesize = temptables.getMaxsize();
+                temptableMaxSize = temptables.getMaxsize();
             }
             SystemSettingsType.Snapshot snapshot = deployment.getSystemsettings().getSnapshot();
             if (snapshot != null) {
-                snapshotpriority = snapshot.getPriority();
+                snapshotPriority = snapshot.getPriority();
             }
             SystemSettingsType.Elastic elastic = deployment.getSystemsettings().getElastic();
             if (elastic != null) {
-                elasticPauseTime = deployment.getSystemsettings().getElastic().getDuration();
-                elasticThroughput = deployment.getSystemsettings().getElastic().getThroughput();
+                elasticDuration = elastic.getDuration();
+                elasticThroughput = elastic.getThroughput();
+            }
+
+            SystemSettingsType.Query timeout = deployment.getSystemsettings().getQuery();
+            if (timeout != null)
+            {
+                queryTimeout = timeout.getTimeout();
             }
         }
-        syssettings.setMaxtemptablesize(maxtemptablesize);
-        syssettings.setSnapshotpriority(snapshotpriority);
-        syssettings.setElasticpausetime(elasticPauseTime);
+        syssettings.setTemptablemaxsize(temptableMaxSize);
+        syssettings.setSnapshotpriority(snapshotPriority);
+        syssettings.setElasticduration(elasticDuration);
         syssettings.setElasticthroughput(elasticThroughput);
+        syssettings.setQuerytimeout(queryTimeout);
     }
 
     private static void validateDirectory(String type, File path, boolean crashOnFailedValidation) {
@@ -876,7 +883,12 @@ public abstract class CatalogUtil {
                 for( PropertyType configProp: configProperties) {
                     ConnectorProperty prop = catconn.getConfig().add(configProp.getName());
                     prop.setName(configProp.getName());
-                    prop.setValue(configProp.getValue());
+                    if (!configProp.getName().toLowerCase().contains("password")) {
+                        prop.setValue(configProp.getValue().trim());
+                    } else {
+                        //Dont trim passwords
+                        prop.setValue(configProp.getValue());
+                    }
                 }
             }
         }
@@ -889,7 +901,7 @@ public abstract class CatalogUtil {
             if (exportConfiguration != null && exportConfiguration.getProperty() != null) {
                 hostLog.info("Export configuration properties are: ");
                 for (PropertyType configProp : exportConfiguration.getProperty()) {
-                    if (!configProp.getName().equalsIgnoreCase("password")) {
+                    if (!configProp.getName().toLowerCase().contains("password")) {
                         hostLog.info("Export Configuration Property NAME=" + configProp.getName() + " VALUE=" + configProp.getValue());
                     }
                 }
@@ -1164,10 +1176,16 @@ public abstract class CatalogUtil {
 
             // process the @groups and @roles comma separated list
             for (final String role : mergeUserRoles(user)) {
-                final GroupRef groupRef = catUser.getGroups().add(role);
                 final Group catalogGroup = db.getGroups().get(role);
+                // if the role doesn't exist, ignore it.
                 if (catalogGroup != null) {
+                    final GroupRef groupRef = catUser.getGroups().add(role);
                     groupRef.setGroup(catalogGroup);
+                }
+                else {
+                    hostLog.warn("User \"" + user.getName() +
+                            "\" is assigned to non-existent role \"" + role + "\" " +
+                            "and may not have the expected database permissions.");
                 }
             }
         }
@@ -1187,7 +1205,7 @@ public abstract class CatalogUtil {
             String [] grouplist = user.getGroups().trim().split(",");
             for (String group: grouplist) {
                 if( group == null || group.trim().isEmpty()) continue;
-                roles.add(group.trim());
+                roles.add(group.trim().toLowerCase());
             }
         }
 
@@ -1195,7 +1213,7 @@ public abstract class CatalogUtil {
             String [] rolelist = user.getRoles().trim().split(",");
             for (String role: rolelist) {
                 if( role == null || role.trim().isEmpty()) continue;
-                roles.add(role.trim());
+                roles.add(role.trim().toLowerCase());
             }
         }
 
@@ -1480,7 +1498,13 @@ public abstract class CatalogUtil {
     }
 
     private static void updateTableUsageAnnotation(Table table, Statement stmt, boolean read) {
-        Procedure proc = (Procedure) stmt.getParent();
+        if (!(stmt.getParent() instanceof Procedure)) {
+            // if parent of statement is not a procedure
+            // it could be a table with a LIMIT ROWS DELETE
+            return;
+        }
+
+        Procedure proc = (Procedure)stmt.getParent();
         // skip CRUD generated procs
         if (proc.getDefaultproc()) {
             return;

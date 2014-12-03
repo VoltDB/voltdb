@@ -38,7 +38,6 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.NoConnectionsException;
 
 /**
  * KafkaConsumer loads data from kafka into voltdb
@@ -82,8 +81,7 @@ public class KafkaLoader {
                 m_client.close();
                 m_client = null;
             }
-        } catch (InterruptedException ex) {
-        } catch (NoConnectionsException ex) {
+        } catch (Exception ex) {
         }
     }
 

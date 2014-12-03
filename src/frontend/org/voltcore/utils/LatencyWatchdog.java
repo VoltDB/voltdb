@@ -90,12 +90,12 @@ public class LatencyWatchdog extends Thread {
                 long now = System.currentTimeMillis();
                 if ((now - timestamp > WATCHDOG_THRESHOLD) && t.getState() != Thread.State.TERMINATED) {
                     StringBuilder sb = new StringBuilder();
-                    sb.append(t.getName() + " has been delayed for more than " + WATCHDOG_THRESHOLD + " milliseconds\n");
+                    String format = t.getName() + " has been delayed for more than " + WATCHDOG_THRESHOLD + " milliseconds\n %s";
                     for (StackTraceElement ste : t.getStackTrace()) {
                         sb.append(ste);
                         sb.append("\n");
                     }
-                    RateLimitedLogger.tryLogForMessage(sb.toString(), now, MIN_LOG_INTERVAL, TimeUnit.MILLISECONDS, LOG, Level.INFO);
+                    RateLimitedLogger.tryLogForMessage(now, MIN_LOG_INTERVAL, TimeUnit.MILLISECONDS, LOG, Level.INFO, format, sb.toString());
                 }
             }
             try {

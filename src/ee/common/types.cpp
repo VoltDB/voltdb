@@ -413,9 +413,6 @@ string planNodeToString(PlanNodeType type)
     case PLAN_NODE_TYPE_MATERIALIZEDSCAN: {
         return "MATERIALIZEDSCAN";
     }
-    case PLAN_NODE_TYPE_UPSERT: {
-        return "UPSERT";
-    }
     }
     return "UNDEFINED";
 }
@@ -466,8 +463,6 @@ PlanNodeType stringToPlanNode(string str )
         return PLAN_NODE_TYPE_DISTINCT;
     } else if (str == "MATERIALIZEDSCAN") {
         return PLAN_NODE_TYPE_MATERIALIZEDSCAN;
-    } else if (str == "UPSERT") {
-        return PLAN_NODE_TYPE_UPSERT;
     }
     return PLAN_NODE_TYPE_INVALID;
 }

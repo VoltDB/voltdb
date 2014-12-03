@@ -68,13 +68,13 @@ public:
         m_node(NULL),
         m_inputTable(NULL),
         m_partitionColumn(-1),
-        m_partitionColumnIsString(false),
         m_multiPartition(false),
         m_isStreamed(false),
+        m_isUpsert(false),
+        m_hasPurgeFragment(false),
         m_templateTuple(),
         m_memoryPool(),
-        m_nowFields(),
-        m_engine(engine)
+        m_nowFields()
     {
     }
 
@@ -87,27 +87,31 @@ public:
         TempTable* m_inputTable;
 
         int m_partitionColumn;
-        bool m_partitionColumnIsString;
         bool m_multiPartition;
         bool m_isStreamed;
+        bool m_isUpsert;
+        bool m_hasPurgeFragment;
 
     private:
 
-        /** A tuple with the target table's schema that is populated with default
-         * values for each field. */
+        /** If the table is at or over its tuple limit, this method
+         * executes the purge fragment for the table.  Returns true if
+         * nothing went wrong (regardless of whether the purge
+         * fragment was executed) and false otherwise. */
+        bool executePurgeFragmentIfNeeded(PersistentTable* table);
+
+        /** A tuple with the target table's schema that is populated
+         * with default values for each field. */
         StandAloneTupleStorage m_templateTuple;
 
-        /** A memory pool for allocating non-inlined varchar and varbinary default values */
+        /** A memory pool for allocating non-inlined varchar and
+         * varbinary default values */
         Pool m_memoryPool;
 
         /** A list of indexes of each column in the template tuple
          * that has a DEFAULT of NOW, which must be set on each
          * execution of this plan. */
         std::vector<int> m_nowFields;
-
-    protected:
-        /** reference to the engine/context to store the number of modified tuples */
-        VoltDBEngine* m_engine;
 };
 
 }

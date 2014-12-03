@@ -60,7 +60,7 @@ def buildCommunity():
         run("pwd")
         run("git status")
         run("git describe --dirty")
-        run("ant -Djmemcheck=NO_MEMCHECK clean default dist")
+        run("ant -Djmemcheck=NO_MEMCHECK %s clean default dist" % build_args)
 
 ################################################
 # BUILD THE ENTERPRISE VERSION
@@ -71,7 +71,7 @@ def buildPro():
         run("pwd")
         run("git status")
         run("git describe --dirty")
-        run("VOLTCORE=../voltdb ant -f mmt.xml -Djmemcheck=NO_MEMCHECK -Dallowreplication=true -Dlicensedays=%d clean dist.pro" % defaultlicensedays)
+        run("VOLTCORE=../voltdb ant -f mmt.xml -Djmemcheck=NO_MEMCHECK -Dallowreplication=true -Dlicensedays=%d %s clean dist.pro" % (defaultlicensedays, build_args))
 
 ################################################
 # BUILD THE RABBITMQ EXPORT CONNECTOR
@@ -133,8 +133,6 @@ def copyCommunityFilesToReleaseDir(releaseDir, version, operatingsys):
         "%s/%s-voltdb-%s.tar.gz" % (releaseDir, operatingsys, version))
     get("%s/voltdb/obj/release/voltdb-client-java-%s.tar.gz" % (builddir, version),
         "%s/voltdb-client-java-%s.tar.gz" % (releaseDir, version))
-    get("%s/voltdb/obj/release/voltdb-studio.web-%s.zip" % (builddir, version),
-        "%s/voltdb-studio.web-%s.zip" % (releaseDir, version))
     get("%s/voltdb/obj/release/voltdb-tools-%s.tar.gz" % (builddir, version),
         "%s/voltdb-tools-%s.tar.gz" % (releaseDir, version))
 
@@ -233,6 +231,11 @@ if len(sys.argv) == 3:
     rbmqExportTreeish = sys.argv[2]
     if voltdbTreeish != proTreeish:
         oneOff = True     #force oneoff when not same tag/branch
+
+try:
+    build_args = os.environ['VOLTDB_BUILD_ARGS']
+except:
+    build_args=""
 
 print "Building with pro: %s and voltdb: %s" % (proTreeish, voltdbTreeish)
 

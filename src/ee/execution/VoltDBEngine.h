@@ -98,6 +98,11 @@ class TheHashinator;
 
 const int64_t DEFAULT_TEMP_TABLE_MEMORY = 1024 * 1024 * 100;
 
+/** A constant only being used temporarily for testing purposes
+ * for the LIMIT PARTITION ROWS EXECUTE DELETE fragment
+ */
+const int64_t MAGIC_PURGE_FRAGMENT_ID = 9223372036854775807LL; // 2^63 - 1
+
 /**
  * Represents an Execution Engine which holds catalog objects (i.e. table) and executes
  * plans on the objects. Every operation starts from this object.
@@ -160,6 +165,13 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         inline int64_t pushTuplesProcessedForProgressMonitoring(int64_t tuplesProcessed);
         inline void pushFinalTuplesProcessedForProgressMonitoring(int64_t tuplesProcessed);
 
+        // If an insert will fail due to row limit constraint and user
+        // has defined a delete action to make space, this method
+        // executes the corresponding fragment.
+        //
+        // Returns ENGINE_ERRORCODE_SUCCESS on success
+        int executePurgeFragment(PersistentTable* table);
+
         // -------------------------------------------------
         // Dependency Transfer Functions
         // -------------------------------------------------
@@ -192,6 +204,11 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         const char* getParameterBuffer() const { return m_parameterBuffer; }
         /** Returns the size of buffer for passing parameters to EE. */
         int getParameterBufferCapacity() const { return m_parameterBufferCapacity; }
+
+        /**
+         * Sets the output and exception buffer to be empty, and then
+         * serializes the exception. */
+        void serializeException(const SerializableEEException& e);
 
         /**
          * Retrieves the size in bytes of the data that has been placed in the reused result buffer
@@ -361,7 +378,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         // Initialization Functions
         // -------------------------------------------------
-        void initPlanNode(const int64_t fragId, AbstractPlanNode* node, TempTableLimits* limits);
         void processCatalogDeletes(int64_t timestamp);
         void initMaterializedViews();
         bool updateCatalogDatabaseReference();
@@ -369,7 +385,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /**
          * Call into the topend with information about how executing a plan fragment is going.
          */
-        void reportProgessToTopend();
+        void reportProgressToTopend();
 
         /**
          * Execute a single plan fragment.
@@ -392,7 +408,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         ExecutorVector *getExecutorVectorForFragmentId(const int64_t fragId);
 
         bool checkTempTableCleanup(ExecutorVector * execsForFrag);
-        void cleanupExecutors(ExecutorVector * execsForFrag);
+        void resetExecutionMetadata();
 
         // -------------------------------------------------
         // Data Members
@@ -578,14 +594,19 @@ inline int64_t VoltDBEngine::pushTuplesProcessedForProgressMonitoring(int64_t tu
 {
     m_tuplesProcessedSinceReport += tuplesProcessed;
     if (m_tuplesProcessedSinceReport >= m_tupleReportThreshold) {
-        reportProgessToTopend();
+        reportProgressToTopend();
     }
     return m_tupleReportThreshold; // size of next batch
 }
 
 inline void VoltDBEngine::pushFinalTuplesProcessedForProgressMonitoring(int64_t tuplesProcessed)
 {
-    pushTuplesProcessedForProgressMonitoring(tuplesProcessed);
+    try {
+        pushTuplesProcessedForProgressMonitoring(tuplesProcessed);
+    } catch(const SerializableEEException &e) {
+        e.serialize(getExceptionOutputSerializer());
+    }
+
     m_lastAccessedExec = NULL;
 }
 

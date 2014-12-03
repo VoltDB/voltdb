@@ -159,6 +159,10 @@ public class AggregatePlanNode extends AbstractPlanNode {
         return m_aggregateTypes.size();
     }
 
+    public List<AbstractExpression> getGroupByExpressions() {
+        return m_groupByExpressions;
+    }
+
     public int getGroupByExpressionsSize () {
         return m_groupByExpressions.size();
     }

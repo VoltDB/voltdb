@@ -78,6 +78,7 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
     assert(m_node->getInputTableCount() == 1);
 
     Table* targetTable = m_node->getTargetTable();
+    m_isUpsert = m_node->isUpsert();
 
     setDMLCountOutputTable(limits);
 
@@ -87,15 +88,22 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
     // Target table can be StreamedTable or PersistentTable and must not be NULL
     PersistentTable *persistentTarget = dynamic_cast<PersistentTable*>(targetTable);
     m_partitionColumn = -1;
-    m_partitionColumnIsString = false;
     m_isStreamed = (persistentTarget == NULL);
+
+    if (m_isUpsert) {
+        VOLT_TRACE("init Upsert Executor actually");
+        if (m_isStreamed) {
+            VOLT_ERROR("UPSERT is not supported for Stream table %s", targetTable->name().c_str());
+        }
+        // look up the tuple whether it exists already
+        if (targetTable->primaryKeyIndex() == NULL) {
+            VOLT_ERROR("No primary keys were found in our target table '%s'",
+                    targetTable->name().c_str());
+        }
+    }
+
     if (persistentTarget) {
         m_partitionColumn = persistentTarget->partitionColumn();
-        if (m_partitionColumn != -1) {
-            if (m_inputTable->schema()->columnType(m_partitionColumn) == VALUE_TYPE_VARCHAR) {
-                m_partitionColumnIsString = true;
-            }
-        }
     }
 
     m_multiPartition = m_node->isMultiPartition();
@@ -112,6 +120,38 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
                                        fieldsExplicitlySet,
                                        tuple,
                                        m_nowFields);
+    m_hasPurgeFragment = persistentTarget ? persistentTarget->hasPurgeFragment() : false;
+
+    return true;
+}
+
+bool InsertExecutor::executePurgeFragmentIfNeeded(PersistentTable* table) {
+    InsertPlanNode *insertPlanNode = static_cast<InsertPlanNode*>(getPlanNode());
+    if (insertPlanNode->isMultiRowInsert()) {
+        // Multi-row inserts triggering a purge is not supported yet.
+        // This should not be difficult to support, just need to
+        // remove this check and add testing.
+        return true;
+    }
+
+    int tupleLimit = table->tupleLimit();
+    int numTuples = table->visibleTupleCount();
+
+    // Note that the number of tuples may be larger than the limit.
+    // This can happen we data is redistributed after an elastic
+    // rejoin for example.
+    if (numTuples >= tupleLimit) {
+        // Next insert will fail: run the purge fragment
+        // before trying to insert.
+        int rc = m_engine->executePurgeFragment(table);
+        if (rc != ENGINE_ERRORCODE_SUCCESS) {
+            VOLT_ERROR("Unexpected error while attempting to purge "
+                       "rows from table %s.  Row limit: %d",
+                       table->name().c_str(),
+                       tupleLimit);
+            return false;
+        }
+    }
 
     return true;
 }
@@ -128,6 +168,10 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     assert(targetTable);
     assert((targetTable == dynamic_cast<PersistentTable*>(targetTable)) ||
             (targetTable == dynamic_cast<StreamedTable*>(targetTable)));
+
+    PersistentTable* persistentTable = m_isStreamed ?
+        NULL : static_cast<PersistentTable*>(targetTable);
+    TableTuple upsertTuple = TableTuple(targetTable->schema());
 
     VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug().c_str());
 
@@ -200,16 +244,58 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
             if (!isLocal) continue;
         }
 
-        // try to put the tuple into the target table
-        if (!targetTable->insertTuple(templateTuple)) {
-            VOLT_ERROR("Failed to insert tuple from input table '%s' into"
-                       " target table '%s'",
-                       m_inputTable->name().c_str(),
-                       targetTable->name().c_str());
-            return false;
+
+        if (! m_isUpsert) {
+            // try to put the tuple into the target table
+
+            if (m_hasPurgeFragment) {
+                if (!executePurgeFragmentIfNeeded(persistentTable))
+                    return false;
+            }
+
+            if (!targetTable->insertTuple(templateTuple)) {
+                VOLT_ERROR("Failed to insert tuple from input table '%s' into"
+                           " target table '%s'",
+                           m_inputTable->name().c_str(),
+                           targetTable->name().c_str());
+                return false;
+            }
+
+        } else {
+            // upsert execution logic
+            assert(persistentTable->primaryKeyIndex() != NULL);
+            TableTuple existsTuple = persistentTable->lookupTuple(templateTuple);
+
+            if (existsTuple.isNullTuple()) {
+                // try to put the tuple into the target table
+
+                if (m_hasPurgeFragment) {
+                    if (!executePurgeFragmentIfNeeded(persistentTable))
+                        return false;
+                }
+
+                if (!persistentTable->insertTuple(templateTuple)) {
+                    VOLT_ERROR("Failed to insert tuple from input table '%s' into"
+                               " target table '%s'",
+                               m_inputTable->name().c_str(),
+                               persistentTable->name().c_str());
+                    return false;
+                }
+            } else {
+                // tuple exists already, try to update the tuple instead
+                upsertTuple.move(templateTuple.address());
+                TableTuple &tempTuple = persistentTable->getTempTupleInlined(upsertTuple);
+
+                if (!persistentTable->updateTupleWithSpecificIndexes(existsTuple, tempTuple,
+                        persistentTable->allIndexes())) {
+                    VOLT_INFO("Failed to update existsTuple from table '%s'",
+                            upsertTable->name().c_str());
+                    return false;
+                }
+            }
         }
 
-        // successfully inserted
+        // successfully inserted or updated
         modifiedTuples++;
     }
 

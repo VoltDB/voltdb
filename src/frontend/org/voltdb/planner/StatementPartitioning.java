@@ -141,6 +141,16 @@ public class StatementPartitioning implements Cloneable{
 
     private boolean m_joinValid = true;
 
+    /** Most of the time DML on a replicated table for a plan that is executed
+     * as single-partition is a bad idea, and the planner will refuse to do it.
+     * However, sometimes we want to bypass this rule; for example, when planning
+     * the DELETE statement executed when LIMIT PARTITION ROWS is about to be violated.
+     * In this special case, the statement is being planned, for simplicity, as if for
+     * single-partition execution, since it never requires a coordinator fragment,
+     * but it will only ever be executed in the context of a replicated table MP insert
+     * on ALL partitions.*/
+    private boolean m_isReplicatedDmlToRunOnAllPartitions = false;
+
     /**
      * @param specifiedValue non-null if only SP plans are to be assumed
      * @param lockInInferredPartitioningConstant true if MP plans should be automatically optimized for SP where possible
@@ -162,6 +172,12 @@ public class StatementPartitioning implements Cloneable{
         return new StatementPartitioning(true, /* default to MP */ false);
     }
 
+    /** See comment for m_singlePartitionReplicatedDMLAllowed, above. */
+    public static StatementPartitioning partitioningForRowLimitDelete() {
+        StatementPartitioning partitioning = forceSP();
+        partitioning.m_isReplicatedDmlToRunOnAllPartitions = true;
+        return partitioning;
+    }
 
     public boolean isInferred() {
         return m_inferPartitioning;
@@ -183,6 +199,25 @@ public class StatementPartitioning implements Cloneable{
     }
 
     /**
+     * Returns true if the expression can be used to restrict plan execution to a single partition.
+     * For now this is anything other than a constant or parameter.  (In the future, one could
+     * imagine evaluating expressions like sqrt(8 * 8) and the like during planning)
+     *
+     * @param expr  The expression to consider
+     * @return      true or false
+     */
+    private static boolean isUsefulPartitioningExpression(AbstractExpression expr) {
+        if (expr instanceof ParameterValueExpression) {
+            return true;
+        }
+        if (expr instanceof ConstantValueExpression) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * @param string table.column name of a(nother) equality-filtered partitioning column
      * @param constExpr -- a constant/parameter-based expression that equality-filters the partitioning column
      */
@@ -200,6 +235,13 @@ public class StatementPartitioning implements Cloneable{
         }
     }
 
+    /**
+     * For a multi-partition statement that can definitely be run SP, this is a constant partitioning key value
+     * inferred from the analysis (suitable for hashinating).
+     * If null, SP may not be safe, or the partitioning may be based on something less obvious like a parameter or constant expression.
+     *
+     * @return  an instance of String or an instance of container class Long
+     */
     public Object getInferredPartitioningValue() {
         return m_inferredValue;
     }
@@ -227,12 +269,15 @@ public class StatementPartitioning implements Cloneable{
     }
 
     /**
-     * Returns true if there exists a single partition expression
+     * Returns true if partitioning inference has been requested, and
+     * at least one of the following is true:
+     *    - We are not doing DML on a replicated table, OR
+     *    - There is a single useful partitioning expression
      */
     public boolean isInferredSingle() {
         return m_inferPartitioning &&
                 (((m_countOfIndependentlyPartitionedTables == 0) && ! m_isDML)  ||
-                        (m_inferredExpression.size() == 1));
+                        (singlePartitioningExpression() != null));
     }
 
     /**
@@ -252,10 +297,22 @@ public class StatementPartitioning implements Cloneable{
     }
 
     /**
-     * smart accessor - only returns a value if it was unique
+     * smart accessor - only returns a value if it was unique and is useful
      * @return
      */
     public AbstractExpression singlePartitioningExpression() {
+        AbstractExpression e = singlePartitioningExpressionForReport();
+        if (e != null && isUsefulPartitioningExpression(e)) {
+            return e;
+        }
+        return null;
+    }
+
+    /**
+     * smart accessor - only returns a value if it was unique.
+     * @return
+     */
+    public AbstractExpression singlePartitioningExpressionForReport() {
         if (m_inferredExpression.size() == 1) {
             return m_inferredExpression.iterator().next();
         }
@@ -297,6 +354,13 @@ public class StatementPartitioning implements Cloneable{
      */
     public Column getPartitionColForDML() {
         return m_partitionColForDML;
+    }
+
+    /**
+     * Accessor
+     */
+    public boolean isReplicatedDmlToRunOnAllPartitions() {
+        return m_isReplicatedDmlToRunOnAllPartitions;
     }
 
     /**
@@ -394,7 +458,7 @@ public class StatementPartitioning implements Cloneable{
             if (unfiltered) {
                 ++unfilteredPartitionKeyCount;
             }
-        }
+        } // end for each table StmtTableScan in the collection
 
         m_countOfIndependentlyPartitionedTables = eqSets.size() + unfilteredPartitionKeyCount;
         if (m_countOfIndependentlyPartitionedTables > 1) {

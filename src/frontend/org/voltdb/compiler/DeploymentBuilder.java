@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.StringWriter;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 
 import javax.xml.bind.JAXBContext;
@@ -118,7 +119,7 @@ public class DeploymentBuilder {
     private boolean m_elenabled;      // true if enabled; false if disabled
 
     // whether to allow DDL over adhoc or use full catalog updates
-    private boolean m_useAdhocSchema = false;
+    private boolean m_useDDLSchema = false;
 
     public DeploymentBuilder() {
         this(1, 1, 0);
@@ -173,8 +174,8 @@ public class DeploymentBuilder {
     /**
      * whether to allow DDL over adhoc or use full catalog updates
      */
-    public void setUseAdhocSchema(boolean useIt) {
-        m_useAdhocSchema = useIt;
+    public void setUseDDLSchema(boolean useIt) {
+        m_useDDLSchema = useIt;
     }
 
     public void configureLogging(String internalSnapshotPath, String commandLogPath, Boolean commandLogSync,
@@ -188,6 +189,11 @@ public class DeploymentBuilder {
         m_commandLogSize = logSize;
     }
 
+    public void setEnableCommandLogging(boolean value)
+    {
+        m_commandLogEnabled = value;
+    }
+
     public void setSnapshotPriority(int priority) {
         m_snapshotPriority = priority;
     }
@@ -197,6 +203,16 @@ public class DeploymentBuilder {
             final boolean added = m_users.add(info);
             if (!added) {
                 assert(added);
+            }
+        }
+    }
+
+    public void removeUser(String userName) {
+        Iterator<UserInfo> iter = m_users.iterator();
+        while (iter.hasNext()) {
+            UserInfo info = iter.next();
+            if (info.name.equals(userName)) {
+                iter.remove();
             }
         }
     }
@@ -293,7 +309,7 @@ public class DeploymentBuilder {
         cluster.setHostcount(m_hostCount);
         cluster.setSitesperhost(m_sitesPerHost);
         cluster.setKfactor(m_replication);
-        cluster.setSchema(m_useAdhocSchema ? SchemaType.ADHOC : SchemaType.CATALOG);
+        cluster.setSchema(m_useDDLSchema ? SchemaType.DDL : SchemaType.CATALOG);
 
         // <paths>
         PathsType paths = factory.createPathsType();
@@ -413,7 +429,7 @@ public class DeploymentBuilder {
                     for (final String group : info.groups) {
                         if (groups.length() > 0)
                             groups.append(",");
-                        groups.append(group);
+                        groups.append(group.toLowerCase());
                     }
                     user.setGroups(groups.toString());
                 }
