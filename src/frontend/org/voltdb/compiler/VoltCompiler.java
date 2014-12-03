@@ -605,17 +605,22 @@ public class VoltCompiler {
             m_reportPath = null;
             File file = null;
 
-            // try to get a catalog context
-            VoltDBInterface voltdb = VoltDB.instance();
-            CatalogContext catalogContext = voltdb != null ? voltdb.getCatalogContext() : null;
-
             // write to working dir when using VoltCompiler directly
             if (standaloneCompiler) {
                 file = new File("catalog-report.html");
             }
-            // write to voltdb root dir when using VoltDB if possible
-            else if (catalogContext != null) {
-                file = new File(catalogContext.cluster.getVoltroot(), "catalog-report.html");
+            else {
+                // try to get a catalog context
+                VoltDBInterface voltdb = VoltDB.instance();
+                CatalogContext catalogContext = voltdb != null ? voltdb.getCatalogContext() : null;
+
+                // it's possible that standaloneCompiler will be false and catalogContext will be null
+                //   in test code.
+
+                // if we have a context, write report to voltroot
+                if (catalogContext != null) {
+                    file = new File(catalogContext.cluster.getVoltroot(), "catalog-report.html");
+                }
             }
 
             // if there's a good place to write the report, do so
