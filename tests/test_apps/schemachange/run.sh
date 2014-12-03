@@ -75,6 +75,11 @@ function smoke() {
         --retryForcedPercent=50 \
         --retryLimit=10 \
         --retrySleep=2
+    if [ $? -eq 0 ]; then
+        echo SUCCESS
+    else
+        echo FAILURE
+    fi
 }
 
 function help() {

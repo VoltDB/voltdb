@@ -35,15 +35,11 @@ CLIENTLOG4J="$VOLTDB_VOLTDB/../tests/log4j-allconsole.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
 HOST="localhost"
 DEPLOYMENT=""
-
-function _ds_atexit() {
-    if [ $? -eq 0 ]; then
-        echo SUCCESS
-    else
-        echo FAILURE
-    fi
-    voltdb_daemon_stop
-}
+SERVER_CREATE_RETRIES=3
+SERVER_CREATE_SLEEP=5
+SERVER_INIT_GREP="Server completed initialization."
+SERVER_INIT_RETRIES=5
+SERVER_INIT_SLEEP=5
 
 function _ds_die() {
     local HOST=$1
@@ -82,27 +78,27 @@ function voltdb_daemon_start() {
     $VOLTDB create -B $DEPLOYMENT_OPTION -l $LICENSE -H $HOST $APPNAME.jar || exit 1
 
     # Make sure the server gets stopped before exiting
-    trap "_ds_atexit" EXIT
+    trap "$VOLTDB stop -H $HOST" EXIT
 
     # Wait for the server process to start.
     local I=0
     while [ ! -e $PID_FILE ]; do
-        test $I -eq 3 && _ds_die $HOST "Gave up on server process creation."
+        test $I -eq $SERVER_CREATE_RETRIES && _ds_die $HOST "Gave up on server process creation."
         echo "Waiting for server process to get created..."
-        sleep 5
+        sleep $SERVER_CREATE_SLEEP
         let I=I+1
     done
     local SERVER_PID=$(cat $PID_FILE)
 
     # Wait for the server to initialize.
     let I=0
-    while ! grep -q 'Server completed initialization.' $OUTPUT_FILE; do
-        test $I -eq 5 && _ds_die $HOST "Gave up on server initialization."
+    while ! grep -q "$SERVER_INIT_GREP" $OUTPUT_FILE; do
+        test $I -eq $SERVER_INIT_RETRIES && _ds_die $HOST "Gave up on server initialization."
         if ! kill -0 $SERVER_PID; then
             _ds_die $HOST "Server process (PID=$SERVER_PID) died."
         fi
         echo "Waiting for server (PID=$SERVER_PID) to initialize..."
-        sleep 5
+        sleep $SERVER_INIT_SLEEP
         let I=I+1
     done
 }

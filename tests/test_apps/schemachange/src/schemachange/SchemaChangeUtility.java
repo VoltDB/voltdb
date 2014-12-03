@@ -136,4 +136,21 @@ public class SchemaChangeUtility
         VoltTable result = cr.getResults()[0];
         return result.getRowCount() > 0 ? result.asScalarLong() : 0;
     }
+
+    /**
+     * Die happily or tragically with a formatted message.
+     * Simply exits if message is null.
+     */
+    static void die(boolean happy, String format, Object... params) {
+        if (format != null) {
+            String message = String.format(format, params);
+            if (happy) {
+                log.info(message);
+            }
+            else {
+                log.error(message);
+            }
+        }
+        System.exit(happy ? 0 : -1);
+    }
 }
