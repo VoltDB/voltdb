@@ -72,7 +72,7 @@ public:
         m_multiPartition(false),
         m_isStreamed(false),
         m_isUpsert(false),
-        m_engine(engine),
+        m_hasPurgeFragment(false),
         m_templateTuple(),
         m_memoryPool(),
         m_nowFields()
@@ -84,6 +84,13 @@ public:
                     TempTableLimits* limits);
         bool p_execute(const NValueArray &params);
 
+        /**
+         * If the table is at or over its tuple limit, this method
+         * executes the purge fragment for the table.  Returns true if
+         * nothing went wrong (regardless of whether the purge
+         * fragment was executed) and false otherwise. */
+        bool executePurgeFragmentIfNeeded(PersistentTable* table);
+
         InsertPlanNode* m_node;
         TempTable* m_inputTable;
 
@@ -92,9 +99,7 @@ public:
         bool m_multiPartition;
         bool m_isStreamed;
         bool m_isUpsert;
-
-        /** reference to the engine/context to store the number of modified tuples */
-        VoltDBEngine* m_engine;
+        bool m_hasPurgeFragment;
 
     private:
         /** A tuple with the target table's schema that is populated with default
