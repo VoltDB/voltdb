@@ -525,7 +525,7 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
        
         // Test for T42A
         assertTrue(findTableInSystemCatalogResults("T42A"));
-        resp = m_client.callProcedure("T42AA.insert", 1, 2, 3);
+        resp = m_client.callProcedure("T42A.insert", 1, 2, 3);
         assertEquals(resp.getResults()[0].getRowCount(), 1);
 
         threw = false;
