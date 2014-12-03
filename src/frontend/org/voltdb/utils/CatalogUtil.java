@@ -526,6 +526,7 @@ public abstract class CatalogUtil {
         setHTTPDInfo(catalog, deployment.getHttpd());
 
         if (!isPlaceHolderCatalog) {
+            hostLog.warn("ExportInfo");
             setExportInfo(catalog, deployment.getExport());
         }
 
@@ -639,7 +640,7 @@ public abstract class CatalogUtil {
 
             // move any deprecated standalone export elements to the group
             ExportType export = deployment.getExport();
-            if (export != null) {
+            if (export != null && export.getTarget() != null) {
                 ExportConfigurationType exportConfig;
                 if (export.getConfiguration() == null || export.getConfiguration().isEmpty()) {
                     exportConfig = new ExportConfigurationType();
@@ -647,6 +648,7 @@ public abstract class CatalogUtil {
                 else {
                     exportConfig = export.getConfiguration().get(0);
                 }
+                hostLog.warn("getDeployment - " + export.getTarget().toString());
                 exportConfig.setEnabled(export.isEnabled());
                 exportConfig.setTarget(export.getTarget());
                 exportConfig.setExportconnectorclass(export.getExportconnectorclass());
@@ -923,6 +925,7 @@ public abstract class CatalogUtil {
 
             String exportClientClassName = null;
 
+            hostLog.warn(exportConfiguration.getTarget().toString());
             switch(exportConfiguration.getTarget()) {
                 case FILE: exportClientClassName = "org.voltdb.exportclient.ExportToFileClient"; break;
                 case JDBC: exportClientClassName = "org.voltdb.exportclient.JDBCExportClient"; break;
