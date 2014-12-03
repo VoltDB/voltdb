@@ -1098,17 +1098,17 @@ public class TestGroupByComplexSuite extends RegressionSuite {
             vt = client.callProcedure("@AdHoc", sql).getResults()[0];
             validateTableOfLongs(vt, new long[][] {{1,1}, {2,1}});
 
-            // (1) base query without distinct
-            sql = "SELECT wage, count(*) from " + tb + " GROUP BY abs(dept-2), wage "
-                    + " ORDER BY 1, 2;";
-            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-            validateTableOfLongs(vt, new long[][] {{10,1}, {10,1}, {20,1}, {30,1}, {40,2}, {50,1}});
-
             // query with one column distinct
             sql = "SELECT DISTINCT count(*) from " + tb + " GROUP BY abs(dept-2), wage "
                     + " ORDER BY 1;";
             vt = client.callProcedure("@AdHoc", sql).getResults()[0];
             validateTableOfScalarLongs(vt, new long[]{1, 2});
+
+            // (1) base query without distinct
+            sql = "SELECT wage, count(*) from " + tb + " GROUP BY abs(dept-2), wage "
+                    + " ORDER BY 1, 2;";
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{10,1}, {10,1}, {20,1}, {30,1}, {40,2}, {50,1}});
 
             // query with multiple columns distinct
             sql = "SELECT DISTINCT wage, count(*) from " + tb + " GROUP BY abs(dept-2), wage "

@@ -216,7 +216,7 @@ public class PlanAssembler {
         return false;
     }
 
-    private boolean isParitionColumnInGroupbyList(ArrayList<ParsedColInfo> groupbyColumns) {
+    private boolean isPartitionColumnInGroupbyList(ArrayList<ParsedColInfo> groupbyColumns) {
         assert(m_parsedSelect != null);
 
         if (groupbyColumns == null) {
@@ -267,13 +267,14 @@ public class PlanAssembler {
             subAssembler = new SelectSubPlanAssembler(m_catalogDb, m_parsedSelect, m_partitioning);
 
             // Process the GROUP BY information, decide whether it is group by the partition column
-            if (isParitionColumnInGroupbyList(m_parsedSelect.m_groupByColumns)) {
+            if (isPartitionColumnInGroupbyList(m_parsedSelect.m_groupByColumns)) {
                 m_parsedSelect.setHasPartitionColumnInGroupby();
             }
 
-            if (isParitionColumnInGroupbyList(m_parsedSelect.m_distinctGroupByColumns)) {
-                m_parsedSelect.setHasPartitionColumnInDistinctGroupby();
-            }
+            // FIXME: turn it on when we are able to push down DISTINCT
+//            if (isPartitionColumnInGroupbyList(m_parsedSelect.m_distinctGroupByColumns)) {
+//                m_parsedSelect.setHasPartitionColumnInDistinctGroupby();
+//            }
 
             return;
         }
@@ -1364,15 +1365,15 @@ public class PlanAssembler {
                 // Add the distributed work back to the plan
                 sendNode.addAndLinkChild(distLimit);
             }
-        }
-        // In future, inline LIMIT for join, Receive
-        // Then we do not need to distinguish the order by node.
-
-        if (m_parsedSelect.hasDistinctWithGroupBy()) {
+        } else if (m_parsedSelect.hasDistinctWithGroupBy()) {
+            // Currently we never pushdown LIMIT when there is a DISTINCT clause
             topLimit.addAndLinkChild(root);
             root = topLimit;
             return root;
         }
+
+        // In future, inline LIMIT for join, Receive
+        // Then we do not need to distinguish the order by node.
 
         // Switch if has Complex aggregations
         if (m_parsedSelect.hasComplexAgg()) {
@@ -2144,41 +2145,10 @@ public class PlanAssembler {
             distinctAggNode.addGroupByExpression(col.expression);
         }
 
-        boolean canPushdownDistinctAgg = m_parsedSelect.hasPartitionColumnInDistinctGroupby();
-        boolean pushedDown = false;
-
-        //
-        // disable pushdown, DISTINCT push down turns out complex
-        //
-        //
-        canPushdownDistinctAgg = false;
-
-        if (canPushdownDistinctAgg && !m_parsedSelect.m_mvFixInfo.needed()) {
-            assert(m_parsedSelect.hasPartitionColumnInGroupby());
-            AbstractPlanNode receive = root;
-            if (receive instanceof ProjectionPlanNode && receive.getChildCount() > 0) {
-                receive = receive.getChild(0);
-            }
-            if (receive instanceof OrderByPlanNode && receive.getChildCount() > 0) {
-                receive = receive.getChild(0);
-            }
-            if (receive instanceof ReceivePlanNode) {
-                // Temporarily strip send/receive pair
-                AbstractPlanNode distNode = receive.getChild(0).getChild(0);
-                receive.getChild(0).unlinkChild(distNode);
-
-                distinctAggNode.addAndLinkChild(distNode);
-                receive.getChild(0).addAndLinkChild(distinctAggNode);
-
-                pushedDown = true;
-            }
-        }
-
-        if (! pushedDown) {
-            // DISTINCT will be a new GROUP BY node on top of the current root.
-            distinctAggNode.addAndLinkChild(root);
-            root = distinctAggNode;
-        }
+        // DISTINCT will not be pushed down, instead it will be
+        // a new GROUP BY node on top of the current root.
+        distinctAggNode.addAndLinkChild(root);
+        root = distinctAggNode;
 
         return root;
     }

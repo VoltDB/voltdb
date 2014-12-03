@@ -28,4 +28,4 @@ SELECT DISTINCT @onefun(LHS78._variable[@columntype]),    LHS78._variable[@colum
 
 --- DISTINCT with GROUP BY
 SELECT DISTINCT  LHS55._variable[#GB2 @columntype],   @agg(LHS55._variable[@columntype])   FROM @fromtables LHS55  @jointype JOIN   @fromtables RHS ON LHS55._variable[@columntype] = RHS._variable[@comparabletype] GROUP BY LHS55.__[#GB1], LHS55.__[#GB2]
-SELECT DISTINCT  LHS55._variable[#GB2 @columntype],   @agg(LHS55._variable[@columntype])   FROM @fromtables LHS55  @jointype JOIN   @fromtables RHS ON LHS55._variable[@columntype] = RHS._variable[@comparabletype] GROUP BY LHS55.__[#GB1], LHS55.__[#GB2] ORDER BY 1, 2 LIMIT 1
+SELECT DISTINCT  LHS55._variable[#GB2 @columntype],   @agg(LHS55._variable[@columntype])   FROM @fromtables LHS55  @jointype JOIN   @fromtables RHS ON LHS55._variable[@columntype] = RHS._variable[@comparabletype] GROUP BY LHS55.__[#GB1], LHS55.__[#GB2] ORDER BY 1, 2 LIMIT 5

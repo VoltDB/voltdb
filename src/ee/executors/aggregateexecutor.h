@@ -235,8 +235,6 @@ protected:
     AbstractExpression* m_prePredicate;    // ENG-1565: for enabling max() using index purpose only
     AbstractExpression* m_postPredicate;
 
-    bool m_noAggregation;
-
     ProgressMonitorProxy* m_pmp;
     PoolBackedTupleStorage m_nextGroupByKeyStorage;
     const TupleSchema * m_inputSchema;

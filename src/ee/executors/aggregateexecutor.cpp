@@ -416,20 +416,6 @@ bool AggregateExecutorBase::p_init(AbstractPlanNode*, TempTableLimits* limits)
     m_groupByExpressions = node->getGroupByExpressions();
     node->collectOutputExpressions(m_outputColumnExpressions);
 
-    m_noAggregation = false;
-    if (m_aggTypes.size() == 0) {
-        bool hasDistinctAgg = false;
-        BOOST_FOREACH(bool distinct, m_distinctAggs) {
-            if (distinct) {
-                hasDistinctAgg = true;
-                break;
-            }
-        }
-        if (! hasDistinctAgg) {
-            m_noAggregation = true;
-        }
-    }
-
     // m_passThroughColumns.size() == m_groupByExpressions.size() is not true,
     // Because group by unique column may be able to select other columns
     m_prePredicate = node->getPrePredicate();
@@ -692,7 +678,7 @@ bool AggregateHashExecutor::p_execute_tuple(const TableTuple& nextTuple) {
         // so force a new tuple allocation to hold the next candidate key.
         nextGroupByKeyTuple.move(NULL);
 
-        if (m_noAggregation) {
+        if (m_aggTypes.size() == 0) {
             insertOutputTuple(aggregateRow);
             return false;
         }
@@ -713,7 +699,7 @@ void AggregateHashExecutor::p_execute_finish() {
     VOLT_TRACE("finalizing..");
 
     // If there is no aggregation, results are already inserted already
-    if (! m_noAggregation) {
+    if (m_aggTypes.size() != 0) {
         for (HashAggregateMapType::const_iterator iter = m_hash.begin(); iter != m_hash.end(); iter++) {
             AggregateRow *aggregateRow = iter->second;
             if (insertOutputTuple(aggregateRow)) {
