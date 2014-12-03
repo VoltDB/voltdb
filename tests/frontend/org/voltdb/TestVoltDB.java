@@ -228,6 +228,6 @@ public class TestVoltDB extends TestCase {
 
         // this should succeed even though group "bar" does not exist
         assertTrue("Deployment file should have been able to validate",
-                CatalogUtil.compileDeployment(catalog, project.getPathToDeployment(), true, true) == 1);
+                CatalogUtil.compileDeployment(catalog, project.getPathToDeployment(), true) == null);
     }
 }

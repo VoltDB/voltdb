@@ -387,7 +387,7 @@ public class TestVoltCompiler extends TestCase {
                 VoltCompilerUtils.readFileFromJarfile("/tmp/snapshot_settings_test.jar", "catalog.txt");
             final Catalog cat = new Catalog();
             cat.execute(catalogContents);
-            CatalogUtil.compileDeployment(cat, builder.getPathToDeployment(), true, false);
+            CatalogUtil.compileDeployment(cat, builder.getPathToDeployment(), false);
             SnapshotSchedule schedule =
                 cat.getClusters().get("cluster").getDatabases().
                     get("database").getSnapshotschedule().get("default");
@@ -450,7 +450,7 @@ public class TestVoltCompiler extends TestCase {
                 VoltCompilerUtils.readFileFromJarfile("/tmp/exportsettingstest.jar", "catalog.txt");
             final Catalog cat = new Catalog();
             cat.execute(catalogContents);
-            CatalogUtil.compileDeployment(cat, project.getPathToDeployment(), true, false);
+            CatalogUtil.compileDeployment(cat, project.getPathToDeployment(), false);
             Connector connector = cat.getClusters().get("cluster").getDatabases().
                 get("database").getConnectors().get("0");
             assertTrue(connector.getEnabled());
