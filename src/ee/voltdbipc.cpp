@@ -849,7 +849,7 @@ int64_t VoltDBIPC::fragmentProgressUpdate(int32_t batchIndex,
 
 // A file static helper function that
 //   Reads a 4-byte integer from fd that is the length of the following string
-//   Reads a the bytes for the string
+//   Reads the bytes for the string
 //   Returns those bytes as an std::string
 static std::string readLengthPrefixedBytesToStdString(int fd) {
     int32_t length;

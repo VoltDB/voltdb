@@ -1368,8 +1368,8 @@ void VoltDBEngine::initMaterializedViewsAndLimitDeletePlans() {
 
             if (srcCatalogTable->tuplelimitDeleteStmt().size() > 0) {
                 catalog::Statement* stmt = srcCatalogTable->tuplelimitDeleteStmt().begin()->second;
-                const std::string hexString = stmt->fragments().begin()->second->plannodetree();
-                std::string jsonPlan = getTopend()->decodeBase64AndDecompress(hexString);
+                const std::string b64String = stmt->fragments().begin()->second->plannodetree();
+                std::string jsonPlan = getTopend()->decodeBase64AndDecompress(b64String);
                 srcPTable->swapPurgeExecutorVector(ExecutorVector::fromJsonPlan(this,
                                                                                 jsonPlan,
                                                                                 -1));

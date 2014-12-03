@@ -389,6 +389,11 @@ public class CatalogDiffEngine {
             return null;
         }
 
+        else if (suspect instanceof Statement && suspect.getParent() instanceof Table) {
+            // LIMIT PARTITION ROWS <n> EXECUTE (DELETE ...)
+            return null;
+        }
+
         //TODO: This code is also pretty fishy
         // -- See the "salmon of doubt" comment in checkModifyWhitelist
 
@@ -663,6 +668,11 @@ public class CatalogDiffEngine {
                     }
                 }
             }
+        }
+
+        else if (suspect instanceof Statement && suspect.getParent() instanceof Table) {
+            // LIMIT PARTITION ROWS <n> EXECUTE (DELETE ...)
+            return null;
         }
 
         // Also allow any field changes (that haven't triggered an early return already)

@@ -2301,6 +2301,17 @@ public class TestVoltCompiler extends TestCase {
         checkDDLErrorMessage(ddl, null);
     }
 
+    public void testDDLCompilerAlterTableLimitWithDelete()
+    {
+        String ddl;
+
+        //
+        // test failed cases
+        ddl = "create table t(id integer not null);\n" +
+                "alter table t add limit partition rows 10 execute(delete from t where id > 0);";
+        checkDDLErrorMessage(ddl, null);
+    }
+
     public void testPartitionOnBadType() {
         final String simpleSchema =
             "create table books (cash float default 0.0 NOT NULL, title varchar(10) default 'foo', PRIMARY KEY(cash));";
