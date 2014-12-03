@@ -1,6 +1,4 @@
-﻿var adminConfiguration = null;
-
-$(document).ready(function () {
+﻿$(document).ready(function () {
     
     if ($.cookie("username") != undefined && $.cookie("username") != 'null') {
         $("#logOut").css('display', 'block');
@@ -241,9 +239,6 @@ $(document).ready(function () {
     //If security is enabled, then it displays login popup. After user is verified, it calls loadPage().
     //If security is not enabled, then it simply calls loadPage().
     voltDbRenderer.HandleLogin(serverName, portid, function () { loadPage(serverName, portid); });
-    adminConfiguration= $('#navAdmin').adminOverview({ 'isAdmin':true});
-
-
 });
 
 function logout() {
@@ -394,10 +389,10 @@ var loadPage = function (serverName, portid) {
         };
         
         var loadAdminTabClientPort = function(clientPortValue) {
-            adminConfiguration.displayClientPort(clientPortValue);
+            VoltDbAdminConfig.displayClientPort(clientPortValue);
         };
             
-        voltDbRenderer.GetSystemInformation(loadClusterHealth, adminConfiguration, loadAdminTabClientPort);
+        voltDbRenderer.GetSystemInformation(loadClusterHealth, loadAdminTabClientPort);
 
 
     };
@@ -470,10 +465,10 @@ var loadPage = function (serverName, portid) {
         };
 
         var loadAdminConfigurations = function (adminConfigValues) {
-            adminConfiguration.displayAdminConfiguration(adminConfigValues);
+            VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues);
         };
 
-        voltDbRenderer.GetProceduresInfoNAdminConfiguration(loadProcedureInformations, adminConfiguration, loadAdminConfigurations);
+        voltDbRenderer.GetProceduresInfoNAdminConfiguration(loadProcedureInformations, loadAdminConfigurations);
         
         voltDbRenderer.getTablesInformation(function (tableMetadata) {
             if (tableMetadata != "" && tableMetadata != undefined) {

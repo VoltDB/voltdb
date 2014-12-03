@@ -294,9 +294,9 @@ function alertNodeClicked(obj) {
             }
         };
 
-        this.GetSystemInformation = function (onInformationLoaded, adminConfiguration, onAdminPageClientPortLoaded) {
+        this.GetSystemInformation = function (onInformationLoaded, onAdminPageClientPortLoaded) {
             VoltDBService.GetSystemInformation(function (connection) {
-                if (adminConfiguration != null && adminConfiguration.options.isAdmin) {
+                if (VoltDbAdminConfig.isAdmin) {
                     onAdminPageClientPortLoaded(getClientPort(connection));
                 }
                 
@@ -311,12 +311,12 @@ function alertNodeClicked(obj) {
         };
 
 
-        this.GetProceduresInfoNAdminConfiguration = function (onProceduresDataLoaded, adminConfiguration, onAdminConfigLoaded) {
+        this.GetProceduresInfoNAdminConfiguration = function (onProceduresDataLoaded, onAdminConfigLoaded) {
             var procedureMetadata = "";
 
             VoltDBService.GetSystemInformationDeployment(function (connection) {
-                
-                if (adminConfiguration != null && adminConfiguration.options.isAdmin) {
+
+                if (VoltDbAdminConfig.isAdmin) {
                     onAdminConfigLoaded(getAdminConfigurationItems(connection));
                 }
 
