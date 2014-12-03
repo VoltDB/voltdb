@@ -53,6 +53,7 @@ import org.codehaus.jackson.schema.JsonSchema;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.eclipse.jetty.server.bio.SocketConnector;
+import org.voltdb.AuthenticationResult;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
@@ -60,6 +61,8 @@ import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.UsersType;
 
 public class HTTPAdminListener {
+
+    private static VoltLogger m_log = new VoltLogger("HOST");
 
     Server m_server = new Server();
     HTTPClientInterface httpClientInterface = new HTTPClientInterface();
@@ -98,12 +101,8 @@ public class HTTPAdminListener {
             return m_hostHeader;
         }
 
-        public boolean authenticate(Request request) throws Exception {
-            try {
-                return httpClientInterface.authenticate(request);
-            } catch (Exception ex) {
-            }
-            return false;
+        public AuthenticationResult authenticate(Request request) {
+            return httpClientInterface.authenticate(request);
         }
 
         @Override
@@ -247,10 +246,10 @@ public class HTTPAdminListener {
 
     }
 
+    //This is for password on User not to be reported.
     abstract class IgnorePasswordMixIn {
         @JsonIgnore abstract String getPassword();
     }
-
 
     class DeploymentRequestHandler extends VoltRequestHandler {
 
@@ -264,9 +263,8 @@ public class HTTPAdminListener {
                 JsonSchema schema = m_mapper.generateJsonSchema(DeploymentType.class);
                 m_schema = schema.toString();
             } catch (JsonMappingException ex) {
-
+                m_log.warn("Failed to generate JSON schema: ", ex);
             }
-
         }
 
         @Override
@@ -280,6 +278,7 @@ public class HTTPAdminListener {
             String jsonp = request.getParameter("jsonp");
 
             try {
+                //schema request does not require authentication.
                 if (baseRequest.getRequestURI().contains("/schema")) {
                     String msg = m_schema;
                     if (jsonp != null) {
@@ -291,8 +290,10 @@ public class HTTPAdminListener {
                     return;
                 }
 
-                if (!authenticate(baseRequest)) {
-                    String msg = "Incorrect authorization credentials.";
+                AuthenticationResult authResult = authenticate(baseRequest);
+                //Do any role checking if required here.
+                if (!authResult.isAuthenticated()) {
+                    String msg = authResult.m_message;
                     ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg);
                     msg = rimpl.toJSONString();
                     if (jsonp != null) {
