@@ -516,6 +516,12 @@ DISTRIBUTION
      populates the core components used by the client distribution. -->
 <target name="dist_internal" depends="dist_internal_core">
 
+	<!-- build the jars for the clients -->
+	<exec dir='examples/voter' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
+	<!--<exec dir='examples/voltkv' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
+	<exec dir='examples/windowing' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
+	<exec dir='examples/json' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>-->
+
     <!-- populate the stuff not handled by dist_internal_core -->
     <copy todir="${dist.dir}/">
         <fileset dir="." defaultexcludes="yes">
@@ -703,10 +709,10 @@ CLEANING
 	description="Remove all compiled and generated files."
 	depends="cleantmp, clean_client, clean_project_gen, clean_deployment_gen,
 	         clean_debian_package, clean_rpm_package, clean_bindoc, clean_other_gen">
-  <exec dir='examples/voter' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
-  <exec dir='examples/json-sessions' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
-  <exec dir='examples/windowing' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
-  <exec dir='examples/voltkv' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
+  <exec dir='examples/voter' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
+  <exec dir='examples/json-sessions' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
+  <exec dir='examples/windowing' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
+  <exec dir='examples/voltkv' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='doc/tutorials/auction' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
   <exec dir='doc/tutorials/helloworld' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>  <exec dir='.' executable='/bin/sh'>
     <arg line="-c 'rm -rf obj/*'"/>
@@ -1814,7 +1820,7 @@ TEST CASES
         <exec dir="${dist.examples.dir}/@{app}" executable="/usr/bin/env" failonerror='true'>
             <arg value="bash" />
             <arg value="run.sh" />
-            <arg value="srccompile" />
+            <arg value="jars" />
         </exec>
     </sequential>
 </macrodef>
