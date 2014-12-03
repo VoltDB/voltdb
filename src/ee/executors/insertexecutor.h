@@ -68,7 +68,6 @@ public:
         m_node(NULL),
         m_inputTable(NULL),
         m_partitionColumn(-1),
-        m_partitionColumnIsString(false),
         m_multiPartition(false),
         m_isStreamed(false),
         m_isUpsert(false),
@@ -95,7 +94,6 @@ public:
         TempTable* m_inputTable;
 
         int m_partitionColumn;
-        bool m_partitionColumnIsString;
         bool m_multiPartition;
         bool m_isStreamed;
         bool m_isUpsert;

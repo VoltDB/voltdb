@@ -88,7 +88,6 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
     // Target table can be StreamedTable or PersistentTable and must not be NULL
     PersistentTable *persistentTarget = dynamic_cast<PersistentTable*>(targetTable);
     m_partitionColumn = -1;
-    m_partitionColumnIsString = false;
     m_isStreamed = (persistentTarget == NULL);
 
     if (m_isUpsert) {
@@ -105,11 +104,6 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
 
     if (persistentTarget) {
         m_partitionColumn = persistentTarget->partitionColumn();
-        if (m_partitionColumn != -1) {
-            if (m_inputTable->schema()->columnType(m_partitionColumn) == VALUE_TYPE_VARCHAR) {
-                m_partitionColumnIsString = true;
-            }
-        }
     }
 
     m_multiPartition = m_node->isMultiPartition();
