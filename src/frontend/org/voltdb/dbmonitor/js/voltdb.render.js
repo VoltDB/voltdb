@@ -299,14 +299,14 @@ function alertNodeClicked(obj) {
                 if (VoltDbAdminConfig.isAdmin) {
                     onAdminPageClientPortLoaded(getClientPort(connection));
                 }
-                
+
                 populateSystemInformation(connection);
                 getMemoryDetails(connection, systemMemory);
 
                 if (gCurrentServer == "")
                     configureRequestedHost(VoltDBCore.hostIP);
                 onInformationLoaded();
-                
+
             });
         };
 
@@ -1645,13 +1645,13 @@ function alertNodeClicked(obj) {
             sysTransaction["currentTimerTick"] = currentTimerTick;
 
         };
-        
+
         //admin Configuration
-        var getAdminConfigurationItems = function(connection) {
+        var getAdminConfigurationItems = function (connection) {
             var adminConfigValues = [];
 
             if (connection != null && connection.Metadata['@SystemInformation_DEPLOYMENT'] != null) {
-                connection.Metadata['@SystemInformation_DEPLOYMENT'].data.forEach(function(columnInfo) {
+                connection.Metadata['@SystemInformation_DEPLOYMENT'].data.forEach(function (columnInfo) {
                     switch (columnInfo[0]) {
                         case 'sitesperhost':
                             adminConfigValues['sitesperhost'] = columnInfo[1];
@@ -1704,19 +1704,19 @@ function alertNodeClicked(obj) {
                         case 'logsegmentsize':
                             adminConfigValues['logSegmentSize'] = columnInfo[1];
                             break;
-                            
+
                         case 'export':
                             adminConfigValues['export'] = columnInfo[1];
                             break;
-                            
+
                         case 'target':
                             adminConfigValues['targets'] = columnInfo[1];
                             break;
-                            
+
                         case "properties":
                             adminConfigValues['properties'] = columnInfo[1];
                             break;
-                            
+
                         case 'maxjavaheap':
                             adminConfigValues['maxJavaHeap'] = columnInfo[1];
                             break;
@@ -1736,28 +1736,51 @@ function alertNodeClicked(obj) {
                         case 'snapshotpriority':
                             adminConfigValues['snapshotPriority'] = columnInfo[1];
                             break;
+
+                            //Directory Values
+                        case 'voltdbroot':
+                            adminConfigValues['voltdbRoot'] = columnInfo[1];
+                            break;
                             
-                    //Directory Values
-                    case 'voltdbroot':
-                        adminConfigValues['voltdbRoot'] = columnInfo[1];
-                        break;
-                    case 'snapshotpath':
-                        adminConfigValues['snapshotPath'] = columnInfo[1];
-                        break;
-                    case 'commandlogpath':
-                        adminConfigValues['commandLogPath'] = columnInfo[1];
-                        break;
-                    case 'commandlogsnapshotpath':
-                        adminConfigValues['commandLogSnapshotPath'] = columnInfo[1];
-                        break;
-                    //Port Items
-                    case 'adminport':
-                        adminConfigValues['adminPort'] = columnInfo[1];
-                        break;
-                    case 'httpport':
-                        adminConfigValues['httpPort'] = columnInfo[1];
-                        break;                                
-                    default:
+                        case 'snapshotpath':
+                            adminConfigValues['snapshotPath'] = columnInfo[1];
+                            break;
+                            
+                        case 'exportoverflow':
+                            adminConfigValues['exportOverflow'] = columnInfo[1];
+                            break;
+                            
+                        case 'commandlogpath':
+                            adminConfigValues['commandLogPath'] = columnInfo[1];
+                            break;
+                            
+                        case 'commandlogsnapshotpath':
+                            adminConfigValues['commandLogSnapshotPath'] = columnInfo[1];
+                            break;
+
+                            //Port values
+                        case 'adminport':
+                            adminConfigValues['adminPort'] = columnInfo[1];
+                            break;
+                            
+                        case 'httpport':
+                            adminConfigValues['httpPort'] = columnInfo[1];
+                            break;
+
+                        case 'internalport':
+                            adminConfigValues['internalPort'] = columnInfo[1];
+                            break;
+
+                        case 'zookeeperport':
+                            adminConfigValues['zookeeperPort'] = columnInfo[1];
+                            break;
+
+                        case 'replicationport':
+                            adminConfigValues['replicationPort'] = columnInfo[1];
+                            break;
+
+
+                        default:
                     }
                 });
             }
@@ -1765,12 +1788,12 @@ function alertNodeClicked(obj) {
 
         };
 
-        var getClientPort = function(connection) {
+        var getClientPort = function (connection) {
             var portConfigValues = [];
 
 
             if (connection != null && connection.Metadata['@SystemInformation_OVERVIEW'] != null) {
-                connection.Metadata['@SystemInformation_OVERVIEW'].data.forEach(function(columnInfo) {
+                connection.Metadata['@SystemInformation_OVERVIEW'].data.forEach(function (columnInfo) {
                     if (columnInfo[1] == 'CLIENTPORT') {
                         portConfigValues['clientPort'] = columnInfo[2];
                     }
@@ -1780,8 +1803,8 @@ function alertNodeClicked(obj) {
 
         };
 
-        this.editConfigurationItem = function (configGroup, configMember, configValue,onConfigurationUpdated) {
-            VoltDBService.editConfigurationItem(configGroup, configMember,configValue,function() {
+        this.editConfigurationItem = function (configGroup, configMember, configValue, onConfigurationUpdated) {
+            VoltDBService.editConfigurationItem(configGroup, configMember, configValue, function () {
                 onConfigurationUpdated();
             });
         };

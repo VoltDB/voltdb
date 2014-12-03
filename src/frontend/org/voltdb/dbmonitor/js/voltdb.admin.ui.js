@@ -46,10 +46,11 @@ $(document).ready(function () {
         internalPort: $('#internalPort'),
         zookeeperPort: $('#zookeeperPort'),
         replicationPort: $('#replicationPort'),
-        root: $('#voltdbroot'),
-        snapShot: $('#snapshotpath'),
-        commandLogs: $('#commandlogpath'),
-        commandLogSnapShots: $('#commandlogsnapshotpath')
+        voltdbRoot: $('#voltdbroot'),
+        snapshotPath: $('#snapshotpath'),
+        exportOverflow: $('#exportOverflow'),
+        commandLogPath: $('#commandlogpath'),
+        commandLogSnapshotPath: $('#commandlogsnapshotpath')
     };
 
     adminEditObjects = {
@@ -599,15 +600,6 @@ $(document).ready(function () {
             adminEditObjects.tBoxHeartbeatTimeoutValue = adminConfigValues.heartBeatTimeout;
         };
 
-        var configurePortValues = function (portConfigValues) {
-            options.clientPort.text(portConfigValues.clientPort);
-            options.adminPort.text(portConfigValues.adminPort);
-            options.httpPort.text(portConfigValues.httpPort);
-            options.internalPort.text(portConfigValues.internalPort);
-            options.zookeeperPort.text(portConfigValues.zookeeperPort);
-            options.replicationPort.text(portConfigValues.replicationPort);
-        };
-
         var configurePortValues = function(portConfigValues) {
             adminDOMObjects.adminPort.text(portConfigValues.adminPort);
             adminDOMObjects.httpPort.text(portConfigValues.httpPort);
@@ -621,10 +613,10 @@ $(document).ready(function () {
         };
 
         var configureDirectoryValues = function(directoryConfigValues) {
-            adminDOMObjects.root.text(directoryConfigValues.voltdbRoot);
-            adminDOMObjects.snapShot.text(directoryConfigValues.snapshotPath);
-            adminDOMObjects.commandLogs.text(directoryConfigValues.commandLogPath);
-            adminDOMObjects.commandLogSnapShots.text(directoryConfigValues.commandLogSnapshotPath);
+            adminDOMObjects.voltdbRoot.text(directoryConfigValues.voltdbRoot);
+            adminDOMObjects.snapshotPath.text(directoryConfigValues.snapshotPath);
+            adminDOMObjects.commandLogPath.text(directoryConfigValues.commandLogPath);
+            adminDOMObjects.commandLogSnapshotPath.text(directoryConfigValues.commandLogSnapshotPath);
 
         };
 
