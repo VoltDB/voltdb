@@ -492,8 +492,8 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
             threw = true;
         }
         assertTrue("Shouldn't violate UNIQUE constraint", threw);
-
-        
+             
+//      ENG-7321 - bug with PRIMARY KEY and verification of generated DDL 
 //        // Test for T41
 //        assertTrue(findTableInSystemCatalogResults("T41"));
 //        resp = m_client.callProcedure("T41.insert", 1);
@@ -523,6 +523,19 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
 		}
 		assertTrue("Shouldn't violate ASSUMEUNIQUE constraint", threw);
        
+        // Test for T42A
+        assertTrue(findTableInSystemCatalogResults("T42A"));
+        resp = m_client.callProcedure("T42AA.insert", 1, 2, 3);
+        assertEquals(resp.getResults()[0].getRowCount(), 1);
+
+        threw = false;
+        try {
+            m_client.callProcedure("T42A.insert", 1, 2, 3);
+        } catch (ProcCallException pce) {
+            threw = true;
+        }
+        assertTrue("Shouldn't violate ASSUMEUNIQUE constraint", threw);
+        
         // Test for T43
 		assertTrue(findTableInSystemCatalogResults("T43"));
 		resp = m_client.callProcedure("T43.insert", 1);
@@ -572,6 +585,7 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         assertTrue(verifyTableColumnType("T47", "C2", "INTEGER" ));
         assertEquals(indexedColumnCount("T47"), 1);
 
+//        ENG-7321 - bug with PRIMARY KEY and verification of generated DDL
 //    	// Test for T48
 //        assertTrue(findTableInSystemCatalogResults("T48"));
 //        assertTrue(doesColumnExist("T48", "C1" ));
