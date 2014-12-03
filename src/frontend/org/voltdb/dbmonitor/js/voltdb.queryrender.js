@@ -145,7 +145,7 @@
             src = src.replace(MatchNonBreakingInsertIntoSelect, GenerateDisguisedCompoundKeywords);
             src = src.replace(MatchNonBreakingCompoundKeywords, GenerateDisguisedCompoundKeywords);
 
-            if (!src.match('explain')) {
+            if (!src.match("^explain")) {
                 // Start a new statement before each remaining statement keyword.
                 src = src.replace(MatchStatementStarts, GenerateSplitStatements);
                 //* Enable this to debug in the browser */ console.log("mid-processed queries:'" + src + "'");
