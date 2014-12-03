@@ -791,7 +791,7 @@ public class TestCatalogUtil extends TestCase {
         final File tmpDefSchema = VoltProjectBuilder.writeStringToTempFile(defSchema);
         CatalogUtil.compileDeployment(catalog, tmpDefSchema.getPath(), true, false);
         Cluster cluster =  catalog.getClusters().get("cluster");
-        assertFalse(cluster.getUseddlschema());
+        assertTrue(cluster.getUseddlschema());
 
         setUp();
         final File tmpCatalogSchema = VoltProjectBuilder.writeStringToTempFile(catalogSchema);

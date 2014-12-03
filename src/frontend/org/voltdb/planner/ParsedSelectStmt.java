@@ -912,10 +912,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
 
         // DISTINCT without GROUP BY
-        if (groupbyElement == null) {
-            // Hsql guards against HAVING without GROUP BY.
-            assert(havingElement == null);
-
+        if (groupbyElement == null || groupbyElement.children.isEmpty()) {
             // Tricky: rewrote DISTINCT without GROUP BY with GROUP BY clause
             if ( ! hasAggregateExpression()) {
                 // attribute "id" is the only one that differs from a real GROUP BY query
@@ -928,7 +925,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // DISTINCT with GROUP BY
         m_distinctGroupByColumns = new ArrayList<ParsedColInfo>();
 
-        // Iterate in the Display code
+        // Iterate the Display columns
         for (ParsedColInfo col: m_displayColumns) {
             ParsedColInfo pcol = new ParsedColInfo();
             pcol.tableName = col.tableName;

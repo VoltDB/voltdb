@@ -216,7 +216,7 @@ public class PlanAssembler {
         return false;
     }
 
-    private boolean isParitionColumnInGroupbyList(ArrayList<ParsedColInfo> groupbyColumns) {
+    private boolean isPartitionColumnInGroupbyList(ArrayList<ParsedColInfo> groupbyColumns) {
         assert(m_parsedSelect != null);
 
         if (groupbyColumns == null) {
@@ -267,13 +267,14 @@ public class PlanAssembler {
             subAssembler = new SelectSubPlanAssembler(m_catalogDb, m_parsedSelect, m_partitioning);
 
             // Process the GROUP BY information, decide whether it is group by the partition column
-            if (isParitionColumnInGroupbyList(m_parsedSelect.m_groupByColumns)) {
+            if (isPartitionColumnInGroupbyList(m_parsedSelect.m_groupByColumns)) {
                 m_parsedSelect.setHasPartitionColumnInGroupby();
             }
 
-            if (isParitionColumnInGroupbyList(m_parsedSelect.m_distinctGroupByColumns)) {
-                m_parsedSelect.setHasPartitionColumnInDistinctGroupby();
-            }
+            // FIXME: turn it on when we are able to push down DISTINCT
+//            if (isPartitionColumnInGroupbyList(m_parsedSelect.m_distinctGroupByColumns)) {
+//                m_parsedSelect.setHasPartitionColumnInDistinctGroupby();
+//            }
 
             return;
         }
@@ -292,7 +293,8 @@ public class PlanAssembler {
         assert (parsedStmt.m_tableList.size() == 1);
         Table targetTable = parsedStmt.m_tableList.get(0);
         if (targetTable.getIsreplicated()) {
-            if (m_partitioning.wasSpecifiedAsSingle()) {
+            if (m_partitioning.wasSpecifiedAsSingle()
+                    && !m_partitioning.isReplicatedDmlToRunOnAllPartitions()) {
                 String msg = "Trying to write to replicated table '" + targetTable.getTypeName()
                         + "' in a single-partition procedure.";
                 throw new PlanningErrorException(msg);
@@ -1362,7 +1364,13 @@ public class PlanAssembler {
                 // Add the distributed work back to the plan
                 sendNode.addAndLinkChild(distLimit);
             }
+        } else if (m_parsedSelect.hasDistinctWithGroupBy()) {
+            // Currently we never pushdown LIMIT when there is a DISTINCT clause
+            topLimit.addAndLinkChild(root);
+            root = topLimit;
+            return root;
         }
+
         // In future, inline LIMIT for join, Receive
         // Then we do not need to distinguish the order by node.
 

@@ -31,7 +31,6 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -882,7 +881,12 @@ public abstract class CatalogUtil {
                 for( PropertyType configProp: configProperties) {
                     ConnectorProperty prop = catconn.getConfig().add(configProp.getName());
                     prop.setName(configProp.getName());
-                    prop.setValue(configProp.getValue());
+                    if (!configProp.getName().toLowerCase().contains("password")) {
+                        prop.setValue(configProp.getValue().trim());
+                    } else {
+                        //Dont trim passwords
+                        prop.setValue(configProp.getValue());
+                    }
                 }
             }
         }
@@ -895,7 +899,7 @@ public abstract class CatalogUtil {
             if (exportConfiguration != null && exportConfiguration.getProperty() != null) {
                 hostLog.info("Export configuration properties are: ");
                 for (PropertyType configProp : exportConfiguration.getProperty()) {
-                    if (!configProp.getName().equalsIgnoreCase("password")) {
+                    if (!configProp.getName().toLowerCase().contains("password")) {
                         hostLog.info("Export Configuration Property NAME=" + configProp.getName() + " VALUE=" + configProp.getValue());
                     }
                 }
@@ -1492,7 +1496,13 @@ public abstract class CatalogUtil {
     }
 
     private static void updateTableUsageAnnotation(Table table, Statement stmt, boolean read) {
-        Procedure proc = (Procedure) stmt.getParent();
+        if (!(stmt.getParent() instanceof Procedure)) {
+            // if parent of statement is not a procedure
+            // it could be a table with a LIMIT ROWS DELETE
+            return;
+        }
+
+        Procedure proc = (Procedure)stmt.getParent();
         // skip CRUD generated procs
         if (proc.getDefaultproc()) {
             return;
