@@ -23,6 +23,8 @@
 
 package org.voltdb.regressionsuites;
 
+import java.io.IOException;
+
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
@@ -30,7 +32,6 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.BatchedMultiPartitionTest;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.TruncateTable;
@@ -142,7 +143,6 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         System.out.println("STARTING TABLE LIMIT AND PERCENTAGE FULL TEST......");
         Client client = getClient();
         VoltTable vt = null;
-        Exception e = null;
         if(isHSQL()) {
             return;
         }
@@ -153,16 +153,9 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         vt = client.callProcedure("@AdHoc", "select count(*) from CAPPED0").getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {0});
 
-        e = null;
-        try {
-            vt = client.callProcedure("CAPPED0.insert", 0, 0, 0).getResults()[0];
-        } catch (ProcCallException ex) {
-            e = ex;
-            assertTrue(ex.getMessage().contains("CONSTRAINT VIOLATION"));
-            assertTrue(ex.getMessage().contains("Table CAPPED0 exceeds table maximum row count 0"));
-        } finally {
-            assertNotNull(e);
-        }
+        verifyProcFails(client, "CONSTRAINT VIOLATION\\s*Table CAPPED0 exceeds table maximum row count 0",
+                "CAPPED0.insert", 0, 0, 0);
+
         vt = client.callProcedure("@AdHoc", "select count(*) from CAPPED0").getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {0});
 
@@ -177,16 +170,9 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         validateTableOfScalarLongs(vt, new long[] {1});
         validStatisticsForTableLimitAndPercentage(client, "CAPPED2", 2, 100);
 
-        e = null;
-        try {
-            vt = client.callProcedure("CAPPED2.insert", 2, 2, 2).getResults()[0];
-        } catch (ProcCallException ex) {
-            e = ex;
-            assertTrue(ex.getMessage().contains("CONSTRAINT VIOLATION"));
-            assertTrue(ex.getMessage().contains("Table CAPPED2 exceeds table maximum row count 2"));
-        } finally {
-            assertNotNull(e);
-        }
+        verifyProcFails(client, "CONSTRAINT VIOLATION\\s*Table CAPPED2 exceeds table maximum row count 2",
+                "CAPPED2.insert", 2, 2, 2);
+
         vt = client.callProcedure("@AdHoc", "select count(*) from CAPPED2").getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {2});
 
@@ -210,19 +196,160 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         validateTableOfScalarLongs(vt, new long[] {1});
         validStatisticsForTableLimitAndPercentage(client, "CAPPED3", 3, 100);
 
-        e = null;
-        try {
-            vt = client.callProcedure("CAPPED3.insert", 3, 3, 3).getResults()[0];
-        } catch (ProcCallException ex) {
-            e = ex;
-            assertTrue(ex.getMessage().contains("CONSTRAINT VIOLATION"));
-            assertTrue(ex.getMessage().contains("Table CAPPED3 exceeds table maximum row count 3"));
-        } finally {
-            assertNotNull(e);
-        }
+        verifyProcFails(client, "CONSTRAINT VIOLATION\\s*Table CAPPED3 exceeds table maximum row count 3",
+                "CAPPED3.insert", 3, 3, 3);
+
+        // This should also fail if attempting to insert a row via INSERT INTO ... SELECT.
+        verifyStmtFails(client, "insert into capped3 select * from capped2",
+                "CONSTRAINT VIOLATION\\s*Table CAPPED3 exceeds table maximum row count 3");
+
         vt = client.callProcedure("@AdHoc", "select count(*) from CAPPED3").getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {3});
 
+    }
+
+    public void testTableLimitPartitionRowsExec() throws IOException, ProcCallException {
+
+        if (isHSQL())
+                return;
+
+        Client client = getClient();
+
+        // CAPPED3_LIMIT_ROWS_EXEC is a special table whose name is recognized by the EE.
+        // The EE will execute a purge fragment when executing inserts on this table when
+        // it's at its 3-row limit:
+        //
+        //  DELETE FROM capped3_limit_rows_exec WHERE purge_me <> 0
+
+        client.callProcedure("CAPPED3_LIMIT_ROWS_EXEC.insert", 0, 10, 20);
+        client.callProcedure("CAPPED3_LIMIT_ROWS_EXEC.insert", 0, 20, 40);
+        client.callProcedure("CAPPED3_LIMIT_ROWS_EXEC.insert", 0, 30, 60);
+
+        // purge fragment executed but deletes no rows... insert still fails.
+        verifyProcFails(client,
+                        "CONSTRAINT VIOLATION\\s*Table CAPPED3_LIMIT_ROWS_EXEC exceeds table maximum row count 3",
+                        "CAPPED3_LIMIT_ROWS_EXEC.insert", 0, 40, 80);
+
+        // If we update the PURGE_ME field, the purge fragment will delete a row on the next insert,
+        // allowing it to succeed.
+        client.callProcedure("@AdHoc", "UPDATE CAPPED3_LIMIT_ROWS_EXEC SET PURGE_ME = 1 WHERE WAGE = 10");
+        client.callProcedure("CAPPED3_LIMIT_ROWS_EXEC.insert", 0, 40, 80);
+
+        // Verify the row where WAGE == 10 was deleted.
+        String selectAll = "SELECT * FROM CAPPED3_LIMIT_ROWS_EXEC ORDER BY WAGE";
+        VoltTable vt = client.callProcedure("@AdHoc", selectAll).getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{0, 20, 40}, {0, 30, 60}, {0, 40, 80}});
+
+        // This mark two rows to be purged.
+        client.callProcedure("@AdHoc",
+                        "UPDATE CAPPED3_LIMIT_ROWS_EXEC SET PURGE_ME = 1 WHERE WAGE IN (20, 40)");
+        client.callProcedure("CAPPED3_LIMIT_ROWS_EXEC.insert", 0, 50, 100);
+        vt = client.callProcedure("@AdHoc", selectAll).getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{0, 30, 60}, {0, 50, 100}});
+
+        // Let's top off the table again
+        client.callProcedure("CAPPED3_LIMIT_ROWS_EXEC.insert", 0, 60, 120);
+
+        // Now mark them all to be purged
+        client.callProcedure("@AdHoc", "UPDATE CAPPED3_LIMIT_ROWS_EXEC SET PURGE_ME = 1");
+
+        client.callProcedure("CAPPED3_LIMIT_ROWS_EXEC.insert", 0, 70, 140);
+        vt = client.callProcedure("@AdHoc", selectAll).getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{0, 70, 140}});
+
+        // Delete remaining row
+        client.callProcedure("CAPPED3_LIMIT_ROWS_EXEC.delete", 70);
+    }
+
+    public void testTableLimitPartitionRowsExecUnique() throws IOException, ProcCallException {
+
+        if (isHSQL())
+                return;
+
+        Client client = getClient();
+
+        // insert into table when it's full, but the
+        // - row to be inserted would violate a uniqueness constraint on the table.
+        //   The insert should fail, and the delete should be rolled back.
+        // - row to be inserted would violate a uniqueness constraint, but the
+        //   duplicate row will be purged.  In our current implementation,
+        //   this will succeed.
+
+        client.callProcedure("CAPPED3_LIMIT_ROWS_EXEC.insert", 0, 10, 20);
+        client.callProcedure("CAPPED3_LIMIT_ROWS_EXEC.insert", 1, 20, 40);
+        client.callProcedure("CAPPED3_LIMIT_ROWS_EXEC.insert", 1, 30, 60);
+
+        verifyProcFails(client,
+                        "Constraint Type UNIQUE, Table CatalogId CAPPED3_LIMIT_ROWS_EXEC",
+                        "CAPPED3_LIMIT_ROWS_EXEC.insert", 0, 10, 20);
+
+        // Should still be three rows
+        String selectAll = "SELECT * FROM CAPPED3_LIMIT_ROWS_EXEC ORDER BY WAGE";
+        VoltTable vt = client.callProcedure("@AdHoc", selectAll).getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{0, 10, 20}, {1, 20, 40}, {1, 30, 60}});
+
+        // Now try to insert a row with PK value same as an existing row that will be purged.
+        // Insert will succeed in this case.
+        client.callProcedure("CAPPED3_LIMIT_ROWS_EXEC.insert", 0, 20, 99);
+        vt = client.callProcedure("@AdHoc", selectAll).getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{0, 10, 20}, {0, 20, 99}});
+
+        client.callProcedure("@AdHoc", "DELETE FROM CAPPED3_LIMIT_ROWS_EXEC");
+    }
+
+    public void testTableLimitPartitionRowsExecMultiRow() throws IOException, ProcCallException {
+
+        if (isHSQL())
+                return;
+
+        Client client = getClient();
+
+        // For multi-row insert, the insert trigger should not fire.
+        client.callProcedure("CAPPED3_LIMIT_ROWS_EXEC.insert", 1, 10, 20);
+        client.callProcedure("CAPPED3_LIMIT_ROWS_EXEC.insert", 1, 20, 40);
+        client.callProcedure("CAPPED3_LIMIT_ROWS_EXEC.insert", 1, 30, 60);
+
+        verifyStmtFails(client,
+                        "INSERT INTO CAPPED3_LIMIT_ROWS_EXEC "
+                        + "SELECT purge_me, wage + 1, dept from CAPPED3_LIMIT_ROWS_EXEC WHERE WAGE = 20",
+                        "exceeds table maximum row count 3");
+
+        String selectAll = "SELECT * FROM CAPPED3_LIMIT_ROWS_EXEC ORDER BY WAGE";
+        VoltTable vt = client.callProcedure("@AdHoc", selectAll).getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{1, 10, 20}, {1, 20, 40}, {1, 30, 60}});
+
+        // Upsert fails too.
+        verifyStmtFails(client,
+                        "UPSERT INTO CAPPED3_LIMIT_ROWS_EXEC "
+                        + "SELECT purge_me, wage + 1, dept from CAPPED3_LIMIT_ROWS_EXEC WHERE WAGE = 20 "
+                        + "ORDER BY 1, 2, 3",
+                        "exceeds table maximum row count 3");
+        vt = client.callProcedure("@AdHoc", selectAll).getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{1, 10, 20}, {1, 20, 40}, {1, 30, 60}});
+    }
+
+    public void testTableLimitPartitionRowsExecUpsert() throws Exception {
+
+        if (isHSQL())
+                return;
+
+        Client client = getClient();
+
+        // For multi-row insert, the insert trigger should not fire.
+        client.callProcedure("CAPPED3_LIMIT_ROWS_EXEC.insert", 1, 10, 20);
+        client.callProcedure("CAPPED3_LIMIT_ROWS_EXEC.insert", 1, 20, 40);
+        client.callProcedure("CAPPED3_LIMIT_ROWS_EXEC.insert", 1, 30, 60);
+
+        // Upsert (update) should succeed, no delete action.
+        client.callProcedure("@AdHoc", "UPSERT INTO CAPPED3_LIMIT_ROWS_EXEC VALUES(1, 30, 61)");
+        String selectAll = "SELECT * FROM CAPPED3_LIMIT_ROWS_EXEC ORDER BY WAGE";
+        VoltTable vt = client.callProcedure("@AdHoc", selectAll).getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{1, 10, 20}, {1, 20, 40}, {1, 30, 61}});
+
+        // Upsert (insert) should succeed, and delete action executions.
+        client.callProcedure("@AdHoc", "UPSERT INTO CAPPED3_LIMIT_ROWS_EXEC VALUES(1, 40, 80)");
+        vt = client.callProcedure("@AdHoc", selectAll).getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{1, 40, 80}});
     }
 
     /**
