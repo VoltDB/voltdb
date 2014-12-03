@@ -64,7 +64,7 @@
     <xs:attribute name="sitesperhost" type="xs:int" default="8"/>
     <xs:attribute name="kfactor" type="xs:int" default="0"/>
     <xs:attribute name="elastic" type="xs:string" default="enabled"/>
-    <xs:attribute name="schema" type="schemaType" default="catalog"/>
+    <xs:attribute name="schema" type="schemaType" default="ddl"/>
   </xs:complexType>
 
   <!-- <paths> -->

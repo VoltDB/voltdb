@@ -35,7 +35,7 @@ def get_stats(hostname, port, days):
     """
 
     conn = FastSerializer(hostname, port)
-    proc = VoltProcedure(conn, 'CenterAverageOfPeriod',
+    proc = VoltProcedure(conn, 'AverageOfPeriod',
                          [FastSerializer.VOLTTYPE_SMALLINT])
     resp = proc.call([days])
     conn.close()

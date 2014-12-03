@@ -52,6 +52,7 @@ import javax.xml.validation.SchemaFactory;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.HSQLInterface;
+import org.hsqldb_voltpatches.VoltXMLElement;
 import org.json_voltpatches.JSONException;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -88,6 +89,7 @@ import org.voltdb.compiler.projectfile.SchemasType;
 import org.voltdb.compilereport.ReportMaker;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.utils.CatalogSchemaTools;
 import org.voltdb.utils.CatalogUtil;
@@ -1126,6 +1128,38 @@ public class VoltCompiler {
         // generated DDL
         m_importLines = voltDdlTracker.m_importLines.toArray(new String[0]);
         addExtraClasses(jarOutput);
+
+        compileRowLimitDeleteStmts(db, hsql, ddlcompiler.getLimitDeleteStmtToXmlEntries());
+    }
+
+    private void compileRowLimitDeleteStmts(
+            Database db,
+            HSQLInterface hsql,
+            Collection<Map.Entry<Statement, VoltXMLElement>> deleteStmtXmlEntries)
+            throws VoltCompilerException {
+
+        for (Map.Entry<Statement, VoltXMLElement> entry : deleteStmtXmlEntries) {
+            Statement stmt = entry.getKey();
+            VoltXMLElement xml = entry.getValue();
+
+            // choose DeterminismMode.FASTER for determinism, and rely on the planner to error out
+            // if we generated a plan that is content-non-deterministic.
+            StatementCompiler.compileStatementAndUpdateCatalog(this,
+                    hsql,
+                    db.getCatalog(),
+                    db,
+                    m_estimates,
+                    stmt,
+                    xml,
+                    stmt.getSqltext(),
+                    null, // no user-supplied join order
+                    DeterminismMode.FASTER,
+                    StatementPartitioning.partitioningForRowLimitDelete());
+
+            // Temporarily log the plan to demonstrate it's actually getting compiled
+            String explainedPlan = Encoder.hexDecodeToString(stmt.getExplainplan());
+            compilerLog.info("Plan for " + m_currentFilename + ":\n" + explainedPlan);
+        }
     }
 
     private void checkValidPartitionTableIndex(Index index, Column partitionCol, String tableName)
