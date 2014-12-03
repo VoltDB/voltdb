@@ -6,14 +6,38 @@ $(document).ready(function () {
         siteNumberHeader: $("#sitePerHost"),
         kSafety: $("#kSafety"),
         partitionDetection: $("#partitionDetectionIcon"),
+        partitionDetectionLabel: $("#partitionDetectionLabel"),
+        security: $('#securityOptionIcon'),
+        securityLabel: $("#spanSecurity"),
         httpAccess: $("#httpAccessIcon"),
+        httpAccessLabel: $("#httpAccessLabel"),
         jsonAPI: $("#jsonAPIIcon"),
+        jsonAPILabel: $("#txtJsonAPI"),
         autoSnapshot: $("#autoSnapshotIcon"),
+        autoSnapshotLabel: $("#txtAutoSnapshot"),
+        frequency: $("#txtFrequency"),
+        frequencyLabel: $("#spanFrequencyUnit"),
+        retained: $("#retainedSpan"),
+        retainedLabel: $("#txtRetained"),
         commandLog: $("#commandLogIcon"),
-        commandLogFrequencyTime: $("#commandlogfreqtime"),
-        commandlogFrequencyTransactions: $("#commandlogfreqtxns"),
+        commandLogLabel: $("#commandLogLabel"),
+        commandLogFrequencyTime: $("#commandLogFrequencyTime"),
+        commandLogFrequencyTimeLabel: $("#commandLogFrequencyUnit"),
+        commandLogFrequencyTransactions: $("#commandLogFrequencyTxns"),
+        commandLogSegmentSize: $("#commandLogSegmentSize"),
+        commandLogSegmentSizeLabel: $("#commandLogSegmentSizeUnit"),
+        exports: $("#exports"),
+        exportLabel: $("#txtExportLabel"),
+        target: $("#target"),
+        properties: $("#properties"),
+        maxJavaHeap: $("#maxJavaHeap"),
+        maxJavaHeapLabel: $("#maxJavaHeapUnit"),
         heartBeatTimeout: $("#hrtTimeOutSpan"),
+        heartBeatTimeoutLabel: $("#hrtTimeOutUnitSpan"),
+        queryTimeout: $("#txtQueryTimeout"),
+        queryTimeoutLabel: $("#queryTimeOutUnitSpan"),
         tempTablesMaxSize: $("#temptablesmaxsize"),
+        tempTablesMaxSizeLabel: $("#temptablesmaxsizeUnit"),
         snapshotPriority: $("#snapshotpriority"),
         clientPort: $('#clientport'),
         adminPort: $('#adminport'),
@@ -73,11 +97,7 @@ $(document).ready(function () {
         tBoxQueryTimeout: $("#txtQueryTimeout"),
         tBoxQueryTimeoutValue: $("#queryTimeOutSpan").text(),
         spanqueryTimeOut: $("#queryTimeOutSpan"),
-    };
-
-    var getOnOffText = function (isChecked) {
-        return (isChecked) ? "On" : "Off";
-    };
+    };    
 
     adminEditObjects.chkSecurity.on('ifChanged', function () {
         adminEditObjects.spanSecurity.text(getOnOffText(adminEditObjects.chkSecurity.is(":checked")));
@@ -536,21 +556,54 @@ $(document).ready(function () {
         this.displayClientPort = function(clientPortValue) {
             configureClientPortValue(clientPortValue);
         };
-
+        
         var configureAdminValues = function(adminConfigValues) {
+            
             adminDOMObjects.siteNumberHeader.text(adminConfigValues.sitesperhost);
             adminDOMObjects.kSafety.text(adminConfigValues.kSafety);
-            adminDOMObjects.partitionDetection.className = adminConfigValues.partitionDetection == 'true' ? 'onIcon' : 'offIcon';
-            adminDOMObjects.httpAccess.className = adminConfigValues.httpEnabled == 'true' ? 'onIcon' : 'offIcon';
-            adminDOMObjects.jsonAPI.className = adminConfigValues.jsonEnabled == 'true' ? 'onIcon' : 'offIcon';
-            adminDOMObjects.jsonAPI.className = adminConfigValues.snapshotEnabled == 'true' ? 'onIcon' : 'offIcon';
-            adminDOMObjects.commandLog.className = adminConfigValues.commandLogEnabled == 'true' ? 'onIcon' : 'offIcon';
-            //adminDOMObjects.commandLogFrequencyTime.text(adminConfigValues.commandLogFrequencyTime);
-            //adminDOMObjects.commandLogFrequencyTransactions.text(adminConfigValues.commandLogFrequencyTransactions);
+            adminDOMObjects.partitionDetection.removeClass().addClass(getOnOffClass(adminConfigValues.partitionDetection));
+            adminDOMObjects.partitionDetectionLabel.text(getOnOffText(adminConfigValues.partitionDetection));
+            adminDOMObjects.security.removeClass().addClass(getOnOffClass(adminConfigValues.securityEnabled));
+            adminDOMObjects.securityLabel.text(getOnOffText(adminConfigValues.securityEnabled));
+            adminDOMObjects.httpAccess.removeClass().addClass(getOnOffClass(adminConfigValues.httpEnabled));
+            adminDOMObjects.httpAccessLabel.text(getOnOffText(adminConfigValues.httpEnabled));
+            adminDOMObjects.jsonAPI.removeClass().addClass(getOnOffClass(adminConfigValues.jsonEnabled));
+            adminDOMObjects.jsonAPILabel.text(getOnOffText(adminConfigValues.jsonEnabled));
+            adminDOMObjects.autoSnapshot.removeClass().addClass(getOnOffClass(adminConfigValues.snapshotEnabled));
+            adminDOMObjects.autoSnapshotLabel.text(getOnOffText(adminConfigValues.snapshotEnabled));
+            adminDOMObjects.frequency.text(adminConfigValues.frequency);
+            adminDOMObjects.frequencyLabel.text(adminConfigValues.frequency > 0 ? "Hrs" : "");
+            adminDOMObjects.retained.text(adminConfigValues.retained);
+            adminDOMObjects.retainedLabel.text(adminConfigValues.retained>0?"Copies":"");
+            adminDOMObjects.commandLog.removeClass().addClass(getOnOffClass(adminConfigValues.commandLogEnabled));
+            adminDOMObjects.commandLogLabel.text(adminConfigValues.commandLogEnabled == 'true' ? 'On' : 'Off');
+            adminDOMObjects.commandLogFrequencyTime.text(adminConfigValues.commandLogFrequencyTime);
+            adminDOMObjects.commandLogFrequencyTimeLabel.text(adminConfigValues.commandLogFrequencyTime > 0 ? "ms" : "");
+            adminDOMObjects.commandLogFrequencyTransactions.text(adminConfigValues.commandLogFrequencyTransactions);
+            adminDOMObjects.commandLogSegmentSize.text(adminConfigValues.logSegmentSize);
+            adminDOMObjects.commandLogSegmentSizeLabel.text(adminConfigValues.logSegmentSize > 0 ? "MB" : "");
+            adminDOMObjects.exports.removeClass().addClass(getOnOffClass(adminConfigValues.export));
+            adminDOMObjects.exportLabel.text(getOnOffText(adminConfigValues.export));
+            adminDOMObjects.target.text(adminConfigValues.targets);
+            adminDOMObjects.maxJavaHeap.text(adminConfigValues.maxJavaHeap);
+            adminDOMObjects.maxJavaHeapLabel.text(adminConfigValues.maxJavaHeap > 0 ? "MB" : "");
             adminDOMObjects.heartBeatTimeout.text(adminConfigValues.heartBeatTimeout);
+            adminDOMObjects.heartBeatTimeoutLabel.text(adminConfigValues.heartBeatTimeout > 0 ? "ms" : "");
+            adminDOMObjects.queryTimeout.text(adminConfigValues.queryTimeout);
+            adminDOMObjects.queryTimeoutLabel.text(adminConfigValues.queryTimeout > 0 ? "ms" : "");
             adminDOMObjects.tempTablesMaxSize.text(adminConfigValues.tempTablesMaxSize);
+            adminDOMObjects.tempTablesMaxSizeLabel.text(adminConfigValues.tempTablesMaxSize > 0 ? "MB" : "");
             adminDOMObjects.snapshotPriority.text(adminConfigValues.snapshotPriority);
 
+        };
+
+        var configurePortValues = function (portConfigValues) {
+            options.clientPort.text(portConfigValues.clientPort);
+            options.adminPort.text(portConfigValues.adminPort);
+            options.httpPort.text(portConfigValues.httpPort);
+            options.internalPort.text(portConfigValues.internalPort);
+            options.zookeeperPort.text(portConfigValues.zookeeperPort);
+            options.replicationPort.text(portConfigValues.replicationPort);
         };
 
         var configurePortValues = function(portConfigValues) {
@@ -577,3 +630,13 @@ $(document).ready(function () {
     window.VoltDbAdminConfig = VoltDbAdminConfig = new iVoltDbAdminConfig();
 
 })(window);
+
+
+//common functions
+var getOnOffText = function (isChecked) {
+    return (isChecked) ? "On" : "Off";
+};
+
+var getOnOffClass = function (isOn) {
+    return (isOn) ? "onIcon" : "offIcon";
+};

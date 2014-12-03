@@ -1653,42 +1653,90 @@ function alertNodeClicked(obj) {
             if (connection != null && connection.Metadata['@SystemInformation_DEPLOYMENT'] != null) {
                 connection.Metadata['@SystemInformation_DEPLOYMENT'].data.forEach(function(columnInfo) {
                     switch (columnInfo[0]) {
-                    case 'sitesperhost':
-                        adminConfigValues['sitesperhost'] = columnInfo[1];
-                        break;
-                    case 'kfactor':
-                        adminConfigValues['kSafety'] = columnInfo[1];
-                        break;
-                    case 'partitiondetection':
-                        adminConfigValues['partitionDetection'] = columnInfo[1];
-                        break;
-                    case 'httpenabled':
-                        adminConfigValues['httpEnabled'] = columnInfo[1];
-                        break;
-                    case 'jsonenabled':
-                        adminConfigValues['jsonEnabled'] = columnInfo[1];
-                        break;
-                    case 'snapshotenabled':
-                        adminConfigValues['snapshotEnabled'] = columnInfo[1];
-                        break;
-                    case 'commandlogenabled':
-                        adminConfigValues['commandLogEnabled'] = columnInfo[1];
-                        break;
-                    case 'commandlogfreqtime':
-                        adminConfigValues['commandlogfreqtime'] = columnInfo[1];
-                        break;
-                    case 'commandlogfreqtxns':
-                        adminConfigValues['commandLogFrequencyTransactions'] = columnInfo[1];
-                        break;
-                    case 'heartbeattimeout':
-                        adminConfigValues['heartBeatTimeout'] = columnInfo[1];
-                        break;
-                    case 'temptablesmaxsize':
-                        adminConfigValues['tempTablesMaxSize'] = columnInfo[1];
-                        break;
-                    case 'snapshotpriority':
-                        adminConfigValues['snapshotPriority'] = columnInfo[1];
-                        break;                                
+                        case 'sitesperhost':
+                            adminConfigValues['sitesperhost'] = columnInfo[1];
+                            break;
+
+                        case 'kfactor':
+                            adminConfigValues['kSafety'] = columnInfo[1];
+                            break;
+
+                        case 'partitiondetection':
+                            adminConfigValues['partitionDetection'] = columnInfo[1];
+                            break;
+
+                        case 'securityEnabled':
+                            adminConfigValues['securityEnabled'] = columnInfo[1];
+                            break;
+
+                        case 'httpenabled':
+                            adminConfigValues['httpEnabled'] = columnInfo[1];
+                            break;
+
+                        case 'jsonenabled':
+                            adminConfigValues['jsonEnabled'] = columnInfo[1];
+                            break;
+
+                        case 'snapshotenabled':
+                            adminConfigValues['snapshotEnabled'] = columnInfo[1];
+                            break;
+
+                        case 'frequency':
+                            adminConfigValues['frequency'] = columnInfo[1];
+                            break;
+
+                        case 'retained':
+                            adminConfigValues['retained'] = columnInfo[1];
+                            break;
+
+                        case 'commandlogenabled':
+                            adminConfigValues['commandLogEnabled'] = columnInfo[1];
+                            break;
+
+                        case 'commandlogfreqtime':
+                            adminConfigValues['commandLogFrequencyTime'] = columnInfo[1];
+                            break;
+
+                        case 'commandlogfreqtxns':
+                            adminConfigValues['commandLogFrequencyTransactions'] = columnInfo[1];
+                            break;
+
+                        case 'logsegmentsize':
+                            adminConfigValues['logSegmentSize'] = columnInfo[1];
+                            break;
+                            
+                        case 'export':
+                            adminConfigValues['export'] = columnInfo[1];
+                            break;
+                            
+                        case 'target':
+                            adminConfigValues['targets'] = columnInfo[1];
+                            break;
+                            
+                        case "properties":
+                            adminConfigValues['properties'] = columnInfo[1];
+                            break;
+                            
+                        case 'maxjavaheap':
+                            adminConfigValues['maxJavaHeap'] = columnInfo[1];
+                            break;
+
+                        case 'heartbeattimeout':
+                            adminConfigValues['heartBeatTimeout'] = columnInfo[1];
+                            break;
+
+                        case 'querytimeout':
+                            adminConfigValues['queryTimeout'] = columnInfo[1];
+                            break;
+
+                        case 'temptablesmaxsize':
+                            adminConfigValues['tempTablesMaxSize'] = columnInfo[1];
+                            break;
+
+                        case 'snapshotpriority':
+                            adminConfigValues['snapshotPriority'] = columnInfo[1];
+                            break;
+                            
                     //Directory Values
                     case 'voltdbroot':
                         adminConfigValues['voltdbRoot'] = columnInfo[1];
