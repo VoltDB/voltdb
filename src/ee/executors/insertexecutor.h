@@ -83,13 +83,6 @@ public:
                     TempTableLimits* limits);
         bool p_execute(const NValueArray &params);
 
-        /**
-         * If the table is at or over its tuple limit, this method
-         * executes the purge fragment for the table.  Returns true if
-         * nothing went wrong (regardless of whether the purge
-         * fragment was executed) and false otherwise. */
-        bool executePurgeFragmentIfNeeded(PersistentTable* table);
-
         InsertPlanNode* m_node;
         TempTable* m_inputTable;
 
@@ -100,11 +93,19 @@ public:
         bool m_hasPurgeFragment;
 
     private:
-        /** A tuple with the target table's schema that is populated with default
-         * values for each field. */
+
+        /** If the table is at or over its tuple limit, this method
+         * executes the purge fragment for the table.  Returns true if
+         * nothing went wrong (regardless of whether the purge
+         * fragment was executed) and false otherwise. */
+        bool executePurgeFragmentIfNeeded(PersistentTable* table);
+
+        /** A tuple with the target table's schema that is populated
+         * with default values for each field. */
         StandAloneTupleStorage m_templateTuple;
 
-        /** A memory pool for allocating non-inlined varchar and varbinary default values */
+        /** A memory pool for allocating non-inlined varchar and
+         * varbinary default values */
         Pool m_memoryPool;
 
         /** A list of indexes of each column in the template tuple

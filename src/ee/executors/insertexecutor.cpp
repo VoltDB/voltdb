@@ -255,11 +255,11 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
 
             if (!targetTable->insertTuple(templateTuple)) {
                 VOLT_ERROR("Failed to insert tuple from input table '%s' into"
-                        " target table '%s'",
-                        m_inputTable->name().c_str(),
-                        targetTable->name().c_str());
-                    return false;
-                }
+                           " target table '%s'",
+                           m_inputTable->name().c_str(),
+                           targetTable->name().c_str());
+                return false;
+            }
 
         } else {
             // upsert execution logic
