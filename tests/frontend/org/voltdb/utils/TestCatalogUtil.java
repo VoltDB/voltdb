@@ -649,8 +649,6 @@ public class TestCatalogUtil extends TestCase {
         final File tmpDdl = VoltProjectBuilder.writeStringToTempFile(ddl);
 
         //Custom deployment with bad class export will be disabled.
-        VoltLogger hostLog = new VoltLogger("HOST");
-        hostLog.warn("BadTest");
         final File tmpBad = VoltProjectBuilder.writeStringToTempFile(withBadCustomExport);
         DeploymentType bad_deployment = CatalogUtil.getDeployment(new FileInputStream(tmpBad));
 
@@ -665,7 +663,6 @@ public class TestCatalogUtil extends TestCase {
         org.voltdb.catalog.Connector catconn = db.getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
         assertNotNull(catconn);
 
-        hostLog.warn("EndBadTest");
         assertFalse(bad_deployment.getExport().getConfiguration().get(0).isEnabled());
 
         //This is a good deployment with custom class that can be found
