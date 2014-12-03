@@ -1,4 +1,5 @@
 ﻿var adminDOMObjects = {};
+var adminEditObjects = {};
 
 $(document).ready(function () {
     
@@ -27,7 +28,7 @@ $(document).ready(function () {
         commandLogSnapShots: $('#commandlogsnapshotpath')
     };
 
-    var adminEditObjects = {
+    adminEditObjects = {
 
         //Edit Security objects
         btnEditSecurityOk: $("#btnEditSecurityOk"),
@@ -551,6 +552,7 @@ $(document).ready(function () {
             adminDOMObjects.tempTablesMaxSize.text(adminConfigValues.tempTablesMaxSize);
             adminDOMObjects.snapshotPriority.text(adminConfigValues.snapshotPriority);
 
+            adminEditObjects.tBoxHeartbeatTimeoutValue = adminConfigValues.heartBeatTimeout;
         };
 
         var configurePortValues = function(portConfigValues) {
