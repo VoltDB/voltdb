@@ -108,7 +108,7 @@
         var userPreferences = getUserPreferences();
         if (userPreferences != null) {
             if (userPreferences['ClusterLatency'] != false || userPreferences['ClusterTransactions'] != false || userPreferences['ServerCPU'] != false || userPreferences['ServerRAM'] != false) {
-                var graphState = $("#graphBlock").css('display');
+                var graphState = $("#mainGraphBlock").css('display');
                 if (graphState == 'none') {
                     $(".showhideIcon").removeClass('collapsed');
                     $(".showhideIcon").addClass('expanded');
@@ -116,7 +116,7 @@
                     $(".showhideIcon").removeClass('expanded');
                     $(".showhideIcon").addClass('collapsed');
                 }
-                $('#graphBlock').slideToggle();
+                $('#mainGraphBlock').slideToggle();
 
                 MonitorGraphUI.UpdateCharts();
             }
