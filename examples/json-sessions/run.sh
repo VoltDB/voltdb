@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-APPNAME="json"
-
 #set -o nounset #exit if an unset variable is used
 set -o errexit #exit on any single command fail
 
@@ -18,6 +16,9 @@ else
     echo "to your PATH."
     echo
 fi
+# move voltdb commands into path for this script
+PATH=$VOLTDB_BIN:$PATH
+
 # installation layout has all libraries in $VOLTDB_ROOT/lib/voltdb
 if [ -d "$VOLTDB_BIN/../lib/voltdb" ]; then
     VOLTDB_BASE=$(dirname "$VOLTDB_BIN")
@@ -30,24 +31,48 @@ else
     VOLTDB_VOLTDB="$VOLTDB_BASE/voltdb"
 fi
 
-APPCLASSPATH=$CLASSPATH:$(ls -x "$VOLTDB_VOLTDB"/voltdb-*.jar | tr '[:space:]' ':')$(ls -x "$VOLTDB_LIB"/*.jar | egrep -v 'voltdb[a-z0-9.-]+\.jar' | tr '[:space:]' ':')
-VOLTDB="$VOLTDB_BIN/voltdb"
+APPCLASSPATH=$CLASSPATH:$({ \
+    \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
+    \ls -1 "$VOLTDB_LIB"/*.jar; \
+    \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
+} 2> /dev/null | paste -sd ':' - )
+CLIENTCLASSPATH=json-client.jar:gson-2.2.2.jar:$CLASSPATH:$({ \
+    \ls -1 "$VOLTDB_VOLTDB"/voltdbclient-*.jar; \
+    \ls -1 "$VOLTDB_LIB"/commons-cli-1.2.jar; \
+} 2> /dev/null | paste -sd ':' - )
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
 HOST="localhost"
 
-# remove build artifacts
+# remove binaries, logs, runtime artifacts, etc... but keep the jars
 function clean() {
-    rm -rf debugoutput $APPNAME-procs.jar voltdbroot catalog-report.html statement-plans \
-    	log client/jsonsessions/*.class procedures/jsonsessions/*.class 
+    rm -rf debugoutput voltdbroot catalog-report.html statement-plans \
+    	log client/jsonsessions/*.class procedures/jsonsessions/*.class
 }
 
-# compile the source code for procedures and the client
-function srccompile() {
-    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH:gson-2.2.2.jar \
-        client/jsonsessions/*.java \
-        procedures/jsonsessions/*.java
-    jar cf $APPNAME-procs.jar -C procedures jsonsessions
+# remove everything from "clean" as well as the jarfiles
+function cleanall() {
+	clean
+    rm -rf json-procs.jar json-client.jar
+}
+
+# compile the source code for procedures and the client into jarfiles
+function jars() {
+	# compile java source
+    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH procedures/jsonsessions/*.java
+    javac -target 1.7 -source 1.7 -classpath $CLIENTCLASSPATH client/jsonsessions/*.java
+    # build procedure and client jars
+    jar cf json-procs.jar -C procedures jsonsessions
+    jar cf json-client.jar -C client jsonsessions
+    # remove compiled .class files
+    rm -rf procedures/jsonsessions/*.class client/jsonsessions/*.class
+}
+
+# compile the procedure and client jarfiles if they don't exist
+function jars-ifneeded() {
+	if [ ! -e json-procs.jar ] || [ ! -e json-client.jar ]; then
+		jars;
+	fi
 }
 
 # run the voltdb server locally
@@ -56,33 +81,32 @@ function server() {
     echo "Starting the VoltDB server."
     echo "To perform this action manually, use the command line: "
     echo
-    echo "$VOLTDB create -d deployment.xml -l $LICENSE -H $HOST"
+    echo "voltdb create -d deployment.xml -l $LICENSE -H $HOST"
     echo
-    $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST
+    voltdb create -d deployment.xml -l $LICENSE -H $HOST
 }
 
 # load schema and procedures
 function init() {
-    srccompile
-    $VOLTDB_BIN/sqlcmd < ddl.sql
+    jars-ifneeded
+    sqlcmd < ddl.sql
 }
 
 # run the client that drives the example
 function client() {
-    srccompile
-    java -classpath client:$APPCLASSPATH:gson-2.2.2.jar \
-    	-Dlog4j.configuration=file://$LOG4J jsonsessions.JSONClient
+    jars-ifneeded
+    java -classpath $CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J jsonsessions.JSONClient
 }
 
 # JSON client sample
 # Use this target for argument help
 function client-help() {
-    srccompile
-    java -classpath client:$APPCLASSPATH jsonsessions.JSONClient --help
+    jars-ifneeded
+    java -classpath $CLIENTCLASSPATH jsonsessions.JSONClient --help
 }
 
 function help() {
-     echo "Usage: ./run.sh {clean|srccompile|server|init|client|client-help}"
+     echo "Usage: ./run.sh {clean|cleanall|jars|server|init|client|client-help}"
 }
 
 # Run the target passed as the first arg on the command line

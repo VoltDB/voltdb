@@ -16,7 +16,7 @@ else
     echo "to your PATH."
     echo
 fi
-# move voltdb commands into path
+# move voltdb commands into path for this script
 PATH=$VOLTDB_BIN:$PATH
 
 # installation layout has all libraries in $VOLTDB_ROOT/lib/voltdb

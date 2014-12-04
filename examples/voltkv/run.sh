@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-APPNAME="voltkv"
-
 #set -o nounset #exit if an unset variable is used
 set -o errexit #exit on any single command fail
 
@@ -18,6 +16,9 @@ else
     echo "to your PATH."
     echo
 fi
+# move voltdb commands into path for this script
+PATH=$VOLTDB_BIN:$PATH
+
 # installation layout has all libraries in $VOLTDB_ROOT/lib/voltdb
 if [ -d "$VOLTDB_BIN/../lib/voltdb" ]; then
     VOLTDB_BASE=$(dirname "$VOLTDB_BIN")
@@ -35,15 +36,24 @@ APPCLASSPATH=$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_LIB"/*.jar; \
     \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
 } 2> /dev/null | paste -sd ':' - )
-VOLTDB="$VOLTDB_BIN/voltdb"
+CLIENTCLASSPATH=voltkv-client.jar:$CLASSPATH:$({ \
+    \ls -1 "$VOLTDB_VOLTDB"/voltdbclient-*.jar; \
+    \ls -1 "$VOLTDB_LIB"/commons-cli-1.2.jar; \
+} 2> /dev/null | paste -sd ':' - )
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
 HOST="localhost"
 
-# remove build artifacts
+# remove binaries, logs, runtime artifacts, etc... but keep the client jar
 function clean() {
     rm -rf client/voltkv/*.class debugoutput voltdbroot log \
     	catalog-report.html statement-plans
+}
+
+# remove everything from "clean" as well as the jarfile
+function cleanall() {
+	clean
+    rm -rf voltkv-client.jar
 }
 
 # compile the source code for procedures and the client
@@ -51,19 +61,37 @@ function srccompile() {
     javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH client/voltkv/*.java
 }
 
+# compile the source code for the client into jarfiles
+function jars() {
+	# compile java source
+    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH client/voltkv/*.java
+    # build client jar
+    jar cf voltkv-client.jar -C client voltkv
+    # remove compiled .class files
+    rm -rf client/voltkv/*.class
+}
+
+# compile the client jarfile if it doesn't exist
+function jars-ifneeded() {
+	if [ ! -e voltkv-client.jar ]; then
+		jars;
+	fi
+}
+
 # run the voltdb server locally
 function server() {
     echo "Starting the VoltDB server."
     echo "To perform this action manually, use the command line: "
     echo
-    echo "$VOLTDB create -d deployment.xml -l $LICENSE -H $HOST"
+    echo "voltdb create -d deployment.xml -l $LICENSE -H $HOST"
     echo
-    $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST
+    voltdb create -d deployment.xml -l $LICENSE -H $HOST
 }
 
 # load schema and procedures
 function init() {
-	$VOLTDB_BIN/sqlcmd < ddl.sql
+	jars-ifneeded
+	sqlcmd < ddl.sql
 }
 
 # run the client that drives the example
@@ -74,16 +102,16 @@ function client() {
 # Asynchronous benchmark sample
 # Use this target for argument help
 function async-benchmark-help() {
-    srccompile
-    java -classpath client:$APPCLASSPATH voltkv.AsyncBenchmark --help
+    jars-ifneeded
+    java -classpath $CLIENTCLASSPATH voltkv.AsyncBenchmark --help
 }
 
 # latencyreport: default is OFF
 # ratelimit: must be a reasonable value if lantencyreport is ON
 # Disable the comments to get latency report
 function async-benchmark() {
-    srccompile
-    java -classpath client:$APPCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+    jars-ifneeded
+    java -classpath $CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         voltkv.AsyncBenchmark \
         --displayinterval=5 \
         --duration=120 \
@@ -103,13 +131,13 @@ function async-benchmark() {
 # Multi-threaded synchronous benchmark sample
 # Use this target for argument help
 function sync-benchmark-help() {
-    srccompile
-    java -classpath client:$APPCLASSPATH voltkv.SyncBenchmark --help
+    jars-ifneeded
+    java -classpath $CLIENTCLASSPATH voltkv.SyncBenchmark --help
 }
 
 function sync-benchmark() {
-    srccompile
-    java -classpath client:$APPCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+    jars-ifneeded
+    java -classpath $CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         voltkv.SyncBenchmark \
         --displayinterval=5 \
         --duration=120 \
@@ -126,13 +154,13 @@ function sync-benchmark() {
 
 # Use this target for argument help
 function jdbc-benchmark-help() {
-    srccompile
-    java -classpath client:$APPCLASSPATH voltkv.JDBCBenchmark --help
+    jars-ifneeded
+    java -classpath $CLIENTCLASSPATH voltkv.JDBCBenchmark --help
 }
 
 function jdbc-benchmark() {
-    srccompile
-    java -classpath client:$APPCLASSPATH -Dlog4j.configuration=file://$LOG4J \
+    jars-ifneeded
+    java -classpath $CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         voltkv.JDBCBenchmark \
         --displayinterval=5 \
         --duration=120 \
@@ -148,7 +176,7 @@ function jdbc-benchmark() {
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|server|init|client|async-benchmark|aysnc-benchmark-help|...}"
+    echo "Usage: ./run.sh {clean|cleanall|jars|server|init|client|async-benchmark|aysnc-benchmark-help|...}"
     echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark|jdbc-benchmark-help}"
 }
 

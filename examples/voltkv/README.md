@@ -51,8 +51,11 @@ run.sh actions described
 - *run.sh* : start the server
 - *run.sh server* : start the server
 - *run.sh init* : compile stored procedures and load the schema and stored procedures
+- *run.sh jars* : compile all Java clients into a Java jarfile
 - *run.sh client* : start the async client benchmark, initialize the given number of key-value pairs (puts) if needed, and begin normal client processing (gets and puts)
 - *run.sh async-benchmark* : same as run.sh client
 - *run.sh sync-benchmark* : start the multi-threaded sync client,  initialize the given number of key-value pairs (puts) if needed, and begin normal client processing (gets and puts)
 - *run.sh jdbc-benchmark* : start the JDBC client benchmark
 - *run.sh clean* : remove compiled and other runtime artifacts
+- *run.sh cleanall* : remove compilation and runtime artifacts *and* the included client jarfile
+
