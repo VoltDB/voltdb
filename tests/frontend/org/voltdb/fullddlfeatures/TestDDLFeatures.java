@@ -586,7 +586,7 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
         assertEquals(indexedColumnCount("T47"), 1);
 
 //        ENG-7321 - bug with PRIMARY KEY and verification of generated DDL
-//      // Test for T48
+//        // Test for T48
 //        assertTrue(findTableInSystemCatalogResults("T48"));
 //        assertTrue(doesColumnExist("T48", "C1" ));
 //        assertTrue(doesColumnExist("T48", "C2" ));
