@@ -405,6 +405,9 @@ public class SQLCommand
 
     public static List<String> getQuery(boolean interactive) throws Exception
     {
+        // Reset the error state to avoid accidentally ignoring future FILE content
+        // after a file had runtime errors (ENG-7335).
+        m_returningToPromptAfterError = false;
         StringBuilder query = new StringBuilder();
         boolean isRecall = false;
         String line = null;
