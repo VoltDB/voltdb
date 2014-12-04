@@ -146,7 +146,7 @@ public class TestJSONInterface extends TestCase {
             throw new Exception("Unable to read response from server");
         }
 
-        StringBuffer decodedString = new StringBuffer();
+        StringBuilder decodedString = new StringBuilder();
         String line;
         while ((line = in.readLine()) != null) {
             decodedString.append(line);
@@ -199,7 +199,7 @@ public class TestJSONInterface extends TestCase {
             throw new Exception("Unable to read response from server");
         }
 
-        StringBuffer decodedString = new StringBuffer();
+        StringBuilder decodedString = new StringBuilder();
         String line;
         while ((line = in.readLine()) != null) {
             decodedString.append(line);
@@ -1033,9 +1033,11 @@ public class TestJSONInterface extends TestCase {
         server.waitForInitialization();
 
         //Get deployment
-        getUrlOverJSON("http://localhost:8095/deployment", 200);
+        String dep = getUrlOverJSON("http://localhost:8095/deployment", 200);
+        assertTrue(dep.contains("cluster"));
         //Get deployment schema
-        getUrlOverJSON("http://localhost:8095/deployment/schema", 200);
+        String schema = getUrlOverJSON("http://localhost:8095/deployment/schema", 200);
+        assertTrue(dep.contains("\"cluster\""));
     } finally {
         if (server != null) {
             server.shutdown();

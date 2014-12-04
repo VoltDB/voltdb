@@ -291,8 +291,10 @@ public class HTTPAdminListener {
                 } catch (KeeperException | InterruptedException ex) {
                     m_log.warn("Failed to get deployment from zookeeper for HTTP interface.", ex);
                 }
-                m_deployment = CatalogUtil.getDeployment(new ByteArrayInputStream(deploymentBytes));
-                // wasn't a valid xml deployment file
+                if (deploymentBytes != null) {
+                    m_deployment = CatalogUtil.getDeployment(new ByteArrayInputStream(deploymentBytes));
+                }
+                // wasn't a valid xml deployment file or zookeeper is gone to town.
                 if (m_deployment == null) {
                     //Get stale version from RealVoltDB
                     m_log.warn("Failed to get deployment from zookeeper for HTTP interface. /deployment will not serve deployment information.");
