@@ -78,7 +78,7 @@ import org.json_voltpatches.JSONObject;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
+import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.compiler.procedures.CrazyBlahProc;
@@ -632,8 +632,8 @@ public class TestJSONInterface extends TestCase {
         builder.addSchema(schemaPath);
         builder.addPartitionInfo("HELLOWORLD", "DIALECT");
 
-        GroupInfo gi = new GroupInfo("foo", true, false, true, true, false, false);
-        builder.addGroups(new GroupInfo[] { gi } );
+        RoleInfo gi = new RoleInfo("foo", true, false, true, true, false, false);
+        builder.addRoles(new RoleInfo[] { gi } );
 
         // create 20 users, only the first one has an interesting user/pass
         UserInfo[] ui = new UserInfo[15];
@@ -727,7 +727,7 @@ public class TestJSONInterface extends TestCase {
         builder2.addPartitionInfo("HELLOWORLD", "DIALECT");
 
         // Same groups
-        builder2.addGroups(new GroupInfo[] { gi } );
+        builder2.addRoles(new RoleInfo[] { gi } );
 
         // create same 15 users, hack the last 14 passwords
         ui = new UserInfo[15];
