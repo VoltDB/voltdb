@@ -71,7 +71,7 @@ public class AsyncBenchmark {
     static final String HORIZONTAL_RULE =
             "----------" + "----------" + "----------" + "----------" +
             "----------" + "----------" + "----------" + "----------" + "\n";
-            
+
     // potential return codes (synced with Vote procedure)
     static final long VOTE_SUCCESSFUL = 0;
     static final long ERR_INVALID_CONTESTANT = 1;
