@@ -28,11 +28,11 @@ import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
+import org.voltdb.ConsumerDRGateway;
 import org.voltdb.MemoryStats;
 import org.voltdb.NodeDRGateway;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.Promotable;
-import org.voltdb.ReplicaDRGateway;
 import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.StartAction;
 import org.voltdb.StatsAgent;
@@ -53,7 +53,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
     final private LeaderCache m_leaderCache;
     private boolean m_promoted = false;
     private final TickProducer m_tickProducer;
-    private ReplicaDRGateway m_replicaDRGateway = null;
+    private ConsumerDRGateway m_consumerDRGateway = null;
 
     LeaderCache.Callback m_leadersChangeHandler = new LeaderCache.Callback()
     {
@@ -93,7 +93,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                           MemoryStats memStats,
                           CommandLog cl,
                           NodeDRGateway nodeDRGateway,
-                          ReplicaDRGateway replicaDRGateway,
+                          ConsumerDRGateway consumerDRGateway,
                           String coreBindIds)
         throws KeeperException, InterruptedException, ExecutionException
     {
@@ -108,7 +108,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 PartitionDRGateway.getInstance(m_partitionId, nodeDRGateway,
                         startAction);
         ((SpScheduler) m_scheduler).setDRGateway(drGateway);
-        m_replicaDRGateway = replicaDRGateway;
+        m_consumerDRGateway = consumerDRGateway;
 
         super.configureCommon(backend, catalogContext,
                 csp, numberOfPartitions, startAction, agent, memStats, cl, coreBindIds, drGateway);
@@ -188,8 +188,8 @@ public class SpInitiator extends BaseInitiator implements Promotable
             // Tag along and become the export master too
             ExportManager.instance().acceptMastership(m_partitionId);
             // If we are a DR replica, inform that subsystem of its new responsibilities
-            if (m_replicaDRGateway != null) {
-                m_replicaDRGateway.promotePartition(m_partitionId, binaryLogUniqueId);
+            if (m_consumerDRGateway != null) {
+                m_consumerDRGateway.promotePartition(m_partitionId, binaryLogUniqueId);
             }
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Terminally failed leader promotion.", true, e);

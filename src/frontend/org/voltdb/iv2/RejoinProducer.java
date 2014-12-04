@@ -327,7 +327,7 @@ public class RejoinProducer extends JoinProducerBase {
 
                     for (Map.Entry<Integer, Long> e : event.remoteDCLastUniqueIds.get(0).entrySet()) {
                         SnapshotSaveAPI.m_lastAppliedUniqueId.put(e.getKey(), new AtomicLong(e.getValue()));
-                        VoltDB.instance().getReplicaDRGateway().notifyOfLastAppliedSpUniqueId(0, e.getValue());
+                        VoltDB.instance().getConsumerDRGateway().notifyOfLastAppliedSpUniqueId(0, e.getValue());
                     }
 
                     REJOINLOG.debug(m_whoami + " monitor completed. Sending SNAPSHOT_FINISHED "

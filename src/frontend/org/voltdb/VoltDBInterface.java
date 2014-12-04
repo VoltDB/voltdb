@@ -155,7 +155,7 @@ public interface VoltDBInterface
 
     public NodeDRGateway getNodeDRGateway();
 
-    public ReplicaDRGateway getReplicaDRGateway();
+    public ConsumerDRGateway getConsumerDRGateway();
 
     public void onSyncSnapshotCompletion();
 

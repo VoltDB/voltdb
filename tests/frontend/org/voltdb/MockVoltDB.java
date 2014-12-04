@@ -632,7 +632,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public ReplicaDRGateway getReplicaDRGateway() {
+    public ConsumerDRGateway getConsumerDRGateway() {
         return null;
     }
 

@@ -25,16 +25,16 @@ import org.apache.zookeeper_voltpatches.KeeperException;
 import org.voltdb.iv2.UniqueIdGenerator;
 
 
-// Interface through which the outside world can interact with the replica-side
+// Interface through which the outside world can interact with the consumer side
 // of DR. Currently, there's not much to do here, since the subsystem is
 // largely self-contained
-public interface ReplicaDRGateway extends Promotable {
+public interface ConsumerDRGateway extends Promotable {
 
     public abstract void updateCatalog(CatalogContext catalog);
 
     public abstract boolean isActive();
 
-    public abstract void start();
+    public abstract void initialize(boolean resumeReplication);
 
     public abstract void shutdown(boolean blocking) throws InterruptedException;
 
@@ -44,11 +44,11 @@ public interface ReplicaDRGateway extends Promotable {
 
     public abstract Map<Integer, Map<Integer, Long>> getLastReceivedUniqueIds();
 
-    public static class DummyReplicaDRGateway implements ReplicaDRGateway {
+    public static class DummyConsumerDRGateway implements ConsumerDRGateway {
         Map<Integer, Map<Integer, Long>> ids = new HashMap<Integer, Map<Integer, Long>>();
 
         @Override
-        public void start() {}
+        public void initialize(boolean resumeReplication) {}
 
         @Override
         public void acceptPromotion() throws InterruptedException,

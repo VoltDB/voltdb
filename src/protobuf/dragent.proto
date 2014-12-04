@@ -30,6 +30,7 @@ message Subscribe {
     optional fixed64 timestamp = 2;
     optional bool isCovering = 3;
     optional fixed64 rewindToUniqueId = 4;
+    optional bool isSyncing = 5;
 }
 
 message EventAck {
@@ -67,6 +68,7 @@ message Response {
     repeated PartitionInfo partitionInfo = 8;
     // status. 0 means ok
     optional int32 status = 9 [default = 0];
+    optional CtrlEnvelope.Type type = 10;
 }
 
 message NodeInfo {

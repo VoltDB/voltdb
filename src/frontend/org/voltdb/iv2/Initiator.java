@@ -25,9 +25,9 @@ import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
+import org.voltdb.ConsumerDRGateway;
 import org.voltdb.MemoryStats;
 import org.voltdb.NodeDRGateway;
-import org.voltdb.ReplicaDRGateway;
 import org.voltdb.StartAction;
 import org.voltdb.StatsAgent;
 
@@ -47,7 +47,7 @@ public interface Initiator
                           MemoryStats memStats,
                           CommandLog cl,
                           NodeDRGateway nodeDRGateway,
-                          ReplicaDRGateway replicaDRGateway,
+                          ConsumerDRGateway consumerDRGateway,
                           String coreBindIds)
         throws KeeperException, InterruptedException, ExecutionException;
 
