@@ -181,9 +181,9 @@ function jdbc-benchmark() {
 }
 
 # The following two demo functions are used by the Docker package. Don't remove.
-# compile the catalog and client code
+# compile the jars for procs and client code
 function demo-compile() {
-    catalog
+    jars
 }
 
 function demo() {
