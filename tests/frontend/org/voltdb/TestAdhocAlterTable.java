@@ -821,7 +821,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
         try {
             startSystem(config);
             m_client.callProcedure("@AdHoc",
-                    "create table FOO (ID integer not null, VAL bigint not null);");
+                    "create table FOO (ID integer not null, VAL bigint not null, VAL2 bigint not null);");
             m_client.callProcedure("@AdHoc",
                     "partition table foo on column ID;");
             // Should be no indexes in the system (no constraints)
@@ -837,6 +837,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             // Only one host, one site/host, should only be one row in returned result
             indexes.advanceRow();
             assertEquals(1, indexes.getLong("IS_UNIQUE"));
+
             // Make sure we can drop a named one (can't drop unnamed at the moment, haha)
             m_client.callProcedure("@AdHoc",
                     "alter table FOO drop constraint blerg;");
@@ -943,6 +944,179 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             assertTrue(verifyTableColumnType("FOO", "NEWCOL", "VARCHAR"));
             assertTrue(verifyTableColumnSize("FOO", "NEWCOL", 50));
             assertFalse(isColumnNullable("FOO", "NEWCOL"));
+        }
+        finally {
+            teardownSystem();
+        }
+    }
+
+    // Check that assumeunique constraints and rowlimit constraints are preserved
+    // across ALTER TABLE
+    public void testAlterTableENG7242NoExpressions() throws Exception
+    {
+        System.out.println("----------------\n\n TestAlterTableENG7242 \n\n--------------");
+        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("-- dont care");
+        builder.setUseDDLSchema(true);
+        boolean success = builder.compile(pathToCatalog, 1, 1, 0);
+        assertTrue("Schema compilation failed", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = pathToCatalog;
+        config.m_pathToDeployment = pathToDeployment;
+
+        try {
+            startSystem(config);
+            m_client.callProcedure("@AdHoc",
+                    "create table FOO (ID integer not null, " +
+                    "VAL bigint not null, " +
+                    "VAL2 bigint not null, " +
+                    "VAL3 bigint not null);");
+            m_client.callProcedure("@AdHoc",
+                    "partition table foo on column ID;");
+            // Should be no indexes in the system (no constraints)
+            VoltTable indexes = m_client.callProcedure("@Statistics", "INDEX", 0).getResults()[0];
+            VoltTable tables = null;
+            assertEquals(0, indexes.getRowCount());
+            m_client.callProcedure("@AdHoc",
+                    "alter table FOO add constraint blarg LIMIT PARTITION ROWS 10;");
+            // and an ASSUMEUNIQUE constraint (custom VoltDB constraint)
+            m_client.callProcedure("@AdHoc",
+                    "alter table FOO add constraint blerg ASSUMEUNIQUE(VAL);");
+            // Stall until the indexes update
+            do {
+                indexes = m_client.callProcedure("@Statistics", "INDEX", 0).getResults()[0];
+                tables = m_client.callProcedure("@Statistics", "TABLE", 0).getResults()[0];
+            }
+            while (indexes.getRowCount() != 1);
+            // Only one host, one site/host, should only be one row in returned result
+            indexes.advanceRow();
+            assertEquals(1, indexes.getLong("IS_UNIQUE"));
+            tables.advanceRow();
+            assertEquals(10, tables.getLong("TUPLE_LIMIT"));
+
+            // ENG-7242 - check that VoltDB constraints are preserved across alter table
+            try {
+                m_client.callProcedure("@AdHoc", "alter table FOO drop column VAL2;");
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                // We just compile-fail here when assumeunique goes away.  Unclear that
+                // there's a better way to programatically check the difference
+                // between ASSUMEUNIQUE and UNIQUE?
+                fail("ALTER TABLE shouldn't drop ASSUMEUNIQUE from constraint blerg");
+            }
+
+            // ENG-7242 - check the row limits on the table
+            // Spin until stats updates the table
+            do {
+                tables = m_client.callProcedure("@Statistics", "TABLE", 0).getResults()[0];
+            }
+            while (tables.getColumnCount() == 3);
+            tables.advanceRow();
+            assertEquals(10, tables.getLong("TUPLE_LIMIT"));
+
+            // Make sure we can drop a named one (can't drop unnamed at the moment, haha)
+            m_client.callProcedure("@AdHoc",
+                    "alter table FOO drop constraint blerg;");
+            indexes = m_client.callProcedure("@Statistics", "INDEX", 0).getResults()[0];
+            do {
+                indexes = m_client.callProcedure("@Statistics", "INDEX", 0).getResults()[0];
+                tables = m_client.callProcedure("@Statistics", "TABLE", 0).getResults()[0];
+            }
+            while (indexes.getRowCount() != 0);
+            // Check row limits again...if we failed to copy it on the first alter table,
+            // it's definitely going to be bad here
+            tables.advanceRow();
+            assertEquals(10, tables.getLong("TUPLE_LIMIT"));
+        }
+        finally {
+            teardownSystem();
+        }
+    }
+
+    // Will also test the constraint with expression part of ENG-7242
+    // Currently commented out because it fails, just wanted to write it while I was here --izzy
+    public void testAlterTableENG7304ENG7305() throws Exception
+    {
+        System.out.println("----------------\n\n TestAlterTableENG7304ENG7305 \n\n--------------");
+        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("-- dont care");
+        builder.setUseDDLSchema(true);
+        boolean success = builder.compile(pathToCatalog, 1, 1, 0);
+        assertTrue("Schema compilation failed", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = pathToCatalog;
+        config.m_pathToDeployment = pathToDeployment;
+        try {
+            startSystem(config);
+            m_client.callProcedure("@AdHoc",
+                    "create table FOO (ID integer not null, " +
+                    "VAL bigint not null, " +
+                    "VAL2 bigint not null, " +
+                    "VAL3 bigint not null);");
+            m_client.callProcedure("@AdHoc",
+                    "partition table foo on column ID;");
+            // Add a unique function constraint (custom VoltDB constraint)
+            // TESTS ENG-7304
+            m_client.callProcedure("@AdHoc",
+                    "alter table FOO add constraint blurg ASSUMEUNIQUE(abs(VAL3));");
+
+            // Check that the unique absolute value constraint applies
+            m_client.callProcedure("FOO.insert", 1, 1, 1, 1);
+            boolean threw = true;
+            try {
+                m_client.callProcedure("FOO.insert", -1, -1, -1, -1);
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                threw = true;
+            }
+            assertTrue("Unique absolute value constraint on FOO never applied", threw);
+
+            // ENG-7305: Verify that we can't alter table that messes with
+            // expression index/constraint when table has data but that we can
+            // when table is empty
+            threw = false;
+            try {
+                m_client.callProcedure("@AdHoc", "alter table FOO drop column VAL2;");
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                threw = true;
+            }
+            assertTrue("Shouldn't be able to drop column VAL2 when table has data", threw);
+
+            // Now empty the table and try again
+            try {
+                m_client.callProcedure("@AdHoc", "truncate table FOO;");
+                m_client.callProcedure("@AdHoc", "alter table FOO drop column VAL2;");
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Should be able to drop a column on empty table in presence of expression-based index: " + pce.getMessage());
+            }
+
+            // Check that the unique absolute value constraint still applies (ENG-7242)
+            m_client.callProcedure("FOO.insert", 2, 2, 2);
+            threw = true;
+            try {
+                m_client.callProcedure("FOO.insert", -2, -2, -2);
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                threw = true;
+            }
+            assertTrue("Unique absolute value constraint on FOO has gone missing", threw);
         }
         finally {
             teardownSystem();
