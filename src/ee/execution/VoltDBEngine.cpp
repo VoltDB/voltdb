@@ -921,6 +921,7 @@ static bool haveDifferentSchema(catalog::Table *t1, voltdb::Table *t2)
     return false;
 }
 
+
 /*
  * Create catalog delegates for new catalog tables.
  * Create the tables themselves when new tables are needed.
@@ -959,7 +960,6 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
                            catalogTable->name().c_str());
                 return false;
             }
-
             m_catalogDelegates[catalogTable->path()] = tcd;
             m_delegatesByName[tcd->getTable()->name()] = tcd;
 
@@ -1322,7 +1322,7 @@ ExecutorVector *VoltDBEngine::getExecutorVectorForFragmentId(const int64_t fragI
         // add the plan to the back
         //
         // (Why to the back?  Shouldn't it be at the front with the
-        // most recently used items?)
+        // most recently used items?  See ENG-7244)
         plans.get<0>().push_back(ev);
 
         // remove a plan from the front if the cache is full

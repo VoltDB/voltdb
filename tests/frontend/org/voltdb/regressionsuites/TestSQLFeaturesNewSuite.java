@@ -377,11 +377,11 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
 
         // Load the table
         vt = client.callProcedure("CAPPED3_LIMIT_EXEC_COMPLEX.insert", 37, 1, 0, "important", 17000).getResults()[0];
-        assertTablesAreEqual("Insert 1 " ,new Object[][] {{1}}, vt);
+        validateTableOfScalarLongs(vt, new long[] {1});
         vt = client.callProcedure("CAPPED3_LIMIT_EXEC_COMPLEX.insert", 37, 2, 0, "important", 17000).getResults()[0];
-        assertTablesAreEqual("Insert 2 ", new Object[][] {{1}}, vt);
+        validateTableOfScalarLongs(vt, new long[] {1});
         vt = client.callProcedure("CAPPED3_LIMIT_EXEC_COMPLEX.insert", 37, 3, 0, "important", 17000).getResults()[0];
-        assertTablesAreEqual("Insert 3 ", new Object[][] {{1}}, vt);
+        validateTableOfScalarLongs(vt, new long[] {1});
 
         // no rows match purge criteria
         verifyProcFails(client,
@@ -392,7 +392,7 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         // for rows to be purged.
 
         vt = client.callProcedure("@AdHoc", "UPDATE CAPPED3_LIMIT_EXEC_COMPLEX SET relevance='moot' WHERE dept = 2").getResults()[0];
-        assertTablesAreEqual("Updated rows ", new Object[][] {{1}}, vt);
+        validateTableOfScalarLongs(vt, new long[] {1});
 
         // Insert still fails!
         verifyProcFails(client,
@@ -400,7 +400,7 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
                 "CAPPED3_LIMIT_EXEC_COMPLEX.insert", 37, 4, 0, "important", 17000);
 
         vt = client.callProcedure("@AdHoc", "UPDATE CAPPED3_LIMIT_EXEC_COMPLEX SET priority=100 WHERE dept = 2").getResults()[0];
-                assertTablesAreEqual("Updated rows ", new Object[][] {{1}}, vt);
+        validateTableOfScalarLongs(vt, new long[] {1});
 
         // Insert still fails!
         verifyProcFails(client,
@@ -408,22 +408,19 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
                 "CAPPED3_LIMIT_EXEC_COMPLEX.insert", 37, 4, 0, "important", 17000);
 
         vt = client.callProcedure("@AdHoc", "UPDATE CAPPED3_LIMIT_EXEC_COMPLEX SET may_be_purged=1 WHERE dept = 2").getResults()[0];
-        assertTablesAreEqual("Updated rows ", new Object[][] {{1}}, vt);
+        validateTableOfScalarLongs(vt, new long[] {1});
 
         // now the insert succeeds!
         vt = client.callProcedure("CAPPED3_LIMIT_EXEC_COMPLEX.insert", 37, 4, 1, "moot", 500).getResults()[0];
-        assertTablesAreEqual("Insert with purge ", new Object[][] {{1}}, vt);
+        validateTableOfScalarLongs(vt, new long[] {1});
 
-        assertQueryProduces("Table contents mismatch ", client, new Object[][] {
-                {37, 1, 0, "important", 32000},
-                {37, 3, 0, "important", 32000},
-                {37, 4, 1, "moot", 500}},
-                "SELECT * FROM CAPPED3_LIMIT_EXEC_COMPLEX ORDER BY dept");
+        vt = client.callProcedure("@AdHoc", "SELECT dept FROM CAPPED3_LIMIT_EXEC_COMPLEX ORDER BY dept").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {1, 3, 4});
 
-        // Insert a bunch of purgable rows in loop
+        // Insert a bunch of purge-able rows in loop
         for (int i = 5; i < 100; ++i) {
             vt = client.callProcedure("CAPPED3_LIMIT_EXEC_COMPLEX.insert", 37, i, 1, "irrelevant", i + 10).getResults()[0];
-            assertTablesAreEqual("Loop insert ", new Object[][] {{1}}, vt);
+            validateTableOfScalarLongs(vt, new long[] {1});
         }
     }
 
@@ -437,11 +434,11 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
 
         // Load the table
         vt = client.callProcedure("CAPPED3_LIMIT_EXEC_COMPLEX.insert", 37, 1, 0, "important", 17000).getResults()[0];
-        assertTablesAreEqual("Insert 1 ", new Object[][] {{1}}, vt);
+        validateTableOfScalarLongs(vt, new long[] {1});
         vt = client.callProcedure("CAPPED3_LIMIT_EXEC_COMPLEX.insert", 37, 2, 0, "important", 17000).getResults()[0];
-        assertTablesAreEqual("Insert 2 ", new Object[][] {{1}}, vt);
+        validateTableOfScalarLongs(vt, new long[] {1});
         vt = client.callProcedure("CAPPED3_LIMIT_EXEC_COMPLEX.insert", 37, 3, 0, "important", 17000).getResults()[0];
-        assertTablesAreEqual("Insert 3 ", new Object[][] {{1}}, vt);
+        validateTableOfScalarLongs(vt, new long[] {1});
 
         // no rows match purge criteria
         verifyProcFails(client,
@@ -456,11 +453,11 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
 
         // Now the insert should succeed because rows are purge-able.
         vt = client.callProcedure("CAPPED3_LIMIT_EXEC_COMPLEX.insert", 37, 4, 0, "important", 17000).getResults()[0];
-        assertTablesAreEqual("Insert 4 ", new Object[][] {{1}}, vt);
+        validateTableOfScalarLongs(vt, new long[] {1});
         vt = client.callProcedure("CAPPED3_LIMIT_EXEC_COMPLEX.insert", 37, 5, 0, "important", 17000).getResults()[0];
-        assertTablesAreEqual("Insert 5 ", new Object[][] {{1}}, vt);
+        validateTableOfScalarLongs(vt, new long[] {1});
         vt = client.callProcedure("CAPPED3_LIMIT_EXEC_COMPLEX.insert", 37, 6, 0, "important", 17000).getResults()[0];
-        assertTablesAreEqual("Insert 6 ", new Object[][] {{1}}, vt);
+        validateTableOfScalarLongs(vt, new long[] {1});
 
         // alter the constraint by removing the delete statement
         cr = client.callProcedure("@AdHoc",
@@ -469,7 +466,7 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
         vt = client.callProcedure("@AdHoc", "select count(*) from capped3_limit_exec_complex").getResults()[0];
-        assertTablesAreEqual("count check ", new Object[][] {{3}}, vt);
+        validateTableOfScalarLongs(vt, new long[] {3});
 
         verifyProcFails(client,
                 "exceeds table maximum row count 3",
@@ -483,7 +480,7 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
 
         // no more constraint means insert can now succeed.
         vt = client.callProcedure("CAPPED3_LIMIT_EXEC_COMPLEX.insert", 37, 7, 0, "important", 17000).getResults()[0];
-        assertTablesAreEqual("Insert 7 ", new Object[][] {{1}}, vt);
+        validateTableOfScalarLongs(vt, new long[] {1});
 
         // Verify that we can add the constraint back again
         cr = client.callProcedure("@AdHoc",
@@ -493,7 +490,7 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
         vt = client.callProcedure("CAPPED3_LIMIT_EXEC_COMPLEX.insert", 37, 8, 0, "important", 17000).getResults()[0];
-        assertTablesAreEqual("Insert 8 ", new Object[][] {{1}}, vt);
+        validateTableOfScalarLongs(vt, new long[] {1});
 
         // my fancy assertTablesAreEqual doesn't work for the below query.  Why?
         vt = client.callProcedure("@AdHoc", "select dept from capped3_limit_exec_complex order by dept asc").getResults()[0];
