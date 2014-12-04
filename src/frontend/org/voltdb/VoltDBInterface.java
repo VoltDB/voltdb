@@ -28,7 +28,6 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.licensetool.LicenseApi;
 
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
-import org.voltdb.compiler.deploymentfile.DeploymentType;
 
 public interface VoltDBInterface
 {
@@ -224,6 +223,4 @@ public interface VoltDBInterface
      public LicenseApi getLicenseApi();
 
     public <T> ListenableFuture<T> submitSnapshotIOWork(Callable<T> work);
-
-    public DeploymentType getDeployment();
 }

@@ -2748,8 +2748,4 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     {
         return System.currentTimeMillis() - getHostMessenger().getInstanceId().getTimestamp();
     }
-
-    public DeploymentType getDeployment() {
-        return this.m_deployment;
-    }
 }

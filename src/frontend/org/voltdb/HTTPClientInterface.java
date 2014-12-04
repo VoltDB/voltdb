@@ -37,16 +37,23 @@ import org.voltdb.client.ProcedureCallback;
 import org.voltcore.logging.Level;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
+import org.voltdb.VoltDB.Configuration;
 import org.voltdb.utils.Encoder;
 
 public class HTTPClientInterface {
 
-    private static VoltLogger m_log = new VoltLogger("HOST");
+    private static final VoltLogger m_log = new VoltLogger("HOST");
     private static final RateLimitedLogger m_rate_limited_log = new RateLimitedLogger(10 * 1000, m_log, Level.WARN);
 
     AuthenticatedConnectionCache m_connections = null;
     static final int CACHE_TARGET_SIZE = 10;
     private final AtomicBoolean m_shouldUpdateCatalog = new AtomicBoolean(false);
+
+    public static final String PARAM_USERNAME = "User";
+    public static final String PARAM_PASSWORD = "Password";
+    public static final String PARAM_HASHEDPASSWORD = "Hashedpassword";
+    public static final String PARAM_ADMIN = "admin";
+
 
     class JSONProcCallback implements ProcedureCallback {
 
@@ -126,10 +133,10 @@ public class HTTPClientInterface {
                 continuation.complete();
                 return;
             }
-            String username = request.getParameter("User");
-            String password = request.getParameter("Password");
-            String hashedPassword = request.getParameter("Hashedpassword");
-            String admin = request.getParameter("admin");
+            String username = request.getParameter(PARAM_USERNAME);
+            String password = request.getParameter(PARAM_PASSWORD);
+            String hashedPassword = request.getParameter(PARAM_HASHEDPASSWORD);
+            String admin = request.getParameter(PARAM_ADMIN);
 
             authResult = getAuthenticationResult(request, username, password, hashedPassword, admin);
             if (!authResult.isAuthenticated()) {
@@ -145,7 +152,7 @@ public class HTTPClientInterface {
                 try {
                     response.getWriter().print(msg);
                     continuation.complete();
-                } catch (IOException e1) {}
+                } catch (IOException e1) {} // Ignore this as browser must have closed.
                 return;
             }
 
@@ -192,7 +199,7 @@ public class HTTPClientInterface {
             try {
                 response.getWriter().print(msg);
                 continuation.complete();
-            } catch (IOException e1) {}
+            } catch (IOException e1) {} // Ignore this as browser must have closed.
         } finally {
             if (authResult != null && authResult.m_client != null) {
                 assert(m_connections != null);
@@ -226,9 +233,10 @@ public class HTTPClientInterface {
         }
 
         if (m_connections == null) {
-            int port = VoltDB.instance().getConfig().m_port;
-            int adminPort = VoltDB.instance().getConfig().m_adminPort;
-            String externalInterface = VoltDB.instance().getConfig().m_externalInterface;
+            Configuration config = VoltDB.instance().getConfig();
+            int port = config.m_port;
+            int adminPort = config.m_adminPort;
+            String externalInterface = config.m_externalInterface;
             String adminInterface = "localhost";
             String clientInterface = "localhost";
             if (externalInterface != null && !externalInterface.isEmpty()) {
@@ -236,11 +244,11 @@ public class HTTPClientInterface {
                 adminInterface = externalInterface;
             }
             //If individual override is available use them.
-            if (VoltDB.instance().getConfig().m_clientInterface.length() > 0) {
-                clientInterface = VoltDB.instance().getConfig().m_clientInterface;
+            if (config.m_clientInterface.length() > 0) {
+                clientInterface = config.m_clientInterface;
             }
-            if (VoltDB.instance().getConfig().m_adminInterface.length() > 0) {
-                adminInterface = VoltDB.instance().getConfig().m_adminInterface;
+            if (config.m_adminInterface.length() > 0) {
+                adminInterface = config.m_adminInterface;
             }
             m_connections = new AuthenticatedConnectionCache(10, clientInterface, port, adminInterface, adminPort);
         }
@@ -288,19 +296,19 @@ public class HTTPClientInterface {
             if (client != null) {
                 return new AuthenticationResult(client, adminMode, username, "");
             }
-            return new AuthenticationResult(null, adminMode, username, "");
+            return new AuthenticationResult(null, adminMode, username, "Failed to get client.");
         } catch (IOException ex) {
-            return new AuthenticationResult(null, adminMode, username, "");
+            return new AuthenticationResult(null, adminMode, username, ex.getMessage());
         }
     }
 
     public AuthenticationResult authenticate(Request request) {
         AuthenticationResult authResult = null;
 
-        String username = request.getParameter("User");
-        String password = request.getParameter("Password");
-        String hashedPassword = request.getParameter("Hashedpassword");
-        String admin = request.getParameter("admin");
+        String username = request.getParameter(PARAM_USERNAME);
+        String password = request.getParameter(PARAM_PASSWORD);
+        String hashedPassword = request.getParameter(PARAM_HASHEDPASSWORD);
+        String admin = request.getParameter(PARAM_ADMIN);
         try {
             authResult = getAuthenticationResult(request, username, password, hashedPassword, admin);
             if (!authResult.isAuthenticated()) {

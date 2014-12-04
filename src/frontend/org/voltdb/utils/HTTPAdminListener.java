@@ -45,7 +45,10 @@ import org.voltdb.compilereport.ReportMaker;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.io.Resources;
+import java.io.ByteArrayInputStream;
 import java.net.InetAddress;
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.map.JsonMappingException;
 import org.codehaus.jackson.map.ObjectMapper;
@@ -62,13 +65,14 @@ import org.voltdb.compiler.deploymentfile.UsersType;
 
 public class HTTPAdminListener {
 
-    private static VoltLogger m_log = new VoltLogger("HOST");
+    private static final VoltLogger m_log = new VoltLogger("HOST");
 
     Server m_server = new Server();
     HTTPClientInterface httpClientInterface = new HTTPClientInterface();
     final boolean m_jsonEnabled;
     Map<String, String> m_htmlTemplates = new HashMap<String, String>();
     final boolean m_mustListen;
+    final DeploymentRequestHandler m_deploymentHandler;
 
     //Somewhat like Filter but we dont have Filter in version and jars we use.
     class VoltRequestHandler extends AbstractHandler {
@@ -255,6 +259,8 @@ public class HTTPAdminListener {
 
         final ObjectMapper m_mapper;
         String m_schema = "";
+        private DeploymentType m_deployment = null;
+
         public DeploymentRequestHandler() {
             m_mapper = new ObjectMapper();
             m_mapper.getSerializationConfig().addMixInAnnotations(UsersType.User.class, IgnorePasswordMixIn.class);
@@ -267,6 +273,49 @@ public class HTTPAdminListener {
             }
         }
 
+        //Get deployment from zookeeper next time
+        public void notifyOfCatalogUpdate() {
+            m_deployment = null;
+        }
+
+        //Get deployment from zookeeper.
+        private DeploymentType getDeployment() {
+            if (m_deployment == null) {
+                ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
+                byte deploymentBytes[] = null;
+
+                try {
+                    //Let us get bytes from ZK
+                    CatalogUtil.CatalogAndIds catalogStuff = CatalogUtil.getCatalogFromZK(zk);
+                    deploymentBytes = catalogStuff.deploymentBytes;
+                } catch (KeeperException | InterruptedException ex) {
+                    m_log.warn("Failed to get deployment from zookeeper for HTTP interface.", ex);
+                }
+                m_deployment = CatalogUtil.getDeployment(new ByteArrayInputStream(deploymentBytes));
+                // wasn't a valid xml deployment file
+                if (m_deployment == null) {
+                    //Get stale version from RealVoltDB
+                    m_log.warn("Failed to get deployment from zookeeper for HTTP interface. /deployment will not serve deployment information.");
+                }
+            }
+            return m_deployment;
+        }
+
+        // TODO - subresources.
+        // We support
+        // /deployment/cluster
+        // /deployment/paths
+        // /deployment/partitionDetection
+        // /deployment/adminMode
+        // /deployment/heartbeat
+        // /deployment/httpd
+        // /deployment/replication
+        // /deployment/snapshot
+        // /deployment/export
+        // /deployment/users
+        // /deployment/commandlog
+        // /deployment/systemsettings
+        // /deployment/security
         @Override
         public void handle(String target,
                            Request baseRequest,
@@ -275,6 +324,20 @@ public class HTTPAdminListener {
                            throws IOException, ServletException {
 
             super.handle(target, baseRequest, request, response);
+
+            if (baseRequest.getMethod().equalsIgnoreCase("GET")) {
+                handleGet(target, baseRequest, request, response);
+            }
+            //TODO handle post later.
+        }
+
+        // GET on /deployment resources.
+        public void handleGet(String target,
+                           Request baseRequest,
+                           HttpServletRequest request,
+                           HttpServletResponse response)
+                           throws IOException, ServletException {
+            //jsonp is specified when response is expected to go to javascript function.
             String jsonp = request.getParameter("jsonp");
 
             try {
@@ -291,7 +354,6 @@ public class HTTPAdminListener {
                 }
 
                 AuthenticationResult authResult = authenticate(baseRequest);
-                //Do any role checking if required here.
                 if (!authResult.isAuthenticated()) {
                     String msg = authResult.m_message;
                     ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg);
@@ -303,12 +365,22 @@ public class HTTPAdminListener {
                     response.getWriter().print(msg);
                     baseRequest.setHandled(true);
                 } else {
-                    DeploymentType d = VoltDB.instance().getDeployment();
-                    String msg = m_mapper.writeValueAsString(d);
-                    if (jsonp != null) {
-                        msg = String.format("%s( %s )", jsonp, msg);
+                    DeploymentType d = getDeployment();
+                    if (d == null) {
+                        String msg = "Deployment Information unavailable.";
+                        ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg);
+                        msg = rimpl.toJSONString();
+                        if (jsonp != null) {
+                            msg = String.format("%s( %s )", jsonp, msg);
+                        }
+                        response.getWriter().print(msg);
+                    } else {
+                        String msg = m_mapper.writeValueAsString(d);
+                        if (jsonp != null) {
+                            msg = String.format("%s( %s )", jsonp, msg);
+                        }
+                        response.getWriter().print(msg);
                     }
-                    response.getWriter().print(msg);
                     response.setStatus(HttpServletResponse.SC_OK);
                     baseRequest.setHandled(true);
                 }
@@ -316,7 +388,6 @@ public class HTTPAdminListener {
               logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage());
             }
         }
-
     }
 
     class APIRequestHandler extends VoltRequestHandler {
@@ -325,7 +396,6 @@ public class HTTPAdminListener {
         public void handle(String target, Request baseRequest,
                            HttpServletRequest request, HttpServletResponse response)
                             throws IOException, ServletException {
-            VoltLogger logger = new VoltLogger("HOST");
             super.handle(target, baseRequest, request, response);
             try {
                 // http://www.ietf.org/rfc/rfc4627.txt dictates this mime type
@@ -444,8 +514,8 @@ public class HTTPAdminListener {
 
             ///deployment
             ContextHandler deploymentRequestHandler = new ContextHandler("/deployment");
-            DeploymentRequestHandler dh = new DeploymentRequestHandler();
-            deploymentRequestHandler.setHandler(dh);
+            m_deploymentHandler = new DeploymentRequestHandler();
+            deploymentRequestHandler.setHandler(m_deploymentHandler);
 
             ContextHandlerCollection handlers = new ContextHandlerCollection();
             handlers.setHandlers(new Handler[] {
@@ -501,6 +571,9 @@ public class HTTPAdminListener {
 
     public void notifyOfCatalogUpdate()
     {
+        //Notify to clean any cached clients so new security can be enforced.
         httpClientInterface.notifyOfCatalogUpdate();
+        //Notify deployment handler
+        m_deploymentHandler.notifyOfCatalogUpdate();
     }
 }
