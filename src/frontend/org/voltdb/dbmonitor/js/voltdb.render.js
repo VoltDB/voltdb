@@ -1650,7 +1650,7 @@ function alertNodeClicked(obj) {
         var getAdminConfigurationItems = function (connection) {
             var adminConfigValues = [];
 
-            if (connection != null && connection.Metadata['@SystemInformation_DEPLOYMENT'] != null) {
+            if (connection != null && (connection.Metadata['@SystemInformation_DEPLOYMENT'] != null || connection.Metadata['@SystemInformation_DEPLOYMENT'] !=undefined)) {
                 connection.Metadata['@SystemInformation_DEPLOYMENT'].data.forEach(function (columnInfo) {
                     switch (columnInfo[0]) {
                         case 'sitesperhost':
@@ -1783,8 +1783,10 @@ function alertNodeClicked(obj) {
                         default:
                     }
                 });
+                return adminConfigValues;
             }
-            return adminConfigValues;
+
+            return undefined;
 
         };
 

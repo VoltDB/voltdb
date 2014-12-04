@@ -2,7 +2,7 @@
 var adminEditObjects = {};
 
 $(document).ready(function () {
-    
+
     adminDOMObjects = {
         siteNumberHeader: $("#sitePerHost"),
         kSafety: $("#kSafety"),
@@ -99,7 +99,7 @@ $(document).ready(function () {
         tBoxQueryTimeout: $("#txtQueryTimeout"),
         tBoxQueryTimeoutValue: $("#queryTimeOutSpan").text(),
         spanqueryTimeOut: $("#queryTimeOutSpan"),
-    };    
+    };
 
     adminEditObjects.chkSecurity.on('ifChanged', function () {
         adminEditObjects.spanSecurity.text(getOnOffText(adminEditObjects.chkSecurity.is(":checked")));
@@ -544,23 +544,26 @@ $(document).ready(function () {
     });
 });
 
-(function(window) {
+(function (window) {
     var iVoltDbAdminConfig = (function () {
 
         this.isAdmin = true;
 
         this.displayAdminConfiguration = function (adminConfigValues) {
-            configureAdminValues(adminConfigValues);
-            configurePortValues(adminConfigValues);
-            configureDirectoryValues(adminConfigValues);
+            if (adminConfigValues != undefined) {
+                configureAdminValues(adminConfigValues);
+                configurePortValues(adminConfigValues);
+                configureDirectoryValues(adminConfigValues);
+            }
         };
 
-        this.displayClientPort = function(clientPortValue) {
-            configureClientPortValue(clientPortValue);
+        this.displayClientPort = function (clientPortValue) {
+            if (clientPortValue != undefined) {
+                configureClientPortValue(clientPortValue);
+            }
         };
-        
-        var configureAdminValues = function(adminConfigValues) {
-            
+
+        var configureAdminValues = function (adminConfigValues) {
             adminDOMObjects.siteNumberHeader.text(adminConfigValues.sitesperhost);
             adminDOMObjects.kSafety.text(adminConfigValues.kSafety);
             adminDOMObjects.partitionDetection.removeClass().addClass(getOnOffClass(adminConfigValues.partitionDetection));
@@ -576,7 +579,7 @@ $(document).ready(function () {
             adminDOMObjects.frequency.text(adminConfigValues.frequency);
             adminDOMObjects.frequencyLabel.text(adminConfigValues.frequency > 0 ? "Hrs" : "");
             adminDOMObjects.retained.text(adminConfigValues.retained);
-            adminDOMObjects.retainedLabel.text(adminConfigValues.retained>0?"Copies":"");
+            adminDOMObjects.retainedLabel.text(adminConfigValues.retained > 0 ? "Copies" : "");
             adminDOMObjects.commandLog.removeClass().addClass(getOnOffClass(adminConfigValues.commandLogEnabled));
             adminDOMObjects.commandLogLabel.text(adminConfigValues.commandLogEnabled == 'true' ? 'On' : 'Off');
             adminDOMObjects.commandLogFrequencyTime.text(adminConfigValues.commandLogFrequencyTime);
@@ -598,21 +601,24 @@ $(document).ready(function () {
             adminDOMObjects.snapshotPriority.text(adminConfigValues.snapshotPriority);
 
             adminEditObjects.tBoxHeartbeatTimeoutValue = adminConfigValues.heartBeatTimeout;
+
         };
 
-        var configurePortValues = function(portConfigValues) {
+        var configurePortValues = function (portConfigValues) {
             adminDOMObjects.adminPort.text(portConfigValues.adminPort);
             adminDOMObjects.httpPort.text(portConfigValues.httpPort);
             adminDOMObjects.internalPort.text(portConfigValues.internalPort);
             adminDOMObjects.zookeeperPort.text(portConfigValues.zookeeperPort);
             adminDOMObjects.replicationPort.text(portConfigValues.replicationPort);
+
         };
 
-        var configureClientPortValue = function(clientPortValue) {
+        var configureClientPortValue = function (clientPortValue) {
             adminDOMObjects.clientPort.text(clientPortValue.clientPort);
+
         };
 
-        var configureDirectoryValues = function(directoryConfigValues) {
+        var configureDirectoryValues = function (directoryConfigValues) {
             adminDOMObjects.voltdbRoot.text(directoryConfigValues.voltdbRoot);
             adminDOMObjects.snapshotPath.text(directoryConfigValues.snapshotPath);
             adminDOMObjects.commandLogPath.text(directoryConfigValues.commandLogPath);
