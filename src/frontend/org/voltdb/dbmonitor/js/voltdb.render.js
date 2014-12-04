@@ -294,29 +294,29 @@ function alertNodeClicked(obj) {
             }
         };
 
-        this.GetSystemInformation = function (onInformationLoaded, adminConfiguration, onAdminPageClientPortLoaded) {
+        this.GetSystemInformation = function (onInformationLoaded, onAdminPageClientPortLoaded) {
             VoltDBService.GetSystemInformation(function (connection) {
-                if (adminConfiguration != null && adminConfiguration.options.isAdmin) {
+                if (VoltDbAdminConfig.isAdmin) {
                     onAdminPageClientPortLoaded(getClientPort(connection));
                 }
-                
+
                 populateSystemInformation(connection);
                 getMemoryDetails(connection, systemMemory);
 
                 if (gCurrentServer == "")
                     configureRequestedHost(VoltDBCore.hostIP);
                 onInformationLoaded();
-                
+
             });
         };
 
 
-        this.GetProceduresInfoNAdminConfiguration = function (onProceduresDataLoaded, adminConfiguration, onAdminConfigLoaded) {
+        this.GetProceduresInfoNAdminConfiguration = function (onProceduresDataLoaded, onAdminConfigLoaded) {
             var procedureMetadata = "";
 
             VoltDBService.GetSystemInformationDeployment(function (connection) {
-                
-                if (adminConfiguration != null && adminConfiguration.options.isAdmin) {
+
+                if (VoltDbAdminConfig.isAdmin) {
                     onAdminConfigLoaded(getAdminConfigurationItems(connection));
                 }
 
@@ -1645,71 +1645,142 @@ function alertNodeClicked(obj) {
             sysTransaction["currentTimerTick"] = currentTimerTick;
 
         };
-        
+
         //admin Configuration
-        var getAdminConfigurationItems = function(connection) {
+        var getAdminConfigurationItems = function (connection) {
             var adminConfigValues = [];
 
             if (connection != null && connection.Metadata['@SystemInformation_DEPLOYMENT'] != null) {
-                connection.Metadata['@SystemInformation_DEPLOYMENT'].data.forEach(function(columnInfo) {
+                connection.Metadata['@SystemInformation_DEPLOYMENT'].data.forEach(function (columnInfo) {
                     switch (columnInfo[0]) {
-                    case 'sitesperhost':
-                        adminConfigValues['sitesperhost'] = columnInfo[1];
-                        break;
-                    case 'kfactor':
-                        adminConfigValues['kSafety'] = columnInfo[1];
-                        break;
-                    case 'partitiondetection':
-                        adminConfigValues['partitionDetection'] = columnInfo[1];
-                        break;
-                    case 'httpenabled':
-                        adminConfigValues['httpEnabled'] = columnInfo[1];
-                        break;
-                    case 'jsonenabled':
-                        adminConfigValues['jsonEnabled'] = columnInfo[1];
-                        break;
-                    case 'snapshotenabled':
-                        adminConfigValues['snapshotEnabled'] = columnInfo[1];
-                        break;
-                    case 'commandlogenabled':
-                        adminConfigValues['commandLogEnabled'] = columnInfo[1];
-                        break;
-                    case 'commandlogfreqtime':
-                        adminConfigValues['commandlogfreqtime'] = columnInfo[1];
-                        break;
-                    case 'commandlogfreqtxns':
-                        adminConfigValues['commandLogFrequencyTransactions'] = columnInfo[1];
-                        break;
-                    case 'heartbeattimeout':
-                        adminConfigValues['heartBeatTimeout'] = columnInfo[1];
-                        break;
-                    case 'temptablesmaxsize':
-                        adminConfigValues['tempTablesMaxSize'] = columnInfo[1];
-                        break;
-                    case 'snapshotpriority':
-                        adminConfigValues['snapshotPriority'] = columnInfo[1];
-                        break;                                
-                    //Directory Values
-                    case 'voltdbroot':
-                        adminConfigValues['voltdbRoot'] = columnInfo[1];
-                        break;
-                    case 'snapshotpath':
-                        adminConfigValues['snapshotPath'] = columnInfo[1];
-                        break;
-                    case 'commandlogpath':
-                        adminConfigValues['commandLogPath'] = columnInfo[1];
-                        break;
-                    case 'commandlogsnapshotpath':
-                        adminConfigValues['commandLogSnapshotPath'] = columnInfo[1];
-                        break;
-                    //Port Items
-                    case 'adminport':
-                        adminConfigValues['adminPort'] = columnInfo[1];
-                        break;
-                    case 'httpport':
-                        adminConfigValues['httpPort'] = columnInfo[1];
-                        break;                                
-                    default:
+                        case 'sitesperhost':
+                            adminConfigValues['sitesperhost'] = columnInfo[1];
+                            break;
+
+                        case 'kfactor':
+                            adminConfigValues['kSafety'] = columnInfo[1];
+                            break;
+
+                        case 'partitiondetection':
+                            adminConfigValues['partitionDetection'] = columnInfo[1];
+                            break;
+
+                        case 'securityEnabled':
+                            adminConfigValues['securityEnabled'] = columnInfo[1];
+                            break;
+
+                        case 'httpenabled':
+                            adminConfigValues['httpEnabled'] = columnInfo[1];
+                            break;
+
+                        case 'jsonenabled':
+                            adminConfigValues['jsonEnabled'] = columnInfo[1];
+                            break;
+
+                        case 'snapshotenabled':
+                            adminConfigValues['snapshotEnabled'] = columnInfo[1];
+                            break;
+
+                        case 'frequency':
+                            adminConfigValues['frequency'] = columnInfo[1];
+                            break;
+
+                        case 'retained':
+                            adminConfigValues['retained'] = columnInfo[1];
+                            break;
+
+                        case 'commandlogenabled':
+                            adminConfigValues['commandLogEnabled'] = columnInfo[1];
+                            break;
+
+                        case 'commandlogfreqtime':
+                            adminConfigValues['commandLogFrequencyTime'] = columnInfo[1];
+                            break;
+
+                        case 'commandlogfreqtxns':
+                            adminConfigValues['commandLogFrequencyTransactions'] = columnInfo[1];
+                            break;
+
+                        case 'logsegmentsize':
+                            adminConfigValues['logSegmentSize'] = columnInfo[1];
+                            break;
+
+                        case 'export':
+                            adminConfigValues['export'] = columnInfo[1];
+                            break;
+
+                        case 'target':
+                            adminConfigValues['targets'] = columnInfo[1];
+                            break;
+
+                        case "properties":
+                            adminConfigValues['properties'] = columnInfo[1];
+                            break;
+
+                        case 'maxjavaheap':
+                            adminConfigValues['maxJavaHeap'] = columnInfo[1];
+                            break;
+
+                        case 'heartbeattimeout':
+                            adminConfigValues['heartBeatTimeout'] = columnInfo[1];
+                            break;
+
+                        case 'querytimeout':
+                            adminConfigValues['queryTimeout'] = columnInfo[1];
+                            break;
+
+                        case 'temptablesmaxsize':
+                            adminConfigValues['tempTablesMaxSize'] = columnInfo[1];
+                            break;
+
+                        case 'snapshotpriority':
+                            adminConfigValues['snapshotPriority'] = columnInfo[1];
+                            break;
+
+                            //Directory Values
+                        case 'voltdbroot':
+                            adminConfigValues['voltdbRoot'] = columnInfo[1];
+                            break;
+                            
+                        case 'snapshotpath':
+                            adminConfigValues['snapshotPath'] = columnInfo[1];
+                            break;
+                            
+                        case 'exportoverflow':
+                            adminConfigValues['exportOverflow'] = columnInfo[1];
+                            break;
+                            
+                        case 'commandlogpath':
+                            adminConfigValues['commandLogPath'] = columnInfo[1];
+                            break;
+                            
+                        case 'commandlogsnapshotpath':
+                            adminConfigValues['commandLogSnapshotPath'] = columnInfo[1];
+                            break;
+
+                            //Port values
+                        case 'adminport':
+                            adminConfigValues['adminPort'] = columnInfo[1];
+                            break;
+                            
+                        case 'httpport':
+                            adminConfigValues['httpPort'] = columnInfo[1];
+                            break;
+
+                        case 'internalport':
+                            adminConfigValues['internalPort'] = columnInfo[1];
+                            break;
+
+                        case 'zookeeperport':
+                            adminConfigValues['zookeeperPort'] = columnInfo[1];
+                            break;
+
+                        case 'replicationport':
+                            adminConfigValues['replicationPort'] = columnInfo[1];
+                            break;
+
+
+                        default:
                     }
                 });
             }
@@ -1717,12 +1788,12 @@ function alertNodeClicked(obj) {
 
         };
 
-        var getClientPort = function(connection) {
+        var getClientPort = function (connection) {
             var portConfigValues = [];
 
 
             if (connection != null && connection.Metadata['@SystemInformation_OVERVIEW'] != null) {
-                connection.Metadata['@SystemInformation_OVERVIEW'].data.forEach(function(columnInfo) {
+                connection.Metadata['@SystemInformation_OVERVIEW'].data.forEach(function (columnInfo) {
                     if (columnInfo[1] == 'CLIENTPORT') {
                         portConfigValues['clientPort'] = columnInfo[2];
                     }
@@ -1732,8 +1803,8 @@ function alertNodeClicked(obj) {
 
         };
 
-        this.editConfigurationItem = function (configGroup, configMember, configValue,onConfigurationUpdated) {
-            VoltDBService.editConfigurationItem(configGroup, configMember,configValue,function() {
+        this.editConfigurationItem = function (configGroup, configMember, configValue, onConfigurationUpdated) {
+            VoltDBService.editConfigurationItem(configGroup, configMember, configValue, function () {
                 onConfigurationUpdated();
             });
         };
