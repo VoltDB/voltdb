@@ -48,6 +48,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Deployment;
 import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.SnapshotSchedule;
+import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.User;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.utils.MiscUtils;
@@ -520,6 +521,15 @@ public class SystemInformation extends VoltSystemProcedure
             users += ";";
         }
         results.addRow("users", users);
+
+        // Add system setting information also
+        // the attribute names follows the above naming rule
+        Systemsettings sysSettings = deploy.getSystemsettings().get("systemsettings");
+        results.addRow("elasticduration", Integer.toString(sysSettings.getElasticduration()));
+        results.addRow("elasticthroughput", Integer.toString(sysSettings.getElasticthroughput()));
+        results.addRow("snapshotpriority", Integer.toString(sysSettings.getSnapshotpriority()));
+        results.addRow("temptablesmaxsize", Integer.toString(sysSettings.getTemptablemaxsize()));
+        results.addRow("querytimeout", Integer.toString(sysSettings.getQuerytimeout()));
 
         return results;
     }

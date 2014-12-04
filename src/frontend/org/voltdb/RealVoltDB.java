@@ -87,7 +87,9 @@ import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Deployment;
 import org.voltdb.catalog.SnapshotSchedule;
+import org.voltdb.catalog.Systemsettings;
 import org.voltdb.compiler.AdHocCompilerCache;
 import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.ClusterConfig;
@@ -170,9 +172,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    static final String m_defaultVersionString = "4.9";
+    static final String m_defaultVersionString = "5.0";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q4.9\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q5.0\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -995,6 +997,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         hostLog.info("URL of deployment info: " + m_config.m_pathToDeployment);
                         hostLog.info("Cluster uptime: " + MiscUtils.formatUptime(getClusterUptime()));
                         logDebuggingInfo(m_config.m_adminPort, m_config.m_httpPort, m_httpPortExtraLogMessage, m_jsonEnabled);
+                        // log system setting information
+                        logSystemSettingFromCatalogContext();
+
                         long nextCheck = nextCheckField.getLong(dailyRollingFileAppender);
                         scheduleWork(new DailyLogTask(),
                                 nextCheck - System.currentTimeMillis() + 30 * 1000, 0, TimeUnit.MILLISECONDS);
@@ -1445,9 +1450,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             // log system setting information
             SystemSettingsType sysType = m_deployment.getSystemsettings();
-            if (sysType != null && sysType.getQuery() != null) {
-                if (sysType.getQuery().getTimeout() > 0) {
-                    hostLog.info("Host query timeout set to " + sysType.getQuery().getTimeout() + " milliseconds");
+            if (sysType != null) {
+                if (sysType.getElastic() != null) {
+                    hostLog.info("Elastic duration set to " + sysType.getElastic().getDuration() + " milliseconds");
+                    hostLog.info("Elastic throughput set to " + sysType.getElastic().getThroughput() + " mb/s");
+                }
+                if (sysType.getTemptables() != null) {
+                    hostLog.info("Max temptable size set to " + sysType.getTemptables().getMaxsize() + " mb");
+                }
+                if (sysType.getSnapshot() != null) {
+                    hostLog.info("Snapshot priority set to " + sysType.getSnapshot().getPriority() + " [0 - 10]");
+                }
+                if (sysType.getQuery() != null && sysType.getQuery().getTimeout() > 0) {
+                    hostLog.info("Query timeout set to " + sysType.getQuery().getTimeout() + " milliseconds");
                 }
             }
 
@@ -1839,6 +1854,27 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         consoleLog.info(String.format("Build: %s %s %s", m_versionString, m_buildString, editionTag));
     }
 
+    void logSystemSettingFromCatalogContext() {
+        if (m_catalogContext == null) {
+            return;
+        }
+        Deployment deploy = m_catalogContext.cluster.getDeployment().get("deployment");
+        Systemsettings sysSettings = deploy.getSystemsettings().get("systemsettings");
+
+        if (sysSettings == null) {
+            return;
+        }
+
+        hostLog.info("Elastic duration set to " + sysSettings.getElasticduration() + " milliseconds");
+        hostLog.info("Elastic throughput set to " + sysSettings.getElasticthroughput() + " mb/s");
+        hostLog.info("Max temptable size set to " + sysSettings.getTemptablemaxsize() + " mb");
+        hostLog.info("Snapshot priority set to " + sysSettings.getSnapshotpriority() + " [0 - 10]");
+
+        if (sysSettings.getQuerytimeout() > 0) {
+            hostLog.info("Query timeout set to " + sysSettings.getQuerytimeout() + " milliseconds");
+        }
+    }
+
     /**
      * Start all the site's event loops. That's it.
      */
@@ -2164,6 +2200,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             new ConfigLogging().logCatalogAndDeployment();
 
+            // log system setting information
+            logSystemSettingFromCatalogContext();
+
             return Pair.of(m_catalogContext, csp);
         }
     }
@@ -2313,6 +2352,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 // Start listening on the DR ports
                 prepareReplication();
             }
+        }
+
+        try {
+            if (m_adminListener != null) {
+                m_adminListener.start();
+            }
+        } catch (Exception e) {
+            hostLog.l7dlog(Level.FATAL, LogKeys.host_VoltDB_ErrorStartHTTPListener.name(), e);
+            VoltDB.crashLocalVoltDB("HTTP service unable to bind to port.", true, e);
         }
 
         if (m_config.m_startAction == StartAction.REJOIN) {
@@ -2476,6 +2524,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             // Start listening on the DR ports
             prepareReplication();
+        }
+
+        try {
+            if (m_adminListener != null) {
+                m_adminListener.start();
+            }
+        } catch (Exception e) {
+            hostLog.l7dlog(Level.FATAL, LogKeys.host_VoltDB_ErrorStartHTTPListener.name(), e);
+            VoltDB.crashLocalVoltDB("HTTP service unable to bind to port.", true, e);
         }
 
         if (m_startMode != null) {

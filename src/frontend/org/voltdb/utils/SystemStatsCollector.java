@@ -381,29 +381,6 @@ public class SystemStatsCollector {
     }
 
     /**
-     * Get a CSV string of all the values in the history,
-     * filtering for uniqueness.
-     * @return A string containing CSV memory values.
-     */
-    public static synchronized String getCSV() {
-        // build a unique set
-        HashMap<Long, Datum> all =  new HashMap<Long, Datum>();
-        for (Datum d : historyS)
-            all.put(d.timestamp, d);
-        for (Datum d : historyM)
-            all.put(d.timestamp, d);
-        for (Datum d : historyL)
-            all.put(d.timestamp, d);
-
-        // print the csv out
-        StringBuilder sb = new StringBuilder();
-        for (Datum d : all.values())
-            sb.append(d.toLine()).append("\n");
-
-        return sb.toString();
-    }
-
-    /**
      * Get a URL that uses the Google Charts API to show a chart of memory usage history.
      *
      * @param minutes The number of minutes the chart should cover. Tested values are 2, 30 and 1440.

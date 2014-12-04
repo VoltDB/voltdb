@@ -32,6 +32,8 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.TimeZone;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.After;
 import org.junit.AfterClass;
@@ -535,8 +537,11 @@ public class TestCSVLoader {
                 "2,2,2,2,a word,1.10,1.11,7777-12-25 14:35:26",
                 "3,3,3,3,a word,1.10,1.11,7777-12-25 14:35:26",
                 "\"4\",\"1\",\"1\",\"1\",\"a word\",\"1.10\",\"1.11\",\"7777-12-25 14:35:26\"",
+                "5,\"5\",\"5\",\"5\",,,,",
+                "\"5\",5,\"5\",\"5\",,,,",
+                "\"5\",\"5\",,,,,,",
         };
-        int invalidLineCnt = 2;
+        int invalidLineCnt = 4;
         int validLineCnt = myData.length - invalidLineCnt;
         test_Interface(myOptions, myData, invalidLineCnt, validLineCnt );
     }
@@ -767,6 +772,34 @@ public class TestCSVLoader {
             }
         }
 
+    }
+
+    @Test
+    public void testTimeZone() throws Exception {
+        String []myOptions = {
+                "-f" + path_csv,
+                "--reportdir=" + reportDir,
+                "--timezone=PST",
+                "BlAh"
+        };
+        String currentTime= "2007-09-23 10:10:10.0";
+        String[] myData = {
+            "1 ,1,1,11111111,first,1.10,1.11," + currentTime,
+        };
+        int invalidLineCnt = 0;
+        int validLineCnt =  1;
+        TimeZone timezone = TimeZone.getDefault();
+        test_Interface(myOptions, myData, invalidLineCnt, validLineCnt);
+        //Resetting the JVM TimeZone
+        TimeZone.setDefault(timezone);
+
+        VoltTable ts_table = client.callProcedure("@AdHoc", "SELECT * FROM BLAH;").getResults()[0];
+        ts_table.advanceRow();
+        long tableTimeCol = ts_table.getTimestampAsLong(7);
+        // 2007-09-23 10:10:10.0 converted to long is 1190542210000000
+        long time = 1190542210000000L;
+        long diff = tableTimeCol - time;
+        assertEquals(TimeUnit.MICROSECONDS.toHours(diff), 7);
     }
 
     public void test_Interface(String[] my_options, String[] my_data, int invalidLineCnt,

@@ -159,6 +159,11 @@ public class CommandLine extends VoltDB.Configuration
         return this;
     }
 
+    public CommandLine httpPort(int httpPort) {
+        m_httpPort = httpPort;
+        return this;
+    }
+
     public CommandLine startCommand(String command)
     {
         StartAction action = StartAction.monickerFor(command);
@@ -549,7 +554,9 @@ public class CommandLine extends VoltDB.Configuration
         cmdline.add(m_startAction.verb());
 
         cmdline.add("host"); cmdline.add(m_leader);
-        cmdline.add("catalog"); cmdline.add(jarFileName());
+        if (jarFileName() != null) {
+            cmdline.add("catalog"); cmdline.add(jarFileName());
+        }
         cmdline.add("deployment"); cmdline.add(pathToDeployment());
 
         // rejoin has no replication role
