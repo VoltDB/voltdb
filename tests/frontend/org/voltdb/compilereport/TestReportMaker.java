@@ -30,10 +30,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.UUID;
 
-import junit.extensions.TestSetup;
-import junit.framework.Test;
 import junit.framework.TestCase;
-import junit.framework.TestSuite;
 
 import org.voltdb.compiler.VoltCompiler;
 
@@ -56,7 +53,7 @@ public class TestReportMaker extends TestCase {
             ddlWriter = new PrintWriter(ddlName);
             ddlWriter.println(ddl);
             ddlWriter.close();
-            VoltCompiler vc = new VoltCompiler();
+            VoltCompiler vc = new VoltCompiler(true); // trick it into behaving like standalone
             boolean success = vc.compileFromDDL(jarName, ddlName);
             assertTrue("Catalog compilation failed!", success);
             report = new String(Files.readAllBytes(Paths.get("catalog-report.html")), Charsets.UTF_8);
