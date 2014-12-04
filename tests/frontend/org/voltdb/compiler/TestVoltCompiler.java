@@ -387,7 +387,7 @@ public class TestVoltCompiler extends TestCase {
                 VoltCompilerUtils.readFileFromJarfile("/tmp/snapshot_settings_test.jar", "catalog.txt");
             final Catalog cat = new Catalog();
             cat.execute(catalogContents);
-            CatalogUtil.compileDeployment(cat, builder.getPathToDeployment(), true, false);
+            CatalogUtil.compileDeployment(cat, builder.getPathToDeployment(), false);
             SnapshotSchedule schedule =
                 cat.getClusters().get("cluster").getDatabases().
                     get("database").getSnapshotschedule().get("default");
@@ -450,7 +450,7 @@ public class TestVoltCompiler extends TestCase {
                 VoltCompilerUtils.readFileFromJarfile("/tmp/exportsettingstest.jar", "catalog.txt");
             final Catalog cat = new Catalog();
             cat.execute(catalogContents);
-            CatalogUtil.compileDeployment(cat, project.getPathToDeployment(), true, false);
+            CatalogUtil.compileDeployment(cat, project.getPathToDeployment(), false);
             Connector connector = cat.getClusters().get("cluster").getDatabases().
                 get("database").getConnectors().get("0");
             assertTrue(connector.getEnabled());
@@ -2004,6 +2004,22 @@ public class TestVoltCompiler extends TestCase {
         schema = "create table t0 (id bigint not null, name varchar(32) not null);\n" +
                 "PARTITION TABLE t0 ON COLUMN id;\n" +
                 "ALTER TABLE t0 ADD UNIQUE(name);";
+        checkValidUniqueAndAssumeUnique(schema, msgP, null);
+
+        // ENG-7242, kinda
+        // (tests the assumeuniqueness constraint is preserved, obliquely, see
+        // TestAdhocAlterTable for more thorough tests)
+        schema = "create table t0 (id bigint not null, name varchar(32) not null, val integer);\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "ALTER TABLE t0 ADD UNIQUE(name);\n" +
+                "ALTER TABLE t0 DROP COLUMN val;\n";
+        checkValidUniqueAndAssumeUnique(schema, msgP, null);
+
+        // ENG-7304, that we can pass functions to constrant definitions in alter table
+        schema = "create table t0 (id bigint not null, val2 integer not null, val integer);\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "ALTER TABLE t0 ADD UNIQUE(abs(val2));\n" +
+                "ALTER TABLE t0 DROP COLUMN val;\n";
         checkValidUniqueAndAssumeUnique(schema, msgP, null);
     }
 
