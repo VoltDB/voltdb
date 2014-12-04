@@ -123,6 +123,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     // It will store the final projection node schema for this plan if it is needed.
     // Calculate once, and use it everywhere else.
     private NodeSchema m_projectSchema = null;
+    private NodeSchema m_distinctProjectSchema = null;
 
     // It may has the consistent element order as the displayColumns
     public ArrayList<ParsedColInfo> m_aggResultColumns = new ArrayList<ParsedColInfo>();
@@ -465,24 +466,30 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
 
         if (hasDistinctWithGroupBy() && m_distinctGroupByColumns != null) {
-            for (ParsedColInfo col: m_distinctGroupByColumns) {
-                AbstractExpression expr = col.expression.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
-                col.expression = expr;
-            }
+            assert(hasComplexAgg() || displayColumnsContainAllGroupByColumns());
+            // DISTINCT group by expressions are already TVEs when set
         }
 
         // place TVEs for ORDER BY
-        placeTVEsForOrderby();
+        if (hasAggregateOrGroupby() || hasDistinctWithGroupBy()) {
+            placeTVEsForOrderby();
+        }
     }
 
+    /**
+     * Restrictions: Order by columns must come from display column list, except for columns
+     * (1) Group by columns list,
+     * (2) in tables or joined tables without GROUP BY or DISTINCT clause.
+     *
+     * Display columns means exact columns/expressions in the select list or tag alias.
+     * Order by clause can be columns or expressions on the columns.
+     */
     private void placeTVEsForOrderby() {
         Map <AbstractExpression, Integer> displayIndexMap = new HashMap <AbstractExpression,Integer>();
         Map <Integer, ParsedColInfo> indexToColumnMap = new HashMap <Integer, ParsedColInfo>();
 
         int index = 0;
-
         for (ParsedColInfo col : m_displayColumns) {
-
             displayIndexMap.put(col.expression, index);
             assert(col.alias != null);
             indexToColumnMap.put(index, col);
@@ -758,20 +765,22 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             groupbyCol.tableAlias = "VOLT_TEMP_TABLE";
             groupbyCol.columnName = "";
             m_hasComplexGroupby = true;
+        }
 
-            ParsedColInfo orig_col = null;
-            for (int i = 0; i < m_displayColumns.size(); ++i) {
-                ParsedColInfo col = m_displayColumns.get(i);
-                if (col.expression.equals(groupbyCol.expression)) {
-                    groupbyCol.alias = col.alias;
-                    orig_col = col;
-                    break;
-                }
-            }
-            if (orig_col != null) {
-                orig_col.groupBy = true;
+        // find the matching columns in display list
+        ParsedColInfo orig_col = null;
+        for (int i = 0; i < m_displayColumns.size(); ++i) {
+            ParsedColInfo col = m_displayColumns.get(i);
+            if (col.expression.equals(groupbyCol.expression)) {
+                groupbyCol.alias = col.alias;
+                orig_col = col;
+                break;
             }
         }
+        if (orig_col != null) {
+            orig_col.groupBy = true;
+        }
+
         m_groupByColumns.add(groupbyCol);
     }
 
@@ -924,16 +933,23 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
         // DISTINCT with GROUP BY
         m_distinctGroupByColumns = new ArrayList<ParsedColInfo>();
-
+        m_distinctProjectSchema = new NodeSchema();
         // Iterate the Display columns
         for (ParsedColInfo col: m_displayColumns) {
+            TupleValueExpression tve = new TupleValueExpression(
+                    col.tableName, col.tableAlias, col.columnName, col.alias, col.index);
+
             ParsedColInfo pcol = new ParsedColInfo();
             pcol.tableName = col.tableName;
             pcol.tableAlias = col.tableAlias;
             pcol.columnName = col.columnName;
             pcol.alias = col.alias;
-            pcol.expression = (AbstractExpression) col.expression.clone();
+            pcol.expression = tve;
             m_distinctGroupByColumns.add(pcol);
+
+            SchemaColumn schema_col = new SchemaColumn(
+                    col.tableName, col.tableAlias, col.columnName, col.alias, tve);
+            m_distinctProjectSchema.addColumn(schema_col);
         }
 
         return groupbyElement;

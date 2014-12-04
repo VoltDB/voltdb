@@ -271,10 +271,9 @@ public class PlanAssembler {
                 m_parsedSelect.setHasPartitionColumnInGroupby();
             }
 
-            // FIXME: turn it on when we are able to push down DISTINCT
-//            if (isPartitionColumnInGroupbyList(m_parsedSelect.m_distinctGroupByColumns)) {
-//                m_parsedSelect.setHasPartitionColumnInDistinctGroupby();
-//            }
+            if (isPartitionColumnInGroupbyList(m_parsedSelect.m_distinctGroupByColumns)) {
+                m_parsedSelect.setHasPartitionColumnInDistinctGroupby();
+            }
 
             return;
         }
@@ -776,15 +775,14 @@ public class PlanAssembler {
             root = handleAggregationOperators(root);
         }
 
-        if (mvFixNeedsProjection || needProjectionNode(root)) {
-            root = addProjection(root);
-        }
-
         root = handleOrderBy(root);
 
-        if (m_parsedSelect.hasLimitOrOffset())
-        {
+        if (m_parsedSelect.hasLimitOrOffset()) {
             root = handleLimitOperator(root);
+        }
+
+        if (mvFixNeedsProjection || needProjectionNode(root)) {
+            root = addProjection(root);
         }
 
         CompiledPlan plan = new CompiledPlan();
@@ -805,14 +803,13 @@ public class PlanAssembler {
              root.getPlanNodeType() == PlanNodeType.PROJECTION) {
             return false;
         }
+        // If there is a complexGroupby at his point, it means that
+        // display columns contain all the order by columns and
+        // does not require another projection node on top of sort node.
 
-        // Assuming the restrictions: Order by columns are (1) columns from table
-        // (2) tag from display columns (3) actual expressions from display columns
-        // Currently, we do not allow order by complex expressions that are not in display columns
-
-        // If there is a complexGroupby at his point, it means that Display columns contain all the order by columns.
-        // In that way, this plan does not require another projection node on top of sort node.
-        if (m_parsedSelect.hasComplexGroupby()) {
+        // If there is a complex aggregation case, the projection plan node is already added
+        // right above the group by plan node. In future, we may inline that projection node.
+        if (m_parsedSelect.hasComplexGroupby() || m_parsedSelect.hasComplexAgg()) {
             return false;
         }
 
@@ -823,7 +820,6 @@ public class PlanAssembler {
             return false;
         }
 
-        // TODO: Maybe we can remove this projection node for more cases as optimization in the future.
         return true;
     }
 
@@ -1366,37 +1362,28 @@ public class PlanAssembler {
             }
         } else if (m_parsedSelect.hasDistinctWithGroupBy()) {
             // Currently we never pushdown LIMIT when there is a DISTINCT clause
-            topLimit.addAndLinkChild(root);
-            root = topLimit;
+            if (isInlineLimitPlanNodePossible(root)) {
+                root.addInlinePlanNode(topLimit);
+            } else {
+                topLimit.addAndLinkChild(root);
+                root = topLimit;
+            }
             return root;
         }
 
         // In future, inline LIMIT for join, Receive
         // Then we do not need to distinguish the order by node.
 
-        // Switch if has Complex aggregations
-        if (m_parsedSelect.hasComplexAgg()) {
-            AbstractPlanNode child = root.getChild(0);
-            if (isInlineLimitPlanNodePossible(child)) {
-                child.addInlinePlanNode(topLimit);
-            } else {
-                root.clearChildren();
-                child.clearParents();
-                topLimit.addAndLinkChild(child);
-                root.addAndLinkChild(topLimit);
-            }
+        if (isInlineLimitPlanNodePossible(root)) {
+            root.addInlinePlanNode(topLimit);
+        } else if (root instanceof ProjectionPlanNode &&
+                isInlineLimitPlanNodePossible(root.getChild(0)) ) {
+            // In future, inlined this projection node for OrderBy and Aggregate
+            // Then we could delete this ELSE IF block.
+            root.getChild(0).addInlinePlanNode(topLimit);
         } else {
-            if (isInlineLimitPlanNodePossible(root)) {
-                root.addInlinePlanNode(topLimit);
-            } else if (root instanceof ProjectionPlanNode &&
-                    isInlineLimitPlanNodePossible(root.getChild(0)) ) {
-                // In future, inlined this projection node for OrderBy and Aggregate
-                // Then we could delete this ELSE IF block.
-                root.getChild(0).addInlinePlanNode(topLimit);
-            } else {
-                topLimit.addAndLinkChild(root);
-                root = topLimit;
-            }
+            topLimit.addAndLinkChild(root);
+            root = topLimit;
         }
         return root;
     }
@@ -1408,7 +1395,7 @@ public class PlanAssembler {
      */
     static private boolean isInlineLimitPlanNodePossible(AbstractPlanNode pn) {
         if (pn instanceof OrderByPlanNode ||
-                pn.getPlanNodeType() == PlanNodeType.AGGREGATE)
+            pn.getPlanNodeType() == PlanNodeType.AGGREGATE)
         {
             return true;
         }
@@ -2132,7 +2119,7 @@ public class PlanAssembler {
         }
         assert(m_parsedSelect.isGrouped());
 
-        // DISTINCT is redundant with GROUP BY IFF all of the grouping columns are present in the display columns. Return early.
+        // DISTINCT is redundant with GROUP BY IFF all of the grouping columns are present in the display columns.
         if (m_parsedSelect.displayColumnsContainAllGroupByColumns()) {
             return root;
         }
@@ -2141,19 +2128,15 @@ public class PlanAssembler {
         assert(m_parsedSelect.hasComplexAgg());
         // project node is the root because of complex agg case
         assert(root instanceof ProjectionPlanNode && root.getChildCount() == 1);
-        // remove complex agg case to pass by the ProjectPlanNode
-
-        root = root.getChild(0);
-        root.clearParents();
 
         AggregatePlanNode distinctAggNode = new HashAggregatePlanNode();
         distinctAggNode.setOutputSchema(m_parsedSelect.getFinalProjectionSchema());
         for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.m_distinctGroupByColumns) {
             distinctAggNode.addGroupByExpression(col.expression);
         }
+        boolean pushedDown = false;
 
         boolean canPushdownDistinctAgg = m_parsedSelect.hasPartitionColumnInDistinctGroupby();
-        boolean pushedDown = false;
         //
         // disable pushdown, DISTINCT push down turns out complex
         //
