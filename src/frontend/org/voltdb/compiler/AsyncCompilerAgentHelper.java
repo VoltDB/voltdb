@@ -170,9 +170,10 @@ public class AsyncCompilerAgentHelper
                 }
             }
 
-            long result = CatalogUtil.compileDeploymentString(newCatalog, deploymentString, false, false);
-            if (result < 0) {
-                retval.errorMsg = "Unable to update deployment configuration; see the server logs for more details.";
+            String result =
+                CatalogUtil.compileDeploymentString(newCatalog, deploymentString, false);
+            if (result != null) {
+                retval.errorMsg = "Unable to update deployment configuration: " + result;
                 return retval;
             }
 

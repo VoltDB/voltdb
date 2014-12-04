@@ -430,73 +430,83 @@ public abstract class CatalogUtil {
         return true;
     }
 
-    public static long compileDeployment(Catalog catalog, String deploymentURL,
-            boolean crashOnFailedValidation, boolean isPlaceHolderCatalog) {
+    public static String compileDeployment(Catalog catalog, String deploymentURL,
+            boolean isPlaceHolderCatalog)
+    {
         DeploymentType deployment = CatalogUtil.parseDeployment(deploymentURL);
         if (deployment == null) {
-            return -1;
+            return "Error parsing deployment file: " + deploymentURL;
         }
-        return compileDeployment(catalog, deployment, crashOnFailedValidation, isPlaceHolderCatalog);
+        return compileDeployment(catalog, deployment, isPlaceHolderCatalog);
     }
 
-    public static long compileDeploymentString(Catalog catalog, String deploymentString,
-            boolean crashOnFailedValidation, boolean isPlaceHolderCatalog) {
+    public static String compileDeploymentString(Catalog catalog, String deploymentString,
+            boolean isPlaceHolderCatalog)
+    {
         DeploymentType deployment = CatalogUtil.parseDeploymentFromString(deploymentString);
         if (deployment == null) {
-            return -1;
+            return "Error parsing deployment string";
         }
-        return compileDeployment(catalog, deployment, crashOnFailedValidation, isPlaceHolderCatalog);
+        return compileDeployment(catalog, deployment, isPlaceHolderCatalog);
     }
 
     /**
      * Parse the deployment.xml file and add its data into the catalog.
      * @param catalog Catalog to be updated.
      * @param deployment Parsed representation of the deployment.xml file.
-     * @param crashOnFailedValidation
      * @param isPlaceHolderCatalog if the catalog is isPlaceHolderCatalog and we are verifying only deployment xml.
-     * @return CRC of the deployment contents (>0) or -1 on failure.
+     * @return String containing any errors parsing/validating the deployment. NULL on success.
      */
-    public static long compileDeployment(Catalog catalog,
+    public static String compileDeployment(Catalog catalog,
             DeploymentType deployment,
-            boolean crashOnFailedValidation,
             boolean isPlaceHolderCatalog)
     {
-        if (!validateDeployment(catalog, deployment)) {
-            return -1;
+        String errmsg = null;
+
+        try {
+            validateDeployment(catalog, deployment);
+
+            // add our hacky Deployment to the catalog
+            catalog.getClusters().get("cluster").getDeployment().add("deployment");
+
+            // set the cluster info
+            setClusterInfo(catalog, deployment);
+
+            //Set the snapshot schedule
+            setSnapshotInfo( catalog, deployment.getSnapshot());
+
+            //Set enable security
+            setSecurityEnabled(catalog, deployment.getSecurity());
+
+            //set path and path overrides
+            // NOTE: this must be called *AFTER* setClusterInfo and setSnapshotInfo
+            // because path locations for snapshots and partition detection don't
+            // exist in the catalog until after those portions of the deployment
+            // file are handled.
+            setPathsInfo(catalog, deployment.getPaths());
+
+            // set the users info
+            setUsersInfo(catalog, deployment.getUsers());
+
+            // set the HTTPD info
+            setHTTPDInfo(catalog, deployment.getHttpd());
+
+            if (!isPlaceHolderCatalog) {
+                setExportInfo(catalog, deployment.getExport());
+            }
+
+            setCommandLogInfo( catalog, deployment.getCommandlog());
+        }
+        catch (Exception e) {
+            // Anything that goes wrong anywhere in trying to handle the deployment file
+            // should return an error, and let the caller decide what to do (crash or not, for
+            // example)
+            errmsg = "Error validating deployment configuration: " + e.getMessage();
+            hostLog.error(errmsg);
+            return errmsg;
         }
 
-        // add our hacky Deployment to the catalog
-        catalog.getClusters().get("cluster").getDeployment().add("deployment");
-
-        // set the cluster info
-        setClusterInfo(catalog, deployment);
-
-        //Set the snapshot schedule
-        setSnapshotInfo( catalog, deployment.getSnapshot());
-
-        //Set enable security
-        setSecurityEnabled(catalog, deployment.getSecurity());
-
-        //set path and path overrides
-        // NOTE: this must be called *AFTER* setClusterInfo and setSnapshotInfo
-        // because path locations for snapshots and partition detection don't
-        // exist in the catalog until after those portions of the deployment
-        // file are handled.
-        setPathsInfo(catalog, deployment.getPaths(), crashOnFailedValidation);
-
-        // set the users info
-        setUsersInfo(catalog, deployment.getUsers());
-
-        // set the HTTPD info
-        setHTTPDInfo(catalog, deployment.getHttpd());
-
-        if (!isPlaceHolderCatalog) {
-            setExportInfo(catalog, deployment.getExport());
-        }
-
-        setCommandLogInfo( catalog, deployment.getCommandlog());
-
-        return 1;
+        return null;
     }
 
     /*
@@ -624,13 +634,13 @@ public abstract class CatalogUtil {
      * This is for validating VoltDB requirements, not XML schema correctness
      * @param catalog Catalog to be validated against.
      * @param deployment Reference to root <deployment> element of deployment file to be validated.
-     * @return Returns true if the deployment file is valid.
+     * @throw throws a RuntimeException if any validation fails
      */
-    private static boolean validateDeployment(Catalog catalog, DeploymentType deployment) {
+    private static void validateDeployment(Catalog catalog, DeploymentType deployment) {
         if (deployment.getSecurity() != null && deployment.getSecurity().isEnabled()) {
             if (deployment.getUsers() == null) {
-                hostLog.error("Cannot enable security without defining at least one user in the built-in ADMINISTRATOR role in the deployment file.");
-                return false;
+                String msg = "Cannot enable security without defining at least one user in the built-in ADMINISTRATOR role in the deployment file.";
+                throw new RuntimeException(msg);
             }
 
             boolean foundAdminUser = false;
@@ -647,11 +657,10 @@ public abstract class CatalogUtil {
             }
 
             if (!foundAdminUser) {
-                hostLog.error("Cannot enable security without defining at least one user in the built-in ADMINISTRATOR role in the deployment file.");
-                return false;
+                String msg = "Cannot enable security without defining at least one user in the built-in ADMINISTRATOR role in the deployment file.";
+                throw new RuntimeException(msg);
             }
         }
-        return true;
     }
 
     /**
@@ -669,7 +678,7 @@ public abstract class CatalogUtil {
         ClusterConfig config = new ClusterConfig(hostCount, sitesPerHost, kFactor);
 
         if (!config.validate()) {
-            hostLog.error(config.getErrorMsg());
+            throw new RuntimeException(config.getErrorMsg());
         } else {
             Cluster catCluster = catalog.getClusters().get("cluster");
             // copy the deployment info that is currently not recorded anywhere else
@@ -782,7 +791,7 @@ public abstract class CatalogUtil {
         syssettings.setQuerytimeout(queryTimeout);
     }
 
-    private static void validateDirectory(String type, File path, boolean crashOnFailedValidation) {
+    private static void validateDirectory(String type, File path) {
         String error = null;
         do {
             if (!path.exists()) {
@@ -802,11 +811,7 @@ public abstract class CatalogUtil {
             }
         } while(false);
         if (error != null) {
-            if (crashOnFailedValidation) {
-                VoltDB.crashLocalVoltDB(error, false, null);
-            } else {
-                hostLog.warn(error);
-            }
+            throw new RuntimeException(error);
         }
     }
 
@@ -1031,13 +1036,13 @@ public abstract class CatalogUtil {
      * @param paths A reference to the <paths> element of the deployment.xml file.
      * @param printLog Whether or not to print paths info.
      */
-    private static void setPathsInfo(Catalog catalog, PathsType paths, boolean crashOnFailedValidation) {
+    private static void setPathsInfo(Catalog catalog, PathsType paths) {
         File voltDbRoot;
         final Cluster cluster = catalog.getClusters().get("cluster");
         // Handles default voltdbroot (and completely missing "paths" element).
         voltDbRoot = getVoltDbRoot(paths);
 
-        validateDirectory("volt root", voltDbRoot, crashOnFailedValidation);
+        validateDirectory("volt root", voltDbRoot);
 
         PathEntry path_entry = null;
         if (paths != null)
@@ -1047,7 +1052,7 @@ public abstract class CatalogUtil {
         File snapshotPath =
             getFeaturePath(paths, path_entry, voltDbRoot,
                            "snapshot", "snapshots");
-        validateDirectory("snapshot path", snapshotPath, crashOnFailedValidation);
+        validateDirectory("snapshot path", snapshotPath);
 
         path_entry = null;
         if (paths != null)
@@ -1057,7 +1062,7 @@ public abstract class CatalogUtil {
         File exportOverflowPath =
             getFeaturePath(paths, path_entry, voltDbRoot, "export overflow",
                            "export_overflow");
-        validateDirectory("export overflow", exportOverflowPath, crashOnFailedValidation);
+        validateDirectory("export overflow", exportOverflowPath);
 
         // only use these directories in the enterprise version
         File commandLogPath = null;
@@ -1071,7 +1076,7 @@ public abstract class CatalogUtil {
         if (VoltDB.instance().getConfig().m_isEnterprise) {
             commandLogPath =
                     getFeaturePath(paths, path_entry, voltDbRoot, "command log", "command_log");
-            validateDirectory("command log", commandLogPath, crashOnFailedValidation);
+            validateDirectory("command log", commandLogPath);
         }
         else {
             // dumb defaults if you ask for logging in community version
@@ -1086,7 +1091,7 @@ public abstract class CatalogUtil {
         if (VoltDB.instance().getConfig().m_isEnterprise) {
             commandLogSnapshotPath =
                 getFeaturePath(paths, path_entry, voltDbRoot, "command log snapshot", "command_log_snapshot");
-            validateDirectory("command log snapshot", commandLogSnapshotPath, crashOnFailedValidation);
+            validateDirectory("command log snapshot", commandLogSnapshotPath);
         }
         else {
             // dumb defaults if you ask for logging in community version
