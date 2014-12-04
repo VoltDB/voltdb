@@ -804,8 +804,8 @@ ul.adminClusterList li a:hover{color:#000;}
 .adminM { float:left;background:#dfdfdf; padding:8px; font-weight:bold;}
 .adminD {float:left;background:#c70000; color:#FFFFFF; padding:8px; font-weight:bold;}  
 .adminE {float:left;background:#76bd1d; color:#FFFFFF; padding:8px; font-weight:bold;}  
-.adminServer { float:left; cursor:pointer;}
-.serverName { float:left; background:#D0D2D2/*#c70000*/; padding:8px; font-weight:bold; /*color:#FFFFFF;*/ } 
+.adminServer { float:left; }
+.serverName {cursor:pointer; float:left; background:#D0D2D2/*#c70000*/; padding:8px; font-weight:bold; /*color:#FFFFFF;*/ } 
 .setServer {float:left;}
 .adminIcons { background-position:-225px -13px; width:30px; height:28px; }
 .adminContainer { margin:0; padding:20px 20px; background:#FFFFFF;}
