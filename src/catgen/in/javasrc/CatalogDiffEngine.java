@@ -288,6 +288,19 @@ public class CatalogDiffEngine {
     }
 
     /**
+     * @return true if the parameter is an instance of Statement owned
+     * by a table node.  This indicates that the Statement is the
+     * DELETE statement in a
+     *   LIMIT PARTITION ROWS <n> EXECUTE (DELETE ...)
+     * constraint.
+     */
+    static private boolean isTableLimitDeleteStmt(final CatalogType catType) {
+        if (catType instanceof Statement && catType.getParent() instanceof Table)
+            return true;
+        return false;
+    }
+
+    /**
      * @return null if the CatalogType can be dynamically added or removed
      * from a running system. Return an error string if it can't be changed on
      * a non-empty table. There will be a subsequent check for empty table
@@ -389,8 +402,7 @@ public class CatalogDiffEngine {
             return null;
         }
 
-        else if (suspect instanceof Statement && suspect.getParent() instanceof Table) {
-            // LIMIT PARTITION ROWS <n> EXECUTE (DELETE ...)
+        else if (isTableLimitDeleteStmt(suspect)) {
             return null;
         }
 
@@ -670,8 +682,7 @@ public class CatalogDiffEngine {
             }
         }
 
-        else if (suspect instanceof Statement && suspect.getParent() instanceof Table) {
-            // LIMIT PARTITION ROWS <n> EXECUTE (DELETE ...)
+        else if (isTableLimitDeleteStmt(suspect)) {
             return null;
         }
 
@@ -701,6 +712,10 @@ public class CatalogDiffEngine {
                                        restrictionQualifier +
                                        " rescued by context '" + parent + "'");
                 }
+                return null;
+            }
+
+            if (isTableLimitDeleteStmt(parent)) {
                 return null;
             }
         }

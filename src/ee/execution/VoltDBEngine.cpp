@@ -1373,6 +1373,11 @@ void VoltDBEngine::initMaterializedViewsAndLimitDeletePlans() {
                 srcPTable->swapPurgeExecutorVector(ExecutorVector::fromJsonPlan(this,
                                                                                 jsonPlan,
                                                                                 -1));
+            } else {
+                // get rid of the purge fragment from the persistent
+                // table if it has been removed from the catalog
+                boost::shared_ptr<ExecutorVector> nullPtr;
+                srcPTable->swapPurgeExecutorVector(nullPtr);
             }
         }
     }

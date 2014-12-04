@@ -2411,6 +2411,9 @@ public class TestVoltCompiler extends TestCase {
                 + ");\n"
                 + "alter table t add limit partition rows 10;";
         compileLimitDeleteStmtAndCheckCatalog(ddl, null, "t", 10, null);
+
+        // See also regression testing that ensures EE picks up catalog changes
+        // in TestSQLFeaturesNewSuite
     }
 
     public void testPartitionOnBadType() {

@@ -31,6 +31,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.BatchedMultiPartitionTest;
@@ -358,8 +359,8 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
             return;
 
         // CREATE TABLE capped3_limit_exec_complex (
-        //   wage INTEGER NOT NULL PRIMARY KEY,
-        //   dept INTEGER NOT NULL,
+        //   wage INTEGER NOT NULL,
+        //   dept INTEGER NOT NULL PRIMARY KEY,
         //   may_be_purged TINYINT DEFAULT 0 NOT NULL,
         //   relevance VARCHAR(255),
         //   priority SMALLINT,
@@ -426,6 +427,79 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         }
     }
 
+    public void testAlterTableLimitPartitionRows() throws IOException, ProcCallException {
+        if (isHSQL())
+            return;
+
+        Client client = getClient();
+
+        VoltTable vt;
+
+        // Load the table
+        vt = client.callProcedure("CAPPED3_LIMIT_EXEC_COMPLEX.insert", 37, 1, 0, "important", 17000).getResults()[0];
+        assertTablesAreEqual("Insert 1 ", new Object[][] {{1}}, vt);
+        vt = client.callProcedure("CAPPED3_LIMIT_EXEC_COMPLEX.insert", 37, 2, 0, "important", 17000).getResults()[0];
+        assertTablesAreEqual("Insert 2 ", new Object[][] {{1}}, vt);
+        vt = client.callProcedure("CAPPED3_LIMIT_EXEC_COMPLEX.insert", 37, 3, 0, "important", 17000).getResults()[0];
+        assertTablesAreEqual("Insert 3 ", new Object[][] {{1}}, vt);
+
+        // no rows match purge criteria
+        verifyProcFails(client,
+                "exceeds table maximum row count 3",
+                "CAPPED3_LIMIT_EXEC_COMPLEX.insert", 37, 4, 0, "important", 17000);
+
+        ClientResponse cr = client.callProcedure("@AdHoc",
+                "ALTER TABLE CAPPED3_LIMIT_EXEC_COMPLEX "
+                + "ADD LIMIT PARTITION ROWS 3 "
+                + "EXECUTE (DELETE FROM CAPPED3_LIMIT_EXEC_COMPLEX WHERE WAGE = 37)");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        // Now the insert should succeed because rows are purge-able.
+        vt = client.callProcedure("CAPPED3_LIMIT_EXEC_COMPLEX.insert", 37, 4, 0, "important", 17000).getResults()[0];
+        assertTablesAreEqual("Insert 4 ", new Object[][] {{1}}, vt);
+        vt = client.callProcedure("CAPPED3_LIMIT_EXEC_COMPLEX.insert", 37, 5, 0, "important", 17000).getResults()[0];
+        assertTablesAreEqual("Insert 5 ", new Object[][] {{1}}, vt);
+        vt = client.callProcedure("CAPPED3_LIMIT_EXEC_COMPLEX.insert", 37, 6, 0, "important", 17000).getResults()[0];
+        assertTablesAreEqual("Insert 6 ", new Object[][] {{1}}, vt);
+
+        // alter the constraint by removing the delete statement
+        cr = client.callProcedure("@AdHoc",
+                "ALTER TABLE CAPPED3_LIMIT_EXEC_COMPLEX "
+                + "ADD LIMIT PARTITION ROWS 3");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        vt = client.callProcedure("@AdHoc", "select count(*) from capped3_limit_exec_complex").getResults()[0];
+        assertTablesAreEqual("count check ", new Object[][] {{3}}, vt);
+
+        verifyProcFails(client,
+                "exceeds table maximum row count 3",
+                "CAPPED3_LIMIT_EXEC_COMPLEX.insert", 37, 7, 0, "important", 17000);
+
+        // Now remove the constraint altogether
+        cr = client.callProcedure("@AdHoc",
+                "ALTER TABLE CAPPED3_LIMIT_EXEC_COMPLEX "
+                + "DROP LIMIT PARTITION ROWS");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        // no more constraint means insert can now succeed.
+        vt = client.callProcedure("CAPPED3_LIMIT_EXEC_COMPLEX.insert", 37, 7, 0, "important", 17000).getResults()[0];
+        assertTablesAreEqual("Insert 7 ", new Object[][] {{1}}, vt);
+
+        // Verify that we can add the constraint back again
+        cr = client.callProcedure("@AdHoc",
+                "ALTER TABLE CAPPED3_LIMIT_EXEC_COMPLEX "
+                + "ADD LIMIT PARTITION ROWS 3 "
+                + "EXECUTE (DELETE FROM CAPPED3_LIMIT_EXEC_COMPLEX WHERE DEPT IN (4, 7))");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        vt = client.callProcedure("CAPPED3_LIMIT_EXEC_COMPLEX.insert", 37, 8, 0, "important", 17000).getResults()[0];
+        assertTablesAreEqual("Insert 8 ", new Object[][] {{1}}, vt);
+
+        // my fancy assertTablesAreEqual doesn't work for the below query.  Why?
+        vt = client.callProcedure("@AdHoc", "select dept from capped3_limit_exec_complex order by dept asc").getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {5, 6, 8});
+    }
+
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
@@ -444,6 +518,7 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(BatchedMultiPartitionTest.class.getResource("sqlfeatures-new-ddl.sql"));
         project.addProcedures(PROCEDURES);
+        project.setUseDDLSchema(true);
 
         boolean success;
 
