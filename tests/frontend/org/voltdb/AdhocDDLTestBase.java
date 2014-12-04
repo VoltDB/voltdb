@@ -250,4 +250,14 @@ public class AdhocDDLTestBase extends TestCase {
         }
         return null;
     }
+
+    protected VoltTable getStatWaitOnRowCount(String selector, int expected) throws Exception
+    {
+        // Stats are polled out of EE, so we have to poll and wait for a change
+        VoltTable stats = null;
+        do {
+            stats = m_client.callProcedure("@Statistics", selector, 0).getResults()[0];
+        } while (stats.getRowCount() != expected);
+        return stats;
+    }
 }
