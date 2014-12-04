@@ -1452,10 +1452,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 }
             }
 
-            long result = CatalogUtil.compileDeployment(catalog, m_deployment, true, true);
-            if (result < 0) {
-                hostLog.fatal("Error validating deployment file");
-                VoltDB.crashLocalVoltDB("Error validating deployment file");
+            String result = CatalogUtil.compileDeployment(catalog, m_deployment, true);
+            if (result != null) {
+                hostLog.fatal(result);
+                VoltDB.crashLocalVoltDB(result);
             }
             byte[] deploymentHash = CatalogUtil.makeCatalogOrDeploymentHash(deploymentBytes);
 
