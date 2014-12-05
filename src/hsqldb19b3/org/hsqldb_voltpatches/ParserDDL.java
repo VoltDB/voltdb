@@ -3571,11 +3571,25 @@ public class ParserDDL extends ParserRoutine {
                     SchemaObject.CONSTRAINT);
         }
 
-        int[]    cols = this.readColumnList(table, false);
+        // A VoltDB extension to support indexed expressions.
+        java.util.List<Expression> indexExprs = XreadExpressions(null);
+        OrderedHashSet set = getSimpleColumnNames(indexExprs);
+        int[] cols = getColumnList(set, table);
+        if ((indexExprs != null) && (cols == null)) {
+            // Not just indexing columns.
+            // The meaning of cols shifts here to be
+            // the set of unique base columns for the indexed expressions.
+            set = getBaseColumnNames(indexExprs);
+            cols = getColumnList(set, table);
+        }
+        /* disable 1 line ...
+        int[] cols = this.readColumnList(table, false);
+        ... disabled 1 line */
+        // End of VoltDB extension
         String   sql  = getLastPart();
-        // A VoltDB extension to support the assume unique attribute
+        // A VoltDB extension to support the assume unique attribute and indexed expressions
         Object[] args = new Object[] {
-            cols, name,
+            cols, name, indexExprs,
             Boolean.valueOf(assumeUnique)
         };
         /* disable 3 lines ...

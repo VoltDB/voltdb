@@ -172,9 +172,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    static final String m_defaultVersionString = "4.9";
+    static final String m_defaultVersionString = "5.0";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q4.9\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q5.0\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -1452,10 +1452,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 }
             }
 
-            long result = CatalogUtil.compileDeployment(catalog, m_deployment, true, true);
-            if (result < 0) {
-                hostLog.fatal("Error validating deployment file");
-                VoltDB.crashLocalVoltDB("Error validating deployment file");
+            String result = CatalogUtil.compileDeployment(catalog, m_deployment, true);
+            if (result != null) {
+                hostLog.fatal(result);
+                VoltDB.crashLocalVoltDB(result);
             }
             byte[] deploymentHash = CatalogUtil.makeCatalogOrDeploymentHash(deploymentBytes);
 
