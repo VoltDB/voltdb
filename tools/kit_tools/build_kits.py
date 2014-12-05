@@ -182,7 +182,7 @@ try:
         print "Found dist.version in VOLTDB_BUILD_ARGS. Setting version to " + distVersion
 except:
     build_args=""
-    distVersion = None
+    distVersion = ""
 
 print "Building with pro: %s and voltdb: %s" % (proTreeish, voltdbTreeish)
 
