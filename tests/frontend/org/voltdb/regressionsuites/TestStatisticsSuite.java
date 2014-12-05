@@ -57,6 +57,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
     private final static int KFACTOR = MiscUtils.isPro() ? 1 : 0;
     private final static int PARTITIONS = (SITES * HOSTS) / (KFACTOR + 1);
     private final static boolean hasLocalServer = false;
+    private static StringBuilder m_recentAnalysis = null;
 
     private static final Class<?>[] PROCEDURES =
     {
@@ -68,69 +69,86 @@ public class TestStatisticsSuite extends SaveRestoreBase {
     }
 
     // For the provided table, verify that there is a row for each host in the cluster where
-    // the column designated by 'columnName' has the value 'rowId'.  For example, for
-    // Initiator stats, if columnName is 'PROCEDURE_NAME' and rowId is 'foo', this
+    // the column designated by 'columnName' has the value 'targetValue'.  For example, for
+    // Initiator stats, if columnName is 'PROCEDURE_NAME' and targetValue is 'foo', this
     // will verify that the initiator at each node has seen a procedure invocation for 'foo'
-    private void validateRowSeenAtAllHosts(VoltTable result, String columnName, String rowId,
+    private void validateRowSeenAtAllHosts(VoltTable result, String columnName, String targetValue,
             boolean enforceUnique)
     {
-        assertEquals(HOSTS, countHostsProvidingRows(result, columnName, rowId, enforceUnique));
+        int hostCount = countHostsProvidingRows(result, columnName, targetValue, enforceUnique);
+        assertEquals(claimRecentAnalysis(), HOSTS, hostCount);
     }
 
-    private int countHostsProvidingRows(VoltTable result, String columnName, String rowId,
+    private String claimRecentAnalysis() {
+        String result = "No root cause analysis is available for this failure.";
+        if (m_recentAnalysis != null) {
+            result = m_recentAnalysis.toString();
+            m_recentAnalysis = null;
+        }
+        return result;
+    }
+
+    private int countHostsProvidingRows(VoltTable result, String columnName, String targetValue,
             boolean enforceUnique)
     {
         result.resetRowPosition();
         Set<Long> hostsSeen = new HashSet<Long>();
         while (result.advanceRow()) {
-            String idFromRow = result.getString(columnName);
-            if (rowId.equalsIgnoreCase(idFromRow)) {
+            String colValFromRow = result.getString(columnName);
+            if (targetValue.equalsIgnoreCase(colValFromRow)) {
                 Long thisHostId = result.getLong("HOST_ID");
                 if (enforceUnique) {
-                    assertFalse("HOST_ID: " + thisHostId + " seen twice in table looking for " + rowId +
+                    assertFalse("HOST_ID: " + thisHostId + " seen twice in table looking for " + targetValue +
                             " in column " + columnName, hostsSeen.contains(thisHostId));
                 }
                 hostsSeen.add(thisHostId);
             }
         }
-        // Before failing the assert, report details of the non-conforming result.
+
+        //* Enable this to force a failure with diagnostics */ hostsSeen.add(123456789L);
+
+        // Before possibly failing an assert, prepare to report details of the non-conforming result.
+        m_recentAnalysis = null;
         if (HOSTS != hostsSeen.size()) {
-            System.out.println("Something in the following results may fail an assert expecting " +
-                    HOSTS + " and getting " + hostsSeen.size());
+            m_recentAnalysis = new StringBuilder();
+            m_recentAnalysis.append("Failure follows from these results:\n");
             Set<Long> seenAgain = new HashSet<Long>();
             result.resetRowPosition();
             while (result.advanceRow()) {
-                String idFromRow = result.getString(columnName);
+                String colValFromRow = result.getString(columnName);
                 Long thisHostId = result.getLong("HOST_ID");
-                if (rowId.equalsIgnoreCase(idFromRow)) {
-                    System.out.println("Found the match at host " + thisHostId + " for " + columnName + " " + idFromRow +
-                                       (seenAgain.add(thisHostId) ? " added" : " duplicated"));
-                    seenAgain.add(thisHostId);
-                } else {
-                    System.out.println("Found non-match at host " + thisHostId + " for " + columnName + " " + idFromRow);
+                String rowStatus = "Found a non-match";
+                if (targetValue.equalsIgnoreCase(colValFromRow)) {
+                    if (seenAgain.add(thisHostId)) {
+                        rowStatus = "Added a match";
+                    } else {
+                        rowStatus = "Duplicated a match";
+                    }
                 }
+                m_recentAnalysis.append(rowStatus +
+                        " at host " + thisHostId + " for " + columnName + " " + colValFromRow + "\n");
             }
         }
         return hostsSeen.size();
     }
 
     // For the provided table, verify that there is a row for each site in the cluster where
-    // the column designated by 'columnName' has the value 'rowId'.  For example, for
-    // Table stats, if columnName is 'TABLE_NAME' and rowId is 'foo', this
+    // the column designated by 'columnName' has the value 'targetValue'.  For example, for
+    // Table stats, if columnName is 'TABLE_NAME' and targetValue is 'foo', this
     // will verify that each site has returned results for table 'foo'
-    private boolean validateRowSeenAtAllSites(VoltTable result, String columnName, String rowId,
+    private boolean validateRowSeenAtAllSites(VoltTable result, String columnName, String targetValue,
             boolean enforceUnique)
     {
         result.resetRowPosition();
         Set<Long> sitesSeen = new HashSet<Long>();
         while (result.advanceRow()) {
-            String idFromRow = result.getString(columnName);
-            if (rowId.equalsIgnoreCase(idFromRow)) {
+            String colValFromRow = result.getString(columnName);
+            if (targetValue.equalsIgnoreCase(colValFromRow)) {
                 long hostId = result.getLong("HOST_ID");
                 long thisSiteId = result.getLong("SITE_ID");
                 thisSiteId |= hostId << 32;
                 if (enforceUnique) {
-                    assertFalse("SITE_ID: " + thisSiteId + " seen twice in table looking for " + rowId +
+                    assertFalse("SITE_ID: " + thisSiteId + " seen twice in table looking for " + targetValue +
                             " in column " + columnName, sitesSeen.contains(thisSiteId));
                 }
                 sitesSeen.add(thisSiteId);
@@ -140,18 +158,18 @@ public class TestStatisticsSuite extends SaveRestoreBase {
     }
 
     // For the provided table, verify that there is a row for each partition in the cluster where
-    // the column designated by 'columnName' has the value 'rowId'.
-    private void validateRowSeenAtAllPartitions(VoltTable result, String columnName, String rowId,
+    // the column designated by 'columnName' has the value 'targetValue'.
+    private void validateRowSeenAtAllPartitions(VoltTable result, String columnName, String targetValue,
             boolean enforceUnique)
     {
         result.resetRowPosition();
         Set<Long> partsSeen = new HashSet<Long>();
         while (result.advanceRow()) {
-            String idFromRow = result.getString(columnName);
-            if (rowId.equalsIgnoreCase(idFromRow)) {
+            String colValFromRow = result.getString(columnName);
+            if (targetValue.equalsIgnoreCase(colValFromRow)) {
                 long thisPartId = result.getLong("PARTITION_ID");
                 if (enforceUnique) {
-                    assertFalse("PARTITION_ID: " + thisPartId + " seen twice in table looking for " + rowId +
+                    assertFalse("PARTITION_ID: " + thisPartId + " seen twice in table looking for " + targetValue +
                             " in column " + columnName, partsSeen.contains(thisPartId));
                 }
                 partsSeen.add(thisPartId);
@@ -944,7 +962,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
             hostsHeardFrom =
                     countHostsProvidingRows(results[0], "HOSTNAME", results[0].getString("HOSTNAME"), true);
         } while ((hostsHeardFrom < HOSTS) && (--patientRetries) > 0);
-        assertEquals(HOSTS, hostsHeardFrom);
+        assertEquals(claimRecentAnalysis(), HOSTS, hostsHeardFrom);
     }
 
     public void testStarvationStatistics() throws Exception {
@@ -1176,7 +1194,10 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         project.addProcedures(PROCEDURES);
 
         /*
-         * Add a cluster configuration for sysprocs too
+         * Create a cluster configuration.
+         * Some of the sysproc results come back a little strange when applied to a cluster that is being
+         * simulated through LocalCluster -- all the hosts have the same HOSTNAME, just different host ids.
+         * So, these tests shouldn't rely on the usual uniqueness of host names in a cluster.
          */
         config = new LocalCluster("statistics-cluster.jar", TestStatisticsSuite.SITES,
                 TestStatisticsSuite.HOSTS, TestStatisticsSuite.KFACTOR,
