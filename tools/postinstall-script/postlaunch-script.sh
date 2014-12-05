@@ -1,12 +1,34 @@
 # !/usr/bin/env bash
- 
+
+# This file is part of VoltDB.
+# Copyright (C) 2008-2014 VoltDB Inc.
+#
+# Permission is hereby granted, free of charge, to any person obtaining
+# a copy of this software and associated documentation files (the
+# "Software"), to deal in the Software without restriction, including
+# without limitation the rights to use, copy, modify, merge, publish,
+# distribute, sublicense, and/or sell copies of the Software, and to
+# permit persons to whom the Software is furnished to do so, subject to
+# the following conditions:
+#
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+# OTHER DEALINGS IN THE SOFTWARE.
+
 # script used to collect data
 # ensure your PATH is configured to properly with voltdb
 # script assumes you are on a running node or exits
 
 # standard usage function
 function usage() {
-	echo "Usage: $0 [--user username] [--password password] [--port portnumber]  "
+	echo "Usage: $0 [--user username] [--password password] [--port portnumber]"
 	echo "Description: postlaunch checkup script"
 	echo "Command line parameters:"
 	echo "  --user 			login username"
@@ -26,7 +48,7 @@ function cleanup() {
 		rm $1
 	fi
 }
- 
+
 function checkvoltdbstatus() {
 	if (( $( jps | grep -c VoltDB ) > 0 )); then
 		echo "voltdb is running"
@@ -36,12 +58,12 @@ function checkvoltdbstatus() {
 		exit 1
 	fi
 }
- 
+
 function formatoutput() {
 # remove java warnings, remove blank lines
 	cat $1 | grep -v "Strict java memory checking is enabled" | sed '/^ *$/d' | sed 's/.*Returned.*//' >> $1-formatted
 }
- 
+
 function systeminfocheck() {
 	hostname >>postcheckup-systeminfo
 	uname -a >>postcheckup-systeminfo
@@ -67,7 +89,7 @@ function testsqlcmd() {
 
 function collectdata() {
 	sqlcmd $@ --query="exec @SystemInformation OVERVIEW;exec @SystemInformation DEPLOYMENT;" >>postcheckup-systeminfo
-	for i in {1..10}; do 
+	for i in {1..10}; do
 		( echo -n "interval $i, " & date & sqlcmd $@ --output-format=csv --query="exec @Statistics, TABLE 0;" ) >>postcheckup-table 2>/dev/null
 		( echo -n "interval $i, " & date & sqlcmd $@ --output-format=csv --query="exec @Statistics, MEMORY 0;" ) >>postcheckup-memory 2>/dev/null
 		( echo -n "interval $i, " & date & sqlcmd $@ --output-format=csv --query="exec @Statistics, PROCEDUREPROFILE 0;" ) >>postcheckup-procprofile 2>/dev/null
@@ -76,7 +98,7 @@ function collectdata() {
 		sleep 60
 	done
 }
- 
+
 #####program start
 USER=
 PASSWORD=
