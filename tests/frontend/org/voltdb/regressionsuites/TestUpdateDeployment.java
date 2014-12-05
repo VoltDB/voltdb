@@ -306,7 +306,7 @@ public class TestUpdateDeployment extends RegressionSuite {
         cb.waitForResponse();
         assertEquals(ClientResponse.GRACEFUL_FAILURE, cb.getResponse().getStatus());
         System.out.println(cb.getResponse().getStatusString());
-        assertTrue(cb.getResponse().getStatusString().contains("Unable to read"));
+        assertTrue(cb.getResponse().getStatusString().contains("Unable to update"));
     }
 
     private void deleteDirectory(File dir) {
@@ -428,7 +428,7 @@ public class TestUpdateDeployment extends RegressionSuite {
         project.addDefaultSchema();
         project.addDefaultPartitioning();
         project.addProcedures(BASEPROCS);
-        project.setSecurityEnabled(true);
+        project.setSecurityEnabled(true, false);
         // build the jarfile
         compile = config.compile(project);
         assertTrue(compile);

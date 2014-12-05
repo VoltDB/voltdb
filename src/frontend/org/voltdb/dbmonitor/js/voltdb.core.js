@@ -2,15 +2,16 @@
 
 (function (window, unused) {
 
-    var iVoltDbCore = (function () { 
+    var iVoltDbCore = (function () {
         this.connections = {};
         this.isServerConnected = true;
-        DbConnection = function(aServer, aPort, aAdmin, aUser, aPassword, aIsHashPassword,aProcess) {
+        this.hostIP = "";
+        DbConnection = function (aServer, aPort, aAdmin, aUser, aPassword, aIsHashPassword, aProcess) {
             this.server = aServer == null ? 'localhost' : $.trim(aServer);
             this.port = aPort == null ? '8080' : $.trim(aPort);
             this.admin = (aAdmin == true || aAdmin == "true");
             this.user = (aUser == '' || aUser == 'null') ? null : aUser;
-            this.password = (aPassword === '' || aPassword === 'null' ) ? null : (aIsHashPassword == false ? aPassword : null);
+            this.password = (aPassword === '' || aPassword === 'null') ? null : (aIsHashPassword == false ? aPassword : null);
             this.isHashedPassword = (aPassword === '' || aPassword === 'null') ? null : (aIsHashPassword == true ? aPassword : null);
             this.process = aProcess;
             this.key = (this.server + '_' + this.port + '_' + (this.user == '' ? '' : this.user) + '_' + (this.admin == true ? 'Admin' : '') + "_" + this.process).replace(/[^_a-zA-Z0-9]/g, "_");
@@ -18,12 +19,12 @@
             this.Metadata = {};
             this.ready = false;
             this.procedureCommands = {};
-            
-            this.getQueue = function() {
+
+            this.getQueue = function () {
                 return (new iQueue(this));
             };
 
-            this.BuildParamSet = function(procedure, parameters) {
+            this.BuildParamSet = function (procedure, parameters) {
                 var s = [];
                 if (!this.procedures.hasOwnProperty(procedure)) {
                     return ['Procedure "' + procedure + '" is undefined.'];
@@ -51,35 +52,35 @@
                             params += ',';
                         }
                         switch (signature[i]) {
-                        case 'tinyint':
-                        case 'smallint':
-                        case 'int':
-                        case 'integer':
-                        case 'bigint':
-                        case 'float':
-                            params += localParameters[i];
-                            break;
-                        case 'decimal':
-                            params += '"' + localParameters[i] + '"';
-                            break;
-                        case 'bit':
-                            if (localParameters[i] == "'true'" || localParameters[i] == 'true' ||
-                                localParameters[i] == "'yes'" || localParameters[i] == 'yes' ||
-                                localParameters[i] == '1' || localParameters[i] == 1)
-                                params += '1';
-                            else
-                                params += '0';
-                            break;
-                        case 'varbinary':
-                            params += localParameters[i];
-                            break;
-                        default:
-                            if (procedure == '@SnapshotDelete')
-                                params += '["' + localParameters[i].replace(/^'|'$/g, '') + '"]';
-                            else
-                                params += (typeof(localParameters[i]) == 'string'
-                                    ? '"' + localParameters[i].replace(/^'|'$/g, '') + '"'
-                                    : localParameters[i]).replace(/''/g, "'");
+                            case 'tinyint':
+                            case 'smallint':
+                            case 'int':
+                            case 'integer':
+                            case 'bigint':
+                            case 'float':
+                                params += localParameters[i];
+                                break;
+                            case 'decimal':
+                                params += '"' + localParameters[i] + '"';
+                                break;
+                            case 'bit':
+                                if (localParameters[i] == "'true'" || localParameters[i] == 'true' ||
+                                    localParameters[i] == "'yes'" || localParameters[i] == 'yes' ||
+                                    localParameters[i] == '1' || localParameters[i] == 1)
+                                    params += '1';
+                                else
+                                    params += '0';
+                                break;
+                            case 'varbinary':
+                                params += localParameters[i];
+                                break;
+                            default:
+                                if (procedure == '@SnapshotDelete')
+                                    params += '["' + localParameters[i].replace(/^'|'$/g, '') + '"]';
+                                else
+                                    params += (typeof (localParameters[i]) == 'string'
+                                        ? '"' + localParameters[i].replace(/^'|'$/g, '') + '"'
+                                        : localParameters[i]).replace(/''/g, "'");
                         }
                     }
                     params += ']';
@@ -96,45 +97,45 @@
                 var paramSet = s.join('&') + '&jsonp=?';
                 return paramSet;
             };
-            
+
             this.CallExecute = function (procedure, parameters, callback) {
                 var uri = 'http://' + this.server + ':' + this.port + '/api/1.0/';
                 var params = this.BuildParamSet(procedure, parameters);
-                if (typeof(params) == 'string') {
+                if (typeof (params) == 'string') {
                     if (VoltDBCore.isServerConnected) {
                         jQuery.postJSON(uri, params, callback);
                     }
                 } else if (callback != null)
                     callback({ "status": -1, "statusstring": "PrepareStatement error: " + params[0], "results": [] });
             };
-            
-            var callbackWrapper = function(userCallback) {
+
+            var callbackWrapper = function (userCallback) {
                 var criticalErrorResponse = { "status": -1, "statusstring": "Query timeout.", "results": [] };
                 var UserCallback = userCallback;
                 var timeoutOccurred = 0;
-                var timeout = setTimeout(function() {
+                var timeout = setTimeout(function () {
                     timeoutOccurred = 1;
                     UserCallback(criticalErrorResponse);
                 }, 20000);
-                this.Callback = function(response) {
+                this.Callback = function (response, headerInfo) {
                     clearTimeout(timeout);
-                    if (timeoutOccurred == 0) UserCallback(response);
+                    if (timeoutOccurred == 0) UserCallback(response, headerInfo);
                 };
                 return this;
             };
-            
-            this.BeginExecute = function(procedure, parameters, callback) {
+
+            this.BeginExecute = function (procedure, parameters, callback) {
                 this.CallExecute(procedure, parameters, (new callbackWrapper(callback)).Callback);
             };
 
-            var iQueue = function(connection) {
+            var iQueue = function (connection) {
                 var continueOnFailure = false;
                 var executing = false;
                 var success = false;
                 var stack = [];
                 var onCompleteHandler = null;
                 var Connection = connection;
-                this.Start = function(continueOnFailure) {
+                this.Start = function (continueOnFailure) {
                     if (executing)
                         return null;
                     continueOnFailure = (continueOnFailure == true);
@@ -143,24 +144,30 @@
                     stack.push(null);
                     return this;
                 };
-                
+
                 this.BeginExecute = function (procedure, parameters, callback) {
                     stack.push([procedure, parameters, callback]);
                     return this;
                 };
-                this.EndExecute = function() {
+                this.EndExecute = function () {
                     if (stack.length > 0)
                         stack.splice(0, 1);
                     if (stack.length > 0 && (success || continueOnFailure)) {
                         var item = stack[0];
                         Connection.CallExecute(item[0], item[1], (new callbackWrapper(
-                            (function(queue, item) {
-                                return function(response) {
+                            (function (queue, item) {
+                                return function (response, headerInfo) {
                                     try {
+                                        
+                                        if (VoltDBCore.hostIP == "") {
+                                            VoltDBCore.hostIP = headerInfo;
+                                        }
+
                                         if (response.status != 1)
                                             success = false;
                                         if (item[2] != null)
                                             item[2](response);
+                                        
                                         queue.EndExecute();
                                     } catch (x) {
                                         success = false;
@@ -180,14 +187,14 @@
                     }
                     return this;
                 };
-                this.End = function(fcn, state) {
+                this.End = function (fcn, state) {
                     onCompleteHandler = [fcn, state];
-                    if (!executing) {                      
+                    if (!executing) {
                         executing = true;
-                        this.EndExecute();                       
+                        this.EndExecute();
                     }
                 };
-                
+
             };
             this.procedures = {
                 '@AdHoc': { '1': ['varchar'] },
@@ -305,7 +312,7 @@
             var timeout = setTimeout(function () {
                 callback(false, { "status": -100, "statusstring": "Server is not available." }, isLoginTest);
             }, callbackTimeout);
-            
+
             conn.BeginExecute('@Statistics', ['TABLE', 0], function (response) {
                 try {
                     clearTimeout(timeout);
@@ -328,7 +335,7 @@
             $.ajax({
                 url: uri + '?' + params,
                 dataType: "jsonp",
-                success:function(e) {
+                success: function (e) {
                     if (e.status === 200) {
                         checkConnection(true);
                     }
@@ -336,24 +343,24 @@
                 complete: function (e) {
                     if (e.status === 200) {
                         checkConnection(true);
-                    } 
+                    }
                 },
-                error: function(e) {
+                error: function (e) {
                     if (e.status != 200) {
                         checkConnection(false);
-                    } 
+                    }
                 },
                 timeout: 60000
             });
-            
+
         };
-        
-        this.AddConnection = function (server, port, admin, user, password, isHashedPassword,procedureNames,parameters,values,processName,onConnectionAdded) {
-            var conn =new DbConnection(server, port, admin, user, password, isHashedPassword,processName);
+
+        this.AddConnection = function (server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, onConnectionAdded) {
+            var conn = new DbConnection(server, port, admin, user, password, isHashedPassword, processName);
             compileProcedureCommands(conn, procedureNames, parameters, values);
             this.connections[conn.key] = conn;
             loadConnectionMetadata(this.connections[conn.key], onConnectionAdded, processName);
-            
+
         };
 
         this.updateConnection = function (server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, connection, onConnectionAdded) {
@@ -361,7 +368,7 @@
             loadConnectionMetadata(connection, onConnectionAdded, processName);
         };
 
-        this.HasConnection = function(server, port, admin, user,processName) {
+        this.HasConnection = function (server, port, admin, user, processName) {
             var serverName = server == null ? 'localhost' : $.trim(server);
             var portId = port == null ? '8080' : $.trim(port);
             var userName = user == '' ? null : user;
@@ -370,7 +377,7 @@
 
             if (this.connections[key] != undefined) {
                 var conn = this.connections[key];
-                if (conn.key in this.connections) {                    
+                if (conn.key in this.connections) {
                     return conn;
                 }
             }
@@ -382,17 +389,16 @@
             var connectionQueue = connection.getQueue();
             connectionQueue.Start();
 
-           
-                jQuery.each(connection.procedureCommands.procedures, function(id, procedure) {
-                    connectionQueue.BeginExecute(procedure['procedure'], (procedure['value'] === undefined ? procedure['parameter'] : [procedure['parameter'], procedure['value']]), function (data) {
 
-                        var suffix = (processName == "GRAPH_MEMORY" || processName == "GRAPH_TRANSACTION") || processName == "TABLE_INFORMATION" ? "_" + processName : "";
-                        connection.Metadata[procedure['procedure'] + "_" + procedure['parameter'] + suffix] = data.results[0];
-                    });
-
+            jQuery.each(connection.procedureCommands.procedures, function (id, procedure) {
+                connectionQueue.BeginExecute(procedure['procedure'], (procedure['value'] === undefined ? procedure['parameter'] : [procedure['parameter'], procedure['value']]), function (data) {
+                    var suffix = (processName == "GRAPH_MEMORY" || processName == "GRAPH_TRANSACTION") || processName == "TABLE_INFORMATION" ? "_" + processName : "";
+                    connection.Metadata[procedure['procedure'] + "_" + procedure['parameter'] + suffix] = data.results[0];
                 });
 
-                connectionQueue.End(function (state) {
+            });
+
+            connectionQueue.End(function (state) {
                 connection.Metadata['sysprocs'] = {
                     '@Explain': { '1': ['SQL (varchar)', 'Returns Table[]'] },
                     '@ExplainProc': { '1': ['Stored Procedure Name (varchar)', 'Returns Table[]'] },
@@ -414,7 +420,7 @@
                     '@ValidatePartitioning': { '2': ['HashinatorType (int)', 'Config (varbinary)', 'Returns Table[]'] },
                     '@GetPartitionKeys': { '1': ['VoltType (varchar)', 'Returns Table[]'] }
                 };
-                            
+
                 var childConnectionQueue = connection.getQueue();
                 childConnectionQueue.Start(true);
                 childConnectionQueue.End(function (state) {
@@ -424,8 +430,8 @@
                 }, null);
             }, null);
         };
-        
-        var compileProcedureCommands = function (connection,procedureNames, parameters, values) {
+
+        var compileProcedureCommands = function (connection, procedureNames, parameters, values) {
             var i = 0;
             var lConnection = connection;
             lConnection.procedureCommands["procedures"] = {};
@@ -440,12 +446,31 @@
         return this;
     });
     window.VoltDBCore = VoltDBCore = new iVoltDbCore();
-    
+
 })(window);
 
 jQuery.extend({
-    postJSON: function (url, data, callback) {
+    postJSON: function (url, formData, callback) {
         
-        return jQuery.post(url, data, callback, "json");
+        if (VoltDBCore.hostIP == "") {
+        
+            jQuery.ajax({
+                type: 'POST',
+                url: url,
+                data: formData,
+                dataType: 'jsonp',
+                success: function (data, textStatus, request) {
+                    var host = request.getResponseHeader("Host") != null ? request.getResponseHeader("Host").split(":")[0] : "-1";
+                    callback(data, host);
+                },
+                error: function (e) {
+                    console.log(e.message);
+                }
+            });
+
+        } else {
+            jQuery.post(url, formData, callback, "json");
+        }
     }
 });
+

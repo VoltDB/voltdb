@@ -34,7 +34,6 @@ import org.eclipse.jetty.server.AsyncContinuation;
 import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.server.bio.SocketConnector;
 import org.eclipse.jetty.server.handler.AbstractHandler;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
@@ -46,22 +45,85 @@ import org.voltdb.compilereport.ReportMaker;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.io.Resources;
+import java.io.ByteArrayInputStream;
+import java.net.InetAddress;
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.codehaus.jackson.annotate.JsonIgnore;
+import org.codehaus.jackson.map.JsonMappingException;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jackson.schema.JsonSchema;
+import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONObject;
+import org.eclipse.jetty.server.bio.SocketConnector;
+import org.voltdb.AuthenticationResult;
+import org.voltdb.ClientResponseImpl;
+import org.voltdb.VoltTable;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.UsersType;
 
 public class HTTPAdminListener {
+
+    private static final VoltLogger m_log = new VoltLogger("HOST");
 
     Server m_server = new Server();
     HTTPClientInterface httpClientInterface = new HTTPClientInterface();
     final boolean m_jsonEnabled;
     Map<String, String> m_htmlTemplates = new HashMap<String, String>();
     final boolean m_mustListen;
+    final DeploymentRequestHandler m_deploymentHandler;
 
-    class DBMonitorHandler extends AbstractHandler {
+    //Somewhat like Filter but we dont have Filter in version and jars we use.
+    class VoltRequestHandler extends AbstractHandler {
+        VoltLogger logger = new VoltLogger("HOST");
+        private String m_hostHeader = null;
+
+        protected String getHostHeader() {
+            if (m_hostHeader != null) {
+                return m_hostHeader;
+            }
+
+            InetAddress addr = null;
+            int httpPort = VoltDB.DEFAULT_HTTP_PORT;
+            try {
+                String localMetadata = VoltDB.instance().getLocalMetadata();
+                JSONObject jsObj = new JSONObject(localMetadata);
+                JSONArray interfaces = jsObj.getJSONArray("interfaces");
+                //The first interface is external interface if specified.
+                String iface = interfaces.getString(0);
+                addr = InetAddress.getByName(iface);
+                httpPort = jsObj.getInt("httpPort");
+            } catch (Exception e) {
+                logger.warn("Failed to get HTTP interface information.", e);
+            }
+            if (addr == null) {
+                addr = org.voltcore.utils.CoreUtils.getLocalAddress();
+            }
+            //Make the header string.
+            m_hostHeader = addr.getHostAddress() + ":" + httpPort;
+            return m_hostHeader;
+        }
+
+        public AuthenticationResult authenticate(Request request) {
+            return httpClientInterface.authenticate(request);
+        }
+
+        @Override
+        public void handle(String string, Request rqst, HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
+            response.setHeader("Host", getHostHeader());
+        }
+
+    }
+
+    class DBMonitorHandler extends VoltRequestHandler {
 
         @Override
         public void handle(String target, Request baseRequest,
                            HttpServletRequest request, HttpServletResponse response)
                             throws IOException, ServletException {
             VoltLogger logger = new VoltLogger("HOST");
+            super.handle(target, baseRequest, request, response);
             try{
 
                 // if this is an internal jetty retry, then just tell
@@ -148,12 +210,12 @@ public class HTTPAdminListener {
                     }
                 }
             }catch(Exception ex){
-                logger.error("Error servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage());
+                logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage());
             }
         }
     }
 
-    class CatalogRequestHandler extends AbstractHandler {
+    class CatalogRequestHandler extends VoltRequestHandler {
 
         @Override
         public void handle(String target,
@@ -162,12 +224,13 @@ public class HTTPAdminListener {
                            HttpServletResponse response)
                            throws IOException, ServletException {
 
+            super.handle(target, baseRequest, request, response);
             handleReportPage(baseRequest, response);
         }
 
     }
 
-    class DDLRequestHandler extends AbstractHandler {
+    class DDLRequestHandler extends VoltRequestHandler {
 
         @Override
         public void handle(String target,
@@ -176,6 +239,7 @@ public class HTTPAdminListener {
                            HttpServletResponse response)
                            throws IOException, ServletException {
 
+            super.handle(target, baseRequest, request, response);
             byte[] reportbytes = VoltDB.instance().getCatalogContext().getFileInJar("autogen-ddl.sql");
             String ddl = new String(reportbytes, Charsets.UTF_8);
             response.setContentType("text/plain;charset=utf-8");
@@ -186,13 +250,152 @@ public class HTTPAdminListener {
 
     }
 
-    class APIRequestHandler extends AbstractHandler {
+    //This is for password on User not to be reported.
+    abstract class IgnorePasswordMixIn {
+        @JsonIgnore abstract String getPassword();
+    }
+
+    class DeploymentRequestHandler extends VoltRequestHandler {
+
+        final ObjectMapper m_mapper;
+        String m_schema = "";
+        private DeploymentType m_deployment = null;
+
+        public DeploymentRequestHandler() {
+            m_mapper = new ObjectMapper();
+            m_mapper.getSerializationConfig().addMixInAnnotations(UsersType.User.class, IgnorePasswordMixIn.class);
+            m_mapper.getDeserializationConfig().addMixInAnnotations(UsersType.User.class, IgnorePasswordMixIn.class);
+            try {
+                JsonSchema schema = m_mapper.generateJsonSchema(DeploymentType.class);
+                m_schema = schema.toString();
+            } catch (JsonMappingException ex) {
+                m_log.warn("Failed to generate JSON schema: ", ex);
+            }
+        }
+
+        //Get deployment from zookeeper next time
+        public void notifyOfCatalogUpdate() {
+            m_deployment = null;
+        }
+
+        //Get deployment from zookeeper.
+        private DeploymentType getDeployment() {
+            if (m_deployment == null) {
+                ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
+                byte deploymentBytes[] = null;
+
+                try {
+                    //Let us get bytes from ZK
+                    CatalogUtil.CatalogAndIds catalogStuff = CatalogUtil.getCatalogFromZK(zk);
+                    deploymentBytes = catalogStuff.deploymentBytes;
+                } catch (KeeperException | InterruptedException ex) {
+                    m_log.warn("Failed to get deployment from zookeeper for HTTP interface.", ex);
+                }
+                if (deploymentBytes != null) {
+                    m_deployment = CatalogUtil.getDeployment(new ByteArrayInputStream(deploymentBytes));
+                }
+                // wasn't a valid xml deployment file or zookeeper is gone to town.
+                if (m_deployment == null) {
+                    //Get stale version from RealVoltDB
+                    m_log.warn("Failed to get deployment from zookeeper for HTTP interface. /deployment will not serve deployment information.");
+                }
+            }
+            return m_deployment;
+        }
+
+        // TODO - subresources.
+        // We support
+        // /deployment/cluster
+        // /deployment/paths
+        // /deployment/partitionDetection
+        // /deployment/adminMode
+        // /deployment/heartbeat
+        // /deployment/httpd
+        // /deployment/replication
+        // /deployment/snapshot
+        // /deployment/export
+        // /deployment/users
+        // /deployment/commandlog
+        // /deployment/systemsettings
+        // /deployment/security
+        @Override
+        public void handle(String target,
+                           Request baseRequest,
+                           HttpServletRequest request,
+                           HttpServletResponse response)
+                           throws IOException, ServletException {
+
+            super.handle(target, baseRequest, request, response);
+
+            handleGet(target, baseRequest, request, response);
+        }
+
+        // GET on /deployment resources.
+        public void handleGet(String target,
+                           Request baseRequest,
+                           HttpServletRequest request,
+                           HttpServletResponse response)
+                           throws IOException, ServletException {
+            //jsonp is specified when response is expected to go to javascript function.
+            String jsonp = request.getParameter("jsonp");
+
+            try {
+                //schema request does not require authentication.
+                if (baseRequest.getRequestURI().contains("/schema")) {
+                    String msg = m_schema;
+                    if (jsonp != null) {
+                        msg = String.format("%s( %s )", jsonp, m_schema);
+                    }
+                    response.getWriter().print(msg);
+                    response.setStatus(HttpServletResponse.SC_OK);
+                    baseRequest.setHandled(true);
+                    return;
+                }
+
+                AuthenticationResult authResult = authenticate(baseRequest);
+                if (!authResult.isAuthenticated()) {
+                    String msg = authResult.m_message;
+                    ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg);
+                    msg = rimpl.toJSONString();
+                    if (jsonp != null) {
+                        msg = String.format("%s( %s )", jsonp, msg);
+                    }
+                    response.setStatus(HttpServletResponse.SC_OK);
+                    response.getWriter().print(msg);
+                    baseRequest.setHandled(true);
+                } else {
+                    DeploymentType d = getDeployment();
+                    if (d == null) {
+                        String msg = "Deployment Information unavailable.";
+                        ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg);
+                        msg = rimpl.toJSONString();
+                        if (jsonp != null) {
+                            msg = String.format("%s( %s )", jsonp, msg);
+                        }
+                        response.getWriter().print(msg);
+                    } else {
+                        String msg = m_mapper.writeValueAsString(d);
+                        if (jsonp != null) {
+                            msg = String.format("%s( %s )", jsonp, msg);
+                        }
+                        response.getWriter().print(msg);
+                    }
+                    response.setStatus(HttpServletResponse.SC_OK);
+                    baseRequest.setHandled(true);
+                }
+            } catch (Exception ex) {
+              logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage());
+            }
+        }
+    }
+
+    class APIRequestHandler extends VoltRequestHandler {
 
         @Override
         public void handle(String target, Request baseRequest,
                            HttpServletRequest request, HttpServletResponse response)
                             throws IOException, ServletException {
-            VoltLogger logger = new VoltLogger("HOST");
+            super.handle(target, baseRequest, request, response);
             try {
                 // http://www.ietf.org/rfc/rfc4627.txt dictates this mime type
                 response.setContentType("application/json;charset=utf-8");
@@ -211,7 +414,7 @@ public class HTTPAdminListener {
                 }
 
             } catch(Exception ex){
-                logger.error("Error servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage());
+                logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage());
             }
         }
     }
@@ -308,11 +511,17 @@ public class HTTPAdminListener {
             ContextHandler ddlRequestHandler = new ContextHandler("/ddl");
             ddlRequestHandler.setHandler(new DDLRequestHandler());
 
+            ///deployment
+            ContextHandler deploymentRequestHandler = new ContextHandler("/deployment");
+            m_deploymentHandler = new DeploymentRequestHandler();
+            deploymentRequestHandler.setHandler(m_deploymentHandler);
+
             ContextHandlerCollection handlers = new ContextHandlerCollection();
             handlers.setHandlers(new Handler[] {
                     apiRequestHandler,
                     catalogRequestHandler,
                     ddlRequestHandler,
+                    deploymentRequestHandler,
                     dbMonitorHandler
             });
 
@@ -361,6 +570,9 @@ public class HTTPAdminListener {
 
     public void notifyOfCatalogUpdate()
     {
+        //Notify to clean any cached clients so new security can be enforced.
         httpClientInterface.notifyOfCatalogUpdate();
+        //Notify deployment handler
+        m_deploymentHandler.notifyOfCatalogUpdate();
     }
 }

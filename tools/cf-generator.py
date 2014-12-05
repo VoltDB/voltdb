@@ -30,7 +30,7 @@ TEMPLATE = r"""
             "Description": "VoltDB example to start. (voter, json-sessions, voltcache, voltkv, windowing)",
             "Type": "String",
             "Default": "voter",
-            "AllowedValues": ["voter", "json-sessions", "voltcache", "voltkv", "windowing"],
+            "AllowedValues": ["voter", "json-sessions", "voltkv", "windowing"],
             "ConstraintDescription": "must be a valid VoltDB example name."
         }
     },

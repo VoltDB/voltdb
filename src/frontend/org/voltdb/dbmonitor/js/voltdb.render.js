@@ -93,6 +93,7 @@ function alertNodeClicked(obj) {
         var maxLatencyIndex = 0;
         var avgLatencyIndex = 0;
         var perExecutionIndex = 0;
+        var gCurrentServer = "";
 
         var tableNameIndex = 5;
         var partitionIndex = 4;
@@ -297,11 +298,13 @@ function alertNodeClicked(obj) {
             VoltDBService.GetSystemInformation(function (connection) {
                 populateSystemInformation(connection);
                 getMemoryDetails(connection, systemMemory);
+                if (gCurrentServer == "")
+                    configureRequestedHost(VoltDBCore.hostIP);
                 onInformationLoaded();
             });
         };
 
-        this.getDatabaseInformation = function (onInformationLoaded) {
+        this.getProceduresInformation = function (onProceduresDataLoaded) {
             var procedureMetadata = "";
 
             VoltDBService.GetSystemInformationDeployment(function (connection) {
@@ -309,14 +312,7 @@ function alertNodeClicked(obj) {
                 VoltDBService.GetProceduresInformation(function (nestConnection) {
                     populateProceduresInformation(nestConnection);
                     procedureMetadata = procedureData;
-
-                    VoltDBService.GetDataTablesInformation(function (inestConnection) {
-                        populateTableTypes(inestConnection);
-                        populateTablesInformation(inestConnection);
-
-                        populatePartitionColumnTypes(inestConnection);
-                        onInformationLoaded(procedureMetadata, inestConnection.Metadata['@Statistics_TABLE'].data);
-                    });
+                    onProceduresDataLoaded(procedureMetadata);
                 });
             });
 
@@ -328,6 +324,14 @@ function alertNodeClicked(obj) {
 
             };
 
+        };
+
+        this.getTablesInformation = function (onTableDataLoaded) {
+            VoltDBService.GetDataTablesInformation(function (inestConnection) {
+                populateTableTypes(inestConnection);
+                populateTablesInformation(inestConnection);               
+                onTableDataLoaded(inestConnection.Metadata['@Statistics_TABLE'].data);
+            });
 
         };
 
@@ -427,14 +431,14 @@ function alertNodeClicked(obj) {
 
             var html =
                 '<li class="activeIcon">Active <span id="activeCount">(' + activeCount + ')</span></li>' +
-                    '<li class="joiningIcon">Joining <span id="joiningCount">(' + joiningCount + ')</span></li>' +
+                    '<!--<li class="joiningIcon">Joining <span id="joiningCount">(' + joiningCount + ')</span></li>-->' +
                     '<li class="missingIcon">Missing <span id="missingCount">(' + missingCount + ')</span></li>';
 
             var alertHtml = "";
 
             jQuery.each(systemMemory, function (id, val) {
 
-                var threshold = $.cookie("alert-threshold") != undefined ? $.cookie("alert-threshold") : 90;
+                var threshold = $.cookie("alert-threshold") != undefined ? $.cookie("alert-threshold") : 70;
                 if (val["MEMORYUSAGE"] * 1 >= threshold) {
                     alertHtml += '<li class="active"><a data-ip="' + systemMemory[val['HOSTNAME']]['HOST_ID'] + '" onclick=\"alertNodeClicked(this);\" href=\"#\">' + val['HOSTNAME'] + '</a> <span class=\"memory-status alert\">' + val['MEMORYUSAGE'] + '%</span></li>';
                     alertCount++;
@@ -448,16 +452,43 @@ function alertNodeClicked(obj) {
             callback(html, alertHtml);
         };
 
+        var configureRequestedHost = function(hostName) {
+
+            $.each(systemOverview, function(id, val) {
+                if (val["IPADDRESS"] == hostName) {
+                    gCurrentServer = val["HOSTNAME"];
+                    saveCookie("currentServer", val["HOSTNAME"]);
+                    return false;
+
+                }
+                return true;
+            });
+
+            if (gCurrentServer == "") {
+                $.each(systemOverview, function(id, val) {
+                    if (val["CLUSTERSTATE"] == "RUNNING") {
+                        gCurrentServer = val["HOSTNAME"];
+                        saveCookie("currentServer", val["HOSTNAME"]);
+                        return false;
+                    }
+                    return true;
+                });
+            }
+
+        };
+
         var populateSystemInformation = function (connection) {
+            var updatedSystemOverview = {};
             connection.Metadata['@SystemInformation_OVERVIEW'].data.forEach(function (entry) {
                 var singleData = entry;
                 var id = singleData[0];
 
-                if (!systemOverview.hasOwnProperty(id)) {
-                    systemOverview[id] = {};
+                if (!updatedSystemOverview.hasOwnProperty(id)) {
+                    updatedSystemOverview[id] = {};
                 }
-                systemOverview[id][singleData[1]] = singleData[2];
+                updatedSystemOverview[id][singleData[1]] = singleData[2];
             });
+            systemOverview = updatedSystemOverview;
         };
 
         var populateTablesInformation = function (connection) {
@@ -791,55 +822,22 @@ function alertNodeClicked(obj) {
                     schemaCatalogTableTypes[tableName] = {};
                     schemaCatalogTableTypes[tableName]['TABLE_NAME'] = entry[tableNameIndex];
                     schemaCatalogTableTypes[tableName]['TABLE_TYPE'] = entry[tableTypeIndex];
-                    schemaCatalogTableTypes[tableName]['REMARKS'] = entry[remarksIndex];
-
-                }
-            });
-
-        };
-
-        var populatePartitionColumnTypes = function (connection) {
-            var counterColumns = 0;
-            var columnName;
-            var columnNameIndex = 0;
-            var tableNameColumnsIndex = 0;
-            var remarksColumnsIndex = 0;
-
-            connection.Metadata['@SystemCatalog_COLUMNS'].schema.forEach(function (columnInfo) {
-                if (columnInfo["name"] == "COLUMN_NAME")
-                    columnNameIndex = counterColumns;
-
-                if (columnInfo["name"] == "TABLE_NAME")
-                    tableNameColumnsIndex = counterColumns;
-
-                if (columnInfo["name"] == "REMARKS")
-                    remarksColumnsIndex = counterColumns;
-
-                counterColumns++;
-            });
-
-            connection.Metadata['@SystemCatalog_COLUMNS'].data.forEach(function (entry) {
-                columnName = entry[columnNameIndex];
-
-                if (entry[remarksColumnsIndex] == "PARTITION_COLUMN") {
-                    if (!schemaCatalogColumnTypes.hasOwnProperty(columnName)) {
-                        schemaCatalogColumnTypes[columnName] = {};
-                        schemaCatalogColumnTypes[columnName]['COLUMN_NAME'] = entry[columnNameIndex];
-                        schemaCatalogColumnTypes[columnName]['TABLE_NAME'] = entry[tableNameColumnsIndex];
-                        schemaCatalogColumnTypes[columnName]['REMARKS'] = entry[remarksColumnsIndex];
-
+                    if(entry[remarksIndex]!=null)
+                        schemaCatalogTableTypes[tableName]['REMARKS'] = jQuery.parseJSON(entry[remarksIndex]).partitionColumn != null ? "PARTITIONED" : "REPLICATED";
+                    else {
+                        schemaCatalogTableTypes[tableName]['REMARKS'] = "REPLICATED";
                     }
                 }
             });
 
         };
-
+       
         this.mapNodeInformationByStatus = function (callback) {
             var counter = 0;
             var memoryThreshold = $.cookie("alert-threshold") != '' ? $.cookie("alert-threshold") : -1;
             var htmlMarkups = { "ServerInformation": [] };
             var htmlMarkup;
-            var currentServerHtml;
+            var currentServerHtml="";
 
             if (systemOverview == null || systemOverview == undefined) {
                 alert("Error: Unable to extract Node Status");
@@ -847,10 +845,8 @@ function alertNodeClicked(obj) {
             }
 
             var currentServer = getCurrentServer();
-            if (currentServer != null) {
+            if (currentServer != "" || currentServer != null) {
                 currentServerHtml = currentServer;
-            } else {
-                currentServerHtml = "";
             }
 
             jQuery.each(systemOverview, function (id, val) {
@@ -861,24 +857,21 @@ function alertNodeClicked(obj) {
                     /*************************************************************************
                     //CLUSTERSTATE implies if server is running or joining
                     **************************************************************************/
-                    if (val["HOSTNAME"] != null && val["CLUSTERSTATE"] == "RUNNING" && (currentServerHtml == "" || currentServer == hostName)) {
+                    if (hostName != null && currentServer == hostName && val["CLUSTERSTATE"] == "RUNNING") {
                         if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
                             htmlMarkup = "<li class=\"active monitoring\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\"  href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
-                            currentServerHtml = hostName;
 
                         } else {
                             htmlMarkup = "<li class=\"active monitoring\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
-                            currentServerHtml = hostName;
                         }
-
-                    } else if (val["HOSTNAME"] != null && val["CLUSTERSTATE"] == "RUNNING" && currentServer != hostName) {
+                    } else if (hostName != null && currentServer != hostName &&  val["CLUSTERSTATE"] == "RUNNING") {
                         if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
                             htmlMarkup = "<li class=\"active\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span><span class=\"hostIdHidden\" style=\"display:none\">" + systemMemory[hostName]["HOST_ID"] + "</span></li>";
                         } else {
                             htmlMarkup = "<li class=\"active\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
                         }
 
-                    } else if (val["HOSTNAME"] != null && val["CLUSTERSTATE"] == "JOINING") {
+                    } else if (hostName != null && val["CLUSTERSTATE"] == "JOINING") {
                         if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
                             htmlMarkup = htmlMarkup + "<li class=\"joining\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span><span class=\"hostIdHidden\" style=\"display:none\">" + systemMemory[hostName]["HOST_ID"] + "</span></li>";
 
@@ -892,7 +885,7 @@ function alertNodeClicked(obj) {
                     /********************************************************************************************
                     "currentServerHtml" is validated to verify if current server to be monitored is already set
                     *********************************************************************************************/
-                    if (val["HOSTNAME"] != null && val["CLUSTERSTATE"] == "RUNNING" && currentServerHtml != "" && currentServerHtml == val["HOSTNAME"]) {
+                    if (hostName != null && currentServerHtml != "" && currentServerHtml == hostName && val["CLUSTERSTATE"] == "RUNNING") {
                         if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
                             htmlMarkup = htmlMarkup + "<li class=\"active monitoring\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
 
@@ -901,7 +894,7 @@ function alertNodeClicked(obj) {
                         }
                     }
 
-                    if (val["HOSTNAME"] != null && val["CLUSTERSTATE"] == "RUNNING" && currentServerHtml != val["HOSTNAME"]) {
+                    if (hostName != null && currentServerHtml != hostName  && val["CLUSTERSTATE"] == "RUNNING") {
                         if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
                             htmlMarkup = htmlMarkup + "<li class=\"active\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
 
@@ -911,7 +904,7 @@ function alertNodeClicked(obj) {
 
                     }
 
-                    if (val["HOSTNAME"] != null && val["CLUSTERSTATE"] == "JOINING") {
+                    if (hostName != null && val["CLUSTERSTATE"] == "JOINING") {
                         if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
                             htmlMarkup = htmlMarkup + "<li class=\"joining\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
 
@@ -1723,7 +1716,7 @@ function alertNodeClicked(obj) {
                     connTypeParams[connTypeParams.length] = procParams[p].type;
                 }
 
-                //// make the procedure callable.
+                // make the procedure callable.
                 connection.procedures[procName] = {};
                 connection.procedures[procName]['' + connTypeParams.length] = connTypeParams;
             }
@@ -1766,16 +1759,17 @@ function alertNodeClicked(obj) {
             }
 
         };
-
+              
         var formatTableData = function (connection) {
             var i = 0;
             var tableMetadata = [];
             var totalTupleCount = 0;
             var partitionEntryCount = 0;
-            var newPartition = false;
+            var duplicatePartition = false;
             var tupleCountPartitions = [];
             var partitionData = {};
-
+            var averageRowCount = 0;
+            
             if (voltDbRenderer.refreshTables) {
                 if (connection.Metadata["@Statistics_TABLE"] != undefined || connection.Metadata["@Statistics_TABLE"] != null) {
                     if (connection.Metadata["@Statistics_TABLE"].data != "" &&
@@ -1786,6 +1780,7 @@ function alertNodeClicked(obj) {
                         tableData = {};
 
                         $.each(tableMetadata, function (key, tupleData) {
+                            duplicatePartition = false;
                             if (tupleData != undefined) {
                                 partitionEntryCount = 0;
 
@@ -1799,16 +1794,14 @@ function alertNodeClicked(obj) {
                                             partitionEntryCount++;
                                             //if partition is repeated for a given table in "partitionData"
                                             if (tupleData[partitionIndex] == partitionData[tupleData[tableNameIndex]][i][partitionIndex]) {
-                                                newPartition = false;
-                                                schemaCatalogTableTypes[tupleData[tableNameIndex]]["TABLE_TYPE"] = schemaCatalogTableTypes[tupleData[tableNameIndex]].TABLE_TYPE == "VIEW" ? "VIEW" : "REPLICATED";
+                                                duplicatePartition = true;
                                                 return false;
                                             }
 
                                         }
-                                        if (partitionEntryCount == partitionData[tupleData[tableNameIndex]].length) {
-                                            newPartition = true;
-                                            partitionData[tupleData[tableNameIndex]].push(tupleData);
-                                            return true;
+                                        if (partitionEntryCount == partitionData[tupleData[tableNameIndex]].length && !duplicatePartition) {                                            
+                                            partitionData[tupleData[tableNameIndex]].push(tupleData);                                                                                        
+                                            return false;
 
                                         }
                                     });
@@ -1818,6 +1811,8 @@ function alertNodeClicked(obj) {
 
                         //formulate max, min, average for each table
                         $.each(partitionData, function (key, data) {
+                            totalTupleCount = 0;
+                            
                             if (!tableData.hasOwnProperty(key)) {
                                 tableData[key] = {};
                             }
@@ -1827,13 +1822,14 @@ function alertNodeClicked(obj) {
                                 tupleCountPartitions[i] = data[i][tupleCountIndex];
                             }
 
+                            
                             tableData[key] = {
                                 "TABLE_NAME": key,
                                 "MAX_ROWS": Math.max.apply(null, tupleCountPartitions),
                                 "MIN_ROWS": Math.min.apply(null, tupleCountPartitions),
                                 "AVG_ROWS": getAverage(tupleCountPartitions),
-                                "TUPLE_COUNT": totalTupleCount,
-                                "TABLE_TYPE": getColumnTypes(key) == "PARTITION_COLUMN" ? "PARTITIONED" : schemaCatalogTableTypes[key].TABLE_TYPE
+                                "TUPLE_COUNT": schemaCatalogTableTypes[key].REMARKS == "REPLICATED" ? data[0][tupleCountIndex] : totalTupleCount,
+                                "TABLE_TYPE": schemaCatalogTableTypes[key].REMARKS
                             };
 
                         });
@@ -1942,8 +1938,7 @@ function alertNodeClicked(obj) {
                         "MIN_ROWS": tableJsonArray[i].MIN_ROWS,
                         "AVG_ROWS": tableJsonArray[i].AVG_ROWS,
                         "TUPLE_COUNT": tableJsonArray[i].TUPLE_COUNT,
-                        "TABLE_TYPE": tableJsonArray[i].TABLE_TYPE,
-
+                        "TABLE_TYPE": tableJsonArray[i].TABLE_TYPE
                     };
                 }
             }
@@ -1975,7 +1970,7 @@ function alertNodeClicked(obj) {
                         "MIN_ROWS": tableSearchJsonArray[i].MIN_ROWS,
                         "AVG_ROWS": tableSearchJsonArray[i].AVG_ROWS,
                         "TUPLE_COUNT": tableSearchJsonArray[i].TUPLE_COUNT,
-                        "TABLE_TYPE": tableSearchJsonArray[i].TABLE_TYPE,
+                        "TABLE_TYPE": tableSearchJsonArray[i].TABLE_TYPE
                     };
                     counter++;
 
@@ -2230,10 +2225,8 @@ $(function () {
 });
 
 $(window).resize(function () {
-    //alert("resized");
     var windowWidth = $(window).width();
     if (windowWidth > 699) {
-        //alert(windowWidth);
         $("#nav").css('display', 'block');
 
     } else if (windowWidth < 699) {

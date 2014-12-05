@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.StringWriter;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 
 import javax.xml.bind.JAXBContext;
@@ -188,6 +189,11 @@ public class DeploymentBuilder {
         m_commandLogSize = logSize;
     }
 
+    public void setEnableCommandLogging(boolean value)
+    {
+        m_commandLogEnabled = value;
+    }
+
     public void setSnapshotPriority(int priority) {
         m_snapshotPriority = priority;
     }
@@ -197,6 +203,16 @@ public class DeploymentBuilder {
             final boolean added = m_users.add(info);
             if (!added) {
                 assert(added);
+            }
+        }
+    }
+
+    public void removeUser(String userName) {
+        Iterator<UserInfo> iter = m_users.iterator();
+        while (iter.hasNext()) {
+            UserInfo info = iter.next();
+            if (info.name.equals(userName)) {
+                iter.remove();
             }
         }
     }
@@ -413,7 +429,7 @@ public class DeploymentBuilder {
                     for (final String group : info.groups) {
                         if (groups.length() > 0)
                             groups.append(",");
-                        groups.append(group);
+                        groups.append(group.toLowerCase());
                     }
                     user.setGroups(groups.toString());
                 }

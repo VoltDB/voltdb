@@ -127,9 +127,6 @@ $(document).ready(function () {
     // Shows memory alerts
     $('#showMemoryAlerts').popup();
 
-    //error popup
-    $('#errorPopup').popup();
-
     //Logout popup
     $('#logOut').popup();
     $('#btnlogOut').popup();
@@ -319,13 +316,15 @@ var loadPage = function (serverName, portid) {
 
     var refreshClusterHealth = function () {
         //loads cluster health and other details on the top banner
+        
         voltDbRenderer.GetSystemInformation(function () {
             voltDbRenderer.GetClusterHealth(function (htmlData, alertHtmlData) {
                 $("#clusterHealth").html(htmlData).show();
                 $("#memoryAlertsList").html(alertHtmlData);
             });
-
+            
             voltDbRenderer.mapNodeInformationByStatus(function (htmlData) {
+                
                 var currentServer = getCurrentServer();
                 if (currentServer == undefined) {
                     saveCurrentServer(htmlData.ServerInformation[1].CurrentServer);
@@ -413,9 +412,9 @@ var loadPage = function (serverName, portid) {
         });
 
 
-        voltDbRenderer.getDatabaseInformation(function (procedureMetadata, tableMetadata) {
+        voltDbRenderer.getProceduresInformation(function(procedureMetadata) {
             if ((procedureMetadata != "" && procedureMetadata != undefined)) {
-                voltDbRenderer.mapProcedureInformation(currentProcedureAction, priorProcedureAction, function (traverse, htmlData) {
+                voltDbRenderer.mapProcedureInformation(currentProcedureAction, priorProcedureAction, function(traverse, htmlData) {
                     if (!voltDbRenderer.isProcedureSearch) {
                         if ((currentProcedureAction == VoltDbUI.ACTION_STATES.REFRESH && currentProcedureAction != VoltDbUI.ACTION_STATES.NONE) || (currentProcedureAction != VoltDbUI.ACTION_STATES.REFRESH && currentProcedureAction == VoltDbUI.ACTION_STATES.NONE)) {
                             lblTotalPages.innerHTML = voltDbRenderer.procedureDataSize < voltDbRenderer.maxVisibleRows ? " ".concat(1) : " ".concat(Math.ceil(voltDbRenderer.procedureDataSize / voltDbRenderer.maxVisibleRows));
@@ -460,6 +459,9 @@ var loadPage = function (serverName, portid) {
 
             }
 
+        });
+        
+        voltDbRenderer.getTablesInformation(function (tableMetadata) {
             if (tableMetadata != "" && tableMetadata != undefined) {
                 voltDbRenderer.mapTableInformation(currentTableAction, priorTableAction, voltDbRenderer.isTableSearch, function (htmlData) {
 
@@ -855,7 +857,7 @@ var loadPage = function (serverName, portid) {
 
     var saveThreshold = function () {
 
-        var defaultThreshold = 90;
+        var defaultThreshold = 70;
         var thresholdInput = $("#threshold");
 
         if (thresholdInput.val() == "") {
@@ -1234,6 +1236,8 @@ var configureUserPreferences = function () {
 //common methods
 /*******************************************************************************************/
 
+
+
 //Dummy wrapper for console.log for IE9
 if (!(window.console && console.log)) {
     console = {
@@ -1401,7 +1405,7 @@ var adjustGraphSpacing = function () {
         this.SORT_STATES = {
             NONE: 0,
             SORTING: 1,
-            SORTED: 2,
+            SORTED: 2
         };
 
         this.DASHBOARD_PROGRESS_STATES = {
