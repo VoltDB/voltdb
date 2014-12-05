@@ -236,6 +236,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                         expectedCatalogVersion,
                         getVoltPrivateRealTransactionIdDontUseMe(),
                         getUniqueId(),
+                        catalogStuff.deploymentBytes,
                         catalogStuff.getDeploymentHash());
 
                 // update the local catalog.  Safe to do this thanks to the check to get into here.
