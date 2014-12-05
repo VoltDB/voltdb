@@ -52,16 +52,15 @@ function clean() {
 
 # remove everything from "clean" as well as the jarfiles
 function cleanall() {
-	clean
+    clean
     rm -rf voter-procs.jar voter-client.jar
 }
 
 # compile the source code for procedures and the client into jarfiles
 function jars() {
-	# compile java source
-    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH \
-        client/voter/*.java \
-        procedures/voter/*.java
+    # compile java source
+    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH procedures/voter/*.java
+    javac -target 1.7 -source 1.7 -classpath $CLIENTCLASSPATH client/voter/*.java
     # build procedure and client jars
     jar cf voter-procs.jar -C procedures voter
     jar cf voter-client.jar -C client voter
@@ -71,9 +70,9 @@ function jars() {
 
 # compile the procedure and client jarfiles if they don't exist
 function jars-ifneeded() {
-	if [ ! -e voter-procs.jar ] || [ ! -e voter-client.jar ]; then
-		jars;
-	fi
+    if [ ! -e voter-procs.jar ] || [ ! -e voter-client.jar ]; then
+        jars;
+    fi
 }
 
 # run the voltdb server locally
@@ -88,7 +87,7 @@ function server() {
 
 # load schema and procedures
 function init() {
-	jars-ifneeded
+    jars-ifneeded
     sqlcmd < ddl.sql
 }
 
@@ -107,7 +106,6 @@ function rejoin() {
 
 # run the client that drives the example
 function client() {
-	jars-ifneeded
     async-benchmark
 }
 

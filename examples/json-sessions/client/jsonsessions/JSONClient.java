@@ -61,6 +61,11 @@ import com.google.gson.*;
 
 public class JSONClient {
 
+    // potential return codes (must be synced with procedure code)
+    public static final long LOGIN_SUCCESSFUL = 0;
+    public static final long LOGIN_FAIL = 1;
+    public static final long LOGIN_TIMEOUT = 2;
+
     // Reference to the database connection we will use
     final Client client;
     // Random record generator
@@ -277,7 +282,7 @@ public class JSONClient {
 
 
             long resultCode = response.getResults()[0].asScalarLong();
-            if (resultCode == Login.LOGIN_SUCCESSFUL)
+            if (resultCode == LOGIN_SUCCESSFUL)
                 acceptedLogins.incrementAndGet();
             else
                 badLogins.incrementAndGet();

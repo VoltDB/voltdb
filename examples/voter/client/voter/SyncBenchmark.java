@@ -352,14 +352,14 @@ public class SyncBenchmark {
 
                     long resultCode = response.getResults()[0].asScalarLong();
                     totalVotes.incrementAndGet();
-                    if (resultCode == Vote.ERR_INVALID_CONTESTANT) {
+                    if (resultCode == ERR_INVALID_CONTESTANT) {
                         badContestantVotes.incrementAndGet();
                     }
-                    else if (resultCode == Vote.ERR_VOTER_OVER_VOTE_LIMIT) {
+                    else if (resultCode == ERR_VOTER_OVER_VOTE_LIMIT) {
                         badVoteCountVotes.incrementAndGet();
                     }
                     else {
-                        assert(resultCode == Vote.VOTE_SUCCESSFUL);
+                        assert(resultCode == VOTE_SUCCESSFUL);
                         acceptedVotes.incrementAndGet();
                     }
                 }

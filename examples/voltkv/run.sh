@@ -47,23 +47,18 @@ HOST="localhost"
 # remove binaries, logs, runtime artifacts, etc... but keep the client jar
 function clean() {
     rm -rf client/voltkv/*.class debugoutput voltdbroot log \
-    	catalog-report.html statement-plans
+        catalog-report.html statement-plans
 }
 
 # remove everything from "clean" as well as the jarfile
 function cleanall() {
-	clean
+    clean
     rm -rf voltkv-client.jar
 }
 
-# compile the source code for procedures and the client
-function srccompile() {
-    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH client/voltkv/*.java
-}
-
-# compile the source code for the client into jarfiles
+# compile the source code for the client into a jarfile
 function jars() {
-	# compile java source
+    # compile java source
     javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH client/voltkv/*.java
     # build client jar
     jar cf voltkv-client.jar -C client voltkv
@@ -73,9 +68,9 @@ function jars() {
 
 # compile the client jarfile if it doesn't exist
 function jars-ifneeded() {
-	if [ ! -e voltkv-client.jar ]; then
-		jars;
-	fi
+    if [ ! -e voltkv-client.jar ]; then
+        jars;
+    fi
 }
 
 # run the voltdb server locally
@@ -90,8 +85,8 @@ function server() {
 
 # load schema and procedures
 function init() {
-	jars-ifneeded
-	sqlcmd < ddl.sql
+    jars-ifneeded
+    sqlcmd < ddl.sql
 }
 
 # run the client that drives the example

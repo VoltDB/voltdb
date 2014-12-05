@@ -52,15 +52,15 @@ function clean() {
 
 # remove everything from "clean" as well as the jarfiles
 function cleanall() {
-	clean
+    clean
     rm -rf windowing-procs.jar windowing-client.jar
 }
 
 # compile the source code for procedures and the client into jarfiles
 function jars() {
-	# compile java source
-	javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH procedures/windowing/*.java
-	javac -target 1.7 -source 1.7 -classpath $CLIENTCLASSPATH client/windowing/*.java
+    # compile java source
+    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH procedures/windowing/*.java
+    javac -target 1.7 -source 1.7 -classpath $CLIENTCLASSPATH client/windowing/*.java
     # build procedure and client jars
     jar cf windowing-procs.jar -C procedures windowing
     jar cf windowing-client.jar -C client windowing
@@ -70,9 +70,9 @@ function jars() {
 
 # compile the procedure and client jarfiles if they don't exist
 function jars-ifneeded() {
-	if [ ! -e voter-procs.jar ] || [ ! -e voter-client.jar ]; then
-		jars;
-	fi
+    if [ ! -e voter-procs.jar ] || [ ! -e voter-client.jar ]; then
+        jars;
+    fi
 }
 
 # run the voltdb server locally

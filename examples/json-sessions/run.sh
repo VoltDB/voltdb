@@ -47,18 +47,18 @@ HOST="localhost"
 # remove binaries, logs, runtime artifacts, etc... but keep the jars
 function clean() {
     rm -rf debugoutput voltdbroot catalog-report.html statement-plans \
-    	log client/jsonsessions/*.class procedures/jsonsessions/*.class
+        log client/jsonsessions/*.class procedures/jsonsessions/*.class
 }
 
 # remove everything from "clean" as well as the jarfiles
 function cleanall() {
-	clean
+    clean
     rm -rf json-procs.jar json-client.jar
 }
 
 # compile the source code for procedures and the client into jarfiles
 function jars() {
-	# compile java source
+    # compile java source
     javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH procedures/jsonsessions/*.java
     javac -target 1.7 -source 1.7 -classpath $CLIENTCLASSPATH client/jsonsessions/*.java
     # build procedure and client jars
@@ -70,9 +70,9 @@ function jars() {
 
 # compile the procedure and client jarfiles if they don't exist
 function jars-ifneeded() {
-	if [ ! -e json-procs.jar ] || [ ! -e json-client.jar ]; then
-		jars;
-	fi
+    if [ ! -e json-procs.jar ] || [ ! -e json-client.jar ]; then
+        jars;
+    fi
 }
 
 # run the voltdb server locally

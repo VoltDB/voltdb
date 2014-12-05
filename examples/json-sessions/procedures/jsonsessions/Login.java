@@ -30,7 +30,7 @@ import org.voltdb.VoltTable;
 
 public class Login extends VoltProcedure {
 
-    // potential return codes
+    // potential return codes (must be synced with client code)
     public static final long LOGIN_SUCCESSFUL = 0;
     public static final long LOGIN_FAIL = 1;
     public static final long LOGIN_TIMEOUT = 2;
