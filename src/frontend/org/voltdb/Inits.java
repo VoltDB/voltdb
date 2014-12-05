@@ -121,7 +121,7 @@ public class Inits {
             m_isRejoin = false;
         }
         m_threadCount = threadCount;
-        m_deployment = rvdb.m_deployment;
+        m_deployment = rvdb.m_catalogContext.getDeployment();
 
         // find all the InitWork subclasses using reflection and load them up
         Class<?>[] declaredClasses = Inits.class.getDeclaredClasses();
@@ -307,10 +307,8 @@ public class Inits {
                     long catalogTxnId;
                     catalogTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
 
-                    // Need to get the deployment bytes from ZK
-                    CatalogAndIds catalogStuff =
-                        CatalogUtil.getCatalogFromZK(m_rvdb.getHostMessenger().getZK());
-                    byte[] deploymentBytes = catalogStuff.deploymentBytes;
+                    // Need to get the deployment bytes from the starter catalog context
+                    byte[] deploymentBytes = m_rvdb.getCatalogContext().deploymentBytes;
 
                     // publish the catalog bytes to ZK
                     CatalogUtil.updateCatalogToZK(
@@ -388,8 +386,8 @@ public class Inits {
                         catalogStuff.uniqueId,
                         catalog,
                         catalogJarBytes,
-                        // Our starter catalog has set the deployment hash, just yoink it out for now
-                        m_rvdb.m_catalogContext.deploymentHash,
+                        // Our starter catalog has set the deployment stuff, just yoink it out for now
+                        m_rvdb.m_catalogContext.deploymentBytes,
                         catalogStuff.version, -1);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Error agreeing on starting catalog version", true, e);
