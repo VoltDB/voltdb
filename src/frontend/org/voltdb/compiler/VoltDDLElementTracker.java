@@ -21,8 +21,8 @@ import static org.voltdb.compiler.ProcedureCompiler.deriveShortProcedureName;
 
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.SortedSet;
@@ -45,8 +45,6 @@ public class VoltDDLElementTracker {
             new HashMap<String, ProcedureDescriptor>();
     // map from export group name to a sorted set of table names in that group
     final SortedMap<String, SortedSet<String>> m_exportsByGroup = new TreeMap<>();
-    // set used to ensure no table is exported twice
-    protected final Set<String> m_exportedTables = new HashSet<>();
     // additional non-procedure classes for the jar
     final Set<String> m_extraClassses = new TreeSet<String>();
     final Set<String> m_importLines = new TreeSet<String>();
@@ -203,14 +201,6 @@ public class VoltDDLElementTracker {
         // store uppercase in the catalog as typename
         groupName = groupName.toUpperCase();
 
-        // ensure this table isn't already exported
-        if(m_exportedTables.contains(tableName)) {
-            throw m_compiler.new VoltCompilerException(String.format(
-                    "Table \"%s\" is already exported", tableName
-                    ));
-        }
-        m_exportedTables.add(tableName);
-
         // insert the table's name into the export group
         SortedSet<String> tableGroup = m_exportsByGroup.get(groupName);
         if (tableGroup == null) {
@@ -222,7 +212,11 @@ public class VoltDDLElementTracker {
 
     void removeExportedTable(String tableName)
     {
-        m_exportsByGroup.remove(tableName);
+        for (Entry<String, SortedSet<String>> groupTables : m_exportsByGroup.entrySet()) {
+            if (groupTables.getValue().contains(tableName)) {
+                groupTables.getValue().remove(tableName);
+            }
+        }
     }
 
     /**

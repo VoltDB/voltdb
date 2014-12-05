@@ -443,24 +443,19 @@ public class TestDDLCompiler extends TestCase {
                 "EXPORT TABLE S GROUP FOO;"
         };
 
-        // boilerplate for making a project
-        final String simpleProject =
-                "<?xml version=\"1.0\"?>\n" +
-                "<project><database><schemas>" +
-                "<schema path='%s' />" +
-                "</schemas></database></project>";
-
         VoltCompiler compiler = new VoltCompiler();
         for (int ii = 0; ii < schema.length; ++ii) {
             File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema[ii]);
             String schemaPath = schemaFile.getPath();
 
-            File projectFile = VoltProjectBuilder.writeStringToTempFile(
-                    String.format(simpleProject, schemaPath));
-            String projectPath = projectFile.getPath();
-
             // compile successfully
-            boolean success = compiler.compileWithProjectXML(projectPath, jarOut.getPath());
+            boolean success = false;
+            try {
+                success = compiler.compileFromDDL(jarOut.getPath(), schemaPath);
+            }
+            catch (Exception e) {
+                // do nothing
+            }
             assertTrue(success);
 
             // cleanup after the test

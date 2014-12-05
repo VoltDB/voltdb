@@ -1120,7 +1120,7 @@ public class VoltCompiler {
             }
         }
 
-        // Process and add exports and connectors to the catalog from project file
+        // Process and add exports and connectors to the catalog
         // Must do this before compiling procedures to deny updates
         // on append-only tables.
         if (export != null) {
@@ -1909,10 +1909,6 @@ public class VoltCompiler {
         return cls;
     }
 
-    /**
-     * Process export tables from the project file.
-     * Note that project file export info doesn't support export groups / named connectors
-     */
     private void compileExport(final ExportType export, final Database catdb)
         throws VoltCompilerException
     {
