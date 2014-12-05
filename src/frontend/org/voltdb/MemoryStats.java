@@ -74,6 +74,7 @@ public class MemoryStats extends StatsSource {
         columns.add(new VoltTable.ColumnInfo("RSS", VoltType.INTEGER));
         columns.add(new VoltTable.ColumnInfo("JAVAUSED", VoltType.INTEGER));
         columns.add(new VoltTable.ColumnInfo("JAVAUNUSED", VoltType.INTEGER));
+        columns.add(new VoltTable.ColumnInfo("JAVAMAXHEAP", VoltType.INTEGER));
         columns.add(new VoltTable.ColumnInfo("TUPLEDATA", VoltType.INTEGER));
         columns.add(new VoltTable.ColumnInfo("TUPLEALLOCATED", VoltType.INTEGER));
         columns.add(new VoltTable.ColumnInfo("INDEXMEMORY", VoltType.INTEGER));
@@ -109,6 +110,7 @@ public class MemoryStats extends StatsSource {
         rowValues[columnNameToIndex.get("RSS")] = rss;
         rowValues[columnNameToIndex.get("JAVAUSED")] = javaused;
         rowValues[columnNameToIndex.get("JAVAUNUSED")] = javaunused;
+        rowValues[columnNameToIndex.get("JAVAMAXHEAP")] = Runtime.getRuntime().maxMemory() / 1024;
         rowValues[columnNameToIndex.get("TUPLEDATA")] = totals.tupleDataMem;
         rowValues[columnNameToIndex.get("TUPLEALLOCATED")] = totals.tupleAllocatedMem;
         rowValues[columnNameToIndex.get("INDEXMEMORY")] = totals.indexMem;
