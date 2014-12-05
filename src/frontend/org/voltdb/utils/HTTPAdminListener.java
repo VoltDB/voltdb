@@ -327,10 +327,7 @@ public class HTTPAdminListener {
 
             super.handle(target, baseRequest, request, response);
 
-            if (baseRequest.getMethod().equalsIgnoreCase("GET")) {
-                handleGet(target, baseRequest, request, response);
-            }
-            //TODO handle post later.
+            handleGet(target, baseRequest, request, response);
         }
 
         // GET on /deployment resources.
