@@ -358,7 +358,7 @@ public interface Client {
      * <li>99.9-percentile round trip latency estimate in ms.</li>
      * <li>99.99-percentile round trip latency estimate in ms.</li>
      * <li>99.999-percentile round trip latency estimate in ms.</li>
-     * </ol></p>
+     * </ol>
      *
      * @param stats {@link ClientStats} instance with relevant stats.
      * @param path Path to write to, passed to {@link FileWriter#FileWriter(String)}.
