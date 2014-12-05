@@ -25,13 +25,20 @@ public class AuthenticationResult {
     final public String m_user;
     final public String m_message;
     final private boolean m_authenticated;
+    final public String[] m_perms;
 
+    //Is user authenticated or not depends on client connection there or not.
     public AuthenticationResult(Client client, boolean adminMode, String user, String message) {
         this.m_adminMode = adminMode;
         this.m_client = client;
-        this.m_user = user;
+        if (!VoltDB.instance().getCatalogContext().authSystem.isSecurityEnabled()) {
+            this.m_user = null;
+        } else {
+            this.m_user = user;
+        }
         this.m_message = message;
         this.m_authenticated = (m_client != null);
+        m_perms = VoltDB.instance().getCatalogContext().authSystem.getUserPermissionList(m_user);
     }
 
     public boolean isAuthenticated() {
