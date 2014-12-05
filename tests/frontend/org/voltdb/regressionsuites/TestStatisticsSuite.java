@@ -401,7 +401,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         System.out.println("\n\nTESTING MEMORY STATS\n\n\n");
         Client client  = getFullyConnectedClient();
 
-        ColumnInfo[] expectedSchema = new ColumnInfo[13];
+        ColumnInfo[] expectedSchema = new ColumnInfo[14];
         expectedSchema[0] = new ColumnInfo("TIMESTAMP", VoltType.BIGINT);
         expectedSchema[1] = new ColumnInfo("HOST_ID", VoltType.INTEGER);
         expectedSchema[2] = new ColumnInfo("HOSTNAME", VoltType.STRING);
@@ -415,6 +415,7 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         expectedSchema[10] = new ColumnInfo("TUPLECOUNT", VoltType.BIGINT);
         expectedSchema[11] = new ColumnInfo("POOLEDMEMORY", VoltType.BIGINT);
         expectedSchema[12] = new ColumnInfo("PHYSICALMEMORY", VoltType.BIGINT);
+        expectedSchema[13] = new ColumnInfo("JAVAMAXHEAP", VoltType.INTEGER);
         VoltTable expectedTable = new VoltTable(expectedSchema);
 
         VoltTable[] results = null;

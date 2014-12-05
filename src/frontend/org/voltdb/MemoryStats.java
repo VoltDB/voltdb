@@ -74,7 +74,6 @@ public class MemoryStats extends StatsSource {
         columns.add(new VoltTable.ColumnInfo("RSS", VoltType.INTEGER));
         columns.add(new VoltTable.ColumnInfo("JAVAUSED", VoltType.INTEGER));
         columns.add(new VoltTable.ColumnInfo("JAVAUNUSED", VoltType.INTEGER));
-        columns.add(new VoltTable.ColumnInfo("JAVAMAXHEAP", VoltType.INTEGER));
         columns.add(new VoltTable.ColumnInfo("TUPLEDATA", VoltType.INTEGER));
         columns.add(new VoltTable.ColumnInfo("TUPLEALLOCATED", VoltType.INTEGER));
         columns.add(new VoltTable.ColumnInfo("INDEXMEMORY", VoltType.INTEGER));
@@ -82,6 +81,7 @@ public class MemoryStats extends StatsSource {
         columns.add(new VoltTable.ColumnInfo("TUPLECOUNT", VoltType.BIGINT));
         columns.add(new VoltTable.ColumnInfo("POOLEDMEMORY", VoltType.BIGINT));
         columns.add(new VoltTable.ColumnInfo("PHYSICALMEMORY", VoltType.BIGINT));
+        columns.add(new VoltTable.ColumnInfo("JAVAMAXHEAP", VoltType.INTEGER));
     }
 
     @Override
@@ -110,7 +110,6 @@ public class MemoryStats extends StatsSource {
         rowValues[columnNameToIndex.get("RSS")] = rss;
         rowValues[columnNameToIndex.get("JAVAUSED")] = javaused;
         rowValues[columnNameToIndex.get("JAVAUNUSED")] = javaunused;
-        rowValues[columnNameToIndex.get("JAVAMAXHEAP")] = Runtime.getRuntime().maxMemory() / 1024;
         rowValues[columnNameToIndex.get("TUPLEDATA")] = totals.tupleDataMem;
         rowValues[columnNameToIndex.get("TUPLEALLOCATED")] = totals.tupleAllocatedMem;
         rowValues[columnNameToIndex.get("INDEXMEMORY")] = totals.indexMem;
@@ -119,6 +118,7 @@ public class MemoryStats extends StatsSource {
         rowValues[columnNameToIndex.get("POOLEDMEMORY")] = totals.pooledMem / 1024;
         //in kb to make math simpler with other mem values.
         rowValues[columnNameToIndex.get("PHYSICALMEMORY")] = PlatformProperties.getPlatformProperties().ramInMegabytes * 1024;
+        rowValues[columnNameToIndex.get("JAVAMAXHEAP")] = Runtime.getRuntime().maxMemory() / 1024;
         super.updateStatsRow(rowKey, rowValues);
     }
 
