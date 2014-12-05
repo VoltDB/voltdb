@@ -125,14 +125,6 @@ public class TestPlansGroupBy extends PlannerTestCase {
         pns = compileToFragments("SELECT DISTINCT A1 FROM T1");
     }
 
-    public void testTry() {
-        AbstractExpression.enableVerboseExplainForDebugging();;
-        pns = compileToFragments("SELECT B1+C1 from R1 ORDER BY abs(B1+C1)");
-        printExplainPlan(pns);
-        AbstractExpression.disableVerboseExplainForDebugging();
-    }
-
-
     public void testDistinctA1_Subquery() {
         AbstractPlanNode p;
         // Distinct rewrote with group by
@@ -581,8 +573,16 @@ public class TestPlansGroupBy extends PlannerTestCase {
     }
 
     private void checkHasComplexAgg(List<AbstractPlanNode> pns) {
+        checkHasComplexAgg(pns, false);
+    }
+
+    private void checkHasComplexAgg(List<AbstractPlanNode> pns, boolean projectPushdown) {
         assertTrue(pns.size() > 0);
         boolean isDistributed = pns.size() > 1 ? true: false;
+
+        if (projectPushdown) {
+            assertTrue(isDistributed);
+        }
 
         AbstractPlanNode p = pns.get(0).getChild(0);
         if (p instanceof LimitPlanNode) {
@@ -591,8 +591,9 @@ public class TestPlansGroupBy extends PlannerTestCase {
         if (p instanceof OrderByPlanNode) {
             p = p.getChild(0);
         }
-        assertTrue(p instanceof ProjectionPlanNode);
-
+        if (! projectPushdown) {
+            assertTrue(p instanceof ProjectionPlanNode);
+        }
         while ( p.getChildCount() > 0) {
             p = p.getChild(0);
             assertFalse(p instanceof ProjectionPlanNode);
@@ -600,7 +601,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         if (isDistributed) {
             p = pns.get(1).getChild(0);
-            assertFalse(p instanceof ProjectionPlanNode);
+            int projectCount = 0;
+            while ( p.getChildCount() > 0) {
+                p = p.getChild(0);
+                if (p instanceof ProjectionPlanNode) {
+                    projectCount++;
+                    assertTrue(projectPushdown);
+                }
+            }
+            if (projectPushdown) {
+                assertEquals(1, projectCount);
+            }
         }
     }
 
@@ -664,6 +675,16 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         pns = compileToFragments("SELECT A1, SUM(PKEY), COUNT(PKEY), (AVG(PKEY) + 1) as A4 FROM P1 GROUP BY A1");
         checkHasComplexAgg(pns);
+    }
+
+    public void testComplexAggCaseProjectPushdown() {
+        // This complex aggregate case will push down ORDER BY LIMIT
+        // so the projection plan node should be also pushed down
+        pns = compileToFragments("SELECT PKEY, sum(A1) + 1 FROM P1 GROUP BY PKEY order by 1, 2 Limit 10");
+        checkHasComplexAgg(pns, true);
+
+        pns = compileToFragments("SELECT PKEY, AVG(A1) FROM P1 GROUP BY PKEY order by 1, 2 Limit 10");
+        checkHasComplexAgg(pns, true);
     }
 
     public void testComplexGroupby() {

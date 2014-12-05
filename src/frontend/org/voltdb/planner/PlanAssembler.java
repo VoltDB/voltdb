@@ -777,12 +777,12 @@ public class PlanAssembler {
 
         root = handleOrderBy(root);
 
-        if (m_parsedSelect.hasLimitOrOffset()) {
-            root = handleLimitOperator(root);
-        }
-
         if (mvFixNeedsProjection || needProjectionNode(root)) {
             root = addProjection(root);
+        }
+
+        if (m_parsedSelect.hasLimitOrOffset()) {
+            root = handleLimitOperator(root);
         }
 
         CompiledPlan plan = new CompiledPlan();
@@ -792,7 +792,8 @@ public class PlanAssembler {
         boolean hasLimitOrOffset = m_parsedSelect.hasLimitOrOffset();
         plan.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic);
 
-        // Apply the micro-optimization: Table count, Counting Index, Optimized Min/Max
+        // Apply the micro-optimization:
+        // LIMIT push down, Table count / Counting Index, Optimized Min/Max
         MicroOptimizationRunner.applyAll(plan, m_parsedSelect);
 
         return plan;
@@ -1360,17 +1361,7 @@ public class PlanAssembler {
                 // Add the distributed work back to the plan
                 sendNode.addAndLinkChild(distLimit);
             }
-        } else if (m_parsedSelect.hasDistinctWithGroupBy()) {
-            // Currently we never pushdown LIMIT when there is a DISTINCT clause
-            if (isInlineLimitPlanNodePossible(root)) {
-                root.addInlinePlanNode(topLimit);
-            } else {
-                topLimit.addAndLinkChild(root);
-                root = topLimit;
-            }
-            return root;
         }
-
         // In future, inline LIMIT for join, Receive
         // Then we do not need to distinguish the order by node.
 
@@ -1938,8 +1929,7 @@ public class PlanAssembler {
                                        AggregatePlanNode distNode,
                                        AggregatePlanNode coordNode,
                                        ParsedSelectStmt selectStmt) {
-
-        boolean needCoordNode = !selectStmt.hasPartitionColumnInGroupby();
+        boolean noNeedCoordNode = selectStmt.hasPartitionColumnInGroupby();
 
         // remember that coordinating aggregation has a pushed-down
         // counterpart deeper in the plan. this allows other operators
@@ -1959,21 +1949,32 @@ public class PlanAssembler {
             root = root.getChild(0).getChild(0);
             root.clearParents();
             distNode.addAndLinkChild(root);
-            root = distNode;
-            // Put the send/receive pair back into place
-            accessPlanTemp.getChild(0).clearChildren();
-            accessPlanTemp.getChild(0).addAndLinkChild(root);
-            root = accessPlanTemp;
-            // Add the top node
-            if (needCoordNode) {
-                coordNode.addAndLinkChild(root);
-                root = coordNode;
-                // Set post predicate for top Aggregation node
-                coordNode.setPostPredicate(m_parsedSelect.m_having);
-            } else {
+
+            if (noNeedCoordNode) {
                 // Set post predicate for final distributed Aggregation node
                 distNode.setPostPredicate(m_parsedSelect.m_having);
+
+                // Edge case: GROUP BY clause contains the partition column
+                // No related GROUP BY or even Re-agg will apply on coordinator
+                // Projection plan node can just be pushed down also.
+                root = processComplexAggProjectionNode(selectStmt, distNode);
+                // Put the send/receive pair back into place
+                accessPlanTemp.getChild(0).clearChildren();
+                accessPlanTemp.getChild(0).addAndLinkChild(root);
+                return accessPlanTemp;
             }
+            // Without including partition column in GROUP BY clause,
+            // there has to be a top GROUP BY plan node on coordinator
+
+            // Put the send/receive pair back into place
+            accessPlanTemp.getChild(0).clearChildren();
+            accessPlanTemp.getChild(0).addAndLinkChild(distNode);
+            root = accessPlanTemp;
+            // Add the top node
+            coordNode.addAndLinkChild(root);
+            root = coordNode;
+            // Set post predicate for top Aggregation node
+            coordNode.setPostPredicate(m_parsedSelect.m_having);
         } else {
             distNode.addAndLinkChild(root);
             root = distNode;
@@ -1981,13 +1982,22 @@ public class PlanAssembler {
             distNode.setPostPredicate(m_parsedSelect.m_having);
         }
 
-        if (selectStmt.hasComplexAgg()) {
-            ProjectionPlanNode proj = new ProjectionPlanNode();
-            proj.addAndLinkChild(root);
-            proj.setOutputSchema(selectStmt.getFinalProjectionSchema());
-            root = proj;
-        }
+        root = processComplexAggProjectionNode(selectStmt, root);
+
         return root;
+    }
+
+    private AbstractPlanNode processComplexAggProjectionNode(
+            ParsedSelectStmt selectStmt, AbstractPlanNode root) {
+        if (! selectStmt.hasComplexAgg()) {
+            return root;
+        }
+
+        ProjectionPlanNode proj = new ProjectionPlanNode();
+        proj.setOutputSchema(selectStmt.getFinalProjectionSchema());
+
+        proj.addAndLinkChild(root);
+        return proj;
     }
 
     /**
@@ -2123,11 +2133,8 @@ public class PlanAssembler {
         if (m_parsedSelect.displayColumnsContainAllGroupByColumns()) {
             return root;
         }
-
         // Now non complex aggregation cases are handled already
         assert(m_parsedSelect.hasComplexAgg());
-        // project node is the root because of complex agg case
-        assert(root instanceof ProjectionPlanNode && root.getChildCount() == 1);
 
         AggregatePlanNode distinctAggNode = new HashAggregatePlanNode();
         distinctAggNode.setOutputSchema(m_parsedSelect.getFinalProjectionSchema());

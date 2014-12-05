@@ -106,15 +106,7 @@ public class TestGroupByComplexSuite extends RegressionSuite {
             expected = new long[][] {{1,2,5,2}, {2,3,10,2}, {3,4,15,2}, {4,5,20,1}, {5,6,25,1} };
             validateTableOfLongs(vt, expected);
 
-            // Test order by expression column which is not in display columns
-            cr = client.callProcedure("@AdHoc", "SELECT COUNT(*) as tag, sum(wage) from " + tb +
-                    " GROUP BY dept ORDER BY abs(dept) DESC");
-            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-            vt = cr.getResults()[0];
-            expected = new long[][] { {2, 90}, {3, 60}};
-            validateTableOfLongs(vt, expected);
-
-            // Test order by expression column which is not in display columns, with complex aggregations
+            // Test order by alias from display list
             cr = client.callProcedure("@AdHoc", "SELECT dept, COUNT(*) as tag, sum(wage) - 1 from " + tb +
                     " GROUP BY dept ORDER BY tag DESC");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
@@ -245,14 +237,6 @@ public class TestGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {1, 57, 4} , {2, 88, 5}};
-            validateTableOfLongs(vt, expected);
-
-            // Test Order by column not in Display columns
-            cr = client.callProcedure("@AdHoc", "SELECT SUM(ABS(wage) - 1) as tag, " +
-                    "(count(*)+sum(dept*2))/2 from " + tb + " GROUP BY dept ORDER BY ABS(dept)");
-            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-            vt = cr.getResults()[0];
-            expected = new long[][] { {57, 4} , {88, 5}};
             validateTableOfLongs(vt, expected);
         }
     }
@@ -547,15 +531,6 @@ public class TestGroupByComplexSuite extends RegressionSuite {
             expected = new long[][] { {1, 3, 6, 20}, {2, 4, 22, 35} };
             validateTableOfLongs(vt, expected);
 
-            // Test order by without tag and not in display columns
-            cr = client.callProcedure("@AdHoc", "SELECT count(wage), sum(id), avg(wage)  from " + tb +
-                    " GROUP BY abs(dept) ORDER BY abs(dept) ");
-            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-            vt = cr.getResults()[0];
-            expected = new long[][] { {3, 6, 20}, {4, 22, 35} };
-            validateTableOfLongs(vt, expected);
-
-
             //(2) Test complex group-by with complex aggregation.
             // Test order by with tag
             cr = client.callProcedure("@AdHoc", "SELECT abs(dept-2) as tag, count(wage)+1, avg(wage)/2 from " + tb +
@@ -571,14 +546,6 @@ public class TestGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {0, 5, 17}, {1, 4, 10} };
-            validateTableOfLongs(vt, expected);
-
-            // Test order by without tag and not in display columns
-            cr = client.callProcedure("@AdHoc", "SELECT count(wage)+1, avg(wage)/2 from " + tb +
-                    " GROUP BY abs(dept-2) ORDER BY abs(dept-2);");
-            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-            vt = cr.getResults()[0];
-            expected = new long[][] { {5, 17}, {4, 10} };
             validateTableOfLongs(vt, expected);
 
             //(3) More hard general test cases with multi group by columns and complex aggs
@@ -1142,6 +1109,41 @@ public class TestGroupByComplexSuite extends RegressionSuite {
         }
     }
 
+
+    public void testOrderbyColumnsNotInDisplayList() throws IOException, ProcCallException {
+        System.out.println("Test testOrderbyColumnsNotInDisplayList...");
+        loadData(true);
+        Client client = this.getClient();
+
+        String sql;
+        VoltTable vt;
+        for (String tb: tbs) {
+            // Test Order by column not in Display columns
+            sql = "SELECT SUM(ABS(wage) - 1) as tag, " +
+                    "(count(*)+sum(dept*2))/2 from " + tb + " GROUP BY dept ORDER BY ABS(dept)";
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfLongs(vt, new long[][] { {57, 4} , {88, 5}});
+
+            // Test order by without tag and not in display columns
+            sql = "SELECT count(wage), sum(id), avg(wage)  from " + tb +
+                    " GROUP BY abs(dept) ORDER BY abs(dept) ";
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfLongs(vt, new long[][] { {3, 6, 20}, {4, 22, 35} });
+
+            sql =  "SELECT count(wage)+1, avg(wage)/2 from " + tb +
+                    " GROUP BY abs(dept-2) ORDER BY abs(dept-2);";
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfLongs(vt, new long[][] { {5, 17}, {4, 10} });
+
+            sql = "SELECT COUNT(*) as tag, sum(wage) from " + tb +
+                    " GROUP BY dept ORDER BY abs(dept) DESC";
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfLongs(vt, new long[][] { {2, 90}, {3, 60}});
+        }
+
+    }
+
+
     //
     // Suite builder boilerplate
     //
@@ -1217,16 +1219,16 @@ public class TestGroupByComplexSuite extends RegressionSuite {
         assertTrue(success);
         builder.addServerConfig(config);
 
-//        config = new LocalCluster("groupByComplex-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-//        success = config.compile(project);
-//        assertTrue(success);
-//        builder.addServerConfig(config);
-//
-//        // Cluster
-//        config = new LocalCluster("groupByComplex-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-//        success = config.compile(project);
-//        assertTrue(success);
-//        builder.addServerConfig(config);
+        config = new LocalCluster("groupByComplex-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+        success = config.compile(project);
+        assertTrue(success);
+        builder.addServerConfig(config);
+
+        // Cluster
+        config = new LocalCluster("groupByComplex-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        success = config.compile(project);
+        assertTrue(success);
+        builder.addServerConfig(config);
 
         return builder;
     }
