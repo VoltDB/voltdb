@@ -50,15 +50,15 @@ public class CatalogBuilder {
     private StringBuffer transformer = new StringBuffer();
 
     public static final class ProcedureInfo {
-        private final String groups[];
+        private final String roles[];
         private final Class<?> cls;
         private final String name;
         private final String sql;
         private final String partitionInfo;
         private final String joinOrder;
 
-        public ProcedureInfo(final String groups[], final Class<?> cls) {
-            this.groups = groups;
+        public ProcedureInfo(final String roles[], final Class<?> cls) {
+            this.roles = roles;
             this.cls = cls;
             this.name = cls.getSimpleName();
             this.sql = null;
@@ -68,21 +68,21 @@ public class CatalogBuilder {
         }
 
         public ProcedureInfo(
-                final String groups[],
+                final String roles[],
                 final String name,
                 final String sql,
                 final String partitionInfo) {
-            this(groups, name, sql, partitionInfo, null);
+            this(roles, name, sql, partitionInfo, null);
         }
 
         public ProcedureInfo(
-                final String groups[],
+                final String roles[],
                 final String name,
                 final String sql,
                 final String partitionInfo,
                 final String joinOrder) {
             assert(name != null);
-            this.groups = groups;
+            this.roles = roles;
             this.cls = null;
             this.name = name;
             if(sql.endsWith(";")) {
@@ -203,7 +203,7 @@ public class CatalogBuilder {
     }
 
     /*
-     * List of groups permitted to invoke the procedure
+     * List of roles permitted to invoke the procedure
      */
     public void addProcedures(final ProcedureInfo... procedures) {
         final ArrayList<ProcedureInfo> procArray = new ArrayList<ProcedureInfo>();
@@ -225,10 +225,10 @@ public class CatalogBuilder {
 
             // ALLOW clause in CREATE PROCEDURE stmt
             StringBuffer roleInfo = new StringBuffer();
-            if(procedure.groups.length != 0) {
+            if(procedure.roles.length != 0) {
                 roleInfo.append(" ALLOW ");
-                for(int i = 0; i < procedure.groups.length; i++) {
-                    roleInfo.append(procedure.groups[i] + ",");
+                for(int i = 0; i < procedure.roles.length; i++) {
+                    roleInfo.append(procedure.roles[i] + ",");
                 }
                 int length = roleInfo.length();
                 roleInfo.replace(length - 1, length, " ");
