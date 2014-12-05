@@ -373,17 +373,13 @@ public class Inits {
             serializedCatalog = null;
 
             // note if this fails it will print an error first
-            try {
-                //This is where we compile real catalog and create runtime catalog context. To validate deployment
-                //we compile and create a starter context which uses a placeholder catalog.
-                long result = CatalogUtil.compileDeployment(catalog, m_deployment, true, false);
-                if (result < 0) {
-                    hostLog.fatal("Error parsing deployment file");
-                    VoltDB.crashLocalVoltDB("Error parsing deployment file");
-                }
-            } catch (Exception e) {
-                hostLog.fatal("Error parsing deployment file", e);
-                VoltDB.crashLocalVoltDB("Error parsing deployment file", true, e);
+            // This is where we compile real catalog and create runtime
+            // catalog context. To validate deployment we compile and create
+            // a starter context which uses a placeholder catalog.
+            String result = CatalogUtil.compileDeployment(catalog, m_deployment, false);
+            if (result != null) {
+                hostLog.fatal(result);
+                VoltDB.crashLocalVoltDB(result);
             }
 
             try {

@@ -41,6 +41,7 @@ import org.voltdb.catalog.Group;
 import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.common.Permission;
@@ -228,11 +229,6 @@ public abstract class CatalogSchemaTools {
                         }
                         sb.append(")");
                     }
-                    else
-                    if (const_type == ConstraintType.LIMIT) {
-                        sb.append("LIMIT PARTITION ROWS " + String.valueOf(catalog_tbl.getTuplelimit()) );
-                    }
-
                 }
                 if (catalog_idx.getTypeName().startsWith(HSQLInterface.AUTO_GEN_PREFIX) ||
                         catalog_idx.getTypeName().startsWith(HSQLInterface.AUTO_GEN_MATVIEW) ) {
@@ -266,6 +262,16 @@ public abstract class CatalogSchemaTools {
 
         if (catalog_tbl.getTuplelimit() != Integer.MAX_VALUE) {
             sb.append(add + spacer + "LIMIT PARTITION ROWS " + String.valueOf(catalog_tbl.getTuplelimit()) );
+            CatalogMap<Statement> deleteMap = catalog_tbl.getTuplelimitdeletestmt();
+            if (deleteMap.size() > 0) {
+                assert(deleteMap.size() == 1);
+                String deleteStmt = deleteMap.iterator().next().getSqltext();
+                if (deleteStmt.endsWith(";")) {
+                    // StatementCompiler appends the semicolon, we don't want it here.
+                    deleteStmt = deleteStmt.substring(0, deleteStmt.length() - 1);
+                }
+                sb.append(" EXECUTE (" + deleteStmt + ")");
+            }
         }
 
         if (viewQuery != null) {

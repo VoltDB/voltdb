@@ -46,6 +46,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.fullddlfeatures.TestDDLFeatures;
 import org.voltdb.utils.MiscUtils;
 
 public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
@@ -57,7 +58,7 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
         String pathToCatalog = Configuration.getPathToCatalogForTest("fullDDL.jar");
 
         VoltCompiler compiler = new VoltCompiler();
-        final URL url = TestCanonicalDDLThroughSQLcmd.class.getResource("fullDDL.sql");
+        final URL url = TestDDLFeatures.class.getResource("fullDDL.sql");
         String pathToSchema = URLDecoder.decode(url.getPath(), "UTF-8");
         boolean success = compiler.compileFromDDL(pathToCatalog, pathToSchema);
         assertTrue(success);

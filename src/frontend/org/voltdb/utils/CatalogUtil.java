@@ -31,7 +31,6 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -465,73 +464,87 @@ public abstract class CatalogUtil {
         return true;
     }
 
-    public static long compileDeployment(Catalog catalog, String deploymentURL,
-            boolean crashOnFailedValidation, boolean isPlaceHolderCatalog) {
+    public static String compileDeployment(Catalog catalog, String deploymentURL,
+            boolean isPlaceHolderCatalog)
+    {
         DeploymentType deployment = CatalogUtil.parseDeployment(deploymentURL);
         if (deployment == null) {
-            return -1;
+            return "Error parsing deployment file: " + deploymentURL;
         }
-        return compileDeployment(catalog, deployment, crashOnFailedValidation, isPlaceHolderCatalog);
+        return compileDeployment(catalog, deployment, isPlaceHolderCatalog);
     }
 
-    public static long compileDeploymentString(Catalog catalog, String deploymentString,
-            boolean crashOnFailedValidation, boolean isPlaceHolderCatalog) {
+    public static String compileDeploymentString(Catalog catalog, String deploymentString,
+            boolean isPlaceHolderCatalog)
+    {
         DeploymentType deployment = CatalogUtil.parseDeploymentFromString(deploymentString);
         if (deployment == null) {
-            return -1;
+            return "Error parsing deployment string";
         }
-        return compileDeployment(catalog, deployment, crashOnFailedValidation, isPlaceHolderCatalog);
+        return compileDeployment(catalog, deployment, isPlaceHolderCatalog);
     }
 
     /**
      * Parse the deployment.xml file and add its data into the catalog.
      * @param catalog Catalog to be updated.
      * @param deployment Parsed representation of the deployment.xml file.
-     * @param crashOnFailedValidation
      * @param isPlaceHolderCatalog if the catalog is isPlaceHolderCatalog and we are verifying only deployment xml.
-     * @return CRC of the deployment contents (>0) or -1 on failure.
+     * @return String containing any errors parsing/validating the deployment. NULL on success.
      */
-    public static long compileDeployment(Catalog catalog,
+    public static String compileDeployment(Catalog catalog,
             DeploymentType deployment,
-            boolean crashOnFailedValidation,
             boolean isPlaceHolderCatalog)
     {
-        if (!validateDeployment(catalog, deployment)) {
-            return -1;
+        String errmsg = null;
+
+        try {
+            validateDeployment(catalog, deployment);
+
+            // add our hacky Deployment to the catalog
+            catalog.getClusters().get("cluster").getDeployment().add("deployment");
+
+            // set the cluster info
+            setClusterInfo(catalog, deployment);
+
+            //Set the snapshot schedule
+            setSnapshotInfo( catalog, deployment.getSnapshot());
+
+            //Set enable security
+            setSecurityEnabled(catalog, deployment.getSecurity());
+
+            //set path and path overrides
+            // NOTE: this must be called *AFTER* setClusterInfo and setSnapshotInfo
+            // because path locations for snapshots and partition detection don't
+            // exist in the catalog until after those portions of the deployment
+            // file are handled.
+            setPathsInfo(catalog, deployment.getPaths());
+
+            // set the users info
+            // We'll skip this when building the dummy catalog on startup
+            // so that we don't spew misleading user/role warnings
+            if (!isPlaceHolderCatalog) {
+                setUsersInfo(catalog, deployment.getUsers());
+            }
+
+            // set the HTTPD info
+            setHTTPDInfo(catalog, deployment.getHttpd());
+
+            if (!isPlaceHolderCatalog) {
+                setExportInfo(catalog, deployment.getExport());
+            }
+
+            setCommandLogInfo( catalog, deployment.getCommandlog());
+        }
+        catch (Exception e) {
+            // Anything that goes wrong anywhere in trying to handle the deployment file
+            // should return an error, and let the caller decide what to do (crash or not, for
+            // example)
+            errmsg = "Error validating deployment configuration: " + e.getMessage();
+            hostLog.error(errmsg);
+            return errmsg;
         }
 
-        // add our hacky Deployment to the catalog
-        catalog.getClusters().get("cluster").getDeployment().add("deployment");
-
-        // set the cluster info
-        setClusterInfo(catalog, deployment);
-
-        //Set the snapshot schedule
-        setSnapshotInfo( catalog, deployment.getSnapshot());
-
-        //Set enable security
-        setSecurityEnabled(catalog, deployment.getSecurity());
-
-        //set path and path overrides
-        // NOTE: this must be called *AFTER* setClusterInfo and setSnapshotInfo
-        // because path locations for snapshots and partition detection don't
-        // exist in the catalog until after those portions of the deployment
-        // file are handled.
-        setPathsInfo(catalog, deployment.getPaths(), crashOnFailedValidation);
-
-        // set the users info
-        setUsersInfo(catalog, deployment.getUsers());
-
-        // set the HTTPD info
-        setHTTPDInfo(catalog, deployment.getHttpd());
-
-        if (!isPlaceHolderCatalog) {
-            setExportInfo(catalog, deployment.getExport());
-        }
-
-        setCommandLogInfo( catalog, deployment.getCommandlog());
-
-        return 1;
+        return null;
     }
 
     /*
@@ -671,42 +684,37 @@ public abstract class CatalogUtil {
     }
 
     /**
-     * Validate the contents of the deployment.xml file. This is for things like making sure users aren't being added to
-     * non-existent groups, not for validating XML syntax.
+     * Validate the contents of the deployment.xml file.
+     * This is for validating VoltDB requirements, not XML schema correctness
      * @param catalog Catalog to be validated against.
      * @param deployment Reference to root <deployment> element of deployment file to be validated.
-     * @return Returns true if the deployment file is valid.
+     * @throw throws a RuntimeException if any validation fails
      */
-    private static boolean validateDeployment(Catalog catalog, DeploymentType deployment) {
-        if (deployment.getUsers() == null) {
-            if (deployment.getSecurity() != null && deployment.getSecurity().isEnabled()) {
-                hostLog.error("Cannot enable security without defining users in the deployment file.");
-                return false;
+    private static void validateDeployment(Catalog catalog, DeploymentType deployment) {
+        if (deployment.getSecurity() != null && deployment.getSecurity().isEnabled()) {
+            if (deployment.getUsers() == null) {
+                String msg = "Cannot enable security without defining at least one user in the built-in ADMINISTRATOR role in the deployment file.";
+                throw new RuntimeException(msg);
             }
-            return true;
-        }
 
-        Cluster cluster = catalog.getClusters().get("cluster");
-        Database database = cluster.getDatabases().get("database");
-        Set<String> validGroups = new HashSet<String>();
-        for (Group group : database.getGroups()) {
-            validGroups.add(group.getTypeName());
-        }
+            boolean foundAdminUser = false;
+            for (UsersType.User user : deployment.getUsers().getUser()) {
+                if (user.getRoles() == null)
+                    continue;
 
-        for (UsersType.User user : deployment.getUsers().getUser()) {
-            if (user.getGroups() == null && user.getRoles() == null)
-                continue;
-
-            for (String group : mergeUserRoles(user)) {
-                if (!validGroups.contains(group)) {
-                    hostLog.error("Cannot assign user \"" + user.getName() + "\" to non-existent group \"" + group +
-                            "\"");
-                    return false;
+                for (String role : extractUserRoles(user)) {
+                    if (role.equalsIgnoreCase("ADMINISTRATOR")) {
+                        foundAdminUser = true;
+                        break;
+                    }
                 }
             }
-        }
 
-        return true;
+            if (!foundAdminUser) {
+                String msg = "Cannot enable security without defining at least one user in the built-in ADMINISTRATOR role in the deployment file.";
+                throw new RuntimeException(msg);
+            }
+        }
     }
 
     /**
@@ -724,7 +732,7 @@ public abstract class CatalogUtil {
         ClusterConfig config = new ClusterConfig(hostCount, sitesPerHost, kFactor);
 
         if (!config.validate()) {
-            hostLog.error(config.getErrorMsg());
+            throw new RuntimeException(config.getErrorMsg());
         } else {
             Cluster catCluster = catalog.getClusters().get("cluster");
             // copy the deployment info that is currently not recorded anywhere else
@@ -837,7 +845,7 @@ public abstract class CatalogUtil {
         syssettings.setQuerytimeout(queryTimeout);
     }
 
-    private static void validateDirectory(String type, File path, boolean crashOnFailedValidation) {
+    private static void validateDirectory(String type, File path) {
         String error = null;
         do {
             if (!path.exists()) {
@@ -857,11 +865,7 @@ public abstract class CatalogUtil {
             }
         } while(false);
         if (error != null) {
-            if (crashOnFailedValidation) {
-                VoltDB.crashLocalVoltDB(error, false, null);
-            } else {
-                hostLog.warn(error);
-            }
+            throw new RuntimeException(error);
         }
     }
 
@@ -961,7 +965,12 @@ public abstract class CatalogUtil {
                 for( PropertyType configProp: configProperties) {
                     ConnectorProperty prop = catconn.getConfig().add(configProp.getName());
                     prop.setName(configProp.getName());
-                    prop.setValue(configProp.getValue());
+                    if (!configProp.getName().toLowerCase().contains("password")) {
+                        prop.setValue(configProp.getValue().trim());
+                    } else {
+                        //Dont trim passwords
+                        prop.setValue(configProp.getValue());
+                    }
                 }
             }
 
@@ -989,7 +998,7 @@ public abstract class CatalogUtil {
                         hostLog.info("Export group " + groupName + " configuration properties are: ");
                     }
                     for (PropertyType configProp : exportConfiguration.getProperty()) {
-                        if (!configProp.getName().equalsIgnoreCase("password")) {
+                        if (!configProp.getName().toLowerCase().contains("password")) {
                             hostLog.info("Export Configuration Property NAME=" + configProp.getName() + " VALUE=" + configProp.getValue());
                         }
                     }
@@ -1122,13 +1131,13 @@ public abstract class CatalogUtil {
      * @param paths A reference to the <paths> element of the deployment.xml file.
      * @param printLog Whether or not to print paths info.
      */
-    private static void setPathsInfo(Catalog catalog, PathsType paths, boolean crashOnFailedValidation) {
+    private static void setPathsInfo(Catalog catalog, PathsType paths) {
         File voltDbRoot;
         final Cluster cluster = catalog.getClusters().get("cluster");
         // Handles default voltdbroot (and completely missing "paths" element).
         voltDbRoot = getVoltDbRoot(paths);
 
-        validateDirectory("volt root", voltDbRoot, crashOnFailedValidation);
+        validateDirectory("volt root", voltDbRoot);
 
         PathEntry path_entry = null;
         if (paths != null)
@@ -1138,7 +1147,7 @@ public abstract class CatalogUtil {
         File snapshotPath =
             getFeaturePath(paths, path_entry, voltDbRoot,
                            "snapshot", "snapshots");
-        validateDirectory("snapshot path", snapshotPath, crashOnFailedValidation);
+        validateDirectory("snapshot path", snapshotPath);
 
         path_entry = null;
         if (paths != null)
@@ -1148,7 +1157,7 @@ public abstract class CatalogUtil {
         File exportOverflowPath =
             getFeaturePath(paths, path_entry, voltDbRoot, "export overflow",
                            "export_overflow");
-        validateDirectory("export overflow", exportOverflowPath, crashOnFailedValidation);
+        validateDirectory("export overflow", exportOverflowPath);
 
         // only use these directories in the enterprise version
         File commandLogPath = null;
@@ -1162,7 +1171,7 @@ public abstract class CatalogUtil {
         if (VoltDB.instance().getConfig().m_isEnterprise) {
             commandLogPath =
                     getFeaturePath(paths, path_entry, voltDbRoot, "command log", "command_log");
-            validateDirectory("command log", commandLogPath, crashOnFailedValidation);
+            validateDirectory("command log", commandLogPath);
         }
         else {
             // dumb defaults if you ask for logging in community version
@@ -1177,7 +1186,7 @@ public abstract class CatalogUtil {
         if (VoltDB.instance().getConfig().m_isEnterprise) {
             commandLogSnapshotPath =
                 getFeaturePath(paths, path_entry, voltDbRoot, "command log snapshot", "command_log_snapshot");
-            validateDirectory("command log snapshot", commandLogSnapshotPath, crashOnFailedValidation);
+            validateDirectory("command log snapshot", commandLogSnapshotPath);
         }
         else {
             // dumb defaults if you ask for logging in community version
@@ -1264,39 +1273,37 @@ public abstract class CatalogUtil {
             catUser.setShadowpassword(hashedPW);
 
             // process the @groups and @roles comma separated list
-            for (final String role : mergeUserRoles(user)) {
-                final GroupRef groupRef = catUser.getGroups().add(role);
+            for (final String role : extractUserRoles(user)) {
                 final Group catalogGroup = db.getGroups().get(role);
+                // if the role doesn't exist, ignore it.
                 if (catalogGroup != null) {
+                    final GroupRef groupRef = catUser.getGroups().add(role);
                     groupRef.setGroup(catalogGroup);
+                }
+                else {
+                    hostLog.warn("User \"" + user.getName() +
+                            "\" is assigned to non-existent role \"" + role + "\" " +
+                            "and may not have the expected database permissions.");
                 }
             }
         }
     }
 
     /**
-     * Takes the list of roles specified in the groups, and roles user
-     * attributes and merges the into one set that contains no duplicates
+     * Takes the list of roles specified in the roles user
+     * attributes and returns a set from the comma-separated list
      * @param user an instance of {@link UsersType.User}
      * @return a {@link Set} of role name
      */
-    public static Set<String> mergeUserRoles(final UsersType.User user) {
+    private static Set<String> extractUserRoles(final UsersType.User user) {
         Set<String> roles = new TreeSet<String>();
         if (user == null) return roles;
-
-        if (user.getGroups() != null && !user.getGroups().trim().isEmpty()) {
-            String [] grouplist = user.getGroups().trim().split(",");
-            for (String group: grouplist) {
-                if( group == null || group.trim().isEmpty()) continue;
-                roles.add(group.trim());
-            }
-        }
 
         if (user.getRoles() != null && !user.getRoles().trim().isEmpty()) {
             String [] rolelist = user.getRoles().trim().split(",");
             for (String role: rolelist) {
                 if( role == null || role.trim().isEmpty()) continue;
-                roles.add(role.trim());
+                roles.add(role.trim().toLowerCase());
             }
         }
 
@@ -1581,7 +1588,13 @@ public abstract class CatalogUtil {
     }
 
     private static void updateTableUsageAnnotation(Table table, Statement stmt, boolean read) {
-        Procedure proc = (Procedure) stmt.getParent();
+        if (!(stmt.getParent() instanceof Procedure)) {
+            // if parent of statement is not a procedure
+            // it could be a table with a LIMIT ROWS DELETE
+            return;
+        }
+
+        Procedure proc = (Procedure)stmt.getParent();
         // skip CRUD generated procs
         if (proc.getDefaultproc()) {
             return;

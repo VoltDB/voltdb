@@ -118,7 +118,7 @@ public class VoltDDLElementTracker {
      * @param Name of procedure being removed
      * @throws VoltCompilerException if the procedure does not exist
      */
-    void removeProcedure(String procName) throws VoltCompilerException
+    void removeProcedure(String procName, boolean ifExists) throws VoltCompilerException
     {
         assert procName != null && ! procName.trim().isEmpty();
 
@@ -127,7 +127,7 @@ public class VoltDDLElementTracker {
         if( m_procedureMap.containsKey(shortName)) {
             m_procedureMap.remove(shortName);
         }
-        else {
+        else if (!ifExists) {
             throw m_compiler.new VoltCompilerException(String.format(
                     "Dropped Procedure \"%s\" is not defined", procName));
         }

@@ -54,7 +54,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.SyncCallback;
-import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
+import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.types.TimestampType;
@@ -894,21 +894,6 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         System.out.println("-----\n\n");
     }
 
-    private void checkDeploymentPropertyValue(Client client, String key, String value)
-            throws IOException, ProcCallException, InterruptedException {
-        boolean found = false;
-
-        VoltTable result = client.callProcedure("@SystemInformation", "DEPLOYMENT").getResults()[0];
-        while (result.advanceRow()) {
-            if (result.getString("PROPERTY").equalsIgnoreCase(key)) {
-                found = true;
-                assertEquals(value, result.getString("VALUE"));
-                break;
-            }
-        }
-        assertTrue(found);
-    }
-
     public void testSystemSettingsUpdateTimeout() throws IOException, ProcCallException, InterruptedException  {
         Client client = getClient();
         String newCatalogURL, deploymentURL;
@@ -1038,7 +1023,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
         // As catalogupdate-cluster-base but with security enabled. This requires users and groups..
         // We piggy-back the heartbeat change here.
-        GroupInfo groups[] = new GroupInfo[] {new GroupInfo("group1", false, false, true, false, false, false)};
+        RoleInfo groups[] = new RoleInfo[] {new RoleInfo("group1", false, false, true, false, false, false)};
         UserInfo users[] = new UserInfo[] {new UserInfo("user1", "userpass1", new String[] {"group1"})};
         ProcedureInfo procInfo = new ProcedureInfo(new String[] {"group1"}, InsertNewOrder.class);
 
@@ -1047,9 +1032,9 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project.addDefaultSchema();
         project.addDefaultPartitioning();
         project.addUsers(users);
-        project.addGroups(groups);
+        project.addRoles(groups);
         project.addProcedures(procInfo);
-        project.setSecurityEnabled(true);
+        project.setSecurityEnabled(true, true);
         project.setDeadHostTimeout(6000);
         boolean compile = config.compile(project);
         assertTrue(compile);

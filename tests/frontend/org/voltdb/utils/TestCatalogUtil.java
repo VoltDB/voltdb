@@ -159,13 +159,14 @@ public class TestCatalogUtil extends TestCase {
         final File tmpDep = VoltProjectBuilder.writeStringToTempFile(dep);
         final File tmpBoom = VoltProjectBuilder.writeStringToTempFile(boom);
 
-        long crcDep = CatalogUtil.compileDeployment(catalog, tmpDep.getPath(), true, false);
+        String msg = CatalogUtil.compileDeployment(catalog, tmpDep.getPath(), false);
 
         assertEquals(30, catalog.getClusters().get("cluster").getHeartbeattimeout());
 
         // This returns -1 on schema violation
-        crcDep = CatalogUtil.compileDeployment(catalog, tmpBoom.getPath(), true, false);
-        assertEquals(-1, crcDep);
+        msg = CatalogUtil.compileDeployment(catalog, tmpBoom.getPath(), false);
+        assertTrue(msg != null);
+        assertTrue(msg.contains("Error parsing deployment file"));
     }
 
     public void testAutoSnapshotEnabledFlag() throws Exception
@@ -187,13 +188,13 @@ public class TestCatalogUtil extends TestCase {
             "</deployment>";
 
         final File tmpDepOff = VoltProjectBuilder.writeStringToTempFile(depOff);
-        CatalogUtil.compileDeployment(catalog, tmpDepOff.getPath(), true, false);
+        CatalogUtil.compileDeployment(catalog, tmpDepOff.getPath(), false);
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
         assertFalse(db.getSnapshotschedule().get("default").getEnabled());
 
         setUp();
         final File tmpDepOn = VoltProjectBuilder.writeStringToTempFile(depOn);
-        CatalogUtil.compileDeployment(catalog, tmpDepOn.getPath(), true, false);
+        CatalogUtil.compileDeployment(catalog, tmpDepOn.getPath(), false);
         db = catalog.getClusters().get("cluster").getDatabases().get("database");
         assertFalse(db.getSnapshotschedule().isEmpty());
         assertTrue(db.getSnapshotschedule().get("default").getEnabled());
@@ -210,7 +211,7 @@ public class TestCatalogUtil extends TestCase {
             "   <security enabled=\"false\"/>" +
             "</deployment>";
 
-        final String secOn =
+        final String secOnWithNoAdmin =
             "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
             "<deployment>" +
             "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
@@ -221,14 +222,31 @@ public class TestCatalogUtil extends TestCase {
             "   </users>" +
             "</deployment>";
 
+        final String secOn =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+            "<deployment>" +
+            "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
+            "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
+            "   <security enabled=\"true\"/>" +
+            "   <users>" +
+            "      <user name=\"joe\" password=\"aaa\" roles=\"administrator\"/>" +
+            "   </users>" +
+            "</deployment>";
+
         final File tmpSecOff = VoltProjectBuilder.writeStringToTempFile(secOff);
-        CatalogUtil.compileDeployment(catalog, tmpSecOff.getPath(), true, false);
+        CatalogUtil.compileDeployment(catalog, tmpSecOff.getPath(), false);
         Cluster cluster =  catalog.getClusters().get("cluster");
         assertFalse(cluster.getSecurityenabled());
 
         setUp();
+        final File tmpSecOnWithNoAdmin = VoltProjectBuilder.writeStringToTempFile(secOnWithNoAdmin);
+        String result = CatalogUtil.compileDeployment(catalog, tmpSecOnWithNoAdmin.getPath(), false);
+        assertTrue(result != null);
+        assertTrue(result.contains("Cannot enable security without defining"));
+
+        setUp();
         final File tmpSecOn = VoltProjectBuilder.writeStringToTempFile(secOn);
-        CatalogUtil.compileDeployment(catalog, tmpSecOn.getPath(), true, false);
+        CatalogUtil.compileDeployment(catalog, tmpSecOn.getPath(), false);
         cluster =  catalog.getClusters().get("cluster");
         assertTrue(cluster.getSecurityenabled());
     }
@@ -242,7 +260,7 @@ public class TestCatalogUtil extends TestCase {
             "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
             "   <security enabled=\"true\"/>" +
             "   <users>" +
-            "      <user name=\"joe\" password=\"aaa\"/>" +
+            "      <user name=\"joe\" password=\"aaa\" roles=\"administrator\"/>" +
             "   </users>" +
             "</deployment>";
 
@@ -253,12 +271,12 @@ public class TestCatalogUtil extends TestCase {
             "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
             "   <security enabled=\"true\" provider=\"kerberos\"/>" +
             "   <users>" +
-            "      <user name=\"joe\" password=\"aaa\"/>" +
+            "      <user name=\"joe\" password=\"aaa\" roles=\"administrator\"/>" +
             "   </users>" +
             "</deployment>";
 
         final File tmpSecOff = VoltProjectBuilder.writeStringToTempFile(secOff);
-        CatalogUtil.compileDeployment(catalog, tmpSecOff.getPath(), true, false);
+        CatalogUtil.compileDeployment(catalog, tmpSecOff.getPath(), false);
         Cluster cluster =  catalog.getClusters().get("cluster");
         Database db = cluster.getDatabases().get("database");
         assertTrue(cluster.getSecurityenabled());
@@ -266,7 +284,7 @@ public class TestCatalogUtil extends TestCase {
 
         setUp();
         final File tmpSecOn = VoltProjectBuilder.writeStringToTempFile(secOn);
-        CatalogUtil.compileDeployment(catalog, tmpSecOn.getPath(), true, false);
+        CatalogUtil.compileDeployment(catalog, tmpSecOn.getPath(), false);
         cluster =  catalog.getClusters().get("cluster");
         db = cluster.getDatabases().get("database");
         assertTrue(cluster.getSecurityenabled());
@@ -283,8 +301,9 @@ public class TestCatalogUtil extends TestCase {
             "<jsonapi enabled='true'/>" +
             "</httpd>" +
             "<users> " +
-            "<user name=\"joe\" password=\"aaa\" roles=\"lotre,lodue,louno\"/>" +
-            "<user name=\"jane\" password=\"bbb\" roles=\"launo,ladue,latre\"/>" +
+            "<user name=\"admin\" password=\"admin\" roles=\"administrator\"/>" +
+            "<user name=\"joe\" password=\"aaa\" roles=\"lotre,lodue,louno,dontexist\"/>" +
+            "<user name=\"jane\" password=\"bbb\" roles=\"launo,ladue,latre,dontexist\"/>" +
             "</users>" +
             "</deployment>";
 
@@ -296,7 +315,7 @@ public class TestCatalogUtil extends TestCase {
         catalog_db.getGroups().add("latre");
 
         final File tmpRole = VoltProjectBuilder.writeStringToTempFile(depRole);
-        CatalogUtil.compileDeployment(catalog, tmpRole.getPath(), true, false);
+        CatalogUtil.compileDeployment(catalog, tmpRole.getPath(), false);
         Database db = catalog.getClusters().get("cluster")
                 .getDatabases().get("database");
 
@@ -306,6 +325,7 @@ public class TestCatalogUtil extends TestCase {
         assertNotNull(joe.getGroups().get("lodue"));
         assertNotNull(joe.getGroups().get("lotre"));
         assertNull(joe.getGroups().get("latre"));
+        assertNull(joe.getGroups().get("dontexist"));
 
         User jane = db.getUsers().get("jane");
         assertNotNull(jane);
@@ -313,6 +333,7 @@ public class TestCatalogUtil extends TestCase {
         assertNotNull(jane.getGroups().get("ladue"));
         assertNotNull(jane.getGroups().get("latre"));
         assertNull(jane.getGroups().get("lotre"));
+        assertNull(joe.getGroups().get("dontexist"));
     }
 
     public void testScrambledPasswords() throws Exception {
@@ -325,7 +346,7 @@ public class TestCatalogUtil extends TestCase {
             "<jsonapi enabled='true'/>" +
             "</httpd>" +
             "<users> " +
-            "<user name=\"joe\" password=\"1E4E888AC66F8DD41E00C5A7AC36A32A9950D271\" plaintext=\"false\" roles=\"louno\"/>" +
+            "<user name=\"joe\" password=\"1E4E888AC66F8DD41E00C5A7AC36A32A9950D271\" plaintext=\"false\" roles=\"louno,administrator\"/>" +
             "<user name=\"jane\" password=\"AAF4C61DDCC5E8A2DABEDE0F3B482CD9AEA9434D\" plaintext=\"false\" roles=\"launo\"/>" +
             "</users>" +
             "</deployment>";
@@ -335,7 +356,7 @@ public class TestCatalogUtil extends TestCase {
 
         final File tmpRole = VoltProjectBuilder.writeStringToTempFile(depRole);
 
-        CatalogUtil.compileDeployment(catalog, tmpRole.getPath(), true, false);
+        CatalogUtil.compileDeployment(catalog, tmpRole.getPath(), false);
 
         Database db = catalog.getClusters().get("cluster")
                 .getDatabases().get("database");
@@ -373,15 +394,15 @@ public class TestCatalogUtil extends TestCase {
             "</deployment>";
 
         final File tmpDepOff = VoltProjectBuilder.writeStringToTempFile(depOff);
-        long crcDepOff = CatalogUtil.compileDeployment(catalog, tmpDepOff.getPath(), true, false);
-        assertTrue(crcDepOff >= 0);
+        String msg = CatalogUtil.compileDeployment(catalog, tmpDepOff.getPath(), false);
+        assertTrue(msg == null);
         Systemsettings sysset = catalog.getClusters().get("cluster").getDeployment().get("deployment").getSystemsettings().get("systemsettings");
         assertEquals(100, sysset.getTemptablemaxsize());
 
         setUp();
         final File tmpDepOn = VoltProjectBuilder.writeStringToTempFile(depOn);
-        long crcDepOn = CatalogUtil.compileDeployment(catalog, tmpDepOn.getPath(), true, false);
-        assertTrue(crcDepOn >= 0);
+        msg = CatalogUtil.compileDeployment(catalog, tmpDepOn.getPath(), false);
+        assertTrue(msg == null);
         sysset = catalog.getClusters().get("cluster").getDeployment().get("deployment").getSystemsettings().get("systemsettings");
         assertEquals(200, sysset.getTemptablemaxsize());
     }
@@ -408,15 +429,15 @@ public class TestCatalogUtil extends TestCase {
             "</deployment>";
 
         final File tmpDepOff = VoltProjectBuilder.writeStringToTempFile(depOff);
-        long crcDepOff = CatalogUtil.compileDeployment(catalog, tmpDepOff.getPath(), true, false);
-        assertTrue(crcDepOff >= 0);
+        String msg = CatalogUtil.compileDeployment(catalog, tmpDepOff.getPath(), false);
+        assertTrue(msg == null);
         Systemsettings sysset = catalog.getClusters().get("cluster").getDeployment().get("deployment").getSystemsettings().get("systemsettings");
         assertEquals(0, sysset.getQuerytimeout());
 
         setUp();
         final File tmpDepOn = VoltProjectBuilder.writeStringToTempFile(depOn);
-        long crcDepOn = CatalogUtil.compileDeployment(catalog, tmpDepOn.getPath(), true, false);
-        assertTrue(crcDepOn >= 0);
+        msg = CatalogUtil.compileDeployment(catalog, tmpDepOn.getPath(), false);
+        assertTrue(msg == null);
         sysset = catalog.getClusters().get("cluster").getDeployment().get("deployment").getSystemsettings().get("systemsettings");
         assertEquals(200, sysset.getQuerytimeout());
     }
@@ -452,7 +473,7 @@ public class TestCatalogUtil extends TestCase {
             "</deployment>";
 
         final File tmpDeploy = VoltProjectBuilder.writeStringToTempFile(deploy);
-        CatalogUtil.compileDeployment(catalog, tmpDeploy.getPath(), true, false);
+        CatalogUtil.compileDeployment(catalog, tmpDeploy.getPath(), false);
 
         File snapdir = new File(voltdbroot, snappath);
         assertTrue("snapshot directory: " + snapdir.getAbsolutePath() + " does not exist",
@@ -499,7 +520,7 @@ public class TestCatalogUtil extends TestCase {
         final File schemaFile = VoltProjectBuilder.writeStringToTempFile(deploymentContent);
         final String depPath = schemaFile.getPath();
 
-        CatalogUtil.compileDeployment(catalog, depPath, false, false);
+        CatalogUtil.compileDeployment(catalog, depPath, false);
 
         String commands = catalog.serialize();
         System.out.println(commands);
@@ -549,32 +570,32 @@ public class TestCatalogUtil extends TestCase {
             "</deployment>";
 
         final File tmpNoElement = VoltProjectBuilder.writeStringToTempFile(noElement);
-        long crc = CatalogUtil.compileDeployment(catalog, tmpNoElement.getPath(), true, false);
-        assertTrue("Deployment file failed to parse", crc != -1);
+        String msg = CatalogUtil.compileDeployment(catalog, tmpNoElement.getPath(), false);
+        assertTrue("Deployment file failed to parse: " + msg, msg == null);
         Cluster cluster = catalog.getClusters().get("cluster");
         assertTrue(cluster.getNetworkpartition());
         assertEquals("partition_detection", cluster.getFaultsnapshots().get("CLUSTER_PARTITION").getPrefix());
 
         setUp();
         final File tmpEnabledDefault = VoltProjectBuilder.writeStringToTempFile(ppdEnabledDefaultPrefix);
-        crc = CatalogUtil.compileDeployment(catalog, tmpEnabledDefault.getPath(), true, false);
-        assertTrue("Deployment file failed to parse", crc != -1);
+        msg = CatalogUtil.compileDeployment(catalog, tmpEnabledDefault.getPath(), false);
+        assertTrue("Deployment file failed to parse: " + msg, msg == null);
         cluster = catalog.getClusters().get("cluster");
         assertTrue(cluster.getNetworkpartition());
         assertEquals("partition_detection", cluster.getFaultsnapshots().get("CLUSTER_PARTITION").getPrefix());
 
         setUp();
         final File tmpEnabledPrefix = VoltProjectBuilder.writeStringToTempFile(ppdEnabledWithPrefix);
-        crc = CatalogUtil.compileDeployment(catalog, tmpEnabledPrefix.getPath(), true, false);
-        assertTrue("Deployment file failed to parse", crc != -1);
+        msg = CatalogUtil.compileDeployment(catalog, tmpEnabledPrefix.getPath(), false);
+        assertTrue("Deployment file failed to parse: " + msg, msg == null);
         cluster = catalog.getClusters().get("cluster");
         assertTrue(cluster.getNetworkpartition());
         assertEquals("testPrefix", cluster.getFaultsnapshots().get("CLUSTER_PARTITION").getPrefix());
 
         setUp();
         final File tmpDisabled = VoltProjectBuilder.writeStringToTempFile(ppdDisabledNoPrefix);
-        crc = CatalogUtil.compileDeployment(catalog, tmpDisabled.getPath(), true, false);
-        assertTrue("Deployment file failed to parse", crc != -1);
+        msg = CatalogUtil.compileDeployment(catalog, tmpDisabled.getPath(), false);
+        assertTrue("Deployment file failed to parse: " + msg, msg == null);
         cluster = catalog.getClusters().get("cluster");
         assertFalse(cluster.getNetworkpartition());
     }
@@ -656,8 +677,8 @@ public class TestCatalogUtil extends TestCase {
         String x[] = {tmpDdl.getAbsolutePath()};
         Catalog cat = compiler.compileCatalogFromDDL(x);
 
-        long crc = CatalogUtil.compileDeployment(cat, bad_deployment, true, false);
-        assertTrue("Deployment file failed to parse", crc != -1);
+        String msg = CatalogUtil.compileDeployment(cat, bad_deployment, false);
+        assertTrue("Deployment file failed to parse: " + msg, msg == null);
 
         Database db = cat.getClusters().get("cluster").getDatabases().get("database");
         org.voltdb.catalog.Connector catconn = db.getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
@@ -670,8 +691,8 @@ public class TestCatalogUtil extends TestCase {
         DeploymentType good_deployment = CatalogUtil.getDeployment(new FileInputStream(tmpGood));
 
         Catalog cat2 = compiler.compileCatalogFromDDL(x);
-        crc = CatalogUtil.compileDeployment(cat2, good_deployment, true, false);
-        assertTrue("Deployment file failed to parse", crc != -1);
+        msg = CatalogUtil.compileDeployment(cat2, good_deployment, false);
+        assertTrue("Deployment file failed to parse: " + msg, msg == null);
 
         db = cat2.getClusters().get("cluster").getDatabases().get("database");
         catconn = db.getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
@@ -689,8 +710,8 @@ public class TestCatalogUtil extends TestCase {
         DeploymentType builtin_deployment = CatalogUtil.getDeployment(new FileInputStream(tmpBuiltin));
 
         Catalog cat3 = compiler.compileCatalogFromDDL(x);
-        crc = CatalogUtil.compileDeployment(cat3, builtin_deployment, true, false);
-        assertTrue("Deployment file failed to parse", crc != -1);
+        msg = CatalogUtil.compileDeployment(cat3, builtin_deployment, false);
+        assertTrue("Deployment file failed to parse: " + msg, msg == null);
 
         db = cat3.getClusters().get("cluster").getDatabases().get("database");
         catconn = db.getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
@@ -706,8 +727,8 @@ public class TestCatalogUtil extends TestCase {
         DeploymentType builtin_kafkadeployment = CatalogUtil.getDeployment(new FileInputStream(tmpKafkaBuiltin));
 
         Catalog cat4 = compiler.compileCatalogFromDDL(x);
-        crc = CatalogUtil.compileDeployment(cat4, builtin_kafkadeployment, true, false);
-        assertTrue("Deployment file failed to parse", crc != -1);
+        msg = CatalogUtil.compileDeployment(cat4, builtin_kafkadeployment, false);
+        assertTrue("Deployment file failed to parse: " + msg, msg == null);
 
         db = cat4.getClusters().get("cluster").getDatabases().get("database");
         catconn = db.getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
@@ -722,8 +743,8 @@ public class TestCatalogUtil extends TestCase {
         final File tmpRabbitMQBuiltin = VoltProjectBuilder.writeStringToTempFile(withBuiltinRabbitMQExport);
         DeploymentType builtin_rabbitmqdeployment = CatalogUtil.getDeployment(new FileInputStream(tmpRabbitMQBuiltin));
         Catalog cat5 = compiler.compileCatalogFromDDL(x);
-        crc = CatalogUtil.compileDeployment(cat5, builtin_rabbitmqdeployment, true, false);
-        assertTrue("Deployment file failed to parse", crc != -1);
+        msg = CatalogUtil.compileDeployment(cat5, builtin_rabbitmqdeployment, false);
+        assertTrue("Deployment file failed to parse: " + msg, msg == null);
         db = cat5.getClusters().get("cluster").getDatabases().get("database");
         catconn = db.getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
         assertNotNull(catconn);
@@ -950,19 +971,19 @@ public class TestCatalogUtil extends TestCase {
             "</deployment>";
 
         final File tmpDefSchema = VoltProjectBuilder.writeStringToTempFile(defSchema);
-        CatalogUtil.compileDeployment(catalog, tmpDefSchema.getPath(), true, false);
+        CatalogUtil.compileDeployment(catalog, tmpDefSchema.getPath(), false);
         Cluster cluster =  catalog.getClusters().get("cluster");
-        assertFalse(cluster.getUseddlschema());
+        assertTrue(cluster.getUseddlschema());
 
         setUp();
         final File tmpCatalogSchema = VoltProjectBuilder.writeStringToTempFile(catalogSchema);
-        CatalogUtil.compileDeployment(catalog, tmpCatalogSchema.getPath(), true, false);
+        CatalogUtil.compileDeployment(catalog, tmpCatalogSchema.getPath(), false);
         cluster =  catalog.getClusters().get("cluster");
         assertFalse(cluster.getUseddlschema());
 
         setUp();
         final File tmpAdhocSchema = VoltProjectBuilder.writeStringToTempFile(adhocSchema);
-        CatalogUtil.compileDeployment(catalog, tmpAdhocSchema.getPath(), true, false);
+        CatalogUtil.compileDeployment(catalog, tmpAdhocSchema.getPath(), false);
         cluster =  catalog.getClusters().get("cluster");
         assertTrue(cluster.getUseddlschema());
     }

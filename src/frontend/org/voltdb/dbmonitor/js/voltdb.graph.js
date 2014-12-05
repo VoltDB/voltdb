@@ -3,7 +3,7 @@
 
     var IMonitorGraphUI = (function () {
 
-        var currentView = "seconds";
+        var currentView = "Seconds";
         var cpuSecCount = 0;
         var cpuMinCount = 0;
         var tpsSecCount = 0;
@@ -14,7 +14,7 @@
         var latMinCount = 0;
         var totalEmptyData = 121;
         var totalEmptyDataForMinutes = 121;
-        var totalEmptyDataForDays = 180;
+        var totalEmptyDataForDays = 360;
         var cpuChart;
         var ramChart;
         var latencyChart;
@@ -56,7 +56,7 @@
 
             for (var i = totalEmptyDataForDays; i >= 0; i--) {
                 arr[i] = { x: new Date(theDate.getTime()), y: null };
-                theDate.setMinutes(theDate.getMinutes() - 10);
+                theDate.setMinutes(theDate.getMinutes() - 5);
             }
 
             return arr;
@@ -77,7 +77,7 @@
         function getEmptyDataForMinutesOptimized() {
             var arr = [];
             arr.push(emptyDataForMinutes[0]);
-            arr.push(emptyDataForMinutes[emptyData.length - 1]);
+            arr.push(emptyDataForMinutes[emptyDataForMinutes.length - 1]);
 
             return arr;
         }
@@ -85,7 +85,7 @@
         function getEmptyDataForDaysOptimized() {
             var arr = [];
             arr.push(emptyDataForDays[0]);
-            arr.push(emptyDataForDays[emptyData.length - 1]);
+            arr.push(emptyDataForDays[emptyDataForDays.length - 1]);
 
             return arr;
         }
@@ -93,7 +93,7 @@
         var dataCpu = [{
             "key": "CPU",
             "values": getEmptyDataOptimized(),
-            "color": "rgb(164, 136, 5)",
+            "color": "rgb(164, 136, 5)"
         }];
 
         var dataRam = [{
@@ -375,7 +375,7 @@
             transactionChart = transactinoChartObj;
             currentView = view;
             MonitorGraphUI.Monitors = {                
-                'latHistogram': null,
+                'latHistogram': {},
                 'latData': getEmptyDataOptimized(),
                 'latDataMin': getEmptyDataForMinutesOptimized(),
                 'latDataDay': getEmptyDataForDaysOptimized(),
@@ -403,7 +403,8 @@
             changeAxisTimeFormat(view);
         };
 
-        this.RefreshGraph = function(view) {
+        this.RefreshGraph = function (view) {
+            currentView = view;
             if (view == 'Days') {
                 dataCpu[0]["values"] = MonitorGraphUI.Monitors.cpuDataHrs;
                 dataTransactions[0]["values"] = MonitorGraphUI.Monitors.tpsDataDay;
@@ -472,13 +473,19 @@
         function sliceFirstData(dataArray, view) {
 
             var total = totalEmptyData;
-            if (view == dataView.Minutes)
+            var refEmptyData = emptyData;
+            
+            if (view == dataView.Minutes) {
                 total = totalEmptyDataForMinutes;
-            else if (view == dataView.Days)
+                refEmptyData = emptyDataForMinutes;
+            }
+            else if (view == dataView.Days) {
                 total = totalEmptyDataForDays;
+                refEmptyData = emptyDataForDays;
+            }
 
             if (dataArray.length <= total)
-                dataArray[0] = emptyData[dataArray.length - 1];
+                dataArray[0] = refEmptyData[dataArray.length - 1];
             else
                 dataArray = dataArray.slice(1);
 
@@ -490,37 +497,41 @@
             var dataLat = monitor.latData;
             var dataLatMin = monitor.latDataMin;
             var dataLatDay = monitor.latDataDay;
-            var strLatStats = "";
             var timeStamp;
+            var maxLatency = 0;
 
             // Compute latency statistics
-            jQuery.each(latency, function (id, val) {
-                strLatStats += val["UNCOMPRESSED_HISTOGRAM"];
+            jQuery.each(latency, function(id, val) {
+                var strLatStats = val["UNCOMPRESSED_HISTOGRAM"];
                 timeStamp = val["TIMESTAMP"];
+                var latStats = convert2Histogram(strLatStats);
+
+                var singlelat = 0;
+                if (!monitor.latHistogram.hasOwnProperty(id))
+                    singlelat = latStats.getValueAtPercentile(99);
+                else
+                    singlelat = monitor.latHistogram[id].diff(latStats).getValueAtPercentile(99);
+                singlelat = parseFloat(singlelat).toFixed(1) * 1;
+
+                if (singlelat > maxLatency) {
+                    maxLatency = singlelat;
+                }
+
+                monitor.latHistogram[id] = latStats;
             });
 
-            var latStats = convert2Histogram(strLatStats);
-            
-            var lat = 0;
-            if (monitor.latHistogram == null)
-                lat = latStats.getValueAtPercentile(99);
-            else
-                lat = monitor.latHistogram.diff(latStats).getValueAtPercentile(99);
-            lat = parseFloat(lat).toFixed(1) * 1;
-
+            var lat = maxLatency;
             if (lat < 0)
                 lat = 0;
 
-            monitor.latHistogram = latStats;
-
-            if (latSecCount == 6 || monitor.latFirstData) {
+            if (latSecCount >= 6 || monitor.latFirstData) {
                 dataLatMin = sliceFirstData(dataLatMin, dataView.Minutes);
                 dataLatMin.push({ 'x': new Date(timeStamp), 'y': lat });
                 MonitorGraphUI.Monitors.latDataMin = dataLatMin;
                 latSecCount = 0;
             }
 
-            if (latMinCount == 120 || monitor.latFirstData) {
+            if (latMinCount >= 60 || monitor.latFirstData) {
                 dataLatDay = sliceFirstData(dataLatDay, dataView.Days);
                 dataLatDay.push({ 'x': new Date(timeStamp), 'y': lat });
                 MonitorGraphUI.Monitors.latDataDay = dataLatDay;
@@ -538,7 +549,7 @@
             else
                 dataLatency[0]["values"] = dataLat;
 
-            if (currentTab == NavigationTabs.DBMonitor && latencyChart.is(":visible")) {
+            if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && latencyChart.is(":visible")) {
                 d3.select("#visualisationLatency")
                     .datum(dataLatency)
                     .transition().duration(500)
@@ -548,7 +559,7 @@
             latSecCount++;
             latMinCount++;
         };
-
+        
         this.RefreshMemory = function (memoryDetails, currentServer, graphView, currentTab) {
             var monitor = MonitorGraphUI.Monitors;
             var dataMem = monitor.memData;
@@ -570,14 +581,14 @@
             else if (physicalMemory != -1 && memRss > physicalMemory)
                 memRss = physicalMemory;
 
-            if (memSecCount == 6 || monitor.memFirstData) {
+            if (memSecCount >= 6 || monitor.memFirstData) {
                 dataMemMin = sliceFirstData(dataMemMin, dataView.Minutes);
                 dataMemMin.push({ 'x': new Date(memTimeStamp), 'y': memRss });
                 MonitorGraphUI.Monitors.memDataMin = dataMemMin;
                 memSecCount = 0;
             }
 
-            if (memMinCount == 120 || monitor.memFirstData) {
+            if (memMinCount >= 60 || monitor.memFirstData) {
                 dataMemDay = sliceFirstData(dataMemDay, dataView.Days);
                 dataMemDay.push({ 'x': new Date(memTimeStamp), 'y': memRss });
                 MonitorGraphUI.Monitors.memDataDay = dataMemDay;
@@ -595,7 +606,7 @@
             else
                 dataRam[0]["values"] = dataMem;
 
-            if (currentTab == NavigationTabs.DBMonitor && ramChart.is(":visible")) {
+            if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && ramChart.is(":visible")) {
                 d3.select('#visualisationRam')
                     .datum(dataRam)
                     .transition().duration(500)
@@ -622,13 +633,13 @@
                 if (calculatedValue < 0)
                     calculatedValue = 0;
 
-                if (tpsSecCount == 6 || monitor.tpsFirstData) {
+                if (tpsSecCount >= 6 || monitor.tpsFirstData) {
                     datatransMin = sliceFirstData(datatransMin, dataView.Minutes);
                     datatransMin.push({ "x": new Date(transacDetail["TimeStamp"]), "y": calculatedValue });
                     MonitorGraphUI.Monitors.tpsDataMin = datatransMin;
                     tpsSecCount = 0;
                 }
-                if (tpsMinCount == 120 || monitor.tpsFirstData) {
+                if (tpsMinCount >= 60 || monitor.tpsFirstData) {
                     datatransDay = sliceFirstData(datatransDay, dataView.Days);
                     datatransDay.push({ "x": new Date(transacDetail["TimeStamp"]), "y": calculatedValue });
                     MonitorGraphUI.Monitors.tpsDataDay = datatransDay;
@@ -637,6 +648,7 @@
                 datatrans = sliceFirstData(datatrans, dataView.Seconds);
                 datatrans.push({ "x": new Date(transacDetail["TimeStamp"]), "y": calculatedValue });
                 MonitorGraphUI.Monitors.tpsData = datatrans;
+                monitor.tpsFirstData = false;
             }
 
             if (graphView == 'Minutes')
@@ -648,9 +660,8 @@
 
             monitor.lastTimedTransactionCount = currentTimedTransactionCount;
             monitor.lastTimerTick = currentTimerTick;
-            monitor.tpsFirstData = false;
 
-            if (currentTab == NavigationTabs.DBMonitor && transactionChart.is(":visible")) {
+            if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && transactionChart.is(":visible")) {
                 d3.select('#visualisationTransaction')
                     .datum(dataTransactions)
                     .transition().duration(500)
@@ -675,13 +686,13 @@
             else if (percentageUsage > 100)
                 percentageUsage = 100;
 
-            if (cpuSecCount == 6 || monitor.cpuFirstData) {
+            if (cpuSecCount >= 6 || monitor.cpuFirstData) {
                 cpuDataMin = sliceFirstData(cpuDataMin, dataView.Minutes);
                 cpuDataMin.push({ "x": new Date(timeStamp), "y": percentageUsage });
                 MonitorGraphUI.Monitors.cpuDataMin = cpuDataMin;
                 cpuSecCount = 0;
             }
-            if (cpuMinCount == 120 || monitor.cpuFirstData) {
+            if (cpuMinCount >= 60 || monitor.cpuFirstData) {
                 cpuDataDay = sliceFirstData(cpuDataDay, dataView.Days);
                 cpuDataDay.push({ "x": new Date(timeStamp), "y": percentageUsage });
                 MonitorGraphUI.Monitors.cpuDataHrs = cpuDataDay;
@@ -702,7 +713,7 @@
 
             }
 
-            if (currentTab == NavigationTabs.DBMonitor && cpuChart.is(":visible")) {
+            if (currentTab == NavigationTabs.DBMonitor && currentView == graphView && cpuChart.is(":visible")) {
                 d3.select('#visualisationCpu')
                     .datum(dataCpu)
                     .transition().duration(500)

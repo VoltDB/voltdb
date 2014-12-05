@@ -34,7 +34,7 @@ import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
+import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.utils.MiscUtils;
@@ -401,30 +401,31 @@ public class TestSecuritySuite extends RegressionSuite {
         project.addProcedures(procedures);
 
         UserInfo users[] = new UserInfo[] {
-                new UserInfo("user1", "password", new String[] {"group1"}),
-                new UserInfo("user2", "password", new String[] {"group2"}),
-                new UserInfo("user3", "password", new String[] {"group3"}),
-                new UserInfo("user4", "password", new String[] {"ADMINISTRATOR"}),
-                new UserInfo("userWithDefaultUserPerm", "password", new String[] {"USER"}),
-                new UserInfo("userWithAllProc", "password", new String[] {"groupWithAllProcPerm"}),
+                new UserInfo("user1", "password", new String[] {"grouP1"}),
+                new UserInfo("user2", "password", new String[] {"grouP2"}),
+                new UserInfo("user3", "password", new String[] {"grouP3"}),
+                new UserInfo("user4", "password", new String[] {"AdMINISTRATOR"}),
+                new UserInfo("userWithDefaultUserPerm", "password", new String[] {"User"}),
+                new UserInfo("userWithAllProc", "password", new String[] {"GroupWithAllProcPerm"}),
                 new UserInfo("userWithDefaultProcPerm", "password", new String[] {"groupWithDefaultProcPerm"}),
-                new UserInfo("userWithoutDefaultProcPerm", "password", new String[] {"groupWithoutDefaultProcPerm"}),
-                new UserInfo("userWithDefaultProcReadPerm", "password", new String[] {"groupWithDefaultProcReadPerm"})
+                new UserInfo("userWithoutDefaultProcPerm", "password", new String[] {"groupWiThoutDefaultProcPerm"}),
+                new UserInfo("userWithDefaultProcReadPerm", "password", new String[] {"groupWiThDefaultProcReadPerm"})
         };
         project.addUsers(users);
 
-        GroupInfo groups[] = new GroupInfo[] {
-                new GroupInfo("group1", false, false, false, false, false, false),
-                new GroupInfo("group2", true, false, false, false, false, false),
-                new GroupInfo("group3", true, false, false, false, false, false),
-                new GroupInfo("groupWithDefaultUserPerm", true, false, false, false, false, true),
-                new GroupInfo("groupWithAllProcPerm", false, false, false, false, false, true),
-                new GroupInfo("groupWithDefaultProcPerm", false, false, false, true, false, false),
-                new GroupInfo("groupWithoutDefaultProcPerm", false, false, false, false, false, false),
-                new GroupInfo("groupWithDefaultProcReadPerm", false, false, false, false, true, false)
+        RoleInfo groups[] = new RoleInfo[] {
+                new RoleInfo("Group1", false, false, false, false, false, false),
+                new RoleInfo("Group2", true, false, false, false, false, false),
+                new RoleInfo("Group3", true, false, false, false, false, false),
+                new RoleInfo("GroupWithDefaultUserPerm", true, false, false, false, false, true),
+                new RoleInfo("GroupWithAllProcPerm", false, false, false, false, false, true),
+                new RoleInfo("GroupWithDefaultProcPerm", false, false, false, true, false, false),
+                new RoleInfo("GroupWithoutDefaultProcPerm", false, false, false, false, false, false),
+                new RoleInfo("GroupWithDefaultProcReadPerm", false, false, false, false, true, false)
         };
-        project.addGroups(groups);
-        project.setSecurityEnabled(true);
+        project.addRoles(groups);
+        // suite defines its own ADMINISTRATOR user
+        project.setSecurityEnabled(true, false);
 
         // export disabled in community
         if (MiscUtils.isPro()) {

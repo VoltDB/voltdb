@@ -78,7 +78,7 @@ import org.json_voltpatches.JSONObject;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
+import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.compiler.procedures.CrazyBlahProc;
@@ -146,7 +146,60 @@ public class TestJSONInterface extends TestCase {
             throw new Exception("Unable to read response from server");
         }
 
-        StringBuffer decodedString = new StringBuffer();
+        StringBuilder decodedString = new StringBuilder();
+        String line;
+        while ((line = in.readLine()) != null) {
+            decodedString.append(line);
+        }
+        in.close();
+        in = null;
+        // get result code
+        int responseCode = conn.getResponseCode();
+
+        String response = decodedString.toString();
+
+        assertEquals(expectedCode, responseCode);
+
+        try {
+            conn.getInputStream().close();
+            conn.disconnect();
+        }
+        // ignore closing problems here
+        catch (Exception e) {}
+        conn = null;
+
+        //System.err.println(response);
+
+        return response;
+    }
+
+    public static String getUrlOverJSON(String url, int expectedCode) throws Exception {
+        URL jsonAPIURL = new URL(url);
+
+        HttpURLConnection conn = (HttpURLConnection) jsonAPIURL.openConnection();
+        conn.setRequestMethod("GET");
+        conn.setDoOutput(true);
+        conn.connect();
+
+        BufferedReader in = null;
+        try {
+            if(conn.getInputStream()!=null){
+                in = new BufferedReader(
+                        new InputStreamReader(
+                        conn.getInputStream(), "UTF-8"));
+            }
+        } catch(IOException e){
+            if(conn.getErrorStream()!=null){
+                in = new BufferedReader(
+                        new InputStreamReader(
+                        conn.getErrorStream(), "UTF-8"));
+            }
+        }
+        if(in==null) {
+            throw new Exception("Unable to read response from server");
+        }
+
+        StringBuilder decodedString = new StringBuilder();
         String line;
         while ((line = in.readLine()) != null) {
             decodedString.append(line);
@@ -632,8 +685,8 @@ public class TestJSONInterface extends TestCase {
         builder.addSchema(schemaPath);
         builder.addPartitionInfo("HELLOWORLD", "DIALECT");
 
-        GroupInfo gi = new GroupInfo("foo", true, false, true, true, false, false);
-        builder.addGroups(new GroupInfo[] { gi } );
+        RoleInfo gi = new RoleInfo("foo", true, false, true, true, false, false);
+        builder.addRoles(new RoleInfo[] { gi } );
 
         // create 20 users, only the first one has an interesting user/pass
         UserInfo[] ui = new UserInfo[15];
@@ -643,7 +696,7 @@ public class TestJSONInterface extends TestCase {
         }
         builder.addUsers(ui);
 
-        builder.setSecurityEnabled(true);
+        builder.setSecurityEnabled(true, true);
 
         ProcedureInfo[] pi = new ProcedureInfo[2];
         pi[0] = new ProcedureInfo(new String[] { "foo" }, "Insert", "insert into HELLOWORLD values (?,?,?);", null);
@@ -727,7 +780,7 @@ public class TestJSONInterface extends TestCase {
         builder2.addPartitionInfo("HELLOWORLD", "DIALECT");
 
         // Same groups
-        builder2.addGroups(new GroupInfo[] { gi } );
+        builder2.addRoles(new RoleInfo[] { gi } );
 
         // create same 15 users, hack the last 14 passwords
         ui = new UserInfo[15];
@@ -739,7 +792,7 @@ public class TestJSONInterface extends TestCase {
         }
         builder2.addUsers(ui);
 
-        builder2.setSecurityEnabled(true);
+        builder2.setSecurityEnabled(true, true);
         builder2.addProcedures(pi);
         builder2.setHTTPDPort(8095);
 
@@ -943,6 +996,48 @@ public class TestJSONInterface extends TestCase {
 
         callProcOverJSONRaw("http://localhost:8080/api/1.0/Tim", 404);
         callProcOverJSONRaw("http://localhost:8080/api/1.0/Tim?Procedure=foo&Parameters=[x4{]", 404);
+    } finally {
+        if (server != null) {
+            server.shutdown();
+            server.join();
+        }
+        server = null;
+    }
+    }
+
+    public void testDeployment() throws Exception {
+    try {
+        String simpleSchema =
+            "CREATE TABLE foo (\n" +
+            "    bar BIGINT NOT NULL,\n" +
+            "    PRIMARY KEY (bar)\n" +
+            ");";
+
+        File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+        String schemaPath = schemaFile.getPath();
+        schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addSchema(schemaPath);
+        builder.addPartitionInfo("foo", "bar");
+        builder.addProcedures(DelayProc.class);
+        builder.setHTTPDPort(8095);
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+        assertTrue(success);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+        config.m_pathToDeployment = builder.getPathToDeployment();
+        server = new ServerThread(config);
+        server.start();
+        server.waitForInitialization();
+
+        //Get deployment
+        String dep = getUrlOverJSON("http://localhost:8095/deployment", 200);
+        assertTrue(dep.contains("cluster"));
+        //Get deployment schema
+        String schema = getUrlOverJSON("http://localhost:8095/deployment/schema", 200);
+        assertTrue(dep.contains("\"cluster\""));
     } finally {
         if (server != null) {
             server.shutdown();

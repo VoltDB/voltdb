@@ -25,11 +25,14 @@ def _print_line():
     print "==============================================================="
 
 def _get_vmx():
+    vmxerror="""FATAL: You must set VMX in your environment
+> export VMX=<path-to-.vmx-file>)
+"""
     try:
         global vmx
         vmx = os.environ['VMX']
     except KeyError:
-        exit("FATAL: You must set VMX in your environment.\n> export VMX=<path>")
+        exit(vmxerror)
 
 
 def _find_files(pattern, path):
@@ -215,6 +218,49 @@ def zip_read(path, chdir=''):
     local('%s unzip -o %s' % (cdcmd, path))
     return
 
+
+@task
+def clean_and_pack_vmimage():
+
+    _get_vmx()
+    #Stop
+    _print_line()
+    print "Stopping VM"
+    try:
+        vm_stop()
+    except:
+        print "This VM was already stopped"
+
+    newvmdir = os.path.dirname(vmx)
+    try:
+        vmdkfiles = _find_files('*LTS*.vmdk', newvmdir)
+        vmdk = [v for v in vmdkfiles if 's0' not in v][0]
+    except:
+        exit("FATAL: Cannot find vmdk file in %s" % newvmdir)
+
+    _print_line()
+    print "Mounting VM disk locally to zerofill before compressing"
+    vm_zerofilldisk(vmdk)
+
+    #Shrink disk
+    _print_line()
+    print "Compressing disk"
+    local ('du -hs ' + os.path.dirname(vmx))
+    vmdk_compressdisk(vmdk)
+    local ('du -hs ' + os.path.dirname(vmx))
+
+    #Clean up files in vmdir
+    _delete_files( _find_files('*.log*', newvmdir))
+    _delete_files( _find_files('*.lck*', newvmdir))
+
+    #zip it
+    _print_line()
+    print "Zipping to %s.zip" % newvmdir
+    zip_write(os.path.basename(newvmdir),
+              newvmdir + '.zip',
+              chdir = os.path.join(newvmdir,".."))
+
+
 @task(default=True)
 def make_new_vmimage(version,oldvmdir=None):
     """
@@ -274,36 +320,7 @@ def make_new_vmimage(version,oldvmdir=None):
     print "Updating new VM with V" + version
     vm_update(version)
 
-    #Stop
-    _print_line()
-    print "Stopping VM"
-    vm_stop()
-
-    newvmdir = os.path.dirname(vmx)
-    try:
-        vmdkfiles = _find_files('*LTS*.vmdk', newvmdir)
-        vmdk = [v for v in vmdkfiles if 's0' not in v][0]
-    except:
-        exit("FATAL: Cannot find vmdk file in %s" % newvmdir)
-
-    _print_line()
-    print "Mounting VM disk locally to zerofill before compressing"
-    vm_zerofilldisk(vmdk)
-
-    #Shrink disk
-    _print_line()
-    print "Compressing disk"
-    local ('du -hs ' + os.path.dirname(vmx))
-    vmdk_compressdisk(vmdk)
-    local ('du -hs ' + os.path.dirname(vmx))
-
-    #Clean up log files
-    _delete_files( _find_files('*.log*', newvmdir))
-
-    #zip it
-    _print_line()
-    print "Zipping to %s.zip" % newvmdir
-    zip_write(newvmdir, newvmdir + '.zip', chdir='newvmdir/..')
+    clean_and_pack_vmimage()
 
     #Start
     _print_line()

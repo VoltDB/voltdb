@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.StringWriter;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 
 import javax.xml.bind.JAXBContext;
@@ -54,12 +55,12 @@ public class DeploymentBuilder {
     public static final class UserInfo {
         public final String name;
         public String password;
-        private final String groups[];
+        private final String roles[];
 
-        public UserInfo (final String name, final String password, final String groups[]){
+        public UserInfo (final String name, final String password, final String roles[]){
             this.name = name;
             this.password = password;
-            this.groups = groups;
+            this.roles = roles;
         }
 
         @Override
@@ -188,6 +189,11 @@ public class DeploymentBuilder {
         m_commandLogSize = logSize;
     }
 
+    public void setEnableCommandLogging(boolean value)
+    {
+        m_commandLogEnabled = value;
+    }
+
     public void setSnapshotPriority(int priority) {
         m_snapshotPriority = priority;
     }
@@ -197,6 +203,16 @@ public class DeploymentBuilder {
             final boolean added = m_users.add(info);
             if (!added) {
                 assert(added);
+            }
+        }
+    }
+
+    public void removeUser(String userName) {
+        Iterator<UserInfo> iter = m_users.iterator();
+        while (iter.hasNext()) {
+            UserInfo info = iter.next();
+            if (info.name.equals(userName)) {
+                iter.remove();
             }
         }
     }
@@ -407,15 +423,15 @@ public class DeploymentBuilder {
                 user.setName(info.name);
                 user.setPassword(info.password);
 
-                // build up user/@groups.
-                if (info.groups.length > 0) {
-                    final StringBuilder groups = new StringBuilder();
-                    for (final String group : info.groups) {
-                        if (groups.length() > 0)
-                            groups.append(",");
-                        groups.append(group);
+                // build up user/roles.
+                if (info.roles.length > 0) {
+                    final StringBuilder roles = new StringBuilder();
+                    for (final String role : info.roles) {
+                        if (roles.length() > 0)
+                            roles.append(",");
+                        roles.append(role.toLowerCase());
                     }
-                    user.setGroups(groups.toString());
+                    user.setRoles(roles.toString());
                 }
             }
         }

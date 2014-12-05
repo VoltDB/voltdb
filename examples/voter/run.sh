@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
-APPNAME="voter"
+#set -o nounset #exit if an unset variable is used
+set -o errexit #exit on any single command fail
 
 # find voltdb binaries in either installation or distribution directory.
 if [ -n "$(which voltdb 2> /dev/null)" ]; then
@@ -15,6 +16,9 @@ else
     echo "to your PATH."
     echo
 fi
+# move voltdb commands into path for this script
+PATH=$VOLTDB_BIN:$PATH
+
 # installation layout has all libraries in $VOLTDB_ROOT/lib/voltdb
 if [ -d "$VOLTDB_BIN/../lib/voltdb" ]; then
     VOLTDB_BASE=$(dirname "$VOLTDB_BIN")
@@ -32,83 +36,72 @@ APPCLASSPATH=$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_LIB"/*.jar; \
     \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
 } 2> /dev/null | paste -sd ':' - )
-CLIENTCLASSPATH=$CLASSPATH:$({ \
+CLIENTCLASSPATH=voter-client.jar:$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdbclient-*.jar; \
     \ls -1 "$VOLTDB_LIB"/commons-cli-1.2.jar; \
 } 2> /dev/null | paste -sd ':' - )
-VOLTDB="$VOLTDB_BIN/voltdb"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
 HOST="localhost"
 
-# remove build artifacts
+# remove binaries, logs, runtime artifacts, etc... but keep the jars
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar $APPNAME-procs.jar voltdbroot voltdbroot
+    rm -rf debugoutput voltdbroot log catalog-report.html \
+         statement-plans procedures/voter/*.class client/voter/*.class
 }
 
-# compile the source code for procedures and the client
-function srccompile() {
-    mkdir -p obj
-    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH -d obj \
-        src/voter/*.java \
-        src/voter/procedures/*.java
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
-    jar cf $APPNAME-procs.jar -C obj voter/procedures
+# remove everything from "clean" as well as the jarfiles
+function cleanall() {
+    clean
+    rm -rf voter-procs.jar voter-client.jar
 }
 
-# build an application catalog
-function catalog() {
-    srccompile
-    echo "Compiling the voter application catalog."
-    echo "To perform this action manually, use the command line: "
-    echo
-    echo "voltdb compile --classpath obj -o $APPNAME.jar ddl.sql"
-    echo
-    $VOLTDB compile --classpath obj -o $APPNAME.jar ddl.sql
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
+# compile the source code for procedures and the client into jarfiles
+function jars() {
+    # compile java source
+    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH procedures/voter/*.java
+    javac -target 1.7 -source 1.7 -classpath $CLIENTCLASSPATH client/voter/*.java
+    # build procedure and client jars
+    jar cf voter-procs.jar -C procedures voter
+    jar cf voter-client.jar -C client voter
+    # remove compiled .class files
+    rm -rf procedures/voter/*.class client/voter/*.class
 }
 
-# Run a server with no catalog 
-function empty-server() {
-    srccompile
-    echo "Compiling the application catalog with no DDL, Procedure classes will be added to ctalog."
-    echo "To perform this action manually, use the command line: "
-    echo
-    echo "voltdb create -d deployment-noschema.xml -l $LICENSE -H $HOST"
-    echo
-    $VOLTDB create -d deployment-noschema.xml -l $LICENSE -H $HOST
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
+# compile the procedure and client jarfiles if they don't exist
+function jars-ifneeded() {
+    if [ ! -e voter-procs.jar ] || [ ! -e voter-client.jar ]; then
+        jars;
+    fi
 }
 
 # run the voltdb server locally
 function server() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
-    # run the server
     echo "Starting the VoltDB server."
     echo "To perform this action manually, use the command line: "
     echo
-    echo "$VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar"
+    echo "voltdb create -d deployment.xml -l $LICENSE -H $HOST"
     echo
-    $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
+    voltdb create -d deployment.xml -l $LICENSE -H $HOST
+}
+
+# load schema and procedures
+function init() {
+    jars-ifneeded
+    sqlcmd < ddl.sql
 }
 
 function nohup_server() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    jars-ifneeded
     # run the server
-    nohup $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar > nohup.log 2>&1 &
+    nohup $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST > nohup.log 2>&1 &
+    sqlcmd < ddl.sql
 }
 
 # run the voltdb server locally
 function rejoin() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    $VOLTDB rejoin -H $HOST -d deployment.xml -l $LICENSE
+    voltdb rejoin -H $HOST -d deployment.xml -l $LICENSE
 }
 
 # run the client that drives the example
@@ -119,16 +112,16 @@ function client() {
 # Asynchronous benchmark sample
 # Use this target for argument help
 function async-benchmark-help() {
-    srccompile
-    java -classpath obj:$CLIENTCLASSPATH:obj voter.AsyncBenchmark --help
+    jars-ifneeded
+    java -classpath $CLIENTCLASSPATH voter.AsyncBenchmark --help
 }
 
 # latencyreport: default is OFF
 # ratelimit: must be a reasonable value if lantencyreport is ON
 # Disable the comments to get latency report
 function async-benchmark() {
-    if [ ! -d obj ]; then srccompile; fi
-    java -classpath obj:$CLIENTCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    jars-ifneeded
+    java -classpath $CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         voter.AsyncBenchmark \
         --displayinterval=5 \
         --warmup=5 \
@@ -141,21 +134,21 @@ function async-benchmark() {
 }
 
 function simple-benchmark() {
-    srccompile
-    java -classpath obj:$CLIENTCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    jars-ifneeded
+    java -classpath $CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         voter.SimpleBenchmark localhost
 }
 
 # Multi-threaded synchronous benchmark sample
 # Use this target for argument help
 function sync-benchmark-help() {
-    srccompile
-    java -classpath obj:$CLIENTCLASSPATH:obj voter.SyncBenchmark --help
+    jars-ifneeded
+    java -classpath $CLIENTCLASSPATH voter.SyncBenchmark --help
 }
 
 function sync-benchmark() {
-    srccompile
-    java -classpath obj:$CLIENTCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    jars-ifneeded
+    java -classpath $CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         voter.SyncBenchmark \
         --displayinterval=5 \
         --warmup=5 \
@@ -169,13 +162,13 @@ function sync-benchmark() {
 # JDBC benchmark sample
 # Use this target for argument help
 function jdbc-benchmark-help() {
-    srccompile
-    java -classpath obj:$CLIENTCLASSPATH:obj voter.JDBCBenchmark --help
+    jars-ifneeded
+    java -classpath $CLIENTCLASSPATH voter.JDBCBenchmark --help
 }
 
 function jdbc-benchmark() {
-    srccompile
-    java -classpath obj:$CLIENTCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    jars-ifneeded
+    java -classpath $CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         voter.JDBCBenchmark \
         --displayinterval=5 \
         --duration=120 \
@@ -186,9 +179,9 @@ function jdbc-benchmark() {
 }
 
 # The following two demo functions are used by the Docker package. Don't remove.
-# compile the catalog and client code
+# compile the jars for procs and client code
 function demo-compile() {
-    catalog
+    jars
 }
 
 function demo() {
@@ -200,12 +193,12 @@ function demo() {
 
     echo
     echo When you are done with the demo database, \
-        remember to use \"$VOLTDB_BIN/voltadmin shutdown\" to stop \
+        remember to use \"voltadmin shutdown\" to stop \
         the server process.
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|catalog|server|async-benchmark|aysnc-benchmark-help|...}"
+    echo "Usage: ./run.sh {clean|server|init|client|async-benchmark|aysnc-benchmark-help|...}"
     echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark|jdbc-benchmark-help}"
 }
 

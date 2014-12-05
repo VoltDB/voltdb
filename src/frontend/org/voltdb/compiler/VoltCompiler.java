@@ -17,8 +17,6 @@
 
 package org.voltdb.compiler;
 
-import java.io.BufferedInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -56,6 +54,7 @@ import javax.xml.validation.SchemaFactory;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.HSQLInterface;
+import org.hsqldb_voltpatches.VoltXMLElement;
 import org.json_voltpatches.JSONException;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -64,6 +63,7 @@ import org.voltdb.ProcInfoData;
 import org.voltdb.RealVoltDB;
 import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltDBInterface;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
@@ -92,6 +92,7 @@ import org.voltdb.compiler.projectfile.SchemasType;
 import org.voltdb.compilereport.ReportMaker;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.utils.CatalogSchemaTools;
 import org.voltdb.utils.CatalogUtil;
@@ -118,6 +119,9 @@ public class VoltCompiler {
     // Causes the "debugoutput" folder to be generated and populated.
     // Also causes explain plans on disk to include cost.
     public final static boolean DEBUG_MODE = System.getProperties().contains("compilerdebug");
+
+    // was this voltcompiler instantiated in a main(), or as part of VoltDB
+    public final boolean standaloneCompiler;
 
     // feedback by filename
     ArrayList<Feedback> m_infos = new ArrayList<Feedback>();
@@ -343,6 +347,16 @@ public class VoltCompiler {
         }
     }
 
+    /** Passing true to constructor indicates the compiler is being run in standalone mode */
+    public VoltCompiler(boolean standaloneCompiler) {
+        this.standaloneCompiler = standaloneCompiler;
+    }
+
+    /** Parameterless constructor is for embedded VoltCompiler use only. */
+    public VoltCompiler() {
+        this(false);
+    }
+
     public boolean hasErrors() {
         return m_errors.size() > 0;
     }
@@ -496,7 +510,8 @@ public class VoltCompiler {
         FilteredCatalogDiffEngine diffEng = new FilteredCatalogDiffEngine(origCatalog, autoGenCatalog);
         String diffCmds = diffEng.commands();
         if (diffCmds != null && !diffCmds.equals("")) {
-            VoltDB.crashLocalVoltDB("Catalog Verification from Generated DDL failed!");
+            VoltDB.crashLocalVoltDB("Catalog Verification from Generated DDL failed! " +
+                    "The offending diffcmds were: " + diffCmds);
         }
         else {
             Log.info("Catalog verification completed successfuly.");
@@ -589,11 +604,34 @@ public class VoltCompiler {
         // generate the catalog report and write it to disk
         try {
             m_report = ReportMaker.report(m_catalog, m_warnings, m_canonicalDDL);
-            File file = new File("catalog-report.html");
-            FileWriter fw = new FileWriter(file);
-            fw.write(m_report);
-            fw.close();
-            m_reportPath = file.getAbsolutePath();
+            m_reportPath = null;
+            File file = null;
+
+            // write to working dir when using VoltCompiler directly
+            if (standaloneCompiler) {
+                file = new File("catalog-report.html");
+            }
+            else {
+                // try to get a catalog context
+                VoltDBInterface voltdb = VoltDB.instance();
+                CatalogContext catalogContext = voltdb != null ? voltdb.getCatalogContext() : null;
+
+                // it's possible that standaloneCompiler will be false and catalogContext will be null
+                //   in test code.
+
+                // if we have a context, write report to voltroot
+                if (catalogContext != null) {
+                    file = new File(catalogContext.cluster.getVoltroot(), "catalog-report.html");
+                }
+            }
+
+            // if there's a good place to write the report, do so
+            if (file != null) {
+                FileWriter fw = new FileWriter(file);
+                fw.write(m_report);
+                fw.close();
+                m_reportPath = file.getAbsolutePath();
+            }
         } catch (IOException e) {
             e.printStackTrace();
             return null;
@@ -852,17 +890,21 @@ public class VoltCompiler {
     /**
      * Create default roles. These roles cannot be removed nor overridden in the DDL.
      * Make sure to omit these roles in the generated DDL in {@link org.voltdb.utils.CatalogSchemaTools}
+     * Also, make sure to prevent them from being dropped by DROP ROLE in the DDLCompiler
+     * !!!
+     * IF YOU ADD A THIRD ROLE TO THE DEFAULTS, IT'S TIME TO BUST THEM OUT INTO A CENTRAL
+     * LOCALE AND DO ALL THIS MAGIC PROGRAMATICALLY --izzy 11/20/2014
      */
     private void addDefaultRoles()
     {
         // admin
-        m_catalog.execute("add /clusters[cluster]/databases[database] groups ADMINISTRATOR");
-        Permission.setPermissionsInGroup(getCatalogDatabase().getGroups().get("ADMINISTRATOR"),
+        m_catalog.execute("add /clusters[cluster]/databases[database] groups administrator");
+        Permission.setPermissionsInGroup(getCatalogDatabase().getGroups().get("administrator"),
                                          Permission.getPermissionsFromAliases(Arrays.asList("ADMIN")));
 
         // user
-        m_catalog.execute("add /clusters[cluster]/databases[database] groups USER");
-        Permission.setPermissionsInGroup(getCatalogDatabase().getGroups().get("USER"),
+        m_catalog.execute("add /clusters[cluster]/databases[database] groups user");
+        Permission.setPermissionsInGroup(getCatalogDatabase().getGroups().get("user"),
                                          Permission.getPermissionsFromAliases(Arrays.asList("SQL", "ALLPROC")));
     }
 
@@ -1095,16 +1137,6 @@ public class VoltCompiler {
                         setGroupedTablePartitionColumn(mvi, partitionCol);
                     }
                 }
-            } else {
-                // Replicated tables case.
-                for (Index index: table.getIndexes()) {
-                    if (index.getAssumeunique()) {
-                        String exceptionMsg = String.format(
-                                "ASSUMEUNIQUE is not valid for replicated tables. Please use UNIQUE instead");
-                        throw new VoltCompilerException(exceptionMsg);
-                    }
-                }
-
             }
         }
 
@@ -1139,6 +1171,38 @@ public class VoltCompiler {
         // generated DDL
         m_importLines = voltDdlTracker.m_importLines.toArray(new String[0]);
         addExtraClasses(jarOutput);
+
+        compileRowLimitDeleteStmts(db, hsql, ddlcompiler.getLimitDeleteStmtToXmlEntries());
+    }
+
+    private void compileRowLimitDeleteStmts(
+            Database db,
+            HSQLInterface hsql,
+            Collection<Map.Entry<Statement, VoltXMLElement>> deleteStmtXmlEntries)
+            throws VoltCompilerException {
+
+        for (Map.Entry<Statement, VoltXMLElement> entry : deleteStmtXmlEntries) {
+            Statement stmt = entry.getKey();
+            VoltXMLElement xml = entry.getValue();
+
+            // choose DeterminismMode.FASTER for determinism, and rely on the planner to error out
+            // if we generated a plan that is content-non-deterministic.
+            StatementCompiler.compileStatementAndUpdateCatalog(this,
+                    hsql,
+                    db.getCatalog(),
+                    db,
+                    m_estimates,
+                    stmt,
+                    xml,
+                    stmt.getSqltext(),
+                    null, // no user-supplied join order
+                    DeterminismMode.FASTER,
+                    StatementPartitioning.partitioningForRowLimitDelete());
+
+            // Temporarily log the plan to demonstrate it's actually getting compiled
+            String explainedPlan = Encoder.hexDecodeToString(stmt.getExplainplan());
+            compilerLog.info("Plan for " + m_currentFilename + ":\n" + explainedPlan);
+        }
     }
 
     private void checkValidPartitionTableIndex(Index index, Column partitionCol, String tableName)
@@ -1999,7 +2063,9 @@ public class VoltCompiler {
      */
     public static void main(final String[] args)
     {
-        final VoltCompiler compiler = new VoltCompiler();
+        // passing true to constructor indicates the compiler is being run in standalone mode
+        final VoltCompiler compiler = new VoltCompiler(true);
+
         boolean success = false;
         if (args.length > 0 && args[0].toLowerCase().endsWith(".jar")) {
             // The first argument is *.jar for the new syntax.
@@ -2250,42 +2316,6 @@ public class VoltCompiler {
     // this needs to be reset in the main compile func
     private static final HashSet<Class<?>> cachedAddedClasses = new HashSet<Class<?>>();
 
-    private byte[] getClassAsBytes(final Class<?> c) throws IOException {
-
-        ClassLoader cl = c.getClassLoader();
-        if (cl == null) {
-            cl = Thread.currentThread().getContextClassLoader();
-        }
-
-        String classAsPath = c.getName().replace('.', '/') + ".class";
-
-        if (cl instanceof JarLoader) {
-            InMemoryJarfile memJar = ((JarLoader) cl).getInMemoryJarfile();
-            return memJar.get(classAsPath);
-        }
-        else {
-            BufferedInputStream   cis = null;
-            ByteArrayOutputStream baos = null;
-            try {
-                cis  = new BufferedInputStream(cl.getResourceAsStream(classAsPath));
-                baos =  new ByteArrayOutputStream();
-
-                byte [] buf = new byte[1024];
-
-                int rsize = 0;
-                while ((rsize=cis.read(buf)) != -1) {
-                    baos.write(buf, 0, rsize);
-                }
-
-            } finally {
-                try { if (cis != null)  cis.close();}   catch (Exception ignoreIt) {}
-                try { if (baos != null) baos.close();}  catch (Exception ignoreIt) {}
-            }
-
-            return baos.toByteArray();
-        }
-    }
-
 
     public List<Class<?>> getInnerClasses(Class <?> c)
             throws VoltCompilerException {
@@ -2400,24 +2430,11 @@ public class VoltCompiler {
             addClassToJar(jarOutput, nested);
         }
 
-        String packagePath = cls.getName();
-        packagePath = packagePath.replace('.', '/');
-        packagePath += ".class";
-
-        String realName = cls.getName();
-        realName = realName.substring(realName.lastIndexOf('.') + 1);
-        realName += ".class";
-
-        byte [] classBytes = null;
         try {
-            classBytes = getClassAsBytes(cls);
-        } catch (Exception e) {
-            final String msg = "Unable to locate classfile for " + realName;
-            throw new VoltCompilerException(msg);
+            return VoltCompilerUtils.addClassToJar(jarOutput, cls);
+        } catch (IOException e) {
+            throw new VoltCompilerException(e.getMessage());
         }
-
-        jarOutput.put(packagePath, classBytes);
-        return true;
     }
 
     /**

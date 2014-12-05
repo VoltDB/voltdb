@@ -37,7 +37,7 @@ public class SQLLexer
             "^\\s*" +  // start of line, 0 or more whitespace
             "(alter|create|drop|export|partition)" + // DDL we're ready to handle
             "\\s+" + // one or more whitespace
-            "(table|assumeunique|unique|index|view|procedure)" +
+            "(table|assumeunique|unique|index|view|procedure|role)" +
             "\\s+" + // one or more whitespace
             ".*$", // all the rest
             Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL

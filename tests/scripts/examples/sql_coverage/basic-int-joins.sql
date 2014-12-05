@@ -12,5 +12,6 @@ INSERT INTO @dmltable VALUES (150, 120, 120, 140)
 
 <join-template.sql>
 
+{@jointype = "_jointype"}
 --- Aggregate with join
 <join-aggregate-template.sql>

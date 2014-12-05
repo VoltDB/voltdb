@@ -64,7 +64,7 @@
     <xs:attribute name="sitesperhost" type="xs:int" default="8"/>
     <xs:attribute name="kfactor" type="xs:int" default="0"/>
     <xs:attribute name="elastic" type="xs:string" default="enabled"/>
-    <xs:attribute name="schema" type="schemaType" default="catalog"/>
+    <xs:attribute name="schema" type="schemaType" default="ddl"/>
   </xs:complexType>
 
   <!-- <paths> -->
@@ -309,7 +309,6 @@
       <xs:element name="user" minOccurs="1" maxOccurs="unbounded">
         <xs:complexType>
           <xs:attribute name="name" type="xs:string" use="required"/>
-          <xs:attribute name="groups" type="xs:string"/>
           <xs:attribute name="roles" type="xs:string"/>
           <xs:attribute name="password" type="xs:string" use="required"/>
           <xs:attribute name="plaintext" type="xs:boolean" default="true"/>

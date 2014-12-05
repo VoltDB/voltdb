@@ -141,6 +141,16 @@ public class StatementPartitioning implements Cloneable{
 
     private boolean m_joinValid = true;
 
+    /** Most of the time DML on a replicated table for a plan that is executed
+     * as single-partition is a bad idea, and the planner will refuse to do it.
+     * However, sometimes we want to bypass this rule; for example, when planning
+     * the DELETE statement executed when LIMIT PARTITION ROWS is about to be violated.
+     * In this special case, the statement is being planned, for simplicity, as if for
+     * single-partition execution, since it never requires a coordinator fragment,
+     * but it will only ever be executed in the context of a replicated table MP insert
+     * on ALL partitions.*/
+    private boolean m_isReplicatedDmlToRunOnAllPartitions = false;
+
     /**
      * @param specifiedValue non-null if only SP plans are to be assumed
      * @param lockInInferredPartitioningConstant true if MP plans should be automatically optimized for SP where possible
@@ -162,6 +172,12 @@ public class StatementPartitioning implements Cloneable{
         return new StatementPartitioning(true, /* default to MP */ false);
     }
 
+    /** See comment for m_singlePartitionReplicatedDMLAllowed, above. */
+    public static StatementPartitioning partitioningForRowLimitDelete() {
+        StatementPartitioning partitioning = forceSP();
+        partitioning.m_isReplicatedDmlToRunOnAllPartitions = true;
+        return partitioning;
+    }
 
     public boolean isInferred() {
         return m_inferPartitioning;
@@ -338,6 +354,13 @@ public class StatementPartitioning implements Cloneable{
      */
     public Column getPartitionColForDML() {
         return m_partitionColForDML;
+    }
+
+    /**
+     * Accessor
+     */
+    public boolean isReplicatedDmlToRunOnAllPartitions() {
+        return m_isReplicatedDmlToRunOnAllPartitions;
     }
 
     /**
