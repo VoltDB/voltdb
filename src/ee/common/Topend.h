@@ -96,6 +96,9 @@ public:
     void pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block);
 
     void fallbackToEEAllocatedBuffer(char *buffer, size_t length);
+
+    std::string decodeBase64AndDecompress(const std::string& buffer);
+
     std::queue<int32_t> partitionIds;
     std::queue<std::string> signatures;
     std::deque<boost::shared_ptr<StreamBlock> > blocks;
