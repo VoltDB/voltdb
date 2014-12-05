@@ -145,9 +145,11 @@
             src = src.replace(MatchNonBreakingInsertIntoSelect, GenerateDisguisedCompoundKeywords);
             src = src.replace(MatchNonBreakingCompoundKeywords, GenerateDisguisedCompoundKeywords);
 
-            // Start a new statement before each remaining statement keyword.
-            src = src.replace(MatchStatementStarts, GenerateSplitStatements);
-            //* Enable this to debug in the browser */ console.log("mid-processed queries:'" + src + "'");
+            if (!src.match("^explain")) {
+                // Start a new statement before each remaining statement keyword.
+                src = src.replace(MatchStatementStarts, GenerateSplitStatements);
+                //* Enable this to debug in the browser */ console.log("mid-processed queries:'" + src + "'");
+            }
 
             // Restore disguised compound keywords post-statement-split.
             src = src.replace(MatchCompoundKeywordDisguise, '');
