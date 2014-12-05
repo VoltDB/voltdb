@@ -319,9 +319,6 @@ public class CSVLoader implements BulkLoaderErrorHandler {
             if(!customNullString.isEmpty() && !blank.equals("error")){
                 blank = "empty";
             }
-            if(blank.equals("foo")) {
-                blank = "null";
-            }
             if (!blank.equalsIgnoreCase("error") &&
                 !blank.equalsIgnoreCase("null") &&
                 !blank.equalsIgnoreCase("empty")) {
