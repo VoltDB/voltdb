@@ -275,7 +275,7 @@
                     </div>
                     <div class="adminRight">
                      <div class="downloadConfig">
-                        <a href="#" class="btnDown">Download Configuration</a>
+                        <a id="downloadAdminConfigurations" href="javascript:void(0);" class="btnDown">Download Configuration</a>
                     </div>
                         <div class="adminServer">
                             <div class="serverName" id="serverName">Server</div>
@@ -296,42 +296,6 @@
                                         <div id="serverListWrapperAdmin">
                                             <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblshutdown">
                                                 <tbody>
-                                                    <tr>
-                                                        <td class="configLabel" width="85%"><a href="#">Test Server Lorem</a></td>
-                                                        <td align="right">
-                                                            <a href="#stopConfirmationPop" class="shutdown " id="stopConfirmation">
-                                                                <span class="shutdownServer">Stop</span></a>
-                                                            <a href="#startConfirmationPop" class="startServ " id="startConfirmation" style="display: none;">
-                                                                <span class="startServer">Start</span> </a></td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td class="configLabel" width="50%"><a href="#">Test Server 2 Lorem </a></td>
-                                                        <td align="right"><a href="#" class="shutdown "><span class="shutdownServer">Stop</span></a></td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td class="configLabel"><a href="#">Server Lorem Ispum</a></td>
-                                                        <td align="right"><a href="#" class="shutdown "><span class="shutdownServer">Stop</span></a></td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td class="configLabel"><a href="#">Server 2 Lorem Ispum </a></td>
-                                                        <td align="right"><a href="#" class="shutdown "><span class="shutdownServer">Stop</span></a></td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td class="configLabel" width="50%"><a href="#">Test Server 2 Lorem </a></td>
-                                                        <td align="right"><a href="#" class="shutdown "><span class="shutdownServer">Stop</span></a></td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td class="configLabel"><a href="#">Server Lorem Ispum</a></td>
-                                                        <td align="right"><a href="#" class="shutdown "><span class="shutdownServer">Stop</span></a></td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td class="configLabel" width="50%"><a href="#">Test Server 2 Lorem </a></td>
-                                                        <td align="right"><a href="#" class="shutdown "><span class="shutdownServer">Stop</span></a></td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td class="configLabel"><a href="#">Server Lorem Ispum</a></td>
-                                                        <td align="right"><a href="#" class="shutdown "><span class="shutdownServer">Stop</span></a></td>
-                                                    </tr>
                                                 </tbody>
                                             </table>
                                         </div>
@@ -548,8 +512,8 @@
                                     <td id="httpport"></td>
                                 </tr>
                                 <tr>
-                                    <td id="internalPort">Internal Port</td>
-                                    <td></td>
+                                    <td>Internal Port</td>
+                                    <td id="internalPort"></td>
                                 </tr>
                                 <tr>
                                     <td>Zookeeper Port</td>
