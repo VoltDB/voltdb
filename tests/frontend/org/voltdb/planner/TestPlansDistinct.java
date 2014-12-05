@@ -221,9 +221,6 @@ public class TestPlansDistinct extends PlannerTestCase {
         failToCompile(sql, errorMsg);
 
         // When including C1 in the display columns, it will be OK
-        sql = "select C1, max(B1) FROM P1 group by PKEY order by C1";
-        compileToFragments(sql);
-
         sql = "select DISTINCT C1, max(B1) FROM P1 group by PKEY order by C1";
         compileToFragments(sql);
 
@@ -232,7 +229,7 @@ public class TestPlansDistinct extends PlannerTestCase {
 
 
         // T3 primary key (PKEY, A3)
-        sql = "select PKEY, max(B3) FROM T3 group by PKEY, A3 order by C3";
+        sql = "select DISTINCT PKEY, max(B3) FROM T3 group by PKEY, A3 order by C3";
         failToCompile(sql, errorMsg);
 
         sql = "select distinct max(B3) FROM T3 group by PKEY, A3 order by C3";
@@ -240,7 +237,6 @@ public class TestPlansDistinct extends PlannerTestCase {
 
         sql = "select distinct C3, max(B3) FROM T3 group by PKEY, A3 order by C3";
         compileToFragments(sql);
-
     }
 
     public void testColumnsExpressionsWithGroupby()
@@ -293,11 +289,11 @@ public class TestPlansDistinct extends PlannerTestCase {
         // A3 is the Partition column for table T3
         // LIMIT can be pushed down with order by plan node for this case
         sql1 = "SELECT distinct A3, COUNT(*) from T3 group by A3, B3 ORDER BY A3 LIMIT 3";
-        sql2 = "SELECT A3, COUNT(*) from T3 group by A3, B3 ORDER BY A3 LIMIT 1";
+        sql2 = "SELECT A3, COUNT(*) from T3 group by A3, B3 ORDER BY A3 LIMIT 3";
         checkDistinctWithGroupbyPlans(sql1, sql2, true);
 
         sql1 = "SELECT distinct B3, COUNT(*) from T3 group by A3, B3 ORDER BY B3 LIMIT 3";
-        sql2 = "SELECT B3, COUNT(*) from T3 group by A3, B3 ORDER BY B3 LIMIT 1";
+        sql2 = "SELECT B3, COUNT(*) from T3 group by A3, B3 ORDER BY B3 LIMIT 3";
         checkDistinctWithGroupbyPlans(sql1, sql2, true);
     }
 
