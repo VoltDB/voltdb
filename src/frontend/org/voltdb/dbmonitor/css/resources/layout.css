@@ -803,36 +803,37 @@ ul.adminClusterList li a:hover{color:#000;}
 .adminMode { float:left; margin:0 10px 0 0;}
 .adminM { float:left;background:#dfdfdf; padding:8px; font-weight:bold;}
 .adminD {float:left;background:#c70000; color:#FFFFFF; padding:8px; font-weight:bold;}  
-.adminE {float:left;background:#76bd1d; color:#FFFFFF; padding:8px; font-weight:bold;}  
-.adminServer { float:left; }
-.serverName {cursor:pointer; float:left; background:#D0D2D2/*#c70000*/; padding:8px; font-weight:bold; /*color:#FFFFFF;*/ } 
+.adminE {float:left;background:#76bd1d; color:#FFFFFF; padding:8px; font-weight:bold;} 
+.downloadConfig { float:left; margin:0 5px 0 0; } 
+.btnDown {cursor: pointer;float: left;background: #D0D2D2;padding: 8px;font-weight: bold;}
+.adminServer { float:left;}
+.serverName {  cursor:pointer; float:left; background:#D0D2D2/*#c70000*/; padding:8px; font-weight:bold; /*color:#FFFFFF;*/ } 
 .setServer {float:left;}
 .adminIcons { background-position:-225px -13px; width:30px; height:28px; }
-.adminContainer { margin:0; padding:20px 20px; background:#FFFFFF;}
-.adminContentLeft { float:left; width:49%; background:#F3F3F3; margin:0 2% 0 0 }
-.adminContentRight { float:left;width:49%; background:#FFFFFF;  }
-.headerAdminContent {background: #d0d2d2;border-bottom: 1px solid #CCCCCC;height:45px;position: relative;}
-.adminDirectories { background:#f3f3f3;}
-.headerAdminContent h1 {padding: 15px 0 0 10px;}
-.adminPorts { margin:0 0 10px 0; background:#f3f3f3;}
+.adminContainer { margin:0; padding:20px 0; font-size:13px;}
+.adminContentLeft { float:left; width:49%; background:#FFFFFF; margin:0 2% 0 0 }
+.adminContentRight { float:left;width:49%;}
+.headerAdminContent {height:53px;position: relative; background:#fbfbfb; border-bottom:1px solid #aaa;}
+.adminDirectories { background:#FFFFFF; margin:20px 0 0 0;}
+.headerAdminContent h1 {padding: 18px 0 0 20px; font-size:17px;}
+.adminPorts { margin:0 0 10px 0; background:#FFFFFF;}
 .adminTbl { margin:0; padding:0;}
 .adminTbl1 tr td { margin:0; padding:2px 2px 2px 2px; border-left:none; border-right:none; line-height:38px; height:32px;}
-.adminTbl2 tr td { margin:0; padding:15px 25px 15px 10px; border-left:none; border-right:none;}
+.adminTbl2 tr td { margin:0; padding:15px 25px 15px 20px; border-left:none; border-right:none;}
 .adminTbl1 tr td a.save {position:relative;top:4px}
 
 .onIcon			 { background-position: -266px -58px; width: 31px; height: 17px; position:relative; top:4px;}
 .offIcon 		 { background-position:-266px -106px; width: 31px; height: 17px; position:relative; top:5px;}
 .edit 			 { background-position: -226px -64px; width: 31px; height: 17px; display:inline-block; position:relative; top:-3px;}
 .arrow 			 { background-position: -316px -102px;width: 10px; height: 17px}
-table.adminTbl1, table.adminTbl2 { border:1px solid #CCCCCC;}
 .adminTbl1 tr td.configLabel{ padding-left:35px; font-weight:bold; white-space:nowrap;}
 .tblshutdown tr td.configLabel a { font-weight:bold;}
-.adminTbl1 tr.hasSubLabel td.configLabel{ padding-left:10px; font-weight:bold;}
+.adminTbl1 tr.hasSubLabel td.configLabel{ padding-left:15px; font-weight:bold;}
 .adminTbl1 tr.subLabelRow td.configLabel{padding-left:40px; font-weight:normal;}
 .adminTbl1 td .edit {top:9px;}
 .hasSubLabel{} 
-.labelCollapsed{ background-position:-352px -11px; padding-left:25px;}
-.labelExpanded{ background-position:-352px -55px; padding-left:25px;}
+.labelCollapsed{ background-position:-352px -11px; padding-left:22px;}
+.labelExpanded{ background-position:-352px -55px; padding-left:22px;}
 .adminTbl2 tr td:nth-child(1){font-weight:bold;}
 
 .adminWrapper{position:relative;}
@@ -890,6 +891,7 @@ td.heartbeattd span.unit, td.queryTimeOut span.unit{position:relative;/* top:7px
 .confirmationHeight { height:auto!important;}
 
 /*********************************************media Qu********************/
+
 @media (max-width: 479px) {
 .serverStat {float:none; clear:left;}
 .userN {display:none;}
