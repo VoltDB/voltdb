@@ -96,7 +96,6 @@ import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
-import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.dtxn.InitiatorStats;
 import org.voltdb.dtxn.LatencyHistogramStats;
 import org.voltdb.dtxn.LatencyStats;
@@ -327,7 +326,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     // The configured license api: use to decide enterprise/community edition feature enablement
     LicenseApi m_licenseApi;
-    @SuppressWarnings("unused")
     private LatencyStats m_latencyStats;
 
     private LatencyHistogramStats m_latencyHistogramStats;
@@ -1434,27 +1432,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             // create a dummy catalog to load deployment info into
             Catalog catalog = new Catalog();
+            // Need these in the dummy catalog
             Cluster cluster = catalog.getClusters().add("cluster");
+            @SuppressWarnings("unused")
             Database db = cluster.getDatabases().add("database");
-
-            // create groups as needed for users
-            if (m_deployment.getUsers() != null) {
-                for (UsersType.User user : m_deployment.getUsers().getUser()) {
-                    Set<String> roles = CatalogUtil.mergeUserRoles(user);
-                    if (roles.isEmpty()) {
-                        continue;
-                    }
-                    for (String role : roles) {
-                        if (db.getGroups().get(role) == null) {
-                            db.getGroups().add(role);
-                        }
-                    }
-                }
-            }
 
             String result = CatalogUtil.compileDeployment(catalog, m_deployment, true);
             if (result != null) {
-                hostLog.fatal(result);
+                // Any other non-enterprise deployment errors will be caught and handled here
+                // (such as <= 0 host count)
                 VoltDB.crashLocalVoltDB(result);
             }
             byte[] deploymentHash = CatalogUtil.makeCatalogOrDeploymentHash(deploymentBytes);
@@ -1464,14 +1450,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                             0, //timestamp
                             catalog, null, deploymentHash, 0, -1);
 
-            int numberOfNodes = m_deployment.getCluster().getHostcount();
-            if (numberOfNodes <= 0) {
-                hostLog.l7dlog( Level.FATAL, LogKeys.host_VoltDB_InvalidHostCount.name(),
-                        new Object[] { numberOfNodes }, null);
-                VoltDB.crashLocalVoltDB("Invalid cluster size: " + numberOfNodes, false, null);
-            }
-
-            return numberOfNodes;
+            return m_deployment.getCluster().getHostcount();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -1563,6 +1542,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             stringer.key("adminInterface").value(m_config.m_adminInterface);
             stringer.key("httpPort").value(m_config.m_httpPort);
             stringer.key("httpInterface").value(m_config.m_httpPortInterface);
+            stringer.key("internalPort").value(m_config.m_internalPort);
+            stringer.key("internalInterface").value(m_config.m_internalInterface);
+            String[] zkInterface = m_config.m_zkInterface.split(":");
+            stringer.key("zkPort").value(zkInterface[1]);
+            stringer.key("zkInterface").value(zkInterface[0]);
             stringer.key("drPort").value(m_config.m_drAgentPortStart);
             stringer.key("drInterface").value(m_config.m_drInterface);
             stringer.endObject();
@@ -1677,13 +1661,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         SortedMap<String, String> dbgMap = m_catalogContext.getDebuggingInfoFromCatalog();
         for (String line : dbgMap.values()) {
             hostLog.info(line);
-        }
-
-        if (m_catalogContext.cluster.getUseddlschema()) {
-            consoleLog.warn("Cluster is configured to use live DDL for application changes. " +
-                  "This feature is currently a preview of work-in-progress and not recommended for " +
-                  "production environments.  Remove the schema attribute in the <cluster> " +
-                  "element of your deployment file if you did not intend to use the preview.");
         }
 
         // print out a bunch of useful system info
