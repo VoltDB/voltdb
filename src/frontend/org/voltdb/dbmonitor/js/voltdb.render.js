@@ -294,18 +294,20 @@ function alertNodeClicked(obj) {
             }
         };
 
-        this.GetSystemInformation = function (onInformationLoaded, onAdminPageClientPortLoaded) {
+        this.GetSystemInformation = function (onInformationLoaded, onAdminPageClientPortLoaded, onAdminPageServerListLoaded) {
             VoltDBService.GetSystemInformation(function (connection) {
-                if (VoltDbAdminConfig.isAdmin) {
-                    onAdminPageClientPortLoaded(getClientPort(connection));
-                }
-
                 populateSystemInformation(connection);
                 getMemoryDetails(connection, systemMemory);
+                
+                if (VoltDbAdminConfig.isAdmin) {
+                    onAdminPageClientPortLoaded(getClientPort(connection));
+                    onAdminPageServerListLoaded(getAdminServerList());
+                }
 
                 if (gCurrentServer == "")
                     configureRequestedHost(VoltDBCore.hostIP);
                 onInformationLoaded();
+
 
             });
         };
@@ -1809,6 +1811,36 @@ function alertNodeClicked(obj) {
             VoltDBService.editConfigurationItem(configGroup, configMember, configValue, function () {
                 onConfigurationUpdated();
             });
+        };
+
+        var getAdminServerList = function () {
+            var htmlServerListHtml = "";
+            
+            if (systemOverview != null || systemOverview != undefined) {
+                $.each(systemOverview, function (id, val) {
+                    if ((val['HOSTNAME'] != null || val['HOSTNAME'] != "") && val['CLUSTERSTATE']=='RUNNING') {
+                        htmlServerListHtml = htmlServerListHtml.concat("<tr><td class=\"configLabel\" width=\"85%\"><a href=\"#\">" + val['HOSTNAME'] + "</a></td>" +
+                                                  "<td align=\"right\"><a href=\"#stopConfirmationPop\" class=\"shutdown\" id=\"stopConfirmation\">" +
+                                                  "<span class=\"shutdownServer\">Stop</span></a></td></tr>");
+                        
+                    }
+                    
+                    else if ((val['HOSTNAME'] != null || val['HOSTNAME'] != "") && val['CLUSTERSTATE'] == 'JOINING') {
+                        htmlServerListHtml = htmlServerListHtml.concat("<tr><td class=\"configLabel\" width=\"85%\"><a href=\"#\">" + val['HOSTNAME'] + "</a></td>" +
+                                                 "<td align=\"right\"><a href=\"javascript:void(0);\" class=\"shutdown\" id=\"stopConfirmation\">" +
+                                                 "<span>Stop</span></a></td></tr>");
+                        
+                    }
+                    
+                    else if ((val['HOSTNAME'] != null || val['HOSTNAME'] != "") && val['CLUSTERSTATE'] == 'MISSING') {
+                        htmlServerListHtml = htmlServerListHtml.concat("<tr><td class=\"configLabel\" width=\"85%\"><a href=\"#\">" + val['HOSTNAME'] + "</a></td>" +
+                                                  "<td align=\"right\"><a href=\"#stopConfirmationPop\" class=\"shutdown\" id=\"stopConfirmation\">" +
+                                                  "<span class=\"shutdownServer\">Start</span></a></td></tr>");
+                    }
+                });
+                return htmlServerListHtml;
+            }
+            return "";
         };
 
 

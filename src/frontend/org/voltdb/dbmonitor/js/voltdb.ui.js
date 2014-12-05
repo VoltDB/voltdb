@@ -392,13 +392,15 @@ var loadPage = function (serverName, portid) {
             VoltDbAdminConfig.displayClientPort(clientPortValue);
         };
             
-        voltDbRenderer.GetSystemInformation(loadClusterHealth, loadAdminTabClientPort);
+        var loadAdminServerList = function (serverList) {
+            VoltDbAdminConfig.refreshServerList(serverList);
+        };
 
+        voltDbRenderer.GetSystemInformation(loadClusterHealth, loadAdminTabClientPort, loadAdminServerList);
 
     };
 
     var refreshGraphAndData = function (graphView, currentTab) {
-
         voltDbRenderer.getMemoryGraphInformation(function (memoryDetails) {
             MonitorGraphUI.RefreshMemory(memoryDetails, getCurrentServer(), graphView, currentTab);
         });

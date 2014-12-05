@@ -35,7 +35,7 @@ $(document).ready(function () {
         maxJavaHeapLabel: $("#maxJavaHeapUnit"),
         heartBeatTimeout: $("#hrtTimeOutSpan"),
         heartBeatTimeoutLabel: $("#hrtTimeOutUnitSpan"),
-        queryTimeout: $("#txtQueryTimeout"),
+        queryTimeout: $("#queryTimeOutSpan"),
         queryTimeoutLabel: $("#queryTimeOutUnitSpan"),
         tempTablesMaxSize: $("#temptablesmaxsize"),
         tempTablesMaxSizeLabel: $("#temptablesmaxsizeUnit"),
@@ -50,7 +50,11 @@ $(document).ready(function () {
         snapshotPath: $('#snapshotpath'),
         exportOverflow: $('#exportOverflow'),
         commandLogPath: $('#commandlogpath'),
-        commandLogSnapshotPath: $('#commandlogsnapshotpath')
+        commandLogSnapshotPath: $('#commandlogsnapshotpath'),
+
+        //ServerList Section
+        adminServerList: $("#serverListWrapperAdmin > .tblshutdown > tbody")
+
     };
 
     adminEditObjects = {
@@ -529,9 +533,9 @@ $(document).ready(function () {
         }
     });
 
+
+
     // Checkbox style
-
-
     $('input.snapshot').iCheck({
         checkboxClass: 'icheckbox_square-aero',
         increaseArea: '20%' // optional
@@ -563,6 +567,10 @@ $(document).ready(function () {
             }
         };
 
+        this.refreshServerList = function (serverList) {
+            adminDOMObjects.adminServerList.html(serverList);
+        };
+
         var configureAdminValues = function (adminConfigValues) {
             adminDOMObjects.siteNumberHeader.text(adminConfigValues.sitesperhost);
             adminDOMObjects.kSafety.text(adminConfigValues.kSafety);
@@ -576,30 +584,32 @@ $(document).ready(function () {
             adminDOMObjects.jsonAPILabel.text(getOnOffText(adminConfigValues.jsonEnabled));
             adminDOMObjects.autoSnapshot.removeClass().addClass(getOnOffClass(adminConfigValues.snapshotEnabled));
             adminDOMObjects.autoSnapshotLabel.text(getOnOffText(adminConfigValues.snapshotEnabled));
-            adminDOMObjects.frequency.text(adminConfigValues.frequency);
-            adminDOMObjects.frequencyLabel.text(adminConfigValues.frequency > 0 ? "Hrs" : "");
-            adminDOMObjects.retained.text(adminConfigValues.retained);
-            adminDOMObjects.retainedLabel.text(adminConfigValues.retained > 0 ? "Copies" : "");
+            adminDOMObjects.frequency.text(adminConfigValues.frequency != "" ? adminConfigValues.frequency : "");
+            adminDOMObjects.frequencyLabel.text(adminConfigValues.frequency != "" ? "Hrs" : "");
+            adminDOMObjects.retained.text(adminConfigValues.retained != "" ? adminConfigValues.retained : "");
+            adminDOMObjects.retainedLabel.text(adminConfigValues.retained != "" ? "Copies" : "");
             adminDOMObjects.commandLog.removeClass().addClass(getOnOffClass(adminConfigValues.commandLogEnabled));
             adminDOMObjects.commandLogLabel.text(adminConfigValues.commandLogEnabled == 'true' ? 'On' : 'Off');
-            adminDOMObjects.commandLogFrequencyTime.text(adminConfigValues.commandLogFrequencyTime);
-            adminDOMObjects.commandLogFrequencyTimeLabel.text(adminConfigValues.commandLogFrequencyTime > 0 ? "ms" : "");
-            adminDOMObjects.commandLogFrequencyTransactions.text(adminConfigValues.commandLogFrequencyTransactions);
-            adminDOMObjects.commandLogSegmentSize.text(adminConfigValues.logSegmentSize);
-            adminDOMObjects.commandLogSegmentSizeLabel.text(adminConfigValues.logSegmentSize > 0 ? "MB" : "");
+            adminDOMObjects.commandLogFrequencyTime.text(adminConfigValues.commandLogFrequencyTime != "" ? adminConfigValues.commandLogFrequencyTime : "");
+            adminDOMObjects.commandLogFrequencyTimeLabel.text(adminConfigValues.commandLogFrequencyTime != "" ? "ms" : "");
+            adminDOMObjects.commandLogFrequencyTransactions.text(adminConfigValues.commandLogFrequencyTransactions != "" ? adminConfigValues.commandLogFrequencyTransactions : "");
+            adminDOMObjects.commandLogSegmentSize.text(adminConfigValues.logSegmentSize != "" ? adminConfigValues.logSegmentSize : "");
+            adminDOMObjects.commandLogSegmentSizeLabel.text(adminConfigValues.logSegmentSize != "" ? "MB" : "");
             adminDOMObjects.exports.removeClass().addClass(getOnOffClass(adminConfigValues.export));
             adminDOMObjects.exportLabel.text(getOnOffText(adminConfigValues.export));
             adminDOMObjects.target.text(adminConfigValues.targets);
-            adminDOMObjects.maxJavaHeap.text(adminConfigValues.maxJavaHeap);
-            adminDOMObjects.maxJavaHeapLabel.text(adminConfigValues.maxJavaHeap > 0 ? "MB" : "");
-            adminDOMObjects.heartBeatTimeout.text(adminConfigValues.heartBeatTimeout);
-            adminDOMObjects.heartBeatTimeoutLabel.text(adminConfigValues.heartBeatTimeout > 0 ? "ms" : "");
-            adminDOMObjects.queryTimeout.text(adminConfigValues.queryTimeout);
-            adminDOMObjects.queryTimeoutLabel.text(adminConfigValues.queryTimeout > 0 ? "ms" : "");
-            adminDOMObjects.tempTablesMaxSize.text(adminConfigValues.tempTablesMaxSize);
-            adminDOMObjects.tempTablesMaxSizeLabel.text(adminConfigValues.tempTablesMaxSize > 0 ? "MB" : "");
+            adminDOMObjects.properties.text(adminConfigValues.properties);
+            adminDOMObjects.maxJavaHeap.text(adminConfigValues.maxJavaHeap != "" ? adminConfigValues.maxJavaHeap : "");
+            adminDOMObjects.maxJavaHeapLabel.text(adminConfigValues.maxJavaHeap != "" ? "MB" : "");
+            adminDOMObjects.heartBeatTimeout.text(adminConfigValues.heartBeatTimeout != "" ? adminConfigValues.heartBeatTimeout : "");
+            adminDOMObjects.heartBeatTimeoutLabel.text(adminConfigValues.heartBeatTimeout != "" ? "ms" : "");
+            adminDOMObjects.queryTimeout.text(adminConfigValues.queryTimeout != "" ? adminConfigValues.queryTimeout : "");
+            adminDOMObjects.queryTimeoutLabel.text(adminConfigValues.queryTimeout != "" ? "ms" : "");
+            adminDOMObjects.tempTablesMaxSize.text(adminConfigValues.tempTablesMaxSize != "" ? adminConfigValues.tempTablesMaxSize : "");
+            adminDOMObjects.tempTablesMaxSizeLabel.text(adminConfigValues.tempTablesMaxSize != "" ? "MB" : "");
             adminDOMObjects.snapshotPriority.text(adminConfigValues.snapshotPriority);
 
+            //edit configuration
             adminEditObjects.tBoxHeartbeatTimeoutValue = adminConfigValues.heartBeatTimeout;
 
         };
@@ -621,9 +631,89 @@ $(document).ready(function () {
         var configureDirectoryValues = function (directoryConfigValues) {
             adminDOMObjects.voltdbRoot.text(directoryConfigValues.voltdbRoot);
             adminDOMObjects.snapshotPath.text(directoryConfigValues.snapshotPath);
+            adminDOMObjects.exportOverflow.text(directoryConfigValues.exportOverflow);
             adminDOMObjects.commandLogPath.text(directoryConfigValues.commandLogPath);
             adminDOMObjects.commandLogSnapshotPath.text(directoryConfigValues.commandLogSnapshotPath);
 
+        };
+
+
+        var mapNodeInformationByStatus = function () {
+            var counter = 0;
+            var htmlMarkups = { "ServerInformation": [] };
+            var htmlMarkup;
+            var currentServerHtml = "";
+
+            jQuery.each(systemOverview, function (id, val) {
+                var hostName;
+                hostName = val["HOSTNAME"];
+
+                if (counter == 0) {
+                    /*************************************************************************
+                    //CLUSTERSTATE implies if server is running or joining
+                    **************************************************************************/
+                    if (hostName != null && currentServer == hostName && val["CLUSTERSTATE"] == "RUNNING") {
+                        if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
+                            htmlMarkup = "<li class=\"active monitoring\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\"  href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
+
+                        } else {
+                            htmlMarkup = "<li class=\"active monitoring\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
+                        }
+                    } else if (hostName != null && currentServer != hostName && val["CLUSTERSTATE"] == "RUNNING") {
+                        if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
+                            htmlMarkup = "<li class=\"active\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span><span class=\"hostIdHidden\" style=\"display:none\">" + systemMemory[hostName]["HOST_ID"] + "</span></li>";
+                        } else {
+                            htmlMarkup = "<li class=\"active\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
+                        }
+
+                    } else if (hostName != null && val["CLUSTERSTATE"] == "JOINING") {
+                        if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
+                            htmlMarkup = htmlMarkup + "<li class=\"joining\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span><span class=\"hostIdHidden\" style=\"display:none\">" + systemMemory[hostName]["HOST_ID"] + "</span></li>";
+
+                        } else {
+                            htmlMarkup = htmlMarkup + "<li class=\"joining\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
+                        }
+                    }
+
+
+                } else {
+                    /********************************************************************************************
+                    "currentServerHtml" is validated to verify if current server to be monitored is already set
+                    *********************************************************************************************/
+                    if (hostName != null && currentServerHtml != "" && currentServerHtml == hostName && val["CLUSTERSTATE"] == "RUNNING") {
+                        if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
+                            htmlMarkup = htmlMarkup + "<li class=\"active monitoring\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
+
+                        } else {
+                            htmlMarkup = htmlMarkup + "<li class=\"active monitoring\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\"class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
+                        }
+                    }
+
+                    if (hostName != null && currentServerHtml != hostName && val["CLUSTERSTATE"] == "RUNNING") {
+                        if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
+                            htmlMarkup = htmlMarkup + "<li class=\"active\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
+
+                        } else {
+                            htmlMarkup = htmlMarkup + "<li class=\"active\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
+                        }
+
+                    }
+
+                    if (hostName != null && val["CLUSTERSTATE"] == "JOINING") {
+                        if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
+                            htmlMarkup = htmlMarkup + "<li class=\"joining\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
+
+                        } else {
+                            htmlMarkup = htmlMarkup + "<li class=\"joining\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
+                        }
+
+                    }
+                }
+                counter++;
+            });
+            htmlMarkups.ServerInformation.push({ "ServersList": htmlMarkup });
+            htmlMarkups.ServerInformation.push({ "CurrentServer": currentServerHtml });
+            callback(htmlMarkups);
         };
 
     });
