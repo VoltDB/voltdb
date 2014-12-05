@@ -7,7 +7,7 @@
 # standard usage function
 function usage() {
 	echo "Usage: $0 [--user username] [--password password] [--port portnumber]  "
-	echo "Description: postinstall checkup script"
+	echo "Description: postlaunch checkup script"
 	echo "Command line parameters:"
 	echo "  --user 			login username"
 	echo "  --password		login password"
@@ -35,7 +35,6 @@ function checkvoltdbstatus() {
 		echo "EXITING"
 		exit 1
 	fi
-	exit 1
 }
  
 function formatoutput() {
@@ -58,7 +57,7 @@ function systeminfocheck() {
 function testsqlcmd() {
 	sqlcmd $@ --query="exec @SystemInformation OVERVIEW;" >/dev/null
 	if [ "$?" -ne "0" ]; then
-		echo "SQLCMD FAILED TO CONNECT"
+		echo "SQLCMD FAILED TO CONNECT - check your PATH variable"
 		echo "EXITING"
 		exit 1
 	else
@@ -148,10 +147,10 @@ for f in $( ls -l postcheckup* | tr -s " " | cut -d' ' -f9 ); do
 	formatoutput $f
 done
 echo "zipping files"
-zip postcheckup.zip postcheckup-*formatted >/dev/null
+zip postlaunch-checkup.zip postcheckup-*formatted >/dev/null
 echo "clean up tmp files"
 for f in $( ls -l postcheckup* | grep -v zip | tr -s " " | cut -d' ' -f9 ); do
 	cleanup $f
 done
-echo "Please send zip file \"postcheckup.zip\" to support@voltdb.com"
+echo "Please send zip file \"postlaunch-checkup.zip\" to support@voltdb.com"
 echo "Script done; exiting"
