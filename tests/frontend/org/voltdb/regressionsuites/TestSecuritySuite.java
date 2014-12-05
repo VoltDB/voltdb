@@ -34,7 +34,7 @@ import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
+import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.utils.MiscUtils;
@@ -413,17 +413,17 @@ public class TestSecuritySuite extends RegressionSuite {
         };
         project.addUsers(users);
 
-        GroupInfo groups[] = new GroupInfo[] {
-                new GroupInfo("Group1", false, false, false, false, false, false),
-                new GroupInfo("Group2", true, false, false, false, false, false),
-                new GroupInfo("Group3", true, false, false, false, false, false),
-                new GroupInfo("GroupWithDefaultUserPerm", true, false, false, false, false, true),
-                new GroupInfo("GroupWithAllProcPerm", false, false, false, false, false, true),
-                new GroupInfo("GroupWithDefaultProcPerm", false, false, false, true, false, false),
-                new GroupInfo("GroupWithoutDefaultProcPerm", false, false, false, false, false, false),
-                new GroupInfo("GroupWithDefaultProcReadPerm", false, false, false, false, true, false)
+        RoleInfo groups[] = new RoleInfo[] {
+                new RoleInfo("Group1", false, false, false, false, false, false),
+                new RoleInfo("Group2", true, false, false, false, false, false),
+                new RoleInfo("Group3", true, false, false, false, false, false),
+                new RoleInfo("GroupWithDefaultUserPerm", true, false, false, false, false, true),
+                new RoleInfo("GroupWithAllProcPerm", false, false, false, false, false, true),
+                new RoleInfo("GroupWithDefaultProcPerm", false, false, false, true, false, false),
+                new RoleInfo("GroupWithoutDefaultProcPerm", false, false, false, false, false, false),
+                new RoleInfo("GroupWithDefaultProcReadPerm", false, false, false, false, true, false)
         };
-        project.addGroups(groups);
+        project.addRoles(groups);
         // suite defines its own ADMINISTRATOR user
         project.setSecurityEnabled(true, false);
 

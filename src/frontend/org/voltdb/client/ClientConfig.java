@@ -17,10 +17,11 @@
 
 package org.voltdb.client;
 
+import java.util.concurrent.TimeUnit;
+
 import javax.security.auth.Subject;
 import javax.security.auth.login.LoginContext;
 import javax.security.auth.login.LoginException;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Container for configuration settings for a Client
@@ -130,9 +131,9 @@ public class ClientConfig {
      * {@link ClientStatusListenerExt#lateProcedureResponse(ClientResponse, String, int)}
      * will be called.</p>
      *
-     * Default value is 2 minutes if not set. Value of 0 means forever.</p>
+     * <p>Default value is 2 minutes if not set. Value of 0 means forever.</p>
      *
-     * Note that while specified in MS, this timeout is only accurate to within a second or so.</p>
+     * <p>Note that while specified in MS, this timeout is only accurate to within a second or so.</p>
      *
      * @param ms Timeout value in milliseconds.
      */
