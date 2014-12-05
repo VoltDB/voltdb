@@ -565,6 +565,7 @@ public class SQLCommand
                 for (String parsedQuery : parsedQueries) {
                     executeQuery(parsedQuery);
                 }
+                return;
             }
             //* enable to debug */ else System.err.println("Read non-null batch line: (" + line + ")");
 
