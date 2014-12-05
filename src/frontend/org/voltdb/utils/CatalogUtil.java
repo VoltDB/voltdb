@@ -486,7 +486,11 @@ public abstract class CatalogUtil {
             setPathsInfo(catalog, deployment.getPaths());
 
             // set the users info
-            setUsersInfo(catalog, deployment.getUsers());
+            // We'll skip this when building the dummy catalog on startup
+            // so that we don't spew misleading user/role warnings
+            if (!isPlaceHolderCatalog) {
+                setUsersInfo(catalog, deployment.getUsers());
+            }
 
             // set the HTTPD info
             setHTTPDInfo(catalog, deployment.getHttpd());
