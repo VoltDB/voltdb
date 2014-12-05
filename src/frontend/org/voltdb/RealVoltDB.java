@@ -1542,6 +1542,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             stringer.key("adminInterface").value(m_config.m_adminInterface);
             stringer.key("httpPort").value(m_config.m_httpPort);
             stringer.key("httpInterface").value(m_config.m_httpPortInterface);
+            stringer.key("internalPort").value(m_config.m_internalPort);
+            stringer.key("internalInterface").value(m_config.m_internalInterface);
+            String[] zkInterface = m_config.m_zkInterface.split(":");
+            stringer.key("zkPort").value(zkInterface[1]);
+            stringer.key("zkInterface").value(zkInterface[0]);
             stringer.key("drPort").value(m_config.m_drAgentPortStart);
             stringer.key("drInterface").value(m_config.m_drInterface);
             stringer.endObject();
