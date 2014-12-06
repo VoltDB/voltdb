@@ -427,23 +427,26 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     /**
      * Returns true if this table has a fragment that may be executed
      * when the table's row limit will be exceeded.
-     *
-     * Until there is frontend support, treat tables with this magic
-     * name as if they have a purge fragment.
      */
     bool hasPurgeFragment() const {
-        return name().compare("CAPPED3_LIMIT_ROWS_EXEC") == 0;
+        return m_purgeExecutorVector.get() != NULL;
     }
 
     /**
-     * Returns the fragment ID of the table's purge fragment.
-     *
-     * Temporarily assume the fragment ID to be a magic number defined
-     * in VoltDBEngine.h
+     * Sets the purge executor vector for this table to method
+     * argument (Using swap instead of reset so that ExecutorVector
+     * may remain a forward-declared incomplete type here)
      */
-    int64_t getPurgeFragmentId() const {
+    void swapPurgeExecutorVector(boost::shared_ptr<ExecutorVector> ev) {
+        m_purgeExecutorVector.swap(ev);
+    }
+
+    /**
+     * Returns the purge executor vector for this table
+     */
+    ExecutorVector* getPurgeExecutorVector() {
         assert(hasPurgeFragment());
-        return MAGIC_PURGE_FRAGMENT_ID;
+        return m_purgeExecutorVector.get();
     }
 
   private:
@@ -539,6 +542,10 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     // table row count limit
     int m_tupleLimit;
+
+    // Executor vector to be executed when imminent insert will exceed
+    // tuple limit
+    boost::shared_ptr<ExecutorVector> m_purgeExecutorVector;
 
     // list of materialized views that are sourced from this table
     std::vector<MaterializedViewMetadata *> m_views;
