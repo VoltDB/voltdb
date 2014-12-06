@@ -184,7 +184,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     m_encoderClass = m_jniEnv->FindClass("org/voltdb/utils/Encoder");
     if (m_encoderClass == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(m_partitionDRGatewayClass != NULL);
+        assert(m_encoderClass != NULL);
         throw std::exception();
     }
 
@@ -202,19 +202,6 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     if (m_decodeBase64AndDecompressToBytesMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_decodeBase64AndDecompressToBytesMID != NULL);
-        throw std::exception();
-    }
-
-    if (m_nextDependencyMID == 0 ||
-        m_crashVoltDBMID == 0 ||
-        m_pushExportBufferMID == 0 ||
-        m_getQueuedExportBytesMID == 0 ||
-        m_exportManagerClass == 0 ||
-        m_fallbackToEEAllocatedBufferMID == 0 ||
-        m_partitionDRGatewayClass == 0 ||
-        m_pushDRBufferMID == 0 ||
-        m_decodeBase64AndDecompressToBytesMID == 0)
-    {
         throw std::exception();
     }
 }
@@ -318,13 +305,7 @@ static std::string jbyteArrayToStdString(JNIEnv* jniEnv,
         jboolean isCopy;
         jbyte *bytes = jniEnv->GetByteArrayElements(jbuf, &isCopy);
         jniFrame.addDependencyRef(isCopy, jbuf, bytes);
-
-        // make a null terminated copy
-        boost::scoped_array<char> strdata(new char[length + 1]);
-        memcpy(strdata.get(), bytes, length);
-        strdata.get()[length] = '\0';
-
-        return std::string(strdata.get());
+        return std::string(reinterpret_cast<char*>(bytes), length);
     }
 
     return "";
