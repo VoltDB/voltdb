@@ -10,12 +10,12 @@ def str_search_1 = "system-test-" + str_nextrelease
 def str_search_2 = "performance-" + str_nextrelease
 def str_search_3 = "endurance-" + str_nextrelease
 def str_oldbranch = "master"
-def str_viewname="system tests-elastic"
+def str_viewname="All system all perf tests on master"
 //def str_viewname="system tests-noelastic"
 
 // DONT CHANGE IT HERE, USE BUILD PARAMETERS
 
-def str_branch = build.buildVariableResolver.resolve("branch")
+def str_branch = build.buildVariableResolver.resolve("branch").replaceAll("\\s","")
 boolean enable_performance =  build.buildVariableResolver.resolve("enable_performance").toBoolean()
 def trigger_performance = "kit" //build.buildVariableResolver.resolve("schedue_performance")
 boolean enable_systemtest = build.buildVariableResolver.resolve("enable_systemtest").toBoolean()
@@ -52,7 +52,6 @@ for(item in view.getItems()) {
       alljobs.add(item)
    }
 
-println alljobs
 
 for(item in alljobs)
 {
@@ -105,11 +104,11 @@ for(item in alljobs)
 
 
       // save the kit-build project ref
-      if (job.getName().startsWith("branch-kit-system-test-build-"))
+      if (job.getName().startsWith("branch-kit-system-test-build-")) {
         kit = project
-      else if (job.getName().startsWith("branch-kit-performance-build-"))
+      } else if (job.getName().startsWith("branch-kit-performance-build-")) {
         kitperf = project
-      else if (kit == null || kitperf == null) {
+      } else if (kit == null || kitperf == null) {
         // kit-build job must be processed first
         assert(false)
       }
@@ -176,10 +175,14 @@ for(item in alljobs)
         }
     }
 
-      project.save()
+    if (!project.getName().startsWith("kit-")) {
+        project.save()
+        project.doReload()
+    }
 
-      println(" $item.name copied as $newName")
+     println(" $item.name copied as $newName")
 }
+
 if (!deletejob) {
    if (downstream.length() > 0) {
    // finally, set all projects to be downstream of/triggered-by the kit build job
@@ -187,19 +190,23 @@ if (!deletejob) {
      try {
         kit.getPublishersList().replace(bt)
      } catch(e) {
+        println e.getMessage();
         kit.getPublishersList().add(bt)
      }
    }
    kit.save()
+   kit.doReload()
 
  if (downstream_perf.length() > 0) {
-   // finally, set all projects to be downstream of/triggered-by the kit build job
-     bt = new tasks.BuildTrigger(downstream_perf.substring(1), false)
+   // finally, set all projects to be downstream of/triggered-by the kit performance build job
+     btp = new tasks.BuildTrigger(downstream_perf.substring(1), false)
      try {
-        kitperf.getPublishersList().replace(bt)
+        kitperf.getPublishersList().replace(btp)
      } catch(e) {
-        kitperf.getPublishersList().add(bt)
+        println e.getMessage()
+        kitperf.getPublishersList().add(btp)
      }
    }
    kitperf.save()
+   kitperf.doReload()
 }
