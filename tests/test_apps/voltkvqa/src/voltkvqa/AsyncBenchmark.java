@@ -199,6 +199,12 @@ public class AsyncBenchmark {
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
 
+        @Option(desc = "user id.")
+        String username = "";
+
+        @Option(desc = "password.")
+        String password = "";
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -305,7 +311,7 @@ public class AsyncBenchmark {
     public AsyncBenchmark(KVConfig config) {
         this.config = config;
 
-        ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
+        ClientConfig clientConfig = new ClientConfig(config.username, config.password, new StatusListener());
         clientConfig.setReconnectOnConnectionLoss(config.recover);
 
         if (config.autotune) {
