@@ -1307,30 +1307,29 @@ ExecutorVector *VoltDBEngine::getExecutorVectorForFragmentId(const int64_t fragI
     }
 
     PlanSet& plans = *m_plans;
-    //TODO -- properly re-indent the section below
-        std::string plan = m_topend->planForFragmentId(fragId);
-        if (plan.length() == 0) {
-            char msg[1024];
-            snprintf(msg, 1024, "Fetched empty plan from frontend for PlanFragment '%jd'",
-                     (intmax_t)fragId);
-            VOLT_ERROR("%s", msg);
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
-        }
+    std::string plan = m_topend->planForFragmentId(fragId);
+    if (plan.length() == 0) {
+        char msg[1024];
+        snprintf(msg, 1024, "Fetched empty plan from frontend for PlanFragment '%jd'",
+                 (intmax_t)fragId);
+        VOLT_ERROR("%s", msg);
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
+    }
 
-        boost::shared_ptr<ExecutorVector> ev = ExecutorVector::fromJsonPlan(this, plan, fragId);
+    boost::shared_ptr<ExecutorVector> ev = ExecutorVector::fromJsonPlan(this, plan, fragId);
 
-        // add the plan to the back
-        //
-        // (Why to the back?  Shouldn't it be at the front with the
-        // most recently used items?  See ENG-7244)
-        plans.get<0>().push_back(ev);
+    // add the plan to the back
+    //
+    // (Why to the back?  Shouldn't it be at the front with the
+    // most recently used items?  See ENG-7244)
+    plans.get<0>().push_back(ev);
 
-        // remove a plan from the front if the cache is full
-        if (plans.size() > PLAN_CACHE_SIZE) {
-            PlanSet::iterator iter = plans.get<0>().begin();
-            plans.erase(iter);
-        }
-    //TODO -- properly re-indent the section above
+    // remove a plan from the front if the cache is full
+    if (plans.size() > PLAN_CACHE_SIZE) {
+        PlanSet::iterator iter = plans.get<0>().begin();
+        plans.erase(iter);
+    }
+
     return ev.get();
 }
 

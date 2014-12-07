@@ -2055,8 +2055,7 @@ public class TestVoltCompiler extends TestCase {
     }
 
     private void checkCompilerErrorMessages(String expectedError, VoltCompiler compiler, boolean success) {
-        boolean expectSuccess = expectedError == null ? true : false;
-        if (expectSuccess) {
+        if (expectedError == null) {
             assertTrue("Expected no compilation errors but got these:\n" + feedbackToString(compiler.m_errors), success);
         } else {
             assertFalse("Expected failure but got success", success);
@@ -2335,6 +2334,10 @@ public class TestVoltCompiler extends TestCase {
 
             if (expectedLimit != -1) {
                 assertEquals(expectedLimit, tbl.getTuplelimit());
+            }
+            else {
+                // no limit is represented as a limit of max int.
+                assertEquals(Integer.MAX_VALUE, tbl.getTuplelimit());
             }
 
             Statement stmt = null;
