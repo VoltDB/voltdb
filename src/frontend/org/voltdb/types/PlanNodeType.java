@@ -24,7 +24,6 @@ import java.util.Map;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.DeletePlanNode;
-import org.voltdb.plannodes.DistinctPlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.IndexCountPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
@@ -88,8 +87,7 @@ public enum PlanNodeType {
     PROJECTION      (54, ProjectionPlanNode.class),
     MATERIALIZE     (55, MaterializePlanNode.class),
     LIMIT           (56, LimitPlanNode.class),
-    DISTINCT        (57, DistinctPlanNode.class),
-    PARTIALAGGREGATE(58, PartialAggregatePlanNode.class)
+    PARTIALAGGREGATE(57, PartialAggregatePlanNode.class)
 
     ;
 

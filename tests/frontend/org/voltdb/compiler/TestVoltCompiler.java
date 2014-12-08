@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -52,6 +53,7 @@ import org.voltdb.catalog.Group;
 import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
+import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler.Feedback;
@@ -129,6 +131,14 @@ public class TestVoltCompiler extends TestCase {
         pb.addPartitionInfo("blah", "pkey");
         boolean success = pb.compile(Configuration.getPathToCatalogForTest("utf8xml.jar"));
         assertTrue(success);
+    }
+
+    private String feedbackToString(List<Feedback> fbs) {
+        StringBuilder sb = new StringBuilder();
+        for (Feedback fb : fbs) {
+            sb.append(fb.getStandardFeedbackLine() + "\n");
+        }
+        return sb.toString();
     }
 
     private boolean isFeedbackPresent(String expectedError,
@@ -2024,7 +2034,7 @@ public class TestVoltCompiler extends TestCase {
         checkValidUniqueAndAssumeUnique(schema, msgP, null);
     }
 
-    private void checkDDLErrorMessage(String ddl, String errorMsg) {
+    private boolean compileDDL(String ddl, VoltCompiler compiler) {
         final File schemaFile = VoltProjectBuilder.writeStringToTempFile(ddl);
         final String schemaPath = schemaFile.getPath();
 
@@ -2042,14 +2052,23 @@ public class TestVoltCompiler extends TestCase {
         final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
         final String projectPath = projectFile.getPath();
 
-        final VoltCompiler compiler = new VoltCompiler();
+        return compiler.compileWithProjectXML(projectPath, testout_jar);
+    }
 
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        boolean expectSuccess = errorMsg == null ? true : false;
-        assertEquals(expectSuccess, success);
-        if (!expectSuccess) {
-            assertTrue(isFeedbackPresent(errorMsg, compiler.m_errors));
+    private void checkCompilerErrorMessages(String expectedError, VoltCompiler compiler, boolean success) {
+        if (expectedError == null) {
+            assertTrue("Expected no compilation errors but got these:\n" + feedbackToString(compiler.m_errors), success);
+        } else {
+            assertFalse("Expected failure but got success", success);
+            assertTrue(isFeedbackPresent(expectedError, compiler.m_errors));
         }
+
+    }
+
+    private void checkDDLErrorMessage(String ddl, String errorMsg) {
+        final VoltCompiler compiler = new VoltCompiler();
+        final boolean success = compileDDL(ddl, compiler);
+        checkCompilerErrorMessages(errorMsg, compiler, success);
     }
 
     private void checkValidUniqueAndAssumeUnique(String ddl, String errorUnique, String errorAssumeUnique) {
@@ -2300,6 +2319,105 @@ public class TestVoltCompiler extends TestCase {
                 "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 6);" +
               "alter table t drop LIMIT PARTITION ROWS;";
         checkDDLErrorMessage(ddl, null);
+    }
+
+    void compileLimitDeleteStmtAndCheckCatalog(String ddl, String expectedMessage, String tblName,
+            int expectedLimit, String expectedStmt) {
+        VoltCompiler compiler = new VoltCompiler();
+        boolean success = compileDDL(ddl, compiler);
+        checkCompilerErrorMessages(expectedMessage, compiler, success);
+
+        if (success) {
+            // We expected  success and got it.  Verify that the catalog looks how we expect
+            Catalog cat = compiler.getCatalog();
+
+            Table tbl = cat.getClusters().get("cluster").getDatabases().get("database").getTables().getIgnoreCase(tblName);
+
+            if (expectedLimit != -1) {
+                assertEquals(expectedLimit, tbl.getTuplelimit());
+            }
+            else {
+                // no limit is represented as a limit of max int.
+                assertEquals(Integer.MAX_VALUE, tbl.getTuplelimit());
+            }
+
+            Statement stmt = null;
+            try {
+                stmt = tbl.getTuplelimitdeletestmt().iterator().next();
+            }
+            catch (NoSuchElementException nse) {
+            }
+
+            if (expectedStmt == null) {
+                assertTrue("Did not expect to find a LIMIT DELETE statement, but found this one:\n"
+                        + (stmt != null ? stmt.getSqltext() : ""),
+                        stmt == null);
+            } else {
+                // Make sure we have the delete statement that we expected
+                assertTrue("Expected to find LIMIT DELETE statement, found none", stmt != null);
+
+                String sql = stmt.getSqltext();
+                if (sql.endsWith(";")) {
+                    // We seem to add a semicolon somewhere.  I guess that's okay.
+                    sql = sql.substring(0, sql.length() - 1);
+                }
+
+                assertEquals("Did not find the LIMIT DELETE statement that we expected",
+                        expectedStmt, sql);
+            }
+        }
+    }
+
+    public void testDDLCompilerAlterTableLimitWithDelete()
+    {
+        String ddl;
+
+        // See also TestVoltCompilerErrorMsgs for negative tests involving
+        // LIMIT PARTITION ROWS <n> EXECUTE (DELETE ...)
+
+        // This exercises adding a limit constraint with a DELETE statement
+        ddl = "create table t(id integer not null);\n" +
+                "alter table t add limit partition rows 10 execute (delete from t where id > 0);";
+        compileLimitDeleteStmtAndCheckCatalog(ddl, null, "t", 10, "delete from t where id > 0");
+
+        // This exercises making a change to the delete statement of an existing constraint
+        ddl = "create table t(id integer not null, "
+                + "constraint c1 limit partition rows 10 execute (delete from t where id > 0)"
+                + ");\n"
+                + "alter table t add limit partition rows 15 execute (delete from t where id between 0 and 100);";
+        compileLimitDeleteStmtAndCheckCatalog(ddl, null, "t", 15, "delete from t where id between 0 and 100");
+
+        // test dropping a limit contraint with a delete
+        ddl = "create table t(id integer not null, "
+                + "constraint c1 limit partition rows 10 execute (delete from t where id > 0)"
+                + ");\n"
+                + "alter table t drop limit partition rows;";
+        compileLimitDeleteStmtAndCheckCatalog(ddl, null, "t", -1, null);
+
+        // test dropping constraint by referencing the constraint name
+        ddl = "create table t(id integer not null, "
+                + "constraint c1 limit partition rows 10 execute (delete from t where id > 0)"
+                + ");\n"
+                + "alter table t drop constraint c1;";
+        compileLimitDeleteStmtAndCheckCatalog(ddl, null, "t", -1, null);
+
+        // test dropping constraint by referencing the constraint name
+        // Negative test---got the constraint name wrong
+        ddl = "create table t(id integer not null, "
+                + "constraint c1 limit partition rows 10 execute (delete from t where id > 0)"
+                + ");\n"
+                + "alter table t drop constraint c34;";
+        compileLimitDeleteStmtAndCheckCatalog(ddl, "object not found", "t", -1, null);
+
+        // Alter the table by removing the LIMIT DELETE statement, but not the row limit
+        ddl = "create table t(id integer not null, "
+                + "constraint c1 limit partition rows 10 execute (delete from t where id > 0)"
+                + ");\n"
+                + "alter table t add limit partition rows 10;";
+        compileLimitDeleteStmtAndCheckCatalog(ddl, null, "t", 10, null);
+
+        // See also regression testing that ensures EE picks up catalog changes
+        // in TestSQLFeaturesNewSuite
     }
 
     public void testPartitionOnBadType() {
