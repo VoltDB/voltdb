@@ -55,6 +55,8 @@
 #include "catalog/index.h"
 #include "catalog/materializedviewinfo.h"
 #include "catalog/table.h"
+#include "catalog/planfragment.h"
+#include "catalog/statement.h"
 #include "common/ElasticHashinator.h"
 #include "common/executorcontext.hpp"
 #include "common/FailureInjection.h"

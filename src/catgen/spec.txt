@@ -152,7 +152,7 @@ begin ProcParameter "Metadata for a parameter to a stored procedure"
   int index         "The index of the parameter within the list of parameters for the stored procedure"
 end
 
-begin Statement             "A parameterized SQL statement embedded in a stored procedure"
+beginEE Statement           "A parameterized SQL statement embedded in a stored procedure"
   string sqltext            "The text of the sql statement"
   int querytype             ""
   bool readonly             "Can the statement modify any data?"
@@ -178,7 +178,7 @@ begin StmtParameter            "A parameter for a parameterized SQL statement"
   ProcParameter? procparameter "Reference back to original input parameter"
 end
 
-begin PlanFragment               "Instructions to the executor to execute part of an execution plan"
+beginEE PlanFragment             "Instructions to the executor to execute part of an execution plan"
   bool hasdependencies           "Dependencies must be received before this plan fragment can execute"
   bool multipartition            "Should this plan fragment be sent to all partitions"
   string plannodetree            "A serialized representation of the plan-graph/plan-pipeline"

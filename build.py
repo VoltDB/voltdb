@@ -172,6 +172,8 @@ CTX.INPUT['catalog'] = """
  database.cpp
  index.cpp
  materializedviewinfo.cpp
+ planfragment.cpp
+ statement.cpp
  table.cpp
 """
 

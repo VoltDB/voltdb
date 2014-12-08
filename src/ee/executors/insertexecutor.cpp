@@ -289,7 +289,7 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
                 if (!persistentTable->updateTupleWithSpecificIndexes(existsTuple, tempTuple,
                         persistentTable->allIndexes())) {
                     VOLT_INFO("Failed to update existsTuple from table '%s'",
-                            upsertTable->name().c_str());
+                            persistentTable->name().c_str());
                     return false;
                 }
             }
