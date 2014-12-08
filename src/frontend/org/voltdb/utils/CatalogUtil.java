@@ -890,8 +890,8 @@ public abstract class CatalogUtil {
 
             if (connectorEnabled) {
                 if (groupList.contains(groupName)) {
-                    VoltDB.crashLocalVoltDB("Multiple connectors can not be assigned to single export group: " +
-                            groupName + ".", false, null);
+                    throw new RuntimeException("Multiple connectors can not be assigned to single export group: " +
+                            groupName + ".");
                 }
                 else {
                     groupList.add(groupName);

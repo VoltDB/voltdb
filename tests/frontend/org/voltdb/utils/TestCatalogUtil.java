@@ -30,7 +30,6 @@ import java.util.SortedSet;
 
 import junit.framework.TestCase;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltDB;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
@@ -846,8 +845,8 @@ public class TestCatalogUtil extends TestCase {
         String x[] = {tmpDdl.getAbsolutePath()};
         Catalog cat = compiler.compileCatalogFromDDL(x);
 
-        long crc = CatalogUtil.compileDeployment(cat, bad_deployment, true, false);
-        assertTrue("Deployment file failed to parse", crc != -1);
+        String msg = CatalogUtil.compileDeployment(cat, bad_deployment, false);
+        assertTrue("Deployment file failed to parse: " + msg, msg == null);
 
         Database db = cat.getClusters().get("cluster").getDatabases().get("database");
         org.voltdb.catalog.Connector catconn = db.getConnectors().get("foo");
@@ -860,24 +859,19 @@ public class TestCatalogUtil extends TestCase {
         DeploymentType bad_grp_deployment = CatalogUtil.getDeployment(new FileInputStream(tmpBadGrp));
 
         Catalog cat2 = compiler.compileCatalogFromDDL(x);
-        VoltDB.ignoreCrash = true;
-        try {
-            CatalogUtil.compileDeployment(cat2, bad_grp_deployment, true, false);
+        if ((msg = CatalogUtil.compileDeployment(cat2, bad_grp_deployment, false)) == null) {
             fail("Should not accept a deployment file containing multiple connectors for the same group.");
-        } catch (AssertionError e) {
-            // don't care
+        } else {
+            assertTrue(msg.contains("Multiple connectors can not be assigned to single export group:"));
         }
-        assertTrue(VoltDB.wasCrashCalled);
-        VoltDB.wasCrashCalled = false;
-        VoltDB.ignoreCrash = false;
 
         // This is to test that unused connectors are ignored
         final File tmpUnused = VoltProjectBuilder.writeStringToTempFile(withUnusedConnector);
         DeploymentType unused_deployment = CatalogUtil.getDeployment(new FileInputStream(tmpUnused));
 
         Catalog cat3 = compiler.compileCatalogFromDDL(x);
-        crc = CatalogUtil.compileDeployment(cat3, unused_deployment, true, false);
-        assertTrue("Deployment file failed to parse", crc != -1);
+        msg = CatalogUtil.compileDeployment(cat3, unused_deployment, false);
+        assertTrue("Deployment file failed to parse: " + msg, msg == null);
 
         db = cat3.getClusters().get("cluster").getDatabases().get("database");
         catconn = db.getConnectors().get("unused");
@@ -888,8 +882,8 @@ public class TestCatalogUtil extends TestCase {
         DeploymentType good_deployment = CatalogUtil.getDeployment(new FileInputStream(tmpGood));
 
         Catalog cat4 = compiler.compileCatalogFromDDL(x);
-        crc = CatalogUtil.compileDeployment(cat4, good_deployment, true, false);
-        assertTrue("Deployment file failed to parse", crc != -1);
+        msg = CatalogUtil.compileDeployment(cat4, good_deployment, false);
+        assertTrue("Deployment file failed to parse: " + msg, msg == null);
 
         db = cat4.getClusters().get("cluster").getDatabases().get("database");
         catconn = db.getConnectors().get("foo");
