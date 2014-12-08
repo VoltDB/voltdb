@@ -294,13 +294,13 @@ function alertNodeClicked(obj) {
             }
         };
 
-        this.GetSystemInformation = function (onInformationLoaded, onAdminPageClientPortLoaded, onAdminPageServerListLoaded) {
+        this.GetSystemInformation = function (onInformationLoaded, onAdminPagePortDetailsLoaded, onAdminPageServerListLoaded) {
             VoltDBService.GetSystemInformation(function (connection) {
                 populateSystemInformation(connection);
                 getMemoryDetails(connection, systemMemory);
                 
                 if (VoltDbAdminConfig.isAdmin) {
-                    onAdminPageClientPortLoaded(getClientPort(connection));
+                    onAdminPagePortDetailsLoaded(getPortDetails(connection));
                     onAdminPageServerListLoaded(getAdminServerList());
                 }
 
@@ -1760,28 +1760,6 @@ function alertNodeClicked(obj) {
                             adminConfigValues['commandLogSnapshotPath'] = columnInfo[1];
                             break;
 
-                            //Port values
-                        case 'adminport':
-                            adminConfigValues['adminPort'] = columnInfo[1];
-                            break;
-                            
-                        case 'httpport':
-                            adminConfigValues['httpPort'] = columnInfo[1];
-                            break;
-
-                        case 'internalport':
-                            adminConfigValues['internalPort'] = columnInfo[1];
-                            break;
-
-                        case 'zookeeperport':
-                            adminConfigValues['zookeeperPort'] = columnInfo[1];
-                            break;
-
-                        case 'replicationport':
-                            adminConfigValues['replicationPort'] = columnInfo[1];
-                            break;
-
-
                         default:
                     }
                 });
@@ -1792,15 +1770,22 @@ function alertNodeClicked(obj) {
 
         };
 
-        var getClientPort = function (connection) {
+        var getPortDetails = function (connection) {
             var portConfigValues = [];
-
+            var currentServer = getCurrentServer();
 
             if (connection != null && connection.Metadata['@SystemInformation_OVERVIEW'] != null) {
-                connection.Metadata['@SystemInformation_OVERVIEW'].data.forEach(function (columnInfo) {
-                    if (columnInfo[1] == 'CLIENTPORT') {
-                        portConfigValues['clientPort'] = columnInfo[2];
+                $.each(systemOverview, function (key, val) {
+                    if (val["HOSTNAME"] == currentServer) {
+                        portConfigValues['adminPort'] = val["ADMINPORT"];
+                        portConfigValues['httpPort'] = val["HTTPPORT"];
+                        portConfigValues['clientPort'] = val["CLIENTPORT"];
+                        portConfigValues['internalPort'] = val["INTERNALPORT"];
+                        portConfigValues['zookeeperPort'] = val["ZKPORT"];
+                        portConfigValues['replicationPort'] = val["DRPORT"];
+                        return false;
                     }
+                    return true;
                 });
             }
             return portConfigValues;

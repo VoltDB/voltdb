@@ -561,9 +561,9 @@ $(document).ready(function () {
             }
         };
 
-        this.displayClientPort = function (clientPortValue) {
-            if (clientPortValue != undefined) {
-                configureClientPortValue(clientPortValue);
+        this.displayPortDetails = function (portValues) {
+            if (portValues != undefined) {
+                configurePortValues(portValues);
             }
         };
 
@@ -620,11 +620,7 @@ $(document).ready(function () {
             adminDOMObjects.internalPort.text(portConfigValues.internalPort);
             adminDOMObjects.zookeeperPort.text(portConfigValues.zookeeperPort);
             adminDOMObjects.replicationPort.text(portConfigValues.replicationPort);
-
-        };
-
-        var configureClientPortValue = function (clientPortValue) {
-            adminDOMObjects.clientPort.text(clientPortValue.clientPort);
+            adminDOMObjects.clientPort.text(portConfigValues.clientPort);
 
         };
 
