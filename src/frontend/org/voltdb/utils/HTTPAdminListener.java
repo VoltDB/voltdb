@@ -115,6 +115,15 @@ public class HTTPAdminListener {
             response.setHeader("Host", getHostHeader());
         }
 
+        //Build a client response based json response
+        protected String buildClientResponse(String jsonp, byte code, String msg) {
+            ClientResponseImpl rimpl = new ClientResponseImpl(code, new VoltTable[0], msg);
+            if (jsonp != null) {
+                return String.format("%s( %s )", jsonp, rimpl.toJSONString());
+            }
+            return rimpl.toJSONString();
+        }
+
     }
 
     class DBMonitorHandler extends VoltRequestHandler {
@@ -123,7 +132,6 @@ public class HTTPAdminListener {
         public void handle(String target, Request baseRequest,
                            HttpServletRequest request, HttpServletResponse response)
                             throws IOException, ServletException {
-            VoltLogger logger = new VoltLogger("HOST");
             super.handle(target, baseRequest, request, response);
             try{
 
@@ -259,17 +267,9 @@ public class HTTPAdminListener {
             user = u;
             permissions = p;
         }
-
-        /**
-         * @return the user
-         */
         public String getUser() {
             return user;
         }
-
-        /**
-         * @return the permissions
-         */
         public String[] getPermissions() {
             return permissions;
         }
@@ -289,28 +289,19 @@ public class HTTPAdminListener {
             String jsonp = request.getParameter("jsonp");
 
             try {
+                response.setStatus(HttpServletResponse.SC_OK);
                 AuthenticationResult authResult = authenticate(baseRequest);
                 if (!authResult.isAuthenticated()) {
-                    String msg = authResult.m_message;
-                    ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg);
-                    msg = rimpl.toJSONString();
-                    if (jsonp != null) {
-                        msg = String.format("%s( %s )", jsonp, msg);
-                    }
-                    response.setStatus(HttpServletResponse.SC_OK);
-                    response.getWriter().print(msg);
-                    baseRequest.setHandled(true);
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, authResult.m_message));
                 } else {
-                    ObjectMapper m_mapper = new ObjectMapper();
-
-                    String msg = m_mapper.writeValueAsString(new Profile(authResult.m_user, authResult.m_perms));
+                    ObjectMapper mapper = new ObjectMapper();
+                    String msg = mapper.writeValueAsString(new Profile(authResult.m_user, authResult.m_perms));
                     if (jsonp != null) {
                         msg = String.format("%s( %s )", jsonp, msg);
                     }
                     response.getWriter().print(msg);
-                    response.setStatus(HttpServletResponse.SC_OK);
-                    baseRequest.setHandled(true);
                 }
+                baseRequest.setHandled(true);
             } catch (Exception ex) {
               logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage(), ex);
             }
@@ -327,6 +318,7 @@ public class HTTPAdminListener {
         final ObjectMapper m_mapper;
         String m_schema = "";
         private DeploymentType m_deployment = null;
+        private String m_deploymentXml = null;
 
         public DeploymentRequestHandler() {
             m_mapper = new ObjectMapper();
@@ -343,23 +335,25 @@ public class HTTPAdminListener {
         //Get deployment from zookeeper next time
         public void notifyOfCatalogUpdate() {
             m_deployment = null;
+            m_deploymentXml = null;
         }
 
         //Get deployment from zookeeper.
         private DeploymentType getDeployment() {
             if (m_deployment == null) {
                 ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
-                byte deploymentBytes[] = null;
+                byte deploymentBytes[];
 
                 try {
                     //Let us get bytes from ZK
                     CatalogUtil.CatalogAndIds catalogStuff = CatalogUtil.getCatalogFromZK(zk);
                     deploymentBytes = catalogStuff.deploymentBytes;
+                    if (deploymentBytes != null) {
+                        m_deploymentXml = new String(deploymentBytes);
+                        m_deployment = CatalogUtil.getDeployment(new ByteArrayInputStream(deploymentBytes));
+                    }
                 } catch (KeeperException | InterruptedException ex) {
                     m_log.warn("Failed to get deployment from zookeeper for HTTP interface.", ex);
-                }
-                if (deploymentBytes != null) {
-                    m_deployment = CatalogUtil.getDeployment(new ByteArrayInputStream(deploymentBytes));
                 }
                 // wasn't a valid xml deployment file or zookeeper is gone to town.
                 if (m_deployment == null) {
@@ -398,6 +392,7 @@ public class HTTPAdminListener {
             String jsonp = request.getParameter("jsonp");
 
             try {
+                response.setStatus(HttpServletResponse.SC_OK);
                 //schema request does not require authentication.
                 if (baseRequest.getRequestURI().contains("/schema")) {
                     String msg = m_schema;
@@ -405,54 +400,42 @@ public class HTTPAdminListener {
                         msg = String.format("%s( %s )", jsonp, m_schema);
                     }
                     response.getWriter().print(msg);
-                    response.setStatus(HttpServletResponse.SC_OK);
                     baseRequest.setHandled(true);
                     return;
                 }
 
+                //Requests require authentication.
                 AuthenticationResult authResult = authenticate(baseRequest);
                 if (!authResult.isAuthenticated()) {
-                    String msg = authResult.m_message;
-                    ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg);
-                    msg = rimpl.toJSONString();
-                    if (jsonp != null) {
-                        msg = String.format("%s( %s )", jsonp, msg);
-                    }
-                    response.setStatus(HttpServletResponse.SC_OK);
-                    response.getWriter().print(msg);
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, authResult.m_message));
                     baseRequest.setHandled(true);
                     return;
                 }
-                if (!authResult.m_auth_user.hasPermission(Permission.ADMIN)) {
-                    String msg = "Permission denied";
-                    ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg);
-                    msg = rimpl.toJSONString();
-                    if (jsonp != null) {
-                        msg = String.format("%s( %s )", jsonp, msg);
-                    }
-                    response.setStatus(HttpServletResponse.SC_OK);
-                    response.getWriter().print(msg);
+                //Authenticated but has no permissions.
+                if (!authResult.m_authUser.hasPermission(Permission.ADMIN)) {
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Permission denied"));
                     baseRequest.setHandled(true);
                     return;
                 }
+
                 //Authenticated and has ADMIN permission
-                DeploymentType d = getDeployment();
-                if (d == null) {
-                    String msg = "Deployment Information unavailable.";
-                    ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg);
-                    msg = rimpl.toJSONString();
-                    if (jsonp != null) {
-                        msg = String.format("%s( %s )", jsonp, msg);
-                    }
-                    response.getWriter().print(msg);
+                getDeployment();
+                if (m_deployment == null) {
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Deployment Information unavailable."));
                 } else {
-                    String msg = m_mapper.writeValueAsString(d);
+                    String msg = null;
+                    if (baseRequest.getRequestURI().contains("/download")) {
+                        msg = m_deploymentXml;
+                        //Deployment xml is text/xml
+                        response.setHeader("Content-Type", "text/xml");
+                    } else {
+                        msg = m_mapper.writeValueAsString(m_deployment);
+                    }
                     if (jsonp != null) {
                         msg = String.format("%s( %s )", jsonp, msg);
                     }
                     response.getWriter().print(msg);
                 }
-                response.setStatus(HttpServletResponse.SC_OK);
                 baseRequest.setHandled(true);
             } catch (Exception ex) {
               logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage(), ex);
