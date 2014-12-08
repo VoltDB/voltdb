@@ -1047,4 +1047,44 @@ public class TestJSONInterface extends TestCase {
     }
     }
 
+    public void testProfile() throws Exception {
+    try {
+        String simpleSchema =
+            "CREATE TABLE foo (\n" +
+            "    bar BIGINT NOT NULL,\n" +
+            "    PRIMARY KEY (bar)\n" +
+            ");";
+
+        File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+        String schemaPath = schemaFile.getPath();
+        schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addSchema(schemaPath);
+        builder.addPartitionInfo("foo", "bar");
+        builder.addProcedures(DelayProc.class);
+        builder.setHTTPDPort(8095);
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+        assertTrue(success);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+        config.m_pathToDeployment = builder.getPathToDeployment();
+        server = new ServerThread(config);
+        server.start();
+        server.waitForInitialization();
+
+        //Get profile
+        String dep = getUrlOverJSON("http://localhost:8095/profile", 200);
+        assertTrue(dep.contains("\"user\""));
+        assertTrue(dep.contains("\"permissions\""));
+    } finally {
+        if (server != null) {
+            server.shutdown();
+            server.join();
+        }
+        server = null;
+    }
+    }
+
 }

@@ -60,6 +60,7 @@ import org.voltdb.AuthenticationResult;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.common.Permission;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.UsersType;
 
@@ -250,6 +251,72 @@ public class HTTPAdminListener {
 
     }
 
+    //This is a wrapper to generate JSON for profile of authenticated user.
+    private final class Profile {
+        private final String user;
+        private final String permissions[];
+        public Profile(String u, String[] p) {
+            user = u;
+            permissions = p;
+        }
+
+        /**
+         * @return the user
+         */
+        public String getUser() {
+            return user;
+        }
+
+        /**
+         * @return the permissions
+         */
+        public String[] getPermissions() {
+            return permissions;
+        }
+    }
+
+    // /profile handler
+    class UserProfileHandler extends VoltRequestHandler {
+
+        // GET on /profile resources.
+        @Override
+        public void handle(String target,
+                           Request baseRequest,
+                           HttpServletRequest request,
+                           HttpServletResponse response)
+                           throws IOException, ServletException {
+            //jsonp is specified when response is expected to go to javascript function.
+            String jsonp = request.getParameter("jsonp");
+
+            try {
+                AuthenticationResult authResult = authenticate(baseRequest);
+                if (!authResult.isAuthenticated()) {
+                    String msg = authResult.m_message;
+                    ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg);
+                    msg = rimpl.toJSONString();
+                    if (jsonp != null) {
+                        msg = String.format("%s( %s )", jsonp, msg);
+                    }
+                    response.setStatus(HttpServletResponse.SC_OK);
+                    response.getWriter().print(msg);
+                    baseRequest.setHandled(true);
+                } else {
+                    ObjectMapper m_mapper = new ObjectMapper();
+
+                    String msg = m_mapper.writeValueAsString(new Profile(authResult.m_user, authResult.m_perms));
+                    if (jsonp != null) {
+                        msg = String.format("%s( %s )", jsonp, msg);
+                    }
+                    response.getWriter().print(msg);
+                    response.setStatus(HttpServletResponse.SC_OK);
+                    baseRequest.setHandled(true);
+                }
+            } catch (Exception ex) {
+              logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage(), ex);
+            }
+        }
+    }
+
     //This is for password on User not to be reported.
     abstract class IgnorePasswordMixIn {
         @JsonIgnore abstract String getPassword();
@@ -327,15 +394,6 @@ public class HTTPAdminListener {
 
             super.handle(target, baseRequest, request, response);
 
-            handleGet(target, baseRequest, request, response);
-        }
-
-        // GET on /deployment resources.
-        public void handleGet(String target,
-                           Request baseRequest,
-                           HttpServletRequest request,
-                           HttpServletResponse response)
-                           throws IOException, ServletException {
             //jsonp is specified when response is expected to go to javascript function.
             String jsonp = request.getParameter("jsonp");
 
@@ -363,28 +421,41 @@ public class HTTPAdminListener {
                     response.setStatus(HttpServletResponse.SC_OK);
                     response.getWriter().print(msg);
                     baseRequest.setHandled(true);
-                } else {
-                    DeploymentType d = getDeployment();
-                    if (d == null) {
-                        String msg = "Deployment Information unavailable.";
-                        ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg);
-                        msg = rimpl.toJSONString();
-                        if (jsonp != null) {
-                            msg = String.format("%s( %s )", jsonp, msg);
-                        }
-                        response.getWriter().print(msg);
-                    } else {
-                        String msg = m_mapper.writeValueAsString(d);
-                        if (jsonp != null) {
-                            msg = String.format("%s( %s )", jsonp, msg);
-                        }
-                        response.getWriter().print(msg);
+                    return;
+                }
+                if (!authResult.m_auth_user.hasPermission(Permission.ADMIN)) {
+                    String msg = "Permission denied";
+                    ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg);
+                    msg = rimpl.toJSONString();
+                    if (jsonp != null) {
+                        msg = String.format("%s( %s )", jsonp, msg);
                     }
                     response.setStatus(HttpServletResponse.SC_OK);
+                    response.getWriter().print(msg);
                     baseRequest.setHandled(true);
+                    return;
                 }
+                //Authenticated and has ADMIN permission
+                DeploymentType d = getDeployment();
+                if (d == null) {
+                    String msg = "Deployment Information unavailable.";
+                    ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg);
+                    msg = rimpl.toJSONString();
+                    if (jsonp != null) {
+                        msg = String.format("%s( %s )", jsonp, msg);
+                    }
+                    response.getWriter().print(msg);
+                } else {
+                    String msg = m_mapper.writeValueAsString(d);
+                    if (jsonp != null) {
+                        msg = String.format("%s( %s )", jsonp, msg);
+                    }
+                    response.getWriter().print(msg);
+                }
+                response.setStatus(HttpServletResponse.SC_OK);
+                baseRequest.setHandled(true);
             } catch (Exception ex) {
-              logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage());
+              logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage(), ex);
             }
         }
     }
@@ -414,7 +485,7 @@ public class HTTPAdminListener {
                 }
 
             } catch(Exception ex){
-                logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage());
+                logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage(), ex);
             }
         }
     }
@@ -516,12 +587,17 @@ public class HTTPAdminListener {
             m_deploymentHandler = new DeploymentRequestHandler();
             deploymentRequestHandler.setHandler(m_deploymentHandler);
 
+            ///profile
+            ContextHandler profileRequestHandler = new ContextHandler("/profile");
+            profileRequestHandler.setHandler(new UserProfileHandler());
+
             ContextHandlerCollection handlers = new ContextHandlerCollection();
             handlers.setHandlers(new Handler[] {
                     apiRequestHandler,
                     catalogRequestHandler,
                     ddlRequestHandler,
                     deploymentRequestHandler,
+                    profileRequestHandler,
                     dbMonitorHandler
             });
 
