@@ -341,11 +341,10 @@ public class AuthSystem {
         byte [] principal = null;
 
         //Build static list of perms auth system knows.
-        EnumSet<Permission> perms = EnumSet.allOf(Permission.class);
-        m_perm_list =  new String[perms.size()];
+        m_perm_list =  new String[Permission.values().length];
         int idx = 0;
-        for (Permission p : perms) {
-            m_perm_list[idx++] = p.toString();
+        for (Permission p : Permission.values()) {
+            m_perm_list[idx++] = p.name();
         }
 
         m_enabled = enabled;
