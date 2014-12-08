@@ -573,7 +573,7 @@ public class AuthSystem {
 
     private final AuthUser m_authDisabledUser = new AuthDisabledUser();
 
-    AuthUser getUser(String name) {
+    public AuthUser getUser(String name) {
         if (!m_enabled) {
             return m_authDisabledUser;
         }

@@ -60,6 +60,7 @@ import org.voltdb.AuthenticationResult;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.common.Permission;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.UsersType;
 
@@ -420,26 +421,39 @@ public class HTTPAdminListener {
                     response.setStatus(HttpServletResponse.SC_OK);
                     response.getWriter().print(msg);
                     baseRequest.setHandled(true);
-                } else {
-                    DeploymentType d = getDeployment();
-                    if (d == null) {
-                        String msg = "Deployment Information unavailable.";
-                        ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg);
-                        msg = rimpl.toJSONString();
-                        if (jsonp != null) {
-                            msg = String.format("%s( %s )", jsonp, msg);
-                        }
-                        response.getWriter().print(msg);
-                    } else {
-                        String msg = m_mapper.writeValueAsString(d);
-                        if (jsonp != null) {
-                            msg = String.format("%s( %s )", jsonp, msg);
-                        }
-                        response.getWriter().print(msg);
+                    return;
+                }
+                if (!authResult.m_auth_user.hasPermission(Permission.ADMIN)) {
+                    String msg = "Permission denied";
+                    ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg);
+                    msg = rimpl.toJSONString();
+                    if (jsonp != null) {
+                        msg = String.format("%s( %s )", jsonp, msg);
                     }
                     response.setStatus(HttpServletResponse.SC_OK);
+                    response.getWriter().print(msg);
                     baseRequest.setHandled(true);
+                    return;
                 }
+                //Authenticated and has ADMIN permission
+                DeploymentType d = getDeployment();
+                if (d == null) {
+                    String msg = "Deployment Information unavailable.";
+                    ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg);
+                    msg = rimpl.toJSONString();
+                    if (jsonp != null) {
+                        msg = String.format("%s( %s )", jsonp, msg);
+                    }
+                    response.getWriter().print(msg);
+                } else {
+                    String msg = m_mapper.writeValueAsString(d);
+                    if (jsonp != null) {
+                        msg = String.format("%s( %s )", jsonp, msg);
+                    }
+                    response.getWriter().print(msg);
+                }
+                response.setStatus(HttpServletResponse.SC_OK);
+                baseRequest.setHandled(true);
             } catch (Exception ex) {
               logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage(), ex);
             }
