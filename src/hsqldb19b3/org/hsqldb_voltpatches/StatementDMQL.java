@@ -947,7 +947,7 @@ public abstract class StatementDMQL extends Statement {
     }
 
     /** return a list of VoltXMLElements that need to be added to the statement XML for LIMIT and OFFSET */
-    private static List<VoltXMLElement> voltGetLimitOffsetXMLFromSortAndSlice(Session session, SortAndSlice sortAndSlice)
+    protected static List<VoltXMLElement> voltGetLimitOffsetXMLFromSortAndSlice(Session session, SortAndSlice sortAndSlice)
             throws HSQLParseException {
         List<VoltXMLElement> result = new ArrayList<>();
 

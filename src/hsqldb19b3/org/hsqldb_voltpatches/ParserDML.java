@@ -440,8 +440,14 @@ public class ParserDML extends ParserDQL {
             rangeVariables = resolver.rangeVariables;
         }
 
+        // VoltDB Extension: ORDER BY, LIMIT and OFFSET allowed on DELETE statement
+        SortAndSlice sas = XreadOrderByExpression();
+
         StatementDMQL cs = new StatementDML(session, table, rangeVariables,
                                             compileContext, restartIdentity);
+
+        // VoltDB Extension:
+        ((StatementDML)cs).setSortAndSlice(sas);
 
         return cs;
     }

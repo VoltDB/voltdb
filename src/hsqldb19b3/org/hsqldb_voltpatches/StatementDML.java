@@ -31,6 +31,8 @@
 
 package org.hsqldb_voltpatches;
 
+import java.util.List;
+
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
@@ -40,6 +42,7 @@ import org.hsqldb_voltpatches.index.IndexAVL;
 import org.hsqldb_voltpatches.lib.ArrayUtil;
 import org.hsqldb_voltpatches.lib.HashMappedList;
 import org.hsqldb_voltpatches.lib.HashSet;
+import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.navigator.RangeIterator;
 import org.hsqldb_voltpatches.navigator.RowIterator;
@@ -1247,6 +1250,12 @@ public class StatementDML extends StatementDMQL {
 
     /************************* Volt DB Extensions *************************/
 
+    private SortAndSlice m_sortAndSlice = null;
+
+    public void setSortAndSlice(SortAndSlice sas) {
+        m_sortAndSlice = sas;
+    }
+
     private void voltAppendTargetColumns(Session session, int[] columnMap, Expression[] expressions, VoltXMLElement xml)
     throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
@@ -1282,6 +1291,31 @@ public class StatementDML extends StatementDMQL {
             xml.children.add(condition);
             condition.children.add(condExpr.voltGetXML(session));
         }
+    }
+
+    private void voltAppendSortAndSlice(Session session, VoltXMLElement xml) throws HSQLParseException {
+        if (m_sortAndSlice == null || m_sortAndSlice == SortAndSlice.noSort) {
+            return;
+        }
+
+        List<VoltXMLElement> newElements = voltGetLimitOffsetXMLFromSortAndSlice(session, m_sortAndSlice);
+
+        // Ideally this code could be shared with code that translate ORDER BY to XML for SELECT as well,
+        // but code in StatementDMQL uses the query's exprColumns field, which we don't have here.
+        // It's unclear to me how the exprList in SortAndSlice is different from this.
+        HsqlArrayList exprList = m_sortAndSlice.exprList;
+        if (exprList != null) {
+            VoltXMLElement orderColumnsXml = new VoltXMLElement("ordercolumns");
+            for (int i = 0; i < exprList.size(); ++i) {
+                Expression e = (Expression)exprList.get(i);
+                VoltXMLElement elem = e.voltGetXML(session);
+                orderColumnsXml.children.add(elem);
+            }
+
+            newElements.add(orderColumnsXml);
+        }
+
+        xml.children.addAll(newElements);
     }
 
     private void voltAppendChildScans(Session session, VoltXMLElement xml)
@@ -1337,6 +1371,7 @@ public class StatementDML extends StatementDMQL {
             // DELETE has no target columns
             voltAppendChildScans(session, xml);
             voltAppendCondition(session, xml);
+            voltAppendSortAndSlice(session, xml);
             break;
 
         default:
