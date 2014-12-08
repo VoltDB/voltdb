@@ -41,22 +41,6 @@ public class TestSqlCommandParserInteractive extends TestCase {
 
     static ExecutorService executor = CoreUtils.getSingleThreadExecutor("TestSqlCommandParser");
 
-    Callable<List<String>> makeQueryTask(final InputStream in, final OutputStream out)
-    {
-        return new Callable<List<String>>() {
-                @Override
-                public List<String> call() {
-                    List<String> results = null;
-                    try {
-                        SQLConsoleReader reader = new SQLConsoleReader(in, out);
-                        SQLCommand.mockLineReaderForTest(reader);
-                        results = SQLCommand.getQuery(true);
-                    } catch (Exception ioe) {}
-                    return results;
-                }
-        };
-    }
-
     static class CommandStuff
     {
         PipedInputStream pis;
@@ -78,13 +62,7 @@ public class TestSqlCommandParserInteractive extends TestCase {
             return new Callable<List<String>>() {
                 @Override
                 public List<String> call() {
-                    List<String> results = null;
-                    try {
-                        SQLConsoleReader reader = new SQLConsoleReader(in, out);
-                        SQLCommand.mockLineReaderForTest(reader);
-                        results = SQLCommand.getQuery(true);
-                    } catch (Exception ioe) {}
-                    return results;
+                    return SQLCommand.getParserTestQueries(in, out);
                 }
             };
         }
