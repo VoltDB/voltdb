@@ -176,7 +176,8 @@ public:
             const TupleSchema * schema, TempTable* newTempTable = NULL);
 
     /**
-     * Return true when limit has been met. By default, return false.
+     * Return true when LIMIT has been met, the caller may stop executing.
+     * By default, return false.
      */
     virtual bool p_execute_tuple(const TableTuple& nextTuple) = 0;
 

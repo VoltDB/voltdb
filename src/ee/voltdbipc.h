@@ -44,14 +44,15 @@ public:
          * from Java. These do not exist in ExecutionEngine.java since they are IPC specific.
          * These constants are mirrored in ExecutionEngine.java.
          */
-        kErrorCode_RetrieveDependency = 100,   // Request for dependency
-        kErrorCode_DependencyFound = 101,      // Response to 100
-        kErrorCode_DependencyNotFound = 102,   // Also response to 100
-        kErrorCode_pushExportBuffer = 103,     // Indication that el buffer is next
-        kErrorCode_CrashVoltDB = 104,          // Crash with reason string
-        kErrorCode_getQueuedExportBytes = 105, //Retrieve value for stats
-        kErrorCode_needPlan = 110,             // fetch a plan from java for a fragment
-        kErrorCode_progressUpdate = 111        //
+        kErrorCode_RetrieveDependency = 100,       // Request for dependency
+        kErrorCode_DependencyFound = 101,          // Response to 100
+        kErrorCode_DependencyNotFound = 102,       // Also response to 100
+        kErrorCode_pushExportBuffer = 103,         // Indication that el buffer is next
+        kErrorCode_CrashVoltDB = 104,              // Crash with reason string
+        kErrorCode_getQueuedExportBytes = 105,     // Retrieve value for stats
+        kErrorCode_needPlan = 110,                 // fetch a plan from java for a fragment
+        kErrorCode_progressUpdate = 111,           // Update Java on execution progress
+        kErrorCode_decodeBase64AndDecompress = 112 // Decode base64, compressed data
     };
 
     VoltDBIPC(int fd);
@@ -75,6 +76,8 @@ public:
     int64_t fragmentProgressUpdate(int32_t batchIndex, std::string planNodeName,
             std::string lastAccessedTable, int64_t lastAccessedTableSize, int64_t tuplesProcessed,
             int64_t currMemoryInBytes, int64_t peakMemoryInBytes);
+
+    std::string decodeBase64AndDecompress(const std::string& base64Data);
 
     /**
      * Retrieve a plan from Java via the IPC connection for a fragment id.

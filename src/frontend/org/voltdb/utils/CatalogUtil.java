@@ -1467,7 +1467,13 @@ public abstract class CatalogUtil {
     }
 
     private static void updateIndexUsageAnnotation(Index index, Statement stmt) {
-        Procedure proc = (Procedure) stmt.getParent();
+        // LIMIT EXECUTE DELETE statements are parented by tables,
+        // not stored procedures.
+        CatalogType parent = stmt.getParent();
+        if (!(parent instanceof Procedure))
+                return;
+
+        Procedure proc = (Procedure) parent;
         // skip CRUD generated procs
         if (proc.getDefaultproc()) {
             return;
