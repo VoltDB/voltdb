@@ -291,6 +291,9 @@ var loadPage = function (serverName, portid) {
         } else if (curTab == NavigationTabs.SQLQuery) {
             $("#overlay").show();
             setTimeout(function () { $("#navSqlQuery > a").trigger("click"); }, 100);
+        } else if (curTab == NavigationTabs.Admin) {
+            $("#overlay").show();
+            setTimeout(function () { $("#navAdmin > a").trigger("click"); }, 100);
         }
     }
 
