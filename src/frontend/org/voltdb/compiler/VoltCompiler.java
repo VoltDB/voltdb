@@ -1192,10 +1192,6 @@ public class VoltCompiler {
                     null, // no user-supplied join order
                     DeterminismMode.FASTER,
                     StatementPartitioning.partitioningForRowLimitDelete());
-
-            // Temporarily log the plan to demonstrate it's actually getting compiled
-            String explainedPlan = Encoder.hexDecodeToString(stmt.getExplainplan());
-            compilerLog.info("Plan for " + m_currentFilename + ":\n" + explainedPlan);
         }
     }
 

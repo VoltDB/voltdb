@@ -30,7 +30,7 @@ import junit.framework.TestCase;
 
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
-import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
+import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
@@ -202,11 +202,11 @@ public class TestVoltDB extends TestCase {
         project.addDefaultProcedures();
 
         project.setSecurityEnabled(true, true);
-        GroupInfo groups[] = new GroupInfo[] {
-                new GroupInfo("foo", false, false, false, false, false, false),
-                new GroupInfo("blah", false, false, false, false, false, false)
+        RoleInfo groups[] = new RoleInfo[] {
+                new RoleInfo("foo", false, false, false, false, false, false),
+                new RoleInfo("blah", false, false, false, false, false, false)
         };
-        project.addGroups(groups);
+        project.addRoles(groups);
         UserInfo users[] = new UserInfo[] {
                 new UserInfo("john", "hugg", new String[] {"foo"}),
                 new UserInfo("ryan", "betts", new String[] {"foo", "bar"}),
