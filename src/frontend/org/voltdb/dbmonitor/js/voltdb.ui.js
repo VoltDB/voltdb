@@ -291,6 +291,9 @@ var loadPage = function (serverName, portid) {
         } else if (curTab == NavigationTabs.SQLQuery) {
             $("#overlay").show();
             setTimeout(function () { $("#navSqlQuery > a").trigger("click"); }, 100);
+        } else if (curTab == NavigationTabs.Admin && VoltDbAdminConfig.isAdmin) {
+            $("#overlay").show();
+            setTimeout(function () { $("#navAdmin > a").trigger("click"); }, 100);
         }
     }
 
@@ -389,7 +392,7 @@ var loadPage = function (serverName, portid) {
         };
         
         var loadAdminTabClientPort = function(clientPortValue) {
-            VoltDbAdminConfig.displayClientPort(clientPortValue);
+            VoltDbAdminConfig.displayPortDetails(clientPortValue);
         };
             
         var loadAdminServerList = function (serverList) {
