@@ -556,7 +556,6 @@ $(document).ready(function () {
         this.displayAdminConfiguration = function (adminConfigValues) {
             if (adminConfigValues != undefined) {
                 configureAdminValues(adminConfigValues);
-                configurePortAndOverviewValues(adminConfigValues);
                 configureDirectoryValues(adminConfigValues);
             }
         };
