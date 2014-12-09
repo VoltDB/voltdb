@@ -226,10 +226,12 @@ public class HTTPClientInterface {
         // if one has happened since we were here last
         if (m_shouldUpdateCatalog.compareAndSet(true, false))
         {
-            m_connections.closeAll();
-            // Just null the old object so we'll create a new one with
-            // updated state below
-            m_connections = null;
+            if (m_connections != null) {
+                m_connections.closeAll();
+                // Just null the old object so we'll create a new one with
+                // updated state below
+                m_connections = null;
+            }
         }
 
         if (m_connections == null) {
