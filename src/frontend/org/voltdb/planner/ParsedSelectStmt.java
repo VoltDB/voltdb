@@ -67,12 +67,15 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         public AbstractExpression expression = null;
         public int index = 0;
 
-        // orderby stuff
+        //
+        // used by in m_displayColumns
+        //
         public boolean orderBy = false;
         public boolean ascending = true;
-
-        // groupby
         public boolean groupBy = false;
+
+        // used by in m_groupbyColumns
+        public boolean groupByInDisplay = false;
 
         @Override
         public boolean equals (Object obj) {
@@ -123,7 +126,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     // It will store the final projection node schema for this plan if it is needed.
     // Calculate once, and use it everywhere else.
     private NodeSchema m_projectSchema = null;
-    private NodeSchema m_distinctProjectSchema = null;
 
     // It may has the consistent element order as the displayColumns
     public ArrayList<ParsedColInfo> m_aggResultColumns = new ArrayList<ParsedColInfo>();
@@ -140,6 +142,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private boolean m_hasPartitionColumnInGroupby = false;
     private boolean m_hasAggregateDistinct = false;
     private boolean m_hasPartitionColumnInDistinctGroupby = false;
+    private boolean m_isComplexOrderBy = false;
 
     // Limit plan node information.
     private LimitPlanNode m_limitNodeTop = null;
@@ -281,7 +284,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             parseHavingExpression(havingElement, true);
         }
 
-        if (orderbyElement != null) {
+        if (orderbyElement != null && ! hasAOneRowResult()) {
             parseOrderColumns(orderbyElement, true);
         }
 
@@ -470,37 +473,67 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             // DISTINCT group by expressions are already TVEs when set
         }
 
-        // place TVEs for ORDER BY
-        if (hasAggregateOrGroupby() || hasDistinctWithGroupBy()) {
-            placeTVEsForOrderby();
-        }
+        placeTVEsForOrderby(aggTableIndexMap, indexToColumnMap);
     }
 
     /**
-     * Restrictions: Order by columns must come from display column list, except for columns
-     * (1) Group by columns list,
+     * Replace TVE for order by columns.
+     * Restrictions: Order by clause must operate on display column list, except for columns that are
+     * (1) GROUP BY columns list without DISTINCT,
      * (2) in tables or joined tables without GROUP BY or DISTINCT clause.
      *
      * Display columns means exact columns/expressions in the select list or tag alias.
      * Order by clause can be columns or expressions on the columns.
      */
-    private void placeTVEsForOrderby() {
-        Map <AbstractExpression, Integer> displayIndexMap = new HashMap <AbstractExpression,Integer>();
-        Map <Integer, ParsedColInfo> indexToColumnMap = new HashMap <Integer, ParsedColInfo>();
+    private void placeTVEsForOrderby(Map <AbstractExpression, Integer> aggTableIndexMap,
+            Map <Integer, ParsedColInfo> indexToColumnMap) {
+        // Detect the edge order by case
+        detectComplexOrderby();
 
-        int index = 0;
-        for (ParsedColInfo col : m_displayColumns) {
-            displayIndexMap.put(col.expression, index);
-            assert(col.alias != null);
-            indexToColumnMap.put(index, col);
-            index++;
-        }
+        if (isComplexOrderby()) {
+            // Case that ORDER BY is below Projection node
+            for (ParsedColInfo orderCol : m_orderColumns) {
+                AbstractExpression expr = orderCol.expression.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
 
-        // place the TVEs from Display columns in the ORDER BY expression
-        for (ParsedColInfo orderCol : m_orderColumns) {
-            AbstractExpression expr = orderCol.expression.replaceWithTVE(displayIndexMap, indexToColumnMap);
-            orderCol.expression = expr;
+                if (hasComplexAgg()) {
+                    orderCol.expression = expr;
+                } else {
+                    // This if case checking is to rule out cases like: select PKEY + A_INT from O1 order by PKEY + A_INT,
+                    // This case later needs a projection node on top of sort node to make it work.
+
+                    // Assuming the restrictions: Order by columns are (1) columns from table
+                    // (2) tag from display columns (3) actual expressions from display columns
+                    // Currently, we do not allow order by complex expressions that are not in display columns
+
+                    // If there is a complexGroupby at his point, it means that Display columns contain all the order by columns.
+                    // In that way, this plan does not require another projection node on top of sort node.
+                    if (orderCol.expression.hasAnySubexpressionOfClass(AggregateExpression.class) ||
+                            hasComplexGroupby()) {
+                        orderCol.expression = expr;
+                    }
+                }
+            }
+        } else if (hasAggregateOrGroupby() || hasDistinctWithGroupBy()) {
+            // Case that ORDER BY is above Projection node
+
+            Map <AbstractExpression, Integer> displayIndexMap = new HashMap <AbstractExpression,Integer>();
+            Map <Integer, ParsedColInfo> displayIndexToColumnMap = new HashMap <Integer, ParsedColInfo>();
+
+            int orderByIndex = 0;
+            for (ParsedColInfo col : m_displayColumns) {
+                displayIndexMap.put(col.expression, orderByIndex);
+                assert(col.alias != null);
+                displayIndexToColumnMap.put(orderByIndex, col);
+                orderByIndex++;
+            }
+
+            // place the TVEs from Display columns in the ORDER BY expression
+            for (ParsedColInfo orderCol : m_orderColumns) {
+                AbstractExpression expr = orderCol.expression.replaceWithTVE(displayIndexMap, displayIndexToColumnMap);
+                orderCol.expression = expr;
+            }
         }
+        // other cases like (2) from the function comments.
     }
 
     /**
@@ -728,12 +761,13 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     private void parseGroupByColumns(VoltXMLElement columnsNode) {
+        int index = 0;
         for (VoltXMLElement child : columnsNode.children) {
-            parseGroupByColumn(child);
+            parseGroupByColumn(child, index++);
         }
     }
 
-    private void parseGroupByColumn(VoltXMLElement groupByNode) {
+    private void parseGroupByColumn(VoltXMLElement groupByNode, int index) {
         ParsedColInfo groupbyCol = new ParsedColInfo();
         groupbyCol.expression = parseExpressionTree(groupByNode);
         assert(groupbyCol.expression != null);
@@ -779,6 +813,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
         if (orig_col != null) {
             orig_col.groupBy = true;
+
+            groupbyCol.groupByInDisplay = true;
         }
 
         m_groupByColumns.add(groupbyCol);
@@ -863,6 +899,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             order_col.alias = orig_col.alias;
             order_col.columnName = orig_col.columnName;
             order_col.tableName = orig_col.tableName;
+        } else {
+            if (order_exp.hasAnySubexpressionOfClass(ParameterValueExpression.class)) {
+                m_isComplexOrderBy = true;
+            }
         }
         assert( ! (order_exp instanceof ConstantValueExpression));
         assert( ! (order_exp instanceof ParameterValueExpression));
@@ -933,7 +973,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
         // DISTINCT with GROUP BY
         m_distinctGroupByColumns = new ArrayList<ParsedColInfo>();
-        m_distinctProjectSchema = new NodeSchema();
         // Iterate the Display columns
         for (ParsedColInfo col: m_displayColumns) {
             TupleValueExpression tve = new TupleValueExpression(
@@ -946,10 +985,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             pcol.alias = col.alias;
             pcol.expression = tve;
             m_distinctGroupByColumns.add(pcol);
-
-            SchemaColumn schema_col = new SchemaColumn(
-                    col.tableName, col.tableAlias, col.columnName, col.alias, tve);
-            m_distinctProjectSchema.addColumn(schema_col);
         }
 
         return groupbyElement;
@@ -1302,6 +1337,69 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     /**
+     * For aggregation queries, ORDER BY can only apply on display columns list.
+     * However, this is an edge case :
+     * ORDER BY on GROUP BY columns or expression that are not selected.
+     *
+     * GROUP BY keys are not in select list will make it complex aggregated.
+     * For this case, the PROJECTION node should apply after the ORDER BY node.
+     *
+     * @return true when this query is the edge case query, false otherwise.
+     */
+    public boolean isComplexOrderby() {
+        return m_isComplexOrderBy;
+    }
+
+    private void detectComplexOrderby() {
+        if (m_isComplexOrderBy) {
+            return;
+        }
+
+        if (! hasOrderByColumns() || ! isGrouped()) {
+            return;
+        }
+
+        if (! hasComplexAgg()) {
+            return;
+        }
+
+        if (hasDistinctWithGroupBy()) {
+            // for distinct GROUP BY case, ORDER BY can not apply on display list,
+            // guarded by HSQL.
+            return;
+        }
+        // HAVING clause does not matter
+
+        Set <AbstractExpression> missingGroupBySet = new HashSet <AbstractExpression>();
+        for (ParsedColInfo col: m_groupByColumns) {
+            if (col.groupByInDisplay) {
+                continue;
+            }
+            if (hasComplexGroupby() &&
+                col.expression.hasAnySubexpressionOfClass(ParameterValueExpression.class)) {
+                // hsql has already guarded invalid ORDER BY expression.
+                // let's be pessimistic about these cases to place Projection above ORDER BY.
+                m_isComplexOrderBy = true;
+                return;
+            }
+
+            missingGroupBySet.add(col.expression);
+        }
+        if (missingGroupBySet.size() == 0) {
+            return;
+        }
+
+        // place the TVEs from Display columns in the ORDER BY expression
+        for (ParsedColInfo orderCol : m_orderColumns) {
+            AbstractExpression expr = orderCol.expression;
+            if (expr.hasSubExpressionFrom(missingGroupBySet)) {
+                m_isComplexOrderBy = true;
+                return;
+            }
+        }
+    }
+
+    /**
      * DISTINCT without GROUP BY is completely rewrote with a GROUP BY query.
      * DISTINCT with GROUP BY is not tricky, it needs another GROUP BY on the original GROUP BY.
      * @return true if query has a DISTINCT with GROUP BY
@@ -1465,11 +1563,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         HashMap<String, List<AbstractExpression> > baseTableAliases =
                 new HashMap<String, List<AbstractExpression> >();
 
-        for (ParsedColInfo col : m_displayColumns) {
-            if (col.orderBy == false) {
-                continue;
-            }
-
+        for (ParsedColInfo col : m_orderColumns) {
             AbstractExpression expr = col.expression;
             List<AbstractExpression> baseTVEs = expr.findBaseTVEs();
             if (baseTVEs.size() != 1) {

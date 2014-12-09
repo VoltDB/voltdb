@@ -271,9 +271,9 @@ public class PlanAssembler {
                 m_parsedSelect.setHasPartitionColumnInGroupby();
             }
 
-            if (isPartitionColumnInGroupbyList(m_parsedSelect.m_distinctGroupByColumns)) {
-                m_parsedSelect.setHasPartitionColumnInDistinctGroupby();
-            }
+//            if (isPartitionColumnInGroupbyList(m_parsedSelect.m_distinctGroupByColumns)) {
+//                m_parsedSelect.setHasPartitionColumnInDistinctGroupby();
+//            }
 
             return;
         }
@@ -775,7 +775,13 @@ public class PlanAssembler {
             root = handleAggregationOperators(root);
         }
 
-        root = handleOrderBy(root);
+        if (m_parsedSelect.hasOrderByColumns()) {
+            root = handleOrderBy(root);
+            if (m_parsedSelect.isComplexOrderby()) {
+                // swap the ORDER BY and complex aggregate Projection node
+                root = swapOrderbyAndProjectionNode(root);
+            }
+        }
 
         if (mvFixNeedsProjection || needProjectionNode(root)) {
             root = addProjection(root);
@@ -797,6 +803,39 @@ public class PlanAssembler {
         MicroOptimizationRunner.applyAll(plan, m_parsedSelect);
 
         return plan;
+    }
+
+    private AbstractPlanNode swapOrderbyAndProjectionNode(AbstractPlanNode orderby) {
+        if (orderby instanceof OrderByPlanNode == false) {
+            return orderby;
+        }
+
+        if (orderby.getChild(0) instanceof ProjectionPlanNode == false) {
+            return orderby;
+        }
+
+        AbstractPlanNode proj = orderby.getChild(0);
+        AbstractPlanNode child = proj.getChild(0);
+
+        if (orderby.getParentCount() > 0) {
+            AbstractPlanNode parrent = orderby;
+            parrent = orderby.getParent(0);
+            parrent.unlinkChild(orderby);
+            orderby.unlinkChild(proj);
+            proj.unlinkChild(child);
+
+            parrent.addAndLinkChild(proj);
+            proj.addAndLinkChild(orderby);
+            orderby.addAndLinkChild(child);
+        } else {
+            orderby.unlinkChild(proj);
+            proj.unlinkChild(child);
+
+            proj.addAndLinkChild(orderby);
+            orderby.addAndLinkChild(child);
+        }
+
+        return proj;
     }
 
     private boolean needProjectionNode (AbstractPlanNode root) {
@@ -1248,11 +1287,6 @@ public class PlanAssembler {
     AbstractPlanNode handleOrderBy(AbstractPlanNode root) {
         assert (m_parsedSelect != null);
 
-        // Only sort when the statement has an ORDER BY.
-        if ( ! m_parsedSelect.hasOrderByColumns()) {
-            return root;
-        }
-
         SortDirectionType sortDirection = SortDirectionType.INVALID;
         // Skip the explicit ORDER BY plan step if an IndexScan is already providing the equivalent ordering.
         // Note that even tree index scans that produce values in their own "key order" only report
@@ -1350,7 +1384,9 @@ public class PlanAssembler {
 
             // If the distributed limit must be performed on ordered input,
             // ensure the order of the data on each partition.
-            distributedPlan = handleOrderBy(distributedPlan);
+            if (m_parsedSelect.hasOrderByColumns()) {
+                distributedPlan = handleOrderBy(distributedPlan);
+            }
 
             if (isInlineLimitPlanNodePossible(distributedPlan)) {
                 // Inline the distributed limit.
@@ -1542,7 +1578,7 @@ public class PlanAssembler {
      * down so that the ordering is not lost by the lack of a mergesort in the RECEIVE node.
      * @param candidate
      * @param gbInfo
-     * @return whether planner can switch to index scan or not from sequential scan,
+     * @return true when planner can switch to index scan from a sequential scan,
      * and when the index scan has no parent plan node.
      */
     private boolean switchToIndexScanForGroupBy(AbstractPlanNode candidate, IndexGroupByInfo gbInfo) {
@@ -1946,8 +1982,9 @@ public class PlanAssembler {
          */
         if (coordNode != null && root instanceof ReceivePlanNode) {
             AbstractPlanNode accessPlanTemp = root;
-            root = root.getChild(0).getChild(0);
+            root = accessPlanTemp.getChild(0).getChild(0);
             root.clearParents();
+            accessPlanTemp.getChild(0).clearChildren();
             distNode.addAndLinkChild(root);
 
             if (noNeedCoordNode) {
@@ -1956,18 +1993,24 @@ public class PlanAssembler {
 
                 // Edge case: GROUP BY clause contains the partition column
                 // No related GROUP BY or even Re-agg will apply on coordinator
-                // Projection plan node can just be pushed down also.
-                root = processComplexAggProjectionNode(selectStmt, distNode);
-                // Put the send/receive pair back into place
-                accessPlanTemp.getChild(0).clearChildren();
-                accessPlanTemp.getChild(0).addAndLinkChild(root);
-                return accessPlanTemp;
+                // Projection plan node can just be pushed down also except for
+                // a very edge ORDRE BY case.
+                if (m_parsedSelect.isComplexOrderby()) {
+                    // Put the send/receive pair back into place
+                    accessPlanTemp.getChild(0).addAndLinkChild(distNode);
+                    root = processComplexAggProjectionNode(selectStmt, accessPlanTemp);
+                    return root;
+                } else {
+                    root = processComplexAggProjectionNode(selectStmt, distNode);
+                    // Put the send/receive pair back into place
+                    accessPlanTemp.getChild(0).addAndLinkChild(root);
+                    return accessPlanTemp;
+                }
             }
             // Without including partition column in GROUP BY clause,
             // there has to be a top GROUP BY plan node on coordinator
 
             // Put the send/receive pair back into place
-            accessPlanTemp.getChild(0).clearChildren();
             accessPlanTemp.getChild(0).addAndLinkChild(distNode);
             root = accessPlanTemp;
             // Add the top node
@@ -2141,8 +2184,10 @@ public class PlanAssembler {
         for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.m_distinctGroupByColumns) {
             distinctAggNode.addGroupByExpression(col.expression);
         }
-        boolean pushedDown = false;
 
+        // TODO(xin): push down the DISTINCT for certain cases
+        /*
+        boolean pushedDown = false;
         boolean canPushdownDistinctAgg = m_parsedSelect.hasPartitionColumnInDistinctGroupby();
         //
         // disable pushdown, DISTINCT push down turns out complex
@@ -2163,12 +2208,10 @@ public class PlanAssembler {
 
                 pushedDown = true;
             }
-        }
+        }*/
 
-        if (! pushedDown) {
-            distinctAggNode.addAndLinkChild(root);
-            root = distinctAggNode;
-        }
+        distinctAggNode.addAndLinkChild(root);
+        root = distinctAggNode;
 
         return root;
     }

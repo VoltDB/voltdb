@@ -95,7 +95,6 @@ public class TestSubQueriesSuite extends RegressionSuite {
             validateTableOfLongs(vt, new long[][] {{14}, {15}});
         }
 
-
     }
 
     /**
@@ -117,6 +116,10 @@ public class TestSubQueriesSuite extends RegressionSuite {
 
         // Test group by queries, order by, limit
         for (String tb: tbs) {
+            vt = client.callProcedure("@Explain", "select * from ( SELECT dept, sum(wage) as sw, sum(wage)/count(wage) as avg_wage " +
+                    "from " + tb + " GROUP BY dept) T1 ORDER BY dept DESC;").getResults()[0];
+            System.err.println(vt);
+
             vt = client.callProcedure("@AdHoc", "select * from ( SELECT dept, sum(wage) as sw, sum(wage)/count(wage) as avg_wage " +
                     "from " + tb + " GROUP BY dept) T1 ORDER BY dept DESC;").getResults()[0];
             System.out.println(vt.toString());
@@ -273,7 +276,6 @@ public class TestSubQueriesSuite extends RegressionSuite {
         validateTableOfLongs(vt, new long[][] {row, row, row, row,
                 row, row, row, row});
     }
-
 
     // Test subqueries on partitioned table cases
     public void testSubSelects_from_partitioned() throws NoConnectionsException, IOException, ProcCallException

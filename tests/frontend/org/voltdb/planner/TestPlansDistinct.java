@@ -237,14 +237,22 @@ public class TestPlansDistinct extends PlannerTestCase {
         sql = "select distinct C3, max(B3) FROM T3 group by PKEY, A3 order by C3";
         compileToFragments(sql);
 
+        // test ORDER BY GROUP BY key without in display list
+        sql = "select distinct max(B3) FROM T3 group by PKEY, A3 order by A3";
+        failToCompile(sql, errorMsg);
+
+        sql = "select max(B3) FROM T3 group by PKEY, A3 order by A3";
+        compileToFragments(sql);
     }
 
-    public void testColumnsExpressionsWithGroupby()
+    public void testColumnsWithGroupby()
     {
         String sql1, sql2;
         // Group by with multiple columns distinct
 
         // PKEY, A3 is the primary key or contains the unique key.
+        // A3 is the Partition key
+
         sql1 = "SELECT distinct B3, C3 from T3 group by PKEY, A3";
         sql2 = "SELECT B3, C3 from T3 group by PKEY, A3";
         checkDistinctWithGroupbyPlans(sql1, sql2);
@@ -254,9 +262,17 @@ public class TestPlansDistinct extends PlannerTestCase {
         sql2 = "SELECT SUM(C3) from T3 group by A3, B3";
         checkDistinctWithGroupbyPlans(sql1, sql2);
 
+        sql1 = "SELECT distinct SUM(C3) from T3 group by D3, B3";
+        sql2 = "SELECT SUM(C3) from T3 group by D3, B3";
+        checkDistinctWithGroupbyPlans(sql1, sql2);
+
         // multiple columns distinct
         sql1 = "SELECT distinct B3, SUM(C3), COUNT(*) from T3 group by A3, B3";
         sql2 = "SELECT B3, SUM(C3), COUNT(*) from T3 group by A3, B3";
+        checkDistinctWithGroupbyPlans(sql1, sql2);
+
+        sql1 = "SELECT distinct B3, SUM(C3), COUNT(*) from T3 group by D3, B3";
+        sql2 = "SELECT B3, SUM(C3), COUNT(*) from T3 group by D3, B3";
         checkDistinctWithGroupbyPlans(sql1, sql2);
 
         // variance on select list and group by list
@@ -264,18 +280,23 @@ public class TestPlansDistinct extends PlannerTestCase {
         sql2 = "SELECT A3, sum(C3) from T3 group by A3, B3";
         checkDistinctWithGroupbyPlans(sql1, sql2);
 
-        sql1 = "SELECT distinct A3, B3 from T3 group by A3, B3, C3";
-        sql2 = "SELECT A3, B3 from T3 group by A3, B3, C3";
+        sql1 = "SELECT distinct D3, sum(C3) from T3 group by D3, B3";
+        sql2 = "SELECT D3, sum(C3) from T3 group by D3, B3";
         checkDistinctWithGroupbyPlans(sql1, sql2);
 
-        // distinct on expression
-        sql1 = "SELECT distinct sum(C3)/count(C3) from T3 group by A3, B3";
-        sql2 = "SELECT sum(C3)/count(C3) from T3 group by A3, B3";
+        // group by 3 columns
+        sql1 = "SELECT distinct A3, B3 from T3 group by A3, B3, C3";
+        sql2 = "SELECT A3, B3 from T3 group by A3, B3, C3";
         checkDistinctWithGroupbyPlans(sql1, sql2);
 
         // order by
         sql1 = "SELECT distinct A3, B3 from T3 group by A3, B3, C3 ORDER BY A3, B3";
         sql2 = "SELECT A3, B3 from T3 group by A3, B3, C3 ORDER BY A3, B3";
+        checkDistinctWithGroupbyPlans(sql1, sql2);
+
+        // order by normal case
+        sql1 = "SELECT distinct D3, B3 from T3 group by D3, B3, C3 ORDER BY D3, B3";
+        sql2 = "SELECT D3, B3 from T3 group by D3, B3, C3 ORDER BY D3, B3";
         checkDistinctWithGroupbyPlans(sql1, sql2);
 
         // Having
@@ -295,6 +316,15 @@ public class TestPlansDistinct extends PlannerTestCase {
         sql1 = "SELECT distinct B3, COUNT(*) from T3 group by A3, B3 ORDER BY B3 LIMIT 3";
         sql2 = "SELECT B3, COUNT(*) from T3 group by A3, B3 ORDER BY B3 LIMIT 3";
         checkDistinctWithGroupbyPlans(sql1, sql2, true);
+    }
+
+    public void testExpressionsWithGroupby() {
+         String sql1, sql2;
+
+         // distinct on expression
+         sql1 = "SELECT distinct sum(C3)/count(C3) from T3 group by A3, B3";
+         sql2 = "SELECT sum(C3)/count(C3) from T3 group by A3, B3";
+         checkDistinctWithGroupbyPlans(sql1, sql2);
     }
 
     protected void checkDistinctWithGroupbyPlans(String distinctSQL, String groupbySQL) {
