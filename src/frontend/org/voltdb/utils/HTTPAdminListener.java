@@ -317,8 +317,6 @@ public class HTTPAdminListener {
 
         final ObjectMapper m_mapper;
         String m_schema = "";
-        private DeploymentType m_deployment = null;
-        private String m_deploymentXml = null;
 
         public DeploymentRequestHandler() {
             m_mapper = new ObjectMapper();
@@ -332,36 +330,14 @@ public class HTTPAdminListener {
             }
         }
 
-        //Get deployment from zookeeper next time
-        public void notifyOfCatalogUpdate() {
-            m_deployment = null;
-            m_deploymentXml = null;
+        //Get deployment from catalog context
+        private DeploymentType getDeployment() {
+            return VoltDB.instance().getCatalogContext().getDeployment();
         }
 
-        //Get deployment from zookeeper.
-        private DeploymentType getDeployment() {
-            if (m_deployment == null) {
-                ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
-                byte deploymentBytes[];
-
-                try {
-                    //Let us get bytes from ZK
-                    CatalogUtil.CatalogAndIds catalogStuff = CatalogUtil.getCatalogFromZK(zk);
-                    deploymentBytes = catalogStuff.deploymentBytes;
-                    if (deploymentBytes != null) {
-                        m_deploymentXml = new String(deploymentBytes);
-                        m_deployment = CatalogUtil.getDeployment(new ByteArrayInputStream(deploymentBytes));
-                    }
-                } catch (KeeperException | InterruptedException ex) {
-                    m_log.warn("Failed to get deployment from zookeeper for HTTP interface.", ex);
-                }
-                // wasn't a valid xml deployment file or zookeeper is gone to town.
-                if (m_deployment == null) {
-                    //Get stale version from RealVoltDB
-                    m_log.warn("Failed to get deployment from zookeeper for HTTP interface. /deployment will not serve deployment information.");
-                }
-            }
-            return m_deployment;
+        //Get deployment bytes from catalog context
+        private byte[] getDeploymentBytes() {
+            return VoltDB.instance().getCatalogContext().getDeploymentBytes();
         }
 
         // TODO - subresources.
@@ -419,23 +395,18 @@ public class HTTPAdminListener {
                 }
 
                 //Authenticated and has ADMIN permission
-                getDeployment();
-                if (m_deployment == null) {
-                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Deployment Information unavailable."));
+                String msg = null;
+                if (baseRequest.getRequestURI().contains("/download")) {
+                    msg = new String(getDeploymentBytes());
+                    //Deployment xml is text/xml
+                    response.setHeader("Content-Type", "text/xml");
                 } else {
-                    String msg = null;
-                    if (baseRequest.getRequestURI().contains("/download")) {
-                        msg = m_deploymentXml;
-                        //Deployment xml is text/xml
-                        response.setHeader("Content-Type", "text/xml");
-                    } else {
-                        msg = m_mapper.writeValueAsString(m_deployment);
-                    }
-                    if (jsonp != null) {
-                        msg = String.format("%s( %s )", jsonp, msg);
-                    }
-                    response.getWriter().print(msg);
+                    msg = m_mapper.writeValueAsString(getDeployment());
                 }
+                if (jsonp != null) {
+                    msg = String.format("%s( %s )", jsonp, msg);
+                }
+                response.getWriter().print(msg);
                 baseRequest.setHandled(true);
             } catch (Exception ex) {
               logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage(), ex);
@@ -631,7 +602,5 @@ public class HTTPAdminListener {
     {
         //Notify to clean any cached clients so new security can be enforced.
         httpClientInterface.notifyOfCatalogUpdate();
-        //Notify deployment handler
-        m_deploymentHandler.notifyOfCatalogUpdate();
     }
 }
