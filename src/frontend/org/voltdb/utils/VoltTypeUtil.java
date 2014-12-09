@@ -23,7 +23,6 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Random;
 import java.util.SortedMap;
-import java.util.TreeMap;
 import java.util.logging.Logger;
 
 import org.voltdb.VoltType;
@@ -294,7 +293,7 @@ public abstract class VoltTypeUtil {
      */
     public static String getSignatureForTable(String name, SortedMap<Integer, VoltType> schema) {
         StringBuilder sb = new StringBuilder();
-        sb.append(name);
+        sb.append(name).append(CatalogUtil.SIGNATURE_TABLE_NAME_SEPARATOR);
         for (VoltType t : schema.values()) {
             sb.append(t.getSignatureChar());
         }

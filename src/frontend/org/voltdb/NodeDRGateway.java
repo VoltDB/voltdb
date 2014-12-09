@@ -17,6 +17,8 @@
 
 package org.voltdb;
 
+import org.voltdb.catalog.Database;
+
 import java.io.IOException;
 
 public interface NodeDRGateway {
@@ -58,5 +60,7 @@ public interface NodeDRGateway {
 
     public abstract void start();
     public abstract void shutdown() throws InterruptedException;
+
+    public abstract void calculateTableSignature(Database catalog);
 
 }
