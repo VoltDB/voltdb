@@ -45,7 +45,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         defaultStoredProcsHeader { storedProcs.find('.systemHeader').last() }
         systemStoredProcs   { storedProcs.find('#systemProcedure').find('h3') }
         defaultStoredProcs  { storedProcs.find('#defaultProcedure').find('h3') }
-        userStoredProcs { defaultStoredProcsHeader.nextAll('h3') } // TODO: fix
+        userStoredProcs { defaultStoredProcsHeader.nextAll('h3') }
         allStoredProcs  { storedProcs.find('h3') }
 
         // Query elements
@@ -61,6 +61,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         sqlQueryTab.displayed
         sqlQueryTab.attr('class') == 'active'
         tabArea.displayed
+        storedProcsTab.displayed
         queryInput.displayed
         queryResHtml.displayed
     }
