@@ -62,7 +62,7 @@ public class CatalogContext {
     public final AuthSystem authSystem;
     public final int catalogVersion;
     private final long catalogCRC;
-    public final byte[] deploymentBytes;
+    private final byte[] deploymentBytes;
     public final byte[] deploymentHash;
     public final long m_transactionId;
     public long m_uniqueId;

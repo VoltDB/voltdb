@@ -22,6 +22,7 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
+import org.voltcore.logging.VoltLogger;
 
 import org.voltdb.common.Constants;
 
@@ -38,6 +39,8 @@ import org.voltdb.common.Constants;
  * This is probably not threadsafe yet.
  */
 public class AuthenticatedConnectionCache {
+
+    private static VoltLogger logger = new VoltLogger("HOST");
 
     final String m_hostname;
     final String m_adminHostName;
@@ -70,6 +73,7 @@ public class AuthenticatedConnectionCache {
 
         @Override
         public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
+            logger.debug("Connection lost was reported for internal client.");
         }
     }
 

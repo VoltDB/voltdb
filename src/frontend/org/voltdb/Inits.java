@@ -308,7 +308,7 @@ public class Inits {
                     catalogTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
 
                     // Need to get the deployment bytes from the starter catalog context
-                    byte[] deploymentBytes = m_rvdb.getCatalogContext().deploymentBytes;
+                    byte[] deploymentBytes = m_rvdb.getCatalogContext().getDeploymentBytes();
 
                     // publish the catalog bytes to ZK
                     CatalogUtil.updateCatalogToZK(
@@ -387,7 +387,7 @@ public class Inits {
                         catalog,
                         catalogJarBytes,
                         // Our starter catalog has set the deployment stuff, just yoink it out for now
-                        m_rvdb.m_catalogContext.deploymentBytes,
+                        m_rvdb.m_catalogContext.getDeploymentBytes(),
                         catalogStuff.version, -1);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Error agreeing on starting catalog version", true, e);

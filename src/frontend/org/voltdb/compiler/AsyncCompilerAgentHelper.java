@@ -156,7 +156,7 @@ public class AsyncCompilerAgentHelper
             // Retrieve the original deployment string, if necessary
             if (deploymentString == null) {
                 // Go get the deployment string from the current catalog context
-                byte[] deploymentBytes = context.deploymentBytes;
+                byte[] deploymentBytes = context.getDeploymentBytes();
                 if (deploymentBytes != null) {
                     deploymentString = new String(deploymentBytes, "UTF-8");
                 }
