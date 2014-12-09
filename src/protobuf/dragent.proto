@@ -69,13 +69,14 @@ message Response {
     // status. 0 means ok
     optional int32 status = 9 [default = 0];
     optional CtrlEnvelope.Type type = 10;
+    optional fixed64 catalogCRC = 11;
+    optional string catalogSignature = 12;
 }
 
 message NodeInfo {
     optional string hostname = 1;
     optional int32 drport = 2;
     optional fixed64 catalogCRC = 3;
-    optional string catalogSignature = 4;
 }
 
 message PartitionInfo {
