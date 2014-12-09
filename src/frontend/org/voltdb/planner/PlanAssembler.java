@@ -914,6 +914,11 @@ public class PlanAssembler {
                 return deleteNode;
             }
         } else {
+
+            if (m_parsedDelete.hasOrderByColumns()) {
+                subSelectRoot = handleOrderBy(m_parsedDelete, subSelectRoot);
+            }
+
             // connect the nodes to build the graph
             deleteNode.addAndLinkChild(subSelectRoot);
             // OPTIMIZATION: Projection Inline

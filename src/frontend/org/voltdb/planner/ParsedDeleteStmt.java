@@ -18,6 +18,7 @@
 package org.voltdb.planner;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -29,7 +30,7 @@ import org.voltdb.catalog.Database;
  */
 public class ParsedDeleteStmt extends AbstractParsedStmt {
 
-    private List<ParsedColInfo> m_orderColumns = null;
+    private final List<ParsedColInfo> m_orderColumns = new ArrayList<>();
 
     /**
     * Class constructor
@@ -41,7 +42,7 @@ public class ParsedDeleteStmt extends AbstractParsedStmt {
     }
 
     private void parseOrderColumns(VoltXMLElement orderColumnsXml) {
-        m_orderColumns = new ArrayList<>();
+        assert(m_orderColumns.size() == 0);
 
         for (VoltXMLElement orderColXml : orderColumnsXml.children) {
             m_orderColumns.add(ParsedColInfo.fromOrderByXml(this, orderColXml));
@@ -60,4 +61,13 @@ public class ParsedDeleteStmt extends AbstractParsedStmt {
         }
     }
 
+    @Override
+    public boolean hasOrderByColumns() {
+        return m_orderColumns.size() > 0;
+    }
+
+    @Override
+    public List<ParsedColInfo> orderByColumns() {
+        return Collections.unmodifiableList(m_orderColumns);
+    }
 }
