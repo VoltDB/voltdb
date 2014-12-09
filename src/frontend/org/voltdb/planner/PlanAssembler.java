@@ -43,7 +43,7 @@ import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
+import org.voltdb.planner.ParsedColInfo;
 import org.voltdb.planner.microoptimizations.MicroOptimizationRunner;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
@@ -1290,7 +1290,7 @@ public class PlanAssembler {
         }
 
         OrderByPlanNode orderByNode = new OrderByPlanNode();
-        for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.m_orderColumns) {
+        for (ParsedColInfo col : m_parsedSelect.m_orderColumns) {
             orderByNode.addSort(col.expression,
                                 col.ascending ? SortDirectionType.ASC
                                               : SortDirectionType.DESC);
@@ -1657,7 +1657,7 @@ public class PlanAssembler {
             NodeSchema agg_schema = new NodeSchema();
             NodeSchema top_agg_schema = new NodeSchema();
 
-            for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.m_aggResultColumns) {
+            for (ParsedColInfo col : m_parsedSelect.m_aggResultColumns) {
                 AbstractExpression rootExpr = col.expression;
                 AbstractExpression agg_input_expr = null;
                 SchemaColumn schema_col = null;
@@ -1768,7 +1768,7 @@ public class PlanAssembler {
                 outputColumnIndex++;
             }
 
-            for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.m_groupByColumns) {
+            for (ParsedColInfo col : m_parsedSelect.m_groupByColumns) {
                 aggNode.addGroupByExpression(col.expression);
 
                 if (topAggNode != null) {
@@ -2065,7 +2065,7 @@ public class PlanAssembler {
     }
 
     private static boolean isOrderByAggregationValue(List<ParsedColInfo> orderBys) {
-        for (ParsedSelectStmt.ParsedColInfo col : orderBys) {
+        for (ParsedColInfo col : orderBys) {
             AbstractExpression rootExpr = col.expression;
             // Fix ENG-3487: can't push down limits when results are ordered by aggregate values.
             ArrayList<AbstractExpression> tves = rootExpr.findBaseTVEs();
@@ -2142,7 +2142,7 @@ public class PlanAssembler {
         AggregatePlanNode distinctAggNode = new HashAggregatePlanNode();
         distinctAggNode.setOutputSchema(m_parsedSelect.getDistinctProjectionSchema());
 
-        for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.m_distinctGroupByColumns) {
+        for (ParsedColInfo col : m_parsedSelect.m_distinctGroupByColumns) {
             distinctAggNode.addGroupByExpression(col.expression);
         }
 

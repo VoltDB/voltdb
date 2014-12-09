@@ -59,59 +59,6 @@ import org.voltdb.types.JoinType;
 
 public class ParsedSelectStmt extends AbstractParsedStmt {
 
-    public static class ParsedColInfo implements Cloneable{
-        public String alias = null;
-        public String columnName = null;
-        public String tableName = null;
-        public String tableAlias = null;
-        public AbstractExpression expression = null;
-        public int index = 0;
-
-        // orderby stuff
-        public boolean orderBy = false;
-        public boolean ascending = true;
-
-        // groupby
-        public boolean groupBy = false;
-
-        @Override
-        public boolean equals (Object obj) {
-            if (obj == null) return false;
-            if (obj instanceof ParsedColInfo == false) return false;
-            ParsedColInfo col = (ParsedColInfo) obj;
-            if ( columnName != null && columnName.equals(col.columnName) &&
-                    tableName != null && tableName.equals(col.tableName) &&
-                    tableAlias != null && tableAlias.equals(col.tableAlias) &&
-                    expression != null && expression.equals(col.expression) )
-                return true;
-            return false;
-        }
-
-        // Based on implementation on equals().
-        @Override
-        public int hashCode() {
-            int result = new HashCodeBuilder(17, 31).
-                    append(columnName).append(tableName).append(tableAlias).
-                    toHashCode();
-            if (expression != null) {
-                result += expression.hashCode();
-            }
-            return result;
-        }
-
-        @Override
-        public ParsedColInfo clone() {
-            ParsedColInfo col = null;
-            try {
-                col = (ParsedColInfo) super.clone();
-            } catch (CloneNotSupportedException e) {
-                e.printStackTrace();
-            }
-            col.expression = (AbstractExpression) expression.clone();
-            return col;
-        }
-    }
-
     public ArrayList<ParsedColInfo> m_displayColumns = new ArrayList<ParsedColInfo>();
     public ArrayList<ParsedColInfo> m_orderColumns = new ArrayList<ParsedColInfo>();
     public AbstractExpression m_having = null;
@@ -1549,7 +1496,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     private boolean orderByColumnsDetermineAllDisplayColumns(ArrayList<AbstractExpression> nonOrdered)
     {
-        ArrayList<ParsedColInfo> candidateColumns = new ArrayList<ParsedSelectStmt.ParsedColInfo>();
+        ArrayList<ParsedColInfo> candidateColumns = new ArrayList<ParsedColInfo>();
         for (ParsedColInfo displayCol : m_displayColumns) {
             if (displayCol.orderBy) {
                 continue;

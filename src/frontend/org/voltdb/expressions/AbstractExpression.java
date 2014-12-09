@@ -28,7 +28,7 @@ import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Table;
-import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
+import org.voltdb.planner.ParsedColInfo;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.types.ExpressionType;
 

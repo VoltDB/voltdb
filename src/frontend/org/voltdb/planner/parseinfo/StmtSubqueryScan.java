@@ -30,7 +30,7 @@ import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.ParsedSelectStmt;
-import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
+import org.voltdb.planner.ParsedColInfo;
 import org.voltdb.planner.ParsedUnionStmt;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.StatementPartitioning;
