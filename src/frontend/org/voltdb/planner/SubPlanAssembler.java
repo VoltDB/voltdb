@@ -805,13 +805,13 @@ public abstract class SubPlanAssembler {
         }
         int nSpoilers = 0;
         ParsedSelectStmt parsedSelectStmt = (ParsedSelectStmt) m_parsedStmt;
-        int countOrderBys = parsedSelectStmt.m_orderColumns.size();
+        int countOrderBys = parsedSelectStmt.orderByColumns().size();
         // There need to be enough indexed expressions to provide full sort coverage.
         if (countOrderBys > 0 && countOrderBys <= keyComponentCount) {
-            boolean ascending = parsedSelectStmt.m_orderColumns.get(0).ascending;
+            boolean ascending = parsedSelectStmt.orderByColumns().get(0).ascending;
             retval.sortDirection = ascending ? SortDirectionType.ASC : SortDirectionType.DESC;
             int jj = 0;
-            for (ParsedColInfo colInfo : parsedSelectStmt.m_orderColumns) {
+            for (ParsedColInfo colInfo : parsedSelectStmt.orderByColumns()) {
                 // This retry loop allows catching special cases that don't perfectly match the
                 // ORDER BY columns but may still be usable for ordering.
                 for ( ; jj < keyComponentCount; ++jj) {

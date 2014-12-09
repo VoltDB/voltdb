@@ -60,7 +60,7 @@ import org.voltdb.types.JoinType;
 public class ParsedSelectStmt extends AbstractParsedStmt {
 
     public ArrayList<ParsedColInfo> m_displayColumns = new ArrayList<ParsedColInfo>();
-    public ArrayList<ParsedColInfo> m_orderColumns = new ArrayList<ParsedColInfo>();
+    private ArrayList<ParsedColInfo> m_orderColumns = new ArrayList<ParsedColInfo>();
     public AbstractExpression m_having = null;
     public ArrayList<ParsedColInfo> m_groupByColumns = new ArrayList<ParsedColInfo>();
     public ArrayList<ParsedColInfo> m_distinctGroupByColumns = null;
@@ -1229,6 +1229,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         m_hasPartitionColumnInDistinctGroupby = true;
     }
 
+    @Override
     public boolean hasOrderByColumns() {
         return ! m_orderColumns.isEmpty();
     }
@@ -1314,6 +1315,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return Collections.unmodifiableList(m_groupByColumns);
     }
 
+    @Override
     public List<ParsedColInfo> orderByColumns() {
         return Collections.unmodifiableList(m_orderColumns);
     }

@@ -858,4 +858,14 @@ public abstract class AbstractParsedStmt {
         throw new RuntimeException("isOrderDeterministicInSpiteOfUnorderedSubqueries not supported by DML statements");
     }
 
+    /** May be true for DELETE or SELECT */
+    public boolean hasOrderByColumns() {
+        return false;
+    }
+
+    public List<ParsedColInfo> orderByColumns() {
+        assert(false);
+        return null;
+    }
+
 }

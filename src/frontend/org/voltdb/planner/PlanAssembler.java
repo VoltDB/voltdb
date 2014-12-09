@@ -777,7 +777,7 @@ public class PlanAssembler {
         }
 
         if (m_parsedSelect.hasOrderByColumns()) {
-            root = handleOrderBy(root);
+            root = handleOrderBy(m_parsedSelect, root);
             if (m_parsedSelect.isComplexOrderBy() && root instanceof OrderByPlanNode) {
                 AbstractPlanNode child = root.getChild(0);
                 AbstractPlanNode grandChild = child.getChild(0);
@@ -1278,8 +1278,8 @@ public class PlanAssembler {
      * @param root
      * @return new orderByNode (the new root) or the original root if no orderByNode was required.
      */
-    private AbstractPlanNode handleOrderBy(AbstractPlanNode root) {
-        assert (m_parsedSelect != null);
+    static private AbstractPlanNode handleOrderBy(AbstractParsedStmt parsedStmt, AbstractPlanNode root) {
+        assert (parsedStmt instanceof ParsedSelectStmt || parsedStmt instanceof ParsedDeleteStmt);
 
         SortDirectionType sortDirection = SortDirectionType.INVALID;
         // Skip the explicit ORDER BY plan step if an IndexScan is already providing the equivalent ordering.
@@ -1310,7 +1310,7 @@ public class PlanAssembler {
         }
 
         OrderByPlanNode orderByNode = new OrderByPlanNode();
-        for (ParsedColInfo col : m_parsedSelect.m_orderColumns) {
+        for (ParsedColInfo col : parsedStmt.orderByColumns()) {
             orderByNode.addSort(col.expression,
                                 col.ascending ? SortDirectionType.ASC
                                               : SortDirectionType.DESC);
@@ -1376,7 +1376,7 @@ public class PlanAssembler {
             // If the distributed limit must be performed on ordered input,
             // ensure the order of the data on each partition.
             if (m_parsedSelect.hasOrderByColumns()) {
-                distributedPlan = handleOrderBy(distributedPlan);
+                distributedPlan = handleOrderBy(m_parsedSelect, distributedPlan);
             }
 
             if (isInlineLimitPlanNodePossible(distributedPlan)) {
