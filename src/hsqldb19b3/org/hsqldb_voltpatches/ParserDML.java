@@ -440,14 +440,11 @@ public class ParserDML extends ParserDQL {
             rangeVariables = resolver.rangeVariables;
         }
 
-        // VoltDB Extension: ORDER BY, LIMIT and OFFSET allowed on DELETE statement
-        SortAndSlice sas = XreadOrderByExpression();
-
         StatementDMQL cs = new StatementDML(session, table, rangeVariables,
                                             compileContext, restartIdentity);
 
         // VoltDB Extension:
-        ((StatementDML)cs).setSortAndSlice(sas);
+        voltAppendDeleteSortAndSlice((StatementDML)cs);
 
         return cs;
     }
@@ -1059,4 +1056,29 @@ public class ParserDML extends ParserDQL {
 
         return cs;
     }
+
+    private void voltAppendDeleteSortAndSlice(StatementDML deleteStmt) {
+        SortAndSlice sas = XreadOrderByExpression();
+        if (sas == null || sas == SortAndSlice.noSort)
+            return;
+
+        // XXX Throw an error if target table is a view
+
+        // Resolve columns in the ORDER BY clause
+        for (int i = 0; i < sas.exprList.size(); ++i) {
+            Expression e = (Expression)sas.exprList.get(i);
+            HsqlList unresolved =
+                e.resolveColumnReferences(RangeVariable.emptyArray, null);
+
+            unresolved = Expression.resolveColumnSet(deleteStmt.rangeVariables,
+                    unresolved, null);
+
+            ExpressionColumn.checkColumnsResolved(unresolved);
+            e.resolveTypes(session, null);
+        }
+
+        deleteStmt.setSortAndSlice(sas);
+    }
+
+
 }
