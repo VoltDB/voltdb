@@ -573,8 +573,7 @@ public class CatalogDiffEngine {
             return null;
         if (suspect instanceof Table) {
             if (field.equals("signature") ||
-                field.equals("tuplelimit") ||
-                field.equals("isDRed"))
+                field.equals("tuplelimit"))
                 return null;
         }
 
@@ -740,6 +739,13 @@ public class CatalogDiffEngine {
                 // error message
                 retval[1] = String.format(
                         "Unable to change the partition column of table %s because it is not empty.",
+                        retval[0]);
+                return retval;
+            }
+            if (field.equalsIgnoreCase("isdred")) {
+                // error message
+                retval[1] = String.format(
+                        "Unable to enable DR on table %s because it is not empty.",
                         retval[0]);
                 return retval;
             }

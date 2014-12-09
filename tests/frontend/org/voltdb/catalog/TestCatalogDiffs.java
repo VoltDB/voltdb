@@ -1154,4 +1154,18 @@ public class TestCatalogDiffs extends TestCase {
         Catalog catUpdated = catalogForJar(testDir + File.separator + "elastic2.jar");
         verifyDiff(catOriginal, catUpdated, null, false);
     }
+
+    public void testEnableDROnEmptyTable() throws IOException {
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);" +
+                                 "\nPARTITION TABLE A ON COLUMN C1;");
+        builder.compile(testDir + File.separator + "dr1.jar");
+        Catalog catOriginal = catalogForJar(testDir +  File.separator + "dr1.jar");
+
+        builder.addLiteralSchema("\nDR TABLE A;");
+        builder.compile(testDir + File.separator + "dr2.jar");
+        Catalog catUpdated = catalogForJar(testDir + File.separator + "dr2.jar");
+        verifyDiffIfEmptyTable(catOriginal, catUpdated);
+    }
 }
