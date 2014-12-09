@@ -49,7 +49,6 @@
 #include "common/FatalException.hpp"
 #include "plannodes/aggregatenode.h"
 #include "plannodes/deletenode.h"
-#include "plannodes/distinctnode.h"
 #include "plannodes/indexscannode.h"
 #include "plannodes/indexcountnode.h"
 #include "plannodes/tablecountnode.h"
@@ -182,12 +181,6 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
         // ------------------------------------------------------------------
         case (voltdb::PLAN_NODE_TYPE_LIMIT):
             ret = new voltdb::LimitPlanNode();
-            break;
-        // ------------------------------------------------------------------
-        // Distinct
-        // ------------------------------------------------------------------
-        case (voltdb::PLAN_NODE_TYPE_DISTINCT):
-            ret = new voltdb::DistinctPlanNode();
             break;
         // ------------------------------------------------------------------
         // Receive

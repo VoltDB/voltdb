@@ -556,7 +556,7 @@ $(document).ready(function () {
         this.displayAdminConfiguration = function (adminConfigValues) {
             if (adminConfigValues != undefined) {
                 configureAdminValues(adminConfigValues);
-                configurePortValues(adminConfigValues);
+                configurePortAndOverviewValues(adminConfigValues);
                 configureDirectoryValues(adminConfigValues);
             }
         };
@@ -630,7 +630,6 @@ $(document).ready(function () {
             adminDOMObjects.exportOverflow.text(directoryConfigValues.exportOverflow);
             adminDOMObjects.commandLogPath.text(directoryConfigValues.commandLogPath);
             adminDOMObjects.commandLogSnapshotPath.text(directoryConfigValues.commandLogSnapshotPath);
-
         };
 
 
