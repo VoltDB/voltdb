@@ -274,6 +274,7 @@ public class HTTPAdminListener {
 
     // /profile handler
     class UserProfileHandler extends VoltRequestHandler {
+        private final ObjectMapper m_mapper = new ObjectMapper();
 
         // GET on /profile resources.
         @Override
@@ -291,12 +292,13 @@ public class HTTPAdminListener {
                 if (!authResult.isAuthenticated()) {
                     response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, authResult.m_message));
                 } else {
-                    ObjectMapper mapper = new ObjectMapper();
-                    String msg = mapper.writeValueAsString(new Profile(authResult.m_user, authResult.m_perms));
                     if (jsonp != null) {
-                        msg = String.format("%s( %s )", jsonp, msg);
+                        response.getWriter().write(jsonp + "(");
                     }
-                    response.getWriter().print(msg);
+                    m_mapper.writeValue(response.getWriter(), new Profile(authResult.m_user, authResult.m_perms));
+                    if (jsonp != null) {
+                        response.getWriter().write(")");
+                    }
                 }
                 baseRequest.setHandled(true);
             } catch (Exception ex) {
@@ -392,18 +394,19 @@ public class HTTPAdminListener {
                 }
 
                 //Authenticated and has ADMIN permission
-                String msg = null;
                 if (baseRequest.getRequestURI().contains("/download")) {
-                    msg = new String(getDeploymentBytes());
                     //Deployment xml is text/xml
                     response.setHeader("Content-Type", "text/xml");
+                    response.getWriter().write(new String(getDeploymentBytes()));
                 } else {
-                    msg = m_mapper.writeValueAsString(getDeployment());
+                    if (jsonp != null) {
+                        response.getWriter().write(jsonp + "(");
+                    }
+                    m_mapper.writeValue(response.getWriter(), getDeployment());
+                    if (jsonp != null) {
+                        response.getWriter().write(")");
+                    }
                 }
-                if (jsonp != null) {
-                    msg = String.format("%s( %s )", jsonp, msg);
-                }
-                response.getWriter().print(msg);
                 baseRequest.setHandled(true);
             } catch (Exception ex) {
               logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage(), ex);
