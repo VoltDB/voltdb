@@ -727,61 +727,28 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
     }
 
-    private void parseOrderColumn(VoltXMLElement orderByNode, boolean isDistributed) {
-        // make sure everything is kosher
-        assert(orderByNode.name.equalsIgnoreCase("orderby"));
+    private void parseOrderColumn(VoltXMLElement orderByNode, final boolean isDistributed) {
 
-        // get desc/asc
-        String desc = orderByNode.attributes.get("desc");
-        boolean descending = (desc != null) && (desc.equalsIgnoreCase("true"));
-
-        // get the columnref or other expression inside the orderby node
-        VoltXMLElement child = orderByNode.children.get(0);
-        assert(child != null);
-
-        // create the orderby column
-        ParsedColInfo order_col = new ParsedColInfo();
-        order_col.orderBy = true;
-        order_col.ascending = !descending;
+        // Aggregation list needs to be cleared before parsing the order by expression
         m_aggregationList.clear();
-        AbstractExpression order_exp = parseExpressionTree(child);
-        assert(order_exp != null);
-        if (isDistributed) {
-            order_exp = order_exp.replaceAVG();
-            updateAvgExpressions();
-        }
-        order_col.expression = order_exp;
-        ExpressionUtil.finalizeValueTypes(order_col.expression);
 
-        // Cases:
-        // child could be columnref, in which case it's just a normal column.
-        // Just make a ParsedColInfo object for it and the planner will do the right thing later
-        if (child.name.equals("columnref")) {
-            assert(order_exp instanceof TupleValueExpression);
-            TupleValueExpression tve = (TupleValueExpression) order_exp;
-            order_col.columnName = tve.getColumnName();
-            order_col.tableName = tve.getTableName();
-            order_col.tableAlias = tve.getTableAlias();
-            if (order_col.tableAlias == null) {
-                order_col.tableAlias = order_col.tableName;
+        ParsedColInfo.ExpressionAdjuster adjuster = new ParsedColInfo.ExpressionAdjuster() {
+            @Override
+            public AbstractExpression adjust(AbstractExpression expr) {
+                if (isDistributed) {
+                    expr = expr.replaceAVG();
+                    updateAvgExpressions();
+                }
+
+                ExpressionUtil.finalizeValueTypes(expr);
+                return expr;
             }
+        };
 
-            order_col.alias = tve.getColumnAlias();
-        } else {
-            String alias = child.attributes.get("alias");
-            order_col.alias = alias;
-            order_col.tableName = "VOLT_TEMP_TABLE";
-            order_col.tableAlias = "VOLT_TEMP_TABLE";
-            order_col.columnName = "";
-            // Replace its expression to TVE after we build the ExpressionIndexMap
+        ParsedColInfo order_col = ParsedColInfo.fromOrderByXml(this, orderByNode, adjuster);
 
-            if ((child.name.equals("operation") == false) &&
-                    (child.name.equals("aggregation") == false) &&
-                    (child.name.equals("function") == false)) {
-               throw new RuntimeException("ORDER BY parsed with strange child node type: " + child.name);
-           }
-        }
-
+        AbstractExpression order_exp = order_col.expression;
+        assert(order_exp != null);
         // Mark the order by column if it is in displayColumns
         // The ORDER BY column MAY be identical to a simple display column, in which case,
         // tagging the actual display column as being also an order by column
