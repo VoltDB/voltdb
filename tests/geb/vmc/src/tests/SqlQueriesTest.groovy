@@ -395,7 +395,7 @@ class SqlQueriesTest extends TestBase {
         if (error != null) {
             status  = 'FAILURE'
             qResult = 'ERROR'
-            debugPrint "actual error : " + error
+            debugPrint "actual error  : " + error
         }
         debugPrint "actual status : " + status
         debugPrint "query duration: " + duration
