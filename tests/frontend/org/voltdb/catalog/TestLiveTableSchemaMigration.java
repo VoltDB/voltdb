@@ -25,7 +25,6 @@ package org.voltdb.catalog;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Random;
 
 import junit.framework.TestCase;
 
@@ -75,10 +74,11 @@ public class TestLiveTableSchemaMigration extends TestCase {
     void migrateSchema(VoltTable t1, VoltTable t2, boolean withData) throws Exception {
         ServerThread server = null;
         Client client = null;
+        TableHelper helper = new TableHelper();
 
         try {
             if (withData) {
-                TableHelper.randomFill(t1, 1000, 1024, new Random(0));
+                helper.randomFill(t1, 1000, 1024);
             }
 
             String catPath1 = catalogPathForTable(t1, "t1.jar");
@@ -150,12 +150,13 @@ public class TestLiveTableSchemaMigration extends TestCase {
     {
         ServerThread server = null;
         Client client = null;
+        TableHelper helper = new TableHelper();
 
         try {
             String alterText = TableHelper.getAlterTableDDLToMigrate(t1, t2);
 
             if (withData) {
-                TableHelper.randomFill(t1, 1000, 1024, new Random(0));
+                helper.randomFill(t1, 1000, 1024);
             }
 
             String catPath1 = catalogPathForTable(t1, "t1.jar");
@@ -363,10 +364,11 @@ public class TestLiveTableSchemaMigration extends TestCase {
     //
     public void testRandomSchemas() throws Exception {
         int count = 15;
-        Random rand = new Random(0);
+        TableHelper helper = new TableHelper();
         for (int i = 0; i < count; i++) {
-            VoltTable t1 = TableHelper.getTotallyRandomTable("foo", rand);
-            VoltTable t2 = TableHelper.mutateTable(t1, true, rand);
+            TableHelper.RandomTable trt = helper.getTotallyRandomTable("foo");
+            VoltTable t1 = trt.table;
+            VoltTable t2 = helper.mutateTable(t1, true);
             migrateSchema(t1, t2);
             System.out.printf("testRandomSchemas tested %d/%d\n", i+1, count);
         }
@@ -374,10 +376,11 @@ public class TestLiveTableSchemaMigration extends TestCase {
 
     public void testRandomSchemasUsingAlter() throws Exception {
         int count = 15;
-        Random rand = new Random(0);
+        TableHelper helper = new TableHelper();
         for (int i = 0; i < count; i++) {
-            VoltTable t1 = TableHelper.getTotallyRandomTable("foo", rand);
-            VoltTable t2 = TableHelper.mutateTable(t1, true, rand);
+            TableHelper.RandomTable trt = helper.getTotallyRandomTable("foo");
+            VoltTable t1 = trt.table;
+            VoltTable t2 = helper.mutateTable(t1, true);
             migrateSchemaUsingAlter(t1, t2, true);
             System.out.printf("testRandomSchemasUsingAlter tested %d/%d\n", i+1, count);
         }

@@ -1039,7 +1039,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     /**
      * @param txnId
      * @param data
-     * @param table
+     * @param tableRep
      */
     @Override
     public byte[] loadTable(long txnId, long spHandle, int tableId,

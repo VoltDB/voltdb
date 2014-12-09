@@ -146,7 +146,6 @@ public class TestCatalogDiffs extends TestCase {
             Catalog catUpdated)
     {
         CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, catUpdated);
-        String originalSerialized = catOriginal.serialize();
         catOriginal.execute(diff.commands());
         String updatedOriginalSerialized = catOriginal.serialize();
         assertTrue(diff.supported());

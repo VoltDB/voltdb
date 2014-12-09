@@ -44,7 +44,7 @@ class TableLoader {
 
     final VoltTable table;
     final Client client;
-    final Random rand;
+    final TableHelper helper;
     final int pkeyColIndex;
     final String deleteCRUD;
     final String insertCRUD;
@@ -62,7 +62,9 @@ class TableLoader {
     TableLoader(Client client, VoltTable t, Random rand, int timeout) {
         this.table = t;
         this.client = client;
-        this.rand = rand;
+        TableHelper.Configuration helperConfig = new TableHelper.Configuration();
+        helperConfig.rand = rand;
+        this.helper = new TableHelper(helperConfig);
         this.timeout = timeout;
 
         // find the primary key
@@ -161,6 +163,7 @@ class TableLoader {
 
         log.info(_F("loadChunk | startPkey:%d stopPkey:%d", startPkey, stopPkey));
 
+        TableHelper.RandomRowMaker filler = helper.createRandomRowMaker(table, Integer.MAX_VALUE, false, true);
         long maxSentPkey = -1;
         hadError.set(false);
         for (long key = startPkey; key <= stopPkey; key++) {
@@ -169,7 +172,7 @@ class TableLoader {
                 return false;
             }
 
-            Object[] row = TableHelper.randomRow(table, Integer.MAX_VALUE, rand);
+            Object[] row = filler.randomRow();
             row[pkeyColIndex] = key;
             try {
                 outstandingPkeys.add(key);
