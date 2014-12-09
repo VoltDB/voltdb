@@ -505,7 +505,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
     }
 
     /**
-     * SELECT FROM WHERE OUTER IN (SELECT INNER ...) returning inner NULL.
+     * SELECT FROM WHERE OUTER IN(=ANY) (SELECT INNER ...) returning inner NULL.
      * If there is a match, IN evalueates to TRUE
      * If there is no match, IN evaluates to FASLE if the INNER result set is empty
      * If there is no match, IN evaluates to NULL if the INNER result set is not empty
@@ -517,7 +517,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
      * @throws IOException
      * @throws ProcCallException
      */
-    public void testSubExpressions_InnerNull() throws NoConnectionsException, IOException, ProcCallException
+    public void testINSubExpressions_InnerNull() throws NoConnectionsException, IOException, ProcCallException
     {
         Client client = getClient();
         VoltTable vt;
@@ -529,21 +529,33 @@ public class TestSubQueriesSuite extends RegressionSuite {
         client.callProcedure("R2.insert", 104,  1000,  2 , "2013-07-18 02:00:00.123457");
         client.callProcedure("R2.insert", 105,  1000,  2 , "2013-07-18 02:00:00.123457");
 
-        // There is an exact match, IN extression evaluates to TRUE
+        // There is an exact match, IN/ANY extression evaluates to TRUE
         vt = client.callProcedure("@AdHoc",
                 "select ID from R1 where (WAGE, DEPT) in " +
                 "( select WAGE, DEPT from R2 limit 6 offset 1) is true;").getResults()[0];
         validateTableOfLongs(vt, new long[][] {{100}});
+        vt = client.callProcedure("@AdHoc",
+                "select ID from R1 where (WAGE, DEPT) =ANY " +
+                "( select WAGE, DEPT from R2 limit 6 offset 1) is true;").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{100}});
 
-        // There is no match and inner result set is empty, , IN extression evaluates to FALSE
+        // There inner result set is empty, IN/ANY expression evaluates to FALSE
         vt = client.callProcedure("@AdHoc",
                 "select ID from R1 where (WAGE, DEPT) in " +
+                "( select WAGE, DEPT from R2 where ID = 0 limit 6 offset 1) is false;").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{100}});
+        vt = client.callProcedure("@AdHoc",
+                "select ID from R1 where (WAGE, DEPT) =ANY " +
                 "( select WAGE, DEPT from R2 where ID = 0 limit 6 offset 1) is false;").getResults()[0];
         validateTableOfLongs(vt, new long[][] {{100}});
 
         // There is no match, IN extression evaluates to NULL (non-empty inner result set)
         vt = client.callProcedure("@AdHoc",
                 "select ID from R1 where (WAGE, DEPT) in " +
+                "( select WAGE, DEPT from R2 where WAGE != 1000 or WAGE is NULL limit 4 offset 1);").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {});
+        vt = client.callProcedure("@AdHoc",
+                "select ID from R1 where (WAGE, DEPT) = ANY " +
                 "( select WAGE, DEPT from R2 where WAGE != 1000 or WAGE is NULL limit 4 offset 1);").getResults()[0];
         validateTableOfLongs(vt, new long[][] {});
 
@@ -567,10 +579,18 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "select ID from R1 where WAGE in " +
                 "( select WAGE from R2 where WAGE != 1000 limit 4 offset 1);").getResults()[0];
         validateTableOfLongs(vt, new long[][] {});
+        vt = client.callProcedure("@AdHoc",
+                "select ID from R1 where WAGE =ANY " +
+                "( select WAGE from R2 where WAGE != 1000 limit 4 offset 1);").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {});
 
         // There is a match, the inner result set doesn't have NULLs, The IN expression evaluates to FALSE
         vt = client.callProcedure("@AdHoc",
                 "select ID from R1 where WAGE in " +
+                "( select WAGE from R2 where WAGE != 1000 limit 6 offset 1) is false;").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{100}});
+        vt = client.callProcedure("@AdHoc",
+                "select ID from R1 where WAGE =ANY " +
                 "( select WAGE from R2 where WAGE != 1000 limit 6 offset 1) is false;").getResults()[0];
         validateTableOfLongs(vt, new long[][] {{100}});
 
@@ -600,15 +620,15 @@ public class TestSubQueriesSuite extends RegressionSuite {
     /**
      * SELECT FROM WHERE OUTER IN (SELECT INNER ...). The OUTER is NULL.
      * If there is a match, IN evalueates to TRUE
-     * If OUTRE is NULL and INNER result set is empty, the IN expression evaluates to FASLE
-     * If OUTRE is NULL and INNER result set is not empty, the IN expression evaluates to NULL
+     * If OUTER is NULL and INNER result set is empty, the IN expression evaluates to FASLE
+     * If OUTER is NULL and INNER result set is not empty, the IN expression evaluates to NULL
      * Need to keep OFFSET for the IN expressions
      * to prevent IN-to-EXISTS optimization
      * @throws NoConnectionsException
      * @throws IOException
      * @throws ProcCallException
      */
-    public void testSubExpressions_OuterNull() throws NoConnectionsException, IOException, ProcCallException
+    public void testANYSubExpressions_OuterNull() throws NoConnectionsException, IOException, ProcCallException
     {
         Client client = getClient();
         VoltTable vt;
@@ -619,15 +639,23 @@ public class TestSubQueriesSuite extends RegressionSuite {
         client.callProcedure("R2.insert", 202,  1001,  2 , "2013-07-18 02:00:00.123457");
         client.callProcedure("R2.insert", 203,  null,  2 , "2013-07-18 02:00:00.123457");
 
-        // R2.200 - the inner result set is not empty, the IN  expression is NULL
+        // R2.200 - the inner result set is not empty, the IN/ANY  expression is NULL
         vt = client.callProcedure("@AdHoc",
                 "select ID from R2 where WAGE in " +
+                "( select WAGE from R1 limit 4 offset 1) is false;").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{201}});
+        vt = client.callProcedure("@AdHoc",
+                "select ID from R2 where WAGE =ANY " +
                 "( select WAGE from R1 limit 4 offset 1) is false;").getResults()[0];
         validateTableOfLongs(vt, new long[][] {{201}});
 
         // R2.200 - the inner result set is not empty, the IN  expression is NULL
         vt = client.callProcedure("@AdHoc",
                 "select ID from R2 where WAGE in " +
+                "( select WAGE from R1 limit 4 offset 1) is true;").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{202}});
+        vt = client.callProcedure("@AdHoc",
+                "select ID from R2 where WAGE =ANY " +
                 "( select WAGE from R1 limit 4 offset 1) is true;").getResults()[0];
         validateTableOfLongs(vt, new long[][] {{202}});
 
@@ -646,6 +674,10 @@ public class TestSubQueriesSuite extends RegressionSuite {
         // R2.200 - the inner result set is empty, the IN expression is TRUE
         vt = client.callProcedure("@AdHoc",
                 "select ID from R2 where WAGE in " +
+                "( select WAGE from R1 where ID > 1000 limit 4 offset 1) is false;").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{200}, {201}, {202}, {203}});
+        vt = client.callProcedure("@AdHoc",
+                "select ID from R2 where WAGE =ANY " +
                 "( select WAGE from R1 where ID > 1000 limit 4 offset 1) is false;").getResults()[0];
         validateTableOfLongs(vt, new long[][] {{200}, {201}, {202}, {203}});
 
@@ -676,12 +708,153 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "( select WAGE from R2 limit 4 offset 1);").getResults()[0];
         System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] {{201}, {202}});
+        vt = client.callProcedure("@AdHoc",
+                "select ID from R2 RR2 where RR2.WAGE =ANY " +
+                "( select WAGE from R2 limit 4 offset 1);").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{201}, {202}});
 
         vt = client.callProcedure("@AdHoc",
                 "select ID from R2 where (WAGE in " +
                 "( select WAGE from R1 limit 4 offset 1)) is null;").getResults()[0];
         System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] {{200}, {203}});
+        vt = client.callProcedure("@AdHoc",
+                "select ID from R2 where (WAGE =ANY " +
+                "( select WAGE from R1 limit 4 offset 1)) is null;").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{200}, {203}});
+
+        // The outer expression is empty. The inner expression is not empty. The =ANY is NULL
+        vt = client.callProcedure("@AdHoc",
+                "select ID from R2 where ((select WAGE from R1 where ID = 0) =ANY " +
+                "( select WAGE from R2 limit 4 offset 1)) is null;").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{200}, {201}, {202}, {203}});
+
+        // The outer expression is empty. The inner expression is empty. The =ANY is FALSE
+        vt = client.callProcedure("@AdHoc",
+                "select ID from R2 where not (select WAGE from R1 where ID = 0) =ANY " +
+                "( select WAGE from R1 where ID = 0 limit 4 offset 1) ;").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{200}, {201}, {202}, {203}});
+
+    }
+
+    /**
+     * SELECT FROM WHERE OUTER = ALL (SELECT INNER ...) returning inner NULL.
+     * If inner_expr is empty => TRUE
+     * If inner_expr contains NULL and outer_expr OP inner_expr is TRUE for all other inner values => NULL
+     * If inner_expr contains NULL and outer_expr OP inner_expr is FALSE for some other inner values => FALSE
+     *
+     * @throws NoConnectionsException
+     * @throws IOException
+     * @throws ProcCallException
+     */
+    public void testALLSubExpressions_InnerNull() throws NoConnectionsException, IOException, ProcCallException
+    {
+        Client client = getClient();
+        VoltTable vt;
+        client.callProcedure("R1.insert", 100,  1000,  2 , "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 100,  null,  2 , "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 101,  null,  2 , "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 102,  1001,  2 , "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 103,  1003,  2 , "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 104,  1000,  2 , "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 105,  1000,  2 , "2013-07-18 02:00:00.123457");
+
+        // The inner_expr is empty => TRUE
+        vt = client.callProcedure("@AdHoc",
+                "select ID from R1 where (WAGE, DEPT) = ALL " +
+                "( select WAGE, DEPT from R2 where ID = 1000);").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{100}});
+        vt = client.callProcedure("@AdHoc",
+                "select ID from R1 where (select WAGE from R1) = ALL " +
+                "( select WAGE from R2 where ID = 1000);").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{100}});
+
+        // The inner set consists only of NULLs
+        vt = client.callProcedure("@AdHoc",
+                "select ID from R1 where WAGE = ALL " +
+                "( select WAGE from R2 where ID in (104, 105));").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{100}});
+        vt = client.callProcedure("@AdHoc",
+                "select ID from R1 where (WAGE,DEPT) = ALL " +
+                "( select WAGE, DEPT from R2 where ID in (104, 105));").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{100}});
+
+        // If inner_expr contains NULL and outer_expr OP inner_expr is TRUE
+        // for all other inner values => NULL
+        vt = client.callProcedure("@AdHoc",
+                "select ID from R1 where (WAGE = ALL " +
+                "( select WAGE from R2 where ID in (100, 104, 105))) is NULL;").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{100}});
+
+        if (!isHSQL()) {
+            // I think HSQL gets this one wrong evaluating the =ALL to FALSE instead of NULL.
+            // PostgreSQL agrees with us
+            vt = client.callProcedure("@AdHoc",
+                    "select ID from R1 where ((WAGE, DEPT) = ALL " +
+                    "( select WAGE, DEPT from R2 where ID in (100, 104, 105))) is NULL;").getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{100}});
+        }
+
+        // If inner_expr contains NULL and outer_expr OP inner_expr is FALSE
+        // for some other inner values => FALSE
+        if (!isHSQL()) {
+            // I think HSQL gets this one wrong evaluating the =ALL to NULL instead of FALSE.
+            // PostgreSQL agrees with us
+            vt = client.callProcedure("@AdHoc",
+                "select ID from R1 where not (WAGE = ALL ( select WAGE from R2));").getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{100}});
+        }
+    }
+
+    /**
+     * SELECT FROM WHERE OUTER = ALL (SELECT INNER ...). The OUTER is NULL.
+     * If outer_expr is NULL and inner_expr is empty => TRUE
+     * If outer_expr is NULL and inner_expr produces any row => NULL
+     * @throws NoConnectionsException
+     * @throws IOException
+     * @throws ProcCallException
+     */
+    public void testALLSubExpressions_OuterNull() throws NoConnectionsException, IOException, ProcCallException
+    {
+        Client client = getClient();
+        VoltTable vt;
+        client.callProcedure("R1.insert", 100,  1000,  2 , "2013-07-18 02:00:00.123457");
+        client.callProcedure("R1.insert", 101,  1001,  2 , "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 200,  null,  2 , "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 201,  2001,  2 , "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 202,  1001,  2 , "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 203,  null,  2 , "2013-07-18 02:00:00.123457");
+
+        // the inner result set is empty, the =ALL  expression is TRUE
+        vt = client.callProcedure("@AdHoc",
+                "select ID from R2 where WAGE =ALL " +
+                "( select WAGE from R1 where ID = 1000) ;").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{200}, {201}, {202}, {203}});
+
+        vt = client.callProcedure("@AdHoc",
+                "select ID from R2 where (ID,WAGE) =ALL " +
+                "( select ID,WAGE from R1 where ID = 1000) ;").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{200}, {201}, {202}, {203}});
+
+        // the inner result set is empty, the =ALL  expression is TRUE
+        vt = client.callProcedure("@AdHoc",
+                "select ID from R2 where (select WAGE from R1 where ID = 1000) =ALL " +
+                "( select WAGE from R1 where ID = 1000) ;").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{200}, {201}, {202}, {203}});
+
+        //  the outer_expr is NULL and inner_expr is not empty => NULL
+        vt = client.callProcedure("@AdHoc",
+                "select ID from R2 where ID = 200 and (WAGE =ALL " +
+                "( select WAGE from R1)) is  null ;").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{200}});
+        if (!isHSQL()) {
+            // I think HSQL gets this one wrong evaluating the =ALL to FALSE instead of NULL.
+            // PostgreSQL agrees with us
+            vt = client.callProcedure("@AdHoc",
+                "select ID from R2 where ID = 200 and ((ID,WAGE) =ALL " +
+                "( select ID, WAGE from R1)) is  null ;").getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{200}});
+        }
     }
 
     // Test subqueries on partitioned table cases
@@ -808,6 +981,22 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] { {1} });
 
+        // Different comparison operators
+        vt = client.callProcedure("@AdHoc",
+                "select R1.ID FROM R1 where R1.DEPT > (SELECT DEPT FROM R2 where ID = 3);").getResults()[0];
+                System.out.println(vt.toString());
+        validateTableOfLongs(vt, new long[][] { {4}, {5} });
+
+        vt = client.callProcedure("@AdHoc",
+                "select R1.ID FROM R1 where (SELECT DEPT FROM R2 where ID = 3) != R1.DEPT;").getResults()[0];
+                System.out.println(vt.toString());
+        validateTableOfLongs(vt, new long[][] { {4}, {5} });
+
+        vt = client.callProcedure("@AdHoc",
+                "select R1.ID FROM R1 where R1.DEPT >= ALL (SELECT DEPT FROM R2);").getResults()[0];
+                System.out.println(vt.toString());
+        validateTableOfLongs(vt, new long[][] { {4}, {5} });
+
         // NLIJ
         vt = client.callProcedure("@AdHoc",
                 "select R1.ID, R2.ID FROM R1, R2 where R1.DEPT = R2.DEPT + (SELECT DEPT FROM R2 where ID = ?) limit 1;", 1).getResults()[0];
@@ -866,14 +1055,52 @@ public class TestSubQueriesSuite extends RegressionSuite {
     public void testWhereRowSubSelects() throws NoConnectionsException, IOException, ProcCallException
     {
         Client client = getClient();
-        loadData(client);
+        client.callProcedure("R1.insert", 1,   5,  1 , "2013-06-18 02:00:00.123457");
+        client.callProcedure("R1.insert", 2,  10,  1 , "2013-06-18 02:00:00.123457");
+        client.callProcedure("R1.insert", 3,  10,  2 , "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 3,   5,  1 , "2013-07-18 10:40:01.123457");
+        client.callProcedure("R2.insert", 4,  10,  1 , "2013-08-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 5,  10,  1 , "2013-08-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 6,  10,  2 , "2013-08-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 7,  50,  2 , "2013-09-18 02:00:00.123457");
         VoltTable vt;
 
         if (!isHSQL()) {
             vt = client.callProcedure("@AdHoc",
-                    "select R1.ID FROM R1 where (R1.DEPT, R1.WAGE) = (SELECT DEPT, WAGE FROM R2 where ID = ?);", 2).getResults()[0];
+                    "select R1.ID FROM R1 where (R1.WAGE, R1.DEPT) = (SELECT WAGE, DEPT FROM R2 where ID = ?);", 4).getResults()[0];
             System.out.println(vt.toString());
             validateTableOfLongs(vt, new long[][] { {2} });
+
+            vt = client.callProcedure("@AdHoc",
+                    "select R1.ID FROM R1 where (R1.WAGE, R1.DEPT) =ALL (SELECT WAGE, DEPT FROM R2 where ID in (4,5));").getResults()[0];
+            System.out.println(vt.toString());
+            validateTableOfLongs(vt, new long[][] { {2} });
+
+            vt = client.callProcedure("@AdHoc",
+                    "select R1.ID FROM R1 where (R1.WAGE, R1.DEPT) =ALL (SELECT WAGE, DEPT FROM R2);").getResults()[0];
+            System.out.println(vt.toString());
+            validateTableOfLongs(vt, new long[][] { });
+
+            vt = client.callProcedure("@AdHoc",
+                    "select R1.ID FROM R1 where (R1.WAGE, R1.DEPT) = (SELECT WAGE, DEPT FROM R2 where ID = ?);", 4).getResults()[0];
+            System.out.println(vt.toString());
+            validateTableOfLongs(vt, new long[][] { {2} });
+
+            vt = client.callProcedure("@AdHoc",
+                    "select R1.ID FROM R1 where ID = 3 and (R1.WAGE, R1.DEPT) >= ALL (SELECT WAGE, DEPT FROM R2 where ID < ?);", 7).getResults()[0];
+            System.out.println(vt.toString());
+            validateTableOfLongs(vt, new long[][] { {3} });
+
+            vt = client.callProcedure("@AdHoc",
+                    "select R1.ID FROM R1 where (R1.WAGE, R1.DEPT) >= ALL (SELECT WAGE, DEPT FROM R2);").getResults()[0];
+            System.out.println(vt.toString());
+            validateTableOfLongs(vt, new long[][] { });
+
+            vt = client.callProcedure("@AdHoc",
+                    "select R1.ID FROM R1 where (R1.DEPT, R1.TM) >= ALL (SELECT DEPT, TM FROM R2);").getResults()[0];
+            System.out.println(vt.toString());
+            validateTableOfLongs(vt, new long[][] { {3} });
+
         }
     }
 

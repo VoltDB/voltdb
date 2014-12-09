@@ -210,13 +210,22 @@ private:
 template <typename OP, typename ValueExtractorOuter, typename ValueExtractorInner>
 NValue VectorComparisonExpression<OP, ValueExtractorOuter, ValueExtractorInner>::eval(const TableTuple *tuple1, const TableTuple *tuple2) const
 {
-    // Outer expression can be either a row (expr1, expr2, expr3...) or a single expr
-    // Inner expression is a select subquery
-    // The outer_expr OP (SELECT inner_expr ...) evaluates as follows:
+    // Outer and inner expressions can be either a row (expr1, expr2, expr3...) or a single expr
+    // The quantifier is expected on the right side of the expression "outer_expr OP ANY/ALL(inner_expr )"
+
+    // The outer_expr OP ANY inner_expr evaluates as follows:
     // There is an exact match OP (outer_expr, inner_expr) == true => TRUE
     // There no match and the inner_expr produces a row where inner_expr is NULL => NULL
     // There no match and the inner_expr produces only non- NULL rows or empty => FASLE
     // The outer_expr is NULL or empty and the inner_expr is empty => FASLE
+    // The outer_expr is NULL or empty and the inner_expr produces any row => NULL
+
+    // The outer_expr OP ALL inner_expr evaluates as follows:
+    // If inner_expr is empty => TRUE
+    // If outer_expr OP inner_expr is TRUE for all inner_expr values => TRUE
+    // If inner_expr contains NULL and outer_expr OP inner_expr is TRUE for all other inner values => NULL
+    // If inner_expr contains NULL and outer_expr OP inner_expr is FALSE for some other inner values => FALSE
+    // The outer_expr is NULL or empty and the inner_expr is empty => TRUE
     // The outer_expr is NULL or empty and the inner_expr produces any row => NULL
 
     // Evaluate the outer_expr. The return value can be either the value itself or a subquery id
@@ -242,6 +251,11 @@ NValue VectorComparisonExpression<OP, ValueExtractorOuter, ValueExtractorInner>:
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
     }
 
+    if (innerExtractor.resultSize() == 0)
+    {
+        return (m_quantifier == QUANTIFIER_TYPE_ALL) ? NValue::getTrue() : NValue::getFalse();
+    }
+
     if (!outerExtractor.hasNext() || outerExtractor.hasNullValue()) {
         NValue retval = NValue::getFalse();
         if (innerExtractor.resultSize() > 0) {
@@ -256,7 +270,6 @@ NValue VectorComparisonExpression<OP, ValueExtractorOuter, ValueExtractorInner>:
     //  ALL qualifier - the first mismatch
     int tuple_ctr = 0;
     bool hasInnerNull = false;
-    bool hasMatch = false;
     while (innerExtractor.hasNext())
     {
         ++tuple_ctr;
@@ -267,8 +280,7 @@ NValue VectorComparisonExpression<OP, ValueExtractorOuter, ValueExtractorInner>:
             continue;
         }
         if (outerExtractor.template compare<OP>(OP(), innerValue)) {
-            hasMatch = true;
-            if (m_quantifier == QUANTIFIER_TYPE_ANY) {
+            if (m_quantifier != QUANTIFIER_TYPE_ALL) {
                 return NValue::getTrue();
             }
         } else if (m_quantifier == QUANTIFIER_TYPE_ALL) {
@@ -276,16 +288,12 @@ NValue VectorComparisonExpression<OP, ValueExtractorOuter, ValueExtractorInner>:
         }
     }
 
-    if (hasMatch) {
-        return NValue::getTrue();
-    } else {
-        // No match
-        NValue retval = NValue::getFalse();
-        if (hasInnerNull == true) {
-            retval.setNull();
-        }
-        return retval;
+    NValue retval = (m_quantifier == QUANTIFIER_TYPE_ALL) ? NValue::getTrue() : NValue::getFalse();
+    if (hasInnerNull == true)
+    {
+        retval.setNull();
     }
+    return retval;
 }
 
 // Compares two tuples column by column using lexicographical compare. The OP predicate
