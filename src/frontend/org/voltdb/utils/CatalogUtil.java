@@ -1387,6 +1387,15 @@ public abstract class CatalogUtil {
         }
     }
 
+    /**
+     * Retrieve the catalog and deployment configuration from zookeeper.
+     * NOTE: In general, people who want the catalog and/or deployment should
+     * be getting it from the current CatalogContext, available from
+     * VoltDB.instance().  This is primarily for startup and for use by
+     * @UpdateApplicationCatalog.  If you think this is where you need to
+     * be getting catalog or deployment from, consider carefully if that's
+     * really what you want to do. --izzy 12/8/2014
+     */
     public static CatalogAndIds getCatalogFromZK(ZooKeeper zk) throws KeeperException, InterruptedException {
         ByteBuffer versionAndBytes =
                 ByteBuffer.wrap(zk.getData(VoltZK.catalogbytes, false, null));
