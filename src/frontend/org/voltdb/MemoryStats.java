@@ -81,6 +81,7 @@ public class MemoryStats extends StatsSource {
         columns.add(new VoltTable.ColumnInfo("TUPLECOUNT", VoltType.BIGINT));
         columns.add(new VoltTable.ColumnInfo("POOLEDMEMORY", VoltType.BIGINT));
         columns.add(new VoltTable.ColumnInfo("PHYSICALMEMORY", VoltType.BIGINT));
+        columns.add(new VoltTable.ColumnInfo("JAVAMAXHEAP", VoltType.INTEGER));
     }
 
     @Override
@@ -117,6 +118,7 @@ public class MemoryStats extends StatsSource {
         rowValues[columnNameToIndex.get("POOLEDMEMORY")] = totals.pooledMem / 1024;
         //in kb to make math simpler with other mem values.
         rowValues[columnNameToIndex.get("PHYSICALMEMORY")] = PlatformProperties.getPlatformProperties().ramInMegabytes * 1024;
+        rowValues[columnNameToIndex.get("JAVAMAXHEAP")] = Runtime.getRuntime().maxMemory() / 1024;
         super.updateStatsRow(rowKey, rowValues);
     }
 

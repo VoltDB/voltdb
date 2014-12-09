@@ -98,11 +98,6 @@ class TheHashinator;
 
 const int64_t DEFAULT_TEMP_TABLE_MEMORY = 1024 * 1024 * 100;
 
-/** A constant only being used temporarily for testing purposes
- * for the LIMIT PARTITION ROWS EXECUTE DELETE fragment
- */
-const int64_t MAGIC_PURGE_FRAGMENT_ID = 9223372036854775807LL; // 2^63 - 1
-
 /**
  * Represents an Execution Engine which holds catalog objects (i.e. table) and executes
  * plans on the objects. Every operation starts from this object.
@@ -367,6 +362,14 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         void rebuildTableCollections();
 
+        int64_t tempTableMemoryLimit() const {
+            return m_tempTableMemoryLimit;
+        }
+
+        int64_t tempTableLogLimit() const {
+            return (m_tempTableMemoryLimit * 3) / 4;
+        }
+
     private:
         /*
          * Tasks dispatched by executeTask
@@ -379,7 +382,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // Initialization Functions
         // -------------------------------------------------
         void processCatalogDeletes(int64_t timestamp);
-        void initMaterializedViews();
+        void initMaterializedViewsAndLimitDeletePlans();
         bool updateCatalogDatabaseReference();
 
         /**

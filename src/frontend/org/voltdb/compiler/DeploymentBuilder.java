@@ -55,12 +55,12 @@ public class DeploymentBuilder {
     public static final class UserInfo {
         public final String name;
         public String password;
-        private final String groups[];
+        private final String roles[];
 
-        public UserInfo (final String name, final String password, final String groups[]){
+        public UserInfo (final String name, final String password, final String roles[]){
             this.name = name;
             this.password = password;
-            this.groups = groups;
+            this.roles = roles;
         }
 
         @Override
@@ -423,15 +423,15 @@ public class DeploymentBuilder {
                 user.setName(info.name);
                 user.setPassword(info.password);
 
-                // build up user/@groups.
-                if (info.groups.length > 0) {
-                    final StringBuilder groups = new StringBuilder();
-                    for (final String group : info.groups) {
-                        if (groups.length() > 0)
-                            groups.append(",");
-                        groups.append(group.toLowerCase());
+                // build up user/roles.
+                if (info.roles.length > 0) {
+                    final StringBuilder roles = new StringBuilder();
+                    for (final String role : info.roles) {
+                        if (roles.length() > 0)
+                            roles.append(",");
+                        roles.append(role.toLowerCase());
                     }
-                    user.setGroups(groups.toString());
+                    user.setRoles(roles.toString());
                 }
             }
         }

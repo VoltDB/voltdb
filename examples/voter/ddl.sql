@@ -64,9 +64,9 @@ AS
 exec @UpdateClasses voter-procs.jar '';
 
 -- stored procedures
-CREATE PROCEDURE FROM CLASS voter.procedures.Initialize;
-CREATE PROCEDURE FROM CLASS voter.procedures.Results;
-CREATE PROCEDURE FROM CLASS voter.procedures.Vote;
+CREATE PROCEDURE FROM CLASS voter.Initialize;
+CREATE PROCEDURE FROM CLASS voter.Results;
+CREATE PROCEDURE FROM CLASS voter.Vote;
 PARTITION PROCEDURE Vote ON TABLE votes COLUMN phone_number;
-CREATE PROCEDURE FROM CLASS voter.procedures.ContestantWinningStates;
-CREATE PROCEDURE FROM CLASS voter.procedures.GetStateHeatmap;
+CREATE PROCEDURE FROM CLASS voter.ContestantWinningStates;
+CREATE PROCEDURE FROM CLASS voter.GetStateHeatmap;

@@ -29,7 +29,6 @@ import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
 
@@ -156,10 +155,8 @@ public class AsyncCompilerAgentHelper
 
             // Retrieve the original deployment string, if necessary
             if (deploymentString == null) {
-                // Go get the deployment string from ZK.  Hope it's there and up-to-date.  Yeehaw!
-                CatalogAndIds catalogStuff =
-                    CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
-                byte[] deploymentBytes = catalogStuff.deploymentBytes;
+                // Go get the deployment string from the current catalog context
+                byte[] deploymentBytes = context.deploymentBytes;
                 if (deploymentBytes != null) {
                     deploymentString = new String(deploymentBytes, "UTF-8");
                 }
@@ -170,9 +167,10 @@ public class AsyncCompilerAgentHelper
                 }
             }
 
-            long result = CatalogUtil.compileDeploymentString(newCatalog, deploymentString, false, false);
-            if (result < 0) {
-                retval.errorMsg = "Unable to update deployment configuration; see the server logs for more details.";
+            String result =
+                CatalogUtil.compileDeploymentString(newCatalog, deploymentString, false);
+            if (result != null) {
+                retval.errorMsg = "Unable to update deployment configuration: " + result;
                 return retval;
             }
 
