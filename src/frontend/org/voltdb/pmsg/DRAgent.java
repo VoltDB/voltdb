@@ -4529,6 +4529,10 @@ public final class DRAgent {
     // optional fixed64 catalogCRC = 3;
     boolean hasCatalogCRC();
     long getCatalogCRC();
+    
+    // optional string catalogSignature = 4;
+    boolean hasCatalogSignature();
+    String getCatalogSignature();
   }
   public static final class NodeInfo extends
       com.google.protobuf.GeneratedMessage
@@ -4611,10 +4615,43 @@ public final class DRAgent {
       return catalogCRC_;
     }
     
+    // optional string catalogSignature = 4;
+    public static final int CATALOGSIGNATURE_FIELD_NUMBER = 4;
+    private java.lang.Object catalogSignature_;
+    public boolean hasCatalogSignature() {
+      return ((bitField0_ & 0x00000008) == 0x00000008);
+    }
+    public String getCatalogSignature() {
+      java.lang.Object ref = catalogSignature_;
+      if (ref instanceof String) {
+        return (String) ref;
+      } else {
+        com.google.protobuf.ByteString bs = 
+            (com.google.protobuf.ByteString) ref;
+        String s = bs.toStringUtf8();
+        if (com.google.protobuf.Internal.isValidUtf8(bs)) {
+          catalogSignature_ = s;
+        }
+        return s;
+      }
+    }
+    private com.google.protobuf.ByteString getCatalogSignatureBytes() {
+      java.lang.Object ref = catalogSignature_;
+      if (ref instanceof String) {
+        com.google.protobuf.ByteString b = 
+            com.google.protobuf.ByteString.copyFromUtf8((String) ref);
+        catalogSignature_ = b;
+        return b;
+      } else {
+        return (com.google.protobuf.ByteString) ref;
+      }
+    }
+    
     private void initFields() {
       hostname_ = "";
       drport_ = 0;
       catalogCRC_ = 0L;
+      catalogSignature_ = "";
     }
     private byte memoizedIsInitialized = -1;
     public final boolean isInitialized() {
@@ -4637,6 +4674,9 @@ public final class DRAgent {
       if (((bitField0_ & 0x00000004) == 0x00000004)) {
         output.writeFixed64(3, catalogCRC_);
       }
+      if (((bitField0_ & 0x00000008) == 0x00000008)) {
+        output.writeBytes(4, getCatalogSignatureBytes());
+      }
       getUnknownFields().writeTo(output);
     }
     
@@ -4657,6 +4697,10 @@ public final class DRAgent {
       if (((bitField0_ & 0x00000004) == 0x00000004)) {
         size += com.google.protobuf.CodedOutputStream
           .computeFixed64Size(3, catalogCRC_);
+      }
+      if (((bitField0_ & 0x00000008) == 0x00000008)) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeBytesSize(4, getCatalogSignatureBytes());
       }
       size += getUnknownFields().getSerializedSize();
       memoizedSerializedSize = size;
@@ -4788,6 +4832,8 @@ public final class DRAgent {
         bitField0_ = (bitField0_ & ~0x00000002);
         catalogCRC_ = 0L;
         bitField0_ = (bitField0_ & ~0x00000004);
+        catalogSignature_ = "";
+        bitField0_ = (bitField0_ & ~0x00000008);
         return this;
       }
       
@@ -4838,6 +4884,10 @@ public final class DRAgent {
           to_bitField0_ |= 0x00000004;
         }
         result.catalogCRC_ = catalogCRC_;
+        if (((from_bitField0_ & 0x00000008) == 0x00000008)) {
+          to_bitField0_ |= 0x00000008;
+        }
+        result.catalogSignature_ = catalogSignature_;
         result.bitField0_ = to_bitField0_;
         onBuilt();
         return result;
@@ -4862,6 +4912,9 @@ public final class DRAgent {
         }
         if (other.hasCatalogCRC()) {
           setCatalogCRC(other.getCatalogCRC());
+        }
+        if (other.hasCatalogSignature()) {
+          setCatalogSignature(other.getCatalogSignature());
         }
         this.mergeUnknownFields(other.getUnknownFields());
         return this;
@@ -4907,6 +4960,11 @@ public final class DRAgent {
             case 25: {
               bitField0_ |= 0x00000004;
               catalogCRC_ = input.readFixed64();
+              break;
+            }
+            case 34: {
+              bitField0_ |= 0x00000008;
+              catalogSignature_ = input.readBytes();
               break;
             }
           }
@@ -4991,6 +5049,42 @@ public final class DRAgent {
         catalogCRC_ = 0L;
         onChanged();
         return this;
+      }
+      
+      // optional string catalogSignature = 4;
+      private java.lang.Object catalogSignature_ = "";
+      public boolean hasCatalogSignature() {
+        return ((bitField0_ & 0x00000008) == 0x00000008);
+      }
+      public String getCatalogSignature() {
+        java.lang.Object ref = catalogSignature_;
+        if (!(ref instanceof String)) {
+          String s = ((com.google.protobuf.ByteString) ref).toStringUtf8();
+          catalogSignature_ = s;
+          return s;
+        } else {
+          return (String) ref;
+        }
+      }
+      public Builder setCatalogSignature(String value) {
+        if (value == null) {
+    throw new NullPointerException();
+  }
+  bitField0_ |= 0x00000008;
+        catalogSignature_ = value;
+        onChanged();
+        return this;
+      }
+      public Builder clearCatalogSignature() {
+        bitField0_ = (bitField0_ & ~0x00000008);
+        catalogSignature_ = getDefaultInstance().getCatalogSignature();
+        onChanged();
+        return this;
+      }
+      void setCatalogSignature(com.google.protobuf.ByteString value) {
+        bitField0_ |= 0x00000008;
+        catalogSignature_ = value;
+        onChanged();
       }
       
       // @@protoc_insertion_point(builder_scope:pmsg.NodeInfo)
@@ -7620,28 +7714,29 @@ public final class DRAgent {
       "ype\030\n \001(\0162\027.pmsg.CtrlEnvelope.Type\"i\n\017Re" +
       "plicationMode\022\010\n\004IDLE\020\001\022\026\n\022SYNCING_REPLI",
       "CATED\020\002\022\027\n\023SYNCING_PARTITIONED\020\003\022\n\n\006ACTI" +
-      "VE\020\004\022\017\n\013UNAVAILABLE\020\005\"@\n\010NodeInfo\022\020\n\010hos" +
+      "VE\020\004\022\017\n\013UNAVAILABLE\020\005\"Z\n\010NodeInfo\022\020\n\010hos" +
       "tname\030\001 \001(\t\022\016\n\006drport\030\002 \001(\005\022\022\n\ncatalogCR" +
-      "C\030\003 \001(\006\"\227\002\n\rPartitionInfo\022\023\n\013partitionId" +
-      "\030\001 \001(\005\022\031\n\021lastSentTimestamp\030\002 \001(\006\022\030\n\020low" +
-      "estTupleIndex\030\003 \001(\003\022\032\n\022lastSentTupleInde" +
-      "x\030\004 \001(\003\022\027\n\017totalTupleCount\030\005 \001(\003\022\036\n\026outs" +
-      "tandingBufferCount\030\006 \001(\003\022\034\n\024outstandingB" +
-      "yteCount\030\007 \001(\003\022\020\n\010isPaused\030\010 \001(\010\022\020\n\010isSy" +
-      "nced\030\t \001(\010\022\024\n\014nextUniqueId\030\n \001(\003\022\017\n\007isEn",
-      "ded\030\013 \001(\010\"\315\003\n\014CtrlEnvelope\022%\n\004type\030\001 \002(\016" +
-      "2\027.pmsg.CtrlEnvelope.Type\022\026\n\002id\030\002 \002(\0132\n." +
-      "pmsg.UUID\022\026\n\003ack\030\003 \001(\0132\t.pmsg.Ack\022\032\n\005res" +
-      "et\030\004 \001(\0132\013.pmsg.Reset\022\032\n\005pause\030\005 \001(\0132\013.p" +
-      "msg.Pause\022 \n\010response\030\006 \001(\0132\016.pmsg.Respo" +
-      "nse\022&\n\013snapshotReq\030\007 \001(\0132\021.pmsg.Snapshot" +
-      "Req\022\"\n\tsubscribe\030\010 \001(\0132\017.pmsg.Subscribe\022" +
-      " \n\010eventAck\030\t \001(\0132\016.pmsg.EventAck\"\235\001\n\004Ty" +
-      "pe\022\007\n\003ACK\020\001\022\t\n\005RESET\020\002\022\t\n\005PAUSE\020\003\022\t\n\005QUE" +
-      "RY\020\004\022\014\n\010RESPONSE\020\005\022\020\n\014SNAPSHOT_REQ\020\006\022\021\n\r",
-      "SNAPSHOT_TERM\020\007\022\r\n\tSTOP_SYNC\020\010\022\013\n\007CONNEC" +
-      "T\020\t\022\r\n\tSUBSCRIBE\020\n\022\r\n\tEVENT_ACK\020\013B\032\n\017org" +
-      ".voltdb.pmsgB\007DRAgent"
+      "C\030\003 \001(\006\022\030\n\020catalogSignature\030\004 \001(\t\"\227\002\n\rPa" +
+      "rtitionInfo\022\023\n\013partitionId\030\001 \001(\005\022\031\n\021last" +
+      "SentTimestamp\030\002 \001(\006\022\030\n\020lowestTupleIndex\030" +
+      "\003 \001(\003\022\032\n\022lastSentTupleIndex\030\004 \001(\003\022\027\n\017tot" +
+      "alTupleCount\030\005 \001(\003\022\036\n\026outstandingBufferC" +
+      "ount\030\006 \001(\003\022\034\n\024outstandingByteCount\030\007 \001(\003" +
+      "\022\020\n\010isPaused\030\010 \001(\010\022\020\n\010isSynced\030\t \001(\010\022\024\n\014",
+      "nextUniqueId\030\n \001(\003\022\017\n\007isEnded\030\013 \001(\010\"\315\003\n\014" +
+      "CtrlEnvelope\022%\n\004type\030\001 \002(\0162\027.pmsg.CtrlEn" +
+      "velope.Type\022\026\n\002id\030\002 \002(\0132\n.pmsg.UUID\022\026\n\003a" +
+      "ck\030\003 \001(\0132\t.pmsg.Ack\022\032\n\005reset\030\004 \001(\0132\013.pms" +
+      "g.Reset\022\032\n\005pause\030\005 \001(\0132\013.pmsg.Pause\022 \n\010r" +
+      "esponse\030\006 \001(\0132\016.pmsg.Response\022&\n\013snapsho" +
+      "tReq\030\007 \001(\0132\021.pmsg.SnapshotReq\022\"\n\tsubscri" +
+      "be\030\010 \001(\0132\017.pmsg.Subscribe\022 \n\010eventAck\030\t " +
+      "\001(\0132\016.pmsg.EventAck\"\235\001\n\004Type\022\007\n\003ACK\020\001\022\t\n" +
+      "\005RESET\020\002\022\t\n\005PAUSE\020\003\022\t\n\005QUERY\020\004\022\014\n\010RESPON",
+      "SE\020\005\022\020\n\014SNAPSHOT_REQ\020\006\022\021\n\rSNAPSHOT_TERM\020" +
+      "\007\022\r\n\tSTOP_SYNC\020\010\022\013\n\007CONNECT\020\t\022\r\n\tSUBSCRI" +
+      "BE\020\n\022\r\n\tEVENT_ACK\020\013B\032\n\017org.voltdb.pmsgB\007" +
+      "DRAgent"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
       new com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner() {
@@ -7717,7 +7812,7 @@ public final class DRAgent {
           internal_static_pmsg_NodeInfo_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_pmsg_NodeInfo_descriptor,
-              new java.lang.String[] { "Hostname", "Drport", "CatalogCRC", },
+              new java.lang.String[] { "Hostname", "Drport", "CatalogCRC", "CatalogSignature", },
               org.voltdb.pmsg.DRAgent.NodeInfo.class,
               org.voltdb.pmsg.DRAgent.NodeInfo.Builder.class);
           internal_static_pmsg_PartitionInfo_descriptor =

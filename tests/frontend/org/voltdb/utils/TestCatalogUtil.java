@@ -25,11 +25,14 @@ package org.voltdb.utils;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.SortedSet;
 
 import junit.framework.TestCase;
 
+import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
@@ -42,6 +45,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
+import org.voltdb.catalog.TestCatalogDiffs;
 import org.voltdb.catalog.User;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -928,5 +932,116 @@ public class TestCatalogUtil extends TestCase {
         assertTrue("Deployment file failed to parse", crc != -1);
 
         assertTrue(catalog.getClusters().get("cluster").getDrmasterhost().isEmpty());
+    }
+
+    public void testDRTableSignatureCrc() throws IOException
+    {
+        // No DR tables, CRC should be 0
+        assertEquals(Pair.of(0l, ""), CatalogUtil.calculateDrTableSignatureAndCrc(catalog_db));
+
+        // Replicated tables cannot be DRed for now, so they are always skipped in the catalog compilation.
+        // Add replicated tables to the test once we start supporting them.
+
+        // Different order should match
+        verifyDrTableSignature(true,
+                               "CREATE TABLE A (C1 INTEGER NOT NULL, C2 TIMESTAMP NOT NULL); PARTITION TABLE A ON COLUMN C1;\n" +
+                               "CREATE TABLE B (C1 BIGINT NOT NULL, C2 SMALLINT NOT NULL); PARTITION TABLE B ON COLUMN C1;\n" +
+                               "CREATE TABLE C (C1 TINYINT NOT NULL, C2 VARCHAR(3) NOT NULL); PARTITION TABLE C ON COLUMN C1;\n" +
+                               "DR TABLE *;\n",
+                               "CREATE TABLE C (C1 TINYINT NOT NULL, C2 VARCHAR(3) NOT NULL); PARTITION TABLE C ON COLUMN C1;\n" +
+                               "CREATE TABLE A (C1 INTEGER NOT NULL, C2 TIMESTAMP NOT NULL); PARTITION TABLE A ON COLUMN C1;\n" +
+                               "CREATE TABLE B (C1 BIGINT NOT NULL, C2 SMALLINT NOT NULL); PARTITION TABLE B ON COLUMN C1;\n" +
+                               "DR TABLE *;\n");
+
+        // Missing one table
+        verifyDrTableSignature(false,
+                               "CREATE TABLE A (C1 INTEGER NOT NULL, C2 TIMESTAMP NOT NULL); PARTITION TABLE A ON COLUMN C1;\n" +
+                               "CREATE TABLE B (C1 BIGINT NOT NULL, C2 SMALLINT NOT NULL); PARTITION TABLE B ON COLUMN C1;\n" +
+                               "CREATE TABLE C (C1 TINYINT NOT NULL, C2 VARCHAR(3) NOT NULL); PARTITION TABLE C ON COLUMN C1;\n" +
+                               "DR TABLE *;\n",
+                               "CREATE TABLE A (C1 INTEGER NOT NULL, C2 TIMESTAMP NOT NULL); PARTITION TABLE A ON COLUMN C1;\n" +
+                               "CREATE TABLE B (C1 BIGINT NOT NULL, C2 SMALLINT NOT NULL); PARTITION TABLE B ON COLUMN C1;\n" +
+                               "DR TABLE *;\n");
+
+        // Different column type
+        verifyDrTableSignature(false,
+                               "CREATE TABLE A (C1 INTEGER NOT NULL, C2 TIMESTAMP NOT NULL); PARTITION TABLE A ON COLUMN C1;\n" +
+                               "CREATE TABLE B (C1 BIGINT NOT NULL, C2 FLOAT NOT NULL); PARTITION TABLE B ON COLUMN C1;\n" +
+                               "CREATE TABLE C (C1 TINYINT NOT NULL, C2 VARCHAR(3) NOT NULL); PARTITION TABLE C ON COLUMN C1;\n" +
+                               "DR TABLE *;\n",
+                               "CREATE TABLE C (C1 TINYINT NOT NULL, C2 VARCHAR(3) NOT NULL); PARTITION TABLE C ON COLUMN C1;\n" +
+                               "CREATE TABLE A (C1 INTEGER NOT NULL, C2 TIMESTAMP NOT NULL); PARTITION TABLE A ON COLUMN C1;\n" +
+                               "CREATE TABLE B (C1 BIGINT NOT NULL, C2 SMALLINT NOT NULL); PARTITION TABLE B ON COLUMN C1;\n" +
+                               "DR TABLE *;\n");
+    }
+
+    private void verifyDrTableSignature(boolean shouldEqual, String schemaA, String schemaB) throws IOException
+    {
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+        final File fileA = VoltFile.createTempFile("catA", ".jar", new File(testDir));
+        final File fileB = VoltFile.createTempFile("catB", ".jar", new File(testDir));
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(schemaA);
+        builder.compile(fileA.getPath());
+        Catalog catA = TestCatalogDiffs.catalogForJar(fileA.getPath());
+
+        builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(schemaB);
+        builder.compile(fileB.getPath());
+        Catalog catB = TestCatalogDiffs.catalogForJar(fileB.getPath());
+
+        fileA.delete();
+        fileB.delete();
+
+        final Pair<Long, String> sigA = CatalogUtil.calculateDrTableSignatureAndCrc(catA.getClusters().get("cluster").getDatabases().get("database"));
+        final Pair<Long, String> sigB = CatalogUtil.calculateDrTableSignatureAndCrc(catB.getClusters().get("cluster").getDatabases().get("database"));
+
+        assertFalse(sigA.getFirst() == 0);
+        assertFalse(sigA.getSecond().isEmpty());
+        assertEquals(shouldEqual, sigA.equals(sigB));
+    }
+
+    public void testDRTableSignatureDeserialization() throws IOException
+    {
+        verifyDeserializedDRTableSignature("CREATE TABLE A (C1 INTEGER NOT NULL, C2 TIMESTAMP NOT NULL); PARTITION TABLE A ON COLUMN C1;\n" +
+                                           "CREATE TABLE B (C1 BIGINT NOT NULL, C2 SMALLINT NOT NULL); PARTITION TABLE B ON COLUMN C1;\n" +
+                                           "CREATE TABLE C (C1 TINYINT NOT NULL, C2 VARCHAR(3) NOT NULL); PARTITION TABLE C ON COLUMN C1;\n");
+
+        verifyDeserializedDRTableSignature("CREATE TABLE A (C1 INTEGER NOT NULL, C2 TIMESTAMP NOT NULL); PARTITION TABLE A ON COLUMN C1;\n" +
+                                           "CREATE TABLE B (C1 BIGINT NOT NULL, C2 SMALLINT NOT NULL); PARTITION TABLE B ON COLUMN C1;\n" +
+                                           "CREATE TABLE C (C1 TINYINT NOT NULL, C2 VARCHAR(3) NOT NULL); PARTITION TABLE C ON COLUMN C1;\n" +
+                                           "DR TABLE B;\n",
+                                           Pair.of("B", "bs"));
+
+        verifyDeserializedDRTableSignature("CREATE TABLE A (C1 INTEGER NOT NULL, C2 TIMESTAMP NOT NULL); PARTITION TABLE A ON COLUMN C1;\n" +
+                                           "CREATE TABLE B (C1 BIGINT NOT NULL, C2 SMALLINT NOT NULL); PARTITION TABLE B ON COLUMN C1;\n" +
+                                           "CREATE TABLE C (C1 TINYINT NOT NULL, C2 VARCHAR(3) NOT NULL); PARTITION TABLE C ON COLUMN C1;\n" +
+                                           "DR TABLE *;\n",
+                                           Pair.of("A", "ip"),
+                                           Pair.of("B", "bs"),
+                                           Pair.of("C", "tv"));
+    }
+
+    @SafeVarargs
+    private final void verifyDeserializedDRTableSignature(String schema, Pair<String, String>... signatures) throws IOException
+    {
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+        final File file = VoltFile.createTempFile("deserializeCat", ".jar", new File(testDir));
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(schema);
+        builder.compile(file.getPath());
+        Catalog cat = TestCatalogDiffs.catalogForJar(file.getPath());
+
+        file.delete();
+
+        final Map<String, String> sig = CatalogUtil.deserializeCatalogSignature(CatalogUtil.calculateDrTableSignatureAndCrc(
+            cat.getClusters().get("cluster").getDatabases().get("database")).getSecond());
+
+        assertEquals(signatures.length, sig.size());
+        for (Pair<String, String> expected : signatures) {
+            assertEquals(expected.getSecond(), sig.get(expected.getFirst()));
+        }
     }
 }

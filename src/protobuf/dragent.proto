@@ -36,7 +36,7 @@ message Subscribe {
 message EventAck {
     optional int32 partitionId = 1;
     // poison pill, cluster restart, rejoin
-    optional int32 eventType = 2; 
+    optional int32 eventType = 2;
     // if true, the recipient should expect to have
     // a corresponding event to discard
     // if false, this is just a query for the next
@@ -75,6 +75,7 @@ message NodeInfo {
     optional string hostname = 1;
     optional int32 drport = 2;
     optional fixed64 catalogCRC = 3;
+    optional string catalogSignature = 4;
 }
 
 message PartitionInfo {
@@ -93,7 +94,7 @@ message PartitionInfo {
     optional int64 outstandingByteCount = 7;
     optional bool isPaused = 8;
     optional bool isSynced = 9;
-    
+
     // info for event synchronization
     optional int64 nextUniqueId = 10;
     optional bool isEnded = 11;

@@ -485,6 +485,15 @@ public enum VoltType {
         return type;
     }
 
+    public static VoltType typeFromSignature(char signature) {
+        for (VoltType type : values()) {
+            if (type.m_signatureChar == signature) {
+                return type;
+            }
+        }
+        throw new VoltTypeException("Unknown type signature: " + signature);
+    }
+
     /**
      * Return the string representation of this type. Note that
      * <tt>VoltType.typeFromString(voltTypeInstance.toString) == true</tt>.
