@@ -930,8 +930,8 @@ public class TestCatalogUtil extends TestCase {
         DeploymentType valid_deployment = CatalogUtil.getDeployment(new FileInputStream(tmpDefault));
         assertNotNull(valid_deployment);
 
-        long crc = CatalogUtil.compileDeployment(catalog, valid_deployment, true, false);
-        assertTrue("Deployment file failed to parse", crc != -1);
+        String msg = CatalogUtil.compileDeployment(catalog, valid_deployment, false);
+        assertTrue("Deployment file failed to parse", msg == null);
 
         assertEquals("master", catalog.getClusters().get("cluster").getDrmasterhost());
 
@@ -940,8 +940,8 @@ public class TestCatalogUtil extends TestCase {
         assertNotNull(valid_deployment_enabled);
 
         setUp();
-        crc = CatalogUtil.compileDeployment(catalog, valid_deployment_enabled, true, false);
-        assertTrue("Deployment file failed to parse", crc != -1);
+        msg = CatalogUtil.compileDeployment(catalog, valid_deployment_enabled, false);
+        assertTrue("Deployment file failed to parse", msg == null);
 
         assertEquals("master", catalog.getClusters().get("cluster").getDrmasterhost());
 
@@ -950,8 +950,8 @@ public class TestCatalogUtil extends TestCase {
         assertNotNull(valid_deployment_disabled);
 
         setUp();
-        crc = CatalogUtil.compileDeployment(catalog, valid_deployment_disabled, true, false);
-        assertTrue("Deployment file failed to parse", crc != -1);
+        msg = CatalogUtil.compileDeployment(catalog, valid_deployment_disabled, false);
+        assertTrue("Deployment file failed to parse", msg == null);
 
         assertTrue(catalog.getClusters().get("cluster").getDrmasterhost().isEmpty());
     }
