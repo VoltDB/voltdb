@@ -1124,7 +1124,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     deploymentFile.delete();
                 }
                 FileOutputStream fileOutputStream = new FileOutputStream(deploymentFile);
-                fileOutputStream.write(m_catalogContext.deploymentBytes);
+                fileOutputStream.write(m_catalogContext.getDeploymentBytes());
                 fileOutputStream.close();
             } catch (Exception e) {
                 hostLog.error("Failed to log deployment file: " + e.getMessage());
