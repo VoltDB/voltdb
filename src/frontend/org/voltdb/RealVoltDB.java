@@ -649,7 +649,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     Class<?> ndrgwClass = null;
                     File drOverflowDir;
                     if (useDRV2) {
-                        drOverflowDir = new File(m_deployment.getPaths().getVoltdbroot().getPath(), "dr_overflow");
+                        drOverflowDir = new File(m_catalogContext.getDeployment().getPaths().getVoltdbroot().getPath(), "dr_overflow");
                         ndrgwClass = Class.forName("org.voltdb.dr2.InvocationBufferServer");
                     } else {
                         drOverflowDir = new File(m_catalogContext.cluster.getVoltroot(), "dr_overflow");
