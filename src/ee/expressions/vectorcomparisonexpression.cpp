@@ -36,14 +36,13 @@ bool TupleExtractor::isNullValue(const ValueType& value) const
 }
 
 template <>
-bool TupleExtractor::compare<CmpEq>(CmpEq comp, const TableTuple& tuple) const
+bool compare_tuple<CmpEq>(CmpEq comp, const TableTuple& tuple1, const TableTuple& tuple2)
 {
-    assert(m_tuple.getSchema()->columnCount() == tuple.getSchema()->columnCount());
-    int schemaSize = m_tuple.getSchema()->columnCount();
-    // Lexicographical compare two sequences
+    assert(tuple1.getSchema()->columnCount() == tuple2.getSchema()->columnCount());
+    int schemaSize = tuple1.getSchema()->columnCount();
     for (int columnIdx = 0; columnIdx < schemaSize; ++columnIdx)
     {
-        if (comp.cmp(m_tuple.getNValue(columnIdx), tuple.getNValue(columnIdx)).isFalse())
+        if (comp.cmp(tuple1.getNValue(columnIdx), tuple2.getNValue(columnIdx)).isFalse())
         {
             return false;
         }
@@ -52,19 +51,24 @@ bool TupleExtractor::compare<CmpEq>(CmpEq comp, const TableTuple& tuple) const
 }
 
 template <>
-bool TupleExtractor::compare<CmpNe>(CmpNe comp, const TableTuple& tuple) const
+bool compare_tuple<CmpNe>(CmpNe comp, const TableTuple& tuple1, const TableTuple& tuple2)
 {
-    assert(m_tuple.getSchema()->columnCount() == tuple.getSchema()->columnCount());
-    int schemaSize = m_tuple.getSchema()->columnCount();
-    // Lexicographical compare two sequences
-    for (int columnIdx = 0; columnIdx < schemaSize; ++columnIdx)
-    {
-        if (comp.cmp(m_tuple.getNValue(columnIdx), tuple.getNValue(columnIdx)).isFalse())
-        {
-            return false;
-        }
-    }
-    return true;
+    // a != b <=> !(a == B)
+    return !compare_tuple(CmpEq(), tuple1, tuple2);
+}
+
+template <>
+bool compare_tuple<CmpGte>(CmpGte comp, const TableTuple& tuple1, const TableTuple& tuple2)
+{
+    // a >= b <=> !(a < b)
+    return !compare_tuple(CmpLt(), tuple1, tuple2);
+}
+
+template <>
+bool compare_tuple<CmpLte>(CmpLte comp, const TableTuple& tuple1, const TableTuple& tuple2)
+{
+    // a <= b <=> !(a > b)
+    return !compare_tuple(CmpGt(), tuple1, tuple2);
 }
 
 }

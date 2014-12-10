@@ -1056,8 +1056,9 @@ public class TestSubQueriesSuite extends RegressionSuite {
     {
         Client client = getClient();
         client.callProcedure("R1.insert", 1,   5,  1 , "2013-06-18 02:00:00.123457");
-        client.callProcedure("R1.insert", 2,  10,  1 , "2013-06-18 02:00:00.123457");
-        client.callProcedure("R1.insert", 3,  10,  2 , "2013-07-18 02:00:00.123457");
+        client.callProcedure("R1.insert", 2,  10,  1 , "2013-07-18 10:40:01.123457");
+        client.callProcedure("R1.insert", 3,  10,  2 , "2013-08-18 02:00:00.123457");
+
         client.callProcedure("R2.insert", 3,   5,  1 , "2013-07-18 10:40:01.123457");
         client.callProcedure("R2.insert", 4,  10,  1 , "2013-08-18 02:00:00.123457");
         client.callProcedure("R2.insert", 5,  10,  1 , "2013-08-18 02:00:00.123457");
@@ -1066,11 +1067,38 @@ public class TestSubQueriesSuite extends RegressionSuite {
         VoltTable vt;
 
         if (!isHSQL()) {
+            // R1 2,  10,  1 = R2 4,  10,  1
             vt = client.callProcedure("@AdHoc",
-                    "select R1.ID FROM R1 where (R1.WAGE, R1.DEPT) = (SELECT WAGE, DEPT FROM R2 where ID = ?);", 4).getResults()[0];
+                    "select R1.ID FROM R1 where (R1.WAGE, R1.DEPT) = (SELECT WAGE, DEPT FROM R2 where ID = 4);").getResults()[0];
             System.out.println(vt.toString());
             validateTableOfLongs(vt, new long[][] { {2} });
 
+            vt = client.callProcedure("@AdHoc",
+                    "select R1.ID FROM R1 where (R1.WAGE, R1.DEPT) != (SELECT WAGE, DEPT FROM R2 where ID = 4);").getResults()[0];
+            System.out.println(vt.toString());
+            validateTableOfLongs(vt, new long[][] { {1}, {3} });
+
+            vt = client.callProcedure("@AdHoc",
+                    "select R1.ID FROM R1 where (R1.WAGE, R1.DEPT) > (SELECT WAGE, DEPT FROM R2 where ID = 4);").getResults()[0];
+            System.out.println(vt.toString());
+            validateTableOfLongs(vt, new long[][] { {3} });
+
+            vt = client.callProcedure("@AdHoc",
+                    "select R1.ID FROM R1 where (R1.WAGE, R1.DEPT) < (SELECT WAGE, DEPT FROM R2 where ID = 4);").getResults()[0];
+            System.out.println(vt.toString());
+            validateTableOfLongs(vt, new long[][] { {1} });
+
+            vt = client.callProcedure("@AdHoc",
+                    "select R1.ID FROM R1 where (R1.WAGE, R1.DEPT) >= (SELECT WAGE, DEPT FROM R2 where ID = 4);").getResults()[0];
+            System.out.println(vt.toString());
+            validateTableOfLongs(vt, new long[][] { {2}, {3} });
+
+            vt = client.callProcedure("@AdHoc",
+                    "select R1.ID FROM R1 where (R1.WAGE, R1.DEPT) <= (SELECT WAGE, DEPT FROM R2 where ID = 4);").getResults()[0];
+            System.out.println(vt.toString());
+            validateTableOfLongs(vt, new long[][] { {1}, {2} });
+
+            // R1 2,  10,  1 = R2 4,  10,  1 and 5,  10,  1
             vt = client.callProcedure("@AdHoc",
                     "select R1.ID FROM R1 where (R1.WAGE, R1.DEPT) =ALL (SELECT WAGE, DEPT FROM R2 where ID in (4,5));").getResults()[0];
             System.out.println(vt.toString());
@@ -1081,25 +1109,27 @@ public class TestSubQueriesSuite extends RegressionSuite {
             System.out.println(vt.toString());
             validateTableOfLongs(vt, new long[][] { });
 
-            vt = client.callProcedure("@AdHoc",
-                    "select R1.ID FROM R1 where (R1.WAGE, R1.DEPT) = (SELECT WAGE, DEPT FROM R2 where ID = ?);", 4).getResults()[0];
-            System.out.println(vt.toString());
-            validateTableOfLongs(vt, new long[][] { {2} });
-
+            // R1 3,  10,  2 >= ALL R2 except R2.7
             vt = client.callProcedure("@AdHoc",
                     "select R1.ID FROM R1 where ID = 3 and (R1.WAGE, R1.DEPT) >= ALL (SELECT WAGE, DEPT FROM R2 where ID < ?);", 7).getResults()[0];
             System.out.println(vt.toString());
             validateTableOfLongs(vt, new long[][] { {3} });
 
+            // R1 3,  10,  2 < R2 except R2.7 50 2
             vt = client.callProcedure("@AdHoc",
                     "select R1.ID FROM R1 where (R1.WAGE, R1.DEPT) >= ALL (SELECT WAGE, DEPT FROM R2);").getResults()[0];
             System.out.println(vt.toString());
             validateTableOfLongs(vt, new long[][] { });
 
             vt = client.callProcedure("@AdHoc",
-                    "select R1.ID FROM R1 where (R1.DEPT, R1.TM) >= ALL (SELECT DEPT, TM FROM R2);").getResults()[0];
+                    "select R1.ID FROM R1 where (R1.DEPT, R1.TM) < ALL (SELECT DEPT, TM FROM R2);").getResults()[0];
             System.out.println(vt.toString());
-            validateTableOfLongs(vt, new long[][] { {3} });
+            validateTableOfLongs(vt, new long[][] { {1} });
+
+            vt = client.callProcedure("@AdHoc",
+                    "select R1.ID FROM R1 where (R1.DEPT, R1.TM) <= ALL (SELECT DEPT, TM FROM R2);").getResults()[0];
+            System.out.println(vt.toString());
+            validateTableOfLongs(vt, new long[][] { {1}, {2} });
 
         }
     }

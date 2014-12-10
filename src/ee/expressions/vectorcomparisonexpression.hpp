@@ -177,7 +177,10 @@ struct TupleExtractor
     bool isNullValue(const ValueType& value) const;
 
     template<typename OP>
-    bool compare(OP comp, const TableTuple& tuple) const;
+    bool compare(OP comp, const TableTuple& tuple) const
+    {
+        return compare_tuple(comp, m_tuple, tuple);
+    }
 
     template<typename OP>
     bool compare(OP comp, const NValue& nvalue) const
@@ -299,20 +302,19 @@ NValue VectorComparisonExpression<OP, ValueExtractorOuter, ValueExtractorInner>:
 // Compares two tuples column by column using lexicographical compare. The OP predicate
 // must satisfy the following condition
 // X and Y are equivalent if both OP(x, y) and OP(y, x) are false
-// CmpEq and CmpNe are handled separately because they don't satisfy the above requirement.
+// CmpEq,CmpNe, CmpGte, and CmpLte are specialized because they don't satisfy the above requirement.
 template<typename OP>
-bool TupleExtractor::compare(OP comp, const TableTuple& tuple) const
+bool compare_tuple(OP comp, const TableTuple& tuple1, const TableTuple& tuple2)
 {
-    assert(m_tuple.getSchema()->columnCount() == tuple.getSchema()->columnCount());
-    int schemaSize = m_tuple.getSchema()->columnCount();
-    // Lexicographical compare two sequences
+    assert(tuple1.getSchema()->columnCount() == tuple2.getSchema()->columnCount());
+    int schemaSize = tuple1.getSchema()->columnCount();
     for (int columnIdx = 0; columnIdx < schemaSize; ++columnIdx)
     {
-        if (comp.cmp(m_tuple.getNValue(columnIdx), tuple.getNValue(columnIdx)).isTrue())
+        if (comp.cmp(tuple1.getNValue(columnIdx), tuple2.getNValue(columnIdx)).isTrue())
         {
             return true;
         }
-        if (comp.cmp(tuple.getNValue(columnIdx), m_tuple.getNValue(columnIdx)).isTrue())
+        if (comp.cmp(tuple2.getNValue(columnIdx), tuple1.getNValue(columnIdx)).isTrue())
         {
             return false;
         }
