@@ -242,7 +242,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                 // update the local catalog.  Safe to do this thanks to the check to get into here.
                 context.updateCatalog(commands, p.getFirst(), p.getSecond(), requiresSnapshotIsolation);
 
-                log.info(String.format("Site %s completed catalog update with catalog hash %s, deployment hash %s%s.",
+                log.debug(String.format("Site %s completed catalog update with catalog hash %s, deployment hash %s%s.",
                         CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()),
                         Encoder.hexEncode(catalogStuff.getCatalogHash()).substring(0, 10),
                         Encoder.hexEncode(catalogStuff.getDeploymentHash()).substring(0, 10),
