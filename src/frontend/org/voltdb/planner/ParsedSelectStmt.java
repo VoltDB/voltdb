@@ -126,6 +126,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     // It will store the final projection node schema for this plan if it is needed.
     // Calculate once, and use it everywhere else.
     private NodeSchema m_projectSchema = null;
+    private NodeSchema m_distinctProjectSchema = null;
 
     // It may has the consistent element order as the displayColumns
     public ArrayList<ParsedColInfo> m_aggResultColumns = new ArrayList<ParsedColInfo>();
@@ -138,6 +139,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private ArrayList<ParsedColInfo> m_avgPushdownOrderColumns = null;
     private AbstractExpression m_avgPushdownHaving = null;
     private NodeSchema m_avgPushdownProjectSchema;
+    private NodeSchema m_avgPushdownFinalProjectSchema;
 
     private boolean m_hasPartitionColumnInGroupby = false;
     private boolean m_hasAggregateDistinct = false;
@@ -266,6 +268,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         boolean tmpHasComplexAgg = hasComplexAgg();
         NodeSchema tmpProjectSchema = m_projectSchema;
+        NodeSchema tmpDistinctProjectSchema = m_distinctProjectSchema;
 
         m_aggregationList = new ArrayList<AbstractExpression>();
         assert(displayElement != null);
@@ -299,6 +302,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         m_avgPushdownDistinctGroupByColumns = m_distinctGroupByColumns;
         m_avgPushdownOrderColumns = m_orderColumns;
         m_avgPushdownProjectSchema = m_projectSchema;
+        m_avgPushdownFinalProjectSchema = m_distinctProjectSchema;
         m_avgPushdownHaving = m_having;
 
         m_displayColumns = tmpDisplayColumns;
@@ -307,6 +311,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         m_distinctGroupByColumns = tmpDistinctGroupByColumns;
         m_orderColumns = tmpOrderColumns;
         m_projectSchema = tmpProjectSchema;
+        m_distinctProjectSchema = tmpDistinctProjectSchema;
         m_hasComplexAgg = tmpHasComplexAgg;
         m_having = tmpHaving;
     }
@@ -321,6 +326,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         m_distinctGroupByColumns = m_avgPushdownDistinctGroupByColumns;
         m_orderColumns = m_avgPushdownOrderColumns;
         m_projectSchema = m_avgPushdownProjectSchema;
+        m_distinctProjectSchema = m_avgPushdownFinalProjectSchema;
         m_hasComplexAgg = true;
         m_having = m_avgPushdownHaving;
     }
@@ -899,10 +905,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             order_col.alias = orig_col.alias;
             order_col.columnName = orig_col.columnName;
             order_col.tableName = orig_col.tableName;
-        } else {
-            if (order_exp.hasAnySubexpressionOfClass(ParameterValueExpression.class)) {
-                m_isComplexOrderBy = true;
-            }
         }
         assert( ! (order_exp instanceof ConstantValueExpression));
         assert( ! (order_exp instanceof ParameterValueExpression));
@@ -973,6 +975,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
         // DISTINCT with GROUP BY
         m_distinctGroupByColumns = new ArrayList<ParsedColInfo>();
+        m_distinctProjectSchema = new NodeSchema();
+
         // Iterate the Display columns
         for (ParsedColInfo col: m_displayColumns) {
             TupleValueExpression tve = new TupleValueExpression(
@@ -985,6 +989,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             pcol.alias = col.alias;
             pcol.expression = tve;
             m_distinctGroupByColumns.add(pcol);
+
+            // ParsedColInfo, TVE, SchemaColumn, NodeSchema ??? Could it be more complicated ???
+            SchemaColumn schema_col = new SchemaColumn(
+                    col.tableName, col.tableAlias, col.columnName, col.alias, tve);
+            m_distinctProjectSchema.addColumn(schema_col);
         }
 
         return groupbyElement;
@@ -1304,6 +1313,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return m_projectSchema;
     }
 
+    public NodeSchema getDistinctProjectionSchema() {
+        return m_distinctProjectSchema;
+    }
+
     public boolean hasComplexGroupby() {
         return m_hasComplexGroupby;
     }
@@ -1344,6 +1357,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      * GROUP BY keys are not in select list will make it complex aggregated.
      * For this case, the PROJECTION node should apply after the ORDER BY node.
      *
+     * However, any expression involved with ConstantValueExpression make us hard
+     * to detect and compare, so we are just pessimistic about them and fall back
+     * to use the old plan node tree.
+     *
      * @return true when this query is the edge case query, false otherwise.
      */
     public boolean isComplexOrderby() {
@@ -1351,25 +1368,13 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     private void detectComplexOrderby() {
-        if (m_isComplexOrderBy) {
-            return;
-        }
+        m_isComplexOrderBy = false;
 
         if (! hasOrderByColumns() || ! isGrouped()) {
             return;
         }
 
-        if (! hasComplexAgg()) {
-            return;
-        }
-
-        if (hasDistinctWithGroupBy()) {
-            // for distinct GROUP BY case, ORDER BY can not apply on display list,
-            // guarded by HSQL.
-            return;
-        }
         // HAVING clause does not matter
-
         Set <AbstractExpression> missingGroupBySet = new HashSet <AbstractExpression>();
         for (ParsedColInfo col: m_groupByColumns) {
             if (col.groupByInDisplay) {
@@ -1385,13 +1390,16 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
             missingGroupBySet.add(col.expression);
         }
-        if (missingGroupBySet.size() == 0) {
-            return;
-        }
 
         // place the TVEs from Display columns in the ORDER BY expression
         for (ParsedColInfo orderCol : m_orderColumns) {
             AbstractExpression expr = orderCol.expression;
+            // be pessimistic at this point
+            if (expr.hasAnySubexpressionOfClass(ParameterValueExpression.class)) {
+                m_isComplexOrderBy = true;
+                return;
+            }
+
             if (expr.hasSubExpressionFrom(missingGroupBySet)) {
                 m_isComplexOrderBy = true;
                 return;
@@ -1562,7 +1570,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // so this check is plan-independent.
         HashMap<String, List<AbstractExpression> > baseTableAliases =
                 new HashMap<String, List<AbstractExpression> >();
-
         for (ParsedColInfo col : m_orderColumns) {
             AbstractExpression expr = col.expression;
             List<AbstractExpression> baseTVEs = expr.findBaseTVEs();
@@ -1571,7 +1578,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 // Neither are (nonsense) constant (table-less) expressions.
                 continue;
             }
-
             // This loops exactly once.
             AbstractExpression baseTVE = baseTVEs.get(0);
             String nextTableAlias = ((TupleValueExpression)baseTVE).getTableAlias();
@@ -1590,7 +1596,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             // like Unique Index nested loop join, etc.
             return false;
         }
-
         boolean allScansAreDeterministic = true;
         for (Entry<String, List<AbstractExpression>> orderedAlias : baseTableAliases.entrySet()) {
             List<AbstractExpression> orderedAliasExprs = orderedAlias.getValue();

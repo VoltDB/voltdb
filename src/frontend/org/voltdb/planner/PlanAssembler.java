@@ -271,6 +271,7 @@ public class PlanAssembler {
                 m_parsedSelect.setHasPartitionColumnInGroupby();
             }
 
+            // FIXME: turn it on when we are able to push down DISTINCT
 //            if (isPartitionColumnInGroupbyList(m_parsedSelect.m_distinctGroupByColumns)) {
 //                m_parsedSelect.setHasPartitionColumnInDistinctGroupby();
 //            }
@@ -777,9 +778,35 @@ public class PlanAssembler {
 
         if (m_parsedSelect.hasOrderByColumns()) {
             root = handleOrderBy(root);
-            if (m_parsedSelect.isComplexOrderby()) {
+            if (m_parsedSelect.isComplexOrderby() && root instanceof OrderByPlanNode) {
+                AbstractPlanNode child = root.getChild(0);
+                AbstractPlanNode grandChild = child.getChild(0);
+
                 // swap the ORDER BY and complex aggregate Projection node
-                root = swapOrderbyAndProjectionNode(root);
+                if (child instanceof ProjectionPlanNode) {
+                    root.unlinkChild(child);
+                    child.unlinkChild(grandChild);
+
+                    child.addAndLinkChild(root);
+                    root.addAndLinkChild(grandChild);
+
+                    // update the new root
+                    root = child;
+                } else if (m_parsedSelect.hasDistinctWithGroupBy() &&
+                    child.getPlanNodeType() == PlanNodeType.HASHAGGREGATE &&
+                    grandChild.getPlanNodeType() == PlanNodeType.PROJECTION) {
+
+                    AbstractPlanNode grandGrandChild = grandChild.getChild(0);
+                    child.clearParents();
+                    root.clearChildren();
+                    grandGrandChild.clearParents();
+                    grandChild.clearChildren();
+
+                    grandChild.addAndLinkChild(root);
+                    root.addAndLinkChild(grandGrandChild);
+
+                    root = child;
+                }
             }
         }
 
@@ -803,39 +830,6 @@ public class PlanAssembler {
         MicroOptimizationRunner.applyAll(plan, m_parsedSelect);
 
         return plan;
-    }
-
-    private AbstractPlanNode swapOrderbyAndProjectionNode(AbstractPlanNode orderby) {
-        if (orderby instanceof OrderByPlanNode == false) {
-            return orderby;
-        }
-
-        if (orderby.getChild(0) instanceof ProjectionPlanNode == false) {
-            return orderby;
-        }
-
-        AbstractPlanNode proj = orderby.getChild(0);
-        AbstractPlanNode child = proj.getChild(0);
-
-        if (orderby.getParentCount() > 0) {
-            AbstractPlanNode parrent = orderby;
-            parrent = orderby.getParent(0);
-            parrent.unlinkChild(orderby);
-            orderby.unlinkChild(proj);
-            proj.unlinkChild(child);
-
-            parrent.addAndLinkChild(proj);
-            proj.addAndLinkChild(orderby);
-            orderby.addAndLinkChild(child);
-        } else {
-            orderby.unlinkChild(proj);
-            proj.unlinkChild(child);
-
-            proj.addAndLinkChild(orderby);
-            orderby.addAndLinkChild(child);
-        }
-
-        return proj;
     }
 
     private boolean needProjectionNode (AbstractPlanNode root) {
@@ -1295,12 +1289,9 @@ public class PlanAssembler {
         // Even an intervening non-hash aggregate will not interfere in this optimization.
         AbstractPlanNode nonAggPlan = root;
 
-        // further optimization for DISTINCT, it keeps the insert ORDER in the EE.
-        if (m_parsedSelect.hasDistinctWithGroupBy()
-                && nonAggPlan.getPlanNodeType() == PlanNodeType.HASHAGGREGATE
-                && ((AggregatePlanNode)nonAggPlan).isDistinctAggregate()) {
-            nonAggPlan = nonAggPlan.getChild(0);
-        }
+        // EE keeps the insertion ORDER so that ORDER BY could apply before DISTINCT.
+        // However, this probably is not optimal if there are low cardinality results.
+        // Again, we have to replace the TVEs for ORDER BY clause for these cases in planning.
 
         if (nonAggPlan.getPlanNodeType() == PlanNodeType.AGGREGATE) {
             nonAggPlan = nonAggPlan.getChild(0);
@@ -2180,12 +2171,14 @@ public class PlanAssembler {
         assert(m_parsedSelect.hasComplexAgg());
 
         AggregatePlanNode distinctAggNode = new HashAggregatePlanNode();
-        distinctAggNode.setOutputSchema(m_parsedSelect.getFinalProjectionSchema());
+        distinctAggNode.setOutputSchema(m_parsedSelect.getDistinctProjectionSchema());
+
         for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.m_distinctGroupByColumns) {
             distinctAggNode.addGroupByExpression(col.expression);
         }
 
         // TODO(xin): push down the DISTINCT for certain cases
+        // Ticket: ENG-7360
         /*
         boolean pushedDown = false;
         boolean canPushdownDistinctAgg = m_parsedSelect.hasPartitionColumnInDistinctGroupby();

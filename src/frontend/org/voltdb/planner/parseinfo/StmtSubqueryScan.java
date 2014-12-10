@@ -35,7 +35,6 @@ import org.voltdb.planner.ParsedUnionStmt;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
@@ -418,10 +417,6 @@ public class StmtSubqueryScan extends StmtTableScan {
 
             assert(child.getChildCount() == 1);
             child = child.getChild(0);
-            if (child instanceof ProjectionPlanNode) {
-                assert(child.getChildCount() == 1);
-                child = child.getChild(0);
-            }
             child.clearParents();
             if (current.getParentCount() == 0) {
                 return child;

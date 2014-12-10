@@ -300,10 +300,12 @@ public class TestSelfJoins  extends PlannerTestCase {
         // in the GROUP BY and ORDER BY.
         apn = compile("select B.C, B.A FROM R2 A, R2 B WHERE A.A = B.A AND B.C > 1 GROUP BY B.A, A.C ORDER BY B.A, A.C");
         //* for debug */ System.out.println(apn.toExplainPlanString());
+
+        // Complex ORDER BY case: GROUP BY columns that are not in the display column list
         pn = apn.getChild(0);
-        assertTrue(pn instanceof OrderByPlanNode);
-        pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
+        pn = pn.getChild(0);
+        assertTrue(pn instanceof OrderByPlanNode);
         pn = pn.getChild(0);
         assertNotNull(AggregatePlanNode.getInlineAggregationNode(pn));
         assertTrue(pn instanceof NestLoopIndexPlanNode);

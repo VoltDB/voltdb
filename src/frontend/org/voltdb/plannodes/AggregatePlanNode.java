@@ -72,8 +72,6 @@ public class AggregatePlanNode extends AbstractPlanNode {
     protected AbstractExpression m_prePredicate;
     protected AbstractExpression m_postPredicate;
 
-    protected boolean m_outputSchemaDefined = false;
-
     public AggregatePlanNode() {
         super();
     }
@@ -169,10 +167,6 @@ public class AggregatePlanNode extends AbstractPlanNode {
         return m_groupByExpressions.size();
     }
 
-    public boolean isDistinctAggregate() {
-        return m_hasSignificantOutputSchema == false;
-    }
-
     public void setOutputSchema(NodeSchema schema)
     {
         // aggregates currently have their output schema specified
@@ -183,16 +177,11 @@ public class AggregatePlanNode extends AbstractPlanNode {
     @Override
     public void generateOutputSchema(Database db)
     {
-        // For most cases, aggregate's output schema is pre-determined
-        // When not determined, we should generate one from its input schema
-        assert(m_outputSchema != null ? m_hasSignificantOutputSchema : ! m_hasSignificantOutputSchema);
-
+        // aggregate's output schema is pre-determined
         if (m_children.size() == 1) {
             m_children.get(0).generateOutputSchema(db);
 
-            if (m_hasSignificantOutputSchema == false) {
-                m_outputSchema = m_children.get(0).getOutputSchema().copyAndReplaceWithTVE();
-            }
+            assert(m_hasSignificantOutputSchema == true);
         }
     }
 

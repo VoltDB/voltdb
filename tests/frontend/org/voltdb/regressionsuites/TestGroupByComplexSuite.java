@@ -66,8 +66,8 @@ public class TestGroupByComplexSuite extends RegressionSuite {
             client.callProcedure(proc, 5,  50,  2 , "2013-09-18 02:00:00.123457");
 
             if (extra) {
-                cr = client.callProcedure(proc, 6,  10,  2 , "2013-07-18 02:00:00.123457");
-                cr = client.callProcedure(proc, 7,  40,  2 , "2013-09-18 02:00:00.123457");
+                client.callProcedure(proc, 6,  10,  2 , "2013-07-18 02:00:00.123457");
+                client.callProcedure(proc, 7,  40,  2 , "2013-09-18 02:00:00.123457");
             }
         }
     }
@@ -1089,21 +1089,20 @@ public class TestGroupByComplexSuite extends RegressionSuite {
             validateTableOfLongs(vt, new long[][] {{10,1}, {20,1}});
 
             // query with multiple expressions distinct
-//          sql = "SELECT DISTINCT ID, COUNT(DEPT) + 1 FROM " + tb + " GROUP BY ID, WAGE ORDER BY ID, 2 ";
-//          vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-//          System.err.println(vt);
-//          validateTableOfLongs(vt, new long[][] {{1,2}, {2,2}, {3,2}, {4,2}, {5,2}, {6,2}, {7,2}});
+            sql = "SELECT DISTINCT ID, COUNT(DEPT) + 1 FROM " + tb + " GROUP BY ID, WAGE order by 1, 2";
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{1,2}, {2,2}, {3,2}, {4,2}, {5,2}, {6,2}, {7,2}});
 
-//            sql = "SELECT DISTINCT wage, count(*)+1 from " + tb + " GROUP BY abs(dept-2), wage "
-//                    + " ORDER BY 1, 2;";
-//            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-//            validateTableOfLongs(vt, new long[][] {{10,2}, {20,2}, {30,2}, {40,3}, {50,2}});
+            sql = "SELECT DISTINCT wage, count(*)+1 from " + tb + " GROUP BY abs(dept-2), wage "
+                    + " ORDER BY 1, 2;";
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{10,2}, {20,2}, {30,2}, {40,3}, {50,2}});
 
             // test LIMIT/OFFSET
-//            sql = "SELECT DISTINCT wage, count(*)+1 from " + tb + " GROUP BY abs(dept-2), wage "
-//                    + " ORDER BY 1, 2 LIMIT 2;";
-//            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
-//            validateTableOfLongs(vt, new long[][] {{10,2}, {20,2}});
+            sql = "SELECT DISTINCT wage, count(*)+1 from " + tb + " GROUP BY abs(dept-2), wage "
+                    + " ORDER BY 1, 2 LIMIT 2;";
+            vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{10,2}, {20,2}});
         }
     }
 

@@ -1114,6 +1114,8 @@ public class TestSubQueries extends PlannerTestCase {
         checkSeqScan(pn, "T1");
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
         pn = pn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        pn = pn.getChild(0);
         checkPrimaryKeyIndexScan(pn, "P1");
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PARTIALAGGREGATE));

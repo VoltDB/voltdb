@@ -337,8 +337,8 @@ public class TestPlansDistinct extends PlannerTestCase {
             boolean limitPushdown) {
         List<AbstractPlanNode> pns1 = compileToFragments(distinctSQL);
         List<AbstractPlanNode> pns2 = compileToFragments(groupbySQL);
-        printExplainPlan(pns1);
-        printExplainPlan(pns2);
+        //printExplainPlan(pns1);
+        //printExplainPlan(pns2);
 
         assertTrue(pns1.get(0) instanceof SendPlanNode);
         assertTrue(pns2.get(0) instanceof SendPlanNode);
