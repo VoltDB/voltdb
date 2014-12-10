@@ -71,8 +71,8 @@ function smoke() {
         schemachange.SchemaChangeClient \
         --servers=localhost \
         --targetrowcount=1000 \
-        --duration=60 \
-        --retryForcedPercent=50 \
+        --duration=180 \
+        --retryForcedPercent=20 \
         --retryLimit=10 \
         --retrySleep=2
     if [ $? -eq 0 ]; then

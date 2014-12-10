@@ -81,8 +81,10 @@ public class TableHelper {
         public Random rand = null;
         // Random seed for locally-created Random object if no randomizer is provided.
         public int seed = 0;
-        // Add n columns to receive unique data and support unique indexes.
-        public int numAdditionalUniqueColumns = 0;
+        // Number of extra columns, e.g. to receive unique data and support unique indexes.
+        public int numExtraColumns = 0;
+        // Prefix given to extra columns.
+        public String extraColumnPrefix = "CX";
         // Randomly partition in getTotallyRandomTable()
         public RandomPartitioning randomPartitioning = RandomPartitioning.RANDOM;
     }
@@ -551,28 +553,28 @@ public class TableHelper {
         // the PK bigint column is randomly chosen from set of random columns
         public int bigintPrimaryKey;
         public int numRandomColumns;
-        // the unique columns immediately follow the random/PK columns
-        public int numUniqueColumns;
+        // the extra columns immediately follow the random/PK columns
+        public int numExtraColumns;
 
         public RandomTable() {
             this.table = null;
             this.bigintPrimaryKey = -1;
             this.numRandomColumns = 0;
-            this.numUniqueColumns = 0;
+            this.numExtraColumns = 0;
         }
 
-        public RandomTable(VoltTable table, int bigintPrimaryKey, int numRandomColumns, int numUniqueColumns) {
+        public RandomTable(VoltTable table, int bigintPrimaryKey, int numRandomColumns, int numExtraColumns) {
             this.table = table;
             this.bigintPrimaryKey = bigintPrimaryKey;
             this.numRandomColumns = numRandomColumns;
-            this.numUniqueColumns = numUniqueColumns;
+            this.numExtraColumns = numExtraColumns;
         }
 
         public RandomTable(final RandomTable other) {
             this.table = other.table;
             this.bigintPrimaryKey = other.bigintPrimaryKey;
             this.numRandomColumns = other.numRandomColumns;
-            this.numUniqueColumns = other.numUniqueColumns;
+            this.numExtraColumns = other.numExtraColumns;
         }
 
         public String getTableName() {
@@ -583,7 +585,7 @@ public class TableHelper {
     /**
      * Generate a totally random (valid) schema.
      * One constraint is that it will have a single bigint pkey somewhere.
-     * Generates unique column(s) if enabled on non-partitioned tables.
+     * Generates extra BIGINT column(s) if enabled on non-partitioned tables.
      * See overloaded getTotallyRandomTable() for more info on partitioning.
      */
     public RandomTable getTotallyRandomTable(String name) {
@@ -593,15 +595,14 @@ public class TableHelper {
     /**
      * Generate a totally random (valid) schema.
      * One constraint is that it will have a single bigint pkey somewhere.
-     * Generates unique column(s) if enabled on non-partitioned tables.
+     * Generates extra BIGINT column(s) if enabled on non-partitioned tables.
      *
      * The partitioning logic has a couple of variations. It can be a 50%
      * random chance of being partitioned or decided by the caller. Randomly
-     * partitioned VoltTable's are fully initialized based on the
-     * partitioning choice. Caller-partitioned tables are set up as
-     * replicated tables, which can be changed by the caller later. It does
-     * make sure to only add additional unique columns when the table isn't
-     * or won't be partitioned.
+     * partitioned VoltTable's are fully initialized based on the partitioning
+     * choice. Caller-partitioned tables are set up as replicated tables,
+     * which can be changed by the caller later. It does make sure to only add
+     * extra unique columns when the table isn't or won't be partitioned.
      */
     public RandomTable getTotallyRandomTable(String name, boolean partition) {
 
@@ -623,21 +624,23 @@ public class TableHelper {
             }
         }
 
-        // only add unique column(s) if requested and the table is partitioned
-        int numUniqueColumns = partitioned ? 0 : m_config.numAdditionalUniqueColumns;
+        /*
+         * Only add more column(s) if requested and the table is not partitioned,
+         * because unique columns are complicated by partitioned tables.
+         */
+        int numExtraColumns = partitioned ? 0 : m_config.numExtraColumns;
 
         // make random columns
-        int numColumnsTotal = numRandomColumns + numUniqueColumns;
+        int numColumnsTotal = numRandomColumns + numExtraColumns;
         VoltTable.ColumnInfo[] columns = new VoltTable.ColumnInfo[numColumnsTotal];
         for (int i = 0; i < numRandomColumns; i++) {
             columns[i] = getRandomColumn(String.format("C%d", i));
         }
 
-        // add optional unique column(s) (only BIGINT for now) for possible use
-        // as alternate keys.
-        for (int i = 0; i < numUniqueColumns; i++) {
+        // add optional extra column(s) (only BIGINT for now) for possible use as alternate keys.
+        for (int i = 0; i < numExtraColumns; i++) {
             columns[numRandomColumns+i] = new VoltTable.ColumnInfo(
-                    String.format("AKEY%d", i), VoltType.BIGINT, 20, false, true, null);
+                    String.format("%s%d", m_config.extraColumnPrefix, i), VoltType.BIGINT, 20, false, false, null);
         }
 
         // pick pkey and make it a bigint
@@ -659,7 +662,7 @@ public class TableHelper {
                                                                             pkeyIndexes,
                                                                             columns);
         VoltTable table = new VoltTable(extraMetadata, columns, columns.length);
-        return new RandomTable(table, bigintPrimaryKey, numRandomColumns, numUniqueColumns);
+        return new RandomTable(table, bigintPrimaryKey, numRandomColumns, numExtraColumns);
     }
 
     /**
@@ -790,6 +793,11 @@ public class TableHelper {
         return false;
     }
 
+    /** Is this an extra column possibly used for alternate keys? */
+    boolean isAnExtraColumn(VoltTable table, VoltTable.ColumnInfo column) {
+        return column.name.startsWith(m_config.extraColumnPrefix);
+    }
+
     /** Check if a unique column should be ASSUMEUNIQUE or UNIQUE */
     static boolean needsAssumeUnique(VoltTable table, VoltTable.ColumnInfo column) {
         // stupid safety
@@ -875,19 +883,21 @@ public class TableHelper {
         // limit tries to prevent looping forever
         int tries = columns.size() * 2;
         while ((columnDrops > 0) && (tries-- > 0)) {
+            // don't drop extra columns because they're used differently
             int indexToRemove = m_rand.nextInt(columns.size());
             VoltTable.ColumnInfo toRemove = columns.get(indexToRemove);
-            if (!isAPkeyColumn(table, toRemove)) {
-                columnDrops--;
-                columns.remove(indexToRemove);
+            if (isAPkeyColumn(table, toRemove)) continue;
+            // don't drop extra columns used as alternate keys
+            if (isAnExtraColumn(table, toRemove)) continue;
+            columnDrops--;
+            columns.remove(indexToRemove);
 
-                if ((partitionColIndex >= 0) && (partitionColIndex > indexToRemove)) {
-                    partitionColIndex--;
-                }
-                for (int i = 0; i < pkeyIndexes.length; i++) {
-                    if (pkeyIndexes[i] > indexToRemove) {
-                        pkeyIndexes[i]--;
-                    }
+            if ((partitionColIndex >= 0) && (partitionColIndex > indexToRemove)) {
+                partitionColIndex--;
+            }
+            for (int i = 0; i < pkeyIndexes.length; i++) {
+                if (pkeyIndexes[i] > indexToRemove) {
+                    pkeyIndexes[i]--;
                 }
             }
         }
@@ -921,6 +931,8 @@ public class TableHelper {
             int indexToGrow = m_rand.nextInt(columns.size());
             VoltTable.ColumnInfo toGrow = columns.get(indexToGrow);
             if (isAPkeyColumn(table, toGrow)) continue;
+            // don't change extra columns used as alternate keys
+            if (isAnExtraColumn(table, toGrow)) continue;
             toGrow = growColumn(toGrow);
             if (toGrow != null) {
                 columns.remove(indexToGrow);
