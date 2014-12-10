@@ -22,7 +22,6 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Random;
-import java.util.SortedMap;
 import java.util.logging.Logger;
 
 import org.voltdb.VoltType;
@@ -283,21 +282,6 @@ public abstract class VoltTypeUtil {
                 LOG.severe("ERROR: Unable to get object from string for invalid ValueType '" + type + "'");
         }
         return (ret);
-    }
-
-    /**
-     * Get a string signature for the table represented by the args
-     * @param name The name of the table
-     * @param schema A sorted map of the columns in the table, keyed by column index
-     * @return The table signature string.
-     */
-    public static String getSignatureForTable(String name, SortedMap<Integer, VoltType> schema) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(name).append(CatalogUtil.SIGNATURE_TABLE_NAME_SEPARATOR);
-        for (VoltType t : schema.values()) {
-            sb.append(t.getSignatureChar());
-        }
-        return sb.toString();
     }
 
     public static long getHashableLongFromObject(Object obj) {

@@ -80,7 +80,6 @@ import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
-import org.voltdb.utils.VoltTypeUtil;
 
 
 /**
@@ -1543,7 +1542,7 @@ public class DDLCompiler {
             }
         }
 
-        table.setSignature(VoltTypeUtil.getSignatureForTable(name, columnTypes));
+        table.setSignature(CatalogUtil.getSignatureForTable(name, columnTypes));
 
         /*
          * Validate that the total size

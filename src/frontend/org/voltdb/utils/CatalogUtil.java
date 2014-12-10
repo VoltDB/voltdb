@@ -34,6 +34,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -1677,6 +1678,21 @@ public abstract class CatalogUtil {
             return null;
         }
         return emptyJarFile;
+    }
+
+    /**
+     * Get a string signature for the table represented by the args
+     * @param name The name of the table
+     * @param schema A sorted map of the columns in the table, keyed by column index
+     * @return The table signature string.
+     */
+    public static String getSignatureForTable(String name, SortedMap<Integer, VoltType> schema) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(name).append(SIGNATURE_TABLE_NAME_SEPARATOR);
+        for (VoltType t : schema.values()) {
+            sb.append(t.getSignatureChar());
+        }
+        return sb.toString();
     }
 
     /**
