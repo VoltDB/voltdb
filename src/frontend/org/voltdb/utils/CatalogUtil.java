@@ -737,8 +737,8 @@ public abstract class CatalogUtil {
             }
             else
             {
-                // default to 10 seconds
-                catCluster.setHeartbeattimeout(10);
+                // default to 90 seconds
+                catCluster.setHeartbeattimeout(org.voltcore.common.Constants.DEFAULT_HEARTBEAT_TIMEOUT_SECONDS);
             }
 
             // copy schema modification behavior from xml to catalog
