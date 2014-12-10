@@ -85,39 +85,28 @@ public class VoltProjectBuilder {
     private StringBuffer transformer = new StringBuffer();
 
     public static final class ProcedureInfo {
-        private final String groups[];
+        private final String roles[];
         private final Class<?> cls;
         private final String name;
         private final String sql;
         private final String partitionInfo;
-        private final String joinOrder;
 
-        public ProcedureInfo(final String groups[], final Class<?> cls) {
-            this.groups = groups;
+        public ProcedureInfo(final String roles[], final Class<?> cls) {
+            this.roles = roles;
             this.cls = cls;
             this.name = cls.getSimpleName();
             this.sql = null;
-            this.joinOrder = null;
             this.partitionInfo = null;
             assert(this.name != null);
         }
 
         public ProcedureInfo(
-                final String groups[],
+                final String roles[],
                 final String name,
                 final String sql,
                 final String partitionInfo) {
-            this(groups, name, sql, partitionInfo, null);
-        }
-
-        public ProcedureInfo(
-                final String groups[],
-                final String name,
-                final String sql,
-                final String partitionInfo,
-                final String joinOrder) {
             assert(name != null);
-            this.groups = groups;
+            this.roles = roles;
             this.cls = null;
             this.name = name;
             if (sql.endsWith(";")) {
@@ -127,7 +116,6 @@ public class VoltProjectBuilder {
                 this.sql = sql + ";";
             }
             this.partitionInfo = partitionInfo;
-            this.joinOrder = joinOrder;
             assert(this.name != null);
         }
 
@@ -149,12 +137,12 @@ public class VoltProjectBuilder {
     public static final class UserInfo {
         public final String name;
         public String password;
-        private final String groups[];
+        private final String roles[];
 
-        public UserInfo (final String name, final String password, final String groups[]){
+        public UserInfo (final String name, final String password, final String roles[]){
             this.name = name;
             this.password = password;
-            this.groups = groups;
+            this.roles = roles;
         }
 
         @Override
@@ -172,7 +160,7 @@ public class VoltProjectBuilder {
         }
     }
 
-    public static final class GroupInfo {
+    public static final class RoleInfo {
         private final String name;
         private final boolean sql;
         private final boolean sqlread;
@@ -181,7 +169,7 @@ public class VoltProjectBuilder {
         private final boolean defaultprocread;
         private final boolean allproc;
 
-        public GroupInfo(final String name, final boolean sql, final boolean sqlread, final boolean admin, final boolean defaultproc, final boolean defaultprocread, final boolean allproc){
+        public RoleInfo(final String name, final boolean sql, final boolean sqlread, final boolean admin, final boolean defaultproc, final boolean defaultprocread, final boolean allproc){
             this.name = name;
             this.sql = sql;
             this.sqlread = sqlread;
@@ -191,13 +179,13 @@ public class VoltProjectBuilder {
             this.allproc = allproc;
         }
 
-        public static GroupInfo[] fromTemplate(final GroupInfo other, final String... names) {
-            GroupInfo[] groups = new GroupInfo[names.length];
+        public static RoleInfo[] fromTemplate(final RoleInfo other, final String... names) {
+            RoleInfo[] roles = new RoleInfo[names.length];
             for (int i = 0; i < names.length; ++i) {
-                groups[i] = new GroupInfo(names[i], other.sql, other.sqlread, other.admin,
+                roles[i] = new RoleInfo(names[i], other.sql, other.sqlread, other.admin,
                                 other.defaultproc, other.defaultprocread, other.allproc);
             }
-            return groups;
+            return roles;
         }
 
         @Override
@@ -207,8 +195,8 @@ public class VoltProjectBuilder {
 
         @Override
         public boolean equals(final Object o) {
-            if (o instanceof GroupInfo) {
-                final GroupInfo oInfo = (GroupInfo)o;
+            if (o instanceof RoleInfo) {
+                final RoleInfo oInfo = (RoleInfo)o;
                 return name.equals(oInfo.name);
             }
             return false;
@@ -360,8 +348,8 @@ public class VoltProjectBuilder {
         }
     }
 
-    public void addGroups(final GroupInfo groups[]) {
-        for (final GroupInfo info : groups) {
+    public void addRoles(final RoleInfo roles[]) {
+        for (final RoleInfo info : roles) {
             transformer.append("CREATE ROLE " + info.name);
             if(info.sql || info.sqlread || info.defaultproc || info.admin || info.defaultprocread || info.allproc) {
                 transformer.append(" WITH ");
@@ -438,15 +426,11 @@ public class VoltProjectBuilder {
     }
 
     public void addStmtProcedure(String name, String sql) {
-        addStmtProcedure(name, sql, null, null);
+        addStmtProcedure(name, sql, null);
     }
 
     public void addStmtProcedure(String name, String sql, String partitionInfo) {
-        addStmtProcedure( name, sql, partitionInfo, null);
-    }
-
-    public void addStmtProcedure(String name, String sql, String partitionInfo, String joinOrder) {
-        addProcedures(new ProcedureInfo(new String[0], name, sql, partitionInfo, joinOrder));
+        addProcedures(new ProcedureInfo(new String[0], name, sql, partitionInfo));
     }
 
     public void addProcedures(final Class<?>... procedures) {
@@ -457,7 +441,7 @@ public class VoltProjectBuilder {
     }
 
     /*
-     * List of groups permitted to invoke the procedure
+     * List of roles permitted to invoke the procedure
      */
     public void addProcedures(final ProcedureInfo... procedures) {
         final ArrayList<ProcedureInfo> procArray = new ArrayList<ProcedureInfo>();
@@ -479,10 +463,10 @@ public class VoltProjectBuilder {
 
             // ALLOW clause in CREATE PROCEDURE stmt
             StringBuffer roleInfo = new StringBuffer();
-            if(procedure.groups.length != 0) {
+            if(procedure.roles.length != 0) {
                 roleInfo.append(" ALLOW ");
-                for(int i = 0; i < procedure.groups.length; i++) {
-                    roleInfo.append(procedure.groups[i] + ",");
+                for(int i = 0; i < procedure.roles.length; i++) {
+                    roleInfo.append(procedure.roles[i] + ",");
                 }
                 int length = roleInfo.length();
                 roleInfo.replace(length - 1, length, " ");
@@ -985,15 +969,15 @@ public class VoltProjectBuilder {
                 user.setName(info.name);
                 user.setPassword(info.password);
 
-                // build up user/@groups.
-                if (info.groups.length > 0) {
-                    final StringBuilder groups = new StringBuilder();
-                    for (final String group : info.groups) {
-                        if (groups.length() > 0)
-                            groups.append(",");
-                        groups.append(group);
+                // build up user/roles.
+                if (info.roles.length > 0) {
+                    final StringBuilder roles = new StringBuilder();
+                    for (final String role : info.roles) {
+                        if (roles.length() > 0)
+                            roles.append(",");
+                        roles.append(role);
                     }
-                    user.setGroups(groups.toString());
+                    user.setRoles(roles.toString());
                 }
             }
         }

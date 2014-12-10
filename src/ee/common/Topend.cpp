@@ -67,4 +67,9 @@ namespace voltdb {
     }
 
     void DummyTopend::fallbackToEEAllocatedBuffer(char *buffer, size_t length) {}
+
+    std::string DummyTopend::decodeBase64AndDecompress(const std::string& buffer) {
+        return "";
+    }
+
 }

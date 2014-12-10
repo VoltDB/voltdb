@@ -94,6 +94,7 @@ PersistentTable::PersistentTable(int partitionColumn, char * signature, bool isM
     m_allowNulls(),
     m_partitionColumn(partitionColumn),
     m_tupleLimit(tupleLimit),
+    m_purgeExecutorVector(),
     stats_(this),
     m_failedCompactionCount(0),
     m_invisibleTuplesPendingDeleteCount(0),

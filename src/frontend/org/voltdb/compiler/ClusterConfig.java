@@ -164,7 +164,7 @@ public class ClusterConfig
         }
         if (m_hostCount <= m_replicationFactor)
         {
-            m_errorMsg = String.format("%d servers required for K-safety=%d",
+            m_errorMsg = String.format("%d servers required for K-safety = %d",
                                        m_replicationFactor + 1, m_replicationFactor);
             return false;
         }

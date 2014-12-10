@@ -976,6 +976,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
                 m_tableStats.setStatsTable(stats);
             }
+            else {
+                // the EE returned no table stats, which means there are no tables.
+                // Need to ensure the cached stats are cleared to reflect that
+                m_tableStats.resetStatsTable();
+            }
 
             // update index stats
             final VoltTable[] s2 =
@@ -993,6 +998,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 stats.resetRowPosition();
 
                 m_indexStats.setStatsTable(stats);
+            }
+            else {
+                // the EE returned no index stats, which means there are no indexes.
+                // Need to ensure the cached stats are cleared to reflect that
+                m_indexStats.resetStatsTable();
             }
 
             // update the rolled up memory statistics

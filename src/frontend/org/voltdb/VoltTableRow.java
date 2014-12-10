@@ -50,11 +50,11 @@ import org.voltdb.utils.VoltTypeUtil;
  * <h3>Example</h3>
  *
  * <code>
- * VoltTableRow row = table.fetchRow(5);<br/>
- * System.out.println(row.getString("foo");<br/>
- * row.resetRowPosition();<br/>
- * while (row.advanceRow()) {<br/>
- * &nbsp;&nbsp;&nbsp;&nbsp;System.out.println(row.getLong(7));<br/>
+ * VoltTableRow row = table.fetchRow(5);<br>
+ * System.out.println(row.getString("foo");<br>
+ * row.resetRowPosition();<br>
+ * while (row.advanceRow()) {<br>
+ * &nbsp;&nbsp;&nbsp;&nbsp;System.out.println(row.getLong(7));<br>
  * }
  * </code>
  */
