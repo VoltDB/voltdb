@@ -21,29 +21,29 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 /*
-Copyright (c) 2008 Twilio, Inc.
+ Copyright (c) 2008 Twilio, Inc.
 
-Permission is hereby granted, free of charge, to any person
-obtaining a copy of this software and associated documentation
-files (the "Software"), to deal in the Software without
-restriction, including without limitation the rights to use,
-copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the
-Software is furnished to do so, subject to the following
-conditions:
+ Permission is hereby granted, free of charge, to any person
+ obtaining a copy of this software and associated documentation
+ files (the "Software"), to deal in the Software without
+ restriction, including without limitation the rights to use,
+ copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the
+ Software is furnished to do so, subject to the following
+ conditions:
 
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
+ The above copyright notice and this permission notice shall be
+ included in all copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
-*/
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+ OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ OTHER DEALINGS IN THE SOFTWARE.
+ */
 /*
  * What's up with the Twilio stuff? They have MIT licensed
  * REST clients in lots of languages, even Java. It's not a
@@ -51,7 +51,6 @@ OTHER DEALINGS IN THE SOFTWARE.
  * they did in a few ways.
  * Thanks Twilio!
  */
-
 package org.voltdb;
 
 import java.io.BufferedReader;
@@ -93,6 +92,7 @@ public class TestJSONInterface extends TestCase {
     ServerThread server;
 
     static class Response {
+
         public byte status = 0;
         public String statusString = null;
         public byte appStatus = Byte.MIN_VALUE;
@@ -103,11 +103,11 @@ public class TestJSONInterface extends TestCase {
 
     static String japaneseTestVarStrings = "Procedure=Insert&Parameters=%5B%22%5Cu3053%5Cu3093%5Cu306b%5Cu3061%5Cu306f%22%2C%22%5Cu4e16%5Cu754c%22%2C%22Japanese%22%5D";
 
-    static String getHTTPVarString(Map<String,String> params) throws UnsupportedEncodingException {
+    static String getHTTPVarString(Map<String, String> params) throws UnsupportedEncodingException {
         String s = "";
         for (Entry<String, String> e : params.entrySet()) {
             String encodedValue = URLEncoder.encode(e.getValue(), "UTF-8");
-            s += "&"+ e.getKey() + "=" + encodedValue;
+            s += "&" + e.getKey() + "=" + encodedValue;
         }
         s = s.substring(1);
         return s;
@@ -130,19 +130,19 @@ public class TestJSONInterface extends TestCase {
 
         BufferedReader in = null;
         try {
-            if(conn.getInputStream()!=null){
+            if (conn.getInputStream() != null) {
                 in = new BufferedReader(
                         new InputStreamReader(
-                        conn.getInputStream(), "UTF-8"));
+                                conn.getInputStream(), "UTF-8"));
             }
-        } catch(IOException e){
-            if(conn.getErrorStream()!=null){
+        } catch (IOException e) {
+            if (conn.getErrorStream() != null) {
                 in = new BufferedReader(
                         new InputStreamReader(
-                        conn.getErrorStream(), "UTF-8"));
+                                conn.getErrorStream(), "UTF-8"));
             }
         }
-        if(in==null) {
+        if (in == null) {
             throw new Exception("Unable to read response from server");
         }
 
@@ -163,17 +163,16 @@ public class TestJSONInterface extends TestCase {
         try {
             conn.getInputStream().close();
             conn.disconnect();
+        } // ignore closing problems here
+        catch (Exception e) {
         }
-        // ignore closing problems here
-        catch (Exception e) {}
         conn = null;
 
         //System.err.println(response);
-
         return response;
     }
 
-    public static String getUrlOverJSON(String url, int expectedCode) throws Exception {
+    public static String getUrlOverJSON(String url, int expectedCode, String expectedCt) throws Exception {
         URL jsonAPIURL = new URL(url);
 
         HttpURLConnection conn = (HttpURLConnection) jsonAPIURL.openConnection();
@@ -183,21 +182,23 @@ public class TestJSONInterface extends TestCase {
 
         BufferedReader in = null;
         try {
-            if(conn.getInputStream()!=null){
+            if (conn.getInputStream() != null) {
                 in = new BufferedReader(
                         new InputStreamReader(
-                        conn.getInputStream(), "UTF-8"));
+                                conn.getInputStream(), "UTF-8"));
             }
-        } catch(IOException e){
-            if(conn.getErrorStream()!=null){
+        } catch (IOException e) {
+            if (conn.getErrorStream() != null) {
                 in = new BufferedReader(
                         new InputStreamReader(
-                        conn.getErrorStream(), "UTF-8"));
+                                conn.getErrorStream(), "UTF-8"));
             }
         }
-        if(in==null) {
+        if (in == null) {
             throw new Exception("Unable to read response from server");
         }
+        String ct = conn.getContentType();
+        assertTrue(ct.contains(expectedCt));
 
         StringBuilder decodedString = new StringBuilder();
         String line;
@@ -216,18 +217,17 @@ public class TestJSONInterface extends TestCase {
         try {
             conn.getInputStream().close();
             conn.disconnect();
+        } // ignore closing problems here
+        catch (Exception e) {
         }
-        // ignore closing problems here
-        catch (Exception e) {}
         conn = null;
 
         //System.err.println(response);
-
         return response;
     }
 
     public static String getHashedPasswordForHTTPVar(String password) {
-        assert(password != null);
+        assert (password != null);
 
         MessageDigest md = null;
         try {
@@ -259,16 +259,18 @@ public class TestJSONInterface extends TestCase {
         // Call insert
         String paramsInJSON = pset.toJSONString();
         //System.out.println(paramsInJSON);
-        HashMap<String,String> params = new HashMap<String,String>();
+        HashMap<String, String> params = new HashMap<String, String>();
         params.put("Procedure", procName);
         params.put("Parameters", paramsInJSON);
-        if (username != null)
+        if (username != null) {
             params.put("User", username);
+        }
         if (password != null) {
-            if (preHash)
+            if (preHash) {
                 params.put("Hashedpassword", getHashedPasswordForHTTPVar(password));
-            else
+            } else {
                 params.put("Password", password);
+            }
         }
         if (admin) {
             params.put("admin", "true");
@@ -288,803 +290,871 @@ public class TestJSONInterface extends TestCase {
         response.results = new VoltTable[resultsJson.length()];
         for (int i = 0; i < response.results.length; i++) {
             JSONObject tableJson = resultsJson.getJSONObject(i);
-            response.results[i] =  VoltTable.fromJSONObject(tableJson);
+            response.results[i] = VoltTable.fromJSONObject(tableJson);
         }
-        if (jsonObj.isNull("status") == false)
+        if (jsonObj.isNull("status") == false) {
             response.status = (byte) jsonObj.getInt("status");
-        if (jsonObj.isNull("appstatus") == false)
+        }
+        if (jsonObj.isNull("appstatus") == false) {
             response.appStatus = (byte) jsonObj.getInt("appstatus");
-        if (jsonObj.isNull("statusstring") == false)
+        }
+        if (jsonObj.isNull("statusstring") == false) {
             response.statusString = jsonObj.getString("statusstring");
-        if (jsonObj.isNull("appstatusstring") == false)
+        }
+        if (jsonObj.isNull("appstatusstring") == false) {
             response.appStatusString = jsonObj.getString("appstatusstring");
-        if (jsonObj.isNull("exception") == false)
+        }
+        if (jsonObj.isNull("exception") == false) {
             response.exception = jsonObj.getString("exception");
+        }
 
         return response;
     }
 
     public void testAdminMode() throws Exception {
-    try {
-        String simpleSchema =
-            "create table blah (" +
-            "ival bigint default 23 not null, " +
-            "sval varchar(200) default 'foo', " +
-            "dateval timestamp, " +
-            "fval float, " +
-            "decval decimal, " +
-            "PRIMARY KEY(ival));";
+        try {
+            String simpleSchema
+                    = "create table blah ("
+                    + "ival bigint default 23 not null, "
+                    + "sval varchar(200) default 'foo', "
+                    + "dateval timestamp, "
+                    + "fval float, "
+                    + "decval decimal, "
+                    + "PRIMARY KEY(ival));";
 
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
-        String schemaPath = schemaFile.getPath();
-        schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+            String schemaPath = schemaFile.getPath();
+            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
+            VoltDB.Configuration config = new VoltDB.Configuration();
 
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addSchema(schemaPath);
-        builder.addPartitionInfo("blah", "ival");
-        builder.addStmtProcedure("Insert", "insert into blah values (?,?,?,?,?);");
-        builder.addProcedures(CrazyBlahProc.class);
-        builder.setHTTPDPort(8095);
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"), 1, 1, 0, 21213, true);
-        assertTrue(success);
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addSchema(schemaPath);
+            builder.addPartitionInfo("blah", "ival");
+            builder.addStmtProcedure("Insert", "insert into blah values (?,?,?,?,?);");
+            builder.addProcedures(CrazyBlahProc.class);
+            builder.setHTTPDPort(8095);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"), 1, 1, 0, 21213, true);
+            assertTrue(success);
 
-        config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
-        config.m_pathToDeployment = builder.getPathToDeployment();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
 
-        server = new ServerThread(config);
-        server.start();
-        server.waitForInitialization();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
 
-        ParameterSet pset;
-        String responseJSON;
-        Response response;
+            ParameterSet pset;
+            String responseJSON;
+            Response response;
 
-        // Call insert on admin port
-        pset = ParameterSet.fromArrayNoCopy(1, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
-        responseJSON = callProcOverJSON("Insert", pset, null, null, false, true);
-        System.out.println(responseJSON);
-        response = responseFromJSON(responseJSON);
-        assertTrue(response.status == ClientResponse.SUCCESS);
+            // Call insert on admin port
+            pset = ParameterSet.fromArrayNoCopy(1, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
+            responseJSON = callProcOverJSON("Insert", pset, null, null, false, true);
+            System.out.println(responseJSON);
+            response = responseFromJSON(responseJSON);
+            assertTrue(response.status == ClientResponse.SUCCESS);
 
-        // Call insert on closed client port and expect failure
-        pset = ParameterSet.fromArrayNoCopy(2, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
-        responseJSON = callProcOverJSON("Insert", pset, null, null, false, false);
-        System.out.println(responseJSON);
-        response = responseFromJSON(responseJSON);
-        assertTrue(response.status == ClientResponse.SERVER_UNAVAILABLE);
+            // Call insert on closed client port and expect failure
+            pset = ParameterSet.fromArrayNoCopy(2, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
+            responseJSON = callProcOverJSON("Insert", pset, null, null, false, false);
+            System.out.println(responseJSON);
+            response = responseFromJSON(responseJSON);
+            assertTrue(response.status == ClientResponse.SERVER_UNAVAILABLE);
 
-        // open client port
-        pset = ParameterSet.emptyParameterSet();
-        responseJSON = callProcOverJSON("@Resume", pset, null, null, false, true);
-        System.out.println(responseJSON);
-        response = responseFromJSON(responseJSON);
-        assertTrue(response.status == ClientResponse.SUCCESS);
+            // open client port
+            pset = ParameterSet.emptyParameterSet();
+            responseJSON = callProcOverJSON("@Resume", pset, null, null, false, true);
+            System.out.println(responseJSON);
+            response = responseFromJSON(responseJSON);
+            assertTrue(response.status == ClientResponse.SUCCESS);
 
-        // call insert on open client port
-        pset = ParameterSet.fromArrayNoCopy(2, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
-        responseJSON = callProcOverJSON("Insert", pset, null, null, false, false);
-        System.out.println(responseJSON);
-        response = responseFromJSON(responseJSON);
-        assertTrue(response.status == ClientResponse.SUCCESS);
+            // call insert on open client port
+            pset = ParameterSet.fromArrayNoCopy(2, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
+            responseJSON = callProcOverJSON("Insert", pset, null, null, false, false);
+            System.out.println(responseJSON);
+            response = responseFromJSON(responseJSON);
+            assertTrue(response.status == ClientResponse.SUCCESS);
 
-        // call insert on admin port again (now that both ports are open)
-        pset = ParameterSet.fromArrayNoCopy(3, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
-        responseJSON = callProcOverJSON("Insert", pset, null, null, false, true);
-        System.out.println(responseJSON);
-        response = responseFromJSON(responseJSON);
-        assertTrue(response.status == ClientResponse.SUCCESS);
+            // call insert on admin port again (now that both ports are open)
+            pset = ParameterSet.fromArrayNoCopy(3, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
+            responseJSON = callProcOverJSON("Insert", pset, null, null, false, true);
+            System.out.println(responseJSON);
+            response = responseFromJSON(responseJSON);
+            assertTrue(response.status == ClientResponse.SUCCESS);
 
-        // put the system in admin mode
-        pset = ParameterSet.emptyParameterSet();
-        responseJSON = callProcOverJSON("@Pause", pset, null, null, false, true);
-        System.out.println(responseJSON);
-        response = responseFromJSON(responseJSON);
-        assertTrue(response.status == ClientResponse.SUCCESS);
+            // put the system in admin mode
+            pset = ParameterSet.emptyParameterSet();
+            responseJSON = callProcOverJSON("@Pause", pset, null, null, false, true);
+            System.out.println(responseJSON);
+            response = responseFromJSON(responseJSON);
+            assertTrue(response.status == ClientResponse.SUCCESS);
 
-        // Call insert on admin port
-        pset = ParameterSet.fromArrayNoCopy(4, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
-        responseJSON = callProcOverJSON("Insert", pset, null, null, false, true);
-        System.out.println(responseJSON);
-        response = responseFromJSON(responseJSON);
-        assertTrue(response.status == ClientResponse.SUCCESS);
+            // Call insert on admin port
+            pset = ParameterSet.fromArrayNoCopy(4, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
+            responseJSON = callProcOverJSON("Insert", pset, null, null, false, true);
+            System.out.println(responseJSON);
+            response = responseFromJSON(responseJSON);
+            assertTrue(response.status == ClientResponse.SUCCESS);
 
-        // Call insert on closed client port and expect failure
-        pset = ParameterSet.fromArrayNoCopy(5, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
-        responseJSON = callProcOverJSON("Insert", pset, null, null, false, false);
-        System.out.println(responseJSON);
-        response = responseFromJSON(responseJSON);
-        assertTrue(response.status == ClientResponse.SERVER_UNAVAILABLE);
-    } finally {
-        if (server != null) {
-            server.shutdown();
-            server.join();
+            // Call insert on closed client port and expect failure
+            pset = ParameterSet.fromArrayNoCopy(5, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
+            responseJSON = callProcOverJSON("Insert", pset, null, null, false, false);
+            System.out.println(responseJSON);
+            response = responseFromJSON(responseJSON);
+            assertTrue(response.status == ClientResponse.SERVER_UNAVAILABLE);
+        } finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
         }
-        server = null;
-    }
     }
 
     public void testSimple() throws Exception {
-    try {
-        String simpleSchema =
-            "create table blah (" +
-            "ival bigint default 23 not null, " +
-            "sval varchar(200) default 'foo', " +
-            "dateval timestamp, " +
-            "fval float, " +
-            "decval decimal, " +
-            "PRIMARY KEY(ival));";
+        try {
+            String simpleSchema
+                    = "create table blah ("
+                    + "ival bigint default 23 not null, "
+                    + "sval varchar(200) default 'foo', "
+                    + "dateval timestamp, "
+                    + "fval float, "
+                    + "decval decimal, "
+                    + "PRIMARY KEY(ival));";
 
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
-        String schemaPath = schemaFile.getPath();
-        schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+            String schemaPath = schemaFile.getPath();
+            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
+            VoltDB.Configuration config = new VoltDB.Configuration();
 
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addSchema(schemaPath);
-        builder.addPartitionInfo("blah", "ival");
-        builder.addStmtProcedure("Insert", "insert into blah values (?,?,?,?,?);");
-        builder.addProcedures(CrazyBlahProc.class);
-        builder.setHTTPDPort(8095);
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"), 1, 1, 0, 21213, false);
-        assertTrue(success);
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addSchema(schemaPath);
+            builder.addPartitionInfo("blah", "ival");
+            builder.addStmtProcedure("Insert", "insert into blah values (?,?,?,?,?);");
+            builder.addProcedures(CrazyBlahProc.class);
+            builder.setHTTPDPort(8095);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"), 1, 1, 0, 21213, false);
+            assertTrue(success);
 
-        config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
-        config.m_pathToDeployment = builder.getPathToDeployment();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
 
-        server = new ServerThread(config);
-        server.start();
-        server.waitForInitialization();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
 
-        ParameterSet pset;
-        String responseJSON;
-        Response response;
+            ParameterSet pset;
+            String responseJSON;
+            Response response;
 
-        // Call insert
-        pset = ParameterSet.fromArrayNoCopy(1, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
-        responseJSON = callProcOverJSON("Insert", pset, null, null, false);
-        System.out.println(responseJSON);
-        response = responseFromJSON(responseJSON);
-        assertTrue(response.status == ClientResponse.SUCCESS);
+            // Call insert
+            pset = ParameterSet.fromArrayNoCopy(1, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
+            responseJSON = callProcOverJSON("Insert", pset, null, null, false);
+            System.out.println(responseJSON);
+            response = responseFromJSON(responseJSON);
+            assertTrue(response.status == ClientResponse.SUCCESS);
 
-        // Call insert again (with failure expected)
-        responseJSON = callProcOverJSON("Insert", pset, null, null, false);
-        System.out.println(responseJSON);
-        response = responseFromJSON(responseJSON);
-        assertTrue(response.status != ClientResponse.SUCCESS);
+            // Call insert again (with failure expected)
+            responseJSON = callProcOverJSON("Insert", pset, null, null, false);
+            System.out.println(responseJSON);
+            response = responseFromJSON(responseJSON);
+            assertTrue(response.status != ClientResponse.SUCCESS);
 
-        // Call proc with complex params
-        pset = ParameterSet.fromArrayNoCopy(1,
-                           5,
-                           new double[] { 1.5, 6.0, 4 },
-                           new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.BIGINT)),
-                           new BigDecimal(5),
-                           new BigDecimal[] {},
-                           new TimestampType(System.currentTimeMillis()));
+            // Call proc with complex params
+            pset = ParameterSet.fromArrayNoCopy(1,
+                    5,
+                    new double[]{1.5, 6.0, 4},
+                    new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.BIGINT)),
+                    new BigDecimal(5),
+                    new BigDecimal[]{},
+                    new TimestampType(System.currentTimeMillis()));
 
-        responseJSON = callProcOverJSON("CrazyBlahProc", pset, null, null, false);
-        System.out.println(responseJSON);
-        response = responseFromJSON(responseJSON);
-        assertEquals(ClientResponse.SUCCESS, response.status);
+            responseJSON = callProcOverJSON("CrazyBlahProc", pset, null, null, false);
+            System.out.println(responseJSON);
+            response = responseFromJSON(responseJSON);
+            assertEquals(ClientResponse.SUCCESS, response.status);
 
-        // check the JSON itself makes sense
-        JSONObject jsonObj = new JSONObject(responseJSON);
-        JSONArray results = jsonObj.getJSONArray("results");
-        assertEquals(4, response.results.length);
-        JSONObject table = results.getJSONObject(0);
-        JSONArray data = table.getJSONArray("data");
-        assertEquals(1, data.length());
-        JSONArray row = data.getJSONArray(0);
-        assertEquals(1, row.length());
-        long value = row.getLong(0);
-        assertEquals(1, value);
+            // check the JSON itself makes sense
+            JSONObject jsonObj = new JSONObject(responseJSON);
+            JSONArray results = jsonObj.getJSONArray("results");
+            assertEquals(4, response.results.length);
+            JSONObject table = results.getJSONObject(0);
+            JSONArray data = table.getJSONArray("data");
+            assertEquals(1, data.length());
+            JSONArray row = data.getJSONArray(0);
+            assertEquals(1, row.length());
+            long value = row.getLong(0);
+            assertEquals(1, value);
 
-        // try to pass a string as a date
-        java.sql.Timestamp ts = new java.sql.Timestamp(System.currentTimeMillis());
-        ts.setNanos(123456000);
-        pset = ParameterSet.fromArrayNoCopy(1,
-                5,
-                new double[] { 1.5, 6.0, 4 },
-                new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.BIGINT)),
-                new BigDecimal(5),
-                new BigDecimal[] {},
-                ts.toString());
+            // try to pass a string as a date
+            java.sql.Timestamp ts = new java.sql.Timestamp(System.currentTimeMillis());
+            ts.setNanos(123456000);
+            pset = ParameterSet.fromArrayNoCopy(1,
+                    5,
+                    new double[]{1.5, 6.0, 4},
+                    new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.BIGINT)),
+                    new BigDecimal(5),
+                    new BigDecimal[]{},
+                    ts.toString());
 
-        responseJSON = callProcOverJSON("CrazyBlahProc", pset, null, null, false);
-        System.out.println(responseJSON);
-        response = responseFromJSON(responseJSON);
-        assertEquals(ClientResponse.SUCCESS, response.status);
-        response.results[3].advanceRow();
-        System.out.println(response.results[3].getTimestampAsTimestamp(0).getTime());
-        assertEquals(123456, response.results[3].getTimestampAsTimestamp(0).getTime() % 1000000);
+            responseJSON = callProcOverJSON("CrazyBlahProc", pset, null, null, false);
+            System.out.println(responseJSON);
+            response = responseFromJSON(responseJSON);
+            assertEquals(ClientResponse.SUCCESS, response.status);
+            response.results[3].advanceRow();
+            System.out.println(response.results[3].getTimestampAsTimestamp(0).getTime());
+            assertEquals(123456, response.results[3].getTimestampAsTimestamp(0).getTime() % 1000000);
 
-        // now try a null short value sent as a int  (param expects short)
-        pset = ParameterSet.fromArrayNoCopy(1,
-                VoltType.NULL_SMALLINT,
-                new double[] { 1.5, 6.0, 4 },
-                new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.BIGINT)),
-                new BigDecimal(5),
-                new BigDecimal[] {},
-                new TimestampType(System.currentTimeMillis()));
+            // now try a null short value sent as a int  (param expects short)
+            pset = ParameterSet.fromArrayNoCopy(1,
+                    VoltType.NULL_SMALLINT,
+                    new double[]{1.5, 6.0, 4},
+                    new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.BIGINT)),
+                    new BigDecimal(5),
+                    new BigDecimal[]{},
+                    new TimestampType(System.currentTimeMillis()));
 
-        responseJSON = callProcOverJSON("CrazyBlahProc", pset, null, null, false);
-        System.out.println(responseJSON);
-        response = responseFromJSON(responseJSON);
-        assertFalse(response.status == ClientResponse.SUCCESS);
+            responseJSON = callProcOverJSON("CrazyBlahProc", pset, null, null, false);
+            System.out.println(responseJSON);
+            response = responseFromJSON(responseJSON);
+            assertFalse(response.status == ClientResponse.SUCCESS);
 
-        // now try an out of range long value (param expects short)
-        pset = ParameterSet.fromArrayNoCopy(1,
-                Long.MAX_VALUE - 100,
-                new double[] { 1.5, 6.0, 4 },
-                new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.BIGINT)),
-                new BigDecimal(5),
-                new BigDecimal[] {},
-                new TimestampType(System.currentTimeMillis()));
+            // now try an out of range long value (param expects short)
+            pset = ParameterSet.fromArrayNoCopy(1,
+                    Long.MAX_VALUE - 100,
+                    new double[]{1.5, 6.0, 4},
+                    new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.BIGINT)),
+                    new BigDecimal(5),
+                    new BigDecimal[]{},
+                    new TimestampType(System.currentTimeMillis()));
 
-        responseJSON = callProcOverJSON("CrazyBlahProc", pset, null, null, false);
-        System.out.println(responseJSON);
-        response = responseFromJSON(responseJSON);
-        assertFalse(response.status == ClientResponse.SUCCESS);
+            responseJSON = callProcOverJSON("CrazyBlahProc", pset, null, null, false);
+            System.out.println(responseJSON);
+            response = responseFromJSON(responseJSON);
+            assertFalse(response.status == ClientResponse.SUCCESS);
 
-        // now try bigdecimal with small value
-        pset = ParameterSet.fromArrayNoCopy(1,
-                4,
-                new double[] { 1.5, 6.0, 4 },
-                new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.BIGINT)),
-                5,
-                new BigDecimal[] {},
-                new TimestampType(System.currentTimeMillis()));
+            // now try bigdecimal with small value
+            pset = ParameterSet.fromArrayNoCopy(1,
+                    4,
+                    new double[]{1.5, 6.0, 4},
+                    new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.BIGINT)),
+                    5,
+                    new BigDecimal[]{},
+                    new TimestampType(System.currentTimeMillis()));
 
-        responseJSON = callProcOverJSON("CrazyBlahProc", pset, null, null, false);
-        System.out.println(responseJSON);
-        response = responseFromJSON(responseJSON);
-        System.out.println(response.statusString);
-        assertEquals(ClientResponse.SUCCESS, response.status);
+            responseJSON = callProcOverJSON("CrazyBlahProc", pset, null, null, false);
+            System.out.println(responseJSON);
+            response = responseFromJSON(responseJSON);
+            System.out.println(response.statusString);
+            assertEquals(ClientResponse.SUCCESS, response.status);
 
-        // now try null
-        pset = ParameterSet.fromArrayNoCopy(1,
-                4,
-                new double[] { 1.5, 6.0, 4 },
-                new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.BIGINT)),
-                5,
-                new BigDecimal[] {},
-                null);
+            // now try null
+            pset = ParameterSet.fromArrayNoCopy(1,
+                    4,
+                    new double[]{1.5, 6.0, 4},
+                    new VoltTable(new VoltTable.ColumnInfo("foo", VoltType.BIGINT)),
+                    5,
+                    new BigDecimal[]{},
+                    null);
 
-        responseJSON = callProcOverJSON("CrazyBlahProc", pset, null, null, false);
-        System.out.println(responseJSON);
-        response = responseFromJSON(responseJSON);
-        System.out.println(response.statusString);
-        assertEquals(ClientResponse.SUCCESS, response.status);
+            responseJSON = callProcOverJSON("CrazyBlahProc", pset, null, null, false);
+            System.out.println(responseJSON);
+            response = responseFromJSON(responseJSON);
+            System.out.println(response.statusString);
+            assertEquals(ClientResponse.SUCCESS, response.status);
 
-        // now try jsonp
-        responseJSON = callProcOverJSONRaw("Procedure=@Statistics&Parameters=[TABLE]&jsonp=fooBar", 200);
-        System.out.println(responseJSON);
-        assertTrue(responseJSON.startsWith("fooBar("));
+            // now try jsonp
+            responseJSON = callProcOverJSONRaw("Procedure=@Statistics&Parameters=[TABLE]&jsonp=fooBar", 200);
+            System.out.println(responseJSON);
+            assertTrue(responseJSON.startsWith("fooBar("));
 
-        // now try adhoc
-        pset = ParameterSet.fromArrayNoCopy("select * from blah");
-        responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
-        System.out.println(responseJSON);
-        response = responseFromJSON(responseJSON);
-        System.out.println(response.statusString);
-        assertEquals(ClientResponse.SUCCESS, response.status);
+            // now try adhoc
+            pset = ParameterSet.fromArrayNoCopy("select * from blah");
+            responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
+            System.out.println(responseJSON);
+            response = responseFromJSON(responseJSON);
+            System.out.println(response.statusString);
+            assertEquals(ClientResponse.SUCCESS, response.status);
 
-        // now try adhoc insert with a huge bigint
-        pset = ParameterSet.fromArrayNoCopy("insert into blah values (974599638818488300, NULL, NULL, NULL, NULL);");
-        responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
-        System.out.println(responseJSON);
-        response = responseFromJSON(responseJSON);
-        System.out.println(response.statusString);
-        assertEquals(ClientResponse.SUCCESS, response.status);
+            // now try adhoc insert with a huge bigint
+            pset = ParameterSet.fromArrayNoCopy("insert into blah values (974599638818488300, NULL, NULL, NULL, NULL);");
+            responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
+            System.out.println(responseJSON);
+            response = responseFromJSON(responseJSON);
+            System.out.println(response.statusString);
+            assertEquals(ClientResponse.SUCCESS, response.status);
 
-        pset = ParameterSet.fromArrayNoCopy("select * from blah where ival = 974599638818488300;");
-        responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
-        System.out.println(responseJSON);
-        response = responseFromJSON(responseJSON);
-        System.out.println(response.statusString);
-        assertEquals(ClientResponse.SUCCESS, response.status);
-        assertEquals(1, response.results.length);
-        assertEquals(1, response.results[0].getRowCount());
+            pset = ParameterSet.fromArrayNoCopy("select * from blah where ival = 974599638818488300;");
+            responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
+            System.out.println(responseJSON);
+            response = responseFromJSON(responseJSON);
+            System.out.println(response.statusString);
+            assertEquals(ClientResponse.SUCCESS, response.status);
+            assertEquals(1, response.results.length);
+            assertEquals(1, response.results[0].getRowCount());
 
-        // Call @AdHoc with zero parameters
-        pset = ParameterSet.emptyParameterSet();
-        responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
-        assertTrue(responseJSON.contains("Adhoc system procedure requires at least the query parameter."));
+            // Call @AdHoc with zero parameters
+            pset = ParameterSet.emptyParameterSet();
+            responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
+            assertTrue(responseJSON.contains("Adhoc system procedure requires at least the query parameter."));
 
-        // Call @AdHoc with many parameters (more than 2)
-        pset = ParameterSet.fromArrayNoCopy("select * from blah", "foo", "bar");
-        responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
-        assertTrue(responseJSON.contains("Unable to execute adhoc sql statement(s): Too many actual arguments were passed for the parameters in the sql statement(s): (2 vs. 0)"));
+            // Call @AdHoc with many parameters (more than 2)
+            pset = ParameterSet.fromArrayNoCopy("select * from blah", "foo", "bar");
+            responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
+            assertTrue(responseJSON.contains("Unable to execute adhoc sql statement(s): Too many actual arguments were passed for the parameters in the sql statement(s): (2 vs. 0)"));
 
-    } finally {
-        if (server != null) {
-            server.shutdown();
-            server.join();
+        } finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
         }
-        server = null;
-    }
     }
 
     public void testJapaneseNastiness() throws Exception {
-    try {
-        String simpleSchema =
-            "CREATE TABLE HELLOWORLD (\n" +
-            "    HELLO VARCHAR(15),\n" +
-            "    WORLD VARCHAR(15),\n" +
-            "    DIALECT VARCHAR(15) NOT NULL,\n" +
-            "    PRIMARY KEY (DIALECT)\n" +
-            ");";
+        try {
+            String simpleSchema
+                    = "CREATE TABLE HELLOWORLD (\n"
+                    + "    HELLO VARCHAR(15),\n"
+                    + "    WORLD VARCHAR(15),\n"
+                    + "    DIALECT VARCHAR(15) NOT NULL,\n"
+                    + "    PRIMARY KEY (DIALECT)\n"
+                    + ");";
 
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
-        String schemaPath = schemaFile.getPath();
-        schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+            String schemaPath = schemaFile.getPath();
+            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
 
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addSchema(schemaPath);
-        builder.addPartitionInfo("HELLOWORLD", "DIALECT");
-        builder.addStmtProcedure("Insert", "insert into HELLOWORLD values (?,?,?);");
-        builder.addStmtProcedure("Select", "select * from HELLOWORLD;");
-        builder.addProcedures(SelectStarHelloWorld.class);
-        builder.setHTTPDPort(8095);
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
-        assertTrue(success);
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addSchema(schemaPath);
+            builder.addPartitionInfo("HELLOWORLD", "DIALECT");
+            builder.addStmtProcedure("Insert", "insert into HELLOWORLD values (?,?,?);");
+            builder.addStmtProcedure("Select", "select * from HELLOWORLD;");
+            builder.addProcedures(SelectStarHelloWorld.class);
+            builder.setHTTPDPort(8095);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            assertTrue(success);
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
-        config.m_pathToDeployment = builder.getPathToDeployment();
-        server = new ServerThread(config);
-        server.start();
-        server.waitForInitialization();
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
 
-        String response = callProcOverJSONRaw(japaneseTestVarStrings, 200);
-        Response r = responseFromJSON(response);
-        assertEquals(1, r.status);
+            String response = callProcOverJSONRaw(japaneseTestVarStrings, 200);
+            Response r = responseFromJSON(response);
+            assertEquals(1, r.status);
 
         // If this line doesn't compile, right click the file in the package explorer.
-        // Select the properties menu. Set the text file encoding to UTF-8.
-        char[] test1 = {'こ', 'ん', 'に', 'ち', 'は' };
-        String test2 = new String(test1);
+            // Select the properties menu. Set the text file encoding to UTF-8.
+            char[] test1 = {'こ', 'ん', 'に', 'ち', 'は'};
+            String test2 = new String(test1);
 
-        ParameterSet pset = ParameterSet.emptyParameterSet();
-        response = callProcOverJSON("Select", pset, null, null, false);
-        System.out.println(response);
-        System.out.println(test2);
-        r = responseFromJSON(response);
-        assertEquals(1, r.status);
+            ParameterSet pset = ParameterSet.emptyParameterSet();
+            response = callProcOverJSON("Select", pset, null, null, false);
+            System.out.println(response);
+            System.out.println(test2);
+            r = responseFromJSON(response);
+            assertEquals(1, r.status);
 
-        response = callProcOverJSON("SelectStarHelloWorld", pset, null, null, false);
-        r = responseFromJSON(response);
-        assertEquals(1, r.status);
-        assertTrue(response.contains(test2));
-    } finally {
-        if (server != null) {
-            server.shutdown();
-            server.join();
+            response = callProcOverJSON("SelectStarHelloWorld", pset, null, null, false);
+            r = responseFromJSON(response);
+            assertEquals(1, r.status);
+            assertTrue(response.contains(test2));
+        } finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
         }
-        server = null;
-    }
     }
 
     public void testJSONAuth() throws Exception {
-    try {
-        String simpleSchema =
-            "CREATE TABLE HELLOWORLD (\n" +
-            "    HELLO VARCHAR(15),\n" +
-            "    WORLD VARCHAR(20),\n" +
-            "    DIALECT VARCHAR(15) NOT NULL,\n" +
-            "    PRIMARY KEY (DIALECT)\n" +
-            ");";
+        try {
+            String simpleSchema
+                    = "CREATE TABLE HELLOWORLD (\n"
+                    + "    HELLO VARCHAR(15),\n"
+                    + "    WORLD VARCHAR(20),\n"
+                    + "    DIALECT VARCHAR(15) NOT NULL,\n"
+                    + "    PRIMARY KEY (DIALECT)\n"
+                    + ");";
 
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
-        String schemaPath = schemaFile.getPath();
-        schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+            String schemaPath = schemaFile.getPath();
+            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
 
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addSchema(schemaPath);
-        builder.addPartitionInfo("HELLOWORLD", "DIALECT");
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addSchema(schemaPath);
+            builder.addPartitionInfo("HELLOWORLD", "DIALECT");
 
-        RoleInfo gi = new RoleInfo("foo", true, false, true, true, false, false);
-        builder.addRoles(new RoleInfo[] { gi } );
+            RoleInfo gi = new RoleInfo("foo", true, false, true, true, false, false);
+            builder.addRoles(new RoleInfo[]{gi});
 
-        // create 20 users, only the first one has an interesting user/pass
-        UserInfo[] ui = new UserInfo[15];
-        ui[0] = new UserInfo("ry@nlikesthe", "y@nkees", new String[] { "foo" } );
-        for (int i = 1; i < ui.length; i++) {
-            ui[i] = new UserInfo("USER" + String.valueOf(i), "PASS" + String.valueOf(i), new String[] { "foo" } );
-        }
-        builder.addUsers(ui);
+            // create 20 users, only the first one has an interesting user/pass
+            UserInfo[] ui = new UserInfo[15];
+            ui[0] = new UserInfo("ry@nlikesthe", "y@nkees", new String[]{"foo"});
+            for (int i = 1; i < ui.length; i++) {
+                ui[i] = new UserInfo("USER" + String.valueOf(i), "PASS" + String.valueOf(i), new String[]{"foo"});
+            }
+            builder.addUsers(ui);
 
-        builder.setSecurityEnabled(true, true);
+            builder.setSecurityEnabled(true, true);
 
-        ProcedureInfo[] pi = new ProcedureInfo[2];
-        pi[0] = new ProcedureInfo(new String[] { "foo" }, "Insert", "insert into HELLOWORLD values (?,?,?);", null);
-        pi[1] = new ProcedureInfo(new String[] { "foo" }, "Select", "select * from HELLOWORLD;", null);
-        builder.addProcedures(pi);
+            ProcedureInfo[] pi = new ProcedureInfo[2];
+            pi[0] = new ProcedureInfo(new String[]{"foo"}, "Insert", "insert into HELLOWORLD values (?,?,?);", null);
+            pi[1] = new ProcedureInfo(new String[]{"foo"}, "Select", "select * from HELLOWORLD;", null);
+            builder.addProcedures(pi);
 
-        builder.setHTTPDPort(8095);
+            builder.setHTTPDPort(8095);
 
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
-        assertTrue(success);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            assertTrue(success);
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
-        config.m_pathToDeployment = builder.getPathToDeployment();
-        server = new ServerThread(config);
-        server.start();
-        server.waitForInitialization();
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
 
-        ParameterSet pset;
+            ParameterSet pset;
 
-        // test good auths
-        for (UserInfo u : ui) {
-            pset = ParameterSet.fromArrayNoCopy(u.name, u.password, u.name);
-            String response = callProcOverJSON("Insert", pset, u.name, u.password, true);
+            // test good auths
+            for (UserInfo u : ui) {
+                pset = ParameterSet.fromArrayNoCopy(u.name, u.password, u.name);
+                String response = callProcOverJSON("Insert", pset, u.name, u.password, true);
+                Response r = responseFromJSON(response);
+                assertEquals(ClientResponse.SUCCESS, r.status);
+            }
+            // test re-using auths
+            for (UserInfo u : ui) {
+                pset = ParameterSet.fromArrayNoCopy(u.name + "-X", u.password + "-X", u.name + "-X");
+                String response = callProcOverJSON("Insert", pset, u.name, u.password, false);
+                Response r = responseFromJSON(response);
+                assertEquals(ClientResponse.SUCCESS, r.status);
+            }
+
+            // test bad auth
+            UserInfo u = ui[0];
+            pset = ParameterSet.fromArrayNoCopy(u.name + "-X1", u.password + "-X1", u.name + "-X1");
+            String response = callProcOverJSON("Insert", pset, u.name, "ick", true);
             Response r = responseFromJSON(response);
-            assertEquals(ClientResponse.SUCCESS, r.status);
-        }
-        // test re-using auths
-        for (UserInfo u : ui) {
-            pset = ParameterSet.fromArrayNoCopy(u.name + "-X", u.password + "-X", u.name + "-X");
-            String response = callProcOverJSON("Insert", pset, u.name, u.password, false);
-            Response r = responseFromJSON(response);
-            assertEquals(ClientResponse.SUCCESS, r.status);
-        }
+            assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.status);
+            response = callProcOverJSON("Insert", pset, u.name, "ick", false);
+            r = responseFromJSON(response);
+            assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.status);
 
-        // test bad auth
-        UserInfo u = ui[0];
-        pset = ParameterSet.fromArrayNoCopy(u.name + "-X1", u.password + "-X1", u.name + "-X1");
-        String response = callProcOverJSON("Insert", pset, u.name, "ick", true);
-        Response r = responseFromJSON(response);
-        assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.status);
-        response = callProcOverJSON("Insert", pset, u.name, "ick", false);
-        r = responseFromJSON(response);
-        assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.status);
+            // test malformed auth (too short hash)
+            pset = ParameterSet.fromArrayNoCopy(u.name + "-X2", u.password + "-X2", u.name + "-X2");
+            String paramsInJSON = pset.toJSONString();
+            HashMap<String, String> params = new HashMap<String, String>();
+            params.put("Procedure", "Insert");
+            params.put("Parameters", paramsInJSON);
+            params.put("User", u.name);
+            params.put("Password", Encoder.hexEncode(new byte[]{1, 2, 3}));
+            String varString = getHTTPVarString(params);
+            response = callProcOverJSONRaw(varString, 200);
+            r = responseFromJSON(response);
+            assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.status);
 
-        // test malformed auth (too short hash)
-        pset = ParameterSet.fromArrayNoCopy(u.name + "-X2", u.password + "-X2", u.name + "-X2");
-        String paramsInJSON = pset.toJSONString();
-        HashMap<String,String> params = new HashMap<String,String>();
-        params.put("Procedure", "Insert");
-        params.put("Parameters", paramsInJSON);
-        params.put("User", u.name);
-        params.put("Password", Encoder.hexEncode(new byte[] {1,2,3}));
-        String varString = getHTTPVarString(params);
-        response = callProcOverJSONRaw(varString, 200);
-        r = responseFromJSON(response);
-        assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.status);
+            // test malformed auth (gibberish password, but good length)
+            pset = ParameterSet.fromArrayNoCopy(u.name + "-X3", u.password + "-X3", u.name + "-X3");
+            paramsInJSON = pset.toJSONString();
+            params = new HashMap<String, String>();
+            params.put("Procedure", "Insert");
+            params.put("Parameters", paramsInJSON);
+            params.put("User", u.name);
+            params.put("Password", "abcdefghiabcdefghiabcdefghiabcdefghi");
+            varString = getHTTPVarString(params);
+            response = callProcOverJSONRaw(varString, 200);
+            r = responseFromJSON(response);
+            assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.status);
 
-        // test malformed auth (gibberish password, but good length)
-        pset = ParameterSet.fromArrayNoCopy(u.name + "-X3", u.password + "-X3", u.name + "-X3");
-        paramsInJSON = pset.toJSONString();
-        params = new HashMap<String,String>();
-        params.put("Procedure", "Insert");
-        params.put("Parameters", paramsInJSON);
-        params.put("User", u.name);
-        params.put("Password", "abcdefghiabcdefghiabcdefghiabcdefghi");
-        varString = getHTTPVarString(params);
-        response = callProcOverJSONRaw(varString, 200);
-        r = responseFromJSON(response);
-        assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.status);
-
-        // the update catalog test below is for enterprise only
-        if (VoltDB.instance().getConfig().m_isEnterprise == false) {
-            return;
-        }
+            // the update catalog test below is for enterprise only
+            if (VoltDB.instance().getConfig().m_isEnterprise == false) {
+                return;
+            }
 
         // ENG-963 below here
-        // do enough to get a new deployment file
-        VoltProjectBuilder builder2 = new VoltProjectBuilder();
-        builder2.addSchema(schemaPath);
-        builder2.addPartitionInfo("HELLOWORLD", "DIALECT");
+            // do enough to get a new deployment file
+            VoltProjectBuilder builder2 = new VoltProjectBuilder();
+            builder2.addSchema(schemaPath);
+            builder2.addPartitionInfo("HELLOWORLD", "DIALECT");
 
-        // Same groups
-        builder2.addRoles(new RoleInfo[] { gi } );
+            // Same groups
+            builder2.addRoles(new RoleInfo[]{gi});
 
-        // create same 15 users, hack the last 14 passwords
-        ui = new UserInfo[15];
-        ui[0] = new UserInfo("ry@nlikesthe", "y@nkees", new String[] { "foo" } );
-        for (int i = 1; i < ui.length; i++) {
-            ui[i] = new UserInfo("USER" + String.valueOf(i),
-                                 "welcomehackers" + String.valueOf(i),
-                                 new String[] { "foo" } );
+            // create same 15 users, hack the last 14 passwords
+            ui = new UserInfo[15];
+            ui[0] = new UserInfo("ry@nlikesthe", "y@nkees", new String[]{"foo"});
+            for (int i = 1; i < ui.length; i++) {
+                ui[i] = new UserInfo("USER" + String.valueOf(i),
+                        "welcomehackers" + String.valueOf(i),
+                        new String[]{"foo"});
+            }
+            builder2.addUsers(ui);
+
+            builder2.setSecurityEnabled(true, true);
+            builder2.addProcedures(pi);
+            builder2.setHTTPDPort(8095);
+
+            success = builder2.compile(Configuration.getPathToCatalogForTest("json-update.jar"));
+            assertTrue(success);
+
+            pset = ParameterSet.fromArrayNoCopy(Encoder.hexEncode(MiscUtils.fileToBytes(new File(config.m_pathToCatalog))),
+                    new String(MiscUtils.fileToBytes(new File(builder2.getPathToDeployment())), "UTF-8"));
+            response = callProcOverJSON("@UpdateApplicationCatalog", pset,
+                    ui[0].name, ui[0].password, true);
+            r = responseFromJSON(response);
+            assertEquals(ClientResponse.SUCCESS, r.status);
+
+            // retest the good auths above
+            for (UserInfo user : ui) {
+                ParameterSet ps = ParameterSet.fromArrayNoCopy(user.name + "-X3", user.password + "-X3", user.name + "-X3");
+                String respstr = callProcOverJSON("Insert", ps, user.name, user.password, false);
+                Response resp = responseFromJSON(respstr);
+                assertEquals(ClientResponse.SUCCESS, resp.status);
+            }
+        } finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
         }
-        builder2.addUsers(ui);
-
-        builder2.setSecurityEnabled(true, true);
-        builder2.addProcedures(pi);
-        builder2.setHTTPDPort(8095);
-
-        success = builder2.compile(Configuration.getPathToCatalogForTest("json-update.jar"));
-        assertTrue(success);
-
-        pset = ParameterSet.fromArrayNoCopy(Encoder.hexEncode(MiscUtils.fileToBytes(new File(config.m_pathToCatalog))),
-                           new String(MiscUtils.fileToBytes(new File(builder2.getPathToDeployment())), "UTF-8"));
-        response = callProcOverJSON("@UpdateApplicationCatalog", pset,
-                                    ui[0].name, ui[0].password, true);
-        r = responseFromJSON(response);
-        assertEquals(ClientResponse.SUCCESS, r.status);
-
-        // retest the good auths above
-        for (UserInfo user : ui) {
-            ParameterSet ps = ParameterSet.fromArrayNoCopy(user.name + "-X3", user.password + "-X3", user.name + "-X3");
-            String respstr = callProcOverJSON("Insert", ps, user.name, user.password, false);
-            Response resp = responseFromJSON(respstr);
-            assertEquals(ClientResponse.SUCCESS, resp.status);
-        }
-    } finally {
-        if (server != null) {
-            server.shutdown();
-            server.join();
-        }
-        server = null;
-    }
     }
 
     public void testJSONDisabled() throws Exception {
-    try {
-        String simpleSchema =
-            "CREATE TABLE HELLOWORLD (\n" +
-            "    HELLO VARCHAR(15),\n" +
-            "    WORLD VARCHAR(15),\n" +
-            "    DIALECT VARCHAR(15) NOT NULL,\n" +
-            "    PRIMARY KEY (DIALECT)\n" +
-            ");";
-
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
-        String schemaPath = schemaFile.getPath();
-        schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addSchema(schemaPath);
-        builder.addPartitionInfo("HELLOWORLD", "DIALECT");
-
-        builder.addStmtProcedure("Insert", "insert into HELLOWORLD values (?,?,?);");
-
-        builder.setHTTPDPort(8095);
-        builder.setJSONAPIEnabled(false);
-
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
-        assertTrue(success);
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
-        config.m_pathToDeployment = builder.getPathToDeployment();
-        server = new ServerThread(config);
-        server.start();
-        server.waitForInitialization();
-
-        // test not enabled
-        ParameterSet pset = ParameterSet.fromArrayNoCopy("foo", "bar", "foobar");
         try {
-            callProcOverJSON("Insert", pset, null, null, false, false, 403); // HTTP_FORBIDDEN
+            String simpleSchema
+                    = "CREATE TABLE HELLOWORLD (\n"
+                    + "    HELLO VARCHAR(15),\n"
+                    + "    WORLD VARCHAR(15),\n"
+                    + "    DIALECT VARCHAR(15) NOT NULL,\n"
+                    + "    PRIMARY KEY (DIALECT)\n"
+                    + ");";
+
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+            String schemaPath = schemaFile.getPath();
+            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addSchema(schemaPath);
+            builder.addPartitionInfo("HELLOWORLD", "DIALECT");
+
+            builder.addStmtProcedure("Insert", "insert into HELLOWORLD values (?,?,?);");
+
+            builder.setHTTPDPort(8095);
+            builder.setJSONAPIEnabled(false);
+
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            assertTrue(success);
+
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
+
+            // test not enabled
+            ParameterSet pset = ParameterSet.fromArrayNoCopy("foo", "bar", "foobar");
+            try {
+                callProcOverJSON("Insert", pset, null, null, false, false, 403); // HTTP_FORBIDDEN
+            } catch (Exception e) {
+                // make sure failed due to permissions on http
+                assertTrue(e.getMessage().contains("403"));
+            }
+        } finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
         }
-        catch (Exception e) {
-            // make sure failed due to permissions on http
-            assertTrue(e.getMessage().contains("403"));
-        }
-    } finally {
-        if (server != null) {
-            server.shutdown();
-            server.join();
-        }
-        server = null;
-    }
     }
 
     public void testLongProc() throws Exception {
-    try {
-        String simpleSchema =
-            "CREATE TABLE foo (\n" +
-            "    bar BIGINT NOT NULL,\n" +
-            "    PRIMARY KEY (bar)\n" +
-            ");";
+        try {
+            String simpleSchema
+                    = "CREATE TABLE foo (\n"
+                    + "    bar BIGINT NOT NULL,\n"
+                    + "    PRIMARY KEY (bar)\n"
+                    + ");";
 
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(simpleSchema);
-        builder.addPartitionInfo("foo", "bar");
-        builder.addProcedures(DelayProc.class);
-        builder.setHTTPDPort(8095);
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
-        assertTrue(success);
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addLiteralSchema(simpleSchema);
+            builder.addPartitionInfo("foo", "bar");
+            builder.addProcedures(DelayProc.class);
+            builder.setHTTPDPort(8095);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            assertTrue(success);
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
-        config.m_pathToDeployment = builder.getPathToDeployment();
-        server = new ServerThread(config);
-        server.start();
-        server.waitForInitialization();
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
 
-        ParameterSet pset = ParameterSet.fromArrayNoCopy(30000);
-        String response = callProcOverJSON("DelayProc", pset, null, null, false);
-        Response r = responseFromJSON(response);
-        assertEquals(ClientResponse.SUCCESS, r.status);
-    } finally {
-        if (server != null) {
-            server.shutdown();
-            server.join();
+            ParameterSet pset = ParameterSet.fromArrayNoCopy(30000);
+            String response = callProcOverJSON("DelayProc", pset, null, null, false);
+            Response r = responseFromJSON(response);
+            assertEquals(ClientResponse.SUCCESS, r.status);
+        } finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
         }
-        server = null;
-    }
     }
 
     public void testBinaryProc() throws Exception {
-    try {
-        String simpleSchema =
-            "CREATE TABLE foo (\n" +
-            "    bar BIGINT NOT NULL,\n" +
-            "    b VARBINARY(256) DEFAULT NULL,\n" +
-            "    PRIMARY KEY (bar)\n" +
-            ");";
+        try {
+            String simpleSchema
+                    = "CREATE TABLE foo (\n"
+                    + "    bar BIGINT NOT NULL,\n"
+                    + "    b VARBINARY(256) DEFAULT NULL,\n"
+                    + "    PRIMARY KEY (bar)\n"
+                    + ");";
 
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(simpleSchema);
-        builder.addPartitionInfo("foo", "bar");
-        builder.addStmtProcedure("Insert", "insert into foo values (?, ?);");
-        builder.setHTTPDPort(8095);
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
-        assertTrue(success);
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addLiteralSchema(simpleSchema);
+            builder.addPartitionInfo("foo", "bar");
+            builder.addStmtProcedure("Insert", "insert into foo values (?, ?);");
+            builder.setHTTPDPort(8095);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            assertTrue(success);
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
-        config.m_pathToDeployment = builder.getPathToDeployment();
-        server = new ServerThread(config);
-        server.start();
-        server.waitForInitialization();
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
 
-        // try a good insert
-        String varString = "Procedure=Insert&Parameters=[5,\"aa\"]";
-        String response = callProcOverJSONRaw(varString, 200);
-        System.out.println(response);
-        Response r = responseFromJSON(response);
-        assertEquals(ClientResponse.SUCCESS, r.status);
+            // try a good insert
+            String varString = "Procedure=Insert&Parameters=[5,\"aa\"]";
+            String response = callProcOverJSONRaw(varString, 200);
+            System.out.println(response);
+            Response r = responseFromJSON(response);
+            assertEquals(ClientResponse.SUCCESS, r.status);
 
-        // try two poorly hex-encoded inserts
-        varString = "Procedure=Insert&Parameters=[6,\"aaa\"]";
-        response = callProcOverJSONRaw(varString, 200);
-        System.out.println(response);
-        r = responseFromJSON(response);
-        assertEquals(ClientResponse.GRACEFUL_FAILURE, r.status);
-        varString = "Procedure=Insert&Parameters=[7,\"aaay\"]";
-        response = callProcOverJSONRaw(varString, 200);
-        System.out.println(response);
-        r = responseFromJSON(response);
-        assertEquals(ClientResponse.GRACEFUL_FAILURE, r.status);
+            // try two poorly hex-encoded inserts
+            varString = "Procedure=Insert&Parameters=[6,\"aaa\"]";
+            response = callProcOverJSONRaw(varString, 200);
+            System.out.println(response);
+            r = responseFromJSON(response);
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, r.status);
+            varString = "Procedure=Insert&Parameters=[7,\"aaay\"]";
+            response = callProcOverJSONRaw(varString, 200);
+            System.out.println(response);
+            r = responseFromJSON(response);
+            assertEquals(ClientResponse.GRACEFUL_FAILURE, r.status);
 
-        // try null binary inserts
-        varString = "Procedure=Insert&Parameters=[8,NULL]";
-        response = callProcOverJSONRaw(varString, 200);
-        System.out.println(response);
-        r = responseFromJSON(response);
-        assertEquals(ClientResponse.SUCCESS, r.status);
-    } finally {
-        if (server != null) {
-            server.shutdown();
-            server.join();
+            // try null binary inserts
+            varString = "Procedure=Insert&Parameters=[8,NULL]";
+            response = callProcOverJSONRaw(varString, 200);
+            System.out.println(response);
+            r = responseFromJSON(response);
+            assertEquals(ClientResponse.SUCCESS, r.status);
+        } finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
         }
-        server = null;
-    }
     }
 
     public void testGarbageProcs() throws Exception {
-    try {
-        String simpleSchema =
-            "CREATE TABLE foo (\n" +
-            "    bar BIGINT NOT NULL,\n" +
-            "    PRIMARY KEY (bar)\n" +
-            ");";
+        try {
+            String simpleSchema
+                    = "CREATE TABLE foo (\n"
+                    + "    bar BIGINT NOT NULL,\n"
+                    + "    PRIMARY KEY (bar)\n"
+                    + ");";
 
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
-        String schemaPath = schemaFile.getPath();
-        schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+            String schemaPath = schemaFile.getPath();
+            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
 
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addSchema(schemaPath);
-        builder.addPartitionInfo("foo", "bar");
-        builder.addProcedures(DelayProc.class);
-        builder.setHTTPDPort(8095);
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
-        assertTrue(success);
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addSchema(schemaPath);
+            builder.addPartitionInfo("foo", "bar");
+            builder.addProcedures(DelayProc.class);
+            builder.setHTTPDPort(8095);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            assertTrue(success);
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
-        config.m_pathToDeployment = builder.getPathToDeployment();
-        server = new ServerThread(config);
-        server.start();
-        server.waitForInitialization();
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
 
-        callProcOverJSONRaw("http://localhost:8080/api/1.0/Tim", 404);
-        callProcOverJSONRaw("http://localhost:8080/api/1.0/Tim?Procedure=foo&Parameters=[x4{]", 404);
-    } finally {
-        if (server != null) {
-            server.shutdown();
-            server.join();
+            callProcOverJSONRaw("http://localhost:8080/api/1.0/Tim", 404);
+            callProcOverJSONRaw("http://localhost:8080/api/1.0/Tim?Procedure=foo&Parameters=[x4{]", 404);
+        } finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
         }
-        server = null;
-    }
     }
 
     public void testDeployment() throws Exception {
-    try {
-        String simpleSchema =
-            "CREATE TABLE foo (\n" +
-            "    bar BIGINT NOT NULL,\n" +
-            "    PRIMARY KEY (bar)\n" +
-            ");";
+        try {
+            String simpleSchema
+                    = "CREATE TABLE foo (\n"
+                    + "    bar BIGINT NOT NULL,\n"
+                    + "    PRIMARY KEY (bar)\n"
+                    + ");";
 
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
-        String schemaPath = schemaFile.getPath();
-        schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+            String schemaPath = schemaFile.getPath();
+            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
 
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addSchema(schemaPath);
-        builder.addPartitionInfo("foo", "bar");
-        builder.addProcedures(DelayProc.class);
-        builder.setHTTPDPort(8095);
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
-        assertTrue(success);
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addSchema(schemaPath);
+            builder.addPartitionInfo("foo", "bar");
+            builder.addProcedures(DelayProc.class);
+            builder.setHTTPDPort(8095);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            assertTrue(success);
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
-        config.m_pathToDeployment = builder.getPathToDeployment();
-        server = new ServerThread(config);
-        server.start();
-        server.waitForInitialization();
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
 
-        //Get deployment
-        String dep = getUrlOverJSON("http://localhost:8095/deployment", 200);
-        assertTrue(dep.contains("cluster"));
-        //Get deployment schema
-        String schema = getUrlOverJSON("http://localhost:8095/deployment/schema", 200);
-        assertTrue(dep.contains("\"cluster\""));
-    } finally {
-        if (server != null) {
-            server.shutdown();
-            server.join();
+            //Get deployment
+            String dep = getUrlOverJSON("http://localhost:8095/deployment", 200,  "application/json");
+            assertTrue(dep.contains("cluster"));
+            //Get deployment schema
+            String schema = getUrlOverJSON("http://localhost:8095/deployment/schema", 200, "application/json");
+            assertTrue(schema.contains("\"cluster\""));
+            //Download deployment
+            dep = getUrlOverJSON("http://localhost:8095/deployment/download", 200, "text/xml");
+            assertTrue(dep.contains("<deployment>"));
+            assertTrue(dep.contains("</deployment>"));
+        } finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
         }
-        server = null;
     }
+
+    public void testDeploymentSecurity() throws Exception {
+        try {
+            String simpleSchema
+                    = "CREATE TABLE foo (\n"
+                    + "    bar BIGINT NOT NULL,\n"
+                    + "    PRIMARY KEY (bar)\n"
+                    + ");";
+
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+            String schemaPath = schemaFile.getPath();
+            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addSchema(schemaPath);
+            builder.addPartitionInfo("foo", "bar");
+            builder.addProcedures(DelayProc.class);
+            builder.setHTTPDPort(8095);
+            UserInfo users[] = new UserInfo[] {
+                    new UserInfo("user1", "admin", new String[] {"user"}),
+                    new UserInfo("user2", "admin", new String[] {"administrator"}),
+            };
+            builder.addUsers(users);
+
+            // suite defines its own ADMINISTRATOR user
+            builder.setSecurityEnabled(true, false);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            assertTrue(success);
+
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
+
+            //Get deployment bad user
+            String dep = getUrlOverJSON("http://localhost:8095/deployment/?User=" + "user1&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", 200, "application/json");
+            assertTrue(dep.contains("Permission denied"));
+            //good user
+            dep = getUrlOverJSON("http://localhost:8095/deployment/?User=" + "user2&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", 200, "application/json");
+            assertTrue(dep.contains("cluster"));
+            //Get deployment schema always
+            String schema = getUrlOverJSON("http://localhost:8095/deployment/schema", 200, "application/json");
+            assertTrue(schema.contains("\"cluster\""));
+            //Download deployment bad user
+            dep = getUrlOverJSON("http://localhost:8095/deployment/download?User=" + "user1&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", 200, "application/json");
+            assertTrue(dep.contains("Permission denied"));
+            //good user
+            dep = getUrlOverJSON("http://localhost:8095/deployment/download?User=" + "user2&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", 200, "text/xml");
+            assertTrue(dep.contains("<deployment>"));
+            assertTrue(dep.contains("</deployment>"));
+        } finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
+        }
     }
 
     public void testProfile() throws Exception {
-    try {
-        String simpleSchema =
-            "CREATE TABLE foo (\n" +
-            "    bar BIGINT NOT NULL,\n" +
-            "    PRIMARY KEY (bar)\n" +
-            ");";
+        try {
+            String simpleSchema
+                    = "CREATE TABLE foo (\n"
+                    + "    bar BIGINT NOT NULL,\n"
+                    + "    PRIMARY KEY (bar)\n"
+                    + ");";
 
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
-        String schemaPath = schemaFile.getPath();
-        schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+            String schemaPath = schemaFile.getPath();
+            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
 
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addSchema(schemaPath);
-        builder.addPartitionInfo("foo", "bar");
-        builder.addProcedures(DelayProc.class);
-        builder.setHTTPDPort(8095);
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
-        assertTrue(success);
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addSchema(schemaPath);
+            builder.addPartitionInfo("foo", "bar");
+            builder.addProcedures(DelayProc.class);
+            builder.setHTTPDPort(8095);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            assertTrue(success);
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
-        config.m_pathToDeployment = builder.getPathToDeployment();
-        server = new ServerThread(config);
-        server.start();
-        server.waitForInitialization();
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
 
-        //Get profile
-        String dep = getUrlOverJSON("http://localhost:8095/profile", 200);
-        assertTrue(dep.contains("\"user\""));
-        assertTrue(dep.contains("\"permissions\""));
-    } finally {
-        if (server != null) {
-            server.shutdown();
-            server.join();
+            //Get profile
+            String dep = getUrlOverJSON("http://localhost:8095/profile", 200, "application/json");
+            assertTrue(dep.contains("\"user\""));
+            assertTrue(dep.contains("\"permissions\""));
+        } finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
         }
-        server = null;
-    }
     }
 
 }

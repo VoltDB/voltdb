@@ -141,6 +141,18 @@ public class TestCatalogUtil extends TestCase {
             "   </httpd>" +
             "</deployment>";
 
+        // Make sure the default is 90 seconds
+        final String def =
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
+            "<deployment>" +
+            "   <cluster hostcount='3' kfactor='1' sitesperhost='2'/>" +
+            "   <admin-mode port='32323' adminstartup='true'/>" +
+            "   <paths><voltdbroot path=\"/tmp/" + System.getProperty("user.name") + "\" /></paths>" +
+            "   <httpd port='0' >" +
+            "       <jsonapi enabled='true'/>" +
+            "   </httpd>" +
+            "</deployment>";
+
         // make sure someone can't give us 0 for timeout value
         final String boom =
             "<?xml version='1.0' encoding='UTF-8' standalone='no'?>" +
@@ -155,11 +167,19 @@ public class TestCatalogUtil extends TestCase {
             "</deployment>";
 
         final File tmpDep = VoltProjectBuilder.writeStringToTempFile(dep);
+        final File tmpDef = VoltProjectBuilder.writeStringToTempFile(def);
         final File tmpBoom = VoltProjectBuilder.writeStringToTempFile(boom);
 
         String msg = CatalogUtil.compileDeployment(catalog, tmpDep.getPath(), false);
 
         assertEquals(30, catalog.getClusters().get("cluster").getHeartbeattimeout());
+
+        catalog = new Catalog();
+        Cluster cluster = catalog.getClusters().add("cluster");
+        cluster.getDatabases().add("database");
+        msg = CatalogUtil.compileDeployment(catalog, tmpDef.getPath(), false);
+        assertEquals(org.voltcore.common.Constants.DEFAULT_HEARTBEAT_TIMEOUT_SECONDS,
+                catalog.getClusters().get("cluster").getHeartbeattimeout());
 
         // This returns -1 on schema violation
         msg = CatalogUtil.compileDeployment(catalog, tmpBoom.getPath(), false);
