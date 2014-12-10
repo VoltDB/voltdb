@@ -922,8 +922,12 @@ public class PlanAssembler {
 
             subSelectRoot = m_parsedDelete.handleLimit(subSelectRoot);
 
-            // connect the nodes to build the graph
+            projectionNode.addAndLinkChild(subSelectRoot);
+
+            subSelectRoot = projectionNode;
+
             deleteNode.addAndLinkChild(subSelectRoot);
+
             // OPTIMIZATION: Projection Inline
             // If the root node we got back from createSelectTree() is an
             // AbstractScanNode, then
@@ -931,7 +935,11 @@ public class PlanAssembler {
             // When we inline this projection into the scan, we're going
             // to overwrite any original projection that we might have inlined
             // in order to simply cull the columns from the persistent table.
-            subSelectRoot.addInlinePlanNode(projectionNode);
+            //subSelectRoot.addInlinePlanNode(projectionNode);
+
+            System.out.println("\n\n----------------------------------------");
+            System.out.println(deleteNode.toExplainPlanString());
+            System.out.println("----------------------------------------\n\n");
         }
 
         if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.isInferredSingle()) {
