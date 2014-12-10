@@ -266,7 +266,7 @@ public class TestUpdateDeployment extends RegressionSuite {
             }
         }
         assertTrue(found);
-        assertEquals(10, timeout);
+        assertEquals(org.voltcore.common.Constants.DEFAULT_HEARTBEAT_TIMEOUT_SECONDS, timeout);
 
         // Verify that table A exists
         ClientResponse response = client3.callProcedure("@AdHoc", "insert into NEWTABLE values (100);");

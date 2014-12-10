@@ -44,6 +44,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.agreement.AgreementSite;
 import org.voltcore.agreement.InterfaceToMessenger;
+import org.voltcore.common.Constants;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.PicoNetwork;
 import org.voltcore.network.VoltNetworkPool;
@@ -89,7 +90,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         public String zkInterface = "127.0.0.1:2181";
         public String internalInterface = "";
         public int internalPort = 3021;
-        public int deadHostTimeout = 90 * 1000;
+        public int deadHostTimeout = Constants.DEFAULT_HEARTBEAT_TIMEOUT_SECONDS * 1000;
         public long backwardsTimeForgivenessWindow = 1000 * 60 * 60 * 24 * 7;
         public VoltMessageFactory factory = new VoltMessageFactory();
         public int networkThreads =  Math.max(2, CoreUtils.availableProcessors() / 4);
