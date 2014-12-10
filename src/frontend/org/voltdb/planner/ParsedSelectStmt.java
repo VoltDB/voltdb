@@ -1333,28 +1333,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return m_limitParameterId != -1 || m_offsetParameterId != -1;
     }
 
-    /// This is for use with integer-valued row count parameters, namely LIMITs and OFFSETs.
-    /// It should be called (at least) once for each LIMIT or OFFSET parameter to establish that
-    /// the parameter is being used in a BIGINT context.
-    /// There may be limitations elsewhere that restrict limits and offsets to 31-bit unsigned values,
-    /// but enforcing that at parameter passing/checking time seems a little arbitrary, so we keep
-    /// the parameters at maximum width -- a 63-bit unsigned BIGINT.
-    private int parameterCountIndexById(long paramId) {
-        if (paramId == -1) {
-            return -1;
-        }
-        assert(m_paramsById.containsKey(paramId));
-        ParameterValueExpression pve = m_paramsById.get(paramId);
-        // As a side effect, re-establish these parameters as integer-typed
-        // -- this helps to catch type errors earlier in the invocation process
-        // and prevents a more serious error in HSQLBackend statement reconstruction.
-        // The HSQL parser originally had these correctly pegged as BIGINTs,
-        // but the VoltDB code ( @see AbstractParsedStmt#parseParameters )
-        // skeptically second-guesses that pending its own verification. This case is now verified.
-        pve.refineValueType(VoltType.BIGINT, VoltType.BIGINT.getLengthInBytesForFixedTypes());
-        return pve.getParameterIndex();
-    }
-
     public int getLimitParameterIndex() {
         return parameterCountIndexById(m_limitParameterId);
     }

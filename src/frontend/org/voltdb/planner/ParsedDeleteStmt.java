@@ -23,6 +23,8 @@ import java.util.List;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Database;
+import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.LimitPlanNode;
 
 /**
  *
@@ -31,6 +33,7 @@ import org.voltdb.catalog.Database;
 public class ParsedDeleteStmt extends AbstractParsedStmt {
 
     private final List<ParsedColInfo> m_orderColumns = new ArrayList<>();
+    private LimitPlanNode m_limitPlanNode = null;
 
     /**
     * Class constructor
@@ -43,6 +46,8 @@ public class ParsedDeleteStmt extends AbstractParsedStmt {
 
     private void parseOrderColumns(VoltXMLElement orderColumnsXml) {
         assert(m_orderColumns.size() == 0);
+        if (orderColumnsXml == null)
+            return;
 
         for (VoltXMLElement orderColXml : orderColumnsXml.children) {
             m_orderColumns.add(ParsedColInfo.fromOrderByXml(this, orderColXml));
@@ -53,12 +58,21 @@ public class ParsedDeleteStmt extends AbstractParsedStmt {
     void parse(VoltXMLElement stmtNode) {
         assert(m_tableList.size() == 1);
 
+        VoltXMLElement limitXml = null;
+        VoltXMLElement offsetXml = null;
         for (VoltXMLElement elem : stmtNode.children) {
             if (elem.name.equalsIgnoreCase("ordercolumns")) {
                 parseOrderColumns(elem);
-
+            }
+            else if (elem.name.equalsIgnoreCase("limit")) {
+                limitXml = elem;
+            }
+            else if(elem.name.equalsIgnoreCase("offset")) {
+                offsetXml = elem;
             }
         }
+
+        m_limitPlanNode = limitPlanNodeFromXml(limitXml, offsetXml);
     }
 
     @Override
@@ -69,5 +83,16 @@ public class ParsedDeleteStmt extends AbstractParsedStmt {
     @Override
     public List<ParsedColInfo> orderByColumns() {
         return Collections.unmodifiableList(m_orderColumns);
+    }
+
+    public AbstractPlanNode handleLimit(AbstractPlanNode root) {
+        if (m_limitPlanNode != null) {
+            // XXX fail here if no ORDER BY present
+            assert (m_limitPlanNode.getChildCount() == 0);
+            m_limitPlanNode.addAndLinkChild(root);
+            return m_limitPlanNode;
+        }
+
+        return root;
     }
 }

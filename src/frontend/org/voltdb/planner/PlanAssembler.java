@@ -916,8 +916,11 @@ public class PlanAssembler {
         } else {
 
             if (m_parsedDelete.hasOrderByColumns()) {
+                /// XXX fail here if multi-fragment plan
                 subSelectRoot = handleOrderBy(m_parsedDelete, subSelectRoot);
             }
+
+            subSelectRoot = m_parsedDelete.handleLimit(subSelectRoot);
 
             // connect the nodes to build the graph
             deleteNode.addAndLinkChild(subSelectRoot);

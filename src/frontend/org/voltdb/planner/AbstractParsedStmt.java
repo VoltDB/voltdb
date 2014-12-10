@@ -43,6 +43,7 @@ import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.planner.parseinfo.SubqueryLeafNode;
 import org.voltdb.planner.parseinfo.TableLeafNode;
+import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
@@ -856,6 +857,86 @@ public abstract class AbstractParsedStmt {
         // The interface is established on AbstractParsedStmt for support
         // in ParsedSelectStmt and ParsedUnionStmt.
         throw new RuntimeException("isOrderDeterministicInSpiteOfUnorderedSubqueries not supported by DML statements");
+    }
+
+    /// This is for use with integer-valued row count parameters, namely LIMITs and OFFSETs.
+    /// It should be called (at least) once for each LIMIT or OFFSET parameter to establish that
+    /// the parameter is being used in a BIGINT context.
+    /// There may be limitations elsewhere that restrict limits and offsets to 31-bit unsigned values,
+    /// but enforcing that at parameter passing/checking time seems a little arbitrary, so we keep
+    /// the parameters at maximum width -- a 63-bit unsigned BIGINT.
+    protected int parameterCountIndexById(long paramId) {
+        if (paramId == -1) {
+            return -1;
+        }
+        assert(m_paramsById.containsKey(paramId));
+        ParameterValueExpression pve = m_paramsById.get(paramId);
+        // As a side effect, re-establish these parameters as integer-typed
+        // -- this helps to catch type errors earlier in the invocation process
+        // and prevents a more serious error in HSQLBackend statement reconstruction.
+        // The HSQL parser originally had these correctly pegged as BIGINTs,
+        // but the VoltDB code ( @see AbstractParsedStmt#parseParameters )
+        // skeptically second-guesses that pending its own verification. This case is now verified.
+        pve.refineValueType(VoltType.BIGINT, VoltType.BIGINT.getLengthInBytesForFixedTypes());
+        return pve.getParameterIndex();
+    }
+
+    LimitPlanNode limitPlanNodeFromXml(VoltXMLElement limitXml, VoltXMLElement offsetXml) {
+
+        if (limitXml == null && offsetXml == null)
+            return null;
+
+        String node;
+        long limitParameterId = -1;
+        long offsetParameterId = -1;
+        long limit = -1;
+        long offset = -1;
+        if (limitXml != null) {
+            // Parse limit
+            if ((node = limitXml.attributes.get("limit_paramid")) != null)
+                limitParameterId = Long.parseLong(node);
+            else {
+                assert(limitXml.children.size() == 1);
+                VoltXMLElement valueNode = limitXml.children.get(0);
+                String isParam = valueNode.attributes.get("isparam");
+                if ((isParam != null) && (isParam.equalsIgnoreCase("true"))) {
+                    limitParameterId = Long.parseLong(valueNode.attributes.get("id"));
+                } else {
+                    node = limitXml.attributes.get("limit");
+                    assert(node != null);
+                    limit = Long.parseLong(node);
+                }
+            }
+        }
+        if (offsetXml != null) {
+            // Parse offset
+            if ((node = offsetXml.attributes.get("offset_paramid")) != null)
+                offsetParameterId = Long.parseLong(node);
+            else {
+                if (offsetXml.children.size() == 1) {
+                    VoltXMLElement valueNode = offsetXml.children.get(0);
+                    String isParam = valueNode.attributes.get("isparam");
+                    if ((isParam != null) && (isParam.equalsIgnoreCase("true"))) {
+                        offsetParameterId = Long.parseLong(valueNode.attributes.get("id"));
+                    } else {
+                        node = offsetXml.attributes.get("offset");
+                        assert(node != null);
+                        offset = Long.parseLong(node);
+                    }
+                }
+            }
+        }
+
+        // limit and offset can't have both value and parameter
+        if (limit != -1) assert limitParameterId == -1 : "Parsed value and param. limit.";
+        if (offset != 0) assert offsetParameterId == -1 : "Parsed value and param. offset.";
+
+        LimitPlanNode limitPlanNode = new LimitPlanNode();
+        limitPlanNode.setLimit((int) limit);
+        limitPlanNode.setOffset((int) offset);
+        limitPlanNode.setLimitParameterIndex(parameterCountIndexById(limitParameterId));
+        limitPlanNode.setOffsetParameterIndex(parameterCountIndexById(offsetParameterId));
+        return limitPlanNode;
     }
 
     /** May be true for DELETE or SELECT */
