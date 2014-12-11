@@ -70,7 +70,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import junit.framework.TestCase;
-import org.apache.catalina.util.Base64;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -85,6 +84,7 @@ import org.voltdb.compiler.procedures.CrazyBlahProc;
 import org.voltdb.compiler.procedures.DelayProc;
 import org.voltdb.compiler.procedures.SelectStarHelloWorld;
 import org.voltdb.types.TimestampType;
+import org.voltdb.utils.Base64;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 
@@ -186,7 +186,7 @@ public class TestJSONInterface extends TestCase {
                 String h = user + ":" + Encoder.hexEncode(hashedPasswordBytes);
                 conn.setRequestProperty("Authorization", "Hashed " + h);
             } else if (scheme.equalsIgnoreCase("basic")) {
-                conn.setRequestProperty("Authorization", "Basic " + new String(Base64.encode(new String(user + ":" + password).getBytes())));
+                conn.setRequestProperty("Authorization", "Basic " + new String(Base64.encodeToString(new String(user + ":" + password).getBytes(), false)));
             }
         }
         conn.connect();
@@ -1119,6 +1119,11 @@ public class TestJSONInterface extends TestCase {
             dep = getUrlOverJSON("http://localhost:8095/deployment/download?User=" + "user2&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", null, null, null, 200, "text/xml");
             assertTrue(dep.contains("<deployment>"));
             assertTrue(dep.contains("</deployment>"));
+            //get with jsonp
+            dep = getUrlOverJSON("http://localhost:8095/deployment/?User=" + "user2&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997&jsonp=jackson5", null, null, null, 200, "application/json");
+            assertTrue(dep.contains("cluster"));
+            assertTrue(dep.contains("jackson5"));
+            assertTrue(dep.matches("^jackson5(.*)"));
         } finally {
             if (server != null) {
                 server.shutdown();
