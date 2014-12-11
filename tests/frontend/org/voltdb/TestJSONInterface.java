@@ -84,6 +84,7 @@ import org.voltdb.compiler.procedures.CrazyBlahProc;
 import org.voltdb.compiler.procedures.DelayProc;
 import org.voltdb.compiler.procedures.SelectStarHelloWorld;
 import org.voltdb.types.TimestampType;
+import org.voltdb.utils.Base64;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 
@@ -172,12 +173,22 @@ public class TestJSONInterface extends TestCase {
         return response;
     }
 
-    public static String getUrlOverJSON(String url, int expectedCode, String expectedCt) throws Exception {
+    public static String getUrlOverJSON(String url, String user, String password, String scheme, int expectedCode, String expectedCt) throws Exception {
         URL jsonAPIURL = new URL(url);
 
         HttpURLConnection conn = (HttpURLConnection) jsonAPIURL.openConnection();
         conn.setRequestMethod("GET");
         conn.setDoOutput(true);
+        if (user != null && password != null) {
+            if (scheme.equalsIgnoreCase("hashed")) {
+                MessageDigest md = MessageDigest.getInstance("SHA-1");
+                byte hashedPasswordBytes[] = md.digest(password.getBytes("UTF-8"));
+                String h = user + ":" + Encoder.hexEncode(hashedPasswordBytes);
+                conn.setRequestProperty("Authorization", "Hashed " + h);
+            } else if (scheme.equalsIgnoreCase("basic")) {
+                conn.setRequestProperty("Authorization", "Basic " + new String(Base64.encodeToString(new String(user + ":" + password).getBytes(), false)));
+            }
+        }
         conn.connect();
 
         BufferedReader in = null;
@@ -1039,13 +1050,10 @@ public class TestJSONInterface extends TestCase {
             server.waitForInitialization();
 
             //Get deployment
-            String dep = getUrlOverJSON("http://localhost:8095/deployment", 200,  "application/json");
+            String dep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
             assertTrue(dep.contains("cluster"));
-            //Get deployment schema
-            String schema = getUrlOverJSON("http://localhost:8095/deployment/schema", 200, "application/json");
-            assertTrue(schema.contains("\"cluster\""));
             //Download deployment
-            dep = getUrlOverJSON("http://localhost:8095/deployment/download", 200, "text/xml");
+            dep = getUrlOverJSON("http://localhost:8095/deployment/download", null, null, null, 200, "text/xml");
             assertTrue(dep.contains("<deployment>"));
             assertTrue(dep.contains("</deployment>"));
         } finally {
@@ -1093,19 +1101,78 @@ public class TestJSONInterface extends TestCase {
             server.waitForInitialization();
 
             //Get deployment bad user
-            String dep = getUrlOverJSON("http://localhost:8095/deployment/?User=" + "user1&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", 200, "application/json");
+            String dep = getUrlOverJSON("http://localhost:8095/deployment/?User=" + "user1&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", null, null, null, 200, "application/json");
             assertTrue(dep.contains("Permission denied"));
             //good user
-            dep = getUrlOverJSON("http://localhost:8095/deployment/?User=" + "user2&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", 200, "application/json");
+            dep = getUrlOverJSON("http://localhost:8095/deployment/?User=" + "user2&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", null, null, null, 200, "application/json");
             assertTrue(dep.contains("cluster"));
-            //Get deployment schema always
-            String schema = getUrlOverJSON("http://localhost:8095/deployment/schema", 200, "application/json");
-            assertTrue(schema.contains("\"cluster\""));
             //Download deployment bad user
-            dep = getUrlOverJSON("http://localhost:8095/deployment/download?User=" + "user1&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", 200, "application/json");
+            dep = getUrlOverJSON("http://localhost:8095/deployment/download?User=" + "user1&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", null, null, null, 200, "application/json");
             assertTrue(dep.contains("Permission denied"));
             //good user
-            dep = getUrlOverJSON("http://localhost:8095/deployment/download?User=" + "user2&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", 200, "text/xml");
+            dep = getUrlOverJSON("http://localhost:8095/deployment/download?User=" + "user2&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", null, null, null, 200, "text/xml");
+            assertTrue(dep.contains("<deployment>"));
+            assertTrue(dep.contains("</deployment>"));
+            //get with jsonp
+            dep = getUrlOverJSON("http://localhost:8095/deployment/?User=" + "user2&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997&jsonp=jackson5", null, null, null, 200, "application/json");
+            assertTrue(dep.contains("cluster"));
+            assertTrue(dep.contains("jackson5"));
+            assertTrue(dep.matches("^jackson5(.*)"));
+        } finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
+        }
+    }
+
+    public void testDeploymentSecurityAuthorizationHashed() throws Exception {
+        try {
+            String simpleSchema
+                    = "CREATE TABLE foo (\n"
+                    + "    bar BIGINT NOT NULL,\n"
+                    + "    PRIMARY KEY (bar)\n"
+                    + ");";
+
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+            String schemaPath = schemaFile.getPath();
+            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addSchema(schemaPath);
+            builder.addPartitionInfo("foo", "bar");
+            builder.addProcedures(DelayProc.class);
+            builder.setHTTPDPort(8095);
+            UserInfo users[] = new UserInfo[] {
+                    new UserInfo("user1", "admin", new String[] {"user"}),
+                    new UserInfo("user2", "admin", new String[] {"administrator"}),
+            };
+            builder.addUsers(users);
+
+            // suite defines its own ADMINISTRATOR user
+            builder.setSecurityEnabled(true, false);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            assertTrue(success);
+
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
+
+            //Get deployment bad user
+            String dep = getUrlOverJSON("http://localhost:8095/deployment/", "user1", "admin", "hashed", 200, "application/json");
+            assertTrue(dep.contains("Permission denied"));
+            //good user
+            dep = getUrlOverJSON("http://localhost:8095/deployment/", "user2", "admin", "hashed", 200, "application/json");
+            assertTrue(dep.contains("cluster"));
+            //Download deployment bad user
+            dep = getUrlOverJSON("http://localhost:8095/deployment/download", "user1", "admin", "hashed", 200, "application/json");
+            assertTrue(dep.contains("Permission denied"));
+            //good user
+            dep = getUrlOverJSON("http://localhost:8095/deployment/download", "user2", "admin", "hashed", 200, "text/xml");
             assertTrue(dep.contains("<deployment>"));
             assertTrue(dep.contains("</deployment>"));
         } finally {
@@ -1116,6 +1183,64 @@ public class TestJSONInterface extends TestCase {
             server = null;
         }
     }
+
+    public void testDeploymentSecurityAuthorizationBasic() throws Exception {
+        try {
+            String simpleSchema
+                    = "CREATE TABLE foo (\n"
+                    + "    bar BIGINT NOT NULL,\n"
+                    + "    PRIMARY KEY (bar)\n"
+                    + ");";
+
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+            String schemaPath = schemaFile.getPath();
+            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addSchema(schemaPath);
+            builder.addPartitionInfo("foo", "bar");
+            builder.addProcedures(DelayProc.class);
+            builder.setHTTPDPort(8095);
+            UserInfo users[] = new UserInfo[] {
+                    new UserInfo("user1", "admin", new String[] {"user"}),
+                    new UserInfo("user2", "admin", new String[] {"administrator"}),
+            };
+            builder.addUsers(users);
+
+            // suite defines its own ADMINISTRATOR user
+            builder.setSecurityEnabled(true, false);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            assertTrue(success);
+
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
+
+            //Get deployment bad user
+            String dep = getUrlOverJSON("http://localhost:8095/deployment/", "user1", "admin", "basic", 200, "application/json");
+            assertTrue(dep.contains("Permission denied"));
+            //good user
+            dep = getUrlOverJSON("http://localhost:8095/deployment/", "user2", "admin", "basic", 200, "application/json");
+            assertTrue(dep.contains("cluster"));
+            //Download deployment bad user
+            dep = getUrlOverJSON("http://localhost:8095/deployment/download", "user1", "admin", "basic", 200, "application/json");
+            assertTrue(dep.contains("Permission denied"));
+            //good user
+            dep = getUrlOverJSON("http://localhost:8095/deployment/download", "user2", "admin", "basic", 200, "text/xml");
+            assertTrue(dep.contains("<deployment>"));
+            assertTrue(dep.contains("</deployment>"));
+        } finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
+        }
+    }
+
 
     public void testProfile() throws Exception {
         try {
@@ -1145,7 +1270,7 @@ public class TestJSONInterface extends TestCase {
             server.waitForInitialization();
 
             //Get profile
-            String dep = getUrlOverJSON("http://localhost:8095/profile", 200, "application/json");
+            String dep = getUrlOverJSON("http://localhost:8095/profile", null, null, null, 200, "application/json");
             assertTrue(dep.contains("\"user\""));
             assertTrue(dep.contains("\"permissions\""));
         } finally {

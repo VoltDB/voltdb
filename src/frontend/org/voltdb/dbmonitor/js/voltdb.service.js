@@ -1,4 +1,4 @@
-﻿
+
 (function (window) {
 
     var procedures = {};
@@ -40,6 +40,18 @@
             password = lPassword;
             admin = lAdmin;
         };
+
+        // build Authorization header based on scheme you could flip to diff header. Server understands both.
+        this.BuildAuthorization = function(user, isHashedPassword, password) {
+            var authz = null;
+            if (user != null && isHashedPassword != null) {
+                authz = "Hashed " + user + ":" + isHashedPassword;
+            } else if (user != null && password != null) {
+                var up = user + ":" + password;
+                authz = "Basic " + $().crypt({method: "b64enc", source: up});
+            }
+            return authz;
+        }
 
         this.ChangeServerConfiguration = function (serverName, portId, userName, pw, isHashPw, isAdmin) {
             server = serverName != null ? serverName : server;
