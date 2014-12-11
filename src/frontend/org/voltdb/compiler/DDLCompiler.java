@@ -77,6 +77,7 @@ import org.voltdb.types.ConstraintType;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
+import org.voltdb.utils.CatalogSchemaTools;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
@@ -448,12 +449,6 @@ public class DDLCompiler {
     HashMap<String, Index> indexMap = new HashMap<String, Index>();
     HashMap<Table, String> matViewMap = new HashMap<Table, String>();
 
-    // Track the original CREATE TABLE statement for each table
-    // Currently used for catalog report generation.
-    // There's specifically no cleanup here because I don't think
-    // any is needed.
-    Map<String, String> m_tableNameToDDL = new TreeMap<String, String>();
-
     /** A cache of the XML used to do validation on LIMIT DELETE statements
      * Preserved here to avoid having to re-parse for planning */
     private final Map<Statement, VoltXMLElement> m_limitDeleteStmtToXml = new HashMap<>();
@@ -508,32 +503,6 @@ public class DDLCompiler {
             }
             if (!processed) {
                 try {
-                    // Check for CREATE TABLE, CREATE VIEW, ALTER or DROP TABLE.
-                    // We sometimes choke at parsing statements with newlines, so
-                    // check against a newline free version of the stmt.
-                    String oneLinerStmt = stmt.statement.replace("\n", " ");
-                    Matcher tableMatcher = createTablePattern.matcher(oneLinerStmt);
-                    if (tableMatcher.find()) {
-                        String tableName = tableMatcher.group(2);
-                        m_tableNameToDDL.put(tableName.toUpperCase(), stmt.statement);
-                    } else {
-                        Matcher atableMatcher = alterOrDropTablePattern.matcher(oneLinerStmt);
-                        if (atableMatcher.find()) {
-                            String op = atableMatcher.group(1);
-                            String tableName = atableMatcher.group(3);
-                            if (op.equalsIgnoreCase("DROP")) {
-                                m_tableNameToDDL.remove(tableName.toUpperCase());
-                            } else {
-                                //ALTER - Append the statement
-                                String prevStmt = m_tableNameToDDL.get(tableName.toUpperCase());
-                                if (prevStmt != null) {
-                                    //Append the SQL for report...else would blow up compilation.
-                                    m_tableNameToDDL.put(tableName.toUpperCase(), prevStmt + "\n" + stmt.statement);
-                                }
-                            }
-                        }
-                    }
-
                     // kind of ugly.  We hex-encode each statement so we can
                     // avoid embedded newlines so we can delimit statements
                     // with newline.
@@ -1536,7 +1505,10 @@ public class DDLCompiler {
         if (query != null) {
             annotation.ddl = query;
         } else {
-            annotation.ddl = m_tableNameToDDL.get(name.toUpperCase());
+            // Get the final DDL for the table rebuilt from the catalog object
+            // Don't need a real StringBuilder or export state to get the CREATE for a table
+            annotation.ddl = CatalogSchemaTools.toSchema(new StringBuilder(),
+                    table, query, false);
         }
 
         if (maxRowSize > MAX_ROW_SIZE) {
