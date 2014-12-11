@@ -35,8 +35,6 @@ import vmcTest.pages.*
  */
 class SqlQueriesTest extends TestBase {
 
-    // Set to true only when running tests against the 'genqa' test app
-    static final boolean RUNNING_GENQA = true;
     static final boolean INSERT_JSON_VALUES = false
     static final int NUM_ROWS_TO_INSERT = 4
 
@@ -49,6 +47,7 @@ class SqlQueriesTest extends TestBase {
 
     static List<String> savedTables = []
     static List<String> savedViews = []
+    static Boolean runningGenqa = null;
 
     @Shared def sqlQueriesFile = new File(SQL_QUERY_FILE)
     @Shared def tablesFile = new File(TABLES_FILE)
@@ -107,6 +106,9 @@ class SqlQueriesTest extends TestBase {
     static List<String> getTables(SqlQueryPage sqp) {
         if (savedTables == null || savedTables.isEmpty()) {
             savedTables = sqp.getTableNames()
+        }
+        if (runningGenqa == null) {
+            runningGenqa = savedTables.containsAll(["PARTITIONED_TABLE", "REPLICATED_TABLE"])
         }
         return savedTables
     }
@@ -244,13 +246,21 @@ class SqlQueriesTest extends TestBase {
      * database, since it gets the Table and View names from the UI.
      */
     def 'insert into, query from, count query, and delete from, all Tables and Views'() {
-        setup: 'delete all data from all Tables (initially)'
+        setup: 'get list of all Tables (plus optional debug print)'
+        boolean startedWithEmptyDatabase = false
         def tables = getTables(page)
-        debugPrint "\n\nIn 'insert into, count query, query from, and delete from, all Tables and Views'..."
+        debugPrint "\n\nIn 'insert into, query from, count query, and delete from, all Tables and Views'..."
         debugPrint "\nTables:\n  " + tables
-        deleteFrom(page, tables)
+        
+        when: 'perform initial count queries on all Tables'
+        def cqResults = queryCount(page, tables)
 
-        and: 'insert data into all Tables'
+        then: 'all Tables should empty, for this test (otherwise, delete at end would be dangerous)'
+        cqResults.size() == tables.size()
+        cqResults.each { assert it ==  0}
+
+        when: 'insert data into all Tables'
+        startedWithEmptyDatabase = true  // true, if we made it this far
         insertInto(page, tables, NUM_ROWS_TO_INSERT)
 
         and: 'perform queries from all Tables'
@@ -260,8 +270,8 @@ class SqlQueriesTest extends TestBase {
         def views = getViews(page)
         queryFrom(page, views, "View")
 
-        when: 'perform count queries on all Tables'
-        def cqResults = queryCount(page, tables)
+        and: 'perform count queries on all Tables'
+        cqResults = queryCount(page, tables)
 
         then: 'all Tables should have the number of rows that were inserted above'
         cqResults.size() == tables.size()
@@ -274,12 +284,14 @@ class SqlQueriesTest extends TestBase {
         then: 'all Views should have the number of rows that were inserted above'
         cqResults.size() == views.size()
         // Note: this might not always be true, but it works for 'genqa'
-        if (RUNNING_GENQA) {
+        if (runningGenqa) {
             cqResults.each { assert it ==  NUM_ROWS_TO_INSERT}
         }
 
-        cleanup: 'delete all data from all Tables (again)'
-        deleteFrom(page, tables)
+        cleanup: 'delete all data added to all Tables (only if database was empty)'
+        if (startedWithEmptyDatabase) {
+            deleteFrom(page, tables)
+        }
     }
 
     /**
@@ -320,7 +332,7 @@ class SqlQueriesTest extends TestBase {
      */
     def checkTables() {
         expect: 'List of displayed Tables should match expected list'
-        printAndCompare('Tables', TABLES_FILE, RUNNING_GENQA, tableLines, getTables(page))
+        printAndCompare('Tables', TABLES_FILE, runningGenqa, tableLines, getTables(page))
     }
     
     /**
@@ -329,7 +341,7 @@ class SqlQueriesTest extends TestBase {
      */
     def checkViews() {
         expect: 'List of displayed Views should match expected list'
-        printAndCompare('Views', VIEWS_FILE, RUNNING_GENQA, viewLines, getViews(page))
+        printAndCompare('Views', VIEWS_FILE, runningGenqa, viewLines, getViews(page))
     }
 
     /**
@@ -348,7 +360,7 @@ class SqlQueriesTest extends TestBase {
      */
     def checkDefaultStoredProcs() {
         expect: 'List of displayed Default Stored Procedures should match expected list'
-        printAndCompare('Default Stored Procedures', DEFAULT_STORED_PROCS_FILE, RUNNING_GENQA,
+        printAndCompare('Default Stored Procedures', DEFAULT_STORED_PROCS_FILE, runningGenqa,
                         defaultStoredProcLines, page.getDefaultStoredProcedures())
     }
 
@@ -358,7 +370,7 @@ class SqlQueriesTest extends TestBase {
      */
     def checkUserStoredProcs() {
         expect: 'List of displayed User Stored Procedures should match expected list'
-        printAndCompare('User Stored Procedures', USER_STORED_PROCS_FILE, RUNNING_GENQA,
+        printAndCompare('User Stored Procedures', USER_STORED_PROCS_FILE, runningGenqa,
                         userStoredProcLines, page.getUserStoredProcedures())
     }
 
@@ -367,12 +379,12 @@ class SqlQueriesTest extends TestBase {
      *  queries only work if you are running against the 'genqa' test app;
      *  otherwise, they will fail immediately.
      */
-    @Unroll //performs this method for each item in 'testName'
+    @Unroll // performs this method for each 'testName' in the SQL Query text file
     def '#testName'() {
 
-        // No point in running these tests, if not running the 'genqa' test app
-        if (!RUNNING_GENQA) {
-            assert false, "This test only works when running against the 'genqa' test app."
+        if (!runningGenqa && expectedResponse.status == "SUCCESS") {
+            println ("\nWARNING: Apparently not running against the 'genqa' test "
+                    + "app, so this test (" + testName + ") will probably fail.")
         }
 
         setup: 'execute the next query (or queries)'
