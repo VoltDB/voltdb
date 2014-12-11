@@ -287,6 +287,7 @@ public class HTTPAdminListener {
             String jsonp = request.getParameter("jsonp");
 
             try {
+                response.setContentType("application/json;charset=utf-8");
                 response.setStatus(HttpServletResponse.SC_OK);
                 AuthenticationResult authResult = authenticate(baseRequest);
                 if (!authResult.isAuthenticated()) {
@@ -367,6 +368,7 @@ public class HTTPAdminListener {
             String jsonp = request.getParameter("jsonp");
 
             try {
+                response.setContentType("application/json;charset=utf-8");
                 response.setStatus(HttpServletResponse.SC_OK);
                 //schema request does not require authentication.
                 if (baseRequest.getRequestURI().contains("/schema")) {
@@ -396,7 +398,7 @@ public class HTTPAdminListener {
                 //Authenticated and has ADMIN permission
                 if (baseRequest.getRequestURI().contains("/download")) {
                     //Deployment xml is text/xml
-                    response.setHeader("Content-Type", "text/xml");
+                    response.setContentType("text/xml;charset=utf-8");
                     response.getWriter().write(new String(getDeploymentBytes()));
                 } else {
                     if (jsonp != null) {

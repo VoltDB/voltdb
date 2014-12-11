@@ -864,6 +864,7 @@ input.exitableTxtBx{width:30px; /*position:relative; top:6px;*/ padding:2px 3px;
 .tblshutdown tr td a.startServ { display:inline-block;background-position:-669px -56px; width:40px; height:36px;line-height:39px; }
 .shutdownServer { position:relative; top:17px; right:2px;}
 .startServer { position:relative; top:17px; right:2px;}
+.disableServer { cursor: default;}
 #serverListWrapperAdmin{ padding:15px 16px 0 15px;}
 #serverListWrapperAdmin table.tblshutdown{margin-bottom:30px;}
 .confirmationInfo{font-weight: bold;}

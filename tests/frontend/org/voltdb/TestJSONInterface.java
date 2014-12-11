@@ -172,7 +172,7 @@ public class TestJSONInterface extends TestCase {
         return response;
     }
 
-    public static String getUrlOverJSON(String url, int expectedCode) throws Exception {
+    public static String getUrlOverJSON(String url, int expectedCode, String expectedCt) throws Exception {
         URL jsonAPIURL = new URL(url);
 
         HttpURLConnection conn = (HttpURLConnection) jsonAPIURL.openConnection();
@@ -197,6 +197,8 @@ public class TestJSONInterface extends TestCase {
         if (in == null) {
             throw new Exception("Unable to read response from server");
         }
+        String ct = conn.getContentType();
+        assertTrue(ct.contains(expectedCt));
 
         StringBuilder decodedString = new StringBuilder();
         String line;
@@ -1037,13 +1039,13 @@ public class TestJSONInterface extends TestCase {
             server.waitForInitialization();
 
             //Get deployment
-            String dep = getUrlOverJSON("http://localhost:8095/deployment", 200);
+            String dep = getUrlOverJSON("http://localhost:8095/deployment", 200,  "application/json");
             assertTrue(dep.contains("cluster"));
             //Get deployment schema
-            String schema = getUrlOverJSON("http://localhost:8095/deployment/schema", 200);
+            String schema = getUrlOverJSON("http://localhost:8095/deployment/schema", 200, "application/json");
             assertTrue(schema.contains("\"cluster\""));
             //Download deployment
-            dep = getUrlOverJSON("http://localhost:8095/deployment/download", 200);
+            dep = getUrlOverJSON("http://localhost:8095/deployment/download", 200, "text/xml");
             assertTrue(dep.contains("<deployment>"));
             assertTrue(dep.contains("</deployment>"));
         } finally {
@@ -1091,19 +1093,19 @@ public class TestJSONInterface extends TestCase {
             server.waitForInitialization();
 
             //Get deployment bad user
-            String dep = getUrlOverJSON("http://localhost:8095/deployment/?User=" + "user1&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", 200);
+            String dep = getUrlOverJSON("http://localhost:8095/deployment/?User=" + "user1&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", 200, "application/json");
             assertTrue(dep.contains("Permission denied"));
             //good user
-            dep = getUrlOverJSON("http://localhost:8095/deployment/?User=" + "user2&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", 200);
+            dep = getUrlOverJSON("http://localhost:8095/deployment/?User=" + "user2&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", 200, "application/json");
             assertTrue(dep.contains("cluster"));
             //Get deployment schema always
-            String schema = getUrlOverJSON("http://localhost:8095/deployment/schema", 200);
+            String schema = getUrlOverJSON("http://localhost:8095/deployment/schema", 200, "application/json");
             assertTrue(schema.contains("\"cluster\""));
             //Download deployment bad user
-            dep = getUrlOverJSON("http://localhost:8095/deployment/download?User=" + "user1&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", 200);
+            dep = getUrlOverJSON("http://localhost:8095/deployment/download?User=" + "user1&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", 200, "application/json");
             assertTrue(dep.contains("Permission denied"));
             //good user
-            dep = getUrlOverJSON("http://localhost:8095/deployment/download?User=" + "user2&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", 200);
+            dep = getUrlOverJSON("http://localhost:8095/deployment/download?User=" + "user2&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", 200, "text/xml");
             assertTrue(dep.contains("<deployment>"));
             assertTrue(dep.contains("</deployment>"));
         } finally {
@@ -1143,7 +1145,7 @@ public class TestJSONInterface extends TestCase {
             server.waitForInitialization();
 
             //Get profile
-            String dep = getUrlOverJSON("http://localhost:8095/profile", 200);
+            String dep = getUrlOverJSON("http://localhost:8095/profile", 200, "application/json");
             assertTrue(dep.contains("\"user\""));
             assertTrue(dep.contains("\"permissions\""));
         } finally {
