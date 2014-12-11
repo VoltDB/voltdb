@@ -38,6 +38,7 @@ import org.voltcore.logging.Level;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.utils.Base64;
 import org.voltdb.utils.Encoder;
 
 public class HTTPClientInterface {
@@ -133,12 +134,8 @@ public class HTTPClientInterface {
                 continuation.complete();
                 return;
             }
-            String username = request.getParameter(PARAM_USERNAME);
-            String password = request.getParameter(PARAM_PASSWORD);
-            String hashedPassword = request.getParameter(PARAM_HASHEDPASSWORD);
-            String admin = request.getParameter(PARAM_ADMIN);
 
-            authResult = getAuthenticationResult(request, username, password, hashedPassword, admin);
+            authResult = getAuthenticationResult(request);
             if (!authResult.isAuthenticated()) {
                 String msg = authResult.m_message;
                 m_rate_limited_log.log("JSON interface exception: " + msg, EstTime.currentTimeMillis());
@@ -219,8 +216,42 @@ public class HTTPClientInterface {
         }
     }
 
-    public AuthenticationResult getAuthenticationResult(Request request, String username, String password, String hashedPassword, String admin) {
+    public AuthenticationResult getAuthenticationResult(Request request) {
         boolean adminMode = false;
+
+        String username = null;
+        String hashedPassword = null;
+        String password = null;
+        //Check authorization header
+        String auth = request.getHeader("Authorization");
+        boolean validAuthHeader = false;
+        if (auth != null) {
+            String schemeAndHandle[] = auth.split(" ");
+            if (schemeAndHandle.length == 2) {
+                if (schemeAndHandle[0].equalsIgnoreCase("hashed")) {
+                    String up[] = schemeAndHandle[1].split(":");
+                    if (up.length == 2) {
+                        username = up[0];
+                        hashedPassword = up[1];
+                        validAuthHeader = true;
+                    }
+                } else if (schemeAndHandle[0].equalsIgnoreCase("basic")) {
+                    String unpw = new String(Base64.decode(schemeAndHandle[1]));
+                    String up[] = unpw.split(":");
+                    if (up.length == 2) {
+                        username = up[0];
+                        password = up[1];
+                        validAuthHeader = true;
+                    }
+                }
+            }
+        }
+        if (!validAuthHeader) {
+            username = request.getParameter(PARAM_USERNAME);
+            hashedPassword = request.getParameter(PARAM_HASHEDPASSWORD);
+            password = request.getParameter(PARAM_PASSWORD);
+        }
+        String admin = request.getParameter(PARAM_ADMIN);
 
         // first check for a catalog update and purge the cached connections
         // if one has happened since we were here last
@@ -307,12 +338,8 @@ public class HTTPClientInterface {
     public AuthenticationResult authenticate(Request request) {
         AuthenticationResult authResult = null;
 
-        String username = request.getParameter(PARAM_USERNAME);
-        String password = request.getParameter(PARAM_PASSWORD);
-        String hashedPassword = request.getParameter(PARAM_HASHEDPASSWORD);
-        String admin = request.getParameter(PARAM_ADMIN);
         try {
-            authResult = getAuthenticationResult(request, username, password, hashedPassword, admin);
+            authResult = getAuthenticationResult(request);
             if (!authResult.isAuthenticated()) {
                 m_rate_limited_log.log("JSON interface exception: " + authResult.m_message, EstTime.currentTimeMillis());
             }

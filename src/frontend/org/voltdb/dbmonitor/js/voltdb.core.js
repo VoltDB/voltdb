@@ -6,6 +6,7 @@
         this.connections = {};
         this.isServerConnected = true;
         this.hostIP = "";
+        this.authorization = null;
         DbConnection = function (aServer, aPort, aAdmin, aUser, aPassword, aIsHashPassword, aProcess) {
             this.server = aServer == null ? 'localhost' : $.trim(aServer);
             this.port = aPort == null ? '8080' : $.trim(aPort);
@@ -19,6 +20,7 @@
             this.Metadata = {};
             this.ready = false;
             this.procedureCommands = {};
+            this.authorization = VoltDBService.BuildAuthorization(this.user, this.isHashedPassword, this.password)
 
             this.getQueue = function () {
                 return (new iQueue(this));
@@ -86,12 +88,6 @@
                     params += ']';
                     s[s.length] = encodeURIComponent('Parameters') + '=' + encodeURIComponent(params);
                 }
-                if (this.user != null)
-                    s[s.length] = encodeURIComponent('User') + '=' + encodeURIComponent(this.user);
-                if (this.password != null)
-                    s[s.length] = encodeURIComponent('Password') + '=' + encodeURIComponent(this.password);
-                if (this.isHashedPassword != null)
-                    s[s.length] = encodeURIComponent('Hashedpassword') + '=' + encodeURIComponent(this.isHashedPassword);
                 if (this.admin)
                     s[s.length] = 'admin=true';
                 var paramSet = s.join('&') + '&jsonp=?';
@@ -103,7 +99,27 @@
                 var params = this.BuildParamSet(procedure, parameters);
                 if (typeof (params) == 'string') {
                     if (VoltDBCore.isServerConnected) {
-                        jQuery.postJSON(uri, params, callback);
+                        var ah = VoltDBService.BuildAuthorization(this.user, this.isHashedPassword, this.password)
+                        jQuery.getJSON(uri, params, callback, ah);
+                    }
+                } else if (callback != null)
+                    callback({ "status": -1, "statusstring": "PrepareStatement error: " + params[0], "results": [] });
+            };
+
+            this.CallExecuteUpdate = function (procedure, parameters, callback) {
+                var uri = 'http://' + this.server + ':' + this.port + '/api/1.0/';
+                var params = this.BuildParamSet(procedure, parameters);
+                if (typeof (params) == 'string') {
+                    if (VoltDBCore.isServerConnected) {
+                        var ah = null;
+                        if (this.authorization != null) {
+                            ah = this.authorization;
+                        } else if (this.user != null && this.isHashedPassword != null) {
+                            ah = "Hashed " + this.user + ":" + this.isHashedPassword;
+                        } else if (this.user != null && this.password != null) {
+                            ah = "Basic " + this.user + ":" + this.password;
+                        }
+                        jQuery.postJSON(uri, params, callback, ah);
                     }
                 } else if (callback != null)
                     callback({ "status": -1, "statusstring": "PrepareStatement error: " + params[0], "results": [] });
@@ -158,7 +174,7 @@
                             (function (queue, item) {
                                 return function (response, headerInfo) {
                                     try {
-                                        
+
                                         if (VoltDBCore.hostIP == "") {
                                             VoltDBCore.hostIP = headerInfo;
                                         }
@@ -167,7 +183,7 @@
                                             success = false;
                                         if (item[2] != null)
                                             item[2](response);
-                                        
+
                                         queue.EndExecute();
                                     } catch (x) {
                                         success = false;
@@ -335,6 +351,12 @@
             $.ajax({
                 url: uri + '?' + params,
                 dataType: "jsonp",
+                beforeSend: function (request)
+                {
+                    if (conn.authorization != null) {
+                        request.setRequestHeader("Authorization", conn.authorization);
+                    }
+                },
                 success: function (e) {
                     if (e.status === 200) {
                         checkConnection(true);
@@ -450,15 +472,21 @@
 })(window);
 
 jQuery.extend({
-    postJSON: function (url, formData, callback) {
-        
+    postJSON: function (url, formData, callback, authorization) {
+
         if (VoltDBCore.hostIP == "") {
-        
+
             jQuery.ajax({
                 type: 'POST',
                 url: url,
                 data: formData,
                 dataType: 'jsonp',
+                beforeSend: function (request)
+                {
+                    if (authorization != null) {
+                        request.setRequestHeader("Authorization", authorization);
+                    }
+                },
                 success: function (data, textStatus, request) {
                     var host = request.getResponseHeader("Host") != null ? request.getResponseHeader("Host").split(":")[0] : "-1";
                     callback(data, host);
@@ -469,8 +497,70 @@ jQuery.extend({
             });
 
         } else {
-            jQuery.post(url, formData, callback, "json");
+            jQuery.ajax({
+                type: 'POST',
+                url: url,
+                data: formData,
+                dataType: 'jsonp',
+                beforeSend: function (request)
+                {
+                    if (authorization != null) {
+                        request.setRequestHeader("Authorization", authorization);
+                    }
+                },
+                success: callback,
+                error: function (e) {
+                    console.log(e.message);
+                }
+            });
         }
     }
+});
+
+jQuery.extend({
+    getJSON: function (url, formData, callback, authorization) {
+
+        if (VoltDBCore.hostIP == "") {
+
+            jQuery.ajax({
+                type: 'GET',
+                url: url,
+                data: formData,
+                dataType: 'jsonp',
+                beforeSend: function (request)
+                {
+                    if (authorization != null) {
+                        request.setRequestHeader("Authorization", authorization);
+                    }
+                },
+                success: function (data, textStatus, request) {
+                    var host = request.getResponseHeader("Host") != null ? request.getResponseHeader("Host").split(":")[0] : "-1";
+                    callback(data, host);
+                },
+                error: function (e) {
+                    console.log(e.message);
+                }
+            });
+
+        } else {
+            jQuery.ajax({
+                type: 'GET',
+                url: url,
+                data: formData,
+                dataType: 'jsonp',
+                beforeSend: function (request)
+                {
+                    if (authorization != null) {
+                        request.setRequestHeader("Authorization", authorization);
+                    }
+                },
+                success: callback,
+                error: function (e) {
+                    console.log(e.message);
+                }
+            });
+        }
+    }
+
 });
 
