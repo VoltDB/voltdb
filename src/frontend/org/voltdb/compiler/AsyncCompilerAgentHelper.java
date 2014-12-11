@@ -223,6 +223,7 @@ public class AsyncCompilerAgentHelper
             String oldDDL = new String(jarfile.get(VoltCompiler.AUTOGEN_DDL_FILE_NAME),
                     Constants.UTF8ENCODING);
             StringBuilder sb = new StringBuilder();
+            compilerLog.trace("OLD DDL: " + oldDDL);
             sb.append(oldDDL);
             sb.append("\n");
             compilerLog.info("Applying the following DDL to cluster:");
