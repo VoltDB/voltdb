@@ -361,7 +361,7 @@ public class RegressionSuite extends TestCase {
             }
             // Long.MIN_VALUE is like a NULL
             if (expected[i] != Long.MIN_VALUE) {
-                assertEquals(expected[i], actual);
+                assertEquals("At index " + i + ", ", expected[i], actual);
             } else {
                 if (isHSQL()) {
                     // Hsql return 0 for NULL

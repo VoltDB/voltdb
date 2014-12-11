@@ -890,7 +890,7 @@ public abstract class AbstractParsedStmt {
         long limitParameterId = -1;
         long offsetParameterId = -1;
         long limit = -1;
-        long offset = -1;
+        long offset = 0;
         if (limitXml != null) {
             // Parse limit
             if ((node = limitXml.attributes.get("limit_paramid")) != null)

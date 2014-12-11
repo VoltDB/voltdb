@@ -866,6 +866,22 @@ public class PlanAssembler {
         return false;
     }
 
+    static private boolean deleteIsTruncate(ParsedDeleteStmt stmt, AbstractPlanNode plan) {
+        if (!(plan instanceof SeqScanPlanNode)) {
+            return false;
+        }
+
+        SeqScanPlanNode seqScanNode = (SeqScanPlanNode)plan;
+        if (seqScanNode.getPredicate() != null) {
+            return false;
+        }
+
+        if (stmt.limitPlanNode() != null) {
+            return false;
+        }
+
+        return true;
+    }
 
     private AbstractPlanNode getNextDeletePlan() {
         assert (subAssembler != null);
@@ -890,43 +906,54 @@ public class PlanAssembler {
         DeletePlanNode deleteNode = new DeletePlanNode();
         deleteNode.setTargetTableName(targetTable.getTypeName());
 
-        ProjectionPlanNode projectionNode = new ProjectionPlanNode();
-        AbstractExpression addressExpr = new TupleAddressExpression();
-        NodeSchema proj_schema = new NodeSchema();
-        // This planner-created column is magic.
-        proj_schema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
-                                               "VOLT_TEMP_TABLE",
-                                               "tuple_address",
-                                               "tuple_address",
-                                               addressExpr));
-        projectionNode.setOutputSchema(proj_schema);
-
         assert(subSelectRoot instanceof AbstractScanPlanNode);
 
         // If the scan matches all rows, we can throw away the scan
         // nodes and use a truncate delete node.
         // Assume all index scans have filters in this context, so only consider seq scans.
-        if ( (subSelectRoot instanceof SeqScanPlanNode) &&
-                (((SeqScanPlanNode) subSelectRoot).getPredicate() == null)) {
+        if (deleteIsTruncate(m_parsedDelete, subSelectRoot)) {
             deleteNode.setTruncate(true);
 
             if (m_partitioning.wasSpecifiedAsSingle()) {
                 return deleteNode;
             }
         } else {
+            boolean needsOrderByNode = isOrderByNodeRequired(m_parsedDelete, subSelectRoot);
+            // Somewhere (after partitioning has been inferred), fail if this is a MP plan
+            // on a partitioned table.
 
-            if (m_parsedDelete.hasOrderByColumns()) {
-                /// XXX fail here if multi-fragment plan
-                subSelectRoot = handleOrderBy(m_parsedDelete, subSelectRoot);
+            ProjectionPlanNode projectionNode = new ProjectionPlanNode();
+            AbstractExpression addressExpr = new TupleAddressExpression();
+            NodeSchema proj_schema = new NodeSchema();
+            // This planner-created column is magic.
+            proj_schema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
+                                                   "VOLT_TEMP_TABLE",
+                                                   "tuple_address",
+                                                   "tuple_address",
+                                                   addressExpr));
+            if (needsOrderByNode) {
+                // Projection will need to pass the sort keys to the order by node
+                for (ParsedColInfo col : m_parsedDelete.orderByColumns()) {
+                    proj_schema.addColumn(col.asSchemaColumn());
+                }
+            }
+            projectionNode.setOutputSchema(proj_schema);
+            subSelectRoot.addInlinePlanNode(projectionNode);
+
+            AbstractPlanNode root = subSelectRoot;
+            if (needsOrderByNode) {
+                OrderByPlanNode ob = buildOrderByPlanNode(m_parsedDelete.orderByColumns());
+                ob.addAndLinkChild(root);
+                root = ob;
             }
 
-            subSelectRoot = m_parsedDelete.handleLimit(subSelectRoot);
+            LimitPlanNode limitNode = m_parsedDelete.limitPlanNode();
+            if (limitNode != null) {
+                assert(m_parsedDelete.orderByColumns().size() > 0);
+                root.addInlinePlanNode(limitNode);
+            }
 
-            projectionNode.addAndLinkChild(subSelectRoot);
-
-            subSelectRoot = projectionNode;
-
-            deleteNode.addAndLinkChild(subSelectRoot);
+            deleteNode.addAndLinkChild(root);
 
             // OPTIMIZATION: Projection Inline
             // If the root node we got back from createSelectTree() is an
@@ -936,10 +963,6 @@ public class PlanAssembler {
             // to overwrite any original projection that we might have inlined
             // in order to simply cull the columns from the persistent table.
             //subSelectRoot.addInlinePlanNode(projectionNode);
-
-            System.out.println("\n\n----------------------------------------");
-            System.out.println(deleteNode.toExplainPlanString());
-            System.out.println("----------------------------------------\n\n");
         }
 
         if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.isInferredSingle()) {
@@ -1289,13 +1312,31 @@ public class PlanAssembler {
         }
     }
 
+    private static OrderByPlanNode buildOrderByPlanNode(List<ParsedColInfo> cols) {
+        OrderByPlanNode n = new OrderByPlanNode();
+
+        for (ParsedColInfo col : cols) {
+            n.addSort(col.expression,
+                    col.ascending ? SortDirectionType.ASC
+                                  : SortDirectionType.DESC);
+        }
+
+        return n;
+    }
+
     /**
-     * Create an order by node as required by the statement and make it a parent of root.
-     * @param root
-     * @return new orderByNode (the new root) or the original root if no orderByNode was required.
+     * Determine if an OrderByPlanNode is needed.  This may return false if the
+     * statement has no ORDER BY clause, or if the subtree is already producing
+     * rows in the correct order.
+     * @param parsedStmt    The statement whose plan may need an OrderByPlanNode
+     * @param root          The subtree which may need its output tuples ordered
+     * @return true if the plan needs an OrderByPlanNode, false otherwise
      */
-    static private AbstractPlanNode handleOrderBy(AbstractParsedStmt parsedStmt, AbstractPlanNode root) {
-        assert (parsedStmt instanceof ParsedSelectStmt || parsedStmt instanceof ParsedDeleteStmt);
+    private static boolean isOrderByNodeRequired(AbstractParsedStmt parsedStmt, AbstractPlanNode root) {
+        // Only sort when the statement has an ORDER BY.
+        if ( ! parsedStmt.hasOrderByColumns()) {
+            return false;
+        }
 
         SortDirectionType sortDirection = SortDirectionType.INVALID;
         // Skip the explicit ORDER BY plan step if an IndexScan is already providing the equivalent ordering.
@@ -1322,15 +1363,26 @@ public class PlanAssembler {
         }
 
         if (sortDirection != SortDirectionType.INVALID) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Create an order by node as required by the statement and make it a parent of root.
+     * @param parsedStmt  Parsed statement, for context
+     * @param root        The root of the plan needing ordering
+     * @return new orderByNode (the new root) or the original root if no orderByNode was required.
+     */
+    private static AbstractPlanNode handleOrderBy(AbstractParsedStmt parsedStmt, AbstractPlanNode root) {
+        assert (parsedStmt instanceof ParsedSelectStmt || parsedStmt instanceof ParsedDeleteStmt);
+
+        if (! isOrderByNodeRequired(parsedStmt, root)) {
             return root;
         }
 
-        OrderByPlanNode orderByNode = new OrderByPlanNode();
-        for (ParsedColInfo col : parsedStmt.orderByColumns()) {
-            orderByNode.addSort(col.expression,
-                                col.ascending ? SortDirectionType.ASC
-                                              : SortDirectionType.DESC);
-        }
+        OrderByPlanNode orderByNode = buildOrderByPlanNode(parsedStmt.orderByColumns());
         orderByNode.addAndLinkChild(root);
         return orderByNode;
     }

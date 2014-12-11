@@ -24,13 +24,17 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.util.List;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
+
+import java.util.Arrays;
 
 /**
  * System tests for DELETE
@@ -44,14 +48,19 @@ public class TestSqlDeleteSuite extends RegressionSuite {
 
     static final int ROWS = 10;
 
+    private static void insertRows(Client client, String tableName, int numRows) throws Exception {
+        for (int i = 0; i < numRows; ++i) {
+            client.callProcedure("Insert", tableName, i, "desc", i, 14.5);
+        }
+
+    }
+
     private void executeAndTestDelete(String tableName, String deleteStmt, int numExpectedRowsChanged)
-            throws IOException, ProcCallException {
+            throws Exception {
 
         Client client = getClient();
 
-        for (int i = 0; i < ROWS; ++i) {
-            client.callProcedure("Insert", tableName, i, "desc", i, 14.5);
-        }
+        insertRows(client, tableName, ROWS);
 
         VoltTable[] results = client.callProcedure("@AdHoc", deleteStmt).getResults();
         assertEquals(numExpectedRowsChanged, results[0].asScalarLong());
@@ -72,7 +81,7 @@ public class TestSqlDeleteSuite extends RegressionSuite {
     }
 
     public void testDelete()
-    throws IOException, ProcCallException
+    throws Exception
     {
         String[] tables = {"P1", "R1"};
         for (String table : tables)
@@ -85,7 +94,7 @@ public class TestSqlDeleteSuite extends RegressionSuite {
     }
 
     public void testDeleteWithEqualToIndexPredicate()
-    throws IOException, ProcCallException
+    throws Exception
     {
         String[] tables = {"P1", "R1"};
         for (String table : tables)
@@ -98,7 +107,7 @@ public class TestSqlDeleteSuite extends RegressionSuite {
     }
 
     public void testDeleteWithEqualToNonIndexPredicate()
-    throws IOException, ProcCallException
+    throws Exception
     {
         String[] tables = {"P1", "R1"};
         for (String table : tables)
@@ -114,7 +123,7 @@ public class TestSqlDeleteSuite extends RegressionSuite {
     // which generates the XML eaten by the planner didn't generate
     // anything in the <condition> element output for > or >= on an index
     public void testDeleteWithGreaterThanIndexPredicate()
-    throws IOException, ProcCallException
+    throws Exception
     {
         String[] tables = {"P1", "R1"};
         for (String table : tables)
@@ -127,7 +136,7 @@ public class TestSqlDeleteSuite extends RegressionSuite {
     }
 
     public void testDeleteWithGreaterThanNonIndexPredicate()
-    throws IOException, ProcCallException
+    throws Exception
     {
         String[] tables = {"P1", "R1"};
         for (String table : tables)
@@ -140,7 +149,7 @@ public class TestSqlDeleteSuite extends RegressionSuite {
     }
 
     public void testDeleteWithLessThanIndexPredicate()
-    throws IOException, ProcCallException
+    throws Exception
     {
         String[] tables = {"P1", "R1"};
         for (String table : tables)
@@ -158,7 +167,7 @@ public class TestSqlDeleteSuite extends RegressionSuite {
     // would end up only seeing the first subnode written to the <condition>
     // element
     public void testDeleteWithOnePredicateAgainstIndexAndOneFalse()
-    throws IOException, ProcCallException
+    throws Exception
     {
         String[] tables = {"P1", "R1"};
         for (String table : tables)
@@ -174,7 +183,7 @@ public class TestSqlDeleteSuite extends RegressionSuite {
     // the index begin and end conditions, so the planner would only see the
     // begin condition in the <condition> element.
     public void testDeleteWithRangeAgainstIndex()
-    throws IOException, ProcCallException
+    throws Exception
     {
         String[] tables = {"P1", "R1"};
         for (String table : tables)
@@ -186,7 +195,7 @@ public class TestSqlDeleteSuite extends RegressionSuite {
     }
 
     public void testDeleteWithRangeAgainstNonIndex()
-    throws IOException, ProcCallException
+    throws Exception
     {
         String[] tables = {"P1", "R1"};
         for (String table : tables)
@@ -194,6 +203,43 @@ public class TestSqlDeleteSuite extends RegressionSuite {
             String delete = String.format("delete from %s where %s.NUM < 8 and %s.NUM > 5",
                                           table, table, table);
             executeAndTestDelete(table, delete, 2);
+        }
+    }
+
+    // Test replicated case with no where clause
+    public void testDeleteWithOrderBy() throws Exception {
+        if (isHSQL()) {
+            return;
+        }
+
+        Client client = getClient();
+        String[] stmtTemplates = {
+                "DELETE FROM %s ORDER BY NUM ASC LIMIT 1",
+                "DELETE FROM %s ORDER BY NUM DESC LIMIT 2",
+                "DELETE FROM %s ORDER BY NUM LIMIT 3"};
+        // Table starts with 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
+        long[][] expectedResults = {
+                new long[] {1, 2, 3, 4, 5, 6, 7, 8, 9},
+                new long[] {1, 2, 3, 4, 5, 6, 7},
+                new long[] {4, 5, 6, 7}};
+
+        insertRows(client, "P1", 10);
+        insertRows(client, "R1", 10);
+
+        VoltTable vt;
+        for (int i = 0; i < stmtTemplates.length; ++i) {
+
+            // Should succeed on replicated table
+            String replStmt = String.format(stmtTemplates[i], "R1");
+            int len = replStmt.length();
+            long expectedRows = Long.valueOf(replStmt.substring(len - 1, len));
+            vt = client.callProcedure("@AdHoc", replStmt).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {expectedRows});
+
+            vt = client.callProcedure("@AdHoc", "SELECT NUM FROM R1 ORDER BY NUM ASC").getResults()[0];
+            System.out.println(replStmt);
+            System.out.println(vt);
+            validateTableOfScalarLongs(vt, expectedResults[i]);
         }
     }
 

@@ -85,6 +85,10 @@ public class ParsedDeleteStmt extends AbstractParsedStmt {
         return Collections.unmodifiableList(m_orderColumns);
     }
 
+    public LimitPlanNode limitPlanNode() {
+        return m_limitPlanNode;
+    }
+
     public AbstractPlanNode handleLimit(AbstractPlanNode root) {
         if (m_limitPlanNode != null) {
             // XXX fail here if no ORDER BY present
