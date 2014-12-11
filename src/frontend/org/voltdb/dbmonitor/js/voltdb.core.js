@@ -158,7 +158,7 @@
                             (function (queue, item) {
                                 return function (response, headerInfo) {
                                     try {
-                                        
+
                                         if (VoltDBCore.hostIP == "") {
                                             VoltDBCore.hostIP = headerInfo;
                                         }
@@ -167,7 +167,7 @@
                                             success = false;
                                         if (item[2] != null)
                                             item[2](response);
-                                        
+
                                         queue.EndExecute();
                                     } catch (x) {
                                         success = false;
@@ -389,13 +389,12 @@
             var connectionQueue = connection.getQueue();
             connectionQueue.Start();
 
-
             jQuery.each(connection.procedureCommands.procedures, function (id, procedure) {
                 connectionQueue.BeginExecute(procedure['procedure'], (procedure['value'] === undefined ? procedure['parameter'] : [procedure['parameter'], procedure['value']]), function (data) {
                     var suffix = (processName == "GRAPH_MEMORY" || processName == "GRAPH_TRANSACTION") || processName == "TABLE_INFORMATION" ? "_" + processName : "";
+                    connection.Metadata[procedure['procedure'] + "_" + procedure['parameter'] + suffix + "_status"] = data.status;
                     connection.Metadata[procedure['procedure'] + "_" + procedure['parameter'] + suffix] = data.results[0];
-                });
-
+                });                
             });
 
             connectionQueue.End(function (state) {
@@ -451,9 +450,9 @@
 
 jQuery.extend({
     postJSON: function (url, formData, callback) {
-        
+
         if (VoltDBCore.hostIP == "") {
-        
+
             jQuery.ajax({
                 type: 'POST',
                 url: url,
