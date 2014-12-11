@@ -188,6 +188,8 @@ public class SchemaChangeClient {
 
     enum ChangeType { CREATE, MUTATE_NONEMPTY, MUTATE_EMPTY }
 
+    enum BatchResult { BATCH_SUCCEEDED, BATCH_FAILED, BATCH_FAILED_AS_EXPECTED }
+
     /**
      * Test driver that initiates catalog changes and tracks state, e.g. for retries.
      */
@@ -226,7 +228,7 @@ public class SchemaChangeClient {
             long max = this.maxId();
 
             TableLoader loader = new TableLoader(client, this.oldSchema.table,
-                                                 rand, config.noProgressTimeout);
+                                                 config.noProgressTimeout, helper);
 
             log.info(_F("Loading table %s", tableName));
             loader.load(max + 1, realRowCount);
@@ -307,9 +309,9 @@ public class SchemaChangeClient {
                 this.ddl.append(_F(queryFmt, params));
             }
 
-            boolean execute() throws IOException {
+            BatchResult execute() throws IOException {
                 String ddlString = this.ddl.toString();
-                boolean success = true;
+                BatchResult result = BatchResult.BATCH_SUCCEEDED;
                 try {
                     if (ddlString.length() > 0) {
                         log.info(_F("\n::: DDL Batch (BEGIN) :::\n%s\n::: DDL Batch (END) :::", ddlString));
@@ -325,20 +327,23 @@ public class SchemaChangeClient {
                         }
                         else {
                             // blowed up good!
-                            success = false;
                             if (this.expectedError != null) {
                                 // expected an error, check that it's the right one
                                 if (this.expectedError.length() == 0) {
+                                    result = BatchResult.BATCH_FAILED_AS_EXPECTED;
                                     log.info("Ignored expected error.");
                                 }
                                 else if (error.contains(this.expectedError)) {
+                                    result = BatchResult.BATCH_FAILED_AS_EXPECTED;
                                     log.info(_F("Ignored expected error containing '%s'.", this.expectedError));
                                 }
                                 else {
+                                    result = BatchResult.BATCH_FAILED;  // not really used, but correct
                                     die("Expected an error containing '%s'.", this.expectedError);
                                 }
                             }
                             else {
+                                result = BatchResult.BATCH_FAILED;
                                 this.lastFailureDDL = ddlString;
                                 this.lastFailureError = error;
                             }
@@ -348,7 +353,7 @@ public class SchemaChangeClient {
                 finally {
                     this.ddl = null;
                 }
-                return success;
+                return result;
             }
 
             void setExpectedError() {
@@ -391,7 +396,8 @@ public class SchemaChangeClient {
             }
 
             int retryCount = 0;
-            while (!this.executeChanges(changeType, retryCount > 0)) {
+            BatchResult result = this.executeChanges(changeType, false);
+            while (result != BatchResult.BATCH_SUCCEEDED) {
                 //=== retry
 
                 // If V<next> is present there is nothing to retry, just finish what we started.
@@ -406,9 +412,16 @@ public class SchemaChangeClient {
                 if (retryCount > config.retryLimit) {
                     this.die("Retry limit (%d) exceeded.", config.retryLimit);
                 }
-                log.info(_F("::::: Catalog Change (retry #%d in %d seconds): %s :::::",
-                        retryCount, config.retrySleep, changeType.toString()));
-                Thread.sleep(config.retrySleep * 1000);
+
+                log.info(_F("::::: Catalog Change (retry #%d): %s :::::", retryCount, changeType.toString()));
+                if (result != BatchResult.BATCH_FAILED_AS_EXPECTED) {
+                    // sleep before retrying when its an unexpected failure
+                    log.info(_F("Sleeping %d seconds...", config.retrySleep));
+                    Thread.sleep(config.retrySleep * 1000);
+                }
+
+                // give it another go
+                result = this.executeChanges(changeType, true);
             }
 
             this.catalogChangeComplete(changeType);
@@ -417,7 +430,7 @@ public class SchemaChangeClient {
         /**
          * Internal implementation to execute the DDL changes.
          */
-        private boolean executeChanges(ChangeType changeType, boolean isRetry) throws Exception {
+        private BatchResult executeChanges(ChangeType changeType, boolean isRetry) throws Exception {
             /*
              * === Drop Batch ===
              *
@@ -444,12 +457,13 @@ public class SchemaChangeClient {
                     }
                 }
                 log.info("Starting to drop database objects.");
-                if (!batch.execute()) {
-                    return false;
+                BatchResult result = batch.execute();
+                if (result != BatchResult.BATCH_SUCCEEDED) {
+                    return result;
                 }
             }
             catch (IOException e) {
-                return false;
+                return BatchResult.BATCH_FAILED;
             }
 
             /*
@@ -536,7 +550,7 @@ public class SchemaChangeClient {
             catch (IOException e) {
                 // All SchemaChanger problems become IOExceptions.
                 // This is a normal error return that is handled by the caller.
-                return false;
+                return BatchResult.BATCH_FAILED;
             }
         }
 

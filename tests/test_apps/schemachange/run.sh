@@ -77,7 +77,7 @@ function auto_smoke() {
 
 # Run automatic quick test.
 function auto_quick() {
-    _auto_run --targetrowcount=1000 --duration=180
+    _auto_run --targetrowcount=10000 --duration=180
 }
 
 function help() {

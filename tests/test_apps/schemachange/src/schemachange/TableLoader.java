@@ -24,7 +24,6 @@
 package schemachange;
 
 import java.util.Collections;
-import java.util.Random;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -59,12 +58,11 @@ class TableLoader {
         return String.format(str, parameters);
     }
 
-    TableLoader(Client client, VoltTable t, Random rand, int timeout) {
+    TableLoader(Client client, VoltTable t, int timeout, TableHelper helper) {
         this.table = t;
         this.client = client;
-        TableHelper.Configuration helperConfig = new TableHelper.Configuration();
-        helperConfig.rand = rand;
-        this.helper = new TableHelper(helperConfig);
+        assert(helper != null);
+        this.helper = helper;
         this.timeout = timeout;
 
         // find the primary key

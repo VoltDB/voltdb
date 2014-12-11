@@ -1033,7 +1033,8 @@ public class TableHelper {
                 int maxStringSize,
                 boolean loadPrimaryKeys,
                 boolean loadUniqueColumns) {
-        return new RandomRowMaker(table, maxStringSize, m_rand, loadPrimaryKeys, loadUniqueColumns, m_config.extraColumnPrefix);
+        String extraColumnPrefix = m_config.numExtraColumns > 0 ? m_config.extraColumnPrefix : null;
+        return new RandomRowMaker(table, maxStringSize, m_rand, loadPrimaryKeys, loadUniqueColumns, extraColumnPrefix);
     }
 
     /**
@@ -1082,7 +1083,7 @@ public class TableHelper {
                 for (int col = 0; col < this.table.getColumnCount(); col++) {
                     // treat extra columns as unique for loading since they become alternate keys
                     if (this.table.getColumnUniqueness(col) ||
-                        this.table.getColumnName(col).startsWith(extraColumnPrefix)) {
+                        (extraColumnPrefix != null && this.table.getColumnName(col).startsWith(extraColumnPrefix))) {
                         this.uniqueValues.put(col, new HashSet<Object>());
                     }
                 }
