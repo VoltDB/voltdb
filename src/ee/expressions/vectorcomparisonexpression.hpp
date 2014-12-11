@@ -62,6 +62,30 @@
 
 namespace voltdb {
 
+// Compares two tuples column by column using lexicographical compare. The OP predicate
+// must satisfy the following condition
+// X and Y are equivalent if both OP(x, y) and OP(y, x) are false
+// CmpEq, CmpNe, CmpGte, and CmpLte are specialized because they don't satisfy the above requirement.
+template<typename OP>
+bool compare_tuple(const TableTuple& tuple1, const TableTuple& tuple2)
+{
+    assert(tuple1.getSchema()->columnCount() == tuple2.getSchema()->columnCount());
+    int schemaSize = tuple1.getSchema()->columnCount();
+    OP comp;
+    for (int columnIdx = 0; columnIdx < schemaSize; ++columnIdx)
+    {
+        if (comp.cmp(tuple1.getNValue(columnIdx), tuple2.getNValue(columnIdx)).isTrue())
+        {
+            return true;
+        }
+        if (comp.cmp(tuple2.getNValue(columnIdx), tuple1.getNValue(columnIdx)).isTrue())
+        {
+            return false;
+        }
+    }
+    return false;
+}
+
 //Assumption - quantifier is on the right
 template <typename OP, typename ValueExtractorLeft, typename ValueExtractorRight>
 class VectorComparisonExpression : public AbstractExpression {
@@ -122,16 +146,16 @@ struct NValueExtractor
     }
 
     template<typename OP>
-    bool compare(OP comp, const TableTuple& tuple) const
+    bool compare(const TableTuple& tuple) const
     {
         assert(tuple.getSchema()->columnCount() == 1);
-        return comp.cmp(m_value, tuple.getNValue(0)).isTrue();
+        return OP().cmp(m_value, tuple.getNValue(0)).isTrue();
     }
 
     template<typename OP>
     bool compare(OP comp, const NValue& nvalue) const
     {
-        return comp.cmp(m_value, nvalue).isTrue();
+        return OP().cmp(m_value, nvalue).isTrue();
     }
 
     std::string debug() const
@@ -177,16 +201,16 @@ struct TupleExtractor
     bool isNullValue(const ValueType& value) const;
 
     template<typename OP>
-    bool compare(OP comp, const TableTuple& tuple) const
+    bool compare(const TableTuple& tuple) const
     {
-        return compare_tuple(comp, m_tuple, tuple);
+        return compare_tuple<OP>(m_tuple, tuple);
     }
 
     template<typename OP>
-    bool compare(OP comp, const NValue& nvalue) const
+    bool compare(const NValue& nvalue) const
     {
         assert(m_tuple.getSchema()->columnCount() == 1);
-        return comp.cmp(m_tuple.getNValue(0), nvalue).isTrue();
+        return OP().cmp(m_tuple.getNValue(0), nvalue).isTrue();
     }
 
     std::string debug() const
@@ -231,6 +255,12 @@ NValue VectorComparisonExpression<OP, ValueExtractorOuter, ValueExtractorInner>:
     // The outer_expr is NULL or empty and the inner_expr is empty => TRUE
     // The outer_expr is NULL or empty and the inner_expr produces any row => NULL
 
+    // The outer_expr OP inner_expr evaluates as follows:
+    // If inner_expr is NULL or empty => NULL
+    // If outer_expr is NULL or empty => NULL
+    // If outer_expr/inner_expr has more than 1 result => runtime exception
+    // Else => outer_expr OP inner_expr
+
     // Evaluate the outer_expr. The return value can be either the value itself or a subquery id
     // in case of the row expression on the left side
     NValue lvalue = m_left->eval(tuple1, tuple2);
@@ -243,7 +273,7 @@ NValue VectorComparisonExpression<OP, ValueExtractorOuter, ValueExtractorInner>:
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
     }
 
-    // Evaluate the inner_expr. The return value is a subquery id
+    // Evaluate the inner_expr. The return value is a subquery id or a value as well
     NValue rvalue = m_right->eval(tuple1, tuple2);
     ValueExtractorInner innerExtractor(rvalue);
     if (m_quantifier == QUANTIFIER_TYPE_NONE && innerExtractor.resultSize() > 1)
@@ -256,14 +286,22 @@ NValue VectorComparisonExpression<OP, ValueExtractorOuter, ValueExtractorInner>:
 
     if (innerExtractor.resultSize() == 0)
     {
-        return (m_quantifier == QUANTIFIER_TYPE_ALL) ? NValue::getTrue() : NValue::getFalse();
+        NValue retval = NValue::getFalse();
+        if (m_quantifier == QUANTIFIER_TYPE_NONE)
+        {
+            retval.setNull();
+        }
+        else if (m_quantifier == QUANTIFIER_TYPE_ALL)
+        {
+            retval = NValue::getTrue();
+        }
+        return retval;
     }
 
     if (!outerExtractor.hasNext() || outerExtractor.hasNullValue()) {
+        assert (innerExtractor.resultSize() > 0);
         NValue retval = NValue::getFalse();
-        if (innerExtractor.resultSize() > 0) {
-            retval.setNull();
-        }
+        retval.setNull();
         return retval;
     }
 
@@ -282,7 +320,7 @@ NValue VectorComparisonExpression<OP, ValueExtractorOuter, ValueExtractorInner>:
             hasInnerNull = true;
             continue;
         }
-        if (outerExtractor.template compare<OP>(OP(), innerValue)) {
+        if (outerExtractor.template compare<OP>(innerValue)) {
             if (m_quantifier != QUANTIFIER_TYPE_ALL) {
                 return NValue::getTrue();
             }
@@ -297,29 +335,6 @@ NValue VectorComparisonExpression<OP, ValueExtractorOuter, ValueExtractorInner>:
         retval.setNull();
     }
     return retval;
-}
-
-// Compares two tuples column by column using lexicographical compare. The OP predicate
-// must satisfy the following condition
-// X and Y are equivalent if both OP(x, y) and OP(y, x) are false
-// CmpEq,CmpNe, CmpGte, and CmpLte are specialized because they don't satisfy the above requirement.
-template<typename OP>
-bool compare_tuple(OP comp, const TableTuple& tuple1, const TableTuple& tuple2)
-{
-    assert(tuple1.getSchema()->columnCount() == tuple2.getSchema()->columnCount());
-    int schemaSize = tuple1.getSchema()->columnCount();
-    for (int columnIdx = 0; columnIdx < schemaSize; ++columnIdx)
-    {
-        if (comp.cmp(tuple1.getNValue(columnIdx), tuple2.getNValue(columnIdx)).isTrue())
-        {
-            return true;
-        }
-        if (comp.cmp(tuple2.getNValue(columnIdx), tuple1.getNValue(columnIdx)).isTrue())
-        {
-            return false;
-        }
-    }
-    return false;
 }
 
 }

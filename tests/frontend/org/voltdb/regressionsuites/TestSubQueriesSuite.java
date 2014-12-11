@@ -505,6 +505,66 @@ public class TestSubQueriesSuite extends RegressionSuite {
     }
 
     /**
+     * SELECT FROM WHERE OUTER OP INNER inner.
+     * If there is a match, IN evalueates to TRUE
+     * If there is no match, IN evaluates to FASLE if the INNER result set is empty
+     * If there is no match, IN evaluates to NULL if the INNER result set is not empty
+     *       and there are inner NULLs
+     * Need to keep OFFSET for the IN expressions
+     * to prevent IN-to-EXISTS optimization
+     *
+     * @throws NoConnectionsException
+     * @throws IOException
+     * @throws ProcCallException
+     */
+    public void testSubExpressions_InnerNull() throws NoConnectionsException, IOException, ProcCallException
+    {
+        Client client = getClient();
+        VoltTable vt;
+        client.callProcedure("R1.insert", 100,  1000,  2 , "2013-07-18 02:00:00.123457");
+        client.callProcedure("R1.insert", 101,  null,  2 , "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 100,  null,  2 , "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 101,  null,  2 , "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 102,  1001,  2 , "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 103,  1003,  2 , "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 104,  1000,  2 , "2013-07-18 02:00:00.123457");
+        client.callProcedure("R2.insert", 105,  1000,  2 , "2013-07-18 02:00:00.123457");
+
+        // Inner result is NULL. The expression is NULL
+        vt = client.callProcedure("@AdHoc",
+                "select ID from R1 where ((WAGE, DEPT) = " +
+                "( select WAGE, DEPT from R2 where ID = 100)) is NULL;").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{100}, {101}});
+
+        // Inner result is empty. The expression is NULL
+        vt = client.callProcedure("@AdHoc",
+                "select ID from R1 where ((WAGE, DEPT) = " +
+                "( select WAGE, DEPT from R2 where ID = 1000)) is NULL;").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{100}, {101}});
+
+        // Outer result is NULL. The expression is NULL
+        if (!isHSQL()) {
+            vt = client.callProcedure("@AdHoc",
+                "select ID from R1 where ((WAGE, DEPT) = " +
+                "( select WAGE, DEPT from R2 where ID = 102)) is NULL;").getResults()[0];
+            validateTableOfLongs(vt, new long[][] {{101}});
+        }
+
+        // Outer result is empty. The expression is NULL
+        vt = client.callProcedure("@AdHoc",
+                "select ID from R1 where ((select WAGE, DEPT from R2 where ID = 1000) = " +
+                "( select WAGE, DEPT from R2 where ID = 102)) is NULL;").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{100}, {101}});
+
+        // Outer result is NULL. Inner is empty The expression is NULL
+        vt = client.callProcedure("@AdHoc",
+                "select ID from R1 where  ID =101 and ((WAGE, DEPT) = " +
+                "( select WAGE, DEPT from R2 where ID = 1000)) is NULL;").getResults()[0];
+        validateTableOfLongs(vt, new long[][] {{101}});
+
+    }
+
+    /**
      * SELECT FROM WHERE OUTER IN(=ANY) (SELECT INNER ...) returning inner NULL.
      * If there is a match, IN evalueates to TRUE
      * If there is no match, IN evaluates to FASLE if the INNER result set is empty
@@ -517,7 +577,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
      * @throws IOException
      * @throws ProcCallException
      */
-    public void testINSubExpressions_InnerNull() throws NoConnectionsException, IOException, ProcCallException
+    public void testANYSubExpressions_InnerNull() throws NoConnectionsException, IOException, ProcCallException
     {
         Client client = getClient();
         VoltTable vt;
@@ -1111,7 +1171,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
 
             // R1 3,  10,  2 >= ALL R2 except R2.7
             vt = client.callProcedure("@AdHoc",
-                    "select R1.ID FROM R1 where ID = 3 and (R1.WAGE, R1.DEPT) >= ALL (SELECT WAGE, DEPT FROM R2 where ID < ?);", 7).getResults()[0];
+                    "select R1.ID FROM R1 where ID = 3 and (R1.WAGE, R1.DEPT) >= ALL (SELECT WAGE, DEPT FROM R2 where ID < 7 ORDER BY WAGE, DEPT DESC);").getResults()[0];
             System.out.println(vt.toString());
             validateTableOfLongs(vt, new long[][] { {3} });
 
@@ -1128,6 +1188,16 @@ public class TestSubQueriesSuite extends RegressionSuite {
 
             vt = client.callProcedure("@AdHoc",
                     "select R1.ID FROM R1 where (R1.DEPT, R1.TM) <= ALL (SELECT DEPT, TM FROM R2);").getResults()[0];
+            System.out.println(vt.toString());
+            validateTableOfLongs(vt, new long[][] { {1}, {2} });
+
+            vt = client.callProcedure("@AdHoc",
+                    "select R1.ID FROM R1 where (R1.DEPT, R1.TM) <= ALL (SELECT DEPT, TM FROM R2 ORDER BY DEPT, TM ASC);").getResults()[0];
+            System.out.println(vt.toString());
+            validateTableOfLongs(vt, new long[][] { {1}, {2} });
+
+            vt = client.callProcedure("@AdHoc",
+                    "select R1.ID FROM R1 where (R1.DEPT, R1.TM) <= ALL (SELECT DEPT, TM FROM R2 ORDER BY DEPT, TM DESC);").getResults()[0];
             System.out.println(vt.toString());
             validateTableOfLongs(vt, new long[][] { {1}, {2} });
 

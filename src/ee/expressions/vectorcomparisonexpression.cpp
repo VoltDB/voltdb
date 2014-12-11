@@ -36,10 +36,11 @@ bool TupleExtractor::isNullValue(const ValueType& value) const
 }
 
 template <>
-bool compare_tuple<CmpEq>(CmpEq comp, const TableTuple& tuple1, const TableTuple& tuple2)
+bool compare_tuple<CmpEq>(const TableTuple& tuple1, const TableTuple& tuple2)
 {
     assert(tuple1.getSchema()->columnCount() == tuple2.getSchema()->columnCount());
     int schemaSize = tuple1.getSchema()->columnCount();
+    CmpEq comp;
     for (int columnIdx = 0; columnIdx < schemaSize; ++columnIdx)
     {
         if (comp.cmp(tuple1.getNValue(columnIdx), tuple2.getNValue(columnIdx)).isFalse())
@@ -51,24 +52,24 @@ bool compare_tuple<CmpEq>(CmpEq comp, const TableTuple& tuple1, const TableTuple
 }
 
 template <>
-bool compare_tuple<CmpNe>(CmpNe comp, const TableTuple& tuple1, const TableTuple& tuple2)
+bool compare_tuple<CmpNe>(const TableTuple& tuple1, const TableTuple& tuple2)
 {
     // a != b <=> !(a == B)
-    return !compare_tuple(CmpEq(), tuple1, tuple2);
+    return !compare_tuple<CmpEq>(tuple1, tuple2);
 }
 
 template <>
-bool compare_tuple<CmpGte>(CmpGte comp, const TableTuple& tuple1, const TableTuple& tuple2)
+bool compare_tuple<CmpGte>(const TableTuple& tuple1, const TableTuple& tuple2)
 {
     // a >= b <=> !(a < b)
-    return !compare_tuple(CmpLt(), tuple1, tuple2);
+    return !compare_tuple<CmpLt>(tuple1, tuple2);
 }
 
 template <>
-bool compare_tuple<CmpLte>(CmpLte comp, const TableTuple& tuple1, const TableTuple& tuple2)
+bool compare_tuple<CmpLte>(const TableTuple& tuple1, const TableTuple& tuple2)
 {
     // a <= b <=> !(a > b)
-    return !compare_tuple(CmpGt(), tuple1, tuple2);
+    return !compare_tuple<CmpGt>(tuple1, tuple2);
 }
 
 }
