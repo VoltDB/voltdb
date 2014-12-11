@@ -380,16 +380,6 @@ public class HTTPAdminListener {
             try {
                 response.setContentType("application/json;charset=utf-8");
                 response.setStatus(HttpServletResponse.SC_OK);
-                //schema request does not require authentication.
-                if (baseRequest.getRequestURI().contains("/schema")) {
-                    String msg = m_schema;
-                    if (jsonp != null) {
-                        msg = String.format("%s( %s )", jsonp, m_schema);
-                    }
-                    response.getWriter().print(msg);
-                    baseRequest.setHandled(true);
-                    return;
-                }
 
                 //Requests require authentication.
                 AuthenticationResult authResult = authenticate(baseRequest);

@@ -1052,9 +1052,6 @@ public class TestJSONInterface extends TestCase {
             //Get deployment
             String dep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
             assertTrue(dep.contains("cluster"));
-            //Get deployment schema
-            String schema = getUrlOverJSON("http://localhost:8095/deployment/schema", null, null, null, 200, "application/json");
-            assertTrue(schema.contains("\"cluster\""));
             //Download deployment
             dep = getUrlOverJSON("http://localhost:8095/deployment/download", null, null, null, 200, "text/xml");
             assertTrue(dep.contains("<deployment>"));
@@ -1109,9 +1106,6 @@ public class TestJSONInterface extends TestCase {
             //good user
             dep = getUrlOverJSON("http://localhost:8095/deployment/?User=" + "user2&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", null, null, null, 200, "application/json");
             assertTrue(dep.contains("cluster"));
-            //Get deployment schema always
-            String schema = getUrlOverJSON("http://localhost:8095/deployment/schema", null, null, null, 200, "application/json");
-            assertTrue(schema.contains("\"cluster\""));
             //Download deployment bad user
             dep = getUrlOverJSON("http://localhost:8095/deployment/download?User=" + "user1&" + "Hashedpassword=d033e22ae348aeb5660fc2140aec35850c4da997", null, null, null, 200, "application/json");
             assertTrue(dep.contains("Permission denied"));
@@ -1174,9 +1168,6 @@ public class TestJSONInterface extends TestCase {
             //good user
             dep = getUrlOverJSON("http://localhost:8095/deployment/", "user2", "admin", "hashed", 200, "application/json");
             assertTrue(dep.contains("cluster"));
-            //Get deployment schema always
-            String schema = getUrlOverJSON("http://localhost:8095/deployment/schema", "user1", "admin", "hashed", 200, "application/json");
-            assertTrue(schema.contains("\"cluster\""));
             //Download deployment bad user
             dep = getUrlOverJSON("http://localhost:8095/deployment/download", "user1", "admin", "hashed", 200, "application/json");
             assertTrue(dep.contains("Permission denied"));
@@ -1234,9 +1225,6 @@ public class TestJSONInterface extends TestCase {
             //good user
             dep = getUrlOverJSON("http://localhost:8095/deployment/", "user2", "admin", "basic", 200, "application/json");
             assertTrue(dep.contains("cluster"));
-            //Get deployment schema always
-            String schema = getUrlOverJSON("http://localhost:8095/deployment/schema", "user1", "admin", "basic", 200, "application/json");
-            assertTrue(schema.contains("\"cluster\""));
             //Download deployment bad user
             dep = getUrlOverJSON("http://localhost:8095/deployment/download", "user1", "admin", "basic", 200, "application/json");
             assertTrue(dep.contains("Permission denied"));

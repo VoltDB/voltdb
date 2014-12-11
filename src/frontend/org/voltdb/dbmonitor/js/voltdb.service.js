@@ -40,7 +40,19 @@
             password = lPassword;
             admin = lAdmin;
         };
-        
+
+        // build Authorization header based on scheme you could flip to diff header. Server understands both.
+        this.BuildAuthorization = function(user, isHashedPassword, password) {
+            var authz = null;
+            if (user != null && isHashedPassword != null) {
+                authz = "Hashed " + user + ":" + isHashedPassword;
+            } else if (user != null && password != null) {
+                var up = user + ":" + password;
+                authz = "Basic " + $().crypt({method: "b64enc", source: up});
+            }
+            return authz;
+        }
+
         this.ChangeServerConfiguration = function (serverName, portId, userName, pw, isHashPw, isAdmin) {
             server = serverName != null ? serverName : server;
             port = portId != null ? portId : port;
@@ -48,7 +60,7 @@
             password = pw != undefined ? pw : "";
             isHashedPassword = isHashPw;
             admin = isAdmin != undefined ? isAdmin : true;
-                        
+
         };
 
         this.GetSystemInformation = function (onConnectionAdded) {
@@ -62,20 +74,20 @@
                     VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
                         if (result == true) {
                             updateTips("Connection successful.");
-                                                       
+
                             VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
                                 onConnectionAdded(connection, status);
                             });
                         } else updateTips("Unable to connect.");
 
                     });
-                    
+
                 } else {
                     VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
                         onConnectionAdded(connection, status);
-                        
+
                     });
-                    
+
                 }
             } catch (e) {
                 console.log(e.message);
@@ -90,9 +102,9 @@
                 }, 500);
             }
 
-            
+
         };
-        
+
         this.GetSystemInformationDeployment = function (onConnectionAdded) {
             try {
                 var processName = "SYSTEM_INFORMATION_DEPLOYMENT";
@@ -148,7 +160,7 @@
                             VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
                                 onConnectionAdded(connection, status);
                             });
-                        } 
+                        }
 
                     });
 
@@ -162,10 +174,10 @@
 
             } catch(e) {
                 console.log(e.message);
-            } 
+            }
 
         };
-        
+
         this.GetProceduresInformation = function (onConnectionAdded) {
             try {
                 var processName = "DATABASE_INFORMATION";
@@ -175,11 +187,11 @@
                 _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
                 if (_connection == null) {
                     VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
-                        if (result == true) {                            
+                        if (result == true) {
                             VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
                                 onConnectionAdded(connection, status);
                             });
-                        } 
+                        }
 
                     });
 
@@ -196,7 +208,7 @@
             }
 
         };
-        
+
         this.getProcedureContextForSorting = function () {
             try {
                 var processName = "DATABASE_INFORMATION";
@@ -213,14 +225,14 @@
                         }
 
                     });
-                } 
+                }
                 return lconnection;
 
             } catch (e) {
                 console.log(e.message);
             }
         };
-        
+
         this.getTablesContextForSorting = function () {
             try {
                 var processName = "DATABASE_INFORMATION";
@@ -250,7 +262,7 @@
                 console.log(e.message);
             }
         };
-        
+
         this.GetMemoryInformation = function (onConnectionAdded) {
             try {
                 var processName = "GRAPH_MEMORY";
@@ -281,7 +293,7 @@
             }
 
         };
-        
+
         this.GetGraphLatencyInformation = function (onConnectionAdded) {
             try {
                 var processName = "GRAPH_LATENCY";
@@ -312,7 +324,7 @@
             }
 
         };
-        
+
         this.GetCPUInformation = function (onConnectionAdded) {
             try {
                 //GRAPH_CPU
@@ -376,7 +388,7 @@
             }
 
         };
-    
+
         this.GetTableInformation = function (onConnectionAdded) {
             try {
                 var processName = "TABLE_INFORMATION";
@@ -411,6 +423,6 @@
     });
 
     window.VoltDBService = VoltDBService = new iVoltDbService();
-    
+
 })(window);
 
