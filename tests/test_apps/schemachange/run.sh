@@ -48,33 +48,16 @@ function client() {
         --duration=1800
 }
 
-# quick client run
-function quick() {
-    srccompile
-    java -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
-        schemachange.SchemaChangeClient \
-        --servers=localhost \
-        --targetrowcount=1000 \
-        --duration=60
-}
-
-# Quick smoke test automatically starts the server and includes forced
-# failures to test retry logic.
-# The voltdb_daemon_start() function sourced from test_daemon_server.sh
-# starts a daemon server, waits for initialization to complete, and sets
-# a trap to kill it whenever this script exits.
-function smoke() {
+# Automatically starts the server in the background and runs the client
+# with the options provided. voltdb_daemon_start() (test_daemon_server.sh)
+# sets a trap to kill the server before the script exits.
+function _auto_run() {
+    local OPTIONS="$@"
     srccompile || exit 1
     catalog || exit 1
     voltdb_daemon_start $APPNAME.jar $HOST deployment.xml $LICENSE || exit 1
     java -ea -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$CLIENTLOG4J \
-        schemachange.SchemaChangeClient \
-        --servers=localhost \
-        --targetrowcount=1000 \
-        --duration=180 \
-        --retryForcedPercent=20 \
-        --retryLimit=10 \
-        --retrySleep=2
+        schemachange.SchemaChangeClient --servers=localhost $OPTIONS
     if [ $? -eq 0 ]; then
         echo SUCCESS
     else
@@ -82,8 +65,24 @@ function smoke() {
     fi
 }
 
+# Run automatic test with forced failures to exercise retry logic.
+function auto_smoke() {
+    _auto_run \
+        --targetrowcount=1000 \
+        --duration=180 \
+        --retryForcedPercent=20 \
+        --retryLimit=10 \
+        --retrySleep=2
+}
+
+# Run automatic quick test.
+function auto_quick() {
+    _auto_run --targetrowcount=1000 --duration=180
+}
+
 function help() {
-    echo "Usage: ./run.sh {clean|catalog|server|client|quick|smoke}"
+    echo "Usage: ./run.sh {clean|catalog|server|client|...}"
+    echo "                {...|auto_smoke|auto_quick}"
 }
 
 # Run the target passed as the first arg on the command line
