@@ -839,7 +839,7 @@ ul.adminClusterList li a:hover{color:#000;}
 
 .adminWrapper{position:relative;}
 #btnServerConfigAdmin:hover{cursor:pointer;}
-#serverConfigAdmin{ position:absolute;right:20px; top:49px; z-index:99;}
+#serverConfigAdmin{ position:absolute;right:20px; top:49px; z-index:99; width:500px;}
 .txt-bold{font-weight:bold;}
 
 .btn-gray { background-color:#999; cursor:pointer; padding:8px 10px; text-align:center; color:#fff; font:14px Arial, Helvetica, sans-serif; text-shadow:none; text-decoration:none; border-radius:0; border:none;} 
@@ -1000,7 +1000,7 @@ top: 3px;}
 	 .adminMode {margin-top:10px}
 	.adminServer {}
 	.adminLeft { float:none; width:100%}
-	#serverConfigAdmin{ top:99px;}
+	#serverConfigAdmin{ top:99px; width:421px;}
 	.adminRight{ padding-top:15px;}
 }
 @media (min-width: 320px) and (max-width: 479px) {
@@ -1020,7 +1020,7 @@ top: 3px;}
  .adminLeft { float:none; width:100%}
 ul.adminClusterList { width:250px;}/*admin*/
 ul.adminClusterList li { margin:0; padding-top:15px; float:left; width:67px; height:100%; line-height:75px;}/*admin*/
-#serverConfigAdmin{ top:214px;}
+#serverConfigAdmin{ top:214px; width:261px;}
 .restoreCont {overflow:auto; height:146px}
 .restoreInfo .overlay-content {  height:auto;}		
 	 }
