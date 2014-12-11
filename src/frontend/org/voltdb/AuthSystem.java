@@ -206,7 +206,7 @@ public class AuthSystem {
         private List<AuthGroup> m_groups = new ArrayList<AuthGroup>();
 
         private EnumSet<Permission> m_permissions = EnumSet.noneOf(Permission.class);
-
+        private String[] m_permissions_list;
         /**
          * Fast membership check set of stored procedures this user has permission to invoke.
          * This is generated when the catalog is parsed and it includes procedures the user has permission
@@ -331,11 +331,21 @@ public class AuthSystem {
 
     private final GSSManager m_gssManager;
 
+    //Auth system keeps a array of all perms used for auth disabled user not for checking permissions.
+    private static String[] m_perm_list;
+
     AuthSystem(final Database db, boolean enabled) {
         AuthProvider ap = null;
         LoginContext loginContext = null;
         GSSManager gssManager = null;
         byte [] principal = null;
+
+        //Build static list of perms auth system knows.
+        m_perm_list =  new String[Permission.values().length];
+        int idx = 0;
+        for (Permission p : Permission.values()) {
+            m_perm_list[idx++] = p.name();
+        }
 
         m_enabled = enabled;
         if (!m_enabled) {
@@ -422,6 +432,12 @@ public class AuthSystem {
                 group.m_users.add(user);
                 user.m_groups.add(group);
             }
+            //Cache the list so we dont rebuild everytime this is asked.
+            user.m_permissions_list =  new String[user.m_permissions.size()];
+            idx = 0;
+            for (Permission p : user.m_permissions) {
+                user.m_permissions_list[idx++] = p.toString();
+            }
         }
 
         for (org.voltdb.catalog.Group catalogGroup : db.getGroups()) {
@@ -472,6 +488,11 @@ public class AuthSystem {
         for (AuthGroup group : m_groups.values()) {
             group.finish();
         }
+    }
+
+    //Is security enabled?
+    public boolean isSecurityEnabled() {
+        return m_enabled;
     }
 
     /**
@@ -552,7 +573,7 @@ public class AuthSystem {
 
     private final AuthUser m_authDisabledUser = new AuthDisabledUser();
 
-    AuthUser getUser(String name) {
+    public AuthUser getUser(String name) {
         if (!m_enabled) {
             return m_authDisabledUser;
         }
@@ -568,6 +589,21 @@ public class AuthSystem {
             return new String[] {};
         }
         return user.getGroupNames();
+    }
+
+    //Get users permission list not god for permission checking.
+    public String[] getUserPermissionList(String userName) {
+        if (!m_enabled) {
+            return m_perm_list;
+        }
+        if (userName == null) {
+            return new String[] {};
+        }
+        AuthUser user = getUser(userName);
+        if (user == null) {
+            return new String[] {};
+        }
+        return user.m_permissions_list;
     }
 
     public class HashAuthenticationRequest extends AuthenticationRequest {

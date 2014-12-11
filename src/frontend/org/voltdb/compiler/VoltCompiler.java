@@ -52,6 +52,7 @@ import javax.xml.validation.SchemaFactory;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.HSQLInterface;
+import org.hsqldb_voltpatches.VoltXMLElement;
 import org.json_voltpatches.JSONException;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -60,6 +61,7 @@ import org.voltdb.ProcInfoData;
 import org.voltdb.RealVoltDB;
 import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltDBInterface;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
@@ -88,6 +90,7 @@ import org.voltdb.compiler.projectfile.SchemasType;
 import org.voltdb.compilereport.ReportMaker;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.utils.CatalogSchemaTools;
 import org.voltdb.utils.CatalogUtil;
@@ -114,6 +117,9 @@ public class VoltCompiler {
     // Causes the "debugoutput" folder to be generated and populated.
     // Also causes explain plans on disk to include cost.
     public final static boolean DEBUG_MODE = System.getProperties().contains("compilerdebug");
+
+    // was this voltcompiler instantiated in a main(), or as part of VoltDB
+    public final boolean standaloneCompiler;
 
     // feedback by filename
     ArrayList<Feedback> m_infos = new ArrayList<Feedback>();
@@ -337,6 +343,16 @@ public class VoltCompiler {
             m_scriptImpl = scriptImpl;
             m_class = clazz;
         }
+    }
+
+    /** Passing true to constructor indicates the compiler is being run in standalone mode */
+    public VoltCompiler(boolean standaloneCompiler) {
+        this.standaloneCompiler = standaloneCompiler;
+    }
+
+    /** Parameterless constructor is for embedded VoltCompiler use only. */
+    public VoltCompiler() {
+        this(false);
     }
 
     public boolean hasErrors() {
@@ -586,11 +602,34 @@ public class VoltCompiler {
         // generate the catalog report and write it to disk
         try {
             m_report = ReportMaker.report(m_catalog, m_warnings, m_canonicalDDL);
-            File file = new File("catalog-report.html");
-            FileWriter fw = new FileWriter(file);
-            fw.write(m_report);
-            fw.close();
-            m_reportPath = file.getAbsolutePath();
+            m_reportPath = null;
+            File file = null;
+
+            // write to working dir when using VoltCompiler directly
+            if (standaloneCompiler) {
+                file = new File("catalog-report.html");
+            }
+            else {
+                // try to get a catalog context
+                VoltDBInterface voltdb = VoltDB.instance();
+                CatalogContext catalogContext = voltdb != null ? voltdb.getCatalogContext() : null;
+
+                // it's possible that standaloneCompiler will be false and catalogContext will be null
+                //   in test code.
+
+                // if we have a context, write report to voltroot
+                if (catalogContext != null) {
+                    file = new File(catalogContext.cluster.getVoltroot(), "catalog-report.html");
+                }
+            }
+
+            // if there's a good place to write the report, do so
+            if (file != null) {
+                FileWriter fw = new FileWriter(file);
+                fw.write(m_report);
+                fw.close();
+                m_reportPath = file.getAbsolutePath();
+            }
         } catch (IOException e) {
             e.printStackTrace();
             return null;
@@ -1126,6 +1165,34 @@ public class VoltCompiler {
         // generated DDL
         m_importLines = voltDdlTracker.m_importLines.toArray(new String[0]);
         addExtraClasses(jarOutput);
+
+        compileRowLimitDeleteStmts(db, hsql, ddlcompiler.getLimitDeleteStmtToXmlEntries());
+    }
+
+    private void compileRowLimitDeleteStmts(
+            Database db,
+            HSQLInterface hsql,
+            Collection<Map.Entry<Statement, VoltXMLElement>> deleteStmtXmlEntries)
+            throws VoltCompilerException {
+
+        for (Map.Entry<Statement, VoltXMLElement> entry : deleteStmtXmlEntries) {
+            Statement stmt = entry.getKey();
+            VoltXMLElement xml = entry.getValue();
+
+            // choose DeterminismMode.FASTER for determinism, and rely on the planner to error out
+            // if we generated a plan that is content-non-deterministic.
+            StatementCompiler.compileStatementAndUpdateCatalog(this,
+                    hsql,
+                    db.getCatalog(),
+                    db,
+                    m_estimates,
+                    stmt,
+                    xml,
+                    stmt.getSqltext(),
+                    null, // no user-supplied join order
+                    DeterminismMode.FASTER,
+                    StatementPartitioning.partitioningForRowLimitDelete());
+        }
     }
 
     private void checkValidPartitionTableIndex(Index index, Column partitionCol, String tableName)
@@ -2000,7 +2067,9 @@ public class VoltCompiler {
      */
     public static void main(final String[] args)
     {
-        final VoltCompiler compiler = new VoltCompiler();
+        // passing true to constructor indicates the compiler is being run in standalone mode
+        final VoltCompiler compiler = new VoltCompiler(true);
+
         boolean success = false;
         if (args.length > 0 && args[0].toLowerCase().endsWith(".jar")) {
             // The first argument is *.jar for the new syntax.

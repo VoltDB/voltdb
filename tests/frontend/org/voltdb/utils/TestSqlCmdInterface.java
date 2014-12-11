@@ -546,7 +546,7 @@ public class TestSqlCmdInterface
     private void assertThis2(String query, String cleanQryStr, int num, int testID) {
         Pattern ExecuteCall = SQLCommand.getExecuteCall();
         query = ExecuteCall.matcher(query).replaceFirst("");
-        List<String> params = SQLCommand.parseQueryProcedureCallParameters(query);
+        List<String> params = SQLCommand.parseProcedureCallParameters(query);
         String parsedString = Joiner.on("").join(params);
         String msg = "\nTest ID: " + testID + ". ";
         String err1 = "\nExpected # of queries: " + num + "\n";
@@ -554,7 +554,7 @@ public class TestSqlCmdInterface
         assertEquals(msg+err1, num, params.size());
         String err2 = "\nExpected queries: \n#" + cleanQryStr + "#\n";
         err2 += "Actual queries: \n#" + parsedString + "#\n";
-           assertTrue(msg+err2, cleanQryStr.equalsIgnoreCase(parsedString));
+        assertTrue(msg+err2, cleanQryStr.equalsIgnoreCase(parsedString));
     }
 
     private void notAssertThis(String qryStr, String cleanQryStr, int numOfQry, int testID) {
@@ -572,7 +572,7 @@ public class TestSqlCmdInterface
     private void notAssertThis2(String query, String cleanQryStr, int num, int testID) {
         Pattern ExecuteCall = SQLCommand.getExecuteCall();
         query = ExecuteCall.matcher(query).replaceFirst("");
-        List<String> params = SQLCommand.parseQueryProcedureCallParameters(query);
+        List<String> params = SQLCommand.parseProcedureCallParameters(query);
         String parsedString = Joiner.on("").join(params);
         String msg = "\nTest ID: " + testID + ". ";
         String err1 = "\nExpected # of queries: " + num + "\n";

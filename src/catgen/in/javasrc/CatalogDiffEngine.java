@@ -288,6 +288,19 @@ public class CatalogDiffEngine {
     }
 
     /**
+     * @return true if the parameter is an instance of Statement owned
+     * by a table node.  This indicates that the Statement is the
+     * DELETE statement in a
+     *   LIMIT PARTITION ROWS <n> EXECUTE (DELETE ...)
+     * constraint.
+     */
+    static private boolean isTableLimitDeleteStmt(final CatalogType catType) {
+        if (catType instanceof Statement && catType.getParent() instanceof Table)
+            return true;
+        return false;
+    }
+
+    /**
      * @return null if the CatalogType can be dynamically added or removed
      * from a running system. Return an error string if it can't be changed on
      * a non-empty table. There will be a subsequent check for empty table
@@ -389,6 +402,10 @@ public class CatalogDiffEngine {
             return null;
         }
 
+        else if (isTableLimitDeleteStmt(suspect)) {
+            return null;
+        }
+
         //TODO: This code is also pretty fishy
         // -- See the "salmon of doubt" comment in checkModifyWhitelist
 
@@ -433,9 +450,11 @@ public class CatalogDiffEngine {
             return retval;
         }
 
+        CatalogType parent = suspect.getParent();
+
         // handle changes to columns in an index - presumably drops and presumably unique
-        if ((suspect instanceof ColumnRef) && (suspect.getParent() instanceof Index)) {
-            Index idx = (Index) suspect.getParent();
+        if ((suspect instanceof ColumnRef) && (parent instanceof Index)) {
+            Index idx = (Index) parent;
             assert(idx.getUnique());
             assert(changeType == ChangeType.DELETION);
             Table table = (Table) idx.getParent();
@@ -444,6 +463,16 @@ public class CatalogDiffEngine {
             retval[1] = String.format(
                     "Unable to remove column %s from unique index %s because table %s is not empty.",
                     suspect.getTypeName(), idx.getTypeName(), retval[0]);
+            return retval;
+        }
+
+        if ((suspect instanceof Column) && (parent instanceof Table) && (changeType == ChangeType.ADDITION)) {
+            Column column = (Column)suspect;
+            String nullness = column.getNullable() ? "NULL" : "NOT NULL";
+            retval[0] = parent.getTypeName();
+            retval[1] = String.format(
+                    "Unable to add %s column %s because table %s is not empty.",
+                    nullness, suspect.getTypeName(), retval[0]);
             return retval;
         }
 
@@ -653,6 +682,10 @@ public class CatalogDiffEngine {
             }
         }
 
+        else if (isTableLimitDeleteStmt(suspect)) {
+            return null;
+        }
+
         // Also allow any field changes (that haven't triggered an early return already)
         // if they are found anywhere in these sub-trees.
 
@@ -679,6 +712,10 @@ public class CatalogDiffEngine {
                                        restrictionQualifier +
                                        " rescued by context '" + parent + "'");
                 }
+                return null;
+            }
+
+            if (isTableLimitDeleteStmt(parent)) {
                 return null;
             }
         }
@@ -729,9 +766,10 @@ public class CatalogDiffEngine {
             }
         }
 
-        // handle narrowing columns
+        // handle narrowing columns and some modifications on empty tables
         if (prevType instanceof Column) {
             Table table = (Table) prevType.getParent();
+            Column column = (Column)prevType;
             Database db = (Database) table.getParent();
 
             // for now, no changes to export tables
@@ -757,6 +795,32 @@ public class CatalogDiffEngine {
                         prevType.getTypeName(), retval[0]);
                 return retval;
             }
+
+            // Nullability changes are allowed on empty tables.
+            if (field.equalsIgnoreCase("nullable")) {
+                // Would be flipping the nullability, so invert the state for the message.
+                String alteredNullness = column.getNullable() ? "NOT NULL" : "NULL";
+                retval[1] = String.format(
+                        "Unable to change column %s null constraint to %s in table %s because it is not empty.",
+                        prevType.getTypeName(), alteredNullness, retval[0]);
+                return retval;
+            }
+        }
+
+        if (prevType instanceof Index) {
+            Table table = (Table) prevType.getParent();
+            Index index = (Index)prevType;
+
+            // capture the table name
+            retval[0] = table.getTypeName();
+            if (field.equalsIgnoreCase("expressionsjson")) {
+                // error message
+                retval[1] = String.format(
+                        "Unable to alter table %s with expression-based index %s becase table %s is not empty.",
+                        retval[0], index.getTypeName(), retval[0]);
+                return retval;
+            }
+
         }
 
         return null;

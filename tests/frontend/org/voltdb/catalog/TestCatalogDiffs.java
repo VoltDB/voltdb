@@ -33,7 +33,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
+import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
@@ -59,7 +59,7 @@ public class TestCatalogDiffs extends TestCase {
 
     protected String compileWithGroups(
             boolean securityEnabled, String securityProvider,
-            GroupInfo[] gi, UserInfo[] ui,
+            RoleInfo[] gi, UserInfo[] ui,
             String name, Class<?>... procList) {
         TPCCProjectBuilder builder = new TPCCProjectBuilder();
         builder.addDefaultSchema();
@@ -68,7 +68,7 @@ public class TestCatalogDiffs extends TestCase {
         builder.setSecurityEnabled(securityEnabled, true);
 
         if (gi != null && gi.length > 0)
-            builder.addGroups(gi);
+            builder.addRoles(gi);
         if (ui != null && ui.length > 0)
             builder.addUsers(ui);
 
@@ -189,8 +189,8 @@ public class TestCatalogDiffs extends TestCase {
         String original = compile("base", BASEPROCS);
         Catalog catOriginal = catalogForJar(original);
 
-        GroupInfo gi[] = new GroupInfo[1];
-        gi[0] = new GroupInfo("group1", true, true, true, true, true, true);
+        RoleInfo gi[] = new RoleInfo[1];
+        gi[0] = new RoleInfo("group1", true, true, true, true, true, true);
         String updated = compileWithGroups(false, null, gi, null, "base", BASEPROCS);
         Catalog catUpdated = catalogForJar(updated);
 
@@ -201,8 +201,8 @@ public class TestCatalogDiffs extends TestCase {
         String original = compile("base", BASEPROCS);
         Catalog catOriginal = catalogForJar(original);
 
-        GroupInfo gi[] = new GroupInfo[1];
-        gi[0] = new GroupInfo("group1", true, true, true, true, true, false);
+        RoleInfo gi[] = new RoleInfo[1];
+        gi[0] = new RoleInfo("group1", true, true, true, true, true, false);
 
         UserInfo ui[] = new UserInfo[1];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
@@ -214,8 +214,8 @@ public class TestCatalogDiffs extends TestCase {
     }
 
     public void testModifyUser() throws IOException {
-        GroupInfo gi[] = new GroupInfo[1];
-        gi[0] = new GroupInfo("group1", true, true, true, true, false, false);
+        RoleInfo gi[] = new RoleInfo[1];
+        gi[0] = new RoleInfo("group1", true, true, true, true, false, false);
 
         UserInfo ui[] = new UserInfo[1];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
@@ -223,8 +223,8 @@ public class TestCatalogDiffs extends TestCase {
         String original = compileWithGroups(false, null, gi, ui, "base", BASEPROCS);
         Catalog catOriginal = catalogForJar(original);
 
-        GroupInfo gi2[] = new GroupInfo[1];
-        gi2[0] = new GroupInfo("group2", true, true, true, true, true, true);
+        RoleInfo gi2[] = new RoleInfo[1];
+        gi2[0] = new RoleInfo("group2", true, true, true, true, true, true);
         // change a user.
         ui[0] = new UserInfo("user1", "drowssap", new String[] {"group2"});
         String updated = compileWithGroups(false, null, gi2, ui, "base", BASEPROCS);
@@ -234,8 +234,8 @@ public class TestCatalogDiffs extends TestCase {
     }
 
     public void testDeleteUser() throws IOException {
-        GroupInfo gi[] = new GroupInfo[1];
-        gi[0] = new GroupInfo("group1", true, true, true, true, false, false);
+        RoleInfo gi[] = new RoleInfo[1];
+        gi[0] = new RoleInfo("group1", true, true, true, true, false, false);
 
         UserInfo ui[] = new UserInfo[1];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
@@ -251,8 +251,8 @@ public class TestCatalogDiffs extends TestCase {
     }
 
     public void testDeleteGroupAndUser() throws IOException {
-        GroupInfo gi[] = new GroupInfo[1];
-        gi[0] = new GroupInfo("group1", true, true, true, true, false, false);
+        RoleInfo gi[] = new RoleInfo[1];
+        gi[0] = new RoleInfo("group1", true, true, true, true, false, false);
 
         UserInfo ui[] = new UserInfo[1];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
@@ -268,9 +268,9 @@ public class TestCatalogDiffs extends TestCase {
     }
 
     public void testChangeUsersAssignedGroups() throws IOException {
-        GroupInfo gi[] = new GroupInfo[2];
-        gi[0] = new GroupInfo("group1", true, true, true, true, false, false);
-        gi[1] = new GroupInfo("group2", true, true, true, true, false, true);
+        RoleInfo gi[] = new RoleInfo[2];
+        gi[0] = new RoleInfo("group1", true, true, true, true, false, false);
+        gi[1] = new RoleInfo("group2", true, true, true, true, false, true);
 
         UserInfo ui[] = new UserInfo[2];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
@@ -289,9 +289,9 @@ public class TestCatalogDiffs extends TestCase {
     }
 
     public void testChangeSecurityEnabled() throws IOException {
-        GroupInfo gi[] = new GroupInfo[2];
-        gi[0] = new GroupInfo("group1", true, true, true, true, false, true);
-        gi[1] = new GroupInfo("group2", true, true, true, true, false, false);
+        RoleInfo gi[] = new RoleInfo[2];
+        gi[0] = new RoleInfo("group1", true, true, true, true, false, true);
+        gi[1] = new RoleInfo("group2", true, true, true, true, false, false);
 
         UserInfo ui[] = new UserInfo[2];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
@@ -308,9 +308,9 @@ public class TestCatalogDiffs extends TestCase {
     }
 
     public void testChangeSecurityProvider() throws IOException {
-        GroupInfo gi[] = new GroupInfo[2];
-        gi[0] = new GroupInfo("group1", true, true, true, true, false, false);
-        gi[1] = new GroupInfo("group2", true, true, true, true, false, false);
+        RoleInfo gi[] = new RoleInfo[2];
+        gi[0] = new RoleInfo("group1", true, true, true, true, false, false);
+        gi[1] = new RoleInfo("group2", true, true, true, true, false, false);
 
         UserInfo ui[] = new UserInfo[2];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
@@ -633,7 +633,7 @@ public class TestCatalogDiffs extends TestCase {
         builder.compile(testDir + File.separator + "testAddNonNullity2.jar");
         Catalog catUpdated = catalogForJar(testDir + File.separator + "testAddNonNullity2.jar");
 
-        verifyDiffRejected(catOriginal, catUpdated);
+        verifyDiffIfEmptyTable(catOriginal, catUpdated);
     }
 
     public void testDropNonNullity() throws IOException {
@@ -921,7 +921,7 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiffRejected(catOriginal, catUpdated);
     }
 
-    public void testModifyMaterializedViewStructureRejected() throws IOException {
+    public void testModifyMaterializedViewStructureRejectedIfEmpty() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 
         // with a view
@@ -945,7 +945,7 @@ public class TestCatalogDiffs extends TestCase {
         builder.compile(testDir + File.separator + "modmatview2.jar");
         Catalog catUpdated = catalogForJar(testDir + File.separator + "modmatview2.jar");
 
-        verifyDiffRejected(catOriginal, catUpdated);
+        verifyDiffIfEmptyTable(catOriginal, catUpdated);
     }
 
     public void testModifyMaterializedViewAddPredicateRejected() throws IOException {
@@ -1026,7 +1026,7 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiffRejected(catOriginal, catUpdated);
     }
 
-    public void testModifyMaterializedViewSourceRejected() throws IOException {
+    public void testModifyMaterializedViewSourceRejectedIfEmpty() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 
         // with a view
@@ -1039,7 +1039,7 @@ public class TestCatalogDiffs extends TestCase {
         builder.compile(testDir + File.separator + "resrcmatview1.jar");
         Catalog catOriginal = catalogForJar(testDir + File.separator + "resrcmatview1.jar");
 
-        // without a view
+        // without an added column (should work with empty table)
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL, C3 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS " +
@@ -1049,7 +1049,7 @@ public class TestCatalogDiffs extends TestCase {
         builder.compile(testDir + File.separator + "resrcmatview2.jar");
         Catalog catUpdated = catalogForJar(testDir + File.separator + "resrcmatview2.jar");
 
-        verifyDiffRejected(catOriginal, catUpdated);
+        verifyDiffIfEmptyTable(catOriginal, catUpdated);
     }
 
     public void testRemoveTableAndMaterializedView() throws IOException {

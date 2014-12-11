@@ -666,6 +666,7 @@ bool AggregateHashExecutor::p_execute_tuple(const TableTuple& nextTuple) {
         VOLT_TRACE("hash aggregate: new group..");
         aggregateRow = new (m_memoryPool, m_aggTypes.size()) AggregateRow();
         m_hash.insert(HashAggregateMapType::value_type(nextGroupByKeyTuple, aggregateRow));
+
         initAggInstances(aggregateRow);
 
         char* storage = reinterpret_cast<char*>(
@@ -676,6 +677,11 @@ bool AggregateHashExecutor::p_execute_tuple(const TableTuple& nextTuple) {
         // The map is referencing the current key tuple for use by the new group,
         // so force a new tuple allocation to hold the next candidate key.
         nextGroupByKeyTuple.move(NULL);
+
+        if (m_aggTypes.size() == 0) {
+            insertOutputTuple(aggregateRow);
+            return false;
+        }
     } else {
         // otherwise, the agg row is the second item of the pair...
         aggregateRow = keyIter->second;
@@ -691,12 +697,16 @@ bool AggregateHashExecutor::p_execute_tuple(const TableTuple& nextTuple) {
 
 void AggregateHashExecutor::p_execute_finish() {
     VOLT_TRACE("finalizing..");
-    for (HashAggregateMapType::const_iterator iter = m_hash.begin(); iter != m_hash.end(); iter++) {
-        AggregateRow *aggregateRow = iter->second;
-        if (insertOutputTuple(aggregateRow)) {
-            m_pmp->countdownProgress();
+
+    // If there is no aggregation, results are already inserted already
+    if (m_aggTypes.size() != 0) {
+        for (HashAggregateMapType::const_iterator iter = m_hash.begin(); iter != m_hash.end(); iter++) {
+            AggregateRow *aggregateRow = iter->second;
+            if (insertOutputTuple(aggregateRow)) {
+                m_pmp->countdownProgress();
+            }
+            delete aggregateRow;
         }
-        delete aggregateRow;
     }
 
     // Clean up
