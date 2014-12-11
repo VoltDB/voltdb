@@ -525,12 +525,13 @@ $(document).ready(function () {
 
     // Hides opened serverlist
     $(document).on('click', function (e) {
-        if (!$(event.target).hasClass('adminIcons') && !$(event.target).hasClass('serverName')) {
-            if ($(e.target).closest("#serverConfigAdmin").length === 0) {
-                $("#serverConfigAdmin").hide();
-            }
-        }
-    });
+       if (!$(e.target).hasClass('adminIcons') && !$(e.target).hasClass('serverName')) {
+           if ($(e.target).closest("#serverConfigAdmin").length === 0) {
+               $("#serverConfigAdmin").hide();
+           }
+       }
+   });
+
 
 
 
