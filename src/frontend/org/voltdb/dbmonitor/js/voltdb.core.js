@@ -20,12 +20,7 @@
             this.Metadata = {};
             this.ready = false;
             this.procedureCommands = {};
-            if (this.user != null && this.isHashedPassword != null) {
-                this.authorization = "Hashed " + this.user + ":" + this.isHashedPassword;
-            } else if (this.user != null && this.password != null) {
-                var up = this.user + ":" + this.password;
-                this.authorization = "Basic " + $().crypt({method: "b64enc", source: up});
-            }
+            this.authorization = VoltDBService.BuildAuthorization(this.user, this.isHashedPassword, this.password)
 
             this.getQueue = function () {
                 return (new iQueue(this));
@@ -104,14 +99,7 @@
                 var params = this.BuildParamSet(procedure, parameters);
                 if (typeof (params) == 'string') {
                     if (VoltDBCore.isServerConnected) {
-                        var ah = null;
-                        if (this.authorization != null) {
-                            ah = this.authorization;
-                        } else if (this.user != null && this.isHashedPassword != null) {
-                            ah = "Hashed " + this.user + ":" + this.isHashedPassword;
-                        } else if (this.user != null && this.password != null) {
-                            ah = "Basic " + this.user + ":" + this.password;
-                        }
+                        var ah = VoltDBService.BuildAuthorization(this.user, this.isHashedPassword, this.password)
                         jQuery.getJSON(uri, params, callback, ah);
                     }
                 } else if (callback != null)
@@ -365,7 +353,9 @@
                 dataType: "jsonp",
                 beforeSend: function (request)
                 {
-                    request.setRequestHeader("Authorization", conn.authorization);
+                    if (conn.authorization != null) {
+                        request.setRequestHeader("Authorization", conn.authorization);
+                    }
                 },
                 success: function (e) {
                     if (e.status === 200) {
