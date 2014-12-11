@@ -61,17 +61,24 @@ public abstract class CatalogSchemaTools {
     /**
      * Convert a Table catalog object into the proper SQL DDL, including all indexes,
      * constraints, and foreign key references.
+     * Also returns just the CREATE TABLE statement, since, like all good methods,
+     * it should have two purposes....
+     * It would be nice to have a separate method to just generate the CREATE TABLE,
+     * but we use that pass to also figure out what separate constraint and index
+     * SQL DDL needs to be generated, so instead, we opt to build the CREATE TABLE DDL
+     * separately as we go here, and then fill it in to the StringBuilder being used
+     * to construct the full canonical DDL at the appropriate time.
      * @param Table - object to be analyzed
      * @param String - the Query if this Table is a View
      * @param Boolean - true if this Table is an Export Table
-     * @return SQL Schema text representing the table.
+     * @return SQL Schema text representing the CREATE TABLE statement to generate the table
      */
     public static String toSchema(StringBuilder sb, Table catalog_tbl, String viewQuery, boolean isExportTable) {
         assert(!catalog_tbl.getColumns().isEmpty());
         boolean tableIsView = (viewQuery != null);
 
-        // We need the intermediate results of building the table schema string,
-        // so accumulate it separately
+        // We need the intermediate results of building the table schema string so that
+        // we can return the full CREATE TABLE statement, so accumulate it separately
         StringBuilder table_sb = new StringBuilder();
 
         Set<Index> skip_indexes = new HashSet<Index>();
@@ -286,7 +293,8 @@ public abstract class CatalogSchemaTools {
             table_sb.append("\n);\n");
         }
 
-        // Append the generated table schema to the provided StringBuilder
+        // We've built the full CREATE TABLE statement for this table,
+        // Append the generated table schema to the canonical DDL StringBuilder
         sb.append(table_sb.toString());
 
         // Partition Table
@@ -345,6 +353,8 @@ public abstract class CatalogSchemaTools {
         }
 
         sb.append("\n");
+        // Canonical DDL generation for this table is done, now just hand the CREATE TABLE
+        // statement to whoever might be interested (DDLCompiler, I'm looking in your direction)
         return table_sb.toString();
     }
 
