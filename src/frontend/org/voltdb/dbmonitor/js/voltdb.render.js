@@ -295,13 +295,13 @@ function alertNodeClicked(obj) {
             }
         };
 
-        this.GetSystemInformation = function (onInformationLoaded, onAdminPageClientPortLoaded, onAdminPageServerListLoaded) {
+        this.GetSystemInformation = function (onInformationLoaded, onAdminPagePortAndOverviewDetailsLoaded, onAdminPageServerListLoaded) {
             VoltDBService.GetSystemInformation(function (connection) {
                 populateSystemInformation(connection);
                 getMemoryDetails(connection, systemMemory);
 
                 if (VoltDbAdminConfig.isAdmin) {
-                    onAdminPageClientPortLoaded(getClientPort(connection));
+                    onAdminPagePortAndOverviewDetailsLoaded(getPortAndOverviewDetails());
                     onAdminPageServerListLoaded(getAdminServerList());
                 }
 
@@ -1533,6 +1533,7 @@ function alertNodeClicked(obj) {
             var timeStampIndex = 0;
             var idIndex = 0;
             var hostNameList = {};
+            var javaMaxHeapIndex = 0;
 
             if (processName == "GRAPH_MEMORY") {
                 suffix = "_" + processName;
@@ -1540,8 +1541,6 @@ function alertNodeClicked(obj) {
             } else {
                 hostNameList = systemOverview;
             }
-
-            getCurrentServer();
 
             connection.Metadata['@Statistics_MEMORY' + suffix].schema.forEach(function (columnInfo) {
 
@@ -1559,6 +1558,8 @@ function alertNodeClicked(obj) {
                     timeStampIndex = counter;
                 else if (columnInfo["name"] == "HOST_ID")
                     idIndex = counter;
+                else if (columnInfo["name"] == "JAVAMAXHEAP")
+                    javaMaxHeapIndex = counter;
                 counter++;
             });
 
@@ -1579,6 +1580,7 @@ function alertNodeClicked(obj) {
                         sysMemory[hostName]["RSS"] = memoryInfo[rssIndex];
                         sysMemory[hostName]["HOST_ID"] = memoryInfo[idIndex];
                         sysMemory[hostName]["PHYSICALMEMORY"] = memoryInfo[physicalMemoryIndex];
+                        sysMemory[hostName]["MAXJAVAHEAP"] = memoryInfo[javaMaxHeapIndex];
 
                         var memoryUsage = (sysMemory[hostName]["RSS"] / sysMemory[hostName]["PHYSICALMEMORY"]) * 100;
                         sysMemory[hostName]["MEMORYUSAGE"] = Math.round(memoryUsage * 100) / 100;
@@ -1721,10 +1723,6 @@ function alertNodeClicked(obj) {
                             adminConfigValues['properties'] = columnInfo[1];
                             break;
 
-                        case 'maxjavaheap':
-                            adminConfigValues['maxJavaHeap'] = columnInfo[1];
-                            break;
-
                         case 'heartbeattimeout':
                             adminConfigValues['heartBeatTimeout'] = columnInfo[1];
                             break;
@@ -1761,29 +1759,7 @@ function alertNodeClicked(obj) {
                         case 'commandlogsnapshotpath':
                             adminConfigValues['commandLogSnapshotPath'] = columnInfo[1];
                             break;
-
-                            //Port values
-                        case 'adminport':
-                            adminConfigValues['adminPort'] = columnInfo[1];
-                            break;
-
-                        case 'httpport':
-                            adminConfigValues['httpPort'] = columnInfo[1];
-                            break;
-
-                        case 'internalport':
-                            adminConfigValues['internalPort'] = columnInfo[1];
-                            break;
-
-                        case 'zookeeperport':
-                            adminConfigValues['zookeeperPort'] = columnInfo[1];
-                            break;
-
-                        case 'replicationport':
-                            adminConfigValues['replicationPort'] = columnInfo[1];
-                            break;
-
-
+                            
                         default:
                     }
                 });
@@ -1794,19 +1770,32 @@ function alertNodeClicked(obj) {
 
         };
 
-        var getClientPort = function (connection) {
+        var getPortAndOverviewDetails = function () {
             var portConfigValues = [];
+            var currentServer = getCurrentServer();
 
+            $.each(systemOverview, function(key, val) {
+                if (val["HOSTNAME"] == currentServer) {
+                    portConfigValues['adminPort'] = val["ADMINPORT"];
+                    portConfigValues['httpPort'] = val["HTTPPORT"];
+                    portConfigValues['clientPort'] = val["CLIENTPORT"];
+                    portConfigValues['internalPort'] = val["INTERNALPORT"];
+                    portConfigValues['zookeeperPort'] = val["ZKPORT"];
+                    portConfigValues['replicationPort'] = val["DRPORT"];
+                    return false;
+                }
+                return true;
+            });
 
-            if (connection != null && connection.Metadata['@SystemInformation_OVERVIEW'] != null) {
-                connection.Metadata['@SystemInformation_OVERVIEW'].data.forEach(function (columnInfo) {
-                    if (columnInfo[1] == 'CLIENTPORT') {
-                        portConfigValues['clientPort'] = columnInfo[2];
-                    }
-                });
-            }
+            $.each(systemMemory, function(key, val) {
+                if (val["HOSTNAME"] == currentServer) {
+                    portConfigValues['maxJavaHeap'] = val["MAXJAVAHEAP"];
+                    return false;
+                }
+                return true;
+            });
+
             return portConfigValues;
-
         };
 
         this.editConfigurationItem = function (configGroup, configMember, configValue, onConfigurationUpdated) {

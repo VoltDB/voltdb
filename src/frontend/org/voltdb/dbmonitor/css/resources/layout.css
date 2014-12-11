@@ -776,7 +776,7 @@ ul.helpSchemaList li { list-style:disc; line-height:25px!important; padding:0; m
 
 .adminWrapper{ margin:0; padding:15px 20px;background:#FFFFFF; border-bottom:1px solid #CCCCCC;}
 		  
-.adminLeft { float:left; width:80%;}
+.adminLeft { float:left; width:63%;}
 .adminLeft h1 { float:left; padding-right:20px;}
 .adminClusterProperties { /*float:left;*/}
 ul.adminClusterList { margin:0; padding:0; /*width:366px;*/ height:40px;}
@@ -892,7 +892,6 @@ td.heartbeattd span.unit, td.queryTimeOut span.unit{position:relative;/* top:7px
 .confirmationHeight { height:auto!important;}
 
 /*********************************************media Qu********************/
-
 @media (max-width: 479px) {
 .serverStat {float:none; clear:left;}
 .userN {display:none;}
@@ -988,7 +987,9 @@ top: 3px;}
 
 @media (width: 640px) {
 	
-	.documentation span {float:right}	
+	.documentation span {float:right}
+	.adminLeft { float:none; width:100%;}
+	.adminRight{ padding-top:15px;}	
 }
 
 @media (min-width: 480px) and  (max-width:540px) {
@@ -998,6 +999,7 @@ top: 3px;}
 	.adminServer {}
 	.adminLeft { float:none; width:100%}
 	#serverConfigAdmin{ top:98px;}
+	.adminRight{ padding-top:15px;}
 }
 @media (min-width: 320px) and (max-width: 479px) {
 	#popServerList {width: 100%;position: absolute;right:-1px;top:205px;}
@@ -1017,7 +1019,8 @@ top: 3px;}
 ul.adminClusterList { width:250px;}/*admin*/
 ul.adminClusterList li { margin:0; padding-top:15px; float:left; width:67px; height:100%; line-height:75px;}/*admin*/
 #serverConfigAdmin{ top:214px;}
-.restoreCont {overflow:auto; height:146px}		
+.restoreCont {overflow:auto; height:146px}
+.restoreInfo .overlay-content {  height:auto;}		
 	 }
 
 @media (width: 320px) {
@@ -1036,6 +1039,8 @@ ul.adminClusterList li { margin:0; padding-top:15px; float:left; width:67px; hei
 	 @media screen and (orientation:landscape) {
 		 
 		.overlay-content {/*height: 150px;*/height:20%;}
+		.restoreInfo .overlay-content { height:125px;}
+		.restoreCont {height:125px;}
 		
 		
 		 }

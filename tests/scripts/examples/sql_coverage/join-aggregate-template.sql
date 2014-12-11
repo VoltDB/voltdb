@@ -21,8 +21,11 @@ SELECT @onefun(LHS72._variable[@columntype]) as tag1,    LHS72._variable[@column
 SELECT @onefun(LHS73._variable[@columntype]) as tag1,    LHS73._variable[@columntype] as tag2,     @agg(LHS73._variable[@columntype])            FROM @fromtables LHS73  @jointype join  @fromtables RHS ON LHS73._variable[@columntype] = RHS._variable[@comparabletype] GROUP BY tag1, tag2   ORDER BY 1, 2   LIMIT 3
 
 
---- DISTINCT with JOIN (76-80)
+--- DISTINCT without GROUP BY (76-80)
 SELECT DISTINCT LHS76._variable[@columntype]                                               FROM @fromtables LHS76 ,           @fromtables RHS WHERE LHS76._variable[@columntype] = RHS._variable[@comparabletype]
 SELECT DISTINCT LHS77._variable[@columntype],  LHS77._variable[@columntype]                FROM @fromtables LHS77 @jointype JOIN   @fromtables RHS ON LHS77._variable[@columntype] = RHS._variable[@comparabletype]
 SELECT DISTINCT @onefun(LHS78._variable[@columntype]),    LHS78._variable[@columntype]     FROM @fromtables LHS78 ,   @fromtables RHS WHERE LHS78._variable[@columntype] = RHS._variable[@comparabletype]
 
+--- DISTINCT with GROUP BY
+SELECT DISTINCT  LHS55._variable[#GB2 @columntype],   @agg(LHS55._variable[@columntype])   FROM @fromtables LHS55  @jointype JOIN   @fromtables RHS ON LHS55._variable[@columntype] = RHS._variable[@comparabletype] GROUP BY LHS55.__[#GB1], LHS55.__[#GB2]
+SELECT DISTINCT  LHS55._variable[#GB2 @columntype],   @agg(LHS55._variable[@columntype])   FROM @fromtables LHS55  @jointype JOIN   @fromtables RHS ON LHS55._variable[@columntype] = RHS._variable[@comparabletype] GROUP BY LHS55.__[#GB1], LHS55.__[#GB2] ORDER BY 1, 2 LIMIT 5

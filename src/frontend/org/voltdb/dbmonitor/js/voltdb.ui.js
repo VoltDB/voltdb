@@ -291,6 +291,9 @@ var loadPage = function (serverName, portid) {
         } else if (curTab == NavigationTabs.SQLQuery) {
             $("#overlay").show();
             setTimeout(function () { $("#navSqlQuery > a").trigger("click"); }, 100);
+        } else if (curTab == NavigationTabs.Admin && VoltDbAdminConfig.isAdmin) {
+            $("#overlay").show();
+            setTimeout(function () { $("#navAdmin > a").trigger("click"); }, 100);
         }
     }
 
@@ -387,9 +390,8 @@ var loadPage = function (serverName, portid) {
             var lUserPreferences = getUserPreferences();
             showHideGraph(lUserPreferences);
         };
-
-        var loadAdminTabClientPort = function (clientPortValue) {
-            VoltDbAdminConfig.displayClientPort(clientPortValue);
+        var loadAdminTabPortAndOverviewDetails = function(portAndOverviewValues) {
+            VoltDbAdminConfig.displayPortAndOverviewDetails(portAndOverviewValues);
         };
 
         var loadAdminServerList = function (serverList) {
@@ -431,7 +433,7 @@ var loadPage = function (serverName, portid) {
 
         };
 
-        voltDbRenderer.GetSystemInformation(loadClusterHealth, loadAdminTabClientPort, loadAdminServerList);
+        voltDbRenderer.GetSystemInformation(loadClusterHealth, loadAdminTabPortAndOverviewDetails, loadAdminServerList);
 
     };
 

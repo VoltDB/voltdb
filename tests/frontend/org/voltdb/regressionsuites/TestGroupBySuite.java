@@ -114,7 +114,6 @@ public class TestGroupBySuite extends RegressionSuite {
         // val3 = 0 for even i, 1 for odd i
 
         for (int i = 0; i < 1000; i++) {
-
             int f_d1 = i % 10; // 10 unique dim1s
             int f_d2 = i % 50; // 50 unique dim2s
             int f_d3 = i % 100; // 100 unique dim3s

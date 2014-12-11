@@ -486,7 +486,11 @@ public abstract class CatalogUtil {
             setPathsInfo(catalog, deployment.getPaths());
 
             // set the users info
-            setUsersInfo(catalog, deployment.getUsers());
+            // We'll skip this when building the dummy catalog on startup
+            // so that we don't spew misleading user/role warnings
+            if (!isPlaceHolderCatalog) {
+                setUsersInfo(catalog, deployment.getUsers());
+            }
 
             // set the HTTPD info
             setHTTPDInfo(catalog, deployment.getHttpd());
@@ -645,11 +649,11 @@ public abstract class CatalogUtil {
 
             boolean foundAdminUser = false;
             for (UsersType.User user : deployment.getUsers().getUser()) {
-                if (user.getGroups() == null && user.getRoles() == null)
+                if (user.getRoles() == null)
                     continue;
 
-                for (String group : mergeUserRoles(user)) {
-                    if (group.equalsIgnoreCase("ADMINISTRATOR")) {
+                for (String role : extractUserRoles(user)) {
+                    if (role.equalsIgnoreCase("ADMINISTRATOR")) {
                         foundAdminUser = true;
                         break;
                     }
@@ -733,8 +737,8 @@ public abstract class CatalogUtil {
             }
             else
             {
-                // default to 10 seconds
-                catCluster.setHeartbeattimeout(10);
+                // default to 90 seconds
+                catCluster.setHeartbeattimeout(org.voltcore.common.Constants.DEFAULT_HEARTBEAT_TIMEOUT_SECONDS);
             }
 
             // copy schema modification behavior from xml to catalog
@@ -1178,7 +1182,7 @@ public abstract class CatalogUtil {
             catUser.setShadowpassword(hashedPW);
 
             // process the @groups and @roles comma separated list
-            for (final String role : mergeUserRoles(user)) {
+            for (final String role : extractUserRoles(user)) {
                 final Group catalogGroup = db.getGroups().get(role);
                 // if the role doesn't exist, ignore it.
                 if (catalogGroup != null) {
@@ -1195,22 +1199,14 @@ public abstract class CatalogUtil {
     }
 
     /**
-     * Takes the list of roles specified in the groups, and roles user
-     * attributes and merges the into one set that contains no duplicates
+     * Takes the list of roles specified in the roles user
+     * attributes and returns a set from the comma-separated list
      * @param user an instance of {@link UsersType.User}
      * @return a {@link Set} of role name
      */
-    public static Set<String> mergeUserRoles(final UsersType.User user) {
+    private static Set<String> extractUserRoles(final UsersType.User user) {
         Set<String> roles = new TreeSet<String>();
         if (user == null) return roles;
-
-        if (user.getGroups() != null && !user.getGroups().trim().isEmpty()) {
-            String [] grouplist = user.getGroups().trim().split(",");
-            for (String group: grouplist) {
-                if( group == null || group.trim().isEmpty()) continue;
-                roles.add(group.trim().toLowerCase());
-            }
-        }
 
         if (user.getRoles() != null && !user.getRoles().trim().isEmpty()) {
             String [] rolelist = user.getRoles().trim().split(",");
@@ -1391,6 +1387,15 @@ public abstract class CatalogUtil {
         }
     }
 
+    /**
+     * Retrieve the catalog and deployment configuration from zookeeper.
+     * NOTE: In general, people who want the catalog and/or deployment should
+     * be getting it from the current CatalogContext, available from
+     * VoltDB.instance().  This is primarily for startup and for use by
+     * @UpdateApplicationCatalog.  If you think this is where you need to
+     * be getting catalog or deployment from, consider carefully if that's
+     * really what you want to do. --izzy 12/8/2014
+     */
     public static CatalogAndIds getCatalogFromZK(ZooKeeper zk) throws KeeperException, InterruptedException {
         ByteBuffer versionAndBytes =
                 ByteBuffer.wrap(zk.getData(VoltZK.catalogbytes, false, null));
@@ -1471,7 +1476,13 @@ public abstract class CatalogUtil {
     }
 
     private static void updateIndexUsageAnnotation(Index index, Statement stmt) {
-        Procedure proc = (Procedure) stmt.getParent();
+        // LIMIT EXECUTE DELETE statements are parented by tables,
+        // not stored procedures.
+        CatalogType parent = stmt.getParent();
+        if (!(parent instanceof Procedure))
+                return;
+
+        Procedure proc = (Procedure) parent;
         // skip CRUD generated procs
         if (proc.getDefaultproc()) {
             return;

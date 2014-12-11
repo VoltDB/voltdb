@@ -556,14 +556,13 @@ $(document).ready(function () {
         this.displayAdminConfiguration = function (adminConfigValues) {
             if (adminConfigValues != undefined) {
                 configureAdminValues(adminConfigValues);
-                configurePortValues(adminConfigValues);
                 configureDirectoryValues(adminConfigValues);
             }
         };
 
-        this.displayClientPort = function (clientPortValue) {
-            if (clientPortValue != undefined) {
-                configureClientPortValue(clientPortValue);
+        this.displayPortAndOverviewDetails = function (portAndOverviewValues) {
+            if (portAndOverviewValues != undefined) {
+                configurePortAndOverviewValues(portAndOverviewValues);
             }
         };
 
@@ -599,8 +598,6 @@ $(document).ready(function () {
             adminDOMObjects.exportLabel.text(getOnOffText(adminConfigValues.export));
             adminDOMObjects.target.text(adminConfigValues.targets);
             adminDOMObjects.properties.text(adminConfigValues.properties);
-            adminDOMObjects.maxJavaHeap.text(adminConfigValues.maxJavaHeap != "" ? adminConfigValues.maxJavaHeap : "");
-            adminDOMObjects.maxJavaHeapLabel.text(adminConfigValues.maxJavaHeap != "" ? "MB" : "");
             adminDOMObjects.heartBeatTimeout.text(adminConfigValues.heartBeatTimeout != "" ? adminConfigValues.heartBeatTimeout : "");
             adminDOMObjects.heartBeatTimeoutLabel.text(adminConfigValues.heartBeatTimeout != "" ? "ms" : "");
             adminDOMObjects.queryTimeout.text(adminConfigValues.queryTimeout != "" ? adminConfigValues.queryTimeout : "");
@@ -614,18 +611,16 @@ $(document).ready(function () {
 
         };
 
-        var configurePortValues = function (portConfigValues) {
-            adminDOMObjects.adminPort.text(portConfigValues.adminPort);
-            adminDOMObjects.httpPort.text(portConfigValues.httpPort);
-            adminDOMObjects.internalPort.text(portConfigValues.internalPort);
-            adminDOMObjects.zookeeperPort.text(portConfigValues.zookeeperPort);
-            adminDOMObjects.replicationPort.text(portConfigValues.replicationPort);
+        var configurePortAndOverviewValues = function (configValues) {
+            adminDOMObjects.adminPort.text(configValues.adminPort);
+            adminDOMObjects.httpPort.text(configValues.httpPort);
+            adminDOMObjects.internalPort.text(configValues.internalPort);
+            adminDOMObjects.zookeeperPort.text(configValues.zookeeperPort);
+            adminDOMObjects.replicationPort.text(configValues.replicationPort);
+            adminDOMObjects.clientPort.text(configValues.clientPort);
 
-        };
-
-        var configureClientPortValue = function (clientPortValue) {
-            adminDOMObjects.clientPort.text(clientPortValue.clientPort);
-
+            adminDOMObjects.maxJavaHeap.text(configValues.maxJavaHeap != "" ? parseFloat(configValues.maxJavaHeap/1024) : "");
+            adminDOMObjects.maxJavaHeapLabel.text(configValues.maxJavaHeap != "" ? "MB" : "");
         };
 
         var configureDirectoryValues = function (directoryConfigValues) {
@@ -634,7 +629,6 @@ $(document).ready(function () {
             adminDOMObjects.exportOverflow.text(directoryConfigValues.exportOverflow);
             adminDOMObjects.commandLogPath.text(directoryConfigValues.commandLogPath);
             adminDOMObjects.commandLogSnapshotPath.text(directoryConfigValues.commandLogSnapshotPath);
-
         };
         
     });
