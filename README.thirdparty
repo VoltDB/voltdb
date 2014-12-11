@@ -1140,6 +1140,25 @@ emma_ant
  */
 
 ================================================================================
+Gradle 1.6 (Used in the GEB automated tests of the VMC, VoltDB Management Center)
+
+/*
+ * Copyright 2007-2011 the original author or authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+================================================================================
 gradle-wrapper.jar
 
 The License is accompanied by a NOTICE
@@ -1148,6 +1167,13 @@ The License is accompanied by a NOTICE
    ==  the Apache License, Version 2.0,                                   ==
    ==  in this case for the Gradle distribution.                          ==
    =========================================================================
+
+================================================================================
+GEB, Spock and Selenium WebDriver are not distributed as part of VoltDB;
+however, if you run the automated tests of the VMC (VoltDB Management Center),
+they will be downloaded by Gradle. All of them use the Apache 2.0 license.
+
+See Apache 2.0 license below.
 
 ================================================================================
 japex
@@ -1755,7 +1781,8 @@ Avro 1.7.7 uses the following license:
 Licenses referred to by some above package license texts
 ================================================================================
 
-Apache License Version 2.0, January 2004http://www.apache.org/licenses/
+Apache License Version 2.0, January 2004
+http://www.apache.org/licenses/
 
 TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
 1. Definitions.
