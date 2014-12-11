@@ -1057,6 +1057,27 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 System.out.println(vt.toString());
         validateTableOfLongs(vt, new long[][] { {4}, {5} });
 
+        // Index scan
+        vt = client.callProcedure("@AdHoc",
+                "select R1.ID FROM R1 where R1.ID > ALL (SELECT ID FROM R2 WHERE R2.ID < 4);").getResults()[0];
+                System.out.println(vt.toString());
+        validateTableOfLongs(vt, new long[][] { {4}, {5} });
+
+        vt = client.callProcedure("@AdHoc",
+                "select R1.ID FROM R1 where R1.ID >= ALL (SELECT ID FROM R2 order by ID asc);").getResults()[0];
+                System.out.println(vt.toString());
+        validateTableOfLongs(vt, new long[][] { {5} });
+
+        vt = client.callProcedure("@AdHoc",
+                "select R1.ID FROM R1 where R1.ID >= ALL (SELECT ID FROM R2 order by ID desc);").getResults()[0];
+                System.out.println(vt.toString());
+        validateTableOfLongs(vt, new long[][] { {5} });
+
+        vt = client.callProcedure("@AdHoc",
+                "select R1.ID FROM R1 where R1.ID <= ALL (SELECT ID FROM R2 order by ID desc);").getResults()[0];
+                System.out.println(vt.toString());
+        validateTableOfLongs(vt, new long[][] { {1} });
+
         // NLIJ
         vt = client.callProcedure("@AdHoc",
                 "select R1.ID, R2.ID FROM R1, R2 where R1.DEPT = R2.DEPT + (SELECT DEPT FROM R2 where ID = ?) limit 1;", 1).getResults()[0];
