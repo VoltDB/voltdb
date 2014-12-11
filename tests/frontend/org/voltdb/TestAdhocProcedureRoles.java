@@ -37,7 +37,7 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
+import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.utils.MiscUtils;
 
@@ -46,8 +46,8 @@ public class TestAdhocProcedureRoles extends AdhocDDLTestBase {
     final static boolean VERBOSE = false;
     final static String CATALOG_PATH = Configuration.getPathToCatalogForTest("adhocddl.jar");
     final static String DEPLOYMENT_PATH = Configuration.getPathToCatalogForTest("adhocddl.xml");
-    final static GroupInfo ADMIN_TEMPLATE = new GroupInfo(null, false, false, true, false, false, false);
-    final static GroupInfo USER_TEMPLATE = new GroupInfo(null, false, false, false, false, false, false);
+    final static RoleInfo ADMIN_TEMPLATE = new RoleInfo(null, false, false, true, false, false, false);
+    final static RoleInfo USER_TEMPLATE = new RoleInfo(null, false, false, false, false, false, false);
 
     private class Tester
     {
@@ -73,9 +73,9 @@ public class TestAdhocProcedureRoles extends AdhocDDLTestBase {
                     ");", name));
         }
 
-        void createRoles(final GroupInfo template, String... roles)
+        void createRoles(final RoleInfo template, String... roles)
         {
-            this.builder.addGroups(GroupInfo.fromTemplate(template, roles));
+            this.builder.addRoles(RoleInfo.fromTemplate(template, roles));
         }
 
         void createUser(String user, String password, String... roles)

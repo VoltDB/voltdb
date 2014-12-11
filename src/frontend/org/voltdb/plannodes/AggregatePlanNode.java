@@ -294,10 +294,10 @@ public class AggregatePlanNode extends AbstractPlanNode {
 
     public void addGroupByExpression(AbstractExpression expr)
     {
-        if (expr != null)
-        {
-            m_groupByExpressions.add((AbstractExpression) expr.clone());
+        if (expr == null) {
+            return;
         }
+        m_groupByExpressions.add((AbstractExpression) expr.clone());
     }
 
     @Override

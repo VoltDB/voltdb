@@ -92,8 +92,8 @@ rely on the garbage collector.
  * sequential access of data. Example:</p>
  *
  * <code>
- * while (table.advanceRow()) {<br/>
- * &nbsp;&nbsp;&nbsp;&nbsp;System.out.println(table.getLong(7));<br/>
+ * while (table.advanceRow()) {<br>
+ * &nbsp;&nbsp;&nbsp;&nbsp;System.out.println(table.getLong(7));<br>
  * }
  * </code>
  *
@@ -104,10 +104,10 @@ rely on the garbage collector.
  * Example:</p>
  *
  * <code>
- * VoltTable t = new VoltTable(<br/>
- * &nbsp;&nbsp;&nbsp;&nbsp;new VoltTable.ColumnInfo("col1", VoltType.BIGINT),<br/>
- * &nbsp;&nbsp;&nbsp;&nbsp;new VoltTable.ColumnInfo("col2", VoltType.STRING));<br/>
- * t.addRow(15, "sampleString");<br/>
+ * VoltTable t = new VoltTable(<br>
+ * &nbsp;&nbsp;&nbsp;&nbsp;new VoltTable.ColumnInfo("col1", VoltType.BIGINT),<br>
+ * &nbsp;&nbsp;&nbsp;&nbsp;new VoltTable.ColumnInfo("col2", VoltType.STRING));<br>
+ * t.addRow(15, "sampleString");<br>
  * t.addRow(-9, "moreData");
  * </code>
  */
@@ -147,8 +147,8 @@ public final class VoltTable extends VoltTableRow implements JSONString {
      * Primarily used to construct in the constructor {@link VoltTable#VoltTable(ColumnInfo...)}
      * and {@link VoltTable#VoltTable(ColumnInfo[], int)}.</p>
      *
-     * <p>Example:<br/>
-     * <tt>VoltTable t = new VoltTable(<br/>
+     * <p>Example:<br>
+     * <tt>VoltTable t = new VoltTable(<br>
      * &nbsp;&nbsp;&nbsp;&nbsp;new ColumnInfo("foo", VoltType.INTEGER),
      * new ColumnInfo("bar", VoltType.STRING));</tt>
      * </p>

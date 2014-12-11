@@ -31,6 +31,7 @@
 package org.voltdb.utils;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 
@@ -199,14 +200,14 @@ public class TestSqlCmdErrorHandling extends TestCase {
         // Set timeout to 1 minute
         long starttime = System.currentTimeMillis();
         long elapsedtime = 0;
-        long pollcount = 0;
+        long pollcount = 1;
         do {
             Thread.sleep(1000);
             try {
                 int exitValue = process.exitValue();
                 // Only verbosely report the successful exit after verbosely reporting a delay.
                 // Frequent false alarms might lead to raising the sleep time.
-                if (pollcount > 0) {
+                if (pollcount > 1) {
                     elapsedtime = System.currentTimeMillis() - starttime;
                     System.err.println("External process (" + commandPath + ") exited after being polled " +
                             pollcount + " times over " + elapsedtime + "ms");
@@ -223,6 +224,19 @@ public class TestSqlCmdErrorHandling extends TestCase {
             }
         } while (elapsedtime < timeout);
 
+        System.err.println("Standard output from timed out " + commandPath + ":");
+        FileInputStream cmdOut = new FileInputStream(out);
+        byte[] transfer = new byte[1000];
+        while (cmdOut.read(transfer) != -1) {
+            System.err.write(transfer);
+        }
+        cmdOut.close();
+        System.err.println("Error outpout from timed out " + commandPath + ":");
+        FileInputStream cmdErr = new FileInputStream(error);
+        while (cmdErr.read(transfer) != -1) {
+            System.err.write(transfer);
+        }
+        cmdErr.close();
         fail("External process (" + commandPath + ") timed out after " + elapsedtime + "ms on input:\n" + inputText);
         return 0;
     }

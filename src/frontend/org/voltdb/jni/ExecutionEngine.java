@@ -74,6 +74,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public static final int ERRORCODE_WRONG_SERIALIZED_BYTES = 101;
     public static final int ERRORCODE_NEED_PLAN = 110;
     public static final int ERRORCODE_PROGRESS_UPDATE = 111;
+    public static final int ERRORCODE_DECODE_BASE64_AND_DECOMPRESS = 112;
 
     /** For now sync this value with the value in the EE C++ code to get good stats. */
     public static final int EE_PLAN_CACHE_SIZE = 1000;

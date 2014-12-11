@@ -847,18 +847,16 @@ int64_t VoltDBIPC::fragmentProgressUpdate(int32_t batchIndex,
     return nextStep;
 }
 
-std::string VoltDBIPC::planForFragmentId(int64_t fragmentId) {
-    char message[sizeof(int8_t) + sizeof(int64_t)];
-
-    message[0] = static_cast<int8_t>(kErrorCode_needPlan);
-    *reinterpret_cast<int64_t*>(&message[1]) = htonll(fragmentId);
-    writeOrDie(m_fd, (unsigned char*)message, sizeof(int8_t) + sizeof(int64_t));
-
+// A file static helper function that
+//   Reads a 4-byte integer from fd that is the length of the following string
+//   Reads the bytes for the string
+//   Returns those bytes as an std::string
+static std::string readLengthPrefixedBytesToStdString(int fd) {
     int32_t length;
-    ssize_t bytes = read(m_fd, &length, sizeof(int32_t));
-    if (bytes != sizeof(int32_t)) {
+    ssize_t numBytesRead = read(fd, &length, sizeof(int32_t));
+    if (numBytesRead != sizeof(int32_t)) {
         printf("Error - blocking read failed. %jd read %jd attempted",
-               (intmax_t)bytes, (intmax_t)sizeof(int32_t));
+               (intmax_t)numBytesRead, (intmax_t)sizeof(int32_t));
         fflush(stdout);
         assert(false);
         exit(-1);
@@ -866,33 +864,62 @@ std::string VoltDBIPC::planForFragmentId(int64_t fragmentId) {
     length = static_cast<int32_t>(ntohl(length) - sizeof(int32_t));
     assert(length > 0);
 
-    boost::scoped_array<char> planBytes(new char[length + 1]);
-    bytes = 0;
-    while (bytes != length) {
-        ssize_t oldBytes = bytes;
-        bytes += read(m_fd, planBytes.get() + bytes, length - bytes);
-        if (oldBytes == bytes) {
+    boost::scoped_array<char> bytes(new char[length + 1]);
+    numBytesRead = 0;
+    while (numBytesRead != length) {
+        ssize_t oldBytes = numBytesRead;
+        numBytesRead += read(fd, bytes.get() + numBytesRead, length - numBytesRead);
+        if (oldBytes == numBytesRead) {
             break;
         }
-        if (oldBytes > bytes) {
-            bytes++;
+        if (oldBytes > numBytesRead) {
+            numBytesRead++;
             break;
         }
     }
 
-    if (bytes != length) {
+    if (numBytesRead != length) {
         printf("Error - blocking read failed. %jd read %jd attempted",
-               (intmax_t)bytes, (intmax_t)length);
+               (intmax_t)numBytesRead, (intmax_t)length);
         fflush(stdout);
         assert(false);
         exit(-1);
     }
 
     // null terminate
-    planBytes[length] = '\0';
+    bytes[length] = '\0';
 
     // need to return a string
-    return std::string(planBytes.get());
+    return std::string(bytes.get());
+
+}
+
+std::string VoltDBIPC::decodeBase64AndDecompress(const std::string& base64Data) {
+    const size_t messageSize = sizeof(int8_t) + sizeof(int32_t) + base64Data.size();
+    unsigned char message[messageSize];
+    size_t offset = 0;
+
+    message[0] = static_cast<int8_t>(kErrorCode_decodeBase64AndDecompress);
+    offset++;
+
+    *reinterpret_cast<int32_t*>(&message[offset]) = htonl(static_cast<int32_t>(base64Data.size()));
+    offset += sizeof(int32_t);
+
+    ::memcpy(&message[offset], base64Data.c_str(), base64Data.size());
+
+    writeOrDie(m_fd, message, messageSize);
+
+    return readLengthPrefixedBytesToStdString(m_fd);
+}
+
+std::string VoltDBIPC::planForFragmentId(int64_t fragmentId) {
+    char message[sizeof(int8_t) + sizeof(int64_t)];
+
+    message[0] = static_cast<int8_t>(kErrorCode_needPlan);
+    *reinterpret_cast<int64_t*>(&message[1]) = htonll(fragmentId);
+    writeOrDie(m_fd, (unsigned char*)message, sizeof(int8_t) + sizeof(int64_t));
+
+    return readLengthPrefixedBytesToStdString(m_fd);
 }
 
 void VoltDBIPC::crashVoltDB(voltdb::FatalException e) {
