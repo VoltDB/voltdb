@@ -6,6 +6,8 @@
         this.connections = {};
         this.isServerConnected = true;
         this.hostIP = "";
+        this.shortApiCredentials = "";
+        
         DbConnection = function (aServer, aPort, aAdmin, aUser, aPassword, aIsHashPassword, aProcess) {
             this.server = aServer == null ? 'localhost' : $.trim(aServer);
             this.port = aPort == null ? '8080' : $.trim(aPort);
@@ -95,6 +97,21 @@
                 if (this.admin)
                     s[s.length] = 'admin=true';
                 var paramSet = s.join('&') + '&jsonp=?';
+
+                if (VoltDBCore.shortApiCredentials == "") {
+                    var credentials = [];
+                    if (this.user != null)
+                        credentials[credentials.length] = encodeURIComponent('User') + '=' + encodeURIComponent(this.user);
+                    if (this.password != null)
+                        credentials[credentials.length] = encodeURIComponent('Password') + '=' + encodeURIComponent(this.password);
+                    if (this.isHashedPassword != null)
+                        credentials[credentials.length] =  encodeURIComponent('Hashedpassword') + '=' + encodeURIComponent(this.isHashedPassword);
+                    if (this.admin)
+                        credentials[credentials.length] = 'admin=true';
+
+                    VoltDBCore.shortApiCredentials = credentials.join('&');
+                }
+
                 return paramSet;
             };
 

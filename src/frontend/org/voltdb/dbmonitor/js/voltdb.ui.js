@@ -261,6 +261,16 @@ var loadPage = function (serverName, portid) {
     //users can't accidentally send requests that might change database contents.
     loadSQLQueryPage(serverName, portid, userName, password, false);
 
+    //Admin Page download link
+    $('#downloadAdminConfigurations').on('click', function (e) {
+        var port = VoltDBConfig.GetPortId() != null ? VoltDBConfig.GetPortId() : '8080';
+        var url = window.location.protocol + '//' + VoltDBConfig.GetDefaultServerIP() + ":" + port + '/deployment/download/deployment.xml?' + VoltDBCore.shortApiCredentials;
+        $(this).attr("href", url);
+        setTimeout(function () {
+            $('#downloadAdminConfigurations').attr("href", "#");
+        }, 100);
+    });
+
     var loadSchemaTab = function () {
         var templateUrl = window.location.protocol + '//' + window.location.host + '/catalog';
         var templateJavascript = "js/template.js";
