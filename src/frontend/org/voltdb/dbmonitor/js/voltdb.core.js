@@ -99,7 +99,12 @@
                 var params = this.BuildParamSet(procedure, parameters);
                 if (typeof (params) == 'string') {
                     if (VoltDBCore.isServerConnected) {
-                        var ah = VoltDBService.BuildAuthorization(this.user, this.isHashedPassword, this.password)
+                        var ah = null;
+                        if (this.authorization != null) {
+                            ah = this.authorization;
+                        } else {
+                            VoltDBService.BuildAuthorization(this.user, this.isHashedPassword, this.password);
+                        }
                         jQuery.getJSON(uri, params, callback, ah);
                     }
                 } else if (callback != null)
@@ -114,10 +119,8 @@
                         var ah = null;
                         if (this.authorization != null) {
                             ah = this.authorization;
-                        } else if (this.user != null && this.isHashedPassword != null) {
-                            ah = "Hashed " + this.user + ":" + this.isHashedPassword;
-                        } else if (this.user != null && this.password != null) {
-                            ah = "Basic " + this.user + ":" + this.password;
+                        } else {
+                            VoltDBService.BuildAuthorization(this.user, this.isHashedPassword, this.password);
                         }
                         jQuery.postJSON(uri, params, callback, ah);
                     }
