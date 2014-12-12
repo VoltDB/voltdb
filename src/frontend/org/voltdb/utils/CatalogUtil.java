@@ -109,6 +109,7 @@ import org.voltdb.types.ConstraintType;
 import org.xml.sax.SAXException;
 
 import com.google_voltpatches.common.base.Charsets;
+import java.util.HashSet;
 
 /**
  *
