@@ -7,6 +7,7 @@
         this.isServerConnected = true;
         this.hostIP = "";
         this.shortApiCredentials = "";
+        this.isLoginVerified = false;
         
         this.authorization = null;
         DbConnection = function (aServer, aPort, aAdmin, aUser, aPassword, aIsHashPassword, aProcess) {
@@ -94,7 +95,7 @@
                     s[s.length] = 'admin=true';
                 var paramSet = s.join('&') + '&jsonp=?';
 
-                if (VoltDBCore.shortApiCredentials == "") {
+                if (VoltDBCore.shortApiCredentials == "" && VoltDBCore.isLoginVerified) {
                     var credentials = [];
                     if (this.user != null)
                         credentials[credentials.length] = encodeURIComponent('User') + '=' + encodeURIComponent(this.user);
@@ -343,6 +344,7 @@
                 try {
                     clearTimeout(timeout);
                     if (response.status == 1) {
+                        VoltDBCore.isLoginVerified = true;
                         callback(true, response, isLoginTest);
                     } else {
                         callback(false, response, isLoginTest);
