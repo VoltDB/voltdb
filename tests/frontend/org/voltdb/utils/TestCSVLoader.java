@@ -24,6 +24,7 @@
 package org.voltdb.utils;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.BufferedReader;
@@ -448,6 +449,54 @@ public class TestCSVLoader {
         int invalidLineCnt = 0;
         int validLineCnt = myData.length - invalidLineCnt;
         test_Interface(myOptions, myData, invalidLineCnt, validLineCnt );
+    }
+
+    @Test
+    public void testCustomNULL() throws Exception
+    {
+        String []myOptions = {
+                "-f" + path_csv,
+                "--reportdir=" + reportDir,
+                "--maxerrors=50",
+                "--user=",
+                "--password=",
+                "--port=",
+                "--separator=,",
+                "--quotechar=\"",
+                "--escape=\\",
+                "--skip=0",
+                "--customNullString=test",
+                "BLAH"
+        };
+        //Both \N and \\N as csv input are treated as NULL
+        String []myData = {
+                "1,1,1,11111111,test,1.10,1.11,",
+                "2,2,1,11111111,\"test\",1.10,1.11,",
+                "3,3,1,11111111,testme,1.10,1.11,",
+                "4,4,1,11111111,iamtest,1.10,1.11,",
+                "5,5,5,5,\\N,1.10,1.11,7777-12-25 14:35:26",
+        };
+        int invalidLineCnt = 0;
+        int validLineCnt = myData.length - invalidLineCnt;
+        test_Interface(myOptions, myData, invalidLineCnt, validLineCnt );
+        VoltTable ts_table = client.callProcedure("@AdHoc", "SELECT * FROM BLAH ORDER BY clm_integer;").getResults()[0];
+        int i = 0;
+        int nulls = 0;
+        while (ts_table.advanceRow()) {
+            String value = ts_table.getString(4);
+            if(i < 2) {
+                assertEquals(value, null);
+                nulls++;
+            } else if(i == 4){
+                // this test case should fail once we stop replacing the \N as NULL
+                assertEquals(value, null);
+                nulls++;
+            } else {
+                assertNotNull(value);
+            }
+            i++;
+        }
+        assertEquals(nulls, 3);
     }
 
     @Test
