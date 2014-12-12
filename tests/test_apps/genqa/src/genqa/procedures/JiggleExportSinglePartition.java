@@ -107,7 +107,7 @@ public class JiggleExportSinglePartition extends VoltProcedure {
                      , record.type_null_varchar1024
                      , record.type_not_null_varchar1024
         );
-        if (exportgroups) {
+        if (exportGroups) {
             voltQueueSQL(
                     exportFoo
                     , txid
