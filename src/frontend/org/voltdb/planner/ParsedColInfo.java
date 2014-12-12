@@ -46,14 +46,15 @@ public class ParsedColInfo implements Cloneable {
     /** Index of the column in its table.  This is used for MV sanity-checking */
     public int index = 0;
 
-    /** This will true if this instance refers to a column in an ORDER BY clause*/
+    //
+    // Used in ParsedSelectStmt.m_displayColumns
+    //
     public boolean orderBy = false;
-
-    /** Only relevant if orderBy is true. */
-    public boolean ascending = true;
-
-    /** This will true if this instance refers to a column in an GROUP BY clause*/
+    public boolean ascending = true; // Only relevant if orderBy is true.
     public boolean groupBy = false;
+
+    // Used in ParsedSelectStmt.m_groupByColumns
+    public boolean groupByInDisplay = false;
 
     /** Sometimes the expression in the parsed column needs to be adjusted
      * for its context.  This is the case for AVG aggregates in SELECT statements,
