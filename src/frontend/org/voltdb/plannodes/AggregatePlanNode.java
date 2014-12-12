@@ -181,7 +181,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
         if (m_children.size() == 1) {
             m_children.get(0).generateOutputSchema(db);
 
-            assert(m_hasSignificantOutputSchema == true);
+            assert(m_hasSignificantOutputSchema);
         }
     }
 

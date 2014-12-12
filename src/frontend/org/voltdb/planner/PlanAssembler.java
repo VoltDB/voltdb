@@ -778,7 +778,7 @@ public class PlanAssembler {
 
         if (m_parsedSelect.hasOrderByColumns()) {
             root = handleOrderBy(root);
-            if (m_parsedSelect.isComplexOrderby() && root instanceof OrderByPlanNode) {
+            if (m_parsedSelect.isComplexOrderBy() && root instanceof OrderByPlanNode) {
                 AbstractPlanNode child = root.getChild(0);
                 AbstractPlanNode grandChild = child.getChild(0);
 
@@ -1252,7 +1252,7 @@ public class PlanAssembler {
      * @return The new root of the plan-sub-graph (might be the same as the
      *         input).
      */
-    AbstractPlanNode addProjection(AbstractPlanNode rootNode) {
+    private AbstractPlanNode addProjection(AbstractPlanNode rootNode) {
         assert (m_parsedSelect != null);
         assert (m_parsedSelect.m_displayColumns != null);
 
@@ -1278,7 +1278,7 @@ public class PlanAssembler {
      * @param root
      * @return new orderByNode (the new root) or the original root if no orderByNode was required.
      */
-    AbstractPlanNode handleOrderBy(AbstractPlanNode root) {
+    private AbstractPlanNode handleOrderBy(AbstractPlanNode root) {
         assert (m_parsedSelect != null);
 
         SortDirectionType sortDirection = SortDirectionType.INVALID;
@@ -1421,7 +1421,7 @@ public class PlanAssembler {
     }
 
 
-    AbstractPlanNode handleMVBasedMultiPartQuery (AbstractPlanNode root, boolean edgeCaseOuterJoin) {
+    private AbstractPlanNode handleMVBasedMultiPartQuery (AbstractPlanNode root, boolean edgeCaseOuterJoin) {
         MaterializedViewFixInfo mvFixInfo = m_parsedSelect.m_mvFixInfo;
 
         HashAggregatePlanNode reAggNode = new HashAggregatePlanNode(mvFixInfo.getReAggregationPlanNode());
@@ -1609,7 +1609,7 @@ public class PlanAssembler {
         return true;
     }
 
-    AbstractPlanNode handleAggregationOperators(AbstractPlanNode root) {
+    private AbstractPlanNode handleAggregationOperators(AbstractPlanNode root) {
         AggregatePlanNode aggNode = null;
 
         /* Check if any aggregate expressions are present */
@@ -1952,7 +1952,7 @@ public class PlanAssembler {
      *            push-down. If this is null, no push-down will be performed.
      * @return The new root node.
      */
-    AbstractPlanNode pushDownAggregate(AbstractPlanNode root,
+    private AbstractPlanNode pushDownAggregate(AbstractPlanNode root,
                                        AggregatePlanNode distNode,
                                        AggregatePlanNode coordNode,
                                        ParsedSelectStmt selectStmt) {
@@ -1986,7 +1986,7 @@ public class PlanAssembler {
                 // No related GROUP BY or even Re-agg will apply on coordinator
                 // Projection plan node can just be pushed down also except for
                 // a very edge ORDRE BY case.
-                if (m_parsedSelect.isComplexOrderby()) {
+                if (m_parsedSelect.isComplexOrderBy()) {
                     // Put the send/receive pair back into place
                     accessPlanTemp.getChild(0).addAndLinkChild(distNode);
                     root = processComplexAggProjectionNode(selectStmt, accessPlanTemp);
@@ -2157,7 +2157,7 @@ public class PlanAssembler {
      * @param root can be aggregate plan node or project plan node
      * @return
      */
-    AbstractPlanNode handleDistinctWithGroupby(AbstractPlanNode root) {
+    private AbstractPlanNode handleDistinctWithGroupby(AbstractPlanNode root) {
         if (! m_parsedSelect.hasDistinctWithGroupBy()) {
             return root;
         }

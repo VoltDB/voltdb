@@ -453,7 +453,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         m_groupByExpressions = new HashMap<String, AbstractExpression>();
         for (ParsedColInfo groupbyCol: m_groupByColumns) {
             assert(aggTableIndexMap.get(groupbyCol.expression) != null);
-            assert(m_groupByExpressions.get(groupbyCol.alias) == null);
+
             AbstractExpression expr = groupbyCol.expression.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
             m_groupByExpressions.put(groupbyCol.alias,expr);
         }
@@ -474,10 +474,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             m_projectSchema.addColumn(schema_col);
         }
 
-        if (hasDistinctWithGroupBy() && m_distinctGroupByColumns != null) {
-            assert(hasComplexAgg() || displayColumnsContainAllGroupByColumns());
-            // DISTINCT group by expressions are already TVEs when set
-        }
+        // DISTINCT group by expressions are already TVEs when set
 
         placeTVEsForOrderby(aggTableIndexMap, indexToColumnMap);
     }
@@ -496,30 +493,15 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // Detect the edge order by case
         detectComplexOrderby();
 
-        if (isComplexOrderby()) {
+        if (isComplexOrderBy()) {
             // Case that ORDER BY is below Projection node
+            boolean replaceAll = hasComplexAgg() || hasComplexGroupby();
             for (ParsedColInfo orderCol : m_orderColumns) {
-                AbstractExpression expr = orderCol.expression.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
-
-                if (hasComplexAgg()) {
-                    orderCol.expression = expr;
-                } else {
-                    // This if case checking is to rule out cases like: select PKEY + A_INT from O1 order by PKEY + A_INT,
-                    // This case later needs a projection node on top of sort node to make it work.
-
-                    // Assuming the restrictions: Order by columns are (1) columns from table
-                    // (2) tag from display columns (3) actual expressions from display columns
-                    // Currently, we do not allow order by complex expressions that are not in display columns
-
-                    // If there is a complexGroupby at his point, it means that Display columns contain all the order by columns.
-                    // In that way, this plan does not require another projection node on top of sort node.
-                    if (orderCol.expression.hasAnySubexpressionOfClass(AggregateExpression.class) ||
-                            hasComplexGroupby()) {
-                        orderCol.expression = expr;
-                    }
+                if (replaceAll || orderCol.expression.hasAnySubexpressionOfClass(AggregateExpression.class)) {
+                    orderCol.expression = orderCol.expression.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
                 }
             }
-        } else if (hasAggregateOrGroupby() || hasDistinctWithGroupBy()) {
+        } else if (hasAggregateOrGroupby()) {
             // Case that ORDER BY is above Projection node
 
             Map <AbstractExpression, Integer> displayIndexMap = new HashMap <AbstractExpression,Integer>();
@@ -767,13 +749,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     private void parseGroupByColumns(VoltXMLElement columnsNode) {
-        int index = 0;
         for (VoltXMLElement child : columnsNode.children) {
-            parseGroupByColumn(child, index++);
+            parseGroupByColumn(child);
         }
     }
 
-    private void parseGroupByColumn(VoltXMLElement groupByNode, int index) {
+    private void parseGroupByColumn(VoltXMLElement groupByNode) {
         ParsedColInfo groupbyCol = new ParsedColInfo();
         groupbyCol.expression = parseExpressionTree(groupByNode);
         assert(groupbyCol.expression != null);
@@ -808,19 +789,15 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
 
         // find the matching columns in display list
-        ParsedColInfo orig_col = null;
         for (int i = 0; i < m_displayColumns.size(); ++i) {
             ParsedColInfo col = m_displayColumns.get(i);
             if (col.expression.equals(groupbyCol.expression)) {
                 groupbyCol.alias = col.alias;
-                orig_col = col;
+                groupbyCol.groupByInDisplay = true;
+
+                col.groupBy = true;
                 break;
             }
-        }
-        if (orig_col != null) {
-            orig_col.groupBy = true;
-
-            groupbyCol.groupByInDisplay = true;
         }
 
         m_groupByColumns.add(groupbyCol);
@@ -891,20 +868,16 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // The ORDER BY column MAY be identical to a simple display column, in which case,
         // tagging the actual display column as being also an order by column
         // helps later when trying to determine ORDER BY coverage (for determinism).
-        ParsedColInfo orig_col = null;
         for (ParsedColInfo col : m_displayColumns) {
             if (col.alias.equals(order_col.alias) || col.expression.equals(order_exp)) {
-                orig_col = col;
+                col.orderBy = true;
+                col.ascending = order_col.ascending;
+
+                order_col.alias = col.alias;
+                order_col.columnName = col.columnName;
+                order_col.tableName = col.tableName;
                 break;
             }
-        }
-        if (orig_col != null) {
-            orig_col.orderBy = true;
-            orig_col.ascending = order_col.ascending;
-
-            order_col.alias = orig_col.alias;
-            order_col.columnName = orig_col.columnName;
-            order_col.tableName = orig_col.tableName;
         }
         assert( ! (order_exp instanceof ConstantValueExpression));
         assert( ! (order_exp instanceof ParameterValueExpression));
@@ -1363,7 +1336,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      *
      * @return true when this query is the edge case query, false otherwise.
      */
-    public boolean isComplexOrderby() {
+    public boolean isComplexOrderBy() {
         return m_isComplexOrderBy;
     }
 
@@ -1380,8 +1353,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             if (col.groupByInDisplay) {
                 continue;
             }
-            if (hasComplexGroupby() &&
-                col.expression.hasAnySubexpressionOfClass(ParameterValueExpression.class)) {
+            if (col.expression.hasAnySubexpressionOfClass(ParameterValueExpression.class)) {
+                // group by expression has ParameterValueExpression
+                assert(hasComplexGroupby());
+
                 // hsql has already guarded invalid ORDER BY expression.
                 // let's be pessimistic about these cases to place Projection above ORDER BY.
                 m_isComplexOrderBy = true;

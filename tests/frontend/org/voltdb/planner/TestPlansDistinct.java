@@ -237,9 +237,6 @@ public class TestPlansDistinct extends PlannerTestCase {
         // test ORDER BY GROUP BY key without in display list
         sql = "select distinct max(B3) FROM T3 group by PKEY, A3 order by A3";
         failToCompile(sql, errorMsg);
-
-        sql = "select max(B3) FROM T3 group by PKEY, A3 order by A3";
-        compileToFragments(sql);
     }
 
     public void testColumnsWithGroupby()
