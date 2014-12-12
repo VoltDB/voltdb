@@ -410,9 +410,6 @@ public class TestDeterminism extends PlannerTestCase {
                 "select    max(a)    from ptree group by z, b order by z   ",
                 ", b", "order by 1");
 
-
-
-
         // Odd edge cases of needlessly long ORDER BY clause
         assertMPPlanDeterminismNeedsOrdering("select z, max(a), max(b) from ptree group by z",
                 "order by z, max(b)", "order by z, 3");

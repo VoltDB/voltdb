@@ -343,7 +343,8 @@ tupleValueFactory(PlannerDomValue obj, ExpressionType et,
             // join inner table
             tableName = " inner";
         }
-        snprintf(message, 100, "tupleValueFactory: invalid column_idx %d for%s table", columnIndex, tableName.c_str());
+        snprintf(message, 100, "tupleValueFactory: invalid column_idx %d for%s table",
+                columnIndex, tableName.c_str());
 
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                 std::string(message));
