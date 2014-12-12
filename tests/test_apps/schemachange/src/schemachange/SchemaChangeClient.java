@@ -24,9 +24,7 @@
 package schemachange;
 
 import java.io.IOException;
-import java.util.HashSet;
 import java.util.Random;
-import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -60,11 +58,7 @@ public class SchemaChangeClient {
     private final AtomicInteger totalConnections = new AtomicInteger(0);
     private final AtomicInteger fatalLevel = new AtomicInteger(0);
 
-    // Current active tables, view and verification proc. Supports dropping before re-creating.
-    Set<String> activeTableNames = new HashSet<String>();
-    TableHelper.ViewRep activeViewRep = null;
-    Class<?> activeVerifyProc = null;
-
+    // Current test state.
     private int schemaVersionNo = 0;
 
     // Percent probability of a test cycle creating a new table.
@@ -376,11 +370,17 @@ public class SchemaChangeClient {
          *
          * Perform a schema change to a mutated version of the current table (80%) or
          * to a new table entirely (20%, drops and adds the new table).
+         *
+         * Returns the ChangeType because a retry that goes backward more than one
+         * version may switch to CREATE to restart from a fresh table.
          */
-        void catalogChange(ChangeType changeType) throws Exception {
+        ChangeType catalogChange(ChangeType reqChangeType) throws Exception {
+
+            // change type may change for retry
+            ChangeType changeType = reqChangeType;
 
             log.info(_F("::::: Catalog Change: %s%s :::::",
-                        changeType.toString(), this.oldSchema == null ? " FIRST" : ""));
+                    changeType.toString(), this.oldSchema == null ? " FIRST" : ""));
 
             // table mutation requires a current schema to mutate
             assert(changeType == ChangeType.CREATE || this.oldSchema != null);
@@ -401,8 +401,9 @@ public class SchemaChangeClient {
                 //=== retry
 
                 // If V<next> is present there is nothing to retry, just finish what we started.
-                // isSchemaVersionObservable() retries internally if the connection is still bad.
-                if (isSchemaVersionObservable(schemaVersionNo+1)) {
+                // findSchemaVersion() retries internally if the connection is still bad.
+                int actualSchemaVersionNo = findSchemaVersion();
+                if (actualSchemaVersionNo == schemaVersionNo + 1) {
                     log.info(_F("The new version table V%d is present, not retrying.", schemaVersionNo+1));
                     break;
                 }
@@ -411,6 +412,19 @@ public class SchemaChangeClient {
                 retryCount++;
                 if (retryCount > config.retryLimit) {
                     this.die("Retry limit (%d) exceeded.", config.retryLimit);
+                }
+
+                // If behind by exactly 1 version then the current changes can be retried.
+                // Recovery from async command logs could put us more than one version behind.
+                if (actualSchemaVersionNo < schemaVersionNo) {
+                    // Behind by more than 1 version.
+                    // Reset the current version number and retry with a fresh create.
+                    // Can't (easily) retry mutations on an arbitrarily old schema version.
+                    schemaVersionNo = actualSchemaVersionNo;
+                    if (changeType != ChangeType.CREATE) {
+                        changeType = ChangeType.CREATE;
+                        this.newSchema = createSchema();
+                    }
                 }
 
                 log.info(_F("::::: Catalog Change (retry #%d): %s :::::", retryCount, changeType.toString()));
@@ -425,6 +439,8 @@ public class SchemaChangeClient {
             }
 
             this.catalogChangeComplete(changeType);
+
+            return changeType;
         }
 
         /**
@@ -444,17 +460,13 @@ public class SchemaChangeClient {
              */
             batch.begin();
             try {
-                batch.add("DROP TABLE %s IF EXISTS", _F("V%d", schemaVersionNo));
-                if (activeViewRep != null) {
-                    batch.add("DROP VIEW %s IF EXISTS", activeViewRep.viewName);
-                }
-                if (activeVerifyProc != null) {
-                    batch.add("DROP PROCEDURE %s IF EXISTS", activeVerifyProc.getName());
-                }
+                batch.add("DROP VIEW MV IF EXISTS");
+                batch.add("DROP PROCEDURE VerifySchemaChangedA IF EXISTS");
+                batch.add("DROP PROCEDURE VerifySchemaChangedB IF EXISTS");
+                // drop all existing tables if creating a new one
                 if (changeType == ChangeType.CREATE) {
-                    if (activeTableNames.contains(this.newSchema.tableName)) {
-                        batch.add("DROP TABLE %s IF EXISTS", this.newSchema.tableName);
-                    }
+                    batch.add("DROP TABLE A IF EXISTS");
+                    batch.add("DROP TABLE B IF EXISTS");
                 }
                 log.info("Starting to drop database objects.");
                 BatchResult result = batch.execute();
@@ -471,6 +483,9 @@ public class SchemaChangeClient {
              */
             batch.begin();
             try {
+                // Drop the version table as part of the create/mutate transaction batch.
+                batch.add("DROP TABLE V%d IF EXISTS", schemaVersionNo);
+
                 // Force failure before executing the batch?
                 // Don't do on the first run (currentSchema!=null).
                 if (this.oldSchema != null && config.retryForcedPercent > rand.nextInt(100)) {
@@ -556,15 +571,6 @@ public class SchemaChangeClient {
 
         private void catalogChangeComplete(ChangeType changeType)
         {
-            if (changeType == ChangeType.CREATE) {
-                if (activeTableNames.contains(this.newSchema.tableName)) {
-                    activeTableNames.remove(this.newSchema.tableName);
-                }
-                activeTableNames.add(this.newSchema.tableName);
-            }
-            activeViewRep = this.newSchema.viewRep;
-            activeVerifyProc = this.newSchema.verifyProc;
-
             // don't actually trust the call... manually verify
             int obsCatVersion = verifyAndGetSchemaVersion();
             // UAC worked
@@ -802,6 +808,20 @@ public class SchemaChangeClient {
         return version;
     }
 
+    /**
+     * Find the current active schema version, e.g. for recovery.
+     */
+    private int findSchemaVersion() {
+        // start with the next schema id and scan backwards
+        int version = schemaVersionNo + 1;
+        for (; version >= 0; --version) {
+            if (isSchemaVersionObservable(version)) {
+                break;
+            }
+        }
+        return version;
+    }
+
     private boolean isSchemaVersionObservable(int schemaid) {
         String query = _F("select count(*) from V%d;", schemaid);
         ClientResponse cr = callROProcedureWithRetry("@AdHoc", query);
@@ -972,25 +992,26 @@ public class SchemaChangeClient {
              *  by the data that remains from previous test cycles. This cycle's data
              *  loading optionally occurs at the end, after creation/mutation.
              */
-            boolean isNewTable = rand.nextInt(100) < percentNewTable;
+            ChangeType changeType = (rand.nextInt(100) < percentNewTable
+                                        ? ChangeType.CREATE
+                                        : (tableHasData
+                                            ? ChangeType.MUTATE_NONEMPTY
+                                            : ChangeType.MUTATE_EMPTY));
+
             boolean addDataToTable = rand.nextInt(100) < percentLoadTable;
 
             // deterministically sample some rows if there's data
             CatalogChangeTestDriver.SampleResults sampleResults = null;
-            if (tableHasData && !isNewTable) {
+            if (tableHasData && changeType != ChangeType.CREATE) {
                 sampleResults = testDriver.sampleRows();
                 //log.info(_F("First sample:\n%s", preT.toFormattedString()));
             }
 
-            // move to an entirely new table or migrated schema
-            ChangeType changeType = (isNewTable ? ChangeType.CREATE
-                                                  : (tableHasData
-                                                      ? ChangeType.MUTATE_NONEMPTY
-                                                      : ChangeType.MUTATE_EMPTY));
-            testDriver.catalogChange(changeType);
+            // perform the changes, retrying as needed
+            changeType = testDriver.catalogChange(changeType);
 
             // there's no more data if a new table was created
-            if (isNewTable) {
+            if (changeType == ChangeType.CREATE) {
                 tableHasData = false;
             }
 
