@@ -20,7 +20,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-package genqa.procedures;
+package genqa2.procedures;
 
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;

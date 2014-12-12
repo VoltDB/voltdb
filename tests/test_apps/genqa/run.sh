@@ -67,7 +67,7 @@ function catalog() {
     $VOLTDB compile --classpath obj -o $APPNAME.jar ddl.sql
     $VOLTDB compile --classpath obj -o $APPNAME2.jar ddl2.sql
     $VOLTDB compile --classpath obj -o $APPNAME3.jar ddl3.sql
-    $VOLTDB compile --classpath obj -o $APPNAME4.jar ddl24.sql
+    $VOLTDB compile --classpath obj -o $APPNAME4.jar ddl4.sql
     # stop if compilation fails
     rm -rf $EXPORTDATA
     mkdir $EXPORTDATA
