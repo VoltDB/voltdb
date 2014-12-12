@@ -808,9 +808,18 @@ ul.adminClusterList li a:hover{color:#000;}
 .downloadConfig { float:left; margin:0 5px 0 0; } 
 .btnDown {cursor: pointer;float: left;background: #D0D2D2;padding: 8px;font-weight: bold;}
 .adminServer { float:left;}
-.serverName {  cursor:pointer; float:left; background:#D0D2D2/*#c70000*/; padding:8px; font-weight:bold; /*color:#FFFFFF;*/ } 
-.setServer {float:left;}
-.adminIcons { background-position:-225px -13px; width:30px; height:28px; }
+.serverName {  /*cursor:pointer; float:left; background:#D0D2D2; padding:8px; font-weight:bold;*/
+			background: none repeat scroll 0 0 #d0d2d2;
+			cursor: pointer;
+			float: left;
+			font-weight:
+			bold;height: 28px;
+			line-height: 28px;
+			padding: 0 0 0 8px;
+
+			} 
+.setServer {/*float:left;*/ float:right;}
+.adminIcons { /*background-position:-225px -13px; width:30px; height:28px;*/ background-position: -225px -14px;height: 28px; width: 30px;}
 .adminContainer { margin:0; padding:20px 0; font-size:13px;}
 .adminContentLeft { float:left; width:49%; background:#FFFFFF; margin:0 2% 0 0 }
 .adminContentRight { float:left;width:49%;}
