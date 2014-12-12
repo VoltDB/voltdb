@@ -1169,13 +1169,6 @@ The License is accompanied by a NOTICE
    =========================================================================
 
 ================================================================================
-GEB, Spock and Selenium WebDriver are not distributed as part of VoltDB;
-however, if you run the automated tests of the VMC (VoltDB Management Center),
-they will be downloaded by Gradle. All of them use the Apache 2.0 license.
-
-See Apache 2.0 license below.
-
-================================================================================
 japex
 /*
 * Japex ver. 0.1 software ("Software")
