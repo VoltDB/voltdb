@@ -1,4 +1,4 @@
-﻿
+
 (function (window) {
 
     var procedures = {};
@@ -40,6 +40,18 @@
             password = lPassword;
             admin = lAdmin;
         };
+
+        // build Authorization header based on scheme you could flip to diff header. Server understands both.
+        this.BuildAuthorization = function(user, isHashedPassword, password) {
+            var authz = null;
+            if (user != null && isHashedPassword != null) {
+                authz = "Hashed " + user + ":" + isHashedPassword;
+            } else if (user != null && password != null) {
+                var up = user + ":" + password;
+                authz = "Basic " + $().crypt({method: "b64enc", source: up});
+            }
+            return authz;
+        }
 
         this.ChangeServerConfiguration = function (serverName, portId, userName, pw, isHashPw, isAdmin) {
             server = serverName != null ? serverName : server;
@@ -497,6 +509,47 @@
 
             }
         };
+
+        this.stopServerNode = function(nodeId,onConnectionAdded) {
+            try {
+                var processName = "SYSTEMINFORMATION_STOPSERVER";
+                var procedureNames = ['@StopNode'];
+                var parameters = [nodeId.toString()];
+                var values=[undefined];
+               
+                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
+                if (_connection == null) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
+                        if (result == true) {
+                            var status = 0;
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function(connection, status) {
+                                status = connection.Metadata['@StopNode_' + nodeId.toString() + '_status'];
+                                if (!(status == "" || status == undefined)) {
+                                    onConnectionAdded(connection, status);
+                                }
+                            
+                                
+                            });
+                        }
+
+                    });
+
+                } else {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
+                        onConnectionAdded(connection, status);
+
+                    });
+
+                }
+
+            } catch (e) {
+                console.log(e.message);
+            }
+
+        };
+
+        //end admin configuration
+
     });
 
     window.VoltDBService = VoltDBService = new iVoltDbService();

@@ -99,15 +99,25 @@ public interface VoltDBInterface
      * Updates the catalog context stored by this VoltDB without destroying the old one,
      * in case anything still links to it.
      *
-     * @param newCatalogBytes The catalog bytes.
      * @param diffCommands The commands to update the current catalog to the new one.
+     * @param newCatalogBytes The catalog bytes.
+     * @param catalogBytesHash  The SHA-1 hash of the catalog bytes
      * @param expectedCatalogVersion The version of the catalog the commands are targeted for.
+     * @param currentTxnId
+     * @param currentTxnTimestamp
      * @param currentTxnId  The transaction ID at which this method is called
+     * @param deploymentBytes  The deployment file bytes
      * @param deploymentHash The SHA-1 hash of the deployment file
      */
-    public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(String diffCommands,
-            byte[] newCatalogBytes, byte[] catalogBytesHash, int expectedCatalogVersion,
-            long currentTxnId, long currentTxnTimestamp, byte[] deploymentHash);
+    public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(
+            String diffCommands,
+            byte[] newCatalogBytes,
+            byte[] catalogBytesHash,
+            int expectedCatalogVersion,
+            long currentTxnId,
+            long currentTxnTimestamp,
+            byte[] deploymentBytes,
+            byte[] deploymentHash);
 
    /**
      * Tells if the VoltDB is running. m_isRunning needs to be set to true

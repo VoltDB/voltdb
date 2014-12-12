@@ -44,6 +44,7 @@ function alertNodeClicked(obj) {
 (function (window) {
 
     var iVoltDbRenderer = (function () {
+        this.hostIds = [];
         this.nodeStatus = new Array();
         this.isProcedureSearch = false;
         this.isTableSearch = false;
@@ -298,7 +299,7 @@ function alertNodeClicked(obj) {
             VoltDBService.GetSystemInformation(function (connection) {
                 populateSystemInformation(connection);
                 getMemoryDetails(connection, systemMemory);
-                
+
                 if (VoltDbAdminConfig.isAdmin) {
                     onAdminPagePortAndOverviewDetailsLoaded(getPortAndOverviewDetails());
                     onAdminPageServerListLoaded(getAdminServerList());
@@ -583,6 +584,7 @@ function alertNodeClicked(obj) {
 
                 if (!updatedSystemOverview.hasOwnProperty(id)) {
                     updatedSystemOverview[id] = {};
+                    voltDbRenderer.hostIds.push(id);
                 }
                 updatedSystemOverview[id][singleData[1]] = singleData[2];
             });
@@ -1737,7 +1739,7 @@ function alertNodeClicked(obj) {
         var getAdminConfigurationItems = function (connection) {
             var adminConfigValues = [];
 
-            if (connection != null && (connection.Metadata['@SystemInformation_DEPLOYMENT'] != null || connection.Metadata['@SystemInformation_DEPLOYMENT'] !=undefined)) {
+            if (connection != null && (connection.Metadata['@SystemInformation_DEPLOYMENT'] != null || connection.Metadata['@SystemInformation_DEPLOYMENT'] != undefined)) {
                 connection.Metadata['@SystemInformation_DEPLOYMENT'].data.forEach(function (columnInfo) {
                     switch (columnInfo[0]) {
                         case 'sitesperhost':
@@ -1824,23 +1826,23 @@ function alertNodeClicked(obj) {
                         case 'voltdbroot':
                             adminConfigValues['voltdbRoot'] = columnInfo[1];
                             break;
-                            
+
                         case 'snapshotpath':
                             adminConfigValues['snapshotPath'] = columnInfo[1];
                             break;
-                            
+
                         case 'exportoverflow':
                             adminConfigValues['exportOverflow'] = columnInfo[1];
                             break;
-                            
+
                         case 'commandlogpath':
                             adminConfigValues['commandLogPath'] = columnInfo[1];
                             break;
-                            
+
                         case 'commandlogsnapshotpath':
                             adminConfigValues['commandLogSnapshotPath'] = columnInfo[1];
                             break;
-
+                            
                         default:
                     }
                 });
@@ -1887,34 +1889,55 @@ function alertNodeClicked(obj) {
 
         var getAdminServerList = function () {
             var htmlServerListHtml = "";
-            
+            //var servercount = 0;
             if (systemOverview != null || systemOverview != undefined) {
                 $.each(systemOverview, function (id, val) {
-                    if ((val['HOSTNAME'] != null || val['HOSTNAME'] != "") && val['CLUSTERSTATE']=='RUNNING') {
+                    if ((val['HOSTNAME'] != null || val['HOSTNAME'] != "") && val['CLUSTERSTATE'] == 'RUNNING') {
                         htmlServerListHtml = htmlServerListHtml.concat("<tr><td class=\"configLabel\" width=\"85%\"><a href=\"#\">" + val['HOSTNAME'] + "</a></td>" +
-                                                  "<td align=\"right\"><a href=\"#stopConfirmationPop\" class=\"shutdown\" id=\"stopConfirmation\">" +
-                                                  "<span class=\"shutdownServer\">Stop</span></a></td></tr>");
-                        
+                                                  "<td align=\"right\"><a href=\"#stopConfirmationPop\" data data-HostId=\"" + id + "\" class=\"shutdown\"  id=\"stopServer" + id + "\">" +
+                                                  "<span class=\"shutdownServer\">Stop</span></a><a href=\"javascript:void(0);\" class=\"startServ disableServer\" id=\"startServer" + id + "\" style=\"display: none;\">" +
+                                                  "<span class=\"startServer\">Start</span></a></td></tr>");
+
                     }
-                    
+
                     else if ((val['HOSTNAME'] != null || val['HOSTNAME'] != "") && val['CLUSTERSTATE'] == 'JOINING') {
                         htmlServerListHtml = htmlServerListHtml.concat("<tr><td class=\"configLabel\" width=\"85%\"><a href=\"#\">" + val['HOSTNAME'] + "</a></td>" +
-                                                 "<td align=\"right\"><a href=\"javascript:void(0);\" class=\"shutdown\" id=\"stopConfirmation\">" +
-                                                 "<span>Stop</span></a></td></tr>");
-                        
+                                                 "<td align=\"right\"><a href=\"javascript:void(0);\" class=\"shutdownDisabled\">" +
+                                                 "<span>Stop</span></a><a href=\"#startConfirmationPop\" class=\"startServ\" id=\"startConfirmation\" style=\"display: none;\">" +
+                                                 "<span class=\"startServer\">Start</span></a></td></tr>");
+
                     }
-                    
+
                     else if ((val['HOSTNAME'] != null || val['HOSTNAME'] != "") && val['CLUSTERSTATE'] == 'MISSING') {
                         htmlServerListHtml = htmlServerListHtml.concat("<tr><td class=\"configLabel\" width=\"85%\"><a href=\"#\">" + val['HOSTNAME'] + "</a></td>" +
-                                                  "<td align=\"right\"><a href=\"#stopConfirmationPop\" class=\"shutdown\" id=\"stopConfirmation\">" +
-                                                  "<span class=\"shutdownServer\">Start</span></a></td></tr>");
-                    }
+                                                  "<td align=\"right\"><a href=\"javascript:void(0);\" class=\"shutdown\">" +
+                                                  "<span class=\"shutdownServer\">Start</span></a><a href=\"#startConfirmationPop\" data-HostId=\""+ id +"\" class=\"startServ\" id=\"startConfirmation\" style=\"display: none;\">" +
+                                                  "<span class=\"startServer\">Start</span></a></td></tr>");
+                    }                    
+                    //servercount++;
                 });
+                
+                //voltDbRenderer.serverNodeCount = servercount;
                 return htmlServerListHtml;
             }
             return "";
         };
 
+        this.stopServer = function(nodeId,onServerStopped) {
+            VoltDBService.stopServerNode(nodeId,function(connection,status) {
+                if (status == 1) {
+                    onServerStopped(true);
+                }
+            });
+        };
+        
+        this.getAdminconfiguration = function (onInformationLoaded) {
+            VoltDBService.GetSystemInformationDeployment(function (connection) {
+                onInformationLoaded(connection);
+            });
+        };
+
+        //end admin configuration
 
         function getTableData(connection, tablesData, viewsData, proceduresData, procedureColumnsData, sysProceduresData, processName) {
             var suffix = "";
@@ -2027,13 +2050,6 @@ function alertNodeClicked(obj) {
             sysProceduresData['sysProcedures'] = connection.Metadata['sysprocs'];
         }
 
-
-        //Admin Tab
-        this.getAdminconfiguration = function (onInformationLoaded) {
-            VoltDBService.GetSystemInformationDeployment(function (connection) {
-                onInformationLoaded(connection);
-            });
-        };
 
         //common methods
         var formatTableNoData = function (listName) {

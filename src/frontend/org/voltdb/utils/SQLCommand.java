@@ -333,7 +333,7 @@ public class SQLCommand
         return queries;
     }
 
-    public static List<String> parseQueryProcedureCallParameters(String query)
+    public static List<String> parseProcedureCallParameters(String query)
     {
         if (query == null) {
             return null;
@@ -353,13 +353,11 @@ public class SQLCommand
         query = AutoSplitParameters.matcher(query).replaceAll(",");
         String[] sqlFragments = query.split("\\s*,+\\s*");
         ArrayList<String> queries = new ArrayList<String>();
-        for(int j = 0;j<sqlFragments.length;j++)
-        {
+        for (int j = 0; j<sqlFragments.length; j++) {
             sqlFragments[j] = sqlFragments[j].trim();
-            if (sqlFragments[j].length() != 0)
-            {
-                if(sqlFragments[j].indexOf("#(SQL_PARSER_STRING_FRAGMENT#") > -1) {
-                    for(int k = 0;k<stringFragments.size();k++) {
+            if (sqlFragments[j].length() != 0) {
+                if (sqlFragments[j].indexOf("#(SQL_PARSER_STRING_FRAGMENT#") > -1) {
+                    for (int k = 0; k<stringFragments.size(); k++) {
                         sqlFragments[j] = sqlFragments[j].replace("#(SQL_PARSER_STRING_FRAGMENT#" + k + ")", stringFragments.get(k));
                     }
                 }
@@ -384,8 +382,7 @@ public class SQLCommand
     private static final Pattern SemicolonToken = Pattern.compile("^.*\\s*;+\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern RecallToken = Pattern.compile("^\\s*recall\\s*([^;]+)\\s*;*\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern FileToken = Pattern.compile("^\\s*file\\s*['\"]*([^;'\"]+)['\"]*\\s*;*\\s*", Pattern.CASE_INSENSITIVE);
-    private static int LineIndex = 1;
-    private static List<String> Lines = new ArrayList<String>();
+    private static List<String> RecallableSessionLines = new ArrayList<String>();
 
     /**
      * The list of recognized basic tab-complete-able SQL command prefixes.
@@ -413,255 +410,314 @@ public class SQLCommand
         "UPDATE",
     };
 
-    public static List<String> getQuery(boolean interactive) throws Exception
+    /// The main loop for interactive mode.
+    public static void interactWithTheUser() throws Exception
+    {
+        List<String> parsedQueries = null;
+        while ((parsedQueries = getInteractiveQueries()) != null) {
+            for (String parsedQuery : parsedQueries) {
+                executeQuery(parsedQuery);
+            }
+        }
+    }
+
+    //TODO: If we can rework the interactive mode unit test framework, we can eliminate this
+    // unit test entry point and inline this code into interactWithTheUser.
+    // This would eliminate an extra layer of looping and needless bouncing
+    // out of and back into getInteractiveQueries for some kinds of input
+    // but not others.
+    public static List<String> getInteractiveQueries() throws Exception
     {
         // Reset the error state to avoid accidentally ignoring future FILE content
         // after a file had runtime errors (ENG-7335).
         m_returningToPromptAfterError = false;
+        //TODO: add to this multiLineStatementBuffer to disable processing of "directives"
+        // while there is a multi-line statement in progress.
+        // For now, for backward compatibility, keep this empty. This undesirably allows the
+        // directives at the start of any line to temporarily interrupt statements in progress.
+        List<String> multiLineStatementBuffer = new ArrayList<>();
+        List<String> parsedQueries = new ArrayList<>();
         StringBuilder query = new StringBuilder();
         boolean isRecall = false;
-        String line = null;
 
-        do
-        {
-            if (interactive)
-            {
-                if (isRecall)
-                {
-                    isRecall = false;
-                    line = lineInputReader.readLine("");
+        boolean executeImmediate = false;
+        while ( ! executeImmediate) {
+            String prompt = isRecall ? "" : ((RecallableSessionLines.size() + 1) + "> ");
+            isRecall = false;
+            String line = lineInputReader.readLine(prompt);
 
-                } else {
-                    line = lineInputReader.readLine((LineIndex++) + "> ");
-                }
-            } else {
-                line = lineInputReader.readLine();
-                //* enable to debug */ if (line == null) {
-                //* enable to debug */     System.err.println("Read null batch line.");
-                //* enable to debug */ }
-                //* enable to debug */ else {
-                //* enable to debug */     System.err.println("Read non-null batch line: (" + line + ")");
-                //* enable to debug */ }
-            }
+            assert(line != null);
 
-            if (line == null)
-            {
-                if (query == null) {
+            // Was there a line-ending semicolon typed at the prompt?
+            // This mostly matters for "non-directive" statements, but, for
+            // now, for backward compatibility, it needs to be noted for FILE
+            // commands prior to their processing.
+            executeImmediate = SemicolonToken.matcher(line).matches();
+
+            // When we are tracking the progress of a multi-line statement,
+            // avoid coincidentally recognizing mid-statement SQL content as sqlcmd
+            // "directives".
+            if (multiLineStatementBuffer.isEmpty()) {
+
+                // EXIT command - exit immediately
+                if (ExitToken.matcher(line).matches()) {
                     return null;
-                } else {
-                    return parseQuery(query.toString());
                 }
-            }
 
-            // Process recall commands - ONLY in interactive mode
-            if (interactive && RecallToken.matcher(line).matches())
-            {
-                    Matcher m = RecallToken.matcher(line);
-                    if (m.find())
-                    {
-                        int recall = -1;
-                        try { recall = Integer.parseInt(m.group(1))-1; } catch(Exception x){}
-                        if (recall > -1 && recall < Lines.size())
-                        {
-                            line = Lines.get(recall);
-                            lineInputReader.putString(line);
-                            lineInputReader.flush();
-                            isRecall = true;
-                            continue;
-                        } else {
-                            System.out.printf("%s> Invalid RECALL reference: '" + m.group(1) + "'.\n", LineIndex-1);
-                        }
+                // RECALL command
+                Matcher recallMatcher = RecallToken.matcher(line);
+                if (recallMatcher.matches()) {
+                    int recall = -1;
+                    try { recall = Integer.parseInt(recallMatcher.group(1))-1; } catch(Exception x){}
+                    if (recall > -1 && recall < RecallableSessionLines.size()) {
+                        line = RecallableSessionLines.get(recall);
+                        lineInputReader.putString(line);
+                        lineInputReader.flush();
+                        isRecall = true;
                     } else {
-                        System.out.printf("%s> Invalid RECALL command: '" + line + "'.\n", LineIndex-1);
+                        System.out.printf("%s> Invalid RECALL reference: '" + recallMatcher.group(1) + "'.\n", RecallableSessionLines.size());
                     }
-            }
+                    executeImmediate = false; // let user edit the recalled line.
+                    continue;
+                }
 
-            // Strip out invalid recall commands
-            if (RecallToken.matcher(line).matches()) {
-                line = "";
-            }
+                // Queue up the line to the recall stack
+                //TODO: In the future, we may not want to have simple directives count as recallable
+                // lines, so this call would move down a ways.
+                RecallableSessionLines.add(line);
 
-            // Queue up the line to the recall stack - ONLY in interactive mode
-            if (interactive) {
-                Lines.add(line);
-            }
+                if (executesAsSimpleDirective(line)) {
+                    executeImmediate = false; // return to prompt.
+                    continue;
+                }
 
-            // EXIT command - ONLY in interactive mode, exit immediately (without running any queued statements)
-            if (ExitToken.matcher(line).matches())
-            {
-                if (interactive) {
-                    return null;
+                // GO commands - signal the end of any pending multi-line statements.
+                //TODO: to be deprecated in favor of just typing a semicolon on its own line to finalize
+                // a multi-line statement.
+                if (GoToken.matcher(line).matches()) {
+                    executeImmediate = true;
+                    line = ";";
                 }
-            }
-            // LIST PROCEDURES command
-            else if (ListProceduresToken.matcher(line).matches())
-            {
-                if (interactive)
-                {
-                    List<String> list = new LinkedList<String>(Procedures.keySet());
-                    Collections.sort(list);
-                    int padding = 0;
-                    for(String procedure : list) {
-                        if (padding < procedure.length()) {
-                            padding = procedure.length();
-                        }
-                    }
-                    padding++;
-                    String format = "%1$-" + padding + "s";
-                    for(int i = 0;i<2;i++)
-                    {
-                        int j = 0;
-                        for(String procedure : list)
-                        {
-                            if (i == 0 && procedure.startsWith("@")) {
-                                continue;
-                            } else if (i == 1 && !procedure.startsWith("@")) {
-                                continue;
-                            }
-                            if (j == 0)
-                            {
-                                if (i == 0) {
-                                    System.out.println("\n--- User Procedures ----------------------------------------");
-                                } else {
-                                    System.out.println("\n--- System Procedures --------------------------------------");
-                                }
-                            }
-                            for (List<String> parameterSet : Procedures.get(procedure).values()) {
-                                System.out.printf(format, procedure);
-                                System.out.print("\t");
-                                int pidx = 0;
-                                for(String paramType : parameterSet)
-                                {
-                                    if (pidx > 0) {
-                                        System.out.print(", ");
-                                    }
-                                    System.out.print(paramType);
-                                    pidx++;
-                                }
-                                System.out.print("\n");
-                            }
-                            j++;
-                        }
-                    }
-                    System.out.print("\n");
-                }
-            }
-            // LIST TABLES command
-            else if (ListTablesToken.matcher(line).matches())
-            {
-                if (interactive)
-                {
-                    Tables tables = getTables();
-                    printTables("User Tables", tables.tables);
-                    printTables("User Views", tables.views);
-                    printTables("User Export Streams", tables.exports);
-                    System.out.print("\n");
-                }
-            }
-            // SHOW CLASSES
-            else if (ListClassesToken.matcher(line).matches()) {
-                if (interactive) {
-                    if (Classlist.isEmpty()) {
-                        System.out.println("\n--- Empty Class List -----------------------\n");
-                    }
-                    List<String> list = new LinkedList<String>(Classlist.keySet());
-                    Collections.sort(list);
-                    int padding = 0;
-                    for(String classname : list) {
-                        if (padding < classname.length()) {
-                            padding = classname.length();
-                        }
-                    }
-                    padding++;
-                    String format = "%1$-" + padding + "s";
-                    for(int i = 0;i<3;i++)
-                    {
-                        int j = 0;
-                        for(String classname : list)
-                        {
-                            List<Boolean> stuff = Classlist.get(classname);
-                            // Print non-active procs first
-                            if (i == 0 && !(stuff.get(0) && !stuff.get(1))) {
-                                continue;
-                            } else if (i == 1 && !(stuff.get(0) && stuff.get(1))) {
-                                continue;
-                            } else if (i == 2 && stuff.get(0)) {
-                                continue;
-                            }
-                            if (j == 0)
-                            {
-                                if (i == 0) {
-                                    System.out.println("\n--- Potential Procedure Classes ----------------------------");
-                                } else if (i == 1) {
-                                    System.out.println("\n--- Active Procedure Classes  ------------------------------");
-                                } else {
-                                    System.out.println("\n--- Non-Procedure Classes ----------------------------------");
-                                }
-                            }
-                            System.out.printf(format, classname);
-                            System.out.print("\n");
-                            j++;
-                        }
-                    }
-                    System.out.print("\n");
-                }
-            }
-            // GO commands - ONLY in interactive mode, close batch and parse for execution
-            else if (GoToken.matcher(line).matches())
-            {
-                if (interactive) {
-                    return parseQuery(query.toString().trim());
-                }
-            }
-            // HELP commands - ONLY in interactive mode, close batch and parse for execution
-            else if (HelpToken.matcher(line).matches())
-            {
-                if (interactive) {
-                    printHelp(System.out); // Print readme to the screen
-                }
-            }
-            else {
-                // Was there a line-ending semicolon typed at the prompt?
-                boolean executeImmediate =
-                        interactive && SemicolonToken.matcher(line).matches();
+
                 // If the line is a FILE command - include the content of the file into the query queue
+                //TODO: executing statements (from files) as they are read rather than queuing them
+                // would improve performance and error handling.
                 Matcher fileMatcher = FileToken.matcher(line);
                 if (fileMatcher.matches()) {
                     // Get the line(s) from the file(s) to queue as regular database commands
-                    // or get back a null if in the recursive call, stopOrContinue decided to continue.
+                    // or get back a null if, in the recursive call, stopOrContinue decided to continue.
                     line = readScriptFile(fileMatcher.group(1));
                     if (m_returningToPromptAfterError) {
                         // readScriptFile stopped because of an error. Wipe the slate clean.
                         query = new StringBuilder();
-                        line = null;
+                        // Until we execute statements as they are read, there will always be a
+                        // chance that errors in queued statements are still waiting to be detected,
+                        // so, this reset is not 100% effective (as discovered in ENG-7335).
                         m_returningToPromptAfterError = false;
+                        executeImmediate = false; // return to prompt.
                         continue;
                     }
                     // else treat the line(s) from the file(s) as regular database commands
                 }
                 // else treat the input line as a regular database command
+            }
+            else {
+                // With a multi-line statement pending, queue up the line continuation to the recall list.
+                //TODO: arguably, it would be more useful to append continuation lines to the last
+                // existing Lines entry to build each complete statement as a single recallable
+                // unit. Experiments indicated that joining the lines with a single space, while not
+                // very pretty for very long statements, behaved best for line editing (cursor synch)
+                // purposes.
+                // The multiLineStatementBuffer MAY become useful here.
+                RecallableSessionLines.add(line);
+            }
 
-                // Collect the lines ...
-                query.append(line);
-                query.append("\n");
+            //TODO: Here's where we might use multiLineStatementBuffer to note a sql statement
+            // in progress -- if the line(s) so far contained anything more than whitespace.
 
-                // ... until there was a line-ending semicolon typed at the prompt.
-                if (executeImmediate) {
-                    return parseQuery(query.toString().trim());
+            // Collect lines ...
+            query.append(line);
+            query.append("\n");
+        }
+        parsedQueries = parseQuery(query.toString());
+        return parsedQueries;
+    }
+
+    /// A stripped down variant of the processing in "interactWithTheUser" suitable for
+    /// applying to a command script. It skips all the interactive-only options.
+    public static void executeNoninteractive() throws Exception
+    {
+        //TODO: increase code reuse between the processing of stdin (piped file) here
+        // and the processing of explicitly opened files in readScriptFile.
+        // Both of these methods should be using more of an execute-as-you-go approach rather than
+        // so much statement queueing.
+        StringBuilder query = new StringBuilder();
+        while (true) {
+            String line = lineInputReader.readLine();
+            if (line == null) {
+                //* enable to debug */     System.err.println("Read null batch line.");
+                List<String> parsedQueries = parseQuery(query.toString());
+                for (String parsedQuery : parsedQueries) {
+                    executeQuery(parsedQuery);
+                }
+                return;
+            }
+            //* enable to debug */ else System.err.println("Read non-null batch line: (" + line + ")");
+
+            // If the line is a FILE command - include the content of the file into the query queue
+            Matcher fileMatcher = FileToken.matcher(line);
+            if (fileMatcher.matches()) {
+                // Get the line(s) from the file(s) to queue as regular database commands,
+                // or get back a null if in the recursive call, stopOrContinue decided to continue.
+                line = readScriptFile(fileMatcher.group(1));
+                if (line == null) {
+                    continue;
                 }
             }
-            line = null;
+            // else treat the input line as a regular database command
+
+            // Collect the lines ...
+            query.append(line);
+            query.append("\n");
         }
-        while(true);
+    }
+
+    /// Simple directives require only the input line and no other context from the input loop.
+    /// Return true if the line is a directive that has been completely handled here, so that the
+    /// input loop can proceed to the next line.
+    //TODO: There have been suggestions that some or all of these directives could be made
+    // available in non-interactive contexts. This function is available to enable that.
+    private static boolean executesAsSimpleDirective(String line) throws Exception {
+        // LIST PROCEDURES command
+        if (ListProceduresToken.matcher(line).matches()) {
+            execListProcedures();
+            return true;
+        }
+        // LIST TABLES command
+        if (ListTablesToken.matcher(line).matches()) {
+            execListTables();
+            return true;
+        }
+        // SHOW CLASSES
+        if (ListClassesToken.matcher(line).matches()) {
+            execListClasses();
+            return true;
+        }
+        // HELP commands - ONLY in interactive mode, close batch and parse for execution
+        if (HelpToken.matcher(line).matches()) {
+            printHelp(System.out); // Print readme to the screen
+            return true;
+        }
+        return false;
+    }
+
+    private static void execListClasses() {
+        //TODO: since sqlcmd makes no intrinsic use of the Classlist, it would be more
+        // efficient to load the Classlist only "on demand" from here and to cache a
+        // complete formatted String result rather than the complex map representation.
+        // This would save churn on startup and on DDL update.
+        if (Classlist.isEmpty()) {
+            System.out.println();
+            System.out.println("--- Empty Class List -----------------------");
+            System.out.println();
+        }
+        List<String> list = new LinkedList<String>(Classlist.keySet());
+        Collections.sort(list);
+        int padding = 0;
+        for (String classname : list) {
+            padding = Math.max(padding, classname.length());
+        }
+        String format = " %1$-" + padding + "s";
+        String categoryHeader[] = new String[] {
+                "--- Potential Procedure Classes ----------------------------",
+                "--- Active Procedure Classes  ------------------------------",
+                "--- Non-Procedure Classes ----------------------------------"};
+        for (int i = 0; i<3; i++) {
+            boolean firstInCategory = true;
+            for (String classname : list) {
+                List<Boolean> stuff = Classlist.get(classname);
+                // Print non-active procs first
+                if (i == 0 && !(stuff.get(0) && !stuff.get(1))) {
+                    continue;
+                } else if (i == 1 && !(stuff.get(0) && stuff.get(1))) {
+                    continue;
+                } else if (i == 2 && stuff.get(0)) {
+                    continue;
+                }
+                if (firstInCategory) {
+                    firstInCategory = false;
+                    System.out.println();
+                    System.out.println(categoryHeader[i]);
+                }
+                System.out.printf(format, classname);
+                System.out.println();
+            }
+        }
+        System.out.println();
+    }
+
+    private static void execListTables() throws Exception {
+        //TODO: since sqlcmd makes no intrinsic use of the tables list, it would be more
+        // efficient to load the list only "on demand" from here and to cache a
+        // complete formatted String result rather than the multiple lists.
+        // This would save churn on startup and on DDL update.
+        Tables tables = getTables();
+        printTables("User Tables", tables.tables);
+        printTables("User Views", tables.views);
+        printTables("User Export Streams", tables.exports);
+        System.out.println();
+    }
+
+    private static void execListProcedures() {
+        List<String> list = new LinkedList<String>(Procedures.keySet());
+        Collections.sort(list);
+        int padding = 0;
+        for (String procedure : list) {
+            if (padding < procedure.length()) {
+                padding = procedure.length();
+            }
+        }
+        padding++;
+        String format = "%1$-" + padding + "s";
+        boolean firstSysProc = true;
+        boolean firstUserProc = true;
+        for (String procedure : list) {
+            //TODO: it would be much easier over all to maintain sysprocs and user procs in
+            // in two separate maps.
+            if (procedure.startsWith("@")) {
+                if (firstSysProc) {
+                    firstSysProc = false;
+                    System.out.println("--- System Procedures --------------------------------------");
+                }
+            }
+            else {
+                if (firstUserProc) {
+                    firstUserProc = false;
+                    System.out.println();
+                    System.out.println("--- User Procedures ----------------------------------------");
+                }
+            }
+            for (List<String> parameterSet : Procedures.get(procedure).values()) {
+                System.out.printf(format, procedure);
+                String sep = "\t";
+                for (String paramType : parameterSet) {
+                    System.out.print(sep + paramType);
+                    sep = ", ";
+                }
+                System.out.println();
+            }
+        }
+        System.out.println();
     }
 
     private static void printTables(final String name, final Collection<String> tables)
     {
-        System.out.printf("\n--- %s --------------------------------------------\n", name);
+        System.out.println();
+        System.out.println("--- " + name + " --------------------------------------------");
         for (String table : tables) {
             System.out.println(table);
         }
-        System.out.print("\n");
+        System.out.println();
     }
 
     public static String readScriptFile(String filePath)
@@ -750,7 +806,7 @@ public class SQLCommand
             Matcher matcher = ExecuteCall.matcher(query);
             if (matcher.find()) {
                 query = matcher.replaceFirst("");
-                List<String> params = parseQueryProcedureCallParameters(query);
+                List<String> params = parseProcedureCallParameters(query);
                 String procedure = params.remove(0);
                 Map<Integer, List<String>> signature = Procedures.get(procedure);
                 if (signature == null) {
@@ -1246,9 +1302,25 @@ public class SQLCommand
         }
     }
 
-    static public void mockVoltDBForTest(Client testVoltDB) { VoltDB = testVoltDB; }
-
-    static public void mockLineReaderForTest(SQLConsoleReader reader) { lineInputReader = reader; }
+    /// Parser unit test entry point
+    ///TODO: it would be simpler if this testing entry point could just set up some mocking
+    /// of io and statement "execution" -- mocking with statement capture instead of actual execution
+    /// to better isolate the parser.
+    /// Then it could call a new simplified version of interactWithTheUser().
+    /// But the current parser tests expect to call a SQLCommand function that can return for
+    /// some progress checking before its input stream has been permanently terminated.
+    /// They would need to be able to check parser progress in one thread while
+    /// SQLCommand.interactWithTheUser() was awaiting further input on another thread
+    /// (or in its own process).
+    public static List<String> getParserTestQueries(InputStream inmocked, OutputStream outmocked)
+    {
+        try {
+            SQLConsoleReader reader = new SQLConsoleReader(inmocked, outmocked);
+            lineInputReader = reader;
+            return getInteractiveQueries();
+        } catch (Exception ioe) {}
+        return null;
+    }
 
     private static InputStream in = null;
     private static OutputStream out = null;
@@ -1417,22 +1489,12 @@ public class SQLCommand
             if (System.in.available() > 0) {
                 // If Standard input comes loaded with data, run in non-interactive mode
                 m_interactive = false;
-                queries = getQuery(false);
-                if (queries != null) {
-                    for (String query : queries) {
-                        executeQuery(query);
-                    }
-                }
+                executeNoninteractive();
             }
             if (m_interactive) {
                 // Print out welcome message
                 System.out.printf("SQL Command :: %s%s:%d\n", (user == "" ? "" : user + "@"), serverList, port);
-
-                while ((queries = getQuery(true)) != null) {
-                    for (String query : queries) {
-                        executeQuery(query);
-                    }
-                }
+                interactWithTheUser();
             }
         }
         catch (Exception x) {

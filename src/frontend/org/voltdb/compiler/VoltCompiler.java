@@ -378,7 +378,12 @@ public class VoltCompiler {
     void addInfo(final String msg, final int lineNo) {
         final Feedback fb = new Feedback(Severity.INFORMATIONAL, msg, m_currentFilename, lineNo);
         m_infos.add(fb);
-        compilerLog.info(fb.getLogString());
+        if (standaloneCompiler) {
+            compilerLog.info(fb.getLogString());
+        }
+        else {
+            compilerLog.debug(fb.getLogString());
+        }
     }
 
     void addWarn(final String msg, final int lineNo) {
@@ -2328,8 +2333,6 @@ public class VoltCompiler {
         if (cl == null) {
             cl = Thread.currentThread().getContextClassLoader();
         }
-
-        Log.info(cl.getClass().getCanonicalName());
 
         // if loading from an InMemoryJarFile, the process is a bit different...
         if (cl instanceof JarLoader) {

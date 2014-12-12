@@ -54,7 +54,7 @@ $(document).ready(function () {
 
         //ServerList Section
         adminServerList: $("#serverListWrapperAdmin > .tblshutdown > tbody")
-
+        
     };
 
     adminEditObjects = {
@@ -260,14 +260,13 @@ $(document).ready(function () {
 
     $('#saveConfirmation').popup();
     $('#restoreConfirmation').popup();
+    
     $('#stopConfirmation').popup({
         open: function (event, ui, ele) {
         },
-        afterOpen: function () {
-
+        afterOpen: function (event) {
             $("#StoptConfirmOK").unbind("click");
-            $("#StoptConfirmOK").on("click", function () {
-
+            $("#StoptConfirmOK").on("click", function () {                
                 $("#stopConfirmation").hide();
                 $("#startConfirmation").show();
 
@@ -277,7 +276,7 @@ $(document).ready(function () {
         }
     });
 
-
+   
     $('#startConfirmation').popup({
         open: function (event, ui, ele) {
         },
@@ -526,12 +525,13 @@ $(document).ready(function () {
 
     // Hides opened serverlist
     $(document).on('click', function (e) {
-        if (!$(event.target).hasClass('adminIcons') && !$(event.target).hasClass('serverName')) {
-            if ($(e.target).closest("#serverConfigAdmin").length === 0) {
-                $("#serverConfigAdmin").hide();
-            }
-        }
-    });
+       if (!$(e.target).hasClass('adminIcons') && !$(e.target).hasClass('serverName')) {
+           if ($(e.target).closest("#serverConfigAdmin").length === 0) {
+               $("#serverConfigAdmin").hide();
+           }
+       }
+   });
+
 
 
 
@@ -552,7 +552,8 @@ $(document).ready(function () {
     var iVoltDbAdminConfig = (function () {
 
         this.isAdmin = true;
-
+        this.registeredElements = [];
+        this.idleServers = [];
         this.displayAdminConfiguration = function (adminConfigValues) {
             if (adminConfigValues != undefined) {
                 configureAdminValues(adminConfigValues);
@@ -566,8 +567,8 @@ $(document).ready(function () {
             }
         };
 
-        this.refreshServerList = function (serverList) {
-            adminDOMObjects.adminServerList.html(serverList);
+        this.refreshServerList = function (serverList,serverCount) {
+           adminDOMObjects.adminServerList.html(serverList);
         };
 
         var configureAdminValues = function (adminConfigValues) {
@@ -633,86 +634,7 @@ $(document).ready(function () {
             adminDOMObjects.commandLogPath.text(directoryConfigValues.commandLogPath);
             adminDOMObjects.commandLogSnapshotPath.text(directoryConfigValues.commandLogSnapshotPath);
         };
-
-
-        var mapNodeInformationByStatus = function () {
-            var counter = 0;
-            var htmlMarkups = { "ServerInformation": [] };
-            var htmlMarkup;
-            var currentServerHtml = "";
-
-            jQuery.each(systemOverview, function (id, val) {
-                var hostName;
-                hostName = val["HOSTNAME"];
-
-                if (counter == 0) {
-                    /*************************************************************************
-                    //CLUSTERSTATE implies if server is running or joining
-                    **************************************************************************/
-                    if (hostName != null && currentServer == hostName && val["CLUSTERSTATE"] == "RUNNING") {
-                        if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
-                            htmlMarkup = "<li class=\"active monitoring\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\"  href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
-
-                        } else {
-                            htmlMarkup = "<li class=\"active monitoring\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
-                        }
-                    } else if (hostName != null && currentServer != hostName && val["CLUSTERSTATE"] == "RUNNING") {
-                        if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
-                            htmlMarkup = "<li class=\"active\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span><span class=\"hostIdHidden\" style=\"display:none\">" + systemMemory[hostName]["HOST_ID"] + "</span></li>";
-                        } else {
-                            htmlMarkup = "<li class=\"active\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
-                        }
-
-                    } else if (hostName != null && val["CLUSTERSTATE"] == "JOINING") {
-                        if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
-                            htmlMarkup = htmlMarkup + "<li class=\"joining\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span><span class=\"hostIdHidden\" style=\"display:none\">" + systemMemory[hostName]["HOST_ID"] + "</span></li>";
-
-                        } else {
-                            htmlMarkup = htmlMarkup + "<li class=\"joining\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
-                        }
-                    }
-
-
-                } else {
-                    /********************************************************************************************
-                    "currentServerHtml" is validated to verify if current server to be monitored is already set
-                    *********************************************************************************************/
-                    if (hostName != null && currentServerHtml != "" && currentServerHtml == hostName && val["CLUSTERSTATE"] == "RUNNING") {
-                        if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
-                            htmlMarkup = htmlMarkup + "<li class=\"active monitoring\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
-
-                        } else {
-                            htmlMarkup = htmlMarkup + "<li class=\"active monitoring\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\"class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
-                        }
-                    }
-
-                    if (hostName != null && currentServerHtml != hostName && val["CLUSTERSTATE"] == "RUNNING") {
-                        if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
-                            htmlMarkup = htmlMarkup + "<li class=\"active\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
-
-                        } else {
-                            htmlMarkup = htmlMarkup + "<li class=\"active\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
-                        }
-
-                    }
-
-                    if (hostName != null && val["CLUSTERSTATE"] == "JOINING") {
-                        if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
-                            htmlMarkup = htmlMarkup + "<li class=\"joining\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
-
-                        } else {
-                            htmlMarkup = htmlMarkup + "<li class=\"joining\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
-                        }
-
-                    }
-                }
-                counter++;
-            });
-            htmlMarkups.ServerInformation.push({ "ServersList": htmlMarkup });
-            htmlMarkups.ServerInformation.push({ "CurrentServer": currentServerHtml });
-            callback(htmlMarkups);
-        };
-
+        
     });
     window.VoltDbAdminConfig = VoltDbAdminConfig = new iVoltDbAdminConfig();
 
