@@ -2071,31 +2071,6 @@ public class VoltCompiler {
         String tableName = drNode.getKey();
         String action = drNode.getValue();
 
-        if (tableName.equalsIgnoreCase("*")) {
-            // star wildcard support
-            StringBuilder replicatedWarning = null;
-            for (Table table : db.getTables()) {
-                if (action.equalsIgnoreCase("DISABLE")) {
-                    table.setIsdred(false);
-                } else if (!table.getIsreplicated()) {
-                    table.setIsdred(true);
-                } else if (!DISABLE_DR_WARNING) {
-                    if (replicatedWarning == null) {
-                        replicatedWarning = new StringBuilder(
-                                "DR is not supported for replicated tables, which are present in the catalog. " +
-                                "The following tables will not be included when replicating the database: ");
-                        replicatedWarning.append(table.getTypeName());
-                    } else {
-                        replicatedWarning.append(", ").append(table.getTypeName());
-                    }
-                }
-            }
-            if (replicatedWarning != null) {
-                compilerLog.warn(replicatedWarning.toString());
-            }
-            return;
-        }
-
         org.voltdb.catalog.Table tableref = db.getTables().getIgnoreCase(tableName);
         if (tableref == null) {
             throw new VoltCompilerException("While configuring dr, table " + tableName + " was not present in the catalog");
