@@ -311,7 +311,15 @@ function alertNodeClicked(obj) {
 
             });
         };
-
+        
+        this.GetAdminDeploymentInformation = function (onInformationLoaded) {
+            if (VoltDbAdminConfig.isAdmin) {
+                
+                VoltDBService.GetShortApiDeployment(function (connection) {
+                    onInformationLoaded(loadAdminDeploymentInformation(connection));
+                });
+            }
+        };
 
         this.GetProceduresInfoNAdminConfiguration = function (onProceduresDataLoaded, onAdminConfigLoaded) {
             var procedureMetadata = "";
@@ -490,6 +498,81 @@ function alertNodeClicked(obj) {
                 });
             }
 
+        };
+
+
+        var loadAdminDeploymentInformation = function(connection) {
+
+            var adminConfigValues = {};
+            if (connection != null && connection.Metadata['SHORTAPI_DEPLOYMENT'] != null) {
+                var data = connection.Metadata['SHORTAPI_DEPLOYMENT'];
+                //var data = { "cluster": { "hostcount": 3, "sitesperhost": 8, "kfactor": 1, "elastic": "enabled", "schema": "CATALOG" }, "paths": { "voltdbroot": { "path": "/var/opt/test/voltdb/83886092" }, "snapshots": { "path": "snapshots" }, "exportoverflow": { "path": "export_overflow" }, "commandlog": { "path": "command_log" }, "commandlogsnapshot": { "path": "command_log_snapshot" } }, "partitionDetection": { "snapshot": { "prefix": "voltdb_partition_detection" }, "enabled": true }, "adminMode": { "port": 21211, "adminstartup": true }, "heartbeat": { "timeout": 90 }, "httpd": { "jsonapi": { "enabled": true }, "port": 8080, "enabled": true }, "replication": null, "snapshot": null, "export": null, "users": { "user": [{ "name": "admin", "roles": "administrator", "plaintext": true }, { "name": "user", "roles": "user", "plaintext": true }] }, "commandlog": { "frequency": { "time": 200, "transactions": 2147483647 }, "synchronous": false, "enabled": true, "logsize": 2048 }, "systemsettings": { "temptables": { "maxsize": 100 }, "snapshot": { "priority": 6 }, "elastic": null, "query": null }, "security": { "enabled": true, "provider": "HASH" } };
+                //data = { "cluster": { "hostcount": 3, "sitesperhost": 8, "kfactor": 1, "elastic": "enabled", "schema": "CATALOG" }, "paths": { "voltdbroot": { "path": "/var/opt/test/voltdb/83886092" }, "snapshots": { "path": "snapshots" }, "exportoverflow": { "path": "export_overflow" }, "commandlog": { "path": "command_log" }, "commandlogsnapshot": { "path": "command_log_snapshot" } }, "partitionDetection": { "snapshot": { "prefix": "voltdb_partition_detection" }, "enabled": true }, "adminMode": { "port": 21211, "adminstartup": true }, "heartbeat": { "timeout": 90 }, "httpd": { "jsonapi": { "enabled": true }, "port": 8080, "enabled": true }, "replication": null, "snapshot": { "frequency": "86400s", "retain": 3, "prefix": "VEMAUTO", "enabled": true }, "export": { "configuration": { "property": [{ "value": "false", "name": "batched" }, { "value": "HEX", "name": "binaryencoding" }, { "value": "exportout-data", "name": "nonce" }, { "value": ".", "name": "outdir" }, { "value": "60", "name": "period" }, { "value": "true", "name": "skipinternals" }, { "value": "CSV", "name": "type" }, { "value": "false", "name": "with-schema" }] }, "enabled": true, "target": "FILE", "exportconnectorclass": "" }, "users": { "user": [{ "name": "admin", "roles": "administrator", "plaintext": true }, { "name": "user", "roles": "user", "plaintext": true }] }, "commandlog": { "frequency": { "time": 200, "transactions": 2147483647 }, "synchronous": false, "enabled": true, "logsize": 2048 }, "systemsettings": { "temptables": { "maxsize": 100 }, "snapshot": { "priority": 6 }, "elastic": null, "query": null }, "security": { "enabled": true, "provider": "HASH" } };
+
+                adminConfigValues['sitesperhost'] = data.cluster.sitesperhost;
+                adminConfigValues['kSafety'] = data.cluster.kfactor;
+                
+                adminConfigValues['partitionDetection'] = data.partitionDetection.enabled;
+                adminConfigValues['securityEnabled'] = data.security.enabled;
+                
+                //HTTP Access
+                if (data.httpd != null) {
+                    adminConfigValues['httpEnabled'] = data.httpd.enabled;
+                    adminConfigValues['jsonEnabled'] = data.httpd.jsonapi.enabled;
+                }
+
+                //Auto Snapshot
+                if (data.snapshot != null) {
+                    adminConfigValues['snapshotEnabled'] = data.snapshot.enabled;
+                    adminConfigValues['frequency'] = data.snapshot.frequency;
+                    adminConfigValues['retained'] = data.snapshot.retain;
+                }
+
+                //Command Logging
+                if (data.commandlog != null) {
+                    adminConfigValues['commandLogEnabled'] = data.commandlog.enabled;
+                    adminConfigValues['commandLogFrequencyTime'] = data.commandlog.frequency.time;
+                    adminConfigValues['commandLogFrequencyTransactions'] = data.commandlog.frequency.transactions;
+                    adminConfigValues['logSegmentSize'] = data.commandlog.logsize;
+                }
+
+                if (data.export != null) {
+                    adminConfigValues['export'] = data.export.enabled;
+                    adminConfigValues['targets'] = data.export.target;
+                    adminConfigValues['properties'] = data.export.configuration.property;
+                }
+
+                //Advanced
+                if (data.heartbeat != null) {
+                    adminConfigValues['heartBeatTimeout'] = data.heartbeat.timeout;
+                }
+
+                if (data.systemsettings != null) {
+                    adminConfigValues['tempTablesMaxSize'] = data.systemsettings.temptables.maxsize;
+                    adminConfigValues['snapshotPriority'] = data.systemsettings.snapshot.priority;
+                }
+
+                //Directory
+                if (data.paths != null) {
+                    
+                    if (data.paths.voltdbroot != null)
+                        adminConfigValues['voltdbRoot'] = data.paths.voltdbroot.path;
+                    
+                    if (data.paths.snapshots != null)
+                        adminConfigValues['snapshotPath'] = data.paths.snapshots.path;
+                    
+                    if (data.paths.exportoverflow != null)
+                        adminConfigValues['exportOverflow'] = data.paths.exportoverflow.path;
+                    
+                    if (data.paths.commandlog != null)
+                        adminConfigValues['commandLogPath'] = data.paths.commandlog.path;
+
+                    if (data.paths.commandlogsnapshot != null)
+                        adminConfigValues['commandLogSnapshotPath'] = data.paths.commandlogsnapshot.path;
+                }
+            }
+
+            return adminConfigValues;
         };
 
         var populateSystemInformation = function (connection) {

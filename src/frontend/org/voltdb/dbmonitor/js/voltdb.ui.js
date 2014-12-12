@@ -400,7 +400,11 @@ var loadPage = function (serverName, portid) {
         };
 
         voltDbRenderer.GetSystemInformation(loadClusterHealth, loadAdminTabPortAndOverviewDetails, loadAdminServerList);
-
+        
+        //Load Admin configurations
+        voltDbRenderer.GetAdminDeploymentInformation(function (adminConfigValues) {
+            VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues);
+        });
     };
 
     var refreshGraphAndData = function (graphView, currentTab) {
@@ -470,7 +474,7 @@ var loadPage = function (serverName, portid) {
         };
 
         var loadAdminConfigurations = function (adminConfigValues) {
-            VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues);
+            //VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues);
         };
 
         voltDbRenderer.GetProceduresInfoNAdminConfiguration(loadProcedureInformations, loadAdminConfigurations);
