@@ -32,10 +32,14 @@ import org.voltdb.VoltProcedure;
 )
 public class JiggleExportDoneTable extends VoltProcedure {
     public final SQLStmt export = new SQLStmt("INSERT INTO export_done_table (txnid) VALUES (?)");
+    public final SQLStmt exportFoo = new SQLStmt("INSERT INTO export_done_table_foo (txnid) VALUES (?)");
 
-    public long run(long txid)
+    public long run(long txid, boolean exportGroups)
     {
         voltQueueSQL(export, txid);
+        if (exportGroups) {
+            voltQueueSQL(exportFoo, txid);
+        }
 
         // Execute last statement batch
         voltExecuteSQL(true);
