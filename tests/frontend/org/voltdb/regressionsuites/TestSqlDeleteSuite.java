@@ -255,52 +255,83 @@ public class TestSqlDeleteSuite extends RegressionSuite {
             return;
         }
 
-        // These queries can all be inferred single-partition for P1.
         Client client = getClient();
-        String[] stmtTemplates = {
-                "DELETE FROM %s WHERE ID = %d ORDER BY NUM ASC LIMIT 1",
-                "DELETE FROM %s WHERE ID = %d AND DESC LIKE 'de%%' ORDER BY NUM DESC LIMIT 2",
-                "DELETE FROM %s WHERE NUM = ID and ID = %d ORDER BY NUM LIMIT 3"
-                };
-        // Table starts with 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
-        long[][] expectedResults = {
-                new long[] {1, 2},
-                new long[] {10},
-                new long[] {}
-                //new long[] {4, 5, 6, 7}
-                };
-        long[] expectedCountStar = {
-                29,
-                27,
-                24
-                };
-
         VoltTable vt;
         for (String table : Arrays.asList("P3", "R3")) {
             insertMoreRows(client, table, 10, 3);
-            for (int i = 0; i < stmtTemplates.length; ++i) {
-                long key = i * 10;
+            // table now contains rows like this
+            // ID  NUM  [other columns omitted]
+            // 0   0
+            // 0   1
+            // 0   2
+            // 10  10
+            // 10  11
+            // 10  12
+            // ...
+            // 90  90
+            // 90  91
+            // 90  92
 
-                vt = client.callProcedure("@AdHoc", "select * from " + table).getResults()[0];
-                System.out.println(vt);
+            String stmt = "DELETE FROM " + table + " WHERE ID = 0 ORDER BY NUM ASC LIMIT 1";
+            vt = client.callProcedure("@AdHoc", stmt).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {1});
 
-                String stmt = String.format(stmtTemplates[i], table, key);
-                int len = stmt.length();
-                long expectedModCount = Long.valueOf(stmt.substring(len - 1, len));
-                vt = client.callProcedure("@AdHoc", stmt).getResults()[0];
-                validateTableOfScalarLongs(vt, new long[] {expectedModCount});
+            // verify the rows that are left are what we expect
+            vt = client.callProcedure("@AdHoc",
+                    "select num from " + table + " where id = 0 order by num asc").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {1, 2});
 
-                // verify the rows that are left are what we expect
-                vt = client.callProcedure("@AdHoc",
-                        "select num from " + table + " where id = " + key + " order by num asc" ).getResults()[0];
-                validateTableOfScalarLongs(vt, expectedResults[i]);
+            // Total row count-- make sure we didn't delete any other rows
+            vt = client.callProcedure("@AdHoc", "select count(*) from " + table).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {29});
 
-                // Total row count
-                vt = client.callProcedure("@AdHoc",
-                        "select count(*) from " + table ).getResults()[0];
-                validateTableOfScalarLongs(vt, new long[] {expectedCountStar[i]});
+            /// ---------------------------------------------------------------------------------
+            // Delete rows where num is 12, 11
+            stmt = "DELETE FROM " + table +
+                    " WHERE DESC LIKE 'de%' AND ID = 10 ORDER BY NUM DESC LIMIT 2";
+            vt = client.callProcedure("@AdHoc", stmt).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {2});
 
-            }
+            // verify the rows that are left are what we expect
+            vt = client.callProcedure("@AdHoc",
+                    "select num from " + table + " where id = 10 order by num asc" ).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {10});
+
+            // Total row count-- make sure we didn't delete any other rows
+            vt = client.callProcedure("@AdHoc", "select count(*) from " + table ).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {27});
+
+            /// ---------------------------------------------------------------------------------
+            // Delete rows where num is 22
+            stmt = "DELETE FROM " + table +
+                    " WHERE ID = 20 ORDER BY NUM LIMIT 10 OFFSET 2";
+            vt = client.callProcedure("@AdHoc", stmt).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {1});
+
+            // verify the rows that are left are what we expect
+            vt = client.callProcedure("@AdHoc",
+                    "select num from " + table + " where id = 20 order by num asc" ).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {20, 21});
+
+            // Total row count-- make sure we didn't delete any other rows
+            vt = client.callProcedure("@AdHoc", "select count(*) from " + table ).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {26});
+
+            /// ---------------------------------------------------------------------------------
+            // Delete rows where num is 31
+            stmt = "DELETE FROM " + table +
+                    " WHERE ID = 30 ORDER BY NUM LIMIT 1 OFFSET 1";
+            vt = client.callProcedure("@AdHoc", stmt).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {1});
+
+            // verify the rows that are left are what we expect
+            vt = client.callProcedure("@AdHoc",
+                    "select num from " + table + " where id = 30 order by num asc" ).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {30, 32});
+
+            // Total row count-- make sure we didn't delete any other rows
+            vt = client.callProcedure("@AdHoc", "select count(*) from " + table ).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {25});
         }
     }
 
@@ -330,6 +361,10 @@ public class TestSqlDeleteSuite extends RegressionSuite {
 
         verifyStmtFails(client, "DELETE FROM P1_VIEW ORDER BY ID ASC LIMIT 1",
                 "INSERT, UPDATE, or DELETE not permitted for view");
+
+        // Check failure for partitioned table where where clause cannot infer partitioning
+        verifyStmtFails(client, "DELETE FROM P1 WHERE ID < 50 ORDER BY NUM DESC LIMIT 1",
+                "Only single-partition DELETE statements may contain ORDER BY with LIMIT and/or OFFSET clauses");
     }
 
     //

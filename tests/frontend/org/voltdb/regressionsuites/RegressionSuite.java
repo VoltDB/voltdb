@@ -315,7 +315,7 @@ public class RegressionSuite extends TestCase {
 
     public void validateTableOfScalarLongs(VoltTable vt, long[] expected) {
         assertNotNull(expected);
-        assertEquals(expected.length, vt.getRowCount());
+        assertEquals("Different number of rows! ", expected.length, vt.getRowCount());
         int len = expected.length;
         for (int i=0; i < len; i++) {
             validateRowOfLongs(vt, new long[] {expected[i]});
