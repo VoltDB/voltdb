@@ -1124,7 +1124,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     deploymentFile.delete();
                 }
                 FileOutputStream fileOutputStream = new FileOutputStream(deploymentFile);
-                fileOutputStream.write(m_catalogContext.deploymentBytes);
+                fileOutputStream.write(m_catalogContext.getDeploymentBytes());
                 fileOutputStream.close();
             } catch (Exception e) {
                 hostLog.error("Failed to log deployment file: " + e.getMessage());
@@ -2052,11 +2052,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         expectedCatalogVersion + " does not match actual version: " + m_catalogContext.catalogVersion);
             }
 
-            hostLog.info(String.format("Globally updating the current application catalog (new hash %s).",
-                    Encoder.hexEncode(catalogBytesHash).substring(0, 10)));
+            hostLog.info(String.format("Globally updating the current application catalog and deployment " +
+                        "(new hashes %s, %s).",
+                    Encoder.hexEncode(catalogBytesHash).substring(0, 10),
+                    Encoder.hexEncode(deploymentHash).substring(0, 10)));
 
             // get old debugging info
             SortedMap<String, String> oldDbgMap = m_catalogContext.getDebuggingInfoFromCatalog();
+            byte[] oldDeployHash = m_catalogContext.deploymentHash;
 
             // 0. A new catalog! Update the global context and the context tracker
             m_catalogContext =
@@ -2133,8 +2136,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             new ConfigLogging().logCatalogAndDeployment();
 
-            // log system setting information
-            logSystemSettingFromCatalogContext();
+            // log system setting information if the deployment config has changed
+            if (!Arrays.equals(oldDeployHash, m_catalogContext.deploymentHash)) {
+                logSystemSettingFromCatalogContext();
+            }
 
             return Pair.of(m_catalogContext, csp);
         }

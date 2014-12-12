@@ -160,7 +160,8 @@ public class VoltDB {
         /** running the enterprise version? */
         public final boolean m_isEnterprise = org.voltdb.utils.MiscUtils.isPro();
 
-        public int m_deadHostTimeoutMS = 90 * 1000;
+        public int m_deadHostTimeoutMS =
+            org.voltcore.common.Constants.DEFAULT_HEARTBEAT_TIMEOUT_SECONDS * 1000;
 
         /** start up action */
         public StartAction m_startAction = null;

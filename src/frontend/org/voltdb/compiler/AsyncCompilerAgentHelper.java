@@ -156,7 +156,7 @@ public class AsyncCompilerAgentHelper
             // Retrieve the original deployment string, if necessary
             if (deploymentString == null) {
                 // Go get the deployment string from the current catalog context
-                byte[] deploymentBytes = context.deploymentBytes;
+                byte[] deploymentBytes = context.getDeploymentBytes();
                 if (deploymentBytes != null) {
                     deploymentString = new String(deploymentBytes, "UTF-8");
                 }
@@ -222,15 +222,17 @@ public class AsyncCompilerAgentHelper
             // adhoc DDL to it.
             String oldDDL = new String(jarfile.get(VoltCompiler.AUTOGEN_DDL_FILE_NAME),
                     Constants.UTF8ENCODING);
-            compilerLog.debug("OLD DDL: " + oldDDL);
             StringBuilder sb = new StringBuilder();
+            compilerLog.trace("OLD DDL: " + oldDDL);
             sb.append(oldDDL);
             sb.append("\n");
+            compilerLog.info("Applying the following DDL to cluster:");
             for (String stmt : adhocDDLStmts) {
+                compilerLog.info("\t" + stmt);
                 sb.append(stmt);
                 sb.append(";\n");
             }
-            compilerLog.debug("Adhoc-modified DDL:\n" + sb.toString());
+            compilerLog.trace("Adhoc-modified DDL:\n" + sb.toString());
             // Put the new DDL back into the InMemoryJarfile we built because that's
             // the artifact the compiler is expecting to work on.  This allows us to preserve any
             // stored procedure classes and the class loader that came with the catalog
@@ -292,6 +294,7 @@ public class AsyncCompilerAgentHelper
             }
         }
         if (deletedClasses || foundClasses) {
+            compilerLog.info("Updating java classes available to stored procedures");
             VoltCompiler compiler = new VoltCompiler();
             compiler.compileInMemoryJarfile(jarfile);
         }
