@@ -263,7 +263,7 @@ CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportSinglePartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportMultiPartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.WaitSinglePartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.WaitMultiPartition;
-CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportDoneTable;
+CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportGroupDoneTable;
 
 PARTITION PROCEDURE JiggleSkinnyExportSinglePartition
   ON TABLE export_skinny_partitioned_table COLUMN rowid;

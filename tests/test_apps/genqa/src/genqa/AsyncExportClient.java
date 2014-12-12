@@ -341,8 +341,7 @@ public class AsyncExportClient
                                                   new AsyncCallback(writer, currentRowId),
                                                   config.procedure,
                                                   currentRowId,
-                                                  0,
-                                                  config.exportGroups);
+                                                  0);
                 }
                 catch (Exception e) {
                     e.printStackTrace();
@@ -371,7 +370,12 @@ public class AsyncExportClient
             waitForStreamedAllocatedMemoryZero(clientRef.get());
             System.out.println("Writing export count as: " + TrackingResults.get(0));
             //Write to export table to get count to be expected on other side.
-            clientRef.get().callProcedure("JiggleExportDoneTable", TrackingResults.get(0), config.exportGroups);
+            if (config.exportGroups) {
+                clientRef.get().callProcedure("JiggleExportGroupDoneTable", TrackingResults.get(0));
+            }
+            else {
+                clientRef.get().callProcedure("JiggleExportDoneTable", TrackingResults.get(0));
+            }
             writer.close(true);
 
             // Now print application results:
