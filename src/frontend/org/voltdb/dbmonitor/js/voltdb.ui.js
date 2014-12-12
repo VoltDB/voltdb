@@ -518,7 +518,7 @@ var loadPage = function (serverName, portid) {
         };
 
         var loadAdminConfigurations = function (adminConfigValues) {
-            //VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues);
+            VoltDbAdminConfig.displayAdminConfigurationFromSystemInfo(adminConfigValues);
         };
 
         voltDbRenderer.GetProceduresInfoNAdminConfiguration(loadProcedureInformations, loadAdminConfigurations);
