@@ -130,30 +130,39 @@ public class SynchronizedStatesManager {
      *    Each proposal in the BARRIER_RESULTS node has a version number that is used
      *    by other members to distinguish a new proposal from a proposal it has already
      *    processed.
-     * 5. When a member detects a transition in the BARRIER_PARTICIPANTS node
-     *    count from 0 to 1 or more, it adds an ephemeral node for itself under
+     * 5. When a member detects a transition in the BARRIER_PARTICIPANTS node and a new
+     *    version of the BARRIER_RESULTS node, it adds an ephemeral node for itself under
      *    BARRIER_PARTICIPANTS and copies the old and proposed state from the BARRIER_RESULTS
      *    node.
-     * 6. Each Host evaluates the proposed state and inserts a SUCCESS or FAILURE indication
+     * 6. Each member evaluates the proposed state and inserts a SUCCESS or FAILURE indication
      *    in a persistent unique node under the BARRIER_RESULTS path.
-     * 7. When the set of BARRIER_RESULTS nodes is a superset of all members currently in the
+     * 7. A member may also request that an action be performed by all fully participating
+     *    members (including itself) by assigning the existing state and a task proposal
+     *    in the BARRIER_RESULTS node with a new version id and then adding a node under the
+     *    BARRIER_PARTICIPANTS directory.
+     * 8. All members detecting the task request perform the task specified in the task
+     *    proposal and inserting a result node under the BARRIER_RESULTS directory.
+     * 9. When the set of BARRIER_RESULTS nodes is a superset of all members currently in the
      *    state machine, all members are considered to have reported in and each member can
-     *    independently determine the outcome. If all BARRIER_RESULTS nodes report SUCCESS
-     *    each member applies the new state and then removes itself from BARRIER_PARTICIPANTS.
-     * 8. Membership in the state machine can change as members join or fail. Membership is
+     *    independently determine the outcome. If the proposal was a state change request,
+     *    and all BARRIER_RESULTS nodes report SUCCESS each member applies the new state
+     *    and then removes itself from BARRIER_PARTICIPANTS. If the proposal was a task
+     *    request, then members remove themselves from BARRIER_PARTICIPANTS to acknowledge
+     *    receipt of all task results.
+     *10. Membership in the state machine can change as members join or fail. Membership is
      *    monitored by the SynchronizedStatesManager and changes are reported to each state
      *    machine instance. While members have joined but have not determined the current
-     *    state because they have not gotten the lock node, they report SUCCESS for each
-     *    state change proposal made by other members.
-     * 9. If any node under BARRIER_RESULTS reports failure, the new state is not applied by
-     *    any member.
-     *10. Each member that has processed BARRIER_RESULTS removes its ephemeral node from the
-     *    below the BARRIER_PARTICIPANTS node.
-     *11. If the initiator of a state change releases the lock node when 7 is satisfied.
-     *12. A member is not told they have the lock node until the last member releases the
+     *    state, they report a NULL result for each state change or task proposal made by
+     *    other members.
+     *11. If any member reports FAILURE node under the BARRIER_RESULTS directory after a
+     *    state change request proposal, the new state is not applied by any member.
+     *12. Each member that has processed BARRIER_RESULTS removes its ephemeral node from the
+     *    BARRIER_PARTICIPANTS directory node.
+     *13. The initiator of a state change or task releases the lock node when 9 is satisfied.
+     *14. A member is not told they have the lock node until the last member releases the
      *    lock node AND all ephemeral nodes under the BARRIER_PARTICIPANTS node are gone,
-     *    indicating that all members waiting on the outcome of the last state change have
-     *    processed the previous outcome
+     *    indicating that all members waiting on the outcome of the last state change or
+     *    task results have processed the previous outcome
      */
 
     public abstract class StateMachineInstance {
@@ -427,17 +436,11 @@ public class SynchronizedStatesManager {
 
         private void checkForBarrierParticipantsChange() {
             assert(isLocalStateLocked());
-//            if (m_pendingProposal != null) {
-//                System.out.println(m_stateMachineId + ": ParticipantMonitor canceled");
-//                // Since there is a proposal in progress, disable the participant monitor until a result is available
-//                assert(m_currentParticipants != 0);
-//                unlockLocalState();
-//                return;
-//            }
             try {
                 Set<String> children = ImmutableSet.copyOf(m_zk.getChildren(m_barrierParticipantsPath, m_barrierParticipantsWatcher));
                 Stat nodeStat = new Stat();
                 // inspect the m_barrierResultsPath and get the new and old states and version
+                // At some point this can be optimized to not examine the proposal all the time
                 byte statePair[] = m_zk.getData(m_barrierResultsPath, false, nodeStat);
                 int proposalVersion = nodeStat.getVersion();
                 System.out.println(m_stateMachineId + ": Waking up partipantMonitor (lastVer "+ m_lastProposalVersion + ") from " + proposalVersion + "/" + m_currentParticipants + " with: " + children.toString());
