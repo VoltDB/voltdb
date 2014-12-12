@@ -50,79 +50,86 @@ import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestSqlCmdErrorHandling extends TestCase {
 
-    private final String m_lastError = "ThisIsObviouslyNotAnAdHocSQLCommand;\n";
+    private static final String m_lastError = "ThisIsObviouslyNotAnAdHocSQLCommand;\n";
 
-    private ServerThread m_server;
-    private Client m_client;
-
+    private static ServerThread m_server;
+    private static Client m_client;
+/*
     @Override
     public void setUp() throws Exception
+    */
+    static
     {
-        String[] mytype = new String[] { "integer", "varbinary", "decimal", "float" };
-        String simpleSchema =
-                "create table intkv (" +
-                "  key integer, " +
-                "  myinteger integer default 0, " +
-                "  myvarbinary varbinary default 'ff', " +
-                "  mydecimal decimal default 10.10, " +
-                "  myfloat float default 9.9, " +
-                "  PRIMARY KEY(key) );" +
-                "\n" +
-                "";
+        try {
+            String[] mytype = new String[] { "integer", "varbinary", "decimal", "float" };
+            String simpleSchema =
+                    "create table intkv (" +
+                    "  key integer, " +
+                    "  myinteger integer default 0, " +
+                    "  myvarbinary varbinary default 'ff', " +
+                    "  mydecimal decimal default 10.10, " +
+                    "  myfloat float default 9.9, " +
+                    "  PRIMARY KEY(key) );" +
+                    "\n" +
+                    "";
 
-        // Define procs that to complain when sqlcmd passes them garbage parameters.
-        for (String type : mytype) {
-            simpleSchema += "create procedure myfussy_" + type + "_proc as" +
-                    " insert into intkv (key, my" + type + ") values (?, ?);" +
-                    "\n";
-        }
+            // Define procs that to complain when sqlcmd passes them garbage parameters.
+            for (String type : mytype) {
+                simpleSchema += "create procedure myfussy_" + type + "_proc as" +
+                        " insert into intkv (key, my" + type + ") values (?, ?);" +
+                        "\n";
+            }
 
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(simpleSchema);
-        builder.setUseDDLSchema(false);
-        String catalogPath = Configuration.getPathToCatalogForTest("sqlcmderror.jar");
-        assertTrue(builder.compile(catalogPath, 1, 1, 0));
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addLiteralSchema(simpleSchema);
+            builder.setUseDDLSchema(false);
+            String catalogPath = Configuration.getPathToCatalogForTest("sqlcmderror.jar");
+            assertTrue(builder.compile(catalogPath, 1, 1, 0));
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = catalogPath;
-        config.m_pathToDeployment = builder.getPathToDeployment();
-        m_server = new ServerThread(config);
-        m_server.start();
-        m_server.waitForInitialization();
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = catalogPath;
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            m_server = new ServerThread(config);
+            m_server.start();
+            m_server.waitForInitialization();
 
-        m_client = ClientFactory.createClient();
-        m_client.createConnection("localhost");
+            m_client = ClientFactory.createClient();
+            m_client.createConnection("localhost");
 
-        assertEquals("sqlcmd dry run failed -- maybe some sqlcmd component (the voltdb jar file?) needs to be rebuilt.",
-                0, callSQLcmd(true, ";\n"));
-
-        assertEquals("sqlcmd --stop-on-error=false dry run failed.",
-                0, callSQLcmd(false, ";\n"));
-
-        // Execute the constrained write to end all constrained writes.
-        // This poisons all future executions of the badWriteCommand() query.
-        ClientResponse response = m_client.callProcedure("@AdHoc", badWriteCommand());
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        VoltTable[] results = response.getResults();
-        assertEquals(1, results.length);
-        VoltTable result = results[0];
-        assertEquals(1, result.asScalarLong());
-
-        // Assert that the procs don't complain when fed good parameters.
-        // Keep these dry run key values out of range of the test cases.
-        // Also make sure they have an even number of digits so they can be used as hex byte values.
-        int goodValue = 1000;
-        for (String type : mytype) {
-            response = m_client.callProcedure("myfussy_" + type + "_proc", goodValue, "" + goodValue);
-            ++goodValue; // keeping keys unique
+            // Execute the constrained write to end all constrained writes.
+            // This poisons all future executions of the badWriteCommand() query.
+            ClientResponse response = m_client.callProcedure("@AdHoc", badWriteCommand());
             assertEquals(ClientResponse.SUCCESS, response.getStatus());
-            results = response.getResults();
+            VoltTable[] results = response.getResults();
             assertEquals(1, results.length);
-            result = results[0];
+            VoltTable result = results[0];
             assertEquals(1, result.asScalarLong());
+
+            assertEquals("sqlcmd dry run failed -- maybe some sqlcmd component (the voltdb jar file?) needs to be rebuilt.",
+                    0, callSQLcmd(true, ";\n"));
+
+            assertEquals("sqlcmd --stop-on-error=false dry run failed.",
+                    0, callSQLcmd(false, ";\n"));
+
+            // Assert that the procs don't complain when fed good parameters.
+            // Keep these dry run key values out of range of the test cases.
+            // Also make sure they have an even number of digits so they can be used as hex byte values.
+            int goodValue = 1000;
+            for (String type : mytype) {
+                response = m_client.callProcedure("myfussy_" + type + "_proc", goodValue, "" + goodValue);
+                ++goodValue; // keeping keys unique
+                assertEquals(ClientResponse.SUCCESS, response.getStatus());
+                results = response.getResults();
+                assertEquals(1, results.length);
+                result = results[0];
+                assertEquals(1, result.asScalarLong());
+            }
+        } catch (Exception e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
         }
     }
-
+/*
     @Override
     public void tearDown() throws InterruptedException
     {
@@ -130,13 +137,13 @@ public class TestSqlCmdErrorHandling extends TestCase {
         m_server.shutdown();
         m_server.join();
     }
-
+*/
     public String writeCommand(int id)
     {
         return "insert into intkv (key, myinteger) values(" + id + ", " + id + ");\n";
     }
 
-    public String badWriteCommand()
+    private static String badWriteCommand()
     {
         return "insert into intkv (key, myinteger) values(0, 0);\n";
     }
@@ -176,7 +183,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
         return 1 == result.asScalarLong();
     }
 
-    private int callSQLcmd(boolean stopOnError, String inputText) throws Exception {
+    static private int callSQLcmd(boolean stopOnError, String inputText) throws Exception {
         final String commandPath = "bin/sqlcmd";
         final long timeout = 60000; // 60,000 millis -- give up after 1 minute of trying.
 
@@ -243,11 +250,13 @@ public class TestSqlCmdErrorHandling extends TestCase {
 
     public void test10Error() throws Exception
     {
+        System.out.println("Starting test10Error");
         assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(false, m_lastError));
     }
 
     public void test20ErrorThenWrite() throws Exception
     {
+        System.out.println("Starting test20ErrorThenWrite");
         int id = 20;
         assertFalse("pre-condition violated", checkIfWritten(id));
         String inputText = m_lastError + writeCommand(id);
@@ -257,6 +266,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
 
     public void test30ErrorThenWriteThenError() throws Exception
     {
+        System.out.println("Starting test30ErrorThenWriteThenError");
         int id = 30;
         assertFalse("pre-condition violated", checkIfWritten(id));
         String inputText = m_lastError + writeCommand(id) + m_lastError;
@@ -266,12 +276,14 @@ public class TestSqlCmdErrorHandling extends TestCase {
 
     public void test40BadWrite() throws Exception
     {
+        System.out.println("Starting test40BadWrite");
         String inputText = badWriteCommand();
         assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(false, inputText));
     }
 
     public void test50BadWriteThenWrite() throws Exception
     {
+        System.out.println("Starting test50BadWriteThenWrite");
         int id = 50;
         assertFalse("pre-condition violated", checkIfWritten(id));
         String inputText = badWriteCommand() + writeCommand(id);
@@ -281,6 +293,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
 
     public void test60BadFileThenWrite() throws Exception
     {
+        System.out.println("Starting test60BadFileThenWrite");
         int id = 60;
         assertFalse("pre-condition violated", checkIfWritten(id));
         String inputText = badFileCommand() + writeCommand(id);
@@ -290,6 +303,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
 
     public void test70BadNestedFileWithWriteThenWrite() throws Exception
     {
+        System.out.println("Starting test70BadNestedFileWithWriteThenWrite");
         int id = 80;
         assertFalse("pre-condition violated", checkIfWritten(id));
         assertFalse("pre-condition violated", checkIfWritten( -id));
@@ -303,11 +317,13 @@ public class TestSqlCmdErrorHandling extends TestCase {
 
     public void test11Error() throws Exception
     {
+        System.out.println("Starting test11Error");
         assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(true, m_lastError));
     }
 
     public void test21ErrorThenStopBeforeWrite() throws Exception
     {
+        System.out.println("Starting test21ErrorThenStopBeforeWrite");
         int id = 21;
         assertFalse("pre-condition violated", checkIfWritten(id));
         String inputText = m_lastError + writeCommand(id);
@@ -317,6 +333,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
 
     public void test31ErrorThenStopBeforeWriteOrError() throws Exception
     {
+        System.out.println("Starting test31ErrorThenStopBeforeWriteOrError");
         int id = 31;
         assertFalse("pre-condition violated", checkIfWritten(id));
         String inputText = m_lastError + writeCommand(id) + m_lastError;
@@ -326,12 +343,14 @@ public class TestSqlCmdErrorHandling extends TestCase {
 
     public void test41BadWrite() throws Exception
     {
+        System.out.println("Starting test41BadWrite");
         String inputText = badWriteCommand();
         assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(true, inputText));
     }
 
     public void test51BadWriteThenStopBeforeWrite() throws Exception
     {
+        System.out.println("Starting test51BadWriteThenStopBeforeWrite");
         int id = 51;
         assertFalse("pre-condition violated", checkIfWritten(id));
         String inputText = badWriteCommand() + writeCommand(id);
@@ -341,6 +360,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
 
     public void test61BadFileStoppedBeforeWrite() throws Exception
     {
+        System.out.println("Starting test61BadFileStoppedBeforeWrite");
         int id = 61;
         assertFalse("pre-condition violated", checkIfWritten(id));
         String inputText = badFileCommand() + writeCommand(id);
@@ -350,6 +370,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
 
     public void test71BadNestedFileStoppedBeforeWrites() throws Exception
     {
+        System.out.println("Starting test71BadNestedFileStoppedBeforeWrites");
         int id = 81;
         assertFalse("pre-condition violated", checkIfWritten(id));
         assertFalse("pre-condition violated", checkIfWritten( -id));
@@ -371,6 +392,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
     // we will at least know it is time to "release note" the change.
     public void test101BadExecsThenStopBeforeWrite() throws Exception
     {
+        System.out.println("Starting test101BadExecsThenStopBeforeWrite");
         int id = 101;
         subtestBadExec("integer", id++, "garbage");
         subtestBadExec("integer", id++, "1 and still garbage");
@@ -392,6 +414,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
 
     public void test125ExecWithNulls() throws Exception
     {
+        System.out.println("Starting test125ExecWithNulls");
         int id = 125;
         String[] types = new String[] {"integer", "varbinary", "decimal", "float"};
         for (String type : types) {
