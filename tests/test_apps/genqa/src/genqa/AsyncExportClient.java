@@ -277,8 +277,8 @@ public class AsyncExportClient
                 .add("ratelimit", "rate_limit", "Rate limit to start from (number of transactions per second).", 100000)
                 .add("autotune", "auto_tune", "Flag indicating whether the benchmark should self-tune the transaction rate for a target execution latency (true|false).", "true")
                 .add("latencytarget", "latency_target", "Execution latency to target to tune transaction rate (in milliseconds).", 10)
-                .add("catalogswap", "Swap catalogs from the client", "true")
-                .add("exportgroups", "Multiple export connections", "false")
+                .add("catalogswap", "catlog_swap", "Swap catalogs from the client", "true")
+                .add("exportgroups", "export_groups", "Multiple export connections", "false")
                 .setArguments(args)
             ;
 
