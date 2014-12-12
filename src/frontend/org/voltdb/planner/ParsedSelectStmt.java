@@ -59,62 +59,6 @@ import org.voltdb.types.JoinType;
 
 public class ParsedSelectStmt extends AbstractParsedStmt {
 
-    public static class ParsedColInfo implements Cloneable{
-        public String alias = null;
-        public String columnName = null;
-        public String tableName = null;
-        public String tableAlias = null;
-        public AbstractExpression expression = null;
-        public int index = 0;
-
-        //
-        // used by in m_displayColumns
-        //
-        public boolean orderBy = false;
-        public boolean ascending = true;
-        public boolean groupBy = false;
-
-        // used by in m_groupbyColumns
-        public boolean groupByInDisplay = false;
-
-        @Override
-        public boolean equals (Object obj) {
-            if (obj == null) return false;
-            if (obj instanceof ParsedColInfo == false) return false;
-            ParsedColInfo col = (ParsedColInfo) obj;
-            if ( columnName != null && columnName.equals(col.columnName) &&
-                    tableName != null && tableName.equals(col.tableName) &&
-                    tableAlias != null && tableAlias.equals(col.tableAlias) &&
-                    expression != null && expression.equals(col.expression) )
-                return true;
-            return false;
-        }
-
-        // Based on implementation on equals().
-        @Override
-        public int hashCode() {
-            int result = new HashCodeBuilder(17, 31).
-                    append(columnName).append(tableName).append(tableAlias).
-                    toHashCode();
-            if (expression != null) {
-                result += expression.hashCode();
-            }
-            return result;
-        }
-
-        @Override
-        public ParsedColInfo clone() {
-            ParsedColInfo col = null;
-            try {
-                col = (ParsedColInfo) super.clone();
-            } catch (CloneNotSupportedException e) {
-                e.printStackTrace();
-            }
-            col.expression = (AbstractExpression) expression.clone();
-            return col;
-        }
-    }
-
     public ArrayList<ParsedColInfo> m_displayColumns = new ArrayList<ParsedColInfo>();
     public ArrayList<ParsedColInfo> m_orderColumns = new ArrayList<ParsedColInfo>();
     public AbstractExpression m_having = null;
@@ -809,61 +753,28 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
     }
 
-    private void parseOrderColumn(VoltXMLElement orderByNode, boolean isDistributed) {
-        // make sure everything is kosher
-        assert(orderByNode.name.equalsIgnoreCase("orderby"));
+    private void parseOrderColumn(VoltXMLElement orderByNode, final boolean isDistributed) {
 
-        // get desc/asc
-        String desc = orderByNode.attributes.get("desc");
-        boolean descending = (desc != null) && (desc.equalsIgnoreCase("true"));
-
-        // get the columnref or other expression inside the orderby node
-        VoltXMLElement child = orderByNode.children.get(0);
-        assert(child != null);
-
-        // create the orderby column
-        ParsedColInfo order_col = new ParsedColInfo();
-        order_col.orderBy = true;
-        order_col.ascending = !descending;
+        // Aggregation list needs to be cleared before parsing the order by expression
         m_aggregationList.clear();
-        AbstractExpression order_exp = parseExpressionTree(child);
-        assert(order_exp != null);
-        if (isDistributed) {
-            order_exp = order_exp.replaceAVG();
-            updateAvgExpressions();
-        }
-        order_col.expression = order_exp;
-        ExpressionUtil.finalizeValueTypes(order_col.expression);
 
-        // Cases:
-        // child could be columnref, in which case it's just a normal column.
-        // Just make a ParsedColInfo object for it and the planner will do the right thing later
-        if (child.name.equals("columnref")) {
-            assert(order_exp instanceof TupleValueExpression);
-            TupleValueExpression tve = (TupleValueExpression) order_exp;
-            order_col.columnName = tve.getColumnName();
-            order_col.tableName = tve.getTableName();
-            order_col.tableAlias = tve.getTableAlias();
-            if (order_col.tableAlias == null) {
-                order_col.tableAlias = order_col.tableName;
+        ParsedColInfo.ExpressionAdjuster adjuster = new ParsedColInfo.ExpressionAdjuster() {
+            @Override
+            public AbstractExpression adjust(AbstractExpression expr) {
+                if (isDistributed) {
+                    expr = expr.replaceAVG();
+                    updateAvgExpressions();
+                }
+
+                ExpressionUtil.finalizeValueTypes(expr);
+                return expr;
             }
+        };
 
-            order_col.alias = tve.getColumnAlias();
-        } else {
-            String alias = child.attributes.get("alias");
-            order_col.alias = alias;
-            order_col.tableName = "VOLT_TEMP_TABLE";
-            order_col.tableAlias = "VOLT_TEMP_TABLE";
-            order_col.columnName = "";
-            // Replace its expression to TVE after we build the ExpressionIndexMap
+        ParsedColInfo order_col = ParsedColInfo.fromOrderByXml(this, orderByNode, adjuster);
 
-            if ((child.name.equals("operation") == false) &&
-                    (child.name.equals("aggregation") == false) &&
-                    (child.name.equals("function") == false)) {
-               throw new RuntimeException("ORDER BY parsed with strange child node type: " + child.name);
-           }
-        }
-
+        AbstractExpression order_exp = order_col.expression;
+        assert(order_exp != null);
         // Mark the order by column if it is in displayColumns
         // The ORDER BY column MAY be identical to a simple display column, in which case,
         // tagging the actual display column as being also an order by column
@@ -1641,7 +1552,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     private boolean orderByColumnsDetermineAllDisplayColumns(ArrayList<AbstractExpression> nonOrdered)
     {
-        ArrayList<ParsedColInfo> candidateColumns = new ArrayList<ParsedSelectStmt.ParsedColInfo>();
+        ArrayList<ParsedColInfo> candidateColumns = new ArrayList<ParsedColInfo>();
         for (ParsedColInfo displayCol : m_displayColumns) {
             if (displayCol.orderBy) {
                 continue;

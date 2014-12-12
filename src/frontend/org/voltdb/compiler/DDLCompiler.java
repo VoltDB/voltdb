@@ -70,7 +70,7 @@ import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.groovy.GroovyCodeBlockCompiler;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.ParsedSelectStmt;
-import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
+import org.voltdb.planner.ParsedColInfo;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.ConstraintType;
@@ -2132,7 +2132,7 @@ public class DDLCompiler {
             } else {
                 // add the group by columns from the src table
                 for (int i = 0; i < stmt.m_groupByColumns.size(); i++) {
-                    ParsedSelectStmt.ParsedColInfo gbcol = stmt.m_groupByColumns.get(i);
+                    ParsedColInfo gbcol = stmt.m_groupByColumns.get(i);
                     Column srcCol = srcColumnArray.get(gbcol.index);
                     ColumnRef cref = matviewinfo.getGroupbycols().add(srcCol.getTypeName());
                     // groupByColumns is iterating in order of groups. Store that grouping order
@@ -2145,7 +2145,7 @@ public class DDLCompiler {
 
                 // parse out the group by columns into the dest table
                 for (int i = 0; i < stmt.m_groupByColumns.size(); i++) {
-                    ParsedSelectStmt.ParsedColInfo col = stmt.m_displayColumns.get(i);
+                    ParsedColInfo col = stmt.m_displayColumns.get(i);
                     Column destColumn = destColumnArray.get(i);
                     processMaterializedViewColumn(matviewinfo, srcTable, destColumn,
                             ExpressionType.VALUE_TUPLE, (TupleValueExpression)col.expression);
@@ -2153,7 +2153,7 @@ public class DDLCompiler {
             }
 
             // Set up COUNT(*) column
-            ParsedSelectStmt.ParsedColInfo countCol = stmt.m_displayColumns.get(stmt.m_groupByColumns.size());
+            ParsedColInfo countCol = stmt.m_displayColumns.get(stmt.m_groupByColumns.size());
             assert(countCol.expression.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR);
             assert(countCol.expression.getLeft() == null);
             processMaterializedViewColumn(matviewinfo, srcTable,
@@ -2181,7 +2181,7 @@ public class DDLCompiler {
             boolean hasMinOrMaxAgg = false;
             ArrayList<AbstractExpression> minMaxAggs = new ArrayList<AbstractExpression>();
             for (int i = stmt.m_groupByColumns.size() + 1; i < stmt.m_displayColumns.size(); i++) {
-                ParsedSelectStmt.ParsedColInfo col = stmt.m_displayColumns.get(i);
+                ParsedColInfo col = stmt.m_displayColumns.get(i);
                 AbstractExpression aggExpr = col.expression.getLeft();
                 if (aggExpr.getExpressionType() != ExpressionType.VALUE_TUPLE) {
                     hasAggregationExprs = true;
@@ -2225,7 +2225,7 @@ public class DDLCompiler {
 
             // parse out the aggregation columns into the dest table
             for (int i = stmt.m_groupByColumns.size() + 1; i < stmt.m_displayColumns.size(); i++) {
-                ParsedSelectStmt.ParsedColInfo col = stmt.m_displayColumns.get(i);
+                ParsedColInfo col = stmt.m_displayColumns.get(i);
                 Column destColumn = destColumnArray.get(i);
 
                 AbstractExpression colExpr = col.expression.getLeft();
@@ -2363,8 +2363,8 @@ public class DDLCompiler {
 
         int i;
         for (i = 0; i < groupColCount; i++) {
-            ParsedSelectStmt.ParsedColInfo gbcol = stmt.m_groupByColumns.get(i);
-            ParsedSelectStmt.ParsedColInfo outcol = stmt.m_displayColumns.get(i);
+            ParsedColInfo gbcol = stmt.m_groupByColumns.get(i);
+            ParsedColInfo outcol = stmt.m_displayColumns.get(i);
 
             if (!outcol.expression.equals(gbcol.expression)) {
                 msg += "must exactly match the GROUP BY clause at index " + String.valueOf(i) + " of SELECT list.";
@@ -2380,7 +2380,7 @@ public class DDLCompiler {
         }
 
         for (i++; i < displayColCount; i++) {
-            ParsedSelectStmt.ParsedColInfo outcol = stmt.m_displayColumns.get(i);
+            ParsedColInfo outcol = stmt.m_displayColumns.get(i);
             if ((outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_COUNT) &&
                     (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_SUM) &&
                     (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_MIN) &&
