@@ -840,6 +840,7 @@ ul.adminClusterList li a:hover{color:#000;}
 .tblshutdown tr td.configLabel a { font-weight:bold;}
 .adminTbl1 tr.hasSubLabel td.configLabel{ padding-left:15px; font-weight:bold;}
 .adminTbl1 tr.subLabelRow td.configLabel{padding-left:40px; font-weight:normal;}
+.adminTbl1 tr.subLabelRow td.configLabe2{padding-left:60px; font-weight:normal;}
 .adminTbl1 td .edit {top:9px;}
 .hasSubLabel{} 
 .labelCollapsed{ background-position:-352px -11px; padding-left:22px;}
