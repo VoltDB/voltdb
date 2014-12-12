@@ -129,7 +129,12 @@
                 var params = this.BuildParamSet(procedure, parameters, shortApiCallDetails);
                 if (typeof (params) == 'string') {
                     if (VoltDBCore.isServerConnected) {
-                        var ah = VoltDBService.BuildAuthorization(this.user, this.isHashedPassword, this.password);
+                        var ah = null;
+                        if (this.authorization != null) {
+                            ah = this.authorization;
+                        } else {
+                            VoltDBService.BuildAuthorization(this.user, this.isHashedPassword, this.password);
+                        }
                         jQuery.getJSON(uri, params, callback, ah);
                     }
                 } else if (callback != null)
@@ -150,7 +155,12 @@
                 var params = this.BuildParamSet(procedure, parameters, shortApiCallDetails);
                 if (typeof (params) == 'string') {
                     if (VoltDBCore.isServerConnected) {
-                        var ah = VoltDBService.BuildAuthorization(this.user, this.isHashedPassword, this.password);
+                        var ah = null;
+                        if (this.authorization != null) {
+                            ah = this.authorization;
+                        } else {
+                            VoltDBService.BuildAuthorization(this.user, this.isHashedPassword, this.password);
+                        }
                         jQuery.postJSON(uri, params, callback, ah);
                     }
                 } else if (callback != null)
