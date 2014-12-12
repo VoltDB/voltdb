@@ -39,8 +39,14 @@ public class Insert extends VoltProcedure {
     public final SQLStmt i_p2 = new SQLStmt
     ("INSERT INTO P2 VALUES (?, ?, ?, ?);");
 
+    public final SQLStmt i_p3 = new SQLStmt
+    ("INSERT INTO P3 VALUES (?, ?, ?, ?);");
+
     public final SQLStmt i_r2 = new SQLStmt
       ("INSERT INTO R2 VALUES (?, ?, ?, ?);");
+
+    public final SQLStmt i_r3 = new SQLStmt
+            ("INSERT INTO R3 VALUES (?, ?, ?, ?);");
 
     public VoltTable[] run(String tablename, long id, String desc, long num,
                     double ratio)
@@ -60,6 +66,18 @@ public class Insert extends VoltProcedure {
         else if (tablename.equals("R2"))
         {
             voltQueueSQL(i_r2, (int)id, desc, (int)num, ratio);
+        }
+        else if (tablename.equals("P3"))
+        {
+            voltQueueSQL(i_p3, (int)id, desc, (int)num, ratio);
+        }
+        else if (tablename.equals("R3"))
+        {
+            voltQueueSQL(i_r3, (int)id, desc, (int)num, ratio);
+        }
+        else
+        {
+            assert(false);
         }
 
 

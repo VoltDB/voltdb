@@ -902,9 +902,12 @@ public class PlanAssembler {
             return getNextDeletePlan();
         }
 
+        boolean isSinglePartitionPlan = m_partitioning.wasSpecifiedAsSingle() || m_partitioning.isInferredSingle();
+
         // generate the delete node with the right target table
         DeletePlanNode deleteNode = new DeletePlanNode();
         deleteNode.setTargetTableName(targetTable.getTypeName());
+
 
         assert(subSelectRoot instanceof AbstractScanPlanNode);
 
@@ -913,14 +916,21 @@ public class PlanAssembler {
         // Assume all index scans have filters in this context, so only consider seq scans.
         if (deleteIsTruncate(m_parsedDelete, subSelectRoot)) {
             deleteNode.setTruncate(true);
-
-            if (m_partitioning.wasSpecifiedAsSingle()) {
-                return deleteNode;
-            }
         } else {
+
+            // User may have specified an ORDER BY ... LIMIT clause
+            if (m_parsedDelete.orderByColumns().size() > 0
+                    && !isSinglePartitionPlan
+                    && !targetTable.getIsreplicated()) {
+                throw new PlanningErrorException("Only single-partition DELETE statements "
+                        + "may contain ORDER BY with LIMIT and/or OFFSET clauses.");
+            }
+
             boolean needsOrderByNode = isOrderByNodeRequired(m_parsedDelete, subSelectRoot);
             // Somewhere (after partitioning has been inferred), fail if this is a MP plan
             // on a partitioned table.
+
+
 
             ProjectionPlanNode projectionNode = new ProjectionPlanNode();
             AbstractExpression addressExpr = new TupleAddressExpression();
@@ -965,7 +975,7 @@ public class PlanAssembler {
             //subSelectRoot.addInlinePlanNode(projectionNode);
         }
 
-        if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.isInferredSingle()) {
+        if (isSinglePartitionPlan) {
             return deleteNode;
         }
 

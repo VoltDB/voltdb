@@ -1057,14 +1057,24 @@ public class ParserDML extends ParserDQL {
         return cs;
     }
 
+    /************************* Volt DB Extensions *************************/
+
+    /**
+     * This is a Volt extension to allow
+     *   DELETE FROM tab ORDER BY c LIMIT 1
+     * Adds a SortAndSlice object to the statement if the next tokens
+     * are ORDER BY, LIMIT or OFFSET.
+     * Also does some guarding against nonsense constructs (e.g.,
+     * limit with no ORDER BY would be non-deterministic).
+     * @param deleteStmt
+     */
     private void voltAppendDeleteSortAndSlice(StatementDML deleteStmt) {
         SortAndSlice sas = XreadOrderByExpression();
         if (sas == null || sas == SortAndSlice.noSort)
             return;
 
-        // XXX Throw an error if target table is a view
-
-        // Resolve columns in the ORDER BY clause
+        // Resolve columns in the ORDER BY clause.  This code modified
+        // from how compileDelete resolves columns in its WHERE clause
         for (int i = 0; i < sas.exprList.size(); ++i) {
             Expression e = (Expression)sas.exprList.get(i);
             HsqlList unresolved =
@@ -1077,8 +1087,9 @@ public class ParserDML extends ParserDQL {
             e.resolveTypes(session, null);
         }
 
+
         deleteStmt.setSortAndSlice(sas);
     }
-
+    /**********************************************************************/
 
 }

@@ -1298,6 +1298,24 @@ public class StatementDML extends StatementDMQL {
             return;
         }
 
+        // Is target a view?
+        if (targetTable.getBaseTable() != targetTable) {
+            // This check is unreachable, but if writable views are ever supported there
+            // will be some more work to do to resolve columns in ORDER BY properly.
+            throw new HSQLParseException("DELETE with ORDER BY, LIMIT or OFFSET is currently unsupported on views.");
+        }
+
+        if (m_sortAndSlice.hasLimit() && !m_sortAndSlice.hasOrder()) {
+            throw new HSQLParseException("DELETE statement with LIMIT or OFFSET but no ORDER BY would produce "
+                    + "non-deterministic results.  Please use an ORDER BY clause.");
+        }
+        else if (m_sortAndSlice.hasOrder() && !m_sortAndSlice.hasLimit()) {
+            // This is harmless, but the order by is meaningless in this case.  Should
+            // we let this slide?
+            throw new HSQLParseException("DELETE statement with ORDER BY but no LIMIT or OFFSET is not allowed.  "
+                    + "Consider removing the ORDER BY clause, as it has no effect here.");
+        }
+
         List<VoltXMLElement> newElements = voltGetLimitOffsetXMLFromSortAndSlice(session, m_sortAndSlice);
 
         // Ideally this code could be shared with code that translate ORDER BY to XML for SELECT as well,

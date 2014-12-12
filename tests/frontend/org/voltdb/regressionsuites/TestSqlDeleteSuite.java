@@ -23,14 +23,9 @@
 
 package org.voltdb.regressionsuites;
 
-import java.io.IOException;
-import java.util.List;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
-import org.voltdb.client.NoConnectionsException;
-import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
 
@@ -237,10 +232,104 @@ public class TestSqlDeleteSuite extends RegressionSuite {
             validateTableOfScalarLongs(vt, new long[] {expectedRows});
 
             vt = client.callProcedure("@AdHoc", "SELECT NUM FROM R1 ORDER BY NUM ASC").getResults()[0];
-            System.out.println(replStmt);
-            System.out.println(vt);
             validateTableOfScalarLongs(vt, expectedResults[i]);
+
+            // In the partitioned case, we expect to get an error
+            String partStmt = String.format(stmtTemplates[i], "P1");
+            verifyStmtFails(client, partStmt, "Only single-partition DELETE statements "
+                    + "may contain ORDER BY with LIMIT and/or OFFSET clauses.");
         }
+    }
+
+    private static void insertMoreRows(Client client, String tableName, int tens, int ones)
+            throws Exception {
+        for (int i = 0; i < tens; ++i) {
+            for (int j = 0; j < ones; ++j) {
+                client.callProcedure("Insert", tableName, i * 10, "desc", i * 10 + j, 14.5);
+            }
+        }
+    }
+
+    public void testDeleteWithWhereAndOrderBy() throws Exception {
+        if (isHSQL()) {
+            return;
+        }
+
+        // These queries can all be inferred single-partition for P1.
+        Client client = getClient();
+        String[] stmtTemplates = {
+                "DELETE FROM %s WHERE ID = %d ORDER BY NUM ASC LIMIT 1",
+                "DELETE FROM %s WHERE ID = %d AND DESC LIKE 'de%%' ORDER BY NUM DESC LIMIT 2",
+                "DELETE FROM %s WHERE NUM = ID and ID = %d ORDER BY NUM LIMIT 3"
+                };
+        // Table starts with 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
+        long[][] expectedResults = {
+                new long[] {1, 2},
+                new long[] {10},
+                new long[] {}
+                //new long[] {4, 5, 6, 7}
+                };
+        long[] expectedCountStar = {
+                29,
+                27,
+                24
+                };
+
+        VoltTable vt;
+        for (String table : Arrays.asList("P3", "R3")) {
+            insertMoreRows(client, table, 10, 3);
+            for (int i = 0; i < stmtTemplates.length; ++i) {
+                long key = i * 10;
+
+                vt = client.callProcedure("@AdHoc", "select * from " + table).getResults()[0];
+                System.out.println(vt);
+
+                String stmt = String.format(stmtTemplates[i], table, key);
+                int len = stmt.length();
+                long expectedModCount = Long.valueOf(stmt.substring(len - 1, len));
+                vt = client.callProcedure("@AdHoc", stmt).getResults()[0];
+                validateTableOfScalarLongs(vt, new long[] {expectedModCount});
+
+                // verify the rows that are left are what we expect
+                vt = client.callProcedure("@AdHoc",
+                        "select num from " + table + " where id = " + key + " order by num asc" ).getResults()[0];
+                validateTableOfScalarLongs(vt, expectedResults[i]);
+
+                // Total row count
+                vt = client.callProcedure("@AdHoc",
+                        "select count(*) from " + table ).getResults()[0];
+                validateTableOfScalarLongs(vt, new long[] {expectedCountStar[i]});
+
+            }
+        }
+    }
+
+    public void testDeleteWithOrderByNegative() throws Exception {
+        if (isHSQL()) {
+            return;
+        }
+
+        Client client = getClient();
+
+        // ORDER BY must have a LIMIT or OFFSET.
+        // LIMIT or OFFSET may not appear by themselves.
+
+        verifyStmtFails(client, "DELETE FROM R1 ORDER BY NUM ASC",
+                "DELETE statement with ORDER BY but no LIMIT or OFFSET is not allowed.");
+        verifyStmtFails(client, "DELETE FROM R1 LIMIT 1",
+                "DELETE statement with LIMIT or OFFSET but no ORDER BY would produce non-deterministic results.");
+
+        // This fails in a different way due to a bug in HSQL.  OFFSET with no LIMIT confuses HSQL.
+        verifyStmtFails(client, "DELETE FROM R1 OFFSET 1",
+                "PlanningErrorException");
+
+        verifyStmtFails(client, "DELETE FROM R1 LIMIT 1 OFFSET 1",
+                "DELETE statement with LIMIT or OFFSET but no ORDER BY would produce non-deterministic results.");
+        verifyStmtFails(client, "DELETE FROM R1 OFFSET 1 LIMIT 1",
+                "DELETE statement with LIMIT or OFFSET but no ORDER BY would produce non-deterministic results.");
+
+        verifyStmtFails(client, "DELETE FROM P1_VIEW ORDER BY ID ASC LIMIT 1",
+                "INSERT, UPDATE, or DELETE not permitted for view");
     }
 
     //
