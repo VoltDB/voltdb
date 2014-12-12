@@ -109,6 +109,9 @@ import org.voltdb.types.ConstraintType;
 import org.xml.sax.SAXException;
 
 import com.google_voltpatches.common.base.Charsets;
+import java.io.StringWriter;
+import javax.xml.bind.Marshaller;
+import javax.xml.namespace.QName;
 
 /**
  *
@@ -629,6 +632,40 @@ public abstract class CatalogUtil {
             }
         } catch (SAXException e) {
             hostLog.error("Error schema validating deployment.xml file. " + e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Given the deployment object generate the XML
+     * @param deployment
+     * @return XML of deployment object.
+     * @throws IOException
+     */
+    public static String getDeployment(DeploymentType deployment) throws IOException {
+        try {
+            JAXBContext jc = JAXBContext.newInstance("org.voltdb.compiler.deploymentfile");
+            // This schema shot the sheriff.
+            SchemaFactory sf = SchemaFactory.newInstance(javax.xml.XMLConstants.W3C_XML_SCHEMA_NS_URI);
+            Schema schema = sf.newSchema(VoltDB.class.getResource("compiler/DeploymentFileSchema.xsd"));
+            Marshaller marshaller = jc.createMarshaller();
+            marshaller.setSchema(schema);
+            StringWriter sw = new StringWriter();
+            marshaller.marshal(new JAXBElement(new QName("","deployment"), DeploymentType.class, deployment), sw);
+            return sw.toString();
+        } catch (JAXBException e) {
+            // Convert some linked exceptions to more friendly errors.
+            if (e.getLinkedException() instanceof java.io.FileNotFoundException) {
+                hostLog.error(e.getLinkedException().getMessage());
+                return null;
+            } else if (e.getLinkedException() instanceof org.xml.sax.SAXParseException) {
+                hostLog.error("Error marshalling DeploymentType " + e.getLinkedException().getMessage());
+                return null;
+            } else {
+                throw new RuntimeException(e);
+            }
+        } catch (SAXException e) {
+            hostLog.error("Error marshalling DeploymentType " + e.getMessage());
             return null;
         }
     }

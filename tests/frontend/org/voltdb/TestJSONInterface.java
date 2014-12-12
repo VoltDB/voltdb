@@ -57,6 +57,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
@@ -70,6 +71,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import junit.framework.TestCase;
+import org.codehaus.jackson.map.ObjectMapper;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -80,11 +82,14 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
+import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.procedures.CrazyBlahProc;
 import org.voltdb.compiler.procedures.DelayProc;
 import org.voltdb.compiler.procedures.SelectStarHelloWorld;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Base64;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 
@@ -174,10 +179,18 @@ public class TestJSONInterface extends TestCase {
     }
 
     public static String getUrlOverJSON(String url, String user, String password, String scheme, int expectedCode, String expectedCt) throws Exception {
+        return httpUrlOverJSON("GET", url, user, password, scheme, expectedCode, expectedCt, null);
+    }
+
+    public static String postUrlOverJSON(String url, String user, String password, String scheme, int expectedCode, String expectedCt, Map<String,String> params) throws Exception {
+        return httpUrlOverJSON("POST", url, user, password, scheme, expectedCode, expectedCt, params);
+    }
+
+    public static String httpUrlOverJSON(String method, String url, String user, String password, String scheme, int expectedCode, String expectedCt, Map<String,String> params) throws Exception {
         URL jsonAPIURL = new URL(url);
 
         HttpURLConnection conn = (HttpURLConnection) jsonAPIURL.openConnection();
-        conn.setRequestMethod("GET");
+        conn.setRequestMethod(method);
         conn.setDoOutput(true);
         if (user != null && password != null) {
             if (scheme.equalsIgnoreCase("hashed")) {
@@ -190,6 +203,13 @@ public class TestJSONInterface extends TestCase {
             }
         }
         conn.connect();
+        if (params != null && params.size() > 0) {
+            OutputStream os = conn.getOutputStream();
+            for (String key : params.keySet()) {
+                String b = key + "=" + params.get(key);
+                os.write(b.getBytes());
+            }
+        }
 
         BufferedReader in = null;
         try {
@@ -1050,12 +1070,42 @@ public class TestJSONInterface extends TestCase {
             server.waitForInitialization();
 
             //Get deployment
-            String dep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
-            assertTrue(dep.contains("cluster"));
+            String jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            assertTrue(jdep.contains("cluster"));
             //Download deployment
-            dep = getUrlOverJSON("http://localhost:8095/deployment/download", null, null, null, 200, "text/xml");
-            assertTrue(dep.contains("<deployment>"));
-            assertTrue(dep.contains("</deployment>"));
+            String xdep = getUrlOverJSON("http://localhost:8095/deployment/download", null, null, null, 200, "text/xml");
+            assertTrue(xdep.contains("<deployment>"));
+            assertTrue(xdep.contains("</deployment>"));
+            //POST deployment with no content
+            String pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", null);
+            assertTrue(pdep.contains("Failed"));
+            Map<String,String> params = new HashMap<>();
+            params.put("deployment", jdep);
+            pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            assertTrue(pdep.contains("Deployment Updated"));
+
+            ObjectMapper mapper = new ObjectMapper();
+            DeploymentType deptype = mapper.readValue(jdep, DeploymentType.class);
+
+            //Test change heartbeat.
+            if (deptype.getHeartbeat() == null) {
+                HeartbeatType hb = new HeartbeatType();
+                hb.setTimeout(99);
+                deptype.setHeartbeat(hb);
+            } else {
+                deptype.getHeartbeat().setTimeout(99);
+            }
+            String ndeptype = mapper.writeValueAsString(deptype);
+            params.put("deployment", ndeptype);
+            pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            System.out.println("POST result is: " + pdep);
+            assertTrue(pdep.contains("Deployment Updated"));
+            jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            assertTrue(jdep.contains("cluster"));
+            deptype = mapper.readValue(jdep, DeploymentType.class);
+            int nto = deptype.getHeartbeat().getTimeout();
+            assertEquals(nto, 99);
+
         } finally {
             if (server != null) {
                 server.shutdown();
