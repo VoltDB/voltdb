@@ -337,6 +337,42 @@ public class PlanAssembler {
         subAssembler = new WriterSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
     }
 
+    private static void failIfNonDeterministicDml(AbstractParsedStmt parsedStmt, CompiledPlan plan) {
+        // If we have content non-determinism on DML, then fail planning.
+        // This can happen if:
+        //   INSERT INTO ... SELECT ... where the select statement has a limit on unordered data.
+        //   UPSERT INTO ... SELECT has the same issue, but no limit is required because
+        //                      order may determine which rows are updated and which are inserted
+        //   DELETE ... ORDER BY <n> LIMIT <n> also has this issue
+        // Update doesn't have this issue yet (but having ORDER BY and LIMIT there doesn't seem out
+        // of the question).
+        // Subqueries in WHERE clauses of DML will also be relevant here.
+
+        if (plan == null || plan.getReadOnly() || plan.isOrderDeterministic()) {
+            return;
+        }
+
+        if (parsedStmt instanceof ParsedInsertStmt) {
+            if (parsedStmt.m_isUpsert) {
+                throw new PlanningErrorException(
+                        "UPSERT statement maniupulates data in a non-deterministic way.  "
+                        + "Adding an ORDER BY clause to UPSERT INTO ... SELECT may address this issue.");
+            }
+            else if (plan.hasLimitOrOffset()) {
+                throw new PlanningErrorException(
+                        "INSERT statement maniupulates data in a content non-deterministic way.  "
+                        + "Adding an ORDER BY clause to INSERT INTO ... SELECT may address this issue.");
+            }
+        }
+
+        if (parsedStmt instanceof ParsedDeleteStmt) {
+            throw new PlanningErrorException(
+                    "DELETE statement manipulates data in a non-deterministic way.  This may happen "
+                    + "when the DELETE has an ORDER BY clause with a LIMIT, but the order is not "
+                    + "well-defined.");
+        }
+    }
+
     /**
      * Generate the best cost plan for the current SQL statement context.
      *
@@ -399,21 +435,7 @@ public class PlanAssembler {
             retval.rootPlanGraph = connectChildrenBestPlans(retval.rootPlanGraph);
         }
 
-        // If we have content non-determinism on DML, then fail planning.
-        // This can happen in case of an INSERT INTO ... SELECT ... where the select statement has a limit on unordered data.
-        // This may also be a concern in the future if we allow subqueries in UPDATE and DELETE statements
-        //   (e.g., WHERE c IN (SELECT ...))
-        if (retval != null && !retval.getReadOnly() && !retval.isOrderDeterministic()) {
-            String errorMsg = "DML statement manipulates data in content non-deterministic way ";
-            if (parsedStmt.m_isUpsert) {
-                throw new PlanningErrorException(errorMsg +
-                        "(this may happen on UPSERT INTO ... SELECT, for example).");
-            }
-            if (retval.hasLimitOrOffset()) {
-                throw new PlanningErrorException(errorMsg +
-                        "(this may happen on INSERT INTO ... SELECT, for example).");
-            }
-        }
+        failIfNonDeterministicDml(parsedStmt, retval);
 
         return retval;
     }

@@ -365,6 +365,13 @@ public class TestSqlDeleteSuite extends RegressionSuite {
         // Check failure for partitioned table where where clause cannot infer partitioning
         verifyStmtFails(client, "DELETE FROM P1 WHERE ID < 50 ORDER BY NUM DESC LIMIT 1",
                 "Only single-partition DELETE statements may contain ORDER BY with LIMIT and/or OFFSET clauses");
+
+        // Non-deterministic ordering should fail!
+        // NUM is not unique.
+        // Need:
+        //   - either every column from a unique or PK constraint must appear in the OB clause
+        //   - Every column from the table is in the OB clause.
+        verifyStmtFails(client, "DELETE FROM P1 WHERE ID = 1 ORDER by NUM LIMIT 1", "Error! non-deterministic DML");
     }
 
     //
