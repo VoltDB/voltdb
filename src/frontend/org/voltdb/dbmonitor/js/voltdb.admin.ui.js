@@ -19,7 +19,7 @@ function loadAdminPage() {
         frequency: $("#txtFrequency"),
         frequencyLabel: $("#spanFrequencyUnit"),
         retained: $("#retainedSpan"),
-        retainedLabel: $("#txtRetained"),
+        retainedLabel: $("#retainedSpanUnit"),
         commandLog: $("#commandLogIcon"),
         commandLogLabel: $("#commandLogLabel"),
         commandLogFrequencyTime: $("#commandLogFrequencyTime"),
@@ -615,6 +615,7 @@ function loadAdminPage() {
             adminDOMObjects.frequencyLabel.text(adminConfigValues.frequency != "" ? "Hrs" : "");
             adminDOMObjects.retained.text(adminConfigValues.retained != "" ? adminConfigValues.retained : "");
             adminDOMObjects.retainedLabel.text(adminConfigValues.retained != "" ? "Copies" : "");
+            adminEditObjects.tBoxAutoSnapshotRetainedValue = adminConfigValues.retained;
             adminDOMObjects.commandLog.removeClass().addClass(getOnOffClass(adminConfigValues.commandLogEnabled));
             adminDOMObjects.commandLogLabel.text(adminConfigValues.commandLogEnabled == true ? 'On' : 'Off');
             adminDOMObjects.commandLogFrequencyTime.text(adminConfigValues.commandLogFrequencyTime != "" ? adminConfigValues.commandLogFrequencyTime : "");
