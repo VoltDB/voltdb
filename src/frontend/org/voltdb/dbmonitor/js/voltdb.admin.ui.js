@@ -595,7 +595,7 @@ $(document).ready(function () {
             adminDOMObjects.retained.text(adminConfigValues.retained != "" ? adminConfigValues.retained : "");
             adminDOMObjects.retainedLabel.text(adminConfigValues.retained != "" ? "Copies" : "");
             adminDOMObjects.commandLog.removeClass().addClass(getOnOffClass(adminConfigValues.commandLogEnabled));
-            adminDOMObjects.commandLogLabel.text(adminConfigValues.commandLogEnabled == 'true' ? 'On' : 'Off');
+            adminDOMObjects.commandLogLabel.text(adminConfigValues.commandLogEnabled == true ? 'On' : 'Off');
             adminDOMObjects.commandLogFrequencyTime.text(adminConfigValues.commandLogFrequencyTime != "" ? adminConfigValues.commandLogFrequencyTime : "");
             adminDOMObjects.commandLogFrequencyTimeLabel.text(adminConfigValues.commandLogFrequencyTime != "" ? "ms" : "");
             adminDOMObjects.commandLogFrequencyTransactions.text(adminConfigValues.commandLogFrequencyTransactions != "" ? adminConfigValues.commandLogFrequencyTransactions : "");
@@ -618,10 +618,51 @@ $(document).ready(function () {
 
             //edit configuration
             adminEditObjects.tBoxHeartbeatTimeoutValue = adminConfigValues.heartBeatTimeout;
+            adminEditObjects.spanAutoSnapshotFreq.text(parseInt(adminConfigValues.frequency));
+            var spanshotUnit = adminConfigValues.frequency.slice(-1);
+            setSnapShotUnit(spanshotUnit);
+            getExportProperties(adminConfigValues.properties);
 
         };
 
-        var configureAdminValuesFromSystemInfo = function(adminConfigValues) {
+        var getExportProperties = function(data) {
+            var result = "";
+            for (var i = 0; i < data.length; i++) {
+                if (i == 0) {
+                    result += '<tr>' +
+                        '<td width="67%">' + data[i].name + '</td>' +
+                        '<td width="33%">' + data[i].value + '</td>' +
+                        '</tr>';
+                }else if (i == (data.length - 1)) {
+                    result += '<tr class="propertyLast">' +
+                        '<td>' + data[i].name + '</td>' +
+                        '<td>' + data[i].value + '</td>' +
+                        '</tr>';
+                } else {
+                    result +='<tr>' +
+                        '<td>' + data[i].name + '</td>' +
+                        '<td>' + data[i].value + '</td>' +
+                        '</tr>';
+                }
+            }
+            if (result == "") {
+                $('#exportProperties').html("No properties available.");
+            } else {
+                $('#exportProperties').html(result);
+            }
+        };
+
+        var setSnapShotUnit = function(unit) {
+            if (unit == 's') {
+                adminEditObjects.spanAutoSnapshotFreqUnit.text('Sec');
+            }else if (unit == 'm') {
+                adminEditObjects.spanAutoSnapshotFreqUnit.text('Min');
+            }else if (unit == 'h') {
+                adminEditObjects.spanAutoSnapshotFreqUnit.text('Hrs');
+            }
+        }; 
+
+        var configureAdminValuesFromSystemInfo = function (adminConfigValues) {
             adminDOMObjects.queryTimeout.text(adminConfigValues.queryTimeout != "" ? adminConfigValues.queryTimeout : "");
             adminDOMObjects.queryTimeoutLabel.text(adminConfigValues.queryTimeout != "" ? "ms" : "");
         };
