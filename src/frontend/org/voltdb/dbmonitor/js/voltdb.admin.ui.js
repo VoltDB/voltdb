@@ -561,6 +561,12 @@ $(document).ready(function () {
             }
         };
 
+        this.displayAdminConfigurationFromSystemInfo = function(adminConfigValues) {
+            if (adminConfigValues != undefined) {
+                configureAdminValuesFromSystemInfo(adminConfigValues);
+            }
+        };
+
         this.displayPortAndOverviewDetails = function (portAndOverviewValues) {
             if (portAndOverviewValues != undefined) {
                 configurePortAndOverviewValues(portAndOverviewValues);
@@ -598,11 +604,14 @@ $(document).ready(function () {
             adminDOMObjects.exports.removeClass().addClass(getOnOffClass(adminConfigValues.export));
             adminDOMObjects.exportLabel.text(getOnOffText(adminConfigValues.export));
             adminDOMObjects.target.text(adminConfigValues.targets);
-            adminDOMObjects.properties.text(adminConfigValues.properties);
+            
+            //TODO: Display properties in table
+            //adminDOMObjects.properties.text(adminConfigValues.properties);
+            
             adminDOMObjects.heartBeatTimeout.text(adminConfigValues.heartBeatTimeout != "" ? adminConfigValues.heartBeatTimeout : "");
             adminDOMObjects.heartBeatTimeoutLabel.text(adminConfigValues.heartBeatTimeout != "" ? "ms" : "");
-            adminDOMObjects.queryTimeout.text(adminConfigValues.queryTimeout != "" ? adminConfigValues.queryTimeout : "");
-            adminDOMObjects.queryTimeoutLabel.text(adminConfigValues.queryTimeout != "" ? "ms" : "");
+            //adminDOMObjects.queryTimeout.text(adminConfigValues.queryTimeout != "" ? adminConfigValues.queryTimeout : "");
+            //adminDOMObjects.queryTimeoutLabel.text(adminConfigValues.queryTimeout != "" ? "ms" : "");
             adminDOMObjects.tempTablesMaxSize.text(adminConfigValues.tempTablesMaxSize != "" ? adminConfigValues.tempTablesMaxSize : "");
             adminDOMObjects.tempTablesMaxSizeLabel.text(adminConfigValues.tempTablesMaxSize != "" ? "MB" : "");
             adminDOMObjects.snapshotPriority.text(adminConfigValues.snapshotPriority);
@@ -610,6 +619,11 @@ $(document).ready(function () {
             //edit configuration
             adminEditObjects.tBoxHeartbeatTimeoutValue = adminConfigValues.heartBeatTimeout;
 
+        };
+
+        var configureAdminValuesFromSystemInfo = function(adminConfigValues) {
+            adminDOMObjects.queryTimeout.text(adminConfigValues.queryTimeout != "" ? adminConfigValues.queryTimeout : "");
+            adminDOMObjects.queryTimeoutLabel.text(adminConfigValues.queryTimeout != "" ? "ms" : "");
         };
 
         var configurePortAndOverviewValues = function (configValues) {

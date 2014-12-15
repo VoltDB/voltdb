@@ -1,4 +1,4 @@
-
+﻿
 
 (function (window, unused) {
 
@@ -8,7 +8,7 @@
         this.hostIP = "";
         this.shortApiCredentials = "";
         this.isLoginVerified = false;
-        
+
         this.authorization = null;
         DbConnection = function (aServer, aPort, aAdmin, aUser, aPassword, aIsHashPassword, aProcess) {
             this.server = aServer == null ? 'localhost' : $.trim(aServer);
@@ -29,34 +29,36 @@
                 return (new iQueue(this));
             };
 
-            this.BuildParamSet = function (procedure, parameters) {
+            this.BuildParamSet = function (procedure, parameters, shortApiCallDetails) {
                 var s = [];
-                if (!this.procedures.hasOwnProperty(procedure)) {
-                    return ['Procedure "' + procedure + '" is undefined.'];
-                }
 
-                var signatures = this.procedures[procedure];
-                var localParameters = [];
-                localParameters = localParameters.concat(parameters);
-
-                if (!(signatures['' + localParameters.length])) {
-                    var retval = 'Invalid parameter count for procedure "' + procedure + '" (received: ' + localParameters.length + ', expected: ';
-                    for (x in signatures) {
-                        retval += x + ', ';
+                if (!(shortApiCallDetails != null && shortApiCallDetails != null)) {
+                    if (!this.procedures.hasOwnProperty(procedure)) {
+                        return ['Procedure "' + procedure + '" is undefined.'];
                     }
-                    return [retval + ')'];
-                }
-                var signature = signatures['' + localParameters.length];
+                
+                    var signatures = this.procedures[procedure];
+                    var localParameters = [];
+                    localParameters = localParameters.concat(parameters);
 
-                s[s.length] = encodeURIComponent('Procedure') + '=' + encodeURIComponent(procedure);
-                if (localParameters != null) {
-                    var params = '[';
-                    var i = 0;
-                    for (i = 0; i < localParameters.length; i++) {
-                        if (i > 0) {
-                            params += ',';
+                    if (!(signatures['' + localParameters.length])) {
+                        var retval = 'Invalid parameter count for procedure "' + procedure + '" (received: ' + localParameters.length + ', expected: ';
+                        for (x in signatures) {
+                            retval += x + ', ';
                         }
-                        switch (signature[i]) {
+                        return [retval + ')'];
+                    }
+                    var signature = signatures['' + localParameters.length];
+
+                    s[s.length] = encodeURIComponent('Procedure') + '=' + encodeURIComponent(procedure);
+                    if (localParameters != null) {
+                        var params = '[';
+                        var i = 0;
+                        for (i = 0; i < localParameters.length; i++) {
+                            if (i > 0) {
+                                params += ',';
+                            }
+                            switch (signature[i]) {
                             case 'tinyint':
                             case 'smallint':
                             case 'int':
@@ -83,13 +85,14 @@
                                 if (procedure == '@SnapshotDelete')
                                     params += '["' + localParameters[i].replace(/^'|'$/g, '') + '"]';
                                 else
-                                    params += (typeof (localParameters[i]) == 'string'
+                                    params += (typeof(localParameters[i]) == 'string'
                                         ? '"' + localParameters[i].replace(/^'|'$/g, '') + '"'
                                         : localParameters[i]).replace(/''/g, "'");
+                            }
                         }
+                        params += ']';
+                        s[s.length] = encodeURIComponent('Parameters') + '=' + encodeURIComponent(params);
                     }
-                    params += ']';
-                    s[s.length] = encodeURIComponent('Parameters') + '=' + encodeURIComponent(params);
                 }
                 if (this.admin)
                     s[s.length] = 'admin=true';
@@ -102,7 +105,7 @@
                     if (this.password != null)
                         credentials[credentials.length] = encodeURIComponent('Password') + '=' + encodeURIComponent(this.password);
                     if (this.isHashedPassword != null)
-                        credentials[credentials.length] =  encodeURIComponent('Hashedpassword') + '=' + encodeURIComponent(this.isHashedPassword);
+                        credentials[credentials.length] = encodeURIComponent('Hashedpassword') + '=' + encodeURIComponent(this.isHashedPassword);
                     if (this.admin)
                         credentials[credentials.length] = 'admin=true';
 
@@ -112,24 +115,52 @@
                 return paramSet;
             };
 
-            this.CallExecute = function (procedure, parameters, callback) {
-                var uri = 'http://' + this.server + ':' + this.port + '/api/1.0/';
-                var params = this.BuildParamSet(procedure, parameters);
+            this.CallExecute = function (procedure, parameters, callback, shortApiCallDetails) {
+                var uri;
+                if (shortApiCallDetails != null && shortApiCallDetails.isShortApiCall) {
+                    if (shortApiCallDetails.apiPath == null || shortApiCallDetails.apiPath == "") {
+                        callback({ "status": -1, "statusstring": "Error: Please specify apiPath.", "results": [] });
+                    }
+                    uri = 'http://' + this.server + ':' + this.port + '/' + shortApiCallDetails.apiPath + '/';
+                } else {
+                    uri = 'http://' + this.server + ':' + this.port + '/api/1.0/';
+                }
+
+                var params = this.BuildParamSet(procedure, parameters, shortApiCallDetails);
                 if (typeof (params) == 'string') {
                     if (VoltDBCore.isServerConnected) {
-                        var ah = VoltDBService.BuildAuthorization(this.user, this.isHashedPassword, this.password)
+                        var ah = null;
+                        if (this.authorization != null) {
+                            ah = this.authorization;
+                        } else {
+                            VoltDBService.BuildAuthorization(this.user, this.isHashedPassword, this.password);
+                        }
                         jQuery.getJSON(uri, params, callback, ah);
                     }
                 } else if (callback != null)
                     callback({ "status": -1, "statusstring": "PrepareStatement error: " + params[0], "results": [] });
             };
 
-            this.CallExecuteUpdate = function (procedure, parameters, callback) {
-                var uri = 'http://' + this.server + ':' + this.port + '/api/1.0/';
-                var params = this.BuildParamSet(procedure, parameters);
+            this.CallExecuteUpdate = function (procedure, parameters, callback, shortApiCallDetails) {
+                var uri;
+                if (shortApiCallDetails != null && shortApiCallDetails.isShortApiCall) {
+                    if (shortApiCallDetails.apiPath == null || shortApiCallDetails.apiPath == "") {
+                        callback({ "status": -1, "statusstring": "Error: Please specify apiPath.", "results": [] });
+                    }
+                    uri = 'http://' + this.server + ':' + this.port + '/' + shortApiCallDetails.apiPath + '/';
+                } else {
+                    uri = 'http://' + this.server + ':' + this.port + '/api/1.0/';
+                }
+                
+                var params = this.BuildParamSet(procedure, parameters, shortApiCallDetails);
                 if (typeof (params) == 'string') {
                     if (VoltDBCore.isServerConnected) {
-                        var ah = VoltDBService.BuildAuthorization(this.user, this.isHashedPassword, this.password);
+                        var ah = null;
+                        if (this.authorization != null) {
+                            ah = this.authorization;
+                        } else {
+                            VoltDBService.BuildAuthorization(this.user, this.isHashedPassword, this.password);
+                        }
                         jQuery.postJSON(uri, params, callback, ah);
                     }
                 } else if (callback != null)
@@ -151,8 +182,8 @@
                 return this;
             };
 
-            this.BeginExecute = function (procedure, parameters, callback) {
-                this.CallExecute(procedure, parameters, (new callbackWrapper(callback)).Callback);
+            this.BeginExecute = function (procedure, parameters, callback, shortApiCallDetails) {
+                this.CallExecute(procedure, parameters, (new callbackWrapper(callback)).Callback, shortApiCallDetails);
             };
 
             var iQueue = function (connection) {
@@ -172,8 +203,8 @@
                     return this;
                 };
 
-                this.BeginExecute = function (procedure, parameters, callback) {
-                    stack.push([procedure, parameters, callback]);
+                this.BeginExecute = function (procedure, parameters, callback, shortApiCallDetails) {
+                    stack.push([procedure, parameters, callback, shortApiCallDetails]);
                     return this;
                 };
                 this.EndExecute = function () {
@@ -201,7 +232,7 @@
                                         queue.EndExecute();
                                     }
                                 };
-                            })(this, item))).Callback);
+                            })(this, item))).Callback, item[3]);
                     } else {
                         executing = false;
                         if (onCompleteHandler != null) {
@@ -250,34 +281,36 @@
             return this;
         };
 
-        this.BuildParamSet = function (procedure, parameters) {
+        this.BuildParamSet = function (procedure, parameters, shortApiCallDetails) {
             var s = [];
-            if (!procedures.hasOwnProperty(procedure)) {
-                return ['Procedure "' + procedure + '" is undefined.'];
-            }
 
-            var signatures = procedures[procedure];
-            var localParameters = [];
-            localParameters = localParameters.concat(parameters);
-
-            if (!(signatures['' + localParameters.length])) {
-                var retval = 'Invalid parameter count for procedure "' + procedure + '" (received: ' + localParameters.length + ', expected: ';
-                for (x in signatures) {
-                    retval += x + ', ';
+            if (!(shortApiCallDetails != null && shortApiCallDetails != null)) {
+                if (!procedures.hasOwnProperty(procedure)) {
+                    return ['Procedure "' + procedure + '" is undefined.'];
                 }
-                return [retval + ')'];
-            }
-            var signature = signatures['' + localParameters.length];
 
-            s[s.length] = encodeURIComponent('Procedure') + '=' + encodeURIComponent(procedure);
-            if (localParameters != null) {
-                var params = '[';
-                var i = 0;
-                for (i = 0; i < localParameters.length; i++) {
-                    if (i > 0) {
-                        params += ',';
+                var signatures = procedures[procedure];
+                var localParameters = [];
+                localParameters = localParameters.concat(parameters);
+
+                if (!(signatures['' + localParameters.length])) {
+                    var retval = 'Invalid parameter count for procedure "' + procedure + '" (received: ' + localParameters.length + ', expected: ';
+                    for (x in signatures) {
+                        retval += x + ', ';
                     }
-                    switch (signature[i]) {
+                    return [retval + ')'];
+                }
+                var signature = signatures['' + localParameters.length];
+
+                s[s.length] = encodeURIComponent('Procedure') + '=' + encodeURIComponent(procedure);
+                if (localParameters != null) {
+                    var params = '[';
+                    var i = 0;
+                    for (i = 0; i < localParameters.length; i++) {
+                        if (i > 0) {
+                            params += ',';
+                        }
+                        switch (signature[i]) {
                         case 'tinyint':
                         case 'smallint':
                         case 'int':
@@ -304,13 +337,14 @@
                             if (procedure == '@SnapshotDelete')
                                 params += '["' + localParameters[i].replace(/^'|'$/g, '') + '"]';
                             else
-                                params += (typeof (localParameters[i]) == 'string'
+                                params += (typeof(localParameters[i]) == 'string'
                                     ? '"' + localParameters[i].replace(/^'|'$/g, '') + '"'
                                     : localParameters[i]).replace(/''/g, "'");
+                        }
                     }
+                    params += ']';
+                    s[s.length] = encodeURIComponent('Parameters') + '=' + encodeURIComponent(params);
                 }
-                params += ']';
-                s[s.length] = encodeURIComponent('Parameters') + '=' + encodeURIComponent(params);
             }
             if (this.User != null)
                 s[s.length] = encodeURIComponent('User') + '=' + encodeURIComponent(this.User);
@@ -363,8 +397,7 @@
             $.ajax({
                 url: uri + '?' + params,
                 dataType: "jsonp",
-                beforeSend: function (request)
-                {
+                beforeSend: function (request) {
                     if (conn.authorization != null) {
                         request.setRequestHeader("Authorization", conn.authorization);
                     }
@@ -389,17 +422,17 @@
 
         };
 
-        this.AddConnection = function (server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, onConnectionAdded) {
+        this.AddConnection = function (server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, onConnectionAdded, shortApiCallDetails) {
             var conn = new DbConnection(server, port, admin, user, password, isHashedPassword, processName);
             compileProcedureCommands(conn, procedureNames, parameters, values);
             this.connections[conn.key] = conn;
-            loadConnectionMetadata(this.connections[conn.key], onConnectionAdded, processName);
+            loadConnectionMetadata(this.connections[conn.key], onConnectionAdded, processName, shortApiCallDetails);
 
         };
 
-        this.updateConnection = function (server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, connection, onConnectionAdded) {
+        this.updateConnection = function (server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, connection, onConnectionAdded, shortApiCallDetails) {
             compileProcedureCommands(connection, procedureNames, parameters, values);
-            loadConnectionMetadata(connection, onConnectionAdded, processName);
+            loadConnectionMetadata(connection, onConnectionAdded, processName, shortApiCallDetails);
         };
 
         this.HasConnection = function (server, port, admin, user, processName) {
@@ -418,18 +451,24 @@
             return null;
         };
 
-        var loadConnectionMetadata = function (connection, onConnectionAdded, processName) {
+        var loadConnectionMetadata = function (connection, onConnectionAdded, processName, shortApiCallDetails) {
             var i = 0;
             var connectionQueue = connection.getQueue();
             connectionQueue.Start();
 
-            jQuery.each(connection.procedureCommands.procedures, function (id, procedure) {
-                connectionQueue.BeginExecute(procedure['procedure'], (procedure['value'] === undefined ? procedure['parameter'] : [procedure['parameter'], procedure['value']]), function (data) {
-                    var suffix = (processName == "GRAPH_MEMORY" || processName == "GRAPH_TRANSACTION") || processName == "TABLE_INFORMATION" ? "_" + processName : "";
-                    connection.Metadata[procedure['procedure'] + "_" + procedure['parameter'] + suffix + "_status"] = data.status;
-                    connection.Metadata[procedure['procedure'] + "_" + procedure['parameter'] + suffix] = data.results[0];
-                });                
-            });
+            if (shortApiCallDetails != null && shortApiCallDetails.isShortApiCall) {
+                connectionQueue.BeginExecute([], [], function (data) {
+                    connection.Metadata[processName] = data;
+                }, shortApiCallDetails);
+            } else {
+                jQuery.each(connection.procedureCommands.procedures, function (id, procedure) {
+                    connectionQueue.BeginExecute(procedure['procedure'], (procedure['value'] === undefined ? procedure['parameter'] : [procedure['parameter'], procedure['value']]), function (data) {
+                        var suffix = (processName == "GRAPH_MEMORY" || processName == "GRAPH_TRANSACTION") || processName == "TABLE_INFORMATION" ? "_" + processName : "";
+                        connection.Metadata[procedure['procedure'] + "_" + procedure['parameter'] + suffix + "_status"] = data.status;
+                        connection.Metadata[procedure['procedure'] + "_" + procedure['parameter'] + suffix] = data.results[0];
+                    });
+                });
+            }
 
             connectionQueue.End(function (state) {
                 connection.Metadata['sysprocs'] = {
@@ -492,8 +531,7 @@ jQuery.extend({
                 url: url,
                 data: formData,
                 dataType: 'jsonp',
-                beforeSend: function (request)
-                {
+                beforeSend: function (request) {
                     if (authorization != null) {
                         request.setRequestHeader("Authorization", authorization);
                     }
@@ -513,8 +551,7 @@ jQuery.extend({
                 url: url,
                 data: formData,
                 dataType: 'jsonp',
-                beforeSend: function (request)
-                {
+                beforeSend: function (request) {
                     if (authorization != null) {
                         request.setRequestHeader("Authorization", authorization);
                     }
@@ -530,7 +567,7 @@ jQuery.extend({
 
 jQuery.extend({
     getJSON: function (url, formData, callback, authorization) {
-
+        
         if (VoltDBCore.hostIP == "") {
 
             jQuery.ajax({
@@ -538,8 +575,7 @@ jQuery.extend({
                 url: url,
                 data: formData,
                 dataType: 'jsonp',
-                beforeSend: function (request)
-                {
+                beforeSend: function (request) {
                     if (authorization != null) {
                         request.setRequestHeader("Authorization", authorization);
                     }
@@ -559,8 +595,7 @@ jQuery.extend({
                 url: url,
                 data: formData,
                 dataType: 'jsonp',
-                beforeSend: function (request)
-                {
+                beforeSend: function (request) {
                     if (authorization != null) {
                         request.setRequestHeader("Authorization", authorization);
                     }
