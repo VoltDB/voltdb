@@ -280,23 +280,38 @@ var loadPage = function (serverName, portid) {
         });
     };
     loadSchemaTab();
+    
+    voltDbRenderer.CheckAdminPriviledges(function (hasAdminPrivileges) {
 
-    //Retain current tab while page refreshing.
-    var curTab = $.cookie("current-tab");
-    if (curTab != undefined) {
-        curTab = curTab * 1;
-        if (curTab == NavigationTabs.Schema) {
-            $("#overlay").show();
-            setTimeout(function () { $("#navSchema > a").trigger("click"); }, 100);
-        } else if (curTab == NavigationTabs.SQLQuery) {
-            $("#overlay").show();
-            setTimeout(function () { $("#navSqlQuery > a").trigger("click"); }, 100);
-        } else if (curTab == NavigationTabs.Admin && VoltDbAdminConfig.isAdmin) {
-            $("#overlay").show();
-            setTimeout(function () { $("#navAdmin > a").trigger("click"); }, 100);
+        if (hasAdminPrivileges) {
+            VoltDbAdminConfig.isAdmin = true;
+            $("#navAdmin").show();
+            loadAdminPage();
+        } else {
+            $("#navAdmin").hide();
         }
-    }
-
+        
+        //Retain current tab while page refreshing.
+        var curTab = $.cookie("current-tab");
+        if (curTab != undefined) {
+            curTab = curTab * 1;
+            if (curTab == NavigationTabs.Schema) {
+                $("#overlay").show();
+                setTimeout(function () { $("#navSchema > a").trigger("click"); }, 100);
+            } else if (curTab == NavigationTabs.SQLQuery) {
+                $("#overlay").show();
+                setTimeout(function () { $("#navSqlQuery > a").trigger("click"); }, 100);
+            } else if (curTab == NavigationTabs.Admin) {
+                if (VoltDbAdminConfig.isAdmin) {
+                    $("#overlay").show();
+                    setTimeout(function() { $("#navAdmin > a").trigger("click"); }, 100);
+                } else {
+                    saveSessionCookie("current-tab", NavigationTabs.DBMonitor);
+                }
+            }
+        }
+    });
+    
     var defaultSearchTextProcedure = 'Search Stored Procedures';
     var defaultSearchTextTable = 'Search Database Tables';
 
@@ -449,7 +464,11 @@ var loadPage = function (serverName, portid) {
         };
 
         voltDbRenderer.GetSystemInformation(loadClusterHealth, loadAdminTabPortAndOverviewDetails, loadAdminServerList);
-
+        
+        //Load Admin configurations
+        voltDbRenderer.GetAdminDeploymentInformation(function (adminConfigValues) {
+            VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues);
+        });
     };
 
     var refreshGraphAndData = function (graphView, currentTab) {
@@ -519,7 +538,7 @@ var loadPage = function (serverName, portid) {
         };
 
         var loadAdminConfigurations = function (adminConfigValues) {
-            VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues);
+            VoltDbAdminConfig.displayAdminConfigurationFromSystemInfo(adminConfigValues);
         };
 
         voltDbRenderer.GetProceduresInfoNAdminConfiguration(loadProcedureInformations, loadAdminConfigurations);
@@ -1208,10 +1227,11 @@ var loadPage = function (serverName, portid) {
 
     refreshClusterHealth();
     refreshGraphAndData($.cookie("graph-view"), VoltDbUI.CurrentTab);
-    setInterval(refreshClusterHealth, 25000);
+    setInterval(refreshClusterHealth,5000);
     setInterval(function () {
         refreshGraphAndData($.cookie("graph-view"), VoltDbUI.CurrentTab);
-    },25000);
+    }, 5000);
+
     //refreshGraphAndDataInLoop(getRefreshTime(), $.cookie("graph-view"));
     configureUserPreferences();
     adjustGraphSpacing();

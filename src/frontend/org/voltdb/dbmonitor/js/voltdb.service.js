@@ -1,4 +1,4 @@
-﻿
+
 (function (window) {
 
     var procedures = {};
@@ -40,6 +40,18 @@
             password = lPassword;
             admin = lAdmin;
         };
+
+        // build Authorization header based on scheme you could flip to diff header. Server understands both.
+        this.BuildAuthorization = function(user, isHashedPassword, password) {
+            var authz = null;
+            if (user != null && isHashedPassword != null) {
+                authz = "Hashed " + user + ":" + isHashedPassword;
+            } else if (user != null && password != null) {
+                var up = user + ":" + password;
+                authz = "Basic " + $().crypt({method: "b64enc", source: up});
+            }
+            return authz;
+        }
 
         this.ChangeServerConfiguration = function (serverName, portId, userName, pw, isHashPw, isAdmin) {
             server = serverName != null ? serverName : server;
@@ -400,6 +412,74 @@
                         onConnectionAdded(connection, status);
 
                     });
+
+                }
+
+            } catch (e) {
+                console.log(e.message);
+            }
+
+        };
+        
+        this.GetShortApiProfile = function (onConnectionAdded) {
+            try {
+                var processName = "SHORTAPI_PROFILE";
+                var procedureNames = [];
+                var parameters = [];
+                var values = [];
+                var shortApiDetails = {
+                    isShortApiCall: true,
+                    apiPath: 'profile'
+                };
+
+                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
+                if (_connection == null) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
+                        if (result == true) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                                onConnectionAdded(connection, status);
+                            }, shortApiDetails);
+                        }
+                    });
+
+                } else {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
+                        onConnectionAdded(connection, status);
+                    }, shortApiDetails);
+
+                }
+
+            } catch (e) {
+                console.log(e.message);
+            }
+
+        };
+        
+        this.GetShortApiDeployment = function (onConnectionAdded) {
+            try {
+                var processName = "SHORTAPI_DEPLOYMENT";
+                var procedureNames = [];
+                var parameters = [];
+                var values = [];
+                var shortApiDetails = {
+                    isShortApiCall : true,
+                    apiPath : 'deployment'
+                };
+
+                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
+                if (_connection == null) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
+                        if (result == true) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                                onConnectionAdded(connection, status);
+                            }, shortApiDetails);
+                        }
+                    });
+
+                } else {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
+                        onConnectionAdded(connection, status);
+                    }, shortApiDetails);
 
                 }
 

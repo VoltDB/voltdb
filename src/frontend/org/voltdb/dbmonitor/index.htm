@@ -50,7 +50,7 @@
                         <nav id="nav">
                             <ul>
                                 <li id="navDbmonitor" class="active"><a href="#" class="linkFirst">DB Monitor</a></li>
-                                <li id="navAdmin"><a href="#">Admin</a></li>
+                                <li id="navAdmin" style="display: none;"><a href="#">Admin</a></li>
                                 <li id="navSchema"><a href="#o">Schema</a></li>
                                 <li id="navSqlQuery"><a href="#">SQL Query</a></li>
                             </ul>
@@ -275,11 +275,11 @@
                     </div>
                     <div class="adminRight">
                      <div class="downloadConfig">
-                        <a id="downloadAdminConfigurations" href="javascript:void(0);" class="btnDown">Download Configuration</a>
+                         <a id="downloadAdminConfigurations" href="javascript:void(0)" download="deployment.xml"  class="btnDown">Download Configuration</a>
                     </div>
                         <div class="adminServer">
-                            <div class="serverName" id="serverName">Server</div>
-                            <div class="setServer adminIcons" id="btnServerConfigAdmin"></div>
+                             <div class="serverName" id="serverName">Server<span class="setServer adminIcons"></span></div>
+                           <!-- <div class="setServer adminIcons" id="btnServerConfigAdmin"></div>-->
                             <!-- server list -->
                             <div id="serverConfigAdmin" style="display: none;">
                                 <div class="slide-pop-wrapper">
@@ -439,17 +439,25 @@
                                 </tr>
                                 <tr class="child-row-4 subLabelRow">
                                     <td class="configLabel">Target</td>
-                                    <td id="target"></td>
+                                    <td align="right">
+                                        <span id="target"></span>
+                                    </td>
                                     <td>&nbsp;</td>
                                     <td>&nbsp;</td>
                                     <td>&nbsp;</td>
                                 </tr>
                                 <tr class="child-row-4 subLabelRow">
-                                    <td class="configLabel">Properties</td>
+                                    <td style="font-weight: bold" class="configLabel">Properties</td>
                                     <td id="properties"></td>
                                     <td>&nbsp;</td>
                                     <td>&nbsp;</td>
                                     <td>&nbsp;</td>
+                                </tr>
+                                <tr class="child-row-4 subLabelRow">
+                                     <td class="configLabe1" colspan="4">
+                                         <table width="100%" class="propertiesTbl" id="exportProperties">
+                                         </table>
+                                     </td>
                                 </tr>
                                 <tr class="hasSubLabel parent" id="row-5">
                                     <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Advanced</a></td>

@@ -809,9 +809,18 @@ ul.adminClusterList li a:hover{color:#000;}
 .downloadConfig { float:left; margin:0 5px 0 0; } 
 .btnDown {cursor: pointer;float: left;background: #D0D2D2;padding: 8px;font-weight: bold;}
 .adminServer { float:left;}
-.serverName {  cursor:pointer; float:left; background:#D0D2D2/*#c70000*/; padding:8px; font-weight:bold; /*color:#FFFFFF;*/ } 
-.setServer {float:left;}
-.adminIcons { background-position:-225px -13px; width:30px; height:28px; }
+.serverName {  /*cursor:pointer; float:left; background:#D0D2D2; padding:8px; font-weight:bold;*/
+			background: none repeat scroll 0 0 #d0d2d2;
+			cursor: pointer;
+			float: left;
+			font-weight:
+			bold;height: 28px;
+			line-height: 28px;
+			padding: 0 0 0 8px;
+
+			} 
+.setServer {/*float:left;*/ float:right;}
+.adminIcons { /*background-position:-225px -13px; width:30px; height:28px;*/ background-position: -225px -14px;height: 28px; width: 30px;}
 .adminContainer { margin:0; padding:20px 0; font-size:13px;}
 .adminContentLeft { float:left; width:49%; background:#FFFFFF; margin:0 2% 0 0 }
 .adminContentRight { float:left;width:49%;}
@@ -832,6 +841,11 @@ ul.adminClusterList li a:hover{color:#000;}
 .tblshutdown tr td.configLabel a { font-weight:bold;}
 .adminTbl1 tr.hasSubLabel td.configLabel{ padding-left:15px; font-weight:bold;}
 .adminTbl1 tr.subLabelRow td.configLabel{padding-left:40px; font-weight:normal;}
+.adminTbl1 tr.subLabelRow td.configLabe2{padding-left:60px; font-weight:normal;}
+.propertiesTbl { margin: 0 !important;padding: 0 !important;}
+.propertiesTbl tr td { padding:0 0 0 60px}
+.propertiesTbl tr.propertyLast td {border-bottom: none;}
+
 .adminTbl1 td .edit {top:9px;}
 .hasSubLabel{} 
 .labelCollapsed{ background-position:-352px -11px; padding-left:22px;}
@@ -886,6 +900,8 @@ td.heartbeattd span.unit, td.queryTimeOut span.unit{position:relative;/* top:7px
 			border: none;
 			margin-left: 10px;} 
 .btnSave:hover{background-color:#76bd1d; color:#fff;}
+.editOk, .editCancel { background-color:#aa1f2f; cursor:pointer; padding:4px 6px; text-align:center; color:#FFFFFF; font:12px Arial, Helvetica, sans-serif; text-shadow:none; text-decoration:none; border-radius:0; border:none;}
+.editOk:hover, .editCancel:hover{background-color:#76bd1d; color:#fff;}
 
 .editOk, .editCancel {
     display: none;

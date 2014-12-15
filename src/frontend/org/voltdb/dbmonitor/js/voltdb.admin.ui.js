@@ -1,7 +1,7 @@
 ﻿var adminDOMObjects = {};
 var adminEditObjects = {};
 
-$(document).ready(function () {
+function loadAdminPage() {
 
     adminDOMObjects = {
         siteNumberHeader: $("#sitePerHost"),
@@ -104,6 +104,16 @@ $(document).ready(function () {
         tBoxQueryTimeoutValue: $("#queryTimeOutSpan").text(),
         spanqueryTimeOut: $("#queryTimeOutSpan"),
     };
+    
+    //Admin Page download link
+    $('#downloadAdminConfigurations').on('click', function (e) {
+        var port = VoltDBConfig.GetPortId() != null ? VoltDBConfig.GetPortId() : '8080';
+        var url = window.location.protocol + '//' + VoltDBConfig.GetDefaultServerIP() + ":" + port + '/deployment/download/deployment.xml?' + VoltDBCore.shortApiCredentials;
+        $(this).attr("href", url);
+        setTimeout(function () {
+            $('#downloadAdminConfigurations').attr("href", "#");
+        }, 100);
+    });
 
     adminEditObjects.chkSecurity.on('ifChanged', function () {
         adminEditObjects.spanSecurity.text(getOnOffText(adminEditObjects.chkSecurity.is(":checked")));
@@ -527,14 +537,12 @@ $(document).ready(function () {
 
     // Hides opened serverlist
     $(document).on('click', function (e) {
-        if (!$(e.target).hasClass('adminIcons') && !$(e.target).hasClass('serverName')) {
-            if ($(e.target).closest("#serverConfigAdmin").length === 0) {
-                $("#serverConfigAdmin").hide();
-            }
-        }
-    });
-
-
+       if (!$(e.target).hasClass('adminIcons') && !$(e.target).hasClass('serverName')) {
+           if ($(e.target).closest("#serverConfigAdmin").length === 0) {
+               $("#serverConfigAdmin").hide();
+           }
+       }
+   });
 
     // Checkbox style
     $('input.snapshot').iCheck({
@@ -547,11 +555,11 @@ $(document).ready(function () {
         checkboxClass: 'icheckbox_square-aero',
         increaseArea: '20%' // optional
     });
-});
+}
 
 (function (window) {
     var iVoltDbAdminConfig = (function () {
-        this.isAdmin = true;
+        this.isAdmin = false;
         this.registeredElements = [];
         this.idleServers = [];
         this.runningServers = [];
@@ -568,14 +576,20 @@ $(document).ready(function () {
         };
 
         this.displayAdminConfiguration = function (adminConfigValues) {
-            if (adminConfigValues != undefined) {
+            if (adminConfigValues != undefined && VoltDbAdminConfig.isAdmin) {
                 configureAdminValues(adminConfigValues);
                 configureDirectoryValues(adminConfigValues);
             }
         };
 
+        this.displayAdminConfigurationFromSystemInfo = function(adminConfigValues) {
+            if (adminConfigValues != undefined && VoltDbAdminConfig.isAdmin) {
+                configureAdminValuesFromSystemInfo(adminConfigValues);
+            }
+        };
+
         this.displayPortAndOverviewDetails = function (portAndOverviewValues) {
-            if (portAndOverviewValues != undefined) {
+            if (portAndOverviewValues != undefined && VoltDbAdminConfig.isAdmin) {
                 configurePortAndOverviewValues(portAndOverviewValues);
             }
         };
@@ -602,7 +616,7 @@ $(document).ready(function () {
             adminDOMObjects.retained.text(adminConfigValues.retained != "" ? adminConfigValues.retained : "");
             adminDOMObjects.retainedLabel.text(adminConfigValues.retained != "" ? "Copies" : "");
             adminDOMObjects.commandLog.removeClass().addClass(getOnOffClass(adminConfigValues.commandLogEnabled));
-            adminDOMObjects.commandLogLabel.text(adminConfigValues.commandLogEnabled == 'true' ? 'On' : 'Off');
+            adminDOMObjects.commandLogLabel.text(adminConfigValues.commandLogEnabled == true ? 'On' : 'Off');
             adminDOMObjects.commandLogFrequencyTime.text(adminConfigValues.commandLogFrequencyTime != "" ? adminConfigValues.commandLogFrequencyTime : "");
             adminDOMObjects.commandLogFrequencyTimeLabel.text(adminConfigValues.commandLogFrequencyTime != "" ? "ms" : "");
             adminDOMObjects.commandLogFrequencyTransactions.text(adminConfigValues.commandLogFrequencyTransactions != "" ? adminConfigValues.commandLogFrequencyTransactions : "");
@@ -611,18 +625,67 @@ $(document).ready(function () {
             adminDOMObjects.exports.removeClass().addClass(getOnOffClass(adminConfigValues.export));
             adminDOMObjects.exportLabel.text(getOnOffText(adminConfigValues.export));
             adminDOMObjects.target.text(adminConfigValues.targets);
-            adminDOMObjects.properties.text(adminConfigValues.properties);
+            
+            //TODO: Display properties in table
+            //adminDOMObjects.properties.text(adminConfigValues.properties);
+            
             adminDOMObjects.heartBeatTimeout.text(adminConfigValues.heartBeatTimeout != "" ? adminConfigValues.heartBeatTimeout : "");
             adminDOMObjects.heartBeatTimeoutLabel.text(adminConfigValues.heartBeatTimeout != "" ? "ms" : "");
-            adminDOMObjects.queryTimeout.text(adminConfigValues.queryTimeout != "" ? adminConfigValues.queryTimeout : "");
-            adminDOMObjects.queryTimeoutLabel.text(adminConfigValues.queryTimeout != "" ? "ms" : "");
+            //adminDOMObjects.queryTimeout.text(adminConfigValues.queryTimeout != "" ? adminConfigValues.queryTimeout : "");
+            //adminDOMObjects.queryTimeoutLabel.text(adminConfigValues.queryTimeout != "" ? "ms" : "");
             adminDOMObjects.tempTablesMaxSize.text(adminConfigValues.tempTablesMaxSize != "" ? adminConfigValues.tempTablesMaxSize : "");
             adminDOMObjects.tempTablesMaxSizeLabel.text(adminConfigValues.tempTablesMaxSize != "" ? "MB" : "");
             adminDOMObjects.snapshotPriority.text(adminConfigValues.snapshotPriority);
 
             //edit configuration
             adminEditObjects.tBoxHeartbeatTimeoutValue = adminConfigValues.heartBeatTimeout;
+            adminEditObjects.spanAutoSnapshotFreq.text(parseInt(adminConfigValues.frequency));
+            var spanshotUnit = adminConfigValues.frequency.slice(-1);
+            setSnapShotUnit(spanshotUnit);
+            getExportProperties(adminConfigValues.properties);
 
+        };
+
+        var getExportProperties = function(data) {
+            var result = "";
+            for (var i = 0; i < data.length; i++) {
+                if (i == 0) {
+                    result += '<tr>' +
+                        '<td width="67%">' + data[i].name + '</td>' +
+                        '<td width="33%">' + data[i].value + '</td>' +
+                        '</tr>';
+                }else if (i == (data.length - 1)) {
+                    result += '<tr class="propertyLast">' +
+                        '<td>' + data[i].name + '</td>' +
+                        '<td>' + data[i].value + '</td>' +
+                        '</tr>';
+                } else {
+                    result +='<tr>' +
+                        '<td>' + data[i].name + '</td>' +
+                        '<td>' + data[i].value + '</td>' +
+                        '</tr>';
+                }
+            }
+            if (result == "") {
+                $('#exportProperties').html("No properties available.");
+            } else {
+                $('#exportProperties').html(result);
+            }
+        };
+
+        var setSnapShotUnit = function(unit) {
+            if (unit == 's') {
+                adminEditObjects.spanAutoSnapshotFreqUnit.text('Sec');
+            }else if (unit == 'm') {
+                adminEditObjects.spanAutoSnapshotFreqUnit.text('Min');
+            }else if (unit == 'h') {
+                adminEditObjects.spanAutoSnapshotFreqUnit.text('Hrs');
+            }
+        }; 
+
+        var configureAdminValuesFromSystemInfo = function (adminConfigValues) {
+            adminDOMObjects.queryTimeout.text(adminConfigValues.queryTimeout != "" ? adminConfigValues.queryTimeout : "");
+            adminDOMObjects.queryTimeoutLabel.text(adminConfigValues.queryTimeout != "" ? "ms" : "");
         };
 
         var configurePortAndOverviewValues = function (configValues) {
