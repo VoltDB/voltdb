@@ -1,7 +1,7 @@
 ﻿var adminDOMObjects = {};
 var adminEditObjects = {};
 
-$(document).ready(function () {
+function loadAdminPage() {
 
     adminDOMObjects = {
         siteNumberHeader: $("#sitePerHost"),
@@ -104,6 +104,16 @@ $(document).ready(function () {
         tBoxQueryTimeoutValue: $("#queryTimeOutSpan").text(),
         spanqueryTimeOut: $("#queryTimeOutSpan"),
     };
+    
+    //Admin Page download link
+    $('#downloadAdminConfigurations').on('click', function (e) {
+        var port = VoltDBConfig.GetPortId() != null ? VoltDBConfig.GetPortId() : '8080';
+        var url = window.location.protocol + '//' + VoltDBConfig.GetDefaultServerIP() + ":" + port + '/deployment/download/deployment.xml?' + VoltDBCore.shortApiCredentials;
+        $(this).attr("href", url);
+        setTimeout(function () {
+            $('#downloadAdminConfigurations').attr("href", "#");
+        }, 100);
+    });
 
     adminEditObjects.chkSecurity.on('ifChanged', function () {
         adminEditObjects.spanSecurity.text(getOnOffText(adminEditObjects.chkSecurity.is(":checked")));
@@ -546,12 +556,12 @@ $(document).ready(function () {
         checkboxClass: 'icheckbox_square-aero',
         increaseArea: '20%' // optional
     });
-});
+}
 
 (function (window) {
     var iVoltDbAdminConfig = (function () {
 
-        this.isAdmin = true;
+        this.isAdmin = false;
         this.registeredElements = [];
         this.idleServers = [];
         this.displayAdminConfiguration = function (adminConfigValues) {

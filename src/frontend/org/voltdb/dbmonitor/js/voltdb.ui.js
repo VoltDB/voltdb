@@ -261,16 +261,6 @@ var loadPage = function (serverName, portid) {
     //users can't accidentally send requests that might change database contents.
     loadSQLQueryPage(serverName, portid, userName, password, false);
 
-    //Admin Page download link
-    $('#downloadAdminConfigurations').on('click', function (e) {
-        var port = VoltDBConfig.GetPortId() != null ? VoltDBConfig.GetPortId() : '8080';
-        var url = window.location.protocol + '//' + VoltDBConfig.GetDefaultServerIP() + ":" + port + '/deployment/download/deployment.xml?' + VoltDBCore.shortApiCredentials;
-        $(this).attr("href", url);
-        setTimeout(function () {
-            $('#downloadAdminConfigurations').attr("href", "#");
-        }, 100);
-    });
-
     var loadSchemaTab = function () {
         var templateUrl = window.location.protocol + '//' + window.location.host + '/catalog';
         var templateJavascript = "js/template.js";
@@ -290,23 +280,38 @@ var loadPage = function (serverName, portid) {
         });
     };
     loadSchemaTab();
+    
+    voltDbRenderer.CheckAdminPriviledges(function (hasAdminPrivileges) {
 
-    //Retain current tab while page refreshing.
-    var curTab = $.cookie("current-tab");
-    if (curTab != undefined) {
-        curTab = curTab * 1;
-        if (curTab == NavigationTabs.Schema) {
-            $("#overlay").show();
-            setTimeout(function () { $("#navSchema > a").trigger("click"); }, 100);
-        } else if (curTab == NavigationTabs.SQLQuery) {
-            $("#overlay").show();
-            setTimeout(function () { $("#navSqlQuery > a").trigger("click"); }, 100);
-        } else if (curTab == NavigationTabs.Admin && VoltDbAdminConfig.isAdmin) {
-            $("#overlay").show();
-            setTimeout(function () { $("#navAdmin > a").trigger("click"); }, 100);
+        if (hasAdminPrivileges) {
+            VoltDbAdminConfig.isAdmin = true;
+            $("#navAdmin").show();
+            loadAdminPage();
+        } else {
+            $("#navAdmin").hide();
         }
-    }
-
+        
+        //Retain current tab while page refreshing.
+        var curTab = $.cookie("current-tab");
+        if (curTab != undefined) {
+            curTab = curTab * 1;
+            if (curTab == NavigationTabs.Schema) {
+                $("#overlay").show();
+                setTimeout(function () { $("#navSchema > a").trigger("click"); }, 100);
+            } else if (curTab == NavigationTabs.SQLQuery) {
+                $("#overlay").show();
+                setTimeout(function () { $("#navSqlQuery > a").trigger("click"); }, 100);
+            } else if (curTab == NavigationTabs.Admin) {
+                if (VoltDbAdminConfig.isAdmin) {
+                    $("#overlay").show();
+                    setTimeout(function() { $("#navAdmin > a").trigger("click"); }, 100);
+                } else {
+                    saveSessionCookie("current-tab", NavigationTabs.DBMonitor);
+                }
+            }
+        }
+    });
+    
     var defaultSearchTextProcedure = 'Search Stored Procedures';
     var defaultSearchTextTable = 'Search Database Tables';
 

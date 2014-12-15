@@ -313,6 +313,13 @@ function alertNodeClicked(obj) {
             });
         };
         
+        this.CheckAdminPriviledges = function(onInformationLoaded) {
+
+            VoltDBService.GetShortApiProfile(function(connection) {
+                onInformationLoaded(hasAdminPrivileges(connection));
+            });
+        };
+        
         this.GetAdminDeploymentInformation = function (onInformationLoaded) {
             if (VoltDbAdminConfig.isAdmin) {
                 
@@ -321,7 +328,7 @@ function alertNodeClicked(obj) {
                 });
             }
         };
-
+        
         this.GetProceduresInfoNAdminConfiguration = function (onProceduresDataLoaded, onAdminConfigLoaded) {
             var procedureMetadata = "";
 
@@ -501,6 +508,24 @@ function alertNodeClicked(obj) {
 
         };
 
+        var hasAdminPrivileges = function (connection) {
+            var isAdmin = false;
+            if (connection != null && connection.Metadata['SHORTAPI_PROFILE'] != null) {
+                var data = connection.Metadata['SHORTAPI_PROFILE'];
+
+                if (data.permissions != null) {
+                    $.each(data.permissions, function(index, value) {
+                        if (value.toUpperCase().trim() == 'ADMIN') {
+                            isAdmin = true;
+                            return false;
+                        }
+                        return true;
+                    });
+                }
+            }
+            
+            return isAdmin;
+        };
 
         var loadAdminDeploymentInformation = function(connection) {
 
