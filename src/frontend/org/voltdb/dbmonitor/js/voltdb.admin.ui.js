@@ -565,20 +565,20 @@ function loadAdminPage() {
         this.registeredElements = [];
         this.idleServers = [];
         this.displayAdminConfiguration = function (adminConfigValues) {
-            if (adminConfigValues != undefined) {
+            if (adminConfigValues != undefined && VoltDbAdminConfig.isAdmin) {
                 configureAdminValues(adminConfigValues);
                 configureDirectoryValues(adminConfigValues);
             }
         };
 
         this.displayAdminConfigurationFromSystemInfo = function(adminConfigValues) {
-            if (adminConfigValues != undefined) {
+            if (adminConfigValues != undefined && VoltDbAdminConfig.isAdmin) {
                 configureAdminValuesFromSystemInfo(adminConfigValues);
             }
         };
 
         this.displayPortAndOverviewDetails = function (portAndOverviewValues) {
-            if (portAndOverviewValues != undefined) {
+            if (portAndOverviewValues != undefined && VoltDbAdminConfig.isAdmin) {
                 configurePortAndOverviewValues(portAndOverviewValues);
             }
         };
