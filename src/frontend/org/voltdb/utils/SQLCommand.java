@@ -1328,6 +1328,12 @@ public class SQLCommand
     // Application entry point
     public static void main(String args[])
     {
+/*        if (out == null) { // always
+            System.err.println("err HARD-CODED QUIT AT TOP OF SQLCOMMAND");
+            System.out.println("out HARD-CODED QUIT AT TOP OF SQLCOMMAND");
+            System.exit(0);
+        }
+*/
         TimeZone.setDefault(TimeZone.getTimeZone("GMT+0"));
         // Initialize parameter defaults
         String serverList = "localhost";
