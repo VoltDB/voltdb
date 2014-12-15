@@ -32,6 +32,7 @@ package org.voltdb.utils;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 
@@ -185,7 +186,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
 
     static private int callSQLcmd(boolean stopOnError, String inputText) throws Exception {
         final String commandPath = "bin/sqlcmd";
-        final long timeout = 60000; // 60,000 millis -- give up after 1 minute of trying.
+        final long timeout = 60 * 60000; // 60,000 millis -- give up after 1 minute of trying.
 
         File f = new File("ddl.sql");
         f.deleteOnExit();
@@ -193,9 +194,11 @@ public class TestSqlCmdErrorHandling extends TestCase {
         fos.write(inputText.getBytes());
         fos.close();
 
-        File out = new File("out.log");
+        File out = File.createTempFile("testsqlcmdout", "log");
+        out.deleteOnExit();
 
-        File error = new File("error.log");
+        File error = File.createTempFile("testsqlcmderr", "log");
+        error.deleteOnExit();
 
         ProcessBuilder pb =
                 new ProcessBuilder(commandPath, "--stop-on-error=" + (stopOnError ? "true" : "false"));
@@ -218,6 +221,10 @@ public class TestSqlCmdErrorHandling extends TestCase {
                     elapsedtime = System.currentTimeMillis() - starttime;
                     System.err.println("External process (" + commandPath + ") exited after being polled " +
                             pollcount + " times over " + elapsedtime + "ms");
+
+                    if (pollcount % 20 == 0) {
+                        dumpProcessTree();
+                    }
                 }
                 //*/enable for debug*/ System.err.println(commandPath + " returned " + exitValue);
                 //*/enable for debug*/ System.err.println(" in " + (System.currentTimeMillis() - starttime)+ "ms");
@@ -232,12 +239,32 @@ public class TestSqlCmdErrorHandling extends TestCase {
         } while (elapsedtime < timeout);
 
 
+        System.err.println("Standard output from timed out " + commandPath + ":");
+        FileInputStream cmdOut = new FileInputStream(out);
+        byte[] transfer = new byte[1000];
+        while (cmdOut.read(transfer) != -1) {
+            System.err.write(transfer);
+        }
+        cmdOut.close();
+        System.err.println("Error output from timed out " + commandPath + ":");
+        FileInputStream cmdErr = new FileInputStream(error);
+        while (cmdErr.read(transfer) != -1) {
+            System.err.write(transfer);
+        }
+        cmdErr.close();
+        fail("External process (" + commandPath + ") timed out after " + elapsedtime + "ms on input:\n" + inputText);
+        return 0;
+    }
+
+    /**
+     * @throws IOException
+     * @throws InterruptedException
+     * @throws FileNotFoundException
+     */
+    private static void dumpProcessTree() throws IOException, InterruptedException, FileNotFoundException {
         File psout = new File("psout.log");
-
         File pserror = new File("pserr.log");
-
-        ProcessBuilder pspb =
-                new ProcessBuilder("ps", "-fx");
+        ProcessBuilder pspb = new ProcessBuilder("ps", "-fx");
         pspb.redirectOutput(psout);
         pspb.redirectError(pserror);
         Process psprocess = pspb.start();
@@ -258,24 +285,6 @@ public class TestSqlCmdErrorHandling extends TestCase {
             System.err.write(pstransfer);
         }
         psOuts.close();
-
-
-
-        System.err.println("Standard output from timed out " + commandPath + ":");
-        FileInputStream cmdOut = new FileInputStream(out);
-        byte[] transfer = new byte[1000];
-        while (cmdOut.read(transfer) != -1) {
-            System.err.write(transfer);
-        }
-        cmdOut.close();
-        System.err.println("Error output from timed out " + commandPath + ":");
-        FileInputStream cmdErr = new FileInputStream(error);
-        while (cmdErr.read(transfer) != -1) {
-            System.err.write(transfer);
-        }
-        cmdErr.close();
-        fail("External process (" + commandPath + ") timed out after " + elapsedtime + "ms on input:\n" + inputText);
-        return 0;
     }
 
     public void test10Error() throws Exception

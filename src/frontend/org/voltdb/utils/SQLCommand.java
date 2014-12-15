@@ -1328,6 +1328,8 @@ public class SQLCommand
     // Application entry point
     public static void main(String args[])
     {
+        System.err.println("IN SQLCOMMAND MAIN");
+        System.err.flush();
 /*
         if (out == null) { // always
             System.err.println("err HARD-CODED QUIT AT TOP OF SQLCOMMAND");
