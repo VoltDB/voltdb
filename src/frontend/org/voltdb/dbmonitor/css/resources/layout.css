@@ -898,6 +898,8 @@ td.heartbeattd span.unit, td.queryTimeOut span.unit{position:relative;/* top:7px
 			border: none;
 			margin-left: 10px;} 
 .btnSave:hover{background-color:#76bd1d; color:#fff;}
+.editOk, .editCancel { background-color:#aa1f2f; cursor:pointer; padding:4px 6px; text-align:center; color:#FFFFFF; font:12px Arial, Helvetica, sans-serif; text-shadow:none; text-decoration:none; border-radius:0; border:none;}
+.editOk:hover, .editCancel:hover{background-color:#76bd1d; color:#fff;}
 
 .editOk, .editCancel {
     display: none;
