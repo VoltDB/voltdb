@@ -231,6 +231,36 @@ public class TestSqlCmdErrorHandling extends TestCase {
             }
         } while (elapsedtime < timeout);
 
+
+        File psout = new File("psout.log");
+
+        File pserror = new File("pserr.log");
+
+        ProcessBuilder pspb =
+                new ProcessBuilder("ps", "-fx");
+        pspb.redirectOutput(psout);
+        pspb.redirectError(pserror);
+        Process psprocess = pspb.start();
+
+        long psstarttime = System.currentTimeMillis();
+        Thread.sleep(1000);
+        try {
+            psprocess.exitValue();
+        }
+        catch (Exception e) {
+            long pselapsed = System.currentTimeMillis() - psstarttime;
+            System.err.println("External process (ps) has not yet exited after " + pselapsed + "ms");
+        }
+
+        FileInputStream psOuts = new FileInputStream(psout);
+        byte[] pstransfer = new byte[1000];
+        while (psOuts.read(pstransfer) != -1) {
+            System.err.write(pstransfer);
+        }
+        psOuts.close();
+
+
+
         System.err.println("Standard output from timed out " + commandPath + ":");
         FileInputStream cmdOut = new FileInputStream(out);
         byte[] transfer = new byte[1000];
