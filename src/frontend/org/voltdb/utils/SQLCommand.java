@@ -562,7 +562,7 @@ public class SQLCommand
                 }
                 return;
             }
-            //* enable to debug */ else System.err.println("Read non-null batch line: (" + line + ")");
+            /*/* enable to debug */ else System.err.println("Read non-null batch line: (" + line + ")");
 
             // If the line is a FILE command - include the content of the file into the query queue
             Matcher fileMatcher = FileToken.matcher(line);
@@ -1428,6 +1428,7 @@ public class SQLCommand
                 config.enableKerberosAuthentication(kerberos);
             }
             VoltDB = getClient(config, servers, port);
+            System.err.println("SQL Command connected on port:: " + port);
         } catch (Exception exc) {
             System.err.println(exc.getMessage());
             System.exit(-1);
@@ -1489,6 +1490,7 @@ public class SQLCommand
             if (System.in.available() > 0) {
                 // If Standard input comes loaded with data, run in non-interactive mode
                 m_interactive = false;
+                System.err.println("SQL Command starting non-interactively");
                 executeNoninteractive();
             }
             if (m_interactive) {

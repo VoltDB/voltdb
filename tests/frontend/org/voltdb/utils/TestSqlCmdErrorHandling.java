@@ -238,7 +238,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
             System.err.write(transfer);
         }
         cmdOut.close();
-        System.err.println("Error outpout from timed out " + commandPath + ":");
+        System.err.println("Error output from timed out " + commandPath + ":");
         FileInputStream cmdErr = new FileInputStream(error);
         while (cmdErr.read(transfer) != -1) {
             System.err.write(transfer);
