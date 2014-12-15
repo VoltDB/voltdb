@@ -3600,28 +3600,19 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(db.getTables().getIgnoreCase("e1").getIsdred());
         assertTrue(db.getTables().getIgnoreCase("e2").getIsdred());
 
-        db = goodDDLAgainstSimpleSchema(
-                schema,
-                "dr table *;"
-                );
-        assertTrue(db.getTables().getIgnoreCase("e1").getIsdred());
-        assertTrue(db.getTables().getIgnoreCase("e2").getIsdred());
-
         // DR statement is order sensitive
         db = goodDDLAgainstSimpleSchema(
                 schema,
-                "dr table *;",
+                "dr table e2;",
                 "dr table e2 disable;"
                 );
-        assertTrue(db.getTables().getIgnoreCase("e1").getIsdred());
         assertFalse(db.getTables().getIgnoreCase("e2").getIsdred());
 
         db = goodDDLAgainstSimpleSchema(
                 schema,
                 "dr table e2 disable;",
-                "dr table *;"
+                "dr table e2;"
                 );
-        assertTrue(db.getTables().getIgnoreCase("e1").getIsdred());
         assertTrue(db.getTables().getIgnoreCase("e2").getIsdred());
     }
 
@@ -3654,10 +3645,6 @@ public class TestVoltCompiler extends TestCase {
 
         Database db;
         db = goodDDLAgainstSimpleSchema(moreSchema, "DR TABLE repl DISABLE;");
-        assertFalse(db.getTables().getIgnoreCase("repl").getIsdred());
-
-        db = goodDDLAgainstSimpleSchema(moreSchema, "DR TABLE *;");
-        assertTrue(db.getTables().getIgnoreCase("books").getIsdred());
         assertFalse(db.getTables().getIgnoreCase("repl").getIsdred());
     }
 
