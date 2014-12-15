@@ -268,4 +268,25 @@ public class TestPlansOrderBy extends PlannerTestCase {
         validateOptimalPlan("SELECT * FROM T, T2, Tmanykeys " +
                 "WHERE T.T_D0 = T2.T_D0 AND T2.T_D1 = Tmanykeys.T_D0 ORDER BY T.T_D0, T.T_D1 LIMIT ?");
     }
+
+    /**
+     * Order by clause can only operate on the display columns list when having DISTINCT or GROUP BY clause.
+     * However, it can operate on other columns or expressions on the table or joined table.
+     */
+    public void testOrderbyColumnsNotInDisplayList() {
+        compile("select T.T_D0 from T order by T.T_D1;");
+        compile("select T.T_D0 from T, Tmanykeys where Tmanykeys.T_D0 = T.T_D2 order by T.T_D1;");
+
+        // DISTINCT
+        failToCompile("select DISTINCT T.T_D0 from T order by T.T_D1;", "invalid ORDER BY expression");
+        // GROUP BY
+        failToCompile("select T.T_D0, count(*) from T group by T.T_D0 order by T.T_D1;", "invalid ORDER BY expression");
+
+        // Very edge case:
+        // Order by GROUP BY columns or expressions which are not in display list
+        compile("select count(*) from T group by T.T_D0 order by T.T_D0;");
+        compile("select count(*) from T group by T.T_D0 order by ABS(T.T_D0);");
+
+        compile("select count(*) from T group by ABS(T.T_D0) order by ABS(T.T_D0);");
+    }
 }

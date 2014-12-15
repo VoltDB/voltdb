@@ -1,0 +1,3 @@
+# Views: (for the genqa test app)
+PARTITIONED_TABLE_GROUP
+REPLICATED_TABLE_GROUP
