@@ -390,7 +390,7 @@ var loadPage = function (serverName, portid) {
             var lUserPreferences = getUserPreferences();
             showHideGraph(lUserPreferences);
         };
-        var loadAdminTabPortAndOverviewDetails = function(portAndOverviewValues) {
+        var loadAdminTabPortAndOverviewDetails = function (portAndOverviewValues) {
             VoltDbAdminConfig.displayPortAndOverviewDetails(portAndOverviewValues);
         };
 
@@ -399,35 +399,50 @@ var loadPage = function (serverName, portid) {
             registerConfirmationPopup();
         };
 
-        var registerConfirmationPopup = function() {
+        var registerConfirmationPopup = function () {
             var i = 0;
-            var hostId =1;
-            
-            $.each(voltDbRenderer.hostIds, function(id, val) {
-                if (!isNodeButtonRegistered($('#stopServer' + val).attr('id'))) {
-                    $('#stopServer' + val).popup({
-                        afterOpen: function(event) {
-                            hostId = $($(this)[0].ele).data("hostid");
+            var hostName = "";
+            var hostId = -1;
+            var idleServerDetails;
+            var popupRef;
+            $.each(voltDbRenderer.hostNames, function (id, val) {
+                if (voltDbRenderer.currentHost != val) {
+                    if (!isNodeButtonRegistered($('#stopServer_' + val).attr('id'))) {
+                        $('#stopServer_' + val).popup({                            
+                            afterOpen: function (event) {
+                                hostName = $($(this)[0].ele).data("hostname");
+                                hostId = $($(this)[0].ele).data("hostid");
 
-                            $("#StoptConfirmOK").unbind("click");
-                            $("#StoptConfirmOK").on("click", function() {
-                                //API Request                                
-                                voltDbRenderer.stopServer(hostId, function(success) {
-                                    if (success) {
-                                        $("#stopServer" + hostId).hide();
-                                        $("#startServer" + hostId).show();
-                                        VoltDbAdminConfig.idleServers.push(hostId);                                        
-                                    }
+                                $("#StoptConfirmOK").unbind("click");
+                                $("#StoptConfirmOK").on("click", function () {
+                                    //API Request                                
+                                    voltDbRenderer.stopServer(hostId, function (success) {
+                                        if (success) {
+                                            $("#stopServer_" + hostName).addClass('disableServer');                                           
+                                            idleServerDetails = new VoltDbAdminConfig.idleServer(hostName, hostName, "MISSING");
+                                            VoltDbAdminConfig.idleServers.push(idleServerDetails);
+                                            
+                                            popupRef.open = function () {
+                                                return false;
+                                            };
+                                        }
 
+                                    });
+
+                                    //Close the popup                                            
+                                    $($(this).siblings()[0]).trigger("click");
+                                    
                                 });
-
-                                //Close the popup                                            
-                                $($(this).siblings()[0]).trigger("click");
-
-                            });
-                        },
-                    });
-                    VoltDbAdminConfig.registeredElements.push('stopServer' + val);
+                            },
+                            
+                            afterClose:function() {
+                                popupRef = $(this)[0];
+                            }
+                        });
+                        VoltDbAdminConfig.registeredElements.push('stopServer_' + val);
+                    }
+                } else {
+                    
                 }
             });
 
@@ -1193,10 +1208,10 @@ var loadPage = function (serverName, portid) {
 
     refreshClusterHealth();
     refreshGraphAndData($.cookie("graph-view"), VoltDbUI.CurrentTab);
-    setInterval(refreshClusterHealth,25000);
+    setInterval(refreshClusterHealth, 25000);
     setInterval(function () {
         refreshGraphAndData($.cookie("graph-view"), VoltDbUI.CurrentTab);
-    }, 25000);
+    },25000);
     //refreshGraphAndDataInLoop(getRefreshTime(), $.cookie("graph-view"));
     configureUserPreferences();
     adjustGraphSpacing();

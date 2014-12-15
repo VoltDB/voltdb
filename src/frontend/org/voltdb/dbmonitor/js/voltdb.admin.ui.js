@@ -169,7 +169,8 @@ $(document).ready(function () {
                 $("#resumeConfirmation").show();
 
                 //Close the popup
-                $($(this).siblings()[0]).trigger("click");
+                $($(this).siblings()[0]).trigger("click");                
+
             });
         }
     });
@@ -272,6 +273,7 @@ $(document).ready(function () {
 
                 //Close the popup
                 $($(this).siblings()[0]).trigger("click");
+                
             });
         }
     });
@@ -525,7 +527,7 @@ $(document).ready(function () {
 
     // Hides opened serverlist
     $(document).on('click', function (e) {
-        if (!$(event.target).hasClass('adminIcons') && !$(event.target).hasClass('serverName')) {
+        if (!$(e.target).hasClass('adminIcons') && !$(e.target).hasClass('serverName')) {
             if ($(e.target).closest("#serverConfigAdmin").length === 0) {
                 $("#serverConfigAdmin").hide();
             }
@@ -549,10 +551,22 @@ $(document).ready(function () {
 
 (function (window) {
     var iVoltDbAdminConfig = (function () {
-
         this.isAdmin = true;
         this.registeredElements = [];
         this.idleServers = [];
+        this.runningServers = [];
+        
+        this.idleServer = function(hostIdvalue,serverNameValue,serverStateValue) {
+            this.hostId = hostIdvalue;
+            this.serverName = serverNameValue;
+            this.serverState = serverStateValue;
+        };
+        
+        this.runningServer = function (serverNameValue, serverStateValue) {
+            this.runningServerName = serverNameValue;
+            this.runningServerState = serverStateValue;
+        };
+
         this.displayAdminConfiguration = function (adminConfigValues) {
             if (adminConfigValues != undefined) {
                 configureAdminValues(adminConfigValues);
@@ -567,7 +581,7 @@ $(document).ready(function () {
         };
 
         this.refreshServerList = function (serverList,serverCount) {
-           adminDOMObjects.adminServerList.html(serverList);
+            adminDOMObjects.adminServerList.html(serverList);
         };
 
         var configureAdminValues = function (adminConfigValues) {
