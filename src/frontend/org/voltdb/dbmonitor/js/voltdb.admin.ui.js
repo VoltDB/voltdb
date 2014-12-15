@@ -1,7 +1,7 @@
 ﻿var adminDOMObjects = {};
 var adminEditObjects = {};
 
-$(document).ready(function () {
+function loadAdminPage() {
 
     adminDOMObjects = {
         siteNumberHeader: $("#sitePerHost"),
@@ -19,7 +19,7 @@ $(document).ready(function () {
         frequency: $("#txtFrequency"),
         frequencyLabel: $("#spanFrequencyUnit"),
         retained: $("#retainedSpan"),
-        retainedLabel: $("#txtRetained"),
+        retainedLabel: $("#retainedSpanUnit"),
         commandLog: $("#commandLogIcon"),
         commandLogLabel: $("#commandLogLabel"),
         commandLogFrequencyTime: $("#commandLogFrequencyTime"),
@@ -104,6 +104,16 @@ $(document).ready(function () {
         tBoxQueryTimeoutValue: $("#queryTimeOutSpan").text(),
         spanqueryTimeOut: $("#queryTimeOutSpan"),
     };
+    
+    //Admin Page download link
+    $('#downloadAdminConfigurations').on('click', function (e) {
+        var port = VoltDBConfig.GetPortId() != null ? VoltDBConfig.GetPortId() : '8080';
+        var url = window.location.protocol + '//' + VoltDBConfig.GetDefaultServerIP() + ":" + port + '/deployment/download/deployment.xml?' + VoltDBCore.shortApiCredentials;
+        $(this).attr("href", url);
+        setTimeout(function () {
+            $('#downloadAdminConfigurations').attr("href", "#");
+        }, 100);
+    });
 
     adminEditObjects.chkSecurity.on('ifChanged', function () {
         adminEditObjects.spanSecurity.text(getOnOffText(adminEditObjects.chkSecurity.is(":checked")));
@@ -169,7 +179,8 @@ $(document).ready(function () {
                 $("#resumeConfirmation").show();
 
                 //Close the popup
-                $($(this).siblings()[0]).trigger("click");
+                $($(this).siblings()[0]).trigger("click");                
+
             });
         }
     });
@@ -272,6 +283,7 @@ $(document).ready(function () {
 
                 //Close the popup
                 $($(this).siblings()[0]).trigger("click");
+                
             });
         }
     });
@@ -532,9 +544,6 @@ $(document).ready(function () {
        }
    });
 
-
-
-
     // Checkbox style
     $('input.snapshot').iCheck({
         checkboxClass: 'icheckbox_square-aero',
@@ -546,35 +555,47 @@ $(document).ready(function () {
         checkboxClass: 'icheckbox_square-aero',
         increaseArea: '20%' // optional
     });
-});
+}
 
 (function (window) {
     var iVoltDbAdminConfig = (function () {
-
-        this.isAdmin = true;
+        this.isAdmin = false;
         this.registeredElements = [];
         this.idleServers = [];
+        this.runningServers = [];
+        
+        this.idleServer = function(hostIdvalue,serverNameValue,serverStateValue) {
+            this.hostId = hostIdvalue;
+            this.serverName = serverNameValue;
+            this.serverState = serverStateValue;
+        };
+        
+        this.runningServer = function (serverNameValue, serverStateValue) {
+            this.runningServerName = serverNameValue;
+            this.runningServerState = serverStateValue;
+        };
+
         this.displayAdminConfiguration = function (adminConfigValues) {
-            if (adminConfigValues != undefined) {
+            if (adminConfigValues != undefined && VoltDbAdminConfig.isAdmin) {
                 configureAdminValues(adminConfigValues);
                 configureDirectoryValues(adminConfigValues);
             }
         };
 
         this.displayAdminConfigurationFromSystemInfo = function(adminConfigValues) {
-            if (adminConfigValues != undefined) {
+            if (adminConfigValues != undefined && VoltDbAdminConfig.isAdmin) {
                 configureAdminValuesFromSystemInfo(adminConfigValues);
             }
         };
 
         this.displayPortAndOverviewDetails = function (portAndOverviewValues) {
-            if (portAndOverviewValues != undefined) {
+            if (portAndOverviewValues != undefined && VoltDbAdminConfig.isAdmin) {
                 configurePortAndOverviewValues(portAndOverviewValues);
             }
         };
 
         this.refreshServerList = function (serverList,serverCount) {
-           adminDOMObjects.adminServerList.html(serverList);
+            adminDOMObjects.adminServerList.html(serverList);
         };
 
         var configureAdminValues = function (adminConfigValues) {
@@ -594,6 +615,7 @@ $(document).ready(function () {
             adminDOMObjects.frequencyLabel.text(adminConfigValues.frequency != "" ? "Hrs" : "");
             adminDOMObjects.retained.text(adminConfigValues.retained != "" ? adminConfigValues.retained : "");
             adminDOMObjects.retainedLabel.text(adminConfigValues.retained != "" ? "Copies" : "");
+            adminEditObjects.tBoxAutoSnapshotRetainedValue = adminConfigValues.retained;
             adminDOMObjects.commandLog.removeClass().addClass(getOnOffClass(adminConfigValues.commandLogEnabled));
             adminDOMObjects.commandLogLabel.text(adminConfigValues.commandLogEnabled == true ? 'On' : 'Off');
             adminDOMObjects.commandLogFrequencyTime.text(adminConfigValues.commandLogFrequencyTime != "" ? adminConfigValues.commandLogFrequencyTime : "");

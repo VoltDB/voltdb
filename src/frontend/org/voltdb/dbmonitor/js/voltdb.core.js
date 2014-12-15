@@ -36,7 +36,7 @@
                     if (!this.procedures.hasOwnProperty(procedure)) {
                         return ['Procedure "' + procedure + '" is undefined.'];
                     }
-                
+
                     var signatures = this.procedures[procedure];
                     var localParameters = [];
                     localParameters = localParameters.concat(parameters);
@@ -59,35 +59,35 @@
                                 params += ',';
                             }
                             switch (signature[i]) {
-                            case 'tinyint':
-                            case 'smallint':
-                            case 'int':
-                            case 'integer':
-                            case 'bigint':
-                            case 'float':
-                                params += localParameters[i];
-                                break;
-                            case 'decimal':
-                                params += '"' + localParameters[i] + '"';
-                                break;
-                            case 'bit':
-                                if (localParameters[i] == "'true'" || localParameters[i] == 'true' ||
-                                    localParameters[i] == "'yes'" || localParameters[i] == 'yes' ||
-                                    localParameters[i] == '1' || localParameters[i] == 1)
-                                    params += '1';
-                                else
-                                    params += '0';
-                                break;
-                            case 'varbinary':
-                                params += localParameters[i];
-                                break;
-                            default:
-                                if (procedure == '@SnapshotDelete')
-                                    params += '["' + localParameters[i].replace(/^'|'$/g, '') + '"]';
-                                else
-                                    params += (typeof(localParameters[i]) == 'string'
-                                        ? '"' + localParameters[i].replace(/^'|'$/g, '') + '"'
-                                        : localParameters[i]).replace(/''/g, "'");
+                                case 'tinyint':
+                                case 'smallint':
+                                case 'int':
+                                case 'integer':
+                                case 'bigint':
+                                case 'float':
+                                    params += localParameters[i];
+                                    break;
+                                case 'decimal':
+                                    params += '"' + localParameters[i] + '"';
+                                    break;
+                                case 'bit':
+                                    if (localParameters[i] == "'true'" || localParameters[i] == 'true' ||
+                                        localParameters[i] == "'yes'" || localParameters[i] == 'yes' ||
+                                        localParameters[i] == '1' || localParameters[i] == 1)
+                                        params += '1';
+                                    else
+                                        params += '0';
+                                    break;
+                                case 'varbinary':
+                                    params += localParameters[i];
+                                    break;
+                                default:
+                                    if (procedure == '@SnapshotDelete')
+                                        params += '["' + localParameters[i].replace(/^'|'$/g, '') + '"]';
+                                    else
+                                        params += (typeof (localParameters[i]) == 'string'
+                                            ? '"' + localParameters[i].replace(/^'|'$/g, '') + '"'
+                                            : localParameters[i]).replace(/''/g, "'");
                             }
                         }
                         params += ']';
@@ -151,7 +151,7 @@
                 } else {
                     uri = 'http://' + this.server + ':' + this.port + '/api/1.0/';
                 }
-                
+
                 var params = this.BuildParamSet(procedure, parameters, shortApiCallDetails);
                 if (typeof (params) == 'string') {
                     if (VoltDBCore.isServerConnected) {
@@ -311,35 +311,35 @@
                             params += ',';
                         }
                         switch (signature[i]) {
-                        case 'tinyint':
-                        case 'smallint':
-                        case 'int':
-                        case 'integer':
-                        case 'bigint':
-                        case 'float':
-                            params += localParameters[i];
-                            break;
-                        case 'decimal':
-                            params += '"' + localParameters[i] + '"';
-                            break;
-                        case 'bit':
-                            if (localParameters[i] == "'true'" || localParameters[i] == 'true' ||
-                                localParameters[i] == "'yes'" || localParameters[i] == 'yes' ||
-                                localParameters[i] == '1' || localParameters[i] == 1)
-                                params += '1';
-                            else
-                                params += '0';
-                            break;
-                        case 'varbinary':
-                            params += localParameters[i];
-                            break;
-                        default:
-                            if (procedure == '@SnapshotDelete')
-                                params += '["' + localParameters[i].replace(/^'|'$/g, '') + '"]';
-                            else
-                                params += (typeof(localParameters[i]) == 'string'
-                                    ? '"' + localParameters[i].replace(/^'|'$/g, '') + '"'
-                                    : localParameters[i]).replace(/''/g, "'");
+                            case 'tinyint':
+                            case 'smallint':
+                            case 'int':
+                            case 'integer':
+                            case 'bigint':
+                            case 'float':
+                                params += localParameters[i];
+                                break;
+                            case 'decimal':
+                                params += '"' + localParameters[i] + '"';
+                                break;
+                            case 'bit':
+                                if (localParameters[i] == "'true'" || localParameters[i] == 'true' ||
+                                    localParameters[i] == "'yes'" || localParameters[i] == 'yes' ||
+                                    localParameters[i] == '1' || localParameters[i] == 1)
+                                    params += '1';
+                                else
+                                    params += '0';
+                                break;
+                            case 'varbinary':
+                                params += localParameters[i];
+                                break;
+                            default:
+                                if (procedure == '@SnapshotDelete')
+                                    params += '["' + localParameters[i].replace(/^'|'$/g, '') + '"]';
+                                else
+                                    params += (typeof (localParameters[i]) == 'string'
+                                        ? '"' + localParameters[i].replace(/^'|'$/g, '') + '"'
+                                        : localParameters[i]).replace(/''/g, "'");
                         }
                     }
                     params += ']';
@@ -464,7 +464,9 @@
                 jQuery.each(connection.procedureCommands.procedures, function (id, procedure) {
                     connectionQueue.BeginExecute(procedure['procedure'], (procedure['value'] === undefined ? procedure['parameter'] : [procedure['parameter'], procedure['value']]), function (data) {
                         var suffix = (processName == "GRAPH_MEMORY" || processName == "GRAPH_TRANSACTION") || processName == "TABLE_INFORMATION" ? "_" + processName : "";
-                        connection.Metadata[procedure['procedure'] + "_" + procedure['parameter'] + suffix + "_status"] = data.status;
+                        if (processName == "SYSTEMINFORMATION_STOPSERVER")
+                            connection.Metadata[procedure['procedure'] + "_" + procedure['parameter'] + suffix + "_status"] = data.status;
+
                         connection.Metadata[procedure['procedure'] + "_" + procedure['parameter'] + suffix] = data.results[0];
                     });
                 });
@@ -567,7 +569,7 @@ jQuery.extend({
 
 jQuery.extend({
     getJSON: function (url, formData, callback, authorization) {
-        
+
         if (VoltDBCore.hostIP == "") {
 
             jQuery.ajax({
