@@ -107,10 +107,10 @@ public class TestSqlCmdErrorHandling extends TestCase {
             assertEquals(1, result.asScalarLong());
 
             assertEquals("sqlcmd dry run failed -- maybe some sqlcmd component (the voltdb jar file?) needs to be rebuilt.",
-                    0, callSQLcmd(true, ";\n"));
+                    0, callSQLcmd(true, /**/"\n"));//";\n"));
 
             assertEquals("sqlcmd --stop-on-error=false dry run failed.",
-                    0, callSQLcmd(false, ";\n"));
+                    0, callSQLcmd(false, /**/"\n"));//";\n"));
 
             // Assert that the procs don't complain when fed good parameters.
             // Keep these dry run key values out of range of the test cases.
@@ -186,7 +186,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
 
     static private int callSQLcmd(boolean stopOnError, String inputText) throws Exception {
         final String commandPath = "bin/sqlcmd";
-        final long timeout = 60 * 60000; // 60,000 millis -- give up after 1 minute of trying.
+        final long timeout = 60000 / 10; // 60,000 millis -- give up after 1 minute of trying.
 
         File f = new File("ddl.sql");
         f.deleteOnExit();
@@ -229,6 +229,21 @@ public class TestSqlCmdErrorHandling extends TestCase {
                 //*/enable for debug*/ System.err.println(commandPath + " returned " + exitValue);
                 //*/enable for debug*/ System.err.println(" in " + (System.currentTimeMillis() - starttime)+ "ms");
                 //*/enable for debug*/ System.err.println(" on input:\n" + inputText);
+                if (exitValue != 0) {
+                    System.err.println("Standard output from failed " + commandPath + ":");
+                    FileInputStream cmdOut = new FileInputStream(out);
+                    byte[] transfer = new byte[1000];
+                    while (cmdOut.read(transfer) != -1) {
+                        System.err.write(transfer);
+                    }
+                    cmdOut.close();
+                    System.err.println("Error output from failed " + commandPath + ":");
+                    FileInputStream cmdErr = new FileInputStream(error);
+                    while (cmdErr.read(transfer) != -1) {
+                        System.err.write(transfer);
+                    }
+                    cmdErr.close();
+                }
                 return exitValue;
             }
             catch (Exception e) {
@@ -251,6 +266,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
             System.err.write(transfer);
         }
         cmdErr.close();
+        dumpProcessTree();
         fail("External process (" + commandPath + ") timed out after " + elapsedtime + "ms on input:\n" + inputText);
         return 0;
     }
@@ -263,7 +279,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
     private static void dumpProcessTree() throws IOException, InterruptedException, FileNotFoundException {
         File psout = new File("psout.log");
         File pserror = new File("pserr.log");
-        ProcessBuilder pspb = new ProcessBuilder("ps", "-fx");
+        ProcessBuilder pspb = new ProcessBuilder("ps", "auxfww");
         pspb.redirectOutput(psout);
         pspb.redirectError(pserror);
         Process psprocess = pspb.start();

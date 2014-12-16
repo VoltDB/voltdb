@@ -563,6 +563,7 @@ public class SQLCommand
                 return;
             }
             /*/* enable to debug */ else System.err.println("Read non-null batch line: (" + line + ")");
+            ////Thread.sleep(10000); // MORE STALLING!
 
             // If the line is a FILE command - include the content of the file into the query queue
             Matcher fileMatcher = FileToken.matcher(line);
@@ -1330,6 +1331,7 @@ public class SQLCommand
     {
         System.err.println("IN SQLCOMMAND MAIN");
         System.err.flush();
+//        try {Thread.sleep(10000);} catch(Exception x){}
 /*
         if (out == null) { // always
             System.err.println("err HARD-CODED QUIT AT TOP OF SQLCOMMAND");
