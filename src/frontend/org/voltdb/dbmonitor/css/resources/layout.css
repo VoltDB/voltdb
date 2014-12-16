@@ -767,6 +767,7 @@ ul.helpSchemaList li { list-style:disc; line-height:25px!important; padding:0; m
 .restore, 
 .stop,
 .shutdown,
+.disableServer,
 .startServ, 
 .onIcon, 
 .offIcon, 
@@ -841,7 +842,7 @@ ul.adminClusterList li a:hover{color:#000;}
 .adminTbl1 tr.hasSubLabel td.configLabel{ padding-left:15px; font-weight:bold;}
 .adminTbl1 tr.subLabelRow td.configLabel{padding-left:40px; font-weight:normal;}
 .adminTbl1 tr.subLabelRow td.configLabe2{padding-left:60px; font-weight:normal;}
-.propertiesTbl { margin: 0 !important;padding: 0 !important;}
+.propertiesTbl { margin: 0 !important;padding: 0 !important;font-size: 12px;}
 .propertiesTbl tr td { padding:0 0 0 60px}
 .propertiesTbl tr.propertyLast td {border-bottom: none;}
 
@@ -875,6 +876,7 @@ input.exitableTxtBx{width:30px; /*position:relative; top:6px;*/ padding:2px 3px;
 .tblshutdown tr {border:1px solid #CCCCCC;}
 .tblshutdown tr td  { border:none;}
 .tblshutdown tr td a.shutdown { display:inline-block;background-position:-669px -105px; width:40px; height:36px;line-height:39px; }
+.tblshutdown tr td a.disableServer { display:inline-block;background-position:-669px -150px; width:40px; height:36px;line-height:39px; }
 .tblshutdown tr td a.startServ { display:inline-block;background-position:-669px -56px; width:40px; height:36px;line-height:39px; }
 .shutdownServer { position:relative; top:17px; right:2px;}
 .startServer { position:relative; top:17px; right:2px;}

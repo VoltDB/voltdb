@@ -181,7 +181,8 @@ function loadAdminPage() {
                 $("#resumeConfirmation").show();
 
                 //Close the popup
-                $($(this).siblings()[0]).trigger("click");
+                $($(this).siblings()[0]).trigger("click");                
+
             });
         }
     });
@@ -284,6 +285,7 @@ function loadAdminPage() {
 
                 //Close the popup
                 $($(this).siblings()[0]).trigger("click");
+                
             });
         }
     });
@@ -544,9 +546,6 @@ function loadAdminPage() {
        }
    });
 
-
-
-
     // Checkbox style
     $('input.snapshot').iCheck({
         checkboxClass: 'icheckbox_square-aero',
@@ -562,10 +561,22 @@ function loadAdminPage() {
 
 (function (window) {
     var iVoltDbAdminConfig = (function () {
-
         this.isAdmin = false;
         this.registeredElements = [];
         this.idleServers = [];
+        this.runningServers = [];
+        
+        this.idleServer = function(hostIdvalue,serverNameValue,serverStateValue) {
+            this.hostId = hostIdvalue;
+            this.serverName = serverNameValue;
+            this.serverState = serverStateValue;
+        };
+        
+        this.runningServer = function (serverNameValue, serverStateValue) {
+            this.runningServerName = serverNameValue;
+            this.runningServerState = serverStateValue;
+        };
+
         this.displayAdminConfiguration = function (adminConfigValues) {
             if (adminConfigValues != undefined && VoltDbAdminConfig.isAdmin) {
                 configureAdminValues(adminConfigValues);
@@ -580,7 +591,7 @@ function loadAdminPage() {
         };
 
         this.refreshServerList = function (serverList,serverCount) {
-           adminDOMObjects.adminServerList.html(serverList);
+            adminDOMObjects.adminServerList.html(serverList);
         };
 
         var configureAdminValues = function (adminConfigValues) {
