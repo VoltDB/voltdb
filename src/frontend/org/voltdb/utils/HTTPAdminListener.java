@@ -45,7 +45,6 @@ import org.voltdb.compilereport.ReportMaker;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.io.Resources;
-import java.io.File;
 import java.net.InetAddress;
 import java.util.List;
 import org.codehaus.jackson.JsonGenerator;
@@ -419,7 +418,6 @@ public class HTTPAdminListener {
                 }
                 baseRequest.setHandled(true);
             } catch (Exception ex) {
-                ex.printStackTrace();
               logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage(), ex);
             }
         }
@@ -463,10 +461,10 @@ public class HTTPAdminListener {
                 Object[] params = new Object[2];
                 params[0] = null;
                 params[1] = dep;
+                //Call sync as nothing else can happen when this is going on.
                 client.callProcedure("@UpdateApplicationCatalog", params);
                 response.getWriter().print(buildClientResponse(jsonp, ClientResponse.SUCCESS, "Deployment Updated."));
             } catch (Exception ex) {
-                //TODO log
                 logger.error("Failed to update deployment from API", ex);
                 response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, ex.toString()));
             }

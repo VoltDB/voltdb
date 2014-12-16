@@ -89,7 +89,6 @@ import org.voltdb.compiler.procedures.DelayProc;
 import org.voltdb.compiler.procedures.SelectStarHelloWorld;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Base64;
-import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 
@@ -206,8 +205,11 @@ public class TestJSONInterface extends TestCase {
         if (params != null && params.size() > 0) {
             OutputStream os = conn.getOutputStream();
             for (String key : params.keySet()) {
-                String b = key + "=" + params.get(key);
-                os.write(b.getBytes());
+                os.write(key.getBytes());
+                if (params.get(key) != null) {
+                    String b = "=" + params.get(key);
+                    os.write(b.getBytes());
+                }
             }
         }
 
