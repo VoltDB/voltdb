@@ -794,7 +794,7 @@ ul.adminClusterList li a.saveme { display:inline-block;background-position:-120p
 
 
 ul.adminClusterList li a.stop { display:inline-block;background-position:-580px -12px; width:40px; height:36px;}
-ul.adminClusterList li a.shutdown{ display:inline-block;background-position:-669px -56px; width:40px; height:36px;}
+ul.adminClusterList li a.shutdown{ display:inline-block;background-position:-739px -56px; width:40px; height:36px;}
 ul.adminClusterList li a:hover{color:#000;}
 .adminTxt01 { margin:0 0 0 6px;}
 .adminTxt02 { margin:0 0 0 2px;}
@@ -848,8 +848,8 @@ ul.adminClusterList li a:hover{color:#000;}
 
 .adminTbl1 td .edit {top:9px;}
 .hasSubLabel{} 
-.labelCollapsed{ background-position:-352px -11px; padding-left:22px;}
-.labelExpanded{ background-position:-352px -55px; padding-left:22px;}
+.labelCollapsed{ background-position:-422px -11px; padding-left:22px;}
+.labelExpanded{ background-position:-422px -55px; padding-left:22px;}
 .adminTbl2 tr td:nth-child(1){font-weight:bold;}
 
 .adminWrapper{position:relative;}
@@ -875,8 +875,8 @@ input.exitableTxtBx{width:30px; /*position:relative; top:6px;*/ padding:2px 3px;
 
 .tblshutdown tr {border:1px solid #CCCCCC;}
 .tblshutdown tr td  { border:none;}
-.tblshutdown tr td a.shutdown { display:inline-block;background-position:-669px -105px; width:40px; height:36px;line-height:39px; }
-.tblshutdown tr td a.disableServer { display:inline-block;background-position:-669px -150px; width:40px; height:36px;line-height:39px; }
+.tblshutdown tr td a.shutdown { display:inline-block;background-position:-740px -105px; width:40px; height:36px;line-height:39px; }
+.tblshutdown tr td a.disableServer { display:inline-block;background-position:-933px -150px; width:40px; height:36px;line-height:39px; }
 .tblshutdown tr td a.startServ { display:inline-block;background-position:-669px -56px; width:40px; height:36px;line-height:39px; }
 .shutdownServer { position:relative; top:17px; right:2px;}
 .startServer { position:relative; top:17px; right:2px;}
