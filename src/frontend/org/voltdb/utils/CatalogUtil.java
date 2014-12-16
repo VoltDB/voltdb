@@ -638,8 +638,16 @@ public abstract class CatalogUtil {
             DeploymentType deployment = result.getValue();
             return deployment;
         } catch (JAXBException e) {
-            hostLog.error(e.getLinkedException().getMessage());
-            throw new RuntimeException(e);
+            // Convert some linked exceptions to more friendly errors.
+            if (e.getLinkedException() instanceof java.io.FileNotFoundException) {
+                hostLog.error(e.getLinkedException().getMessage());
+                return null;
+            } else if (e.getLinkedException() instanceof org.xml.sax.SAXParseException) {
+                hostLog.error("Error schema validating deployment.xml file. " + e.getLinkedException().getMessage());
+                return null;
+            } else {
+                throw new RuntimeException(e);
+            }
         }
     }
 
@@ -660,8 +668,16 @@ public abstract class CatalogUtil {
             marshaller.marshal(new JAXBElement(new QName("","deployment"), DeploymentType.class, deployment), sw);
             return sw.toString();
         } catch (JAXBException e) {
-            hostLog.error(e.getLinkedException().getMessage());
-            throw new RuntimeException(e);
+            // Convert some linked exceptions to more friendly errors.
+            if (e.getLinkedException() instanceof java.io.FileNotFoundException) {
+                hostLog.error(e.getLinkedException().getMessage());
+                return null;
+            } else if (e.getLinkedException() instanceof org.xml.sax.SAXParseException) {
+                hostLog.error("Error schema validating deployment.xml file. " + e.getLinkedException().getMessage());
+                return null;
+            } else {
+                throw new RuntimeException(e);
+            }
         }
     }
 
