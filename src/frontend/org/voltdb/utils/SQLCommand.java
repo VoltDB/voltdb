@@ -562,8 +562,7 @@ public class SQLCommand
                 }
                 return;
             }
-            /*/* enable to debug */ else System.err.println("Read non-null batch line: (" + line + ")");
-            ////Thread.sleep(10000); // MORE STALLING!
+            //* enable to debug */ else System.err.println("Read non-null batch line: (" + line + ")");
 
             // If the line is a FILE command - include the content of the file into the query queue
             Matcher fileMatcher = FileToken.matcher(line);
@@ -1329,16 +1328,6 @@ public class SQLCommand
     // Application entry point
     public static void main(String args[])
     {
-        System.err.println("IN SQLCOMMAND MAIN");
-        System.err.flush();
-//        try {Thread.sleep(10000);} catch(Exception x){}
-/*
-        if (out == null) { // always
-            System.err.println("err HARD-CODED QUIT AT TOP OF SQLCOMMAND");
-            System.out.println("out HARD-CODED QUIT AT TOP OF SQLCOMMAND");
-            System.exit(0);
-        }
-*/
         TimeZone.setDefault(TimeZone.getTimeZone("GMT+0"));
         // Initialize parameter defaults
         String serverList = "localhost";
@@ -1439,7 +1428,6 @@ public class SQLCommand
                 config.enableKerberosAuthentication(kerberos);
             }
             VoltDB = getClient(config, servers, port);
-            System.err.println("SQL Command connected on port:: " + port);
         } catch (Exception exc) {
             System.err.println(exc.getMessage());
             System.exit(-1);
@@ -1501,7 +1489,6 @@ public class SQLCommand
             if (System.in.available() > 0) {
                 // If Standard input comes loaded with data, run in non-interactive mode
                 m_interactive = false;
-                System.err.println("SQL Command starting non-interactively");
                 executeNoninteractive();
             }
             if (m_interactive) {

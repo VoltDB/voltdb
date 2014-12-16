@@ -55,6 +55,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
 
     private static ServerThread m_server;
     private static Client m_client;
+    private static boolean m_verboseForDebug = false;
 /*
     @Override
     public void setUp() throws Exception
@@ -184,9 +185,10 @@ public class TestSqlCmdErrorHandling extends TestCase {
         return 1 == result.asScalarLong();
     }
 
-    static private int callSQLcmd(boolean stopOnError, String inputText) throws Exception {
+    static private int callSQLcmd(boolean stopOnError, String inputText) throws Exception
+    {
         final String commandPath = "bin/sqlcmd";
-        final long timeout = 60000 / 10; // 60,000 millis -- give up after 1 minute of trying.
+        final long timeout = 10000; // 10,000 millis -- give up after 10 seconds of trying.
 
         File f = new File("ddl.sql");
         f.deleteOnExit();
@@ -226,26 +228,33 @@ public class TestSqlCmdErrorHandling extends TestCase {
                         dumpProcessTree();
                     }
                 }
-                //*/enable for debug*/ System.err.println(commandPath + " returned " + exitValue);
-                //*/enable for debug*/ System.err.println(" in " + (System.currentTimeMillis() - starttime)+ "ms");
-                //*/enable for debug*/ System.err.println(" on input:\n" + inputText);
-                if (exitValue != 0) {
+                if (m_verboseForDebug && exitValue != 0) {
+                    byte[] transfer = new byte[1000];
+
+                    System.err.println("Standard input for timed out " + commandPath + ":");
+                    FileInputStream cmdIn = new FileInputStream(f);
+                    while (cmdIn.read(transfer) != -1) {
+                        System.err.write(transfer);
+                    }
+                    System.err.println("-----");
                     System.err.println("Standard output from failed " + commandPath + ":");
                     FileInputStream cmdOut = new FileInputStream(out);
-                    byte[] transfer = new byte[1000];
                     while (cmdOut.read(transfer) != -1) {
                         System.err.write(transfer);
                     }
+                    System.err.println("-----");
                     cmdOut.close();
-                    out.delete();
                     System.err.println("Error output from failed " + commandPath + ":");
                     FileInputStream cmdErr = new FileInputStream(error);
                     while (cmdErr.read(transfer) != -1) {
                         System.err.write(transfer);
                     }
+                    System.err.println("-----");
                     cmdErr.close();
-                    error.delete();
                 }
+                f.delete();
+                out.delete();
+                error.delete();
                 return exitValue;
             }
             catch (Exception e) {
@@ -257,12 +266,22 @@ public class TestSqlCmdErrorHandling extends TestCase {
 
         process.destroy();
 
+        byte[] transfer = new byte[1000];
+
+        System.err.println("Standard input for timed out " + commandPath + ":");
+        FileInputStream cmdIn = new FileInputStream(f);
+        while (cmdIn.read(transfer) != -1) {
+            System.err.write(transfer);
+        }
+        System.err.println("-----");
+        cmdIn.close();
+        f.delete();
         System.err.println("Standard output from timed out " + commandPath + ":");
         FileInputStream cmdOut = new FileInputStream(out);
-        byte[] transfer = new byte[1000];
         while (cmdOut.read(transfer) != -1) {
             System.err.write(transfer);
         }
+        System.err.println("-----");
         cmdOut.close();
         out.delete();
         System.err.println("Error output from timed out " + commandPath + ":");
@@ -270,6 +289,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
         while (cmdErr.read(transfer) != -1) {
             System.err.write(transfer);
         }
+        System.err.println("-----");
         cmdErr.close();
         error.delete();
         dumpProcessTree();
