@@ -329,14 +329,10 @@ function alertNodeClicked(obj) {
             }
         };
         
-        this.GetProceduresInfoNAdminConfiguration = function (onProceduresDataLoaded, onAdminConfigLoaded) {
+        this.GetProceduresInfo = function (onProceduresDataLoaded) {
             var procedureMetadata = "";
 
             VoltDBService.GetSystemInformationDeployment(function (connection) {
-
-                if (VoltDbAdminConfig.isAdmin) {
-                    onAdminConfigLoaded(getAdminConfigurationItemsFromSystemInfo(connection));
-                }
 
                 setKFactor(connection);
                 VoltDBService.GetProceduresInformation(function (nestConnection) {
@@ -532,7 +528,7 @@ function alertNodeClicked(obj) {
             var adminConfigValues = {};
             if (connection != null && connection.Metadata['SHORTAPI_DEPLOYMENT'] != null) {
                 var data = connection.Metadata['SHORTAPI_DEPLOYMENT'];
-                
+               
                 adminConfigValues['sitesperhost'] = data.cluster.sitesperhost;
                 adminConfigValues['kSafety'] = data.cluster.kfactor;
                 
@@ -566,9 +562,13 @@ function alertNodeClicked(obj) {
                     adminConfigValues['properties'] = data.export.configuration.property;
                 }
 
-                //Advanced
+                //Advanced 
                 if (data.heartbeat != null) {
                     adminConfigValues['heartBeatTimeout'] = data.heartbeat.timeout;
+                }
+                
+                if (data.systemsettings != null && data.systemsettings.query != null) {
+                    adminConfigValues['queryTimeout'] = data.systemsettings.query.timeout;
                 }
 
                 if (data.systemsettings != null) {
@@ -1755,124 +1755,6 @@ function alertNodeClicked(obj) {
             }
             sysTransaction["CurrentTimedTransactionCount"] = currentTimedTransactionCount;
             sysTransaction["currentTimerTick"] = currentTimerTick;
-
-        };
-
-        //admin Configuration
-        var getAdminConfigurationItemsFromSystemInfo = function (connection) {
-            var adminConfigValues = [];
-
-            if (connection != null && (connection.Metadata['@SystemInformation_DEPLOYMENT'] != null || connection.Metadata['@SystemInformation_DEPLOYMENT'] != undefined)) {
-                connection.Metadata['@SystemInformation_DEPLOYMENT'].data.forEach(function (columnInfo) {
-                    switch (columnInfo[0]) {
-                        //case 'sitesperhost':
-                        //    adminConfigValues['sitesperhost'] = columnInfo[1];
-                        //    break;
-
-                        //case 'kfactor':
-                        //    adminConfigValues['kSafety'] = columnInfo[1];
-                        //    break;
-
-                        //case 'partitiondetection':
-                        //    adminConfigValues['partitionDetection'] = columnInfo[1];
-                        //    break;
-
-                        //case 'securityEnabled':
-                        //    adminConfigValues['securityEnabled'] = columnInfo[1];
-                        //    break;
-
-                        //case 'httpenabled':
-                        //    adminConfigValues['httpEnabled'] = columnInfo[1];
-                        //    break;
-
-                        //case 'jsonenabled':
-                        //    adminConfigValues['jsonEnabled'] = columnInfo[1];
-                        //    break;
-
-                        //case 'snapshotenabled':
-                        //    adminConfigValues['snapshotEnabled'] = columnInfo[1];
-                        //    break;
-
-                        //case 'frequency':
-                        //    adminConfigValues['frequency'] = columnInfo[1];
-                        //    break;
-
-                        //case 'retained':
-                        //    adminConfigValues['retained'] = columnInfo[1];
-                        //    break;
-
-                        //case 'commandlogenabled':
-                        //    adminConfigValues['commandLogEnabled'] = columnInfo[1];
-                        //    break;
-
-                        //case 'commandlogfreqtime':
-                        //    adminConfigValues['commandLogFrequencyTime'] = columnInfo[1];
-                        //    break;
-
-                        //case 'commandlogfreqtxns':
-                        //    adminConfigValues['commandLogFrequencyTransactions'] = columnInfo[1];
-                        //    break;
-
-                        //case 'logsegmentsize':
-                        //    adminConfigValues['logSegmentSize'] = columnInfo[1];
-                        //    break;
-
-                        //case 'export':
-                        //    adminConfigValues['export'] = columnInfo[1];
-                        //    break;
-
-                        //case 'target':
-                        //    adminConfigValues['targets'] = columnInfo[1];
-                        //    break;
-
-                        //case "properties":
-                        //    adminConfigValues['properties'] = columnInfo[1];
-                        //    break;
-
-                        //case 'heartbeattimeout':
-                        //    adminConfigValues['heartBeatTimeout'] = columnInfo[1];
-                        //    break;
-
-                        case 'querytimeout':
-                            adminConfigValues['queryTimeout'] = columnInfo[1];
-                            break;
-
-                        //case 'temptablesmaxsize':
-                        //    adminConfigValues['tempTablesMaxSize'] = columnInfo[1];
-                        //    break;
-
-                        //case 'snapshotpriority':
-                        //    adminConfigValues['snapshotPriority'] = columnInfo[1];
-                        //    break;
-
-                        //    //Directory Values
-                        //case 'voltdbroot':
-                        //    adminConfigValues['voltdbRoot'] = columnInfo[1];
-                        //    break;
-
-                        //case 'snapshotpath':
-                        //    adminConfigValues['snapshotPath'] = columnInfo[1];
-                        //    break;
-
-                        //case 'exportoverflow':
-                        //    adminConfigValues['exportOverflow'] = columnInfo[1];
-                        //    break;
-
-                        //case 'commandlogpath':
-                        //    adminConfigValues['commandLogPath'] = columnInfo[1];
-                        //    break;
-
-                        //case 'commandlogsnapshotpath':
-                        //    adminConfigValues['commandLogSnapshotPath'] = columnInfo[1];
-                        //    break;
-                            
-                        default:
-                    }
-                });
-                return adminConfigValues;
-            }
-
-            return undefined;
 
         };
 

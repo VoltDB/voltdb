@@ -522,11 +522,7 @@ var loadPage = function (serverName, portid) {
 
         };
 
-        var loadAdminConfigurations = function (adminConfigValues) {
-            VoltDbAdminConfig.displayAdminConfigurationFromSystemInfo(adminConfigValues);
-        };
-
-        voltDbRenderer.GetProceduresInfoNAdminConfiguration(loadProcedureInformations, loadAdminConfigurations);
+        voltDbRenderer.GetProceduresInfo(loadProcedureInformations);
 
         voltDbRenderer.getTablesInformation(function (tableMetadata) {
             if (tableMetadata != "" && tableMetadata != undefined) {
