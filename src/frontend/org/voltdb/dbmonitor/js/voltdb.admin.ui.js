@@ -205,7 +205,6 @@ function loadAdminPage() {
     });
 
     var toggleSecurityEdit = function (showEdit) {
-
         if (adminEditObjects.chkSecurityValue) {
             adminEditObjects.chkSecurity.iCheck('check');
         } else {
@@ -631,6 +630,7 @@ function loadAdminPage() {
             configureQueryTimeout(adminConfigValues);
 
             //edit configuration
+            adminEditObjects.chkSecurityValue = adminConfigValues.securityEnabled;
             adminEditObjects.tBoxHeartbeatTimeoutValue = adminConfigValues.heartBeatTimeout;
             var snapshotFrequency = adminConfigValues.frequency != undefined ? parseInt(adminConfigValues.frequency) : '';
             adminEditObjects.tBoxAutoSnapshotFreqValue = snapshotFrequency;
