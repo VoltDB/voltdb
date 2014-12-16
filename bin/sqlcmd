@@ -136,4 +136,5 @@ jvmOPTS+=("-classpath" "${CLASSPATH}" "org.voltdb.utils.SQLCommand")
 
 # run it
 echo RUNNING exec $JAVA "${jvmOPTS[@]}" "${programOPTS[@]}"
+echo RAN exec $JAVA "${jvmOPTS[@]}" "${programOPTS[@]}" > sqlcmd_ran.out
 exec $JAVA "${jvmOPTS[@]}" "${programOPTS[@]}"

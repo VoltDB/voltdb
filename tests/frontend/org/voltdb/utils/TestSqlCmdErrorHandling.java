@@ -222,7 +222,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
                     System.err.println("External process (" + commandPath + ") exited after being polled " +
                             pollcount + " times over " + elapsedtime + "ms");
 
-                    if (pollcount % 20 == 0) {
+                    if (pollcount % 10 == 0) {
                         dumpProcessTree();
                     }
                 }
@@ -237,7 +237,6 @@ public class TestSqlCmdErrorHandling extends TestCase {
                 System.err.println("External process (" + commandPath + ") has not yet exited after " + elapsedtime + "ms");
             }
         } while (elapsedtime < timeout);
-
 
         System.err.println("Standard output from timed out " + commandPath + ":");
         FileInputStream cmdOut = new FileInputStream(out);
