@@ -280,18 +280,23 @@ var loadPage = function (serverName, portid) {
         });
     };
     loadSchemaTab();
-
-    voltDbRenderer.CheckAdminPriviledges(function (hasAdminPrivileges) {
-
-        if (hasAdminPrivileges) {
+    
+    var showAdminPage = function () {
+        
+        if (!VoltDbAdminConfig.isAdmin) {
             VoltDbAdminConfig.isAdmin = true;
             $("#navAdmin").show();
             loadAdminPage();
-        } else {
-            $("#navAdmin").hide();
         }
 
-        //Retain current tab while page refreshing.
+    };
+
+    //Retains the current tab while page refreshing.
+    var retainCurrentTab = function () {
+
+        if (!(securityChecks.securityChecked && securityChecks.previlegesChecked))
+            return;
+
         var curTab = $.cookie("current-tab");
         if (curTab != undefined) {
             curTab = curTab * 1;
@@ -310,6 +315,38 @@ var loadPage = function (serverName, portid) {
                 }
             }
         }
+    };
+
+    var securityChecks = {
+        securityChecked: false,
+        previlegesChecked: false
+    };
+    
+    //Load Admin configurations
+    voltDbRenderer.GetAdminDeploymentInformation(true, function (adminConfigValues) {
+        securityChecks.securityChecked = true;
+
+        //Show admin page if security is turned off.
+        if (adminConfigValues != null && adminConfigValues.VMCNoPermission != true && !adminConfigValues.security) {
+            showAdminPage();
+        } else if (!VoltDbAdminConfig.isAdmin) {
+            $("#navAdmin").hide();
+        }
+
+        retainCurrentTab();
+    });
+
+
+    voltDbRenderer.CheckAdminPriviledges(function (hasAdminPrivileges) {
+        securityChecks.previlegesChecked = true;
+
+        if (hasAdminPrivileges) {
+            showAdminPage();
+        } else if (!VoltDbAdminConfig.isAdmin) {
+            $("#navAdmin").hide();
+        }
+
+        retainCurrentTab();
     });
 
     var defaultSearchTextProcedure = 'Search Stored Procedures';
@@ -472,7 +509,7 @@ var loadPage = function (serverName, portid) {
         voltDbRenderer.GetSystemInformation(loadClusterHealth, loadAdminTabPortAndOverviewDetails, loadAdminServerList);
 
         //Load Admin configurations
-        voltDbRenderer.GetAdminDeploymentInformation(function (adminConfigValues) {
+        voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues) {
             VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues);
         });
     };
@@ -543,11 +580,7 @@ var loadPage = function (serverName, portid) {
 
         };
 
-        var loadAdminConfigurations = function (adminConfigValues) {
-            VoltDbAdminConfig.displayAdminConfigurationFromSystemInfo(adminConfigValues);
-        };
-
-        voltDbRenderer.GetProceduresInfoNAdminConfiguration(loadProcedureInformations, loadAdminConfigurations);
+        voltDbRenderer.GetProceduresInfo(loadProcedureInformations);
 
         voltDbRenderer.getTablesInformation(function (tableMetadata) {
             if (tableMetadata != "" && tableMetadata != undefined) {
