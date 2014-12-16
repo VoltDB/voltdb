@@ -237,12 +237,14 @@ public class TestSqlCmdErrorHandling extends TestCase {
                         System.err.write(transfer);
                     }
                     cmdOut.close();
+                    out.delete();
                     System.err.println("Error output from failed " + commandPath + ":");
                     FileInputStream cmdErr = new FileInputStream(error);
                     while (cmdErr.read(transfer) != -1) {
                         System.err.write(transfer);
                     }
                     cmdErr.close();
+                    error.delete();
                 }
                 return exitValue;
             }
@@ -253,6 +255,8 @@ public class TestSqlCmdErrorHandling extends TestCase {
             }
         } while (elapsedtime < timeout);
 
+        process.destroy();
+
         System.err.println("Standard output from timed out " + commandPath + ":");
         FileInputStream cmdOut = new FileInputStream(out);
         byte[] transfer = new byte[1000];
@@ -260,12 +264,14 @@ public class TestSqlCmdErrorHandling extends TestCase {
             System.err.write(transfer);
         }
         cmdOut.close();
+        out.delete();
         System.err.println("Error output from timed out " + commandPath + ":");
         FileInputStream cmdErr = new FileInputStream(error);
         while (cmdErr.read(transfer) != -1) {
             System.err.write(transfer);
         }
         cmdErr.close();
+        error.delete();
         dumpProcessTree();
         fail("External process (" + commandPath + ") timed out after " + elapsedtime + "ms on input:\n" + inputText);
         return 0;
