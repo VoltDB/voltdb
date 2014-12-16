@@ -536,12 +536,12 @@ function alertNodeClicked(obj) {
                     adminConfigValues.VMCNoPermission = true;
                     return adminConfigValues;
                 }
-               
+
                 adminConfigValues['sitesperhost'] = data.cluster.sitesperhost;
                 adminConfigValues['kSafety'] = data.cluster.kfactor;
-                
-                adminConfigValues['partitionDetection'] = data.partitionDetection.enabled;
-                adminConfigValues['securityEnabled'] = data.security.enabled;
+
+                adminConfigValues['partitionDetection'] = data.partitionDetection != null ? data.partitionDetection.enabled : false;
+                adminConfigValues['securityEnabled'] = data.security != null ? data.security.enabled : false;
                 
                 //HTTP Access
                 if (data.httpd != null) {

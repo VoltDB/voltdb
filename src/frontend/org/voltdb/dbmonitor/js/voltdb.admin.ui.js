@@ -205,7 +205,6 @@ function loadAdminPage() {
     });
 
     var toggleSecurityEdit = function (showEdit) {
-
         if (adminEditObjects.chkSecurityValue) {
             adminEditObjects.chkSecurity.iCheck('check');
         } else {
@@ -610,7 +609,7 @@ function loadAdminPage() {
             adminDOMObjects.frequency.text(adminConfigValues.frequency != "" ? adminConfigValues.frequency : "");
             adminDOMObjects.frequencyLabel.text(adminConfigValues.frequency != "" ? "Hrs" : "");
             adminDOMObjects.retained.text(adminConfigValues.retained != "" ? adminConfigValues.retained : "");
-            adminDOMObjects.retainedLabel.text(adminConfigValues.retained != "" ? "Copies" : "");
+            adminDOMObjects.retainedLabel.text(adminConfigValues.retained != "" && adminConfigValues.retained != undefined ? "Copies" : "");
             adminEditObjects.tBoxAutoSnapshotRetainedValue = adminConfigValues.retained;
             adminDOMObjects.commandLog.removeClass().addClass(getOnOffClass(adminConfigValues.commandLogEnabled));
             adminDOMObjects.commandLogLabel.text(adminConfigValues.commandLogEnabled == true ? 'On' : 'Off');
@@ -631,10 +630,13 @@ function loadAdminPage() {
             configureQueryTimeout(adminConfigValues);
 
             //edit configuration
+            adminEditObjects.chkSecurityValue = adminConfigValues.securityEnabled;
+            adminEditObjects.chkAutoSnapshotValue = adminConfigValues.snapshotEnabled;
             adminEditObjects.tBoxHeartbeatTimeoutValue = adminConfigValues.heartBeatTimeout;
-            adminEditObjects.tBoxAutoSnapshotFreqValue = parseInt(adminConfigValues.frequency);
-            adminEditObjects.spanAutoSnapshotFreq.text(parseInt(adminConfigValues.frequency));
-            var spanshotUnit = adminConfigValues.frequency.slice(-1);
+            var snapshotFrequency = adminConfigValues.frequency != undefined ? parseInt(adminConfigValues.frequency) : '';
+            adminEditObjects.tBoxAutoSnapshotFreqValue = snapshotFrequency;
+            adminEditObjects.spanAutoSnapshotFreq.text(snapshotFrequency);
+            var spanshotUnit = adminConfigValues.frequency != undefined ? adminConfigValues.frequency.slice(-1) : '';
             setSnapShotUnit(spanshotUnit);
             getExportProperties(adminConfigValues.properties);
 
@@ -642,22 +644,24 @@ function loadAdminPage() {
 
         var getExportProperties = function(data) {
             var result = "";
-            for (var i = 0; i < data.length; i++) {
-                if (i == 0) {
-                    result += '<tr>' +
-                        '<td width="67%">' + data[i].name + '</td>' +
-                        '<td width="33%">' + data[i].value + '</td>' +
-                        '</tr>';
-                }else if (i == (data.length - 1)) {
-                    result += '<tr class="propertyLast">' +
-                        '<td>' + data[i].name + '</td>' +
-                        '<td>' + data[i].value + '</td>' +
-                        '</tr>';
-                } else {
-                    result +='<tr>' +
-                        '<td>' + data[i].name + '</td>' +
-                        '<td>' + data[i].value + '</td>' +
-                        '</tr>';
+            if (data != undefined) {
+                for (var i = 0; i < data.length; i++) {
+                    if (i == 0) {
+                        result += '<tr>' +
+                            '<td width="67%">' + data[i].name + '</td>' +
+                            '<td width="33%">' + data[i].value + '</td>' +
+                            '</tr>';
+                    } else if (i == (data.length - 1)) {
+                        result += '<tr class="propertyLast">' +
+                            '<td>' + data[i].name + '</td>' +
+                            '<td>' + data[i].value + '</td>' +
+                            '</tr>';
+                    } else {
+                        result += '<tr>' +
+                            '<td>' + data[i].name + '</td>' +
+                            '<td>' + data[i].value + '</td>' +
+                            '</tr>';
+                    }
                 }
             }
             if (result == "") {
@@ -680,6 +684,9 @@ function loadAdminPage() {
             }else if (unit == 'h') {
                 adminEditObjects.spanAutoSnapshotFreqUnit.text('Hrs');
                 adminEditObjects.ddlAutoSnapshotFreqUnitValue = 'Hrs';
+            } else {
+                adminEditObjects.spanAutoSnapshotFreqUnit.text('');
+                adminEditObjects.ddlAutoSnapshotFreqUnitValue = '';
             }
         }; 
 
