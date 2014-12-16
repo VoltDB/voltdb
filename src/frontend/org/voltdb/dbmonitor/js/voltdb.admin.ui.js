@@ -89,6 +89,7 @@ function loadAdminPage() {
         spanAutoSnapshotRetained: $("#retainedSpan"),
 
         //Heartbeat Timeout
+        rowHeartbeatTimeout: $("#heartbeatTimeoutRow"),
         btnEditHeartbeatTimeoutOk: $("#btnEditHeartbeatTimeoutOk"),
         btnEditHeartbeatTimeoutCancel: $("#btnEditHeartbeatTimeoutCancel"),
         LinkHeartbeatEdit: $("#btnEditHrtTimeOut"),
@@ -97,6 +98,7 @@ function loadAdminPage() {
         spanHeartbeatTimeOut: $("#hrtTimeOutSpan"),
 
         //Query Timeout
+        rowQueryTimeout: $("#queryTimoutRow"),
         btnEditQueryTimeoutOk: $("#btnEditQueryTimeoutOk"),
         btnEditQueryTimeoutCancel: $("#btnEditQueryTimeoutCancel"),
         LinkQueryTimeoutEdit: $("#btnEditQueryTimeout"),
@@ -582,12 +584,6 @@ function loadAdminPage() {
             }
         };
 
-        this.displayAdminConfigurationFromSystemInfo = function(adminConfigValues) {
-            if (adminConfigValues != undefined && VoltDbAdminConfig.isAdmin) {
-                configureAdminValuesFromSystemInfo(adminConfigValues);
-            }
-        };
-
         this.displayPortAndOverviewDetails = function (portAndOverviewValues) {
             if (portAndOverviewValues != undefined && VoltDbAdminConfig.isAdmin) {
                 configurePortAndOverviewValues(portAndOverviewValues);
@@ -627,19 +623,16 @@ function loadAdminPage() {
             adminDOMObjects.exportLabel.text(getOnOffText(adminConfigValues.export));
             adminDOMObjects.target.text(adminConfigValues.targets);
             
-            //TODO: Display properties in table
-            //adminDOMObjects.properties.text(adminConfigValues.properties);
-            
             adminDOMObjects.heartBeatTimeout.text(adminConfigValues.heartBeatTimeout != "" ? adminConfigValues.heartBeatTimeout : "");
             adminDOMObjects.heartBeatTimeoutLabel.text(adminConfigValues.heartBeatTimeout != "" ? "ms" : "");
-            //adminDOMObjects.queryTimeout.text(adminConfigValues.queryTimeout != "" ? adminConfigValues.queryTimeout : "");
-            //adminDOMObjects.queryTimeoutLabel.text(adminConfigValues.queryTimeout != "" ? "ms" : "");
             adminDOMObjects.tempTablesMaxSize.text(adminConfigValues.tempTablesMaxSize != "" ? adminConfigValues.tempTablesMaxSize : "");
             adminDOMObjects.tempTablesMaxSizeLabel.text(adminConfigValues.tempTablesMaxSize != "" ? "MB" : "");
             adminDOMObjects.snapshotPriority.text(adminConfigValues.snapshotPriority);
+            configureQueryTimeout(adminConfigValues);
 
             //edit configuration
             adminEditObjects.tBoxHeartbeatTimeoutValue = adminConfigValues.heartBeatTimeout;
+            adminEditObjects.tBoxAutoSnapshotFreqValue = parseInt(adminConfigValues.frequency);
             adminEditObjects.spanAutoSnapshotFreq.text(parseInt(adminConfigValues.frequency));
             var spanshotUnit = adminConfigValues.frequency.slice(-1);
             setSnapShotUnit(spanshotUnit);
@@ -668,25 +661,53 @@ function loadAdminPage() {
                 }
             }
             if (result == "") {
-                $('#exportProperties').html("No properties available.");
-            } else {
-                $('#exportProperties').html(result);
+                result += '<tr class="propertyLast">' +
+                        '<td width="67%">No properties available.</td>' +
+                        '<td width="33%">&nbsp</td>' +
+                        '</tr>';
             }
+            $('#exportProperties').html(result);
+
         };
 
         var setSnapShotUnit = function(unit) {
             if (unit == 's') {
                 adminEditObjects.spanAutoSnapshotFreqUnit.text('Sec');
+                adminEditObjects.ddlAutoSnapshotFreqUnitValue = 'Sec';
             }else if (unit == 'm') {
                 adminEditObjects.spanAutoSnapshotFreqUnit.text('Min');
+                adminEditObjects.ddlAutoSnapshotFreqUnitValue = 'Min';
             }else if (unit == 'h') {
                 adminEditObjects.spanAutoSnapshotFreqUnit.text('Hrs');
+                adminEditObjects.ddlAutoSnapshotFreqUnitValue = 'Hrs';
             }
         }; 
 
-        var configureAdminValuesFromSystemInfo = function (adminConfigValues) {
+        //var configureAdminValuesFromSystemInfo = function (adminConfigValues) {
+        var configureQueryTimeout = function (adminConfigValues) {
+
+            if (adminConfigValues.queryTimeout == null) {
+                adminEditObjects.rowQueryTimeout.hide();
+                
+                //Remove the class used to expand/collapse all child rows inside 'Admin'
+                if (adminEditObjects.rowQueryTimeout.hasClass("child-row-5")) {
+                    adminEditObjects.rowQueryTimeout.removeClass("child-row-5");
+                }
+            }
+            //Expand the Querytimeout row to make it visible, only if its sibling 'Heartbeat Timeout' 
+            //is also visible. /Otherwise it is in collapsed form.
+            else if (adminEditObjects.rowHeartbeatTimeout.is(":visible")) {
+                adminEditObjects.rowQueryTimeout.show();
+                
+                //Add the class used to expand/collapse all child rows inside 'Admin'
+                if (!adminEditObjects.rowQueryTimeout.hasClass("child-row-5")) {
+                    adminEditObjects.rowQueryTimeout.addClass("child-row-5");
+                }
+            }
+            
             adminDOMObjects.queryTimeout.text(adminConfigValues.queryTimeout != "" ? adminConfigValues.queryTimeout : "");
             adminDOMObjects.queryTimeoutLabel.text(adminConfigValues.queryTimeout != "" ? "ms" : "");
+            adminEditObjects.tBoxQueryTimeoutValue = adminConfigValues.queryTimeout;
         };
 
         var configurePortAndOverviewValues = function (configValues) {
