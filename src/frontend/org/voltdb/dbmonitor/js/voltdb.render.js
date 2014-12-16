@@ -314,23 +314,23 @@ function alertNodeClicked(obj) {
 
             });
         };
-        
-        this.CheckAdminPriviledges = function(onInformationLoaded) {
 
-            VoltDBService.GetShortApiProfile(function(connection) {
+        this.CheckAdminPriviledges = function (onInformationLoaded) {
+
+            VoltDBService.GetShortApiProfile(function (connection) {
                 onInformationLoaded(hasAdminPrivileges(connection));
             });
         };
-        
+
         this.GetAdminDeploymentInformation = function (onInformationLoaded) {
             if (VoltDbAdminConfig.isAdmin) {
-                
+
                 VoltDBService.GetShortApiDeployment(function (connection) {
                     onInformationLoaded(loadAdminDeploymentInformation(connection));
                 });
             }
         };
-        
+
         this.GetProceduresInfoNAdminConfiguration = function (onProceduresDataLoaded, onAdminConfigLoaded) {
             var procedureMetadata = "";
 
@@ -516,7 +516,7 @@ function alertNodeClicked(obj) {
                 var data = connection.Metadata['SHORTAPI_PROFILE'];
 
                 if (data.permissions != null) {
-                    $.each(data.permissions, function(index, value) {
+                    $.each(data.permissions, function (index, value) {
                         if (value.toUpperCase().trim() == 'ADMIN') {
                             isAdmin = true;
                             return false;
@@ -525,22 +525,22 @@ function alertNodeClicked(obj) {
                     });
                 }
             }
-            
+
             return isAdmin;
         };
 
-        var loadAdminDeploymentInformation = function(connection) {
+        var loadAdminDeploymentInformation = function (connection) {
 
             var adminConfigValues = {};
             if (connection != null && connection.Metadata['SHORTAPI_DEPLOYMENT'] != null) {
                 var data = connection.Metadata['SHORTAPI_DEPLOYMENT'];
-                
+
                 adminConfigValues['sitesperhost'] = data.cluster.sitesperhost;
                 adminConfigValues['kSafety'] = data.cluster.kfactor;
-                
+
                 adminConfigValues['partitionDetection'] = data.partitionDetection.enabled;
                 adminConfigValues['securityEnabled'] = data.security.enabled;
-                
+
                 //HTTP Access
                 if (data.httpd != null) {
                     adminConfigValues['httpEnabled'] = data.httpd.enabled;
@@ -580,16 +580,15 @@ function alertNodeClicked(obj) {
 
                 //Directory
                 if (data.paths != null) {
-                    
                     if (data.paths.voltdbroot != null)
                         adminConfigValues['voltdbRoot'] = data.paths.voltdbroot.path;
-                    
+
                     if (data.paths.snapshots != null)
                         adminConfigValues['snapshotPath'] = data.paths.snapshots.path;
-                    
+
                     if (data.paths.exportoverflow != null)
                         adminConfigValues['exportOverflow'] = data.paths.exportoverflow.path;
-                    
+
                     if (data.paths.commandlog != null)
                         adminConfigValues['commandLogPath'] = data.paths.commandlog.path;
 
@@ -1858,35 +1857,35 @@ function alertNodeClicked(obj) {
                             adminConfigValues['queryTimeout'] = columnInfo[1];
                             break;
 
-                        //case 'temptablesmaxsize':
-                        //    adminConfigValues['tempTablesMaxSize'] = columnInfo[1];
-                        //    break;
+                            //case 'temptablesmaxsize':
+                            //    adminConfigValues['tempTablesMaxSize'] = columnInfo[1];
+                            //    break;
 
-                        //case 'snapshotpriority':
-                        //    adminConfigValues['snapshotPriority'] = columnInfo[1];
-                        //    break;
+                            //case 'snapshotpriority':
+                            //    adminConfigValues['snapshotPriority'] = columnInfo[1];
+                            //    break;
 
-                        //    //Directory Values
-                        //case 'voltdbroot':
-                        //    adminConfigValues['voltdbRoot'] = columnInfo[1];
-                        //    break;
+                            //    //Directory Values
+                            //case 'voltdbroot':
+                            //    adminConfigValues['voltdbRoot'] = columnInfo[1];
+                            //    break;
 
-                        //case 'snapshotpath':
-                        //    adminConfigValues['snapshotPath'] = columnInfo[1];
-                        //    break;
+                            //case 'snapshotpath':
+                            //    adminConfigValues['snapshotPath'] = columnInfo[1];
+                            //    break;
 
-                        //case 'exportoverflow':
-                        //    adminConfigValues['exportOverflow'] = columnInfo[1];
-                        //    break;
+                            //case 'exportoverflow':
+                            //    adminConfigValues['exportOverflow'] = columnInfo[1];
+                            //    break;
 
-                        //case 'commandlogpath':
-                        //    adminConfigValues['commandLogPath'] = columnInfo[1];
-                        //    break;
+                            //case 'commandlogpath':
+                            //    adminConfigValues['commandLogPath'] = columnInfo[1];
+                            //    break;
 
-                        //case 'commandlogsnapshotpath':
-                        //    adminConfigValues['commandLogSnapshotPath'] = columnInfo[1];
-                        //    break;
-                            
+                            //case 'commandlogsnapshotpath':
+                            //    adminConfigValues['commandLogSnapshotPath'] = columnInfo[1];
+                            //    break;
+
                         default:
                     }
                 });
@@ -1935,15 +1934,15 @@ function alertNodeClicked(obj) {
             var htmlServerListHtml = "";
             var runningServerDetails;
             var className;
-            
-            this.setRunningServers = function (serverInfo) {
+
+            this.setRunningServers = function (hostId,serverInfo) {
                 var count = 0;
                 if ((VoltDbAdminConfig.runningServers != "" || VoltDbAdminConfig.runningServers != null || VoltDbAdminConfig.runningServers != undefined)
                     && VoltDbAdminConfig.runningServers.length > 0) {
                     $.each(VoltDbAdminConfig.runningServers, function (id, value) {
                         {
                             if (value.runningServerName != serverInfo['HOSTNAME'] && count == VoltDbAdminConfig.runningServers.length - 1) {
-                                runningServerDetails = new VoltDbAdminConfig.runningServer(serverInfo['HOSTNAME'], serverInfo['CLUSTERSTATE']);
+                                runningServerDetails = new VoltDbAdminConfig.runningServer(hostId,serverInfo['HOSTNAME'], serverInfo['CLUSTERSTATE']);
                                 VoltDbAdminConfig.runningServers.push(runningServerDetails);
 
                             }
@@ -1956,17 +1955,22 @@ function alertNodeClicked(obj) {
                     });
 
                 } else {
-                    runningServerDetails = new VoltDbAdminConfig.runningServer(serverInfo['HOSTNAME'], serverInfo['CLUSTERSTATE']);
+                    runningServerDetails = new VoltDbAdminConfig.runningServer(hostId,serverInfo['HOSTNAME'], serverInfo['CLUSTERSTATE']);
                     VoltDbAdminConfig.runningServers.push(runningServerDetails);
 
                 }
             };
-            var updateAdminServerList = function () {
+
+
+            var renderNextIdleServer = function (id) {
+
+            };
+            var updateAdminServerList = function (renderedIdleServers) {
                 if ((VoltDbAdminConfig.idleServers != "" || VoltDbAdminConfig.idleServers != null || VoltDbAdminConfig.idleServers != undefined)
                     && VoltDbAdminConfig.idleServers.length > 0) {
                     $.each(VoltDbAdminConfig.idleServers, function (id, value) {
                         $.each(VoltDbAdminConfig.runningServers, function (nestId, nestValue) {
-                            if (nestValue.runningServerName == value.serverName && value.serverState == 'RUNNING') {
+                            if (nestValue.runningServerName == value.serverName && nestValue.runningServerState == 'RUNNING') {
                                 VoltDbAdminConfig.idleServers.splice(id, 1);
 
                             } else if (nestValue.runningServerName == value.serverName && value.serverState == 'MISSING') {
@@ -1977,37 +1981,43 @@ function alertNodeClicked(obj) {
                     });
                 }
 
-                //$($(this)[0].ele).attr("href", "javascript:void()");
+                $($(this)[0].ele).attr("href", "javascript:void()");
                 $.each(VoltDbAdminConfig.idleServers, function (id, value) {
-                    htmlServerListHtml = htmlServerListHtml.concat("<tr><td class=\"configLabel\" width=\"85%\"><a href=\"#\">" + value.serverName + "</a></td>" +
-                        "<td align=\"right\"><a href=\"javascript:void(0);\" data-HostId=\"" + id + "\" data-HostName=\"" + value.serverName + "\" class=\"disableServer\"  id=\"stopServer_" + value['HOSTNAME'] + "\">" +
-                        "<span class=\"shutdownServer\">Stop</span></a></td></tr>");
+                    //if (!($.inArray(renderedIdleServers, value.serverName))) {
+                        htmlServerListHtml = htmlServerListHtml.concat("<tr><td class=\"configLabel\" width=\"85%\"><a href=\"#\">" + value.serverName + "</a></td>" +
+                            "<td align=\"right\"><a href=\"javascript:void(0);\" data-HostId=\"" + id + "\" data-HostName=\"" + value.serverName + "\" class=\"disableServer\"  id=\"stopServer_" + value['HOSTNAME'] + "\">" +
+                            "<span class=\"shutdownServer\">Stop</span></a></td></tr>");
+                    //}
                 });
+                //idleServers = [];
             };
+
 
             if (systemOverview != null || systemOverview != undefined) {
                 $.each(systemOverview, function (id, val) {
                     if ((val['HOSTNAME'] != null || val['HOSTNAME'] != "") && val['CLUSTERSTATE'] == 'RUNNING') {
                         className = voltDbRenderer.currentHost == val['HOSTNAME'] ? "disableServer" : "shutdown";
                         htmlServerListHtml = htmlServerListHtml.concat("<tr><td class=\"configLabel\" width=\"85%\"><a href=\"#\">" + val['HOSTNAME'] + "</a></td>" +
-                            "<td align=\"right\"><a href=\"#stopConfirmationPop\" data-HostId=\"" + id + "\" data-HostName=\"" + val['HOSTNAME'] + "\" class=\"" +className+ "\" id=\"stopServer_" + val['HOSTNAME'] + "\">" +
+                            "<td align=\"right\"><a href=\"#stopConfirmationPop\" data-HostId=\"" + id + "\" data-HostName=\"" + val['HOSTNAME'] + "\" class=\"" + className + "\" id=\"stopServer_" + val['HOSTNAME'] + "\">" +
                             "<span class=\"shutdownServer\">Stop</span></a></td></tr>");
-                        setRunningServers(val);
+                        setRunningServers(id,val);
 
                     } else if ((val['HOSTNAME'] != null || val['HOSTNAME'] != "") && val['CLUSTERSTATE'] == 'JOINING') {
                         htmlServerListHtml = htmlServerListHtml.concat("<tr><td class=\"configLabel\" width=\"85%\"><a href=\"#\">" + val['HOSTNAME'] + "</a></td>" +
                             "<td align=\"right\"><a href=\"javascript:void(0);\" class=\"shutdownDisabled\">" +
                             "<span>Stop</span></a></td></tr>");
 
-                    } else if ((val['HOSTNAME'] != null || val['HOSTNAME'] != "") && val['CLUSTERSTATE'] == 'MISSING') {
-                        htmlServerListHtml = htmlServerListHtml.concat("<tr><td class=\"configLabel\" width=\"85%\"><a href=\"#\">" + val['HOSTNAME'] + "</a></td>" +
-                            "<td align=\"right\"><a href=\"javascript:void(0);\" class=\"shutdown\">" +
-                            "<span class=\"shutdownServer\">Start</span></a></td></tr>");
-                    }
+                    } //else if ((val['HOSTNAME'] != null || val['HOSTNAME'] != "") && val['CLUSTERSTATE'] == 'MISSING') {
+                    //    htmlServerListHtml = htmlServerListHtml.concat("<tr><td class=\"configLabel\" width=\"85%\"><a href=\"#\">" + val['HOSTNAME'] + "</a></td>" +
+                    //        "<td align=\"right\"><a href=\"javascript:void(0);\" class=\"shutdown\">" +
+                    //        "<span class=\"shutdownServer\">Start</span></a></td></tr>");
+                    //    idleServers.push(val['HOSTNAME']);
+                    //}
 
                 });
 
                 updateAdminServerList();
+               
                 return htmlServerListHtml;
 
             }
