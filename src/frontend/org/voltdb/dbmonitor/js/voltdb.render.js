@@ -322,8 +322,8 @@ function alertNodeClicked(obj) {
             });
         };
         
-        this.GetAdminDeploymentInformation = function (onInformationLoaded) {
-            if (VoltDbAdminConfig.isAdmin) {
+        this.GetAdminDeploymentInformation = function (checkSecurity, onInformationLoaded) {
+            if (VoltDbAdminConfig.isAdmin || checkSecurity) {
                 
                 VoltDBService.GetShortApiDeployment(function (connection) {
                     onInformationLoaded(loadAdminDeploymentInformation(connection));
@@ -530,6 +530,12 @@ function alertNodeClicked(obj) {
             var adminConfigValues = {};
             if (connection != null && connection.Metadata['SHORTAPI_DEPLOYMENT'] != null) {
                 var data = connection.Metadata['SHORTAPI_DEPLOYMENT'];
+                
+                //The user does not have permission to view admin details.
+                if (data.status == -3) {
+                    adminConfigValues.VMCNoPermission = true;
+                    return adminConfigValues;
+                }
                
                 adminConfigValues['sitesperhost'] = data.cluster.sitesperhost;
                 adminConfigValues['kSafety'] = data.cluster.kfactor;

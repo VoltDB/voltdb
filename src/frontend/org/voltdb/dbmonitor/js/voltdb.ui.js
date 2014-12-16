@@ -281,17 +281,21 @@ var loadPage = function (serverName, portid) {
     };
     loadSchemaTab();
     
-    voltDbRenderer.CheckAdminPriviledges(function (hasAdminPrivileges) {
-
-        if (hasAdminPrivileges) {
+    var showAdminPage = function () {
+        
+        if (!VoltDbAdminConfig.isAdmin) {
             VoltDbAdminConfig.isAdmin = true;
             $("#navAdmin").show();
             loadAdminPage();
-        } else {
-            $("#navAdmin").hide();
         }
+    };
+
+    //Retains the current tab while page refreshing.
+    var retainCurrentTab = function () {
+
+        if (!(securityChecks.securityChecked && securityChecks.previlegesChecked))
+            return;
         
-        //Retain current tab while page refreshing.
         var curTab = $.cookie("current-tab");
         if (curTab != undefined) {
             curTab = curTab * 1;
@@ -304,12 +308,44 @@ var loadPage = function (serverName, portid) {
             } else if (curTab == NavigationTabs.Admin) {
                 if (VoltDbAdminConfig.isAdmin) {
                     $("#overlay").show();
-                    setTimeout(function() { $("#navAdmin > a").trigger("click"); }, 100);
+                    setTimeout(function () { $("#navAdmin > a").trigger("click"); }, 100);
                 } else {
                     saveSessionCookie("current-tab", NavigationTabs.DBMonitor);
                 }
             }
         }
+    };
+
+    var securityChecks = {
+        securityChecked: false,
+        previlegesChecked: false
+    };
+    
+    //Load Admin configurations
+    voltDbRenderer.GetAdminDeploymentInformation(true, function (adminConfigValues) {
+        securityChecks.securityChecked = true;
+
+        //Show admin page if security is turned off.
+        if (adminConfigValues != null && adminConfigValues.VMCNoPermission != true && !adminConfigValues.security) {
+            showAdminPage();
+        } else if (!VoltDbAdminConfig.isAdmin) {
+            $("#navAdmin").hide();
+        }
+
+        retainCurrentTab();
+    });
+
+
+    voltDbRenderer.CheckAdminPriviledges(function (hasAdminPrivileges) {
+        securityChecks.previlegesChecked = true;
+
+        if (hasAdminPrivileges) {
+            showAdminPage();
+        } else if (!VoltDbAdminConfig.isAdmin) {
+            $("#navAdmin").hide();
+        }
+
+        retainCurrentTab();
     });
     
     var defaultSearchTextProcedure = 'Search Stored Procedures';
@@ -466,7 +502,7 @@ var loadPage = function (serverName, portid) {
         voltDbRenderer.GetSystemInformation(loadClusterHealth, loadAdminTabPortAndOverviewDetails, loadAdminServerList);
         
         //Load Admin configurations
-        voltDbRenderer.GetAdminDeploymentInformation(function (adminConfigValues) {
+        voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues) {
             VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues);
         });
     };
