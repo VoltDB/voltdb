@@ -631,6 +631,7 @@ function loadAdminPage() {
 
             //edit configuration
             adminEditObjects.chkSecurityValue = adminConfigValues.securityEnabled;
+            adminEditObjects.chkAutoSnapshotValue = adminConfigValues.snapshotEnabled;
             adminEditObjects.tBoxHeartbeatTimeoutValue = adminConfigValues.heartBeatTimeout;
             var snapshotFrequency = adminConfigValues.frequency != undefined ? parseInt(adminConfigValues.frequency) : '';
             adminEditObjects.tBoxAutoSnapshotFreqValue = snapshotFrequency;
