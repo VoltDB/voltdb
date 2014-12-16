@@ -46,6 +46,7 @@ import org.voltdb.compilereport.ReportMaker;
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.io.Resources;
 import java.net.InetAddress;
+import java.util.List;
 import org.codehaus.jackson.JsonGenerator;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.map.JsonMappingException;
@@ -57,10 +58,12 @@ import org.eclipse.jetty.server.bio.SocketConnector;
 import org.voltdb.AuthenticationResult;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
+import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.common.Permission;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.UsersType;
+import org.voltdb.compiler.deploymentfile.UsersType.User;
 
 public class HTTPAdminListener {
 
@@ -329,7 +332,6 @@ public class HTTPAdminListener {
             m_mapper = new ObjectMapper();
             //Mixin for to not output passwords.
             m_mapper.getSerializationConfig().addMixInAnnotations(UsersType.User.class, IgnorePasswordMixIn.class);
-            m_mapper.getDeserializationConfig().addMixInAnnotations(UsersType.User.class, IgnorePasswordMixIn.class);
             //We want jackson to stop closing streams
             m_mapper.configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false);
             try {
@@ -401,17 +403,70 @@ public class HTTPAdminListener {
                     response.setContentType("text/xml;charset=utf-8");
                     response.getWriter().write(new String(getDeploymentBytes()));
                 } else {
-                    if (jsonp != null) {
-                        response.getWriter().write(jsonp + "(");
-                    }
-                    m_mapper.writeValue(response.getWriter(), getDeployment());
-                    if (jsonp != null) {
-                        response.getWriter().write(")");
+                    if (request.getMethod().equalsIgnoreCase("POST")) {
+                        handleUpdateDeployment(jsonp, target, baseRequest, request, response, authResult.m_client);
+                    } else {
+                        //non POST
+                        if (jsonp != null) {
+                            response.getWriter().write(jsonp + "(");
+                        }
+                        m_mapper.writeValue(response.getWriter(), getDeployment());
+                        if (jsonp != null) {
+                            response.getWriter().write(")");
+                        }
                     }
                 }
                 baseRequest.setHandled(true);
             } catch (Exception ex) {
               logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage(), ex);
+            }
+        }
+
+        //Update the deployment
+        public void handleUpdateDeployment(String jsonp, String target,
+                           Request baseRequest,
+                           HttpServletRequest request,
+                           HttpServletResponse response, Client client)
+                           throws IOException, ServletException {
+            String deployment = request.getParameter("deployment");
+            if (deployment == null || deployment.length() == 0) {
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Failed to get deployment information."));
+                return;
+            }
+            try {
+                DeploymentType newDeployment = m_mapper.readValue(deployment, DeploymentType.class);
+                if (newDeployment == null) {
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Failed to build deployment information."));
+                    return;
+                }
+                //For users that are listed if they exists without password set their password to current else password will get changed for existing user.
+                //New users if valid will get updated.
+                //For Scrambled passowrd this will work also but new passwords will be unscrambled
+                //TODO: add switch to post to scramble??
+                if (newDeployment.getSecurity().isEnabled()) {
+                    DeploymentType currentDeployment = this.getDeployment();
+                    List<User> users = currentDeployment.getUsers().getUser();
+                    for (UsersType.User user : newDeployment.getUsers().getUser()) {
+                        if (user.getPassword() == null || user.getPassword().trim().length() == 0) {
+                            for (User u : users) {
+                                if (user.getName().equalsIgnoreCase(u.getName())) {
+                                    user.setPassword(u.getPassword());
+                                }
+                            }
+                        }
+                    }
+                }
+
+                String dep = CatalogUtil.getDeployment(newDeployment);
+                Object[] params = new Object[2];
+                params[0] = null;
+                params[1] = dep;
+                //Call sync as nothing else can happen when this is going on.
+                client.callProcedure("@UpdateApplicationCatalog", params);
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.SUCCESS, "Deployment Updated."));
+            } catch (Exception ex) {
+                logger.error("Failed to update deployment from API", ex);
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, ex.toString()));
             }
         }
     }
