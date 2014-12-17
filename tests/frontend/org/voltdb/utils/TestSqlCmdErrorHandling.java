@@ -203,7 +203,11 @@ public class TestSqlCmdErrorHandling extends TestCase {
         error.deleteOnExit();
 
         ProcessBuilder pb =
-                new ProcessBuilder(commandPath, "--stop-on-error=" + (stopOnError ? "true" : "false"));
+                // Enable elapsed time reports to stderr.
+                new ProcessBuilder(commandPath, "--debugdelay=,,", "--stop-on-error=" + (stopOnError ? "true" : "false"));
+//                // Use up all alloted time on the first error to selectively exercise timeout diagnostics."
+//                new ProcessBuilder(commandPath, "--debugdelay=,,10000", "--stop-on-error=" + (stopOnError ? "true" : "false"));
+//                new ProcessBuilder(commandPath, "--stop-on-error=" + (stopOnError ? "true" : "false"));
         pb.redirectInput(f);
         pb.redirectOutput(out);
         pb.redirectError(error);
@@ -237,6 +241,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
                         System.err.write(transfer);
                     }
                     System.err.println("-----");
+                    cmdIn.close();
                     System.err.println("Standard output from failed " + commandPath + ":");
                     FileInputStream cmdOut = new FileInputStream(out);
                     while (cmdOut.read(transfer) != -1) {

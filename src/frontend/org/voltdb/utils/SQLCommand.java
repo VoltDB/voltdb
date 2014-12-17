@@ -72,10 +72,13 @@ public class SQLCommand
                                                   .put("bigint", "long numeric")
                                                   .build();
     private static boolean m_stopOnError = true;
-    private static boolean m_debug = false;
     private static boolean m_interactive;
     private static boolean m_returningToPromptAfterError = false;
     private static int m_exitCode = 0;
+
+    private static boolean m_debug = false;
+    private static String[] m_debugDelay;
+    private static long m_debugStartTime;
 
     // SQL Parsing
     private static final Pattern EscapedSingleQuote = Pattern.compile("''", Pattern.MULTILINE);
@@ -563,6 +566,15 @@ public class SQLCommand
                 return;
             }
             //* enable to debug */ else System.err.println("Read non-null batch line: (" + line + ")");
+            if (m_debug) {
+                reportElapsedTime("line read");
+                // second debug delay is on each successful read line.
+                try { 
+                    long delay2 = Long.parseLong(m_debugDelay[1]);
+                    Thread.sleep(delay2);
+                    reportElapsedTime("post line read delay");
+                } catch (Exception x) {}
+            }
 
             // If the line is a FILE command - include the content of the file into the query queue
             Matcher fileMatcher = FileToken.matcher(line);
@@ -580,6 +592,11 @@ public class SQLCommand
             query.append(line);
             query.append("\n");
         }
+    }
+
+    private static void reportElapsedTime(String stage) {
+        System.err.println("SQLCommand " + stage + " elapsed time: " +
+                (System.currentTimeMillis() - m_debugStartTime) + " ms.");
     }
 
     /// Simple directives require only the input line and no other context from the input loop.
@@ -961,6 +978,13 @@ public class SQLCommand
         System.err.println(exc.getMessage());
         if (m_debug) {
             exc.printStackTrace(System.err);
+            // third debug delay is on each detected error.
+            reportElapsedTime("caught error");
+            try { 
+                long delay3 = Long.parseLong(m_debugDelay[2]);
+                Thread.sleep(delay3);
+                reportElapsedTime("post error delay");
+            } catch (Exception x) {}
         }
         // Let the final exit code reflect any error(s) in the run.
         // This is useful for debugging a script that may have multiple errors
@@ -1383,6 +1407,19 @@ public class SQLCommand
             }
             else if (arg.equals("--debug")) {
                 m_debug = true;
+                m_debugStartTime = System.currentTimeMillis();
+            }
+            else if (arg.startsWith("--debugdelay")) {
+                String optionValue = arg.split("=")[1];
+                m_debug = true;
+                m_debugStartTime = System.currentTimeMillis();
+                m_debugDelay = optionValue.split(",");
+                // first debug delay is immediate/unconditional.
+                try { 
+                    long delay1 = Long.parseLong(m_debugDelay[0]);
+                    Thread.sleep(delay1);
+                    reportElapsedTime("post initial delay");
+                } catch (Exception x) {}
             }
             else if (arg.startsWith("--stop-on-error=")) {
                 String optionName = arg.split("=")[1].toLowerCase();
