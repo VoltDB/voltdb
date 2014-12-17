@@ -1066,6 +1066,7 @@ ul.adminClusterList li { margin:0; padding-top:15px; float:left; width:67px; hei
 	 @media screen and (orientation:landscape) {
 		 
 		.overlay-content {/*height: 150px;*/height:20%;}
+		.graphPop { height:130px; margin-bottom:20px;}
 		.restoreInfo .overlay-content { height:125px;}
 		.restoreCont {height:125px;}
 		
@@ -1075,7 +1076,8 @@ ul.adminClusterList li { margin:0; padding-top:15px; float:left; width:67px; hei
 @media (min-width: 480px) and (max-width: 1024px) and (orientation:landscape)   {		 
 	.VDBMonitorHelp { height:150px;  }
 		.VDBSchemaHelp { height:150px; overflow:auto;}
-		.VDBQueryHelp { height:150px; overflow:auto;}	
+		.VDBQueryHelp { height:150px; overflow:auto;}
+			
 
 }		 
 
