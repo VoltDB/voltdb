@@ -288,6 +288,7 @@ var loadPage = function (serverName, portid) {
             $("#navAdmin").show();
             loadAdminPage();
         }
+
     };
 
     //Retains the current tab while page refreshing.
@@ -295,7 +296,7 @@ var loadPage = function (serverName, portid) {
 
         if (!(securityChecks.securityChecked && securityChecks.previlegesChecked))
             return;
-        
+
         var curTab = $.cookie("current-tab");
         if (curTab != undefined) {
             curTab = curTab * 1;
@@ -347,7 +348,7 @@ var loadPage = function (serverName, portid) {
 
         retainCurrentTab();
     });
-    
+
     var defaultSearchTextProcedure = 'Search Stored Procedures';
     var defaultSearchTextTable = 'Search Database Tables';
 
@@ -459,7 +460,7 @@ var loadPage = function (serverName, portid) {
             $.each(voltDbRenderer.hostNames, function (id, val) {
                 if (voltDbRenderer.currentHost != val) {
                     if (!isNodeButtonRegistered($('#stopServer_' + val).attr('id'))) {
-                        $('#stopServer_' + val).popup({                            
+                        $('#stopServer_' + val).popup({
                             afterOpen: function (event) {
                                 hostName = $($(this)[0].ele).data("hostname");
                                 hostId = $($(this)[0].ele).data("hostid");
@@ -469,10 +470,15 @@ var loadPage = function (serverName, portid) {
                                     //API Request                                
                                     voltDbRenderer.stopServer(hostId, function (success) {
                                         if (success) {
-                                            $("#stopServer_" + hostName).addClass('disableServer');                                           
-                                            idleServerDetails = new VoltDbAdminConfig.idleServer(hostName, hostName, "MISSING");
+                                            $("#stopServer_" + hostName).addClass('disableServer');
+                                            idleServerDetails = new VoltDbAdminConfig.idleServer(id, hostName, "MISSING");
                                             VoltDbAdminConfig.idleServers.push(idleServerDetails);
-                                            
+                                            $.each(VoltDbAdminConfig.runningServers, function (runningServerId, runningServer) {
+                                                if (runningServer.runningServerName == hostName)
+                                                    VoltDbAdminConfig.runningServers.splice(runningServerId, 1);
+                                                
+                                            });
+
                                             popupRef.open = function () {
                                                 return false;
                                             };
@@ -482,25 +488,26 @@ var loadPage = function (serverName, portid) {
 
                                     //Close the popup                                            
                                     $($(this).siblings()[0]).trigger("click");
-                                    
+
                                 });
                             },
-                            
-                            afterClose:function() {
+
+                            afterClose: function () {
                                 popupRef = $(this)[0];
                             }
                         });
                         VoltDbAdminConfig.registeredElements.push('stopServer_' + val);
                     }
                 } else {
-                    
+                    //idleServerDetails = new VoltDbAdminConfig.idleServer(id, hostName, "RUNNING");
+                    //VoltDbAdminConfig.idleServers.push(idleServerDetails);
                 }
             });
 
         };
 
         voltDbRenderer.GetSystemInformation(loadClusterHealth, loadAdminTabPortAndOverviewDetails, loadAdminServerList);
-        
+
         //Load Admin configurations
         voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues) {
             VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues);
@@ -1259,7 +1266,7 @@ var loadPage = function (serverName, portid) {
 
     refreshClusterHealth();
     refreshGraphAndData($.cookie("graph-view"), VoltDbUI.CurrentTab);
-    setInterval(refreshClusterHealth,5000);
+    setInterval(refreshClusterHealth, 5000);
     setInterval(function () {
         refreshGraphAndData($.cookie("graph-view"), VoltDbUI.CurrentTab);
     }, 5000);

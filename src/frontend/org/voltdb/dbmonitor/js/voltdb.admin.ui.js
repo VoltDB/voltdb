@@ -571,7 +571,8 @@ function loadAdminPage() {
             this.serverState = serverStateValue;
         };
         
-        this.runningServer = function (serverNameValue, serverStateValue) {
+        this.runningServer = function (hostIdValue, serverNameValue, serverStateValue) {
+            this.runningHostId = hostIdValue;
             this.runningServerName = serverNameValue;
             this.runningServerState = serverStateValue;
         };
