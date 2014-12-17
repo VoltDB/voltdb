@@ -400,7 +400,8 @@ public class HTTPAdminListener {
                 //Authenticated and has ADMIN permission
                 if (baseRequest.getRequestURI().contains("/download")) {
                     //Deployment xml is text/xml
-                    response.setContentType("text/xml;charset=utf-8");
+                    response.setContentType("application/xml;charset=utf-8");
+                    response.addHeader("Content-Disposition", "attachment");
                     response.getWriter().write(new String(getDeploymentBytes()));
                 } else {
                     if (request.getMethod().equalsIgnoreCase("POST")) {
