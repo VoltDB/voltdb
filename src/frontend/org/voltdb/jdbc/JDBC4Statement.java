@@ -233,11 +233,6 @@ public class JDBC4Statement implements java.sql.Statement
                 parameterCount = queryParts.length-1;
             }
 
-            // Welcome to volt... cannot accept \r or \n in inline SQL...
-            if (query.indexOf("\r") > -1 || query.indexOf("\n") > -1) {
-                throw SQLError.get(SQLError.QUERY_PARSING_ERROR);
-            }
-
             return new VoltSQL(new String[] {query}, parameterCount, type);
         }
     }
