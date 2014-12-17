@@ -106,6 +106,7 @@ public class TestCatalogDiffs extends TestCase {
         System.out.println(commands);
         catOriginal.execute(commands);
         assertTrue(diff.supported());
+        assertEquals(0, diff.tablesThatMustBeEmpty().length);
         if (expectSnapshotIsolation != null) {
             assertEquals((boolean) expectSnapshotIsolation, diff.requiresSnapshotIsolation());
         }
@@ -1088,7 +1089,7 @@ public class TestCatalogDiffs extends TestCase {
         builder.addPartitionInfo("A", "C1");
         builder.compile(testDir + File.separator + "addpart2.jar");
         Catalog catUpdated = catalogForJar(testDir + File.separator + "addpart2.jar");
-        verifyDiff(catOriginal, catUpdated);
+        verifyDiffIfEmptyTable(catOriginal, catUpdated);
     }
 
     public void testChangeTableReplicationSettingOfExportTable() throws IOException {
@@ -1167,5 +1168,20 @@ public class TestCatalogDiffs extends TestCase {
         builder.compile(testDir + File.separator + "dr2.jar");
         Catalog catUpdated = catalogForJar(testDir + File.separator + "dr2.jar");
         verifyDiffIfEmptyTable(catOriginal, catUpdated);
+    }
+
+    public void testDisableDROnTable() throws IOException {
+        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);" +
+                                 "\nPARTITION TABLE A ON COLUMN C1;" +
+                                 "\nDR TABLE A;");
+        builder.compile(testDir + File.separator + "dr1.jar");
+        Catalog catOriginal = catalogForJar(testDir +  File.separator + "dr1.jar");
+
+        builder.addLiteralSchema("\nDR TABLE A DISABLE;");
+        builder.compile(testDir + File.separator + "dr2.jar");
+        Catalog catUpdated = catalogForJar(testDir + File.separator + "dr2.jar");
+        verifyDiff(catOriginal, catUpdated);
     }
 }

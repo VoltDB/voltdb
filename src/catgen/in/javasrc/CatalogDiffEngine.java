@@ -592,6 +592,13 @@ public class CatalogDiffEngine {
             if (field.equals("signature") ||
                 field.equals("tuplelimit"))
                 return null;
+
+            // Always allow disabling DR on table
+            if (field.equalsIgnoreCase("isdred")) {
+                Boolean isDRed = (Boolean) suspect.getField(field);
+                assert isDRed != null;
+                if (!isDRed) return null;
+            }
         }
 
 
