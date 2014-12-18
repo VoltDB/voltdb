@@ -497,6 +497,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      */
     private long m_lastSysprocInvocation = System.currentTimeMillis();
     static long m_minTimeBetweenSysprocs = 3000;
+    private SynchronizedStatesManager m_perHostStateManager;
+    private SnapshotQueue m_snapshotQueue;
 
     /**
      * List of snapshots on disk sorted by creation time
@@ -569,6 +571,16 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         try {
             m_zk.create(VoltZK.completed_snapshots, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
         } catch (Exception e) {}
+
+        String hostId = "HOST_" + Integer.toString(messenger.getHostId());
+        try {
+            m_perHostStateManager = new SynchronizedStatesManager(m_zk, "PER_HOST_MANAGER", hostId, 1);
+        }
+        catch (Exception e) {}
+        try {
+            m_snapshotQueue = new SnapshotQueue(m_perHostStateManager, null);
+        }
+        catch (Exception e) {}
 
         if (threadLocalInit != null) {
             m_es.execute(threadLocalInit);
