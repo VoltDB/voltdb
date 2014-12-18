@@ -95,7 +95,6 @@ import org.voltdb.compiler.deploymentfile.SecurityProviderString;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
-import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compilereport.IndexAnnotation;
 import org.voltdb.compilereport.ProcedureAnnotation;
@@ -111,6 +110,10 @@ import com.google_voltpatches.common.base.Charsets;
 import java.io.StringWriter;
 import javax.xml.bind.Marshaller;
 import javax.xml.namespace.QName;
+import org.voltdb.compiler.deploymentfile.AdminModeType;
+import org.voltdb.compiler.deploymentfile.HeartbeatType;
+import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
+import org.voltdb.compiler.deploymentfile.ReplicationType;
 import org.xml.sax.SAXException;
 
 /**
@@ -527,6 +530,7 @@ public abstract class CatalogUtil {
             // Anything that goes wrong anywhere in trying to handle the deployment file
             // should return an error, and let the caller decide what to do (crash or not, for
             // example)
+            e.printStackTrace();
             errmsg = "Error validating deployment configuration: " + e.getMessage();
             hostLog.error(errmsg);
             return errmsg;
@@ -541,38 +545,26 @@ public abstract class CatalogUtil {
     private static void setCommandLogInfo(Catalog catalog, CommandLogType commandlog) {
         int fsyncInterval = 200;
         int maxTxnsBeforeFsync = Integer.MAX_VALUE;
-        boolean enabled = false;
-        // enterprise voltdb defaults to CL enabled if not specified in the XML
-        if (MiscUtils.isPro()) {
-            enabled = true;
-        }
-        boolean sync = false;
-        int logSizeMb = 1024;
         org.voltdb.catalog.CommandLog config = catalog.getClusters().get("cluster").getLogconfig().get("log");
-        if (commandlog != null) {
-            logSizeMb = commandlog.getLogsize();
-            sync = commandlog.isSynchronous();
-            enabled = commandlog.isEnabled();
-            Frequency freq = commandlog.getFrequency();
-            if (freq != null) {
-                long maxTxnsBeforeFsyncTemp = freq.getTransactions();
-                if (maxTxnsBeforeFsyncTemp < 1 || maxTxnsBeforeFsyncTemp > Integer.MAX_VALUE) {
-                    throw new RuntimeException("Invalid command log max txns before fsync (" + maxTxnsBeforeFsync
-                            + ") specified. Supplied value must be between 1 and (2^31 - 1) txns");
-                }
-                maxTxnsBeforeFsync = (int)maxTxnsBeforeFsyncTemp;
-                fsyncInterval = freq.getTime();
-                if (fsyncInterval < 1 | fsyncInterval > 5000) {
-                    throw new RuntimeException("Invalid command log fsync interval(" + fsyncInterval
-                            + ") specified. Supplied value must be between 1 and 5000 milliseconds");
-                }
+        Frequency freq = commandlog.getFrequency();
+        if (freq != null) {
+            long maxTxnsBeforeFsyncTemp = freq.getTransactions();
+            if (maxTxnsBeforeFsyncTemp < 1 || maxTxnsBeforeFsyncTemp > Integer.MAX_VALUE) {
+                throw new RuntimeException("Invalid command log max txns before fsync (" + maxTxnsBeforeFsync
+                        + ") specified. Supplied value must be between 1 and (2^31 - 1) txns");
+            }
+            maxTxnsBeforeFsync = (int)maxTxnsBeforeFsyncTemp;
+            fsyncInterval = freq.getTime();
+            if (fsyncInterval < 1 | fsyncInterval > 5000) {
+                throw new RuntimeException("Invalid command log fsync interval(" + fsyncInterval
+                        + ") specified. Supplied value must be between 1 and 5000 milliseconds");
             }
         }
-        config.setEnabled(enabled);
-        config.setSynchronous(sync);
+        config.setEnabled(commandlog.isEnabled());
+        config.setSynchronous(commandlog.isSynchronous());
         config.setFsyncinterval(fsyncInterval);
         config.setMaxtxns(maxTxnsBeforeFsync);
-        config.setLogsize(logSizeMb);
+        config.setLogsize(commandlog.getLogsize());
     }
 
     /**
@@ -636,6 +628,7 @@ public abstract class CatalogUtil {
             JAXBElement<DeploymentType> result =
                 (JAXBElement<DeploymentType>) unmarshaller.unmarshal(deployIS);
             DeploymentType deployment = result.getValue();
+            populateDefaultDeployment(deployment);
             return deployment;
         } catch (JAXBException e) {
             // Convert some linked exceptions to more friendly errors.
@@ -649,6 +642,138 @@ public abstract class CatalogUtil {
                 throw new RuntimeException(e);
             }
         }
+    }
+
+    public static void populateDefaultDeployment(DeploymentType deployment) {
+            //partition detection
+            if (deployment.getPartitionDetection() == null) {
+                PartitionDetectionType pd = new PartitionDetectionType();
+                pd.setEnabled(true);
+                PartitionDetectionType.Snapshot sshot = new PartitionDetectionType.Snapshot();
+                sshot.setPrefix("partition_detection");
+                pd.setSnapshot(sshot);
+                deployment.setPartitionDetection(pd);
+            }
+            //admin mode
+            if (deployment.getAdminMode() == null) {
+                AdminModeType amode = new AdminModeType();
+                amode.setPort(VoltDB.DEFAULT_ADMIN_PORT);
+                deployment.setAdminMode(amode);
+            }
+            //heartbeat
+            if (deployment.getHeartbeat() == null) {
+                HeartbeatType hb = new HeartbeatType();
+                hb.setTimeout(org.voltcore.common.Constants.DEFAULT_HEARTBEAT_TIMEOUT_SECONDS);
+                deployment.setHeartbeat(hb);
+            }
+            //httpd
+            if (deployment.getHttpd() == null) {
+                HttpdType httpd = new HttpdType();
+                httpd.setEnabled(false);
+                httpd.setPort(-1);
+                HttpdType.Jsonapi jsonApi = new HttpdType.Jsonapi();
+                jsonApi.setEnabled(false);
+                httpd.setJsonapi(jsonApi);
+                deployment.setHttpd(httpd);
+            }
+            //replication
+            if (deployment.getReplication() == null) {
+                ReplicationType repl = new ReplicationType();
+                deployment.setReplication(repl);
+            }
+            //snapshot
+            if (deployment.getSnapshot() == null) {
+                SnapshotType snap = new SnapshotType();
+                snap.setFrequency("10m");
+                snap.setPrefix("SNAPSHOTNONCE");
+                snap.setRetain(1);
+                snap.setEnabled(false);
+                deployment.setSnapshot(snap);
+            }
+            //Security
+            if (deployment.getSecurity() == null) {
+                SecurityType sec = new SecurityType();
+                sec.setEnabled(false);
+                sec.setProvider(SecurityProviderString.HASH);
+                deployment.setSecurity(sec);
+            }
+            //Paths
+            if (deployment.getPaths() == null) {
+                PathsType paths = new PathsType();
+                deployment.setPaths(paths);
+            }
+            //create paths entries
+            PathsType paths = deployment.getPaths();
+            if (paths.getVoltdbroot() == null) {
+                PathsType.Voltdbroot root = new PathsType.Voltdbroot();
+                root.setPath("voltdbroot");
+                paths.setVoltdbroot(root);
+            }
+            //snapshot
+            if (paths.getSnapshots() == null) {
+                PathEntry snap = new PathEntry();
+                snap.setPath("snapshots");
+                paths.setSnapshots(snap);
+            }
+            if (paths.getCommandlog() == null) {
+                //cl
+                PathEntry cl = new PathEntry();
+                cl.setPath("command_log");
+                paths.setCommandlog(cl);
+            }
+            if (paths.getCommandlogsnapshot() == null) {
+                //cl snap
+                PathEntry clsnap = new PathEntry();
+                clsnap.setPath("command_log_snapshot");
+                paths.setCommandlogsnapshot(clsnap);
+            }
+            if (paths.getExportoverflow() == null) {
+                //export overflow
+                PathEntry exp = new PathEntry();
+                exp.setPath("export_overflow");
+                paths.setExportoverflow(exp);
+            }
+
+            //Command log info
+            if (deployment.getCommandlog() == null) {
+                boolean enabled = false;
+                if (MiscUtils.isPro()) {
+                    enabled = true;
+                }
+                CommandLogType cl = new CommandLogType();
+                cl.setEnabled(enabled);
+                cl.setSynchronous(false);
+                cl.setLogsize(1024);
+                Frequency freq = new Frequency();
+                cl.setFrequency(freq);
+                deployment.setCommandlog(cl);
+            }
+            //System settings
+            SystemSettingsType ss = deployment.getSystemsettings();
+            if (deployment.getSystemsettings() == null) {
+                ss = new SystemSettingsType();
+                deployment.setSystemsettings(ss);
+            }
+            SystemSettingsType.Elastic sse = ss.getElastic();
+            if (sse == null) {
+               sse = new SystemSettingsType.Elastic();
+               ss.setElastic(sse);
+            }
+            SystemSettingsType.Query query = ss.getQuery();
+            if (query == null) {
+               query = new SystemSettingsType.Query();
+               ss.setQuery(query);
+            }
+            SystemSettingsType.Snapshot snap = ss.getSnapshot();
+            if (snap == null) {
+               snap = new SystemSettingsType.Snapshot();
+               ss.setSnapshot(snap);
+            }
+            SystemSettingsType.Temptables tt = ss.getTemptables();
+            if (tt == null) {
+               tt = new SystemSettingsType.Temptables();
+               ss.setTemptables(tt);
+            }
     }
 
     /**
@@ -740,54 +865,27 @@ public abstract class CatalogUtil {
             catDeploy.setKfactor(kFactor);
             // copy partition detection configuration from xml to catalog
             String defaultPPDPrefix = "partition_detection";
-            if (deployment.getPartitionDetection() != null) {
-                if (deployment.getPartitionDetection().isEnabled()) {
-                    catCluster.setNetworkpartition(true);
-                    CatalogMap<SnapshotSchedule> faultsnapshots = catCluster.getFaultsnapshots();
-                    SnapshotSchedule sched = faultsnapshots.add("CLUSTER_PARTITION");
-                    if (deployment.getPartitionDetection().getSnapshot() != null) {
-                        sched.setPrefix(deployment.getPartitionDetection().getSnapshot().getPrefix());
-                    }
-                    else {
-                        sched.setPrefix(defaultPPDPrefix);
-                    }
-                }
-                else {
-                    catCluster.setNetworkpartition(false);
-                }
-            }
-            else {
-                // Default partition detection on
+            if (deployment.getPartitionDetection().isEnabled()) {
                 catCluster.setNetworkpartition(true);
                 CatalogMap<SnapshotSchedule> faultsnapshots = catCluster.getFaultsnapshots();
                 SnapshotSchedule sched = faultsnapshots.add("CLUSTER_PARTITION");
-                sched.setPrefix(defaultPPDPrefix);
+                if (deployment.getPartitionDetection().getSnapshot() != null) {
+                    sched.setPrefix(deployment.getPartitionDetection().getSnapshot().getPrefix());
+                }
+                else {
+                    sched.setPrefix(defaultPPDPrefix);
+                }
+            }
+            else {
+                catCluster.setNetworkpartition(false);
             }
 
-            // copy admin mode configuration from xml to catalog
-            if (deployment.getAdminMode() != null)
-            {
-                catCluster.setAdminport(deployment.getAdminMode().getPort());
-                catCluster.setAdminstartup(deployment.getAdminMode().isAdminstartup());
-            }
-            else
-            {
-                // encode the default values
-                catCluster.setAdminport(VoltDB.DEFAULT_ADMIN_PORT);
-                catCluster.setAdminstartup(false);
-            }
+            catCluster.setAdminport(deployment.getAdminMode().getPort());
+            catCluster.setAdminstartup(deployment.getAdminMode().isAdminstartup());
 
             setSystemSettings(deployment, catDeploy);
 
-            if (deployment.getHeartbeat() != null)
-            {
-                catCluster.setHeartbeattimeout(deployment.getHeartbeat().getTimeout());
-            }
-            else
-            {
-                // default to 90 seconds
-                catCluster.setHeartbeattimeout(org.voltcore.common.Constants.DEFAULT_HEARTBEAT_TIMEOUT_SECONDS);
-            }
+            catCluster.setHeartbeattimeout(deployment.getHeartbeat().getTimeout());
 
             // copy schema modification behavior from xml to catalog
             if (cluster.getSchema() != null) {
@@ -808,39 +906,12 @@ public abstract class CatalogUtil {
         // Create catalog Systemsettings
         Systemsettings syssettings =
             catDeployment.getSystemsettings().add("systemsettings");
-        int temptableMaxSize = 100;
-        int snapshotPriority = 6;
-        int elasticDuration = 50;
-        int elasticThroughput = 2;
-        int queryTimeout = 0;
-        if (deployment.getSystemsettings() != null)
-        {
-            Temptables temptables = deployment.getSystemsettings().getTemptables();
-            if (temptables != null)
-            {
-                temptableMaxSize = temptables.getMaxsize();
-            }
-            SystemSettingsType.Snapshot snapshot = deployment.getSystemsettings().getSnapshot();
-            if (snapshot != null) {
-                snapshotPriority = snapshot.getPriority();
-            }
-            SystemSettingsType.Elastic elastic = deployment.getSystemsettings().getElastic();
-            if (elastic != null) {
-                elasticDuration = elastic.getDuration();
-                elasticThroughput = elastic.getThroughput();
-            }
 
-            SystemSettingsType.Query timeout = deployment.getSystemsettings().getQuery();
-            if (timeout != null)
-            {
-                queryTimeout = timeout.getTimeout();
-            }
-        }
-        syssettings.setTemptablemaxsize(temptableMaxSize);
-        syssettings.setSnapshotpriority(snapshotPriority);
-        syssettings.setElasticduration(elasticDuration);
-        syssettings.setElasticthroughput(elasticThroughput);
-        syssettings.setQuerytimeout(queryTimeout);
+        syssettings.setTemptablemaxsize(deployment.getSystemsettings().getTemptables().getMaxsize());
+        syssettings.setSnapshotpriority(deployment.getSystemsettings().getSnapshot().getPriority());
+        syssettings.setElasticduration(deployment.getSystemsettings().getElastic().getDuration());
+        syssettings.setElasticthroughput(deployment.getSystemsettings().getElastic().getThroughput());
+        syssettings.setQuerytimeout(deployment.getSystemsettings().getQuery().getTimeout());
     }
 
     private static void validateDirectory(String type, File path) {
@@ -973,19 +1044,8 @@ public abstract class CatalogUtil {
         Cluster cluster = catalog.getClusters().get("cluster");
         Database database = cluster.getDatabases().get("database");
 
-        boolean enabled = false;
-        if (security != null) {
-            enabled = security.isEnabled();
-        }
-        cluster.setSecurityenabled(enabled);
-
-        SecurityProviderString provider = SecurityProviderString.HASH;
-        if (enabled && security != null) {
-            if (security.getProvider() != null) {
-                provider = security.getProvider();
-            }
-        }
-        database.setSecurityprovider(provider.value());
+        cluster.setSecurityenabled(security.isEnabled());
+        database.setSecurityprovider(security.getProvider().value());
     }
 
     /**
@@ -996,65 +1056,58 @@ public abstract class CatalogUtil {
     private static void setSnapshotInfo(Catalog catalog, SnapshotType snapshotSettings) {
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
         SnapshotSchedule schedule = db.getSnapshotschedule().add("default");
-        if (snapshotSettings != null)
-        {
-            schedule.setEnabled(snapshotSettings.isEnabled());
-            String frequency = snapshotSettings.getFrequency();
-            if (!frequency.endsWith("s") &&
-                    !frequency.endsWith("m") &&
-                    !frequency.endsWith("h")) {
-                hostLog.error(
-                        "Snapshot frequency " + frequency +
-                        " needs to end with time unit specified" +
-                        " that is one of [s, m, h] (seconds, minutes, hours)" +
-                        " Defaulting snapshot frequency to 10m.");
-                frequency = "10m";
-            }
-
-            int frequencyInt = 0;
-            String frequencySubstring = frequency.substring(0, frequency.length() - 1);
-            try {
-                frequencyInt = Integer.parseInt(frequencySubstring);
-            } catch (Exception e) {
-                hostLog.error("Frequency " + frequencySubstring +
-                        " is not an integer. Defaulting frequency to 10m.");
-                frequency = "10m";
-                frequencyInt = 10;
-            }
-
-            String prefix = snapshotSettings.getPrefix();
-            if (prefix == null || prefix.isEmpty()) {
-                hostLog.error("Snapshot prefix " + prefix +
-                " is not a valid prefix. Using prefix of 'SNAPSHOTNONCE' ");
-                prefix = "SNAPSHOTNONCE";
-            }
-
-            if (prefix.contains("-") || prefix.contains(",")) {
-                String oldprefix = prefix;
-                prefix = prefix.replaceAll("-", "_");
-                prefix = prefix.replaceAll(",", "_");
-                hostLog.error("Snapshot prefix " + oldprefix + " cannot include , or -." +
-                        " Using the prefix: " + prefix + " instead.");
-            }
-
-            int retain = snapshotSettings.getRetain();
-            if (retain < 1) {
-                hostLog.error("Snapshot retain value " + retain +
-                        " is not a valid value. Must be 1 or greater." +
-                        " Defaulting snapshot retain to 1.");
-                retain = 1;
-            }
-
-            schedule.setFrequencyunit(
-                    frequency.substring(frequency.length() - 1, frequency.length()));
-            schedule.setFrequencyvalue(frequencyInt);
-            schedule.setPrefix(prefix);
-            schedule.setRetain(retain);
+        schedule.setEnabled(snapshotSettings.isEnabled());
+        String frequency = snapshotSettings.getFrequency();
+        if (!frequency.endsWith("s") &&
+                !frequency.endsWith("m") &&
+                !frequency.endsWith("h")) {
+            hostLog.error(
+                    "Snapshot frequency " + frequency +
+                    " needs to end with time unit specified" +
+                    " that is one of [s, m, h] (seconds, minutes, hours)" +
+                    " Defaulting snapshot frequency to 10m.");
+            frequency = "10m";
         }
-        else
-        {
-            schedule.setEnabled(false);
+
+        int frequencyInt = 0;
+        String frequencySubstring = frequency.substring(0, frequency.length() - 1);
+        try {
+            frequencyInt = Integer.parseInt(frequencySubstring);
+        } catch (Exception e) {
+            hostLog.error("Frequency " + frequencySubstring +
+                    " is not an integer. Defaulting frequency to 10m.");
+            frequency = "10m";
+            frequencyInt = 10;
         }
+
+        String prefix = snapshotSettings.getPrefix();
+        if (prefix == null || prefix.isEmpty()) {
+            hostLog.error("Snapshot prefix " + prefix +
+            " is not a valid prefix. Using prefix of 'SNAPSHOTNONCE' ");
+            prefix = "SNAPSHOTNONCE";
+        }
+
+        if (prefix.contains("-") || prefix.contains(",")) {
+            String oldprefix = prefix;
+            prefix = prefix.replaceAll("-", "_");
+            prefix = prefix.replaceAll(",", "_");
+            hostLog.error("Snapshot prefix " + oldprefix + " cannot include , or -." +
+                    " Using the prefix: " + prefix + " instead.");
+        }
+
+        int retain = snapshotSettings.getRetain();
+        if (retain < 1) {
+            hostLog.error("Snapshot retain value " + retain +
+                    " is not a valid value. Must be 1 or greater." +
+                    " Defaulting snapshot retain to 1.");
+            retain = 1;
+        }
+
+        schedule.setFrequencyunit(
+                frequency.substring(frequency.length() - 1, frequency.length()));
+        schedule.setFrequencyvalue(frequencyInt);
+        schedule.setPrefix(prefix);
+        schedule.setRetain(retain);
     }
 
     private static File getFeaturePath(PathsType paths, PathEntry pathEntry,
@@ -1194,6 +1247,12 @@ public abstract class CatalogUtil {
             }
         } else {
             voltDbRoot = new VoltFile(paths.getVoltdbroot().getPath());
+            if (!voltDbRoot.exists()) {
+                hostLog.info("Creating voltdbroot directory: " + voltDbRoot.getAbsolutePath());
+                if (!voltDbRoot.mkdir()) {
+                    hostLog.fatal("Failed to create voltdbroot directory \"" + voltDbRoot.getAbsolutePath() + "\"");
+                }
+            }
         }
         return voltDbRoot;
     }
@@ -1268,23 +1327,11 @@ public abstract class CatalogUtil {
     }
 
     private static void setHTTPDInfo(Catalog catalog, HttpdType httpd) {
-        // defaults
-        int httpdPort = -1;
-        boolean jsonEnabled = false;
-
         Cluster cluster = catalog.getClusters().get("cluster");
 
-        // if the httpd info is available, use it
-        if (httpd != null && httpd.isEnabled()) {
-           httpdPort = httpd.getPort();
-           HttpdType.Jsonapi jsonapi = httpd.getJsonapi();
-           if (jsonapi != null)
-               jsonEnabled = jsonapi.isEnabled();
-        }
-
         // set the catalog info
-        cluster.setHttpdportno(httpdPort);
-        cluster.setJsonapi(jsonEnabled);
+        cluster.setHttpdportno(httpd.getPort());
+        cluster.setJsonapi(httpd.getJsonapi().isEnabled());
     }
 
     /** Read a hashed password from password.
@@ -1320,6 +1367,25 @@ public abstract class CatalogUtil {
         byte[] hash = md.digest();
         assert(hash.length == 20); // sha-1 length
         return hash;
+    }
+
+    /**
+     * This code appeared repeatedly.  Extract method to take bytes for the catalog
+     * or deployment file, do the irritating exception crash test, jam the bytes in,
+     * and get the SHA-1 hash.
+     */
+    public static Pair<byte[],byte[]> getDefaultPopulatedDeploymentAndHash(byte[] inbytes)
+    {
+        MessageDigest md = null;
+        try {
+            md = MessageDigest.getInstance("SHA-1");
+        } catch (NoSuchAlgorithmException e) {
+            VoltDB.crashLocalVoltDB("Bad JVM has no SHA-1 hash.", true, e);
+        }
+        md.update(inbytes);
+        byte[] hash = md.digest();
+        assert(hash.length == 20); // sha-1 length
+        return new Pair(hash, inbytes);
     }
 
     private static ByteBuffer makeCatalogVersionAndBytes(
