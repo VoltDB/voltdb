@@ -100,7 +100,7 @@ public class SynchronizedStatesManager {
         return true;
     }
 
-    protected boolean addIfMissing(String absolutePath, CreateMode createMode, byte[] data)
+    public boolean addIfMissing(String absolutePath, CreateMode createMode, byte[] data)
             throws KeeperException, InterruptedException {
         return addIfMissing(m_zk, absolutePath, createMode, data);
     }
@@ -169,7 +169,7 @@ public class SynchronizedStatesManager {
         protected final String m_stateMachineId;
         private Set<String> m_knownMembers;
         private boolean m_membershipChangePending = false;
-        private final String m_statePath;
+        protected final String m_statePath;
         private final String m_lockPath;
         private final String m_barrierResultsPath;
         private final String m_myResultPath;
@@ -1348,6 +1348,14 @@ public class SynchronizedStatesManager {
 
         protected String getMemberId() {
             return m_memberId;
+        }
+
+        protected boolean ownDistributedLock() {
+            boolean weOwnLock;
+            lockLocalState();
+            weOwnLock = m_ourDistributedLockName != null && m_lockWaitingOn == null;
+            unlockLocalState();
+            return weOwnLock;
         }
     }
 

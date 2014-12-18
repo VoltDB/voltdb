@@ -25,9 +25,11 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -59,6 +61,8 @@ import org.voltcore.network.Connection;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.utils.RateLimitedLogger;
+import org.voltcore.zk.SynchronizedStatesManager;
+import org.voltcore.zk.SynchronizedStatesManager.StateMachineInstance;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.ClientResponse;
@@ -69,6 +73,7 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.VoltTableUtil;
 
 import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.common.collect.ImmutableSortedMap;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.util.concurrent.Callables;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -91,6 +96,299 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         private String path;
         private String nonce;
         private boolean finished;
+    }
+
+    private enum SNAPSHOT_TYPE {
+        STREAM,
+        INDEX,
+        FILE,
+        CSV,
+        EMPTY
+    }
+    private static final int m_queueSlots = SNAPSHOT_TYPE.values().length - 1;
+
+    private class ByteArrayWrapper {
+        public ByteArrayWrapper(byte[] snapshotDetails) {
+            m_byteArray = snapshotDetails;
+        }
+
+        public byte[] m_byteArray;
+    }
+
+    public void LeaderHasQueueLockForNextSnapshot() {
+    }
+
+    private class SnapshotQueue extends StateMachineInstance {
+        // Unused required abstracts
+        @Override
+        protected void taskRequested(ByteBuffer proposedTask) {}
+        @Override
+        protected void staleTaskRequestNotification(ByteBuffer proposedTask) {}
+        @Override
+        protected void correlatedTaskCompleted(boolean ourTask, ByteBuffer taskRequest, Map<String, ByteBuffer> results) {}
+        @Override
+        protected void uncorrelatedTaskCompleted(boolean ourTask, ByteBuffer taskRequest, Set<ByteBuffer> results) {}
+        @Override
+        protected void membershipChanged(Set<String> addedMembers, Set<String> removedMembers) {}
+
+        /*
+         *  Layout of queue:
+         *        1 byte of currently active snapshot category
+         *        4 byte ordering of pending snapshot categories for round robin processing
+         *        1 byte number of requests the current snapshot is satisfying
+         *        n entries of:
+         *          1 int representing node id that this current snapshot is satisfying
+         */
+        private final String m_streamSnapshotPrefix;
+        private final String m_indexSnapshotPrefix;
+        private final String m_fileSnapshotPrefix;
+        private final String m_csvSnapshotPrefix;
+        private boolean m_completedSnapshotPending = false;
+        private ArrayList<Integer> m_coalescedSnapshotRequestNodes = null;
+        private SNAPSHOT_TYPE m_activeSnapshot = SNAPSHOT_TYPE.EMPTY;
+        private final LinkedHashSet<SNAPSHOT_TYPE> m_pendingSnapshotsQueue = new LinkedHashSet<SNAPSHOT_TYPE>();
+        private final LinkedHashSet<SNAPSHOT_TYPE> m_localPendingSnapshots = new LinkedHashSet<SNAPSHOT_TYPE>();
+        private final byte[] m_startQueue = new byte[] {(byte)SNAPSHOT_TYPE.EMPTY.ordinal(),
+            (byte)SNAPSHOT_TYPE.EMPTY.ordinal(), (byte)SNAPSHOT_TYPE.EMPTY.ordinal(),
+            (byte)SNAPSHOT_TYPE.EMPTY.ordinal(), (byte)SNAPSHOT_TYPE.EMPTY.ordinal(), 0};
+
+
+        public SnapshotQueue(SynchronizedStatesManager ssm) throws KeeperException, InterruptedException {
+            ssm.super("snapshot_queue", SNAP_LOG);
+            m_streamSnapshotPrefix = ZKUtil.joinZKPath(m_statePath, "stream_snapshots");
+            ssm.addIfMissing(m_streamSnapshotPrefix, CreateMode.PERSISTENT, null);
+            m_indexSnapshotPrefix = ZKUtil.joinZKPath(m_statePath, "index_snapshots");
+            ssm.addIfMissing(m_indexSnapshotPrefix, CreateMode.PERSISTENT, null);
+            m_fileSnapshotPrefix = ZKUtil.joinZKPath(m_statePath, "file_snapshots");
+            ssm.addIfMissing(m_fileSnapshotPrefix, CreateMode.PERSISTENT, null);
+            m_csvSnapshotPrefix = ZKUtil.joinZKPath(m_statePath, "csv_snapshots");
+            ssm.addIfMissing(m_csvSnapshotPrefix, CreateMode.PERSISTENT, null);
+
+            // Start with an empty queue
+            registerStateMachineWithManager(ByteBuffer.wrap(m_startQueue));
+        }
+
+        private String getPathFromType(SNAPSHOT_TYPE type) {
+            String path = null;
+            switch (type) {
+            case STREAM:
+                path = m_streamSnapshotPrefix;
+                break;
+            case INDEX:
+                path = m_indexSnapshotPrefix;
+                break;
+            case FILE:
+                path = m_fileSnapshotPrefix;
+                break;
+            case CSV:
+                path = m_csvSnapshotPrefix;
+                break;
+            default:
+                break;
+            }
+            return path;
+        }
+
+        private int buildSnapshotNode(String snapshotDirPrefix, byte[] nodeData)
+                throws KeeperException, InterruptedException {
+            String nodePath;
+            nodePath = m_zk.create(snapshotDirPrefix, nodeData,
+                    Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT_SEQUENTIAL);
+            String nodeNum = nodePath.substring(snapshotDirPrefix.length());
+            return Integer.valueOf(nodeNum);
+        }
+
+        private void deleteSnapshotNode(String snapshotDirPrefix, int nodeId) {
+            try {
+                m_zk.delete(getPathFromNodeId(snapshotDirPrefix, nodeId), -1);
+            }
+            catch (InterruptedException e) {
+            }
+            catch (KeeperException e) {
+            }
+        }
+
+        private String getPathFromNodeId(String snapshotDirPrefix, int nodeId) {
+            return ZKUtil.joinZKPath(snapshotDirPrefix, Integer.toString(nodeId));
+        }
+
+        private byte[] getDetailsFromSnapshotNode(String snapshotDirPrefix, int nodeId) throws KeeperException, InterruptedException {
+            return m_zk.getData(getPathFromNodeId(snapshotDirPrefix, nodeId), false, null);
+        }
+
+        private void recoverCurrentSnapshotNodes() {
+            assert(ownDistributedLock());
+            m_coalescedSnapshotRequestNodes = new ArrayList<Integer>();
+            if (m_activeSnapshot != SNAPSHOT_TYPE.EMPTY) {
+                ByteBuffer currentQueue = getCurrentState();
+                currentQueue.position(currentQueue.position()+m_queueSlots);
+                int nodeCnt = currentQueue.get();
+                for (int ii=0; ii<nodeCnt; ii++) {
+                    m_coalescedSnapshotRequestNodes.add(currentQueue.getInt());
+                }
+            }
+        }
+
+        private ByteBuffer buildProposalFromUpdatedQueue(ByteBuffer inprogressNodeList) {
+            assert(ownDistributedLock());
+            ByteBuffer newQueue = null;
+            newQueue = ByteBuffer.allocate(1 + m_queueSlots + inprogressNodeList.remaining());
+            newQueue.put((byte) m_activeSnapshot.ordinal());   // snapshot in progress
+            for (SNAPSHOT_TYPE slot : m_pendingSnapshotsQueue) {
+                newQueue.put((byte) slot.ordinal());
+            }
+            for (int ii=0; ii<m_queueSlots-m_pendingSnapshotsQueue.size(); ii++) {
+                newQueue.put((byte) SNAPSHOT_TYPE.EMPTY.ordinal());
+            }
+            // append nodes list in process with current snapshot
+            newQueue.put(inprogressNodeList);
+            return newQueue;
+        }
+
+        private void processCurrentQueueState(ByteBuffer currentAgreedState) {
+            m_activeSnapshot = SNAPSHOT_TYPE.values()[currentAgreedState.get()];
+            for (int ii=0; ii<m_queueSlots; ii++) {
+                m_pendingSnapshotsQueue.add(SNAPSHOT_TYPE.values()[currentAgreedState.get()]);
+            }
+            m_pendingSnapshotsQueue.remove(SNAPSHOT_TYPE.EMPTY);
+        }
+
+        @Override
+        protected void setInitialState(ByteBuffer currentAgreedState)
+        {
+            processCurrentQueueState(currentAgreedState);
+        }
+
+        @Override
+        protected void lockRequestCompleted() {
+            ByteBuffer newQueue;
+            ByteBuffer nodeList;
+            boolean queueChanged = false;
+            for (SNAPSHOT_TYPE snapshotReq : m_localPendingSnapshots) {
+                if (!m_pendingSnapshotsQueue.contains(snapshotReq)) {
+                    m_pendingSnapshotsQueue.add(snapshotReq);
+                    queueChanged = true;
+                }
+            }
+            m_localPendingSnapshots.clear();
+            if (m_completedSnapshotPending) {
+                // We are the leader and we finished the last snapshot so start the next one in the queue
+                LeaderHasQueueLockForNextSnapshot();
+            }
+            else
+            if (queueChanged) {
+                nodeList = getCurrentState();
+                nodeList.position(nodeList.position()+m_queueSlots+1);
+                newQueue = buildProposalFromUpdatedQueue(nodeList);
+                newQueue.flip();
+                proposeStateChange(newQueue);
+            }
+        }
+
+        @Override
+        protected void stateChangeProposed(ByteBuffer proposedState) {
+            // Accept all queue change requests
+            requestedStateChangeAcceptable(true);
+        }
+
+        @Override
+        protected void proposedStateResolved(boolean ourProposal, ByteBuffer proposedState, boolean success) {
+            assert(success);
+            if (ourProposal) {
+                // Since all changes are always successful, the were applied when we proposed the change
+                return;
+            }
+            processCurrentQueueState(proposedState);
+        }
+
+        public int requestSnapshot(SNAPSHOT_TYPE reqType, byte[] snapshotDetails) throws KeeperException, InterruptedException {
+            int nodeId = buildSnapshotNode(getPathFromType(reqType), snapshotDetails);
+
+            if (m_localPendingSnapshots.size() == 0 && requestLock()) {
+                if (!m_pendingSnapshotsQueue.contains(reqType)) {
+                    m_pendingSnapshotsQueue.add(reqType);
+                    ByteBuffer nodeList = getCurrentState();
+                    nodeList.position(nodeList.position()+m_queueSlots+1);
+                    ByteBuffer newQueue = buildProposalFromUpdatedQueue(nodeList);
+                    proposeStateChange(newQueue);
+                }
+            }
+            else {
+                m_localPendingSnapshots.add(reqType);
+            }
+            return nodeId;
+        }
+
+        public SNAPSHOT_TYPE getPendingSnapshotType() {
+            return (SNAPSHOT_TYPE) m_pendingSnapshotsQueue.toArray()[0];
+        }
+
+        public boolean requestLockForCompletedSnapshot() {
+            if (requestLock()) {
+                return true;
+            }
+            else {
+                m_completedSnapshotPending = true;
+            }
+            return false;
+        }
+
+        public ArrayList<Integer> getNodeListFor(SNAPSHOT_TYPE type) {
+            String path = getPathFromType(type);
+            assert(path != null);
+            ArrayList<Integer> nodeList = new ArrayList<Integer>();
+            List<String> nodeNames;
+            try {
+                nodeNames = m_zk.getChildren(path, false);
+            }
+            catch (KeeperException | InterruptedException e) {
+                nodeNames = new ArrayList<String>();
+            }
+            for (String nodeName : nodeNames) {
+                nodeList.add(Integer.valueOf(nodeName));
+            }
+            return nodeList;
+        }
+
+        public Map<Integer, ByteArrayWrapper> getDetailsFromSnapshotNodeByType(SNAPSHOT_TYPE type) {
+            byte[] nodeData = null;
+            String path = getPathFromType(type);
+            assert(path != null);
+            Map<Integer, ByteArrayWrapper> results = new HashMap<Integer, ByteArrayWrapper>();
+            try {
+                List<String> nodeNames = m_zk.getChildren(path, false);
+                for (String nodeName : nodeNames) {
+                    Integer nodeId = Integer.valueOf(nodeName);
+                    nodeData = getDetailsFromSnapshotNode(path, nodeId);
+                    results.put(nodeId, new ByteArrayWrapper(nodeData));
+                }
+            }
+            catch (KeeperException | InterruptedException e) {
+            }
+            return ImmutableSortedMap.copyOf(results);
+        }
+
+        public void removeSnapshotNodeList(List<Integer> satisfyingNodes, boolean clearActive) {
+            String activePath = getPathFromType(m_activeSnapshot);
+            for (Integer nodeId : satisfyingNodes) {
+                deleteSnapshotNode(activePath, nodeId);
+            }
+            if (clearActive) {
+                proposeStateChange(ByteBuffer.wrap(m_startQueue));
+            }
+        }
+
+        public void initiateNewSnapshot(SNAPSHOT_TYPE type, boolean satisfiesAllNodes, List<Integer> satisfyingNodes) {
+            if (satisfiesAllNodes) {
+                m_pendingSnapshotsQueue.remove(type);
+            }
+            m_activeSnapshot = type;
+            ByteBuffer nodeList = ByteBuffer.allocate(satisfyingNodes.size()*4);
+            for (Integer requestNodeId : satisfyingNodes) {
+                nodeList.putInt(requestNodeId);
+            }
+            ByteBuffer newQueue = buildProposalFromUpdatedQueue(nodeList);
+        }
     }
 
     static int m_periodicWorkInterval = 2000;
