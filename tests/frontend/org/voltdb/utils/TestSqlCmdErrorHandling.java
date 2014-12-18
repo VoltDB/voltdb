@@ -204,7 +204,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
 
         ProcessBuilder pb =
                 // Enable elapsed time reports to stderr.
-                new ProcessBuilder(commandPath, "--debugdelay=,,", "--stop-on-error=" + (stopOnError ? "true" : "false"));
+                new ProcessBuilder(commandPath, "--debugdelay=0,,", "--stop-on-error=" + (stopOnError ? "true" : "false"));
 //                // Use up all alloted time on the first error to selectively exercise timeout diagnostics."
 //                new ProcessBuilder(commandPath, "--debugdelay=,,10000", "--stop-on-error=" + (stopOnError ? "true" : "false"));
 //                new ProcessBuilder(commandPath, "--stop-on-error=" + (stopOnError ? "true" : "false"));
