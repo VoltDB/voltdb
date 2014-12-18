@@ -16,14 +16,15 @@
  */
 package org.voltdb.utils;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
-
-import java.io.File;
-import java.io.IOException;
-import java.io.*;
-import java.nio.*;
-import java.nio.channels.*;
 
 /*
  * Extend the File class and override its constructors to allow a property to be specified
@@ -172,7 +173,7 @@ public class VoltFile extends File {
     }
 
     /*
-     * Tests that use ServerThread and LocalSingleProcessServer can't use the
+     * Tests that use ServerThread can't use the
      * property to set m_voltFilePrefix so they have to invoke this to make
      * sure a clean filesystem is generated.
      */

@@ -71,17 +71,17 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import junit.framework.TestCase;
-import org.codehaus.jackson.map.ObjectMapper;
 
+import org.codehaus.jackson.map.ObjectMapper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.compiler.CatalogBuilder.ProcedureInfo;
+import org.voltdb.compiler.CatalogBuilder.RoleInfo;
+import org.voltdb.compiler.DeploymentBuilder.UserInfo;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
-import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
-import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.procedures.CrazyBlahProc;
@@ -355,9 +355,7 @@ public class TestJSONInterface extends TestCase {
                     + "decval decimal, "
                     + "PRIMARY KEY(ival));";
 
-            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
-            String schemaPath = schemaFile.getPath();
-            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+            String schemaPath = MiscUtils.writeStringToTempFileURL(simpleSchema);
 
             VoltDB.Configuration config = new VoltDB.Configuration();
 
@@ -367,7 +365,8 @@ public class TestJSONInterface extends TestCase {
             builder.addStmtProcedure("Insert", "insert into blah values (?,?,?,?,?);");
             builder.addProcedures(CrazyBlahProc.class);
             builder.setHTTPDPort(8095);
-            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"), 1, 1, 0, 21213, true);
+            builder.useCustomAdmin(21213, true);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"), 1, 1, 0);
             assertTrue(success);
 
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
@@ -456,9 +455,7 @@ public class TestJSONInterface extends TestCase {
                     + "decval decimal, "
                     + "PRIMARY KEY(ival));";
 
-            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
-            String schemaPath = schemaFile.getPath();
-            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+            String schemaPath = MiscUtils.writeStringToTempFileURL(simpleSchema);
 
             VoltDB.Configuration config = new VoltDB.Configuration();
 
@@ -468,7 +465,8 @@ public class TestJSONInterface extends TestCase {
             builder.addStmtProcedure("Insert", "insert into blah values (?,?,?,?,?);");
             builder.addProcedures(CrazyBlahProc.class);
             builder.setHTTPDPort(8095);
-            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"), 1, 1, 0, 21213, false);
+            builder.useCustomAdmin(21213, false);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"), 1, 1, 0);
             assertTrue(success);
 
             config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
@@ -657,9 +655,7 @@ public class TestJSONInterface extends TestCase {
                     + "    PRIMARY KEY (DIALECT)\n"
                     + ");";
 
-            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
-            String schemaPath = schemaFile.getPath();
-            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+            String schemaPath = MiscUtils.writeStringToTempFileURL(simpleSchema);
 
             VoltProjectBuilder builder = new VoltProjectBuilder();
             builder.addSchema(schemaPath);
@@ -717,9 +713,7 @@ public class TestJSONInterface extends TestCase {
                     + "    PRIMARY KEY (DIALECT)\n"
                     + ");";
 
-            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
-            String schemaPath = schemaFile.getPath();
-            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+            String schemaPath = MiscUtils.writeStringToTempFileURL(simpleSchema);
 
             VoltProjectBuilder builder = new VoltProjectBuilder();
             builder.addSchema(schemaPath);
@@ -872,9 +866,7 @@ public class TestJSONInterface extends TestCase {
                     + "    PRIMARY KEY (DIALECT)\n"
                     + ");";
 
-            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
-            String schemaPath = schemaFile.getPath();
-            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+            String schemaPath = MiscUtils.writeStringToTempFileURL(simpleSchema);
 
             VoltProjectBuilder builder = new VoltProjectBuilder();
             builder.addSchema(schemaPath);
@@ -1014,9 +1006,7 @@ public class TestJSONInterface extends TestCase {
                     + "    PRIMARY KEY (bar)\n"
                     + ");";
 
-            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
-            String schemaPath = schemaFile.getPath();
-            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+            String schemaPath = MiscUtils.writeStringToTempFileURL(simpleSchema);
 
             VoltProjectBuilder builder = new VoltProjectBuilder();
             builder.addSchema(schemaPath);
@@ -1052,9 +1042,7 @@ public class TestJSONInterface extends TestCase {
                     + "    PRIMARY KEY (bar)\n"
                     + ");";
 
-            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
-            String schemaPath = schemaFile.getPath();
-            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+            String schemaPath = MiscUtils.writeStringToTempFileURL(simpleSchema);
 
             VoltProjectBuilder builder = new VoltProjectBuilder();
             builder.addSchema(schemaPath);
@@ -1125,9 +1113,7 @@ public class TestJSONInterface extends TestCase {
                     + "    PRIMARY KEY (bar)\n"
                     + ");";
 
-            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
-            String schemaPath = schemaFile.getPath();
-            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+            String schemaPath = MiscUtils.writeStringToTempFileURL(simpleSchema);
 
             VoltProjectBuilder builder = new VoltProjectBuilder();
             builder.addSchema(schemaPath);
@@ -1187,9 +1173,7 @@ public class TestJSONInterface extends TestCase {
                     + "    PRIMARY KEY (bar)\n"
                     + ");";
 
-            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
-            String schemaPath = schemaFile.getPath();
-            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+            String schemaPath = MiscUtils.writeStringToTempFileURL(simpleSchema);
 
             VoltProjectBuilder builder = new VoltProjectBuilder();
             builder.addSchema(schemaPath);
@@ -1244,9 +1228,7 @@ public class TestJSONInterface extends TestCase {
                     + "    PRIMARY KEY (bar)\n"
                     + ");";
 
-            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
-            String schemaPath = schemaFile.getPath();
-            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+            String schemaPath = MiscUtils.writeStringToTempFileURL(simpleSchema);
 
             VoltProjectBuilder builder = new VoltProjectBuilder();
             builder.addSchema(schemaPath);
@@ -1302,9 +1284,7 @@ public class TestJSONInterface extends TestCase {
                     + "    PRIMARY KEY (bar)\n"
                     + ");";
 
-            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
-            String schemaPath = schemaFile.getPath();
-            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+            String schemaPath = MiscUtils.writeStringToTempFileURL(simpleSchema);
 
             VoltProjectBuilder builder = new VoltProjectBuilder();
             builder.addSchema(schemaPath);

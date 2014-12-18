@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.regex.Pattern;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.BackendTarget;
@@ -85,6 +86,7 @@ public class LocalCluster implements VoltServerConfig {
     boolean m_running = false;
     private final boolean m_debug;
     FailureState m_failureState;
+    int m_requestedAdminPortOverride = 0;
     int m_nextIPCPort = 10000;
     ArrayList<Process> m_cluster = new ArrayList<Process>();
     int perLocalClusterExtProcessIndex = 0;
@@ -195,9 +197,11 @@ public class LocalCluster implements VoltServerConfig {
         for (;      traces[i].getClassName().equals(getClass().getName()); i++);
         // skip the package name
         int dot = traces[i].getClassName().lastIndexOf('.');
+        Pattern SpecialCharacterPattern = Pattern.compile("[<$>]");
         m_callingClassName = traces[i].getClassName().substring(dot + 1);
+        m_callingClassName = SpecialCharacterPattern.matcher(m_callingClassName).replaceAll("_");
         m_callingMethodName = traces[i].getMethodName();
-
+        m_callingMethodName = SpecialCharacterPattern.matcher(m_callingMethodName).replaceAll("_");
         log.info("Instantiating LocalCluster for " + jarFileName + " with class.method: " +
                 m_callingClassName + "." + m_callingMethodName);
         log.info("Sites: " + siteCount + " hosts: " + hostCount + " replication factor: " + kfactor);
@@ -318,11 +322,10 @@ public class LocalCluster implements VoltServerConfig {
         return m_compiled;
     }
 
-    @Override
-    public boolean compileWithPartitionDetection(VoltProjectBuilder builder, String snapshotPath, String ppdPrefix) {
+    public boolean compileWithPartitionDetection(VoltProjectBuilder builder, String ppdPrefix) {
         if (!m_compiled) {
-            m_compiled = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor,
-                    null, true, snapshotPath, ppdPrefix);
+            builder.setPartitionDetectionSettings("/tmp", ppdPrefix);
+            m_compiled = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor);
             templateCmdLine.pathToDeployment(builder.getPathToDeployment());
             m_voltdbroot = builder.getPathToVoltRoot().getAbsolutePath();
         }
@@ -332,16 +335,17 @@ public class LocalCluster implements VoltServerConfig {
     @Override
     public boolean compileWithAdminMode(VoltProjectBuilder builder, int adminPort, boolean adminOnStartup)
     {
-        // ATTN: LocalCluster does not support non-default admin ports.
-        // Need a way to correctly initializing the portGenerator
-        // and then resetting it after tests to the usual default.
+        // ATTN: LocalCluster does not normally consult the deployment file to determine
+        // admin ports, so the value is cached here and used for exactly one "host"
+        // to avoid port conflicts among the co-located host processes.
         if (adminPort != VoltDB.DEFAULT_ADMIN_PORT) {
-            return false;
+            m_requestedAdminPortOverride = adminPort;
         }
 
         if (!m_compiled) {
-            m_compiled = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor,
-                    adminPort, adminOnStartup);
+            builder.useCustomAdmin(adminPort, adminOnStartup);
+            m_compiled = builder.compile(templateCmdLine.jarFileName(),
+                    m_siteCount, m_hostCount, m_kfactor);
             templateCmdLine.pathToDeployment(builder.getPathToDeployment());
             m_voltdbroot = builder.getPathToVoltRoot().getAbsolutePath();
         }
@@ -350,7 +354,7 @@ public class LocalCluster implements VoltServerConfig {
 
     @Override
     public void startUp() {
-        startUp(true);
+        startUp(true, ReplicationRole.NONE);
     }
 
     @Override
@@ -398,7 +402,9 @@ public class LocalCluster implements VoltServerConfig {
         cmdln.voltFilePrefix(subroot.getPath());
         cmdln.internalPort(portGenerator.nextInternalPort());
         cmdln.port(portGenerator.nextClient());
-        cmdln.adminPort(portGenerator.nextAdmin());
+        int adminPort = portGenerator.nextAdmin();
+        adminPort = considerAdminPortOverride(adminPort);
+        cmdln.adminPort(adminPort);
         cmdln.zkport(portGenerator.nextZkPort());
         cmdln.httpPort(portGenerator.nextHttp());
         // replication port and its two automatic followers.
@@ -649,7 +655,9 @@ public class LocalCluster implements VoltServerConfig {
             }
 
             cmdln.port(portGenerator.nextClient());
-            cmdln.adminPort(portGenerator.nextAdmin());
+            int adminPort = portGenerator.nextAdmin();
+            adminPort = considerAdminPortOverride(adminPort);
+            cmdln.adminPort(adminPort);
             cmdln.httpPort(portGenerator.nextHttp());
             cmdln.replicaMode(replicaMode);
             cmdln.timestampSalt(getRandomTimestampSalt());
@@ -755,6 +763,19 @@ public class LocalCluster implements VoltServerConfig {
             m_hostCount++;
             this.m_compiled = false; //Host count changed, should recompile
         }
+    }
+
+    private int considerAdminPortOverride(int adminPort) {
+        if (m_requestedAdminPortOverride != 0) {
+            if (m_requestedAdminPortOverride == -1) {
+                //Oops. the requested admin port has already been used up.
+                throw new RuntimeException(
+                        "LocalCluster multi-host simulation can not support a fixed admin port.");
+            }
+            adminPort = m_requestedAdminPortOverride;
+            m_requestedAdminPortOverride = -1; // disallow reuse
+        }
+        return adminPort;
     }
 
     /**

@@ -24,12 +24,10 @@
 package org.voltdb.utils;
 
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.net.URLEncoder;
 import java.util.concurrent.atomic.AtomicLong;
 
 import javax.servlet.ServletException;
@@ -238,12 +236,8 @@ public class HTTPDBenchmark extends TestCase {
             "sval3 varchar(100) default 'bar', " +
             "PRIMARY KEY(sval1));";
 
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
-        String schemaPath = schemaFile.getPath();
-        schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
-
         VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addSchema(schemaPath);
+        builder.addLiteralSchema(simpleSchema);
         builder.addPartitionInfo("dummy", "sval1");
         builder.addStmtProcedure("Insert", "insert into dummy values (?,?,?);");
         builder.addStmtProcedure("Select", "select * from dummy;");

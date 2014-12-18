@@ -25,14 +25,11 @@ package org.voltdb.utils;
 
 import java.io.CharArrayReader;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.LineNumberReader;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLDecoder;
-import java.util.jar.JarEntry;
-import java.util.jar.JarInputStream;
 
 import junit.framework.TestCase;
 
@@ -40,7 +37,6 @@ import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.VoltCompiler;
-import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.InMemoryJarfile.JarLoader;
 
 public class TestInMemoryJarfile extends TestCase {
@@ -73,8 +69,7 @@ public class TestInMemoryJarfile extends TestCase {
             "</project>";
         String simpleProject = String.format(simpleProjectTmpl, elemPfx, elemPfx, elemPfx);
         System.out.println(simpleProject);
-        File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        String projectPath = projectFile.getPath();
+        String projectPath = MiscUtils.writeStringToTempFilePath(simpleProject);
         VoltCompiler compiler = new VoltCompiler();
         assertTrue(compiler.compileWithProjectXML(projectPath, jarFileName));
         return compiler.getCatalog();
@@ -105,6 +100,7 @@ public class TestInMemoryJarfile extends TestCase {
     }
 
     /**
+     * @throws IOException
      *
      */
     public void testReadFileFromJarfile() throws IOException {

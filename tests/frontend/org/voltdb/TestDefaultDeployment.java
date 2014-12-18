@@ -30,7 +30,7 @@ import junit.framework.TestCase;
 
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.utils.CatalogUtil;
 
@@ -44,18 +44,15 @@ public class TestDefaultDeployment extends TestCase {
             "PRIMARY KEY  (W_ID)" +
             ");";
 
-        VoltProjectBuilder builder = new VoltProjectBuilder();
+        CatalogBuilder builder = new CatalogBuilder();
         builder.addLiteralSchema(ddl);
         builder.addStmtProcedure("hello", "select * from warehouse");
 
         // compileWithDefaultDeployment() generates no deployment.xml so that the default is used.
         String jarPath = Configuration.getPathToCatalogForTest("test.jar");
-        assertTrue(builder.compileWithDefaultDeployment(jarPath));
+        assertTrue(builder.compile(jarPath));
         final File jar = new File(jarPath);
         jar.deleteOnExit();
-
-        String pathToDeployment = builder.getPathToDeployment();
-        assertEquals(pathToDeployment, null);
 
         // the default deployment file includes an http server on port 8080.
         // do some verification without starting VoltDB, since that port

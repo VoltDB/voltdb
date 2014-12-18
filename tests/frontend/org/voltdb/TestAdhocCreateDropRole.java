@@ -68,7 +68,6 @@ public class TestAdhocCreateDropRole extends AdhocDDLTestBase {
         dbuilder.addUsers(new DeploymentBuilder.UserInfo[]
                 {new DeploymentBuilder.UserInfo("admin", "admin", new String[] {"Administrator"})});
         dbuilder.setSecurityEnabled(true);
-        dbuilder.setEnableCommandLogging(false);
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue("Schema compilation failed", success);
         dbuilder.writeXML(pathToDeployment);

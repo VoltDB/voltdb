@@ -105,10 +105,6 @@ public interface VoltServerConfig {
      */
     public boolean isValgrind();
 
-    boolean compileWithPartitionDetection(VoltProjectBuilder builder,
-            String snapshotPath,
-            String ppdPrefix);
-
     boolean compileWithAdminMode(VoltProjectBuilder builder, int adminPort,
                                  boolean adminOnStartup);
 

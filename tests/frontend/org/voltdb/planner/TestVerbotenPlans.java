@@ -23,13 +23,12 @@
 
 package org.voltdb.planner;
 
-import java.io.File;
 import java.io.IOException;
 
 import junit.framework.TestCase;
 
-import org.voltdb.compiler.VoltCompiler;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.VoltDB.Configuration;
+import org.voltdb.compiler.TestVoltCompiler;
 
 public class TestVerbotenPlans extends TestCase {
 
@@ -43,39 +42,17 @@ public class TestVerbotenPlans extends TestCase {
             "CREATE TABLE ASSET (" +
                 "ASSET_ID INTEGER NOT NULL, " +
                 "OBJECT_DETAIL_ID INTEGER NOT NULL, " +
-                "PRIMARY KEY (ASSET_ID) );";
+                "PRIMARY KEY (ASSET_ID) );\n" +
+            "CREATE PROCEDURE SelectEng490 AS \n" +
+                "SELECT A.ASSET_ID, A.OBJECT_DETAIL_ID, OD.OBJECT_DETAIL_ID " +
+                "FROM ASSET A, OBJECT_DETAIL OD WHERE A.OBJECT_DETAIL_ID = OD.OBJECT_DETAIL_ID;\n" +
+            "PARTITION TABLE ASSET ON COLUMN ASSET_ID;\n" +
+            "PARTITION TABLE OBJECT_DETAIL ON COLUMN OBJECT_DETAIL_ID;\n" +
+            "";
 
-        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
-        final String schemaPath = schemaFile.getPath();
-
-        final String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas>" +
-            "<schema path='" + schemaPath + "' />" +
-            "</schemas>" +
-            "<procedures>" +
-            "<procedure class='SelectEng490'>" +
-            "<sql>SELECT A.ASSET_ID, A.OBJECT_DETAIL_ID, OD.OBJECT_DETAIL_ID " +
-                "FROM ASSET A, OBJECT_DETAIL OD WHERE A.OBJECT_DETAIL_ID = OD.OBJECT_DETAIL_ID;</sql>" +
-            "</procedure>" +
-            "</procedures>" +
-            "<partitions>" +
-            "<partition table='ASSET' column='ASSET_ID' />" +
-            "<partition table='OBJECT_DETAIL' column='OBJECT_DETAIL_ID' />" +
-            "</partitions>" +
-            "</database>" +
-            "</project>";
-
-        final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        final String projectPath = projectFile.getPath();
-
-        final VoltCompiler compiler = new VoltCompiler();
-
-        final boolean success = compiler.compileWithProjectXML(projectPath, "testout.jar");
-
-        assertFalse(success);
+        String pathToCatalog = Configuration.getPathToCatalogForTest("testout.jar");
+        TestVoltCompiler.compileLiteralSchemaForErrors(pathToCatalog, simpleSchema);
+        //TODO: assert specific error messages from compileLiteralSchemaForErrors's return value.
     }
 
 }

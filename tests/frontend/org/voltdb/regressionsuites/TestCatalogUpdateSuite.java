@@ -54,9 +54,9 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.SyncCallback;
-import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
-import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
-import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
+import org.voltdb.compiler.CatalogBuilder.ProcedureInfo;
+import org.voltdb.compiler.CatalogBuilder.RoleInfo;
+import org.voltdb.compiler.DeploymentBuilder.UserInfo;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.MiscUtils;
 
@@ -1040,7 +1040,6 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         assertTrue(compile);
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-base-secure.xml"));
 
-        //config = new LocalSingleProcessServer("catalogupdate-local-addtables.jar", 2, BackendTarget.NATIVE_EE_JNI);
         config = new LocalCluster("catalogupdate-cluster-addtables.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
@@ -1101,7 +1100,6 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         assertTrue(compile);
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-addexpressindex.xml"));
 
-        //config = new LocalSingleProcessServer("catalogupdate-local-expanded.jar", 2, BackendTarget.NATIVE_EE_JNI);
         config = new LocalCluster("catalogupdate-cluster-expanded.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
@@ -1111,7 +1109,6 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         assertTrue(compile);
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.xml"));
 
-        //config = new LocalSingleProcessServer("catalogupdate-local-conflict.jar", 2, BackendTarget.NATIVE_EE_JNI);
         config = new LocalCluster("catalogupdate-cluster-conflict.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
@@ -1121,7 +1118,6 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         assertTrue(compile);
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-conflict.xml"));
 
-        //config = new LocalSingleProcessServer("catalogupdate-local-many.jar", 2, BackendTarget.NATIVE_EE_JNI);
         config = new LocalCluster("catalogupdate-cluster-many.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();

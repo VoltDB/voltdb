@@ -136,7 +136,6 @@ public class TPCCProjectBuilder extends VoltProjectBuilder {
         setTableAsExportOnly("HISTORY");
     }
 
-    @Override
     public String[] compileAllCatalogs(int sitesPerHost,
                                        int length,
                                        int kFactor,
@@ -150,7 +149,6 @@ public class TPCCProjectBuilder extends VoltProjectBuilder {
         return new String[] {m_jarFileName};
     }
 
-    @Override
     public void addAllDefaults() {
         addDefaultProcedures();
         addDefaultPartitioning();

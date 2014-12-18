@@ -34,6 +34,7 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.utils.BuildDirectoryUtils;
+import org.voltdb.utils.MiscUtils;
 
 /**
  * @author scooper
@@ -130,8 +131,7 @@ public class TestPartitionDDL extends TestCase {
                     sb.append('\n');
                 }
             }
-            final File ddlFile = VoltProjectBuilder.writeStringToTempFile(sb.toString());
-            return ddlFile.getPath();
+            return MiscUtils.writeStringToTempFilePath(sb.toString());
         }
 
         String writeXML(final boolean partitioned, final String ddlPath, final Item... items) {
@@ -162,7 +162,7 @@ public class TestPartitionDDL extends TestCase {
             xmlText += "    </procedures>\n" +
                     "  </database>\n" +
                     "</project>\n";
-            return VoltProjectBuilder.writeStringToTempFile(xmlText).getPath();
+            return MiscUtils.writeStringToTempFilePath(xmlText);
         }
 
         String getMessages(final VoltCompiler compiler, final boolean success) {

@@ -32,9 +32,9 @@ import org.voltdb.TableHelper;
 import org.voltdb.VoltTable;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.CatalogBuilder.RoleInfo;
+import org.voltdb.compiler.DeploymentBuilder.UserInfo;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
-import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
@@ -54,7 +54,7 @@ public class TestCatalogDiffs extends TestCase {
                                  org.voltdb.benchmark.tpcc.procedures.delivery.class };
 
     protected String compile(String name, Class<?>... procList) {
-        return  compileWithGroups(false, null, null, null, name, procList);
+        return compileWithGroups(false, null, null, null, name, procList);
     }
 
     protected String compileWithGroups(
@@ -146,7 +146,7 @@ public class TestCatalogDiffs extends TestCase {
             Catalog catUpdated)
     {
         CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, catUpdated);
-        String originalSerialized = catOriginal.serialize();
+        //*/ enable for debug */ String originalSerialized = catOriginal.serialize();
         catOriginal.execute(diff.commands());
         String updatedOriginalSerialized = catOriginal.serialize();
         assertTrue(diff.supported());
@@ -332,15 +332,12 @@ public class TestCatalogDiffs extends TestCase {
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.addPartitionInfo("A", "C1");
-        builder.compile(testDir + File.separator + "adminstartup1.jar",
-                1, 1, 0, 1000, true);
+        builder.useCustomAdmin(1000, true); // Currently a one-way transition for VoltProjectBuilder
+        builder.compile(testDir + File.separator + "adminstartup1.jar", 1, 1, 0);
         Catalog catOriginal = catalogForJar(testDir + File.separator + "adminstartup1.jar");
 
-        builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
-        builder.addPartitionInfo("A", "C1");
-        builder.compile(testDir + File.separator + "adminstartup2.jar",
-                1, 1, 0, 1000, false); // setting adminstartup to false is the test
+        builder.useCustomAdmin(1000, false); // setting adminstartup to false is the test
+        builder.compile(testDir + File.separator + "adminstartup2.jar", 1, 1, 0);
         Catalog catUpdated = catalogForJar(testDir + File.separator + "adminstartup2.jar");
 
         verifyDiff(catOriginal, catUpdated);

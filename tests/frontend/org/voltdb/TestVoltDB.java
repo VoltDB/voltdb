@@ -30,8 +30,8 @@ import junit.framework.TestCase;
 
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
-import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
-import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
+import org.voltdb.compiler.CatalogBuilder.RoleInfo;
+import org.voltdb.compiler.DeploymentBuilder.UserInfo;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;

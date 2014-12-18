@@ -88,24 +88,6 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
     }
 
     @Override
-    public boolean compileWithPartitionDetection(VoltProjectBuilder builder, String snapshotPath, String ppdPrefix) {
-        // this doesn't really make a lot of sense, in that you can't partition a single node,
-        // but I suppose it is still feasible user configuration
-        int hostCount = 1;
-        int replication = 0;
-
-        if (m_compiled) {
-            return true;
-        }
-        m_compiled = builder.compile(m_jarFileName, m_siteCount, hostCount, replication,
-                                     null, true, snapshotPath, ppdPrefix);
-        m_pathToDeployment = builder.getPathToDeployment();
-        m_pathToVoltRoot = builder.getPathToVoltRoot();
-
-        return m_compiled;
-    }
-
-    @Override
     public boolean compileWithAdminMode(VoltProjectBuilder builder,
                                         int adminPort, boolean adminOnStartup)
     {
@@ -115,8 +97,8 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
         if (m_compiled) {
             return true;
         }
-        m_compiled = builder.compile(m_jarFileName, m_siteCount, hostCount, replication,
-                                     adminPort, adminOnStartup);
+        builder.useCustomAdmin(adminPort, adminOnStartup);
+        m_compiled = builder.compile(m_jarFileName, m_siteCount, hostCount, replication);
         m_pathToDeployment = builder.getPathToDeployment();
         return m_compiled;
 

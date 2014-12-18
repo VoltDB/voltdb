@@ -23,27 +23,23 @@
 
 package org.voltdb;
 
-import java.io.File;
 import java.io.IOException;
-import java.net.URLEncoder;
 
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.utils.MiscUtils;
 
 /**
  * Test project builder with empty DDL.
  */
 public class EmptyProjectBuilder extends VoltProjectBuilder
 {
-    private static File s_ddlFile = null;
     private static String s_ddlURL = null;
 
     public EmptyProjectBuilder() throws IOException
     {
         super();
-        if (s_ddlFile == null) {
-            s_ddlFile = VoltProjectBuilder.writeStringToTempFile("");
-            s_ddlFile.deleteOnExit();
-            s_ddlURL = URLEncoder.encode(s_ddlFile.getPath(), "UTF-8");
+        if (s_ddlURL == null) {
+            s_ddlURL = MiscUtils.writeStringToTempFileURLDOE("");
         }
         addSchema(s_ddlURL);
     }

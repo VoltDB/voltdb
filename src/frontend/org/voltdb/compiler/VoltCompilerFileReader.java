@@ -23,6 +23,7 @@ import java.io.FileReader;
 import java.io.IOException;
 
 import org.voltdb.utils.InMemoryJarfile;
+import org.voltdb.utils.MiscUtils;
 
 /**
  * VoltCompiler file-based reader.
@@ -93,9 +94,8 @@ public class VoltCompilerFileReader extends VoltCompilerReader
         File file = null;
 
         if (path.contains(".jar!")) {
-            String ddlText = null;
-            ddlText = VoltCompilerUtils.readFileFromJarfile(path);
-            file = VoltProjectBuilder.writeStringToTempFile(ddlText);
+            String ddlText = VoltCompilerUtils.readFileFromJarfile(path);
+            file = MiscUtils.writeStringToTempFile(ddlText);
         }
         else {
             file = new File(path);

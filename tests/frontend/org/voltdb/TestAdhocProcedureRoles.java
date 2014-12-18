@@ -36,9 +36,9 @@ import org.voltdb.catalog.Catalog;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.compiler.CatalogBuilder.RoleInfo;
+import org.voltdb.compiler.DeploymentBuilder.UserInfo;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
-import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.utils.MiscUtils;
 
 public class TestAdhocProcedureRoles extends AdhocDDLTestBase {

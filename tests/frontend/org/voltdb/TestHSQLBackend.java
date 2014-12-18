@@ -147,7 +147,10 @@ public class TestHSQLBackend extends TestCase {
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("hsqldbbin.jar"), 1, 1, 0);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("hsqldbbin.xml"));
-
+        //File dump = new File(Configuration.getPathToCatalogForTest("hsqldbbin.xml"));
+        //FileInputStream fis = new FileInputStream(dump);
+        //byte[] onek = new byte[1000];
+        //fis.read(onek);
         VoltDB.Configuration config = new VoltDB.Configuration();
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("hsqldbbin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("hsqldbbin.xml");

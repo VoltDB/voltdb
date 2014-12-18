@@ -41,6 +41,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compilereport.TableAnnotation;
+import org.voltdb.utils.MiscUtils;
 
 public class TestDDLCompiler extends TestCase {
 
@@ -177,12 +178,11 @@ public class TestDDLCompiler extends TestCase {
                 "</schemas></database></project>";
 
         // RUN EXPECTING WARNINGS
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema1);
-        String schemaPath = schemaFile.getPath();
+        String schemaPath = MiscUtils.writeStringToTempFilePath(schema1);
 
-        File projectFile = VoltProjectBuilder.writeStringToTempFile(
+        String projectPath = MiscUtils.writeStringToTempFilePath(
                 String.format(simpleProject, schemaPath));
-        String projectPath = projectFile.getPath();
+
 
         // compile successfully (but with two warnings hopefully)
         VoltCompiler compiler = new VoltCompiler();
@@ -207,12 +207,11 @@ public class TestDDLCompiler extends TestCase {
         jarOut.delete();
 
         // RUN EXPECTING NO WARNINGS
-        schemaFile = VoltProjectBuilder.writeStringToTempFile(schema2);
-        schemaPath = schemaFile.getPath();
+        schemaPath = MiscUtils.writeStringToTempFilePath(schema2);
 
-        projectFile = VoltProjectBuilder.writeStringToTempFile(
+        projectPath = MiscUtils.writeStringToTempFilePath(
                 String.format(simpleProject, schemaPath));
-        projectPath = projectFile.getPath();
+
 
         // don't reinitialize the compiler to test that it can be re-called
         //compiler = new VoltCompiler();
@@ -234,13 +233,12 @@ public class TestDDLCompiler extends TestCase {
 
         String schema = String.format("IMPORT CLASS %s;", importStmt);
 
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
-        schemaFile.deleteOnExit();
+        String schemaPath = MiscUtils.writeStringToTempFilePathDOE(schema);
 
         // compile and fail on bad import
         VoltCompiler compiler = new VoltCompiler();
         try {
-            return compiler.compileFromDDL(jarOut.getPath(), schemaFile.getPath());
+            return compiler.compileFromDDL(jarOut.getPath(), schemaPath);
         }
         catch (VoltCompilerException e) {
             e.printStackTrace();
@@ -273,17 +271,15 @@ public class TestDDLCompiler extends TestCase {
         jarOut.deleteOnExit();
 
         String schema1 = String.format("IMPORT CLASS %s;", importStmt1);
-        File schemaFile1 = VoltProjectBuilder.writeStringToTempFile(schema1);
-        schemaFile1.deleteOnExit();
+        String schemaPath1 = MiscUtils.writeStringToTempFilePathDOE(schema1);
 
         String schema2 = String.format("IMPORT CLASS %s;", importStmt2);
-        File schemaFile2 = VoltProjectBuilder.writeStringToTempFile(schema2);
-        schemaFile2.deleteOnExit();
+        String schemaPath2 = MiscUtils.writeStringToTempFilePathDOE(schema2);
 
         // compile and fail on bad import
         VoltCompiler compiler = new VoltCompiler();
         try {
-            boolean rslt = compiler.compileFromDDL(jarOut.getPath(), schemaFile1.getPath(), schemaFile2.getPath());
+            boolean rslt = compiler.compileFromDDL(jarOut.getPath(), schemaPath1, schemaPath2);
             assertTrue(checkWarn^compiler.m_warnings.isEmpty());
             return rslt;
         }
@@ -389,12 +385,10 @@ public class TestDDLCompiler extends TestCase {
 
         VoltCompiler compiler = new VoltCompiler();
         for (int ii = 0; ii < schema.length; ++ii) {
-            File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema[ii]);
-            String schemaPath = schemaFile.getPath();
+            String schemaPath = MiscUtils.writeStringToTempFilePath(schema[ii]);
 
-            File projectFile = VoltProjectBuilder.writeStringToTempFile(
+            String projectPath = MiscUtils.writeStringToTempFilePath(
                     String.format(simpleProject, schemaPath));
-            String projectPath = projectFile.getPath();
 
             // compile successfully (but with two warnings hopefully)
             boolean success = compiler.compileWithProjectXML(projectPath, jarOut.getPath());

@@ -26,6 +26,7 @@ import java.net.URL;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -35,7 +36,6 @@ import java.util.Map;
 import org.voltdb.ProcInfoData;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.utils.MiscUtils;
-import org.voltdb.utils.NotImplementedException;
 
 /**
  * Alternate (programmatic) interface to VoltCompiler. Give the class all of
@@ -50,21 +50,19 @@ public class CatalogBuilder {
     private StringBuffer transformer = new StringBuffer();
 
     public static final class ProcedureInfo {
-        private final String roles[];
-        private final Class<?> cls;
-        private final String name;
-        private final String sql;
-        private final String partitionInfo;
-        private final String joinOrder;
+        private final String m_roles[];
+        private final Class<?> m_class;
+        private final String m_name;
+        private final String m_sql;
+        private final String m_partitionInfo;
 
         public ProcedureInfo(final String roles[], final Class<?> cls) {
-            this.roles = roles;
-            this.cls = cls;
-            this.name = cls.getSimpleName();
-            this.sql = null;
-            this.joinOrder = null;
-            this.partitionInfo = null;
-            assert(this.name != null);
+            m_roles = roles;
+            m_class = cls;
+            m_name = cls.getSimpleName();
+            m_sql = null;
+            m_partitionInfo = null;
+            assert(m_name != null);
         }
 
         public ProcedureInfo(
@@ -72,28 +70,61 @@ public class CatalogBuilder {
                 final String name,
                 final String sql,
                 final String partitionInfo) {
-            this(roles, name, sql, partitionInfo, null);
-        }
-
-        public ProcedureInfo(
-                final String roles[],
-                final String name,
-                final String sql,
-                final String partitionInfo,
-                final String joinOrder) {
             assert(name != null);
-            this.roles = roles;
-            this.cls = null;
-            this.name = name;
-            if(sql.endsWith(";")) {
-                this.sql = sql;
+            m_roles = roles;
+            m_class = null;
+            m_name = name;
+            if (sql.endsWith(";")) {
+                m_sql = sql;
             }
             else {
-                this.sql = sql + ";";
+                m_sql = sql + ";";
             }
-            this.partitionInfo = partitionInfo;
-            this.joinOrder = joinOrder;
-            assert(this.name != null);
+            m_partitionInfo = partitionInfo;
+            assert(m_name != null);
+        }
+
+        @Override
+        public int hashCode() {
+            return m_name.hashCode();
+        }
+
+        @Override
+        public boolean equals(final Object o) {
+            if (o instanceof ProcedureInfo) {
+                final ProcedureInfo oInfo = (ProcedureInfo)o;
+                return m_name.equals(oInfo.m_name);
+            }
+            return false;
+        }
+    }
+
+    public static final class RoleInfo {
+        private final String name;
+        private final boolean sql;
+        private final boolean sqlread;
+        private final boolean admin;
+        private final boolean defaultproc;
+        private final boolean defaultprocread;
+        private final boolean allproc;
+
+        public RoleInfo(final String name, final boolean sql, final boolean sqlread, final boolean admin, final boolean defaultproc, final boolean defaultprocread, final boolean allproc){
+            this.name = name;
+            this.sql = sql;
+            this.sqlread = sqlread;
+            this.admin = admin;
+            this.defaultproc = defaultproc;
+            this.defaultprocread = defaultprocread;
+            this.allproc = allproc;
+        }
+
+        public static RoleInfo[] fromTemplate(final RoleInfo other, final String... names) {
+            RoleInfo[] roles = new RoleInfo[names.length];
+            for (int i = 0; i < names.length; ++i) {
+                roles[i] = new RoleInfo(names[i], other.sql, other.sqlread, other.admin,
+                                other.defaultproc, other.defaultprocread, other.allproc);
+            }
+            return roles;
         }
 
         @Override
@@ -103,8 +134,8 @@ public class CatalogBuilder {
 
         @Override
         public boolean equals(final Object o) {
-            if (o instanceof ProcedureInfo) {
-                final ProcedureInfo oInfo = (ProcedureInfo)o;
+            if (o instanceof RoleInfo) {
+                final RoleInfo oInfo = (RoleInfo)o;
                 return name.equals(oInfo.name);
             }
             return false;
@@ -120,27 +151,39 @@ public class CatalogBuilder {
 
     private List<String> m_diagnostics;
 
-    /**
-     * Produce all catalogs this project builder knows how to produce.
-     * Written to allow BenchmarkController to cause compilation of multiple
-     * catalogs for benchmarks that need to update running appplications and
-     * consequently need multiple benchmark controlled catalog jars.
-     * @param sitesPerHost
-     * @param length
-     * @param kFactor
-     * @param voltRoot  where to put the compiled catalogs
-     * @return a list of jar filenames that were compiled. The benchmark will
-     * be started using the filename at index 0.
-     */
-    public String[] compileAllCatalogs(
-            int sitesPerHost, int length,
-            int kFactor, String voltRoot)
-    {
-        throw new NotImplementedException("This project builder does not support compileAllCatalogs");
-    }
-
     public void addAllDefaults() {
         // does nothing in the base class
+    }
+
+    public void addRoles(final RoleInfo roles[]) {
+        for (final RoleInfo info : roles) {
+            transformer.append("CREATE ROLE " + info.name);
+            if(info.sql || info.sqlread || info.defaultproc || info.admin || info.defaultprocread || info.allproc) {
+                transformer.append(" WITH ");
+                if(info.sql) {
+                    transformer.append("sql,");
+                }
+                if(info.sqlread) {
+                    transformer.append("sqlread,");
+                }
+                if(info.defaultproc) {
+                    transformer.append("defaultproc,");
+                }
+                if(info.admin) {
+                    transformer.append("admin,");
+                }
+                if(info.defaultprocread) {
+                    transformer.append("defaultprocread,");
+                }
+                if(info.allproc) {
+                    transformer.append("allproc,");
+                }
+                transformer.replace(transformer.length() - 1, transformer.length(), ";");
+            }
+            else {
+                transformer.append(";");
+            }
+        }
     }
 
     public void addSchema(final URL schemaURL) {
@@ -184,15 +227,11 @@ public class CatalogBuilder {
     }
 
     public void addStmtProcedure(String name, String sql) {
-        addStmtProcedure(name, sql, null, null);
+        addStmtProcedure(name, sql, null);
     }
 
     public void addStmtProcedure(String name, String sql, String partitionInfo) {
-        addStmtProcedure( name, sql, partitionInfo, null);
-    }
-
-    public void addStmtProcedure(String name, String sql, String partitionInfo, String joinOrder) {
-        addProcedures(new ProcedureInfo(new String[0], name, sql, partitionInfo, joinOrder));
+        addProcedures(new ProcedureInfo(new String[0], name, sql, partitionInfo));
     }
 
     public void addProcedures(final Class<?>... procedures) {
@@ -206,10 +245,7 @@ public class CatalogBuilder {
      * List of roles permitted to invoke the procedure
      */
     public void addProcedures(final ProcedureInfo... procedures) {
-        final ArrayList<ProcedureInfo> procArray = new ArrayList<ProcedureInfo>();
-        for (final ProcedureInfo procedure : procedures)
-            procArray.add(procedure);
-        addProcedures(procArray);
+        addProcedures(Arrays.asList(procedures));
     }
 
     public void addProcedures(final Iterable<ProcedureInfo> procedures) {
@@ -225,30 +261,30 @@ public class CatalogBuilder {
 
             // ALLOW clause in CREATE PROCEDURE stmt
             StringBuffer roleInfo = new StringBuffer();
-            if(procedure.roles.length != 0) {
+            if(procedure.m_roles.length != 0) {
                 roleInfo.append(" ALLOW ");
-                for(int i = 0; i < procedure.roles.length; i++) {
-                    roleInfo.append(procedure.roles[i] + ",");
+                for(int i = 0; i < procedure.m_roles.length; i++) {
+                    roleInfo.append(procedure.m_roles[i] + ",");
                 }
                 int length = roleInfo.length();
                 roleInfo.replace(length - 1, length, " ");
             }
 
-            if(procedure.cls != null) {
-                transformer.append("CREATE PROCEDURE " + roleInfo.toString() + " FROM CLASS " + procedure.cls.getName() + ";");
+            if(procedure.m_class != null) {
+                transformer.append("CREATE PROCEDURE " + roleInfo.toString() + " FROM CLASS " + procedure.m_class.getName() + ";");
             }
-            else if(procedure.sql != null) {
-                transformer.append("CREATE PROCEDURE " + procedure.name + roleInfo.toString() + " AS " + procedure.sql);
+            else if(procedure.m_sql != null) {
+                transformer.append("CREATE PROCEDURE " + procedure.m_name + roleInfo.toString() + " AS " + procedure.m_sql);
             }
 
-            if(procedure.partitionInfo != null) {
-                String[] parameter = procedure.partitionInfo.split(":");
+            if(procedure.m_partitionInfo != null) {
+                String[] parameter = procedure.m_partitionInfo.split(":");
                 String[] token = parameter[0].split("\\.");
                 String position = "";
                 if(Integer.parseInt(parameter[1].trim()) > 0) {
                     position = " PARAMETER " + parameter[1];
                 }
-                transformer.append("PARTITION PROCEDURE " + procedure.name + " ON TABLE " + token[0] + " COLUMN " + token[1] + position + ";");
+                transformer.append("PARTITION PROCEDURE " + procedure.m_name + " ON TABLE " + token[0] + " COLUMN " + token[1] + position + ";");
             }
         }
     }
@@ -289,19 +325,6 @@ public class CatalogBuilder {
 
     public void setCompilerDebugPrintStream(final PrintStream out) {
         m_compilerDebugPrintStream = out;
-    }
-
-    /**
-     * Override the procedure annotation with the specified values for a
-     * specified procedure.
-     *
-     * @param procName The name of the procedure to override the annotation.
-     * @param info The values to use instead of the annotation.
-     */
-    public void overrideProcInfoForProcedure(final String procName, final ProcInfoData info) {
-        assert(procName != null);
-        assert(info != null);
-        m_procInfoOverrides.put(procName, info);
     }
 
     public byte[] compileToBytes() {
@@ -360,33 +383,6 @@ public class CatalogBuilder {
             }
         }
         return success;
-    }
-
-    /**
-     * Utility method to take a string and put it in a file. This is used by
-     * this class to write the project file to a temp file, but it also used
-     * by some other tests.
-     *
-     * @param content The content of the file to create.
-     * @return A reference to the file created or null on failure.
-     */
-    public static File writeStringToTempFile(final String content) {
-        File tempFile;
-        try {
-            tempFile = File.createTempFile("myApp", ".tmp");
-            // tempFile.deleteOnExit();
-
-            final FileWriter writer = new FileWriter(tempFile);
-            writer.write(content);
-            writer.flush();
-            writer.close();
-
-            return tempFile;
-
-        } catch (final IOException e) {
-            e.printStackTrace();
-            return null;
-        }
     }
 
     /** Provide a feedback path to monitor the VoltCompiler's plan output via harvestDiagnostics */

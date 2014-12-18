@@ -82,7 +82,6 @@ public class SaveRestoreTestProjectBuilder extends VoltProjectBuilder
         addSchema(ddlURL);
     }
 
-    @Override
     public void addAllDefaults()
     {
         addDefaultSchema();

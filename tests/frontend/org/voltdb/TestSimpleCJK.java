@@ -23,9 +23,7 @@
 
 package org.voltdb;
 
-import java.io.File;
 import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
 
 import junit.framework.TestCase;
 
@@ -35,6 +33,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.utils.MiscUtils;
 
 public class TestSimpleCJK extends TestCase {
     public static final String POORLY_TRANSLATED_CHINESE =
@@ -79,9 +78,7 @@ public class TestSimpleCJK extends TestCase {
             "sval3 varchar(20) default 'bar', " +
             "PRIMARY KEY(sval1));";*/
 
-        File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
-        String schemaPath = schemaFile.getPath();
-        schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+        String schemaPath = MiscUtils.writeStringToTempFileURL(simpleSchema);
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addSchema(schemaPath);

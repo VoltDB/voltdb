@@ -19,10 +19,13 @@ package org.voltdb.utils;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.net.BindException;
 import java.net.ServerSocket;
 import java.net.URISyntaxException;
+import java.net.URLEncoder;
 import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -72,6 +75,122 @@ public class MiscUtils {
         File inputFile = new File(fromPath);
         File outputFile = new File(toPath);
         com.google_voltpatches.common.io.Files.copy(inputFile, outputFile);
+    }
+
+    /**
+     * Utility method to take a string and put it in a file.
+     *
+     * @param content The content of the file to create.
+     * @return A reference to the file created.
+     */
+    public static File writeStringToTempFile(String content) {
+        try {
+            File tempFile = File.createTempFile("myApp", ".tmp");
+            writeStringToFile(tempFile, content);
+            return tempFile;
+        } catch (final IOException e) {
+            e.printStackTrace();
+            throw new RuntimeException(e); // Good enough for test code?
+        }
+    }
+
+    /**
+     * Utility method to take a string and put it in a file.
+     *
+     * @param content The content of the file to create.
+     * @return The path name of the file created.
+     */
+    public static String writeStringToTempFilePath(String content) {
+        try {
+            File tempFile = File.createTempFile("myApp", ".tmp");
+            writeStringToFile(tempFile, content);
+            return tempFile.getPath();
+        } catch (final IOException e) {
+            e.printStackTrace();
+            throw new RuntimeException(e); // Good enough for test code?
+        }
+    }
+    public static String writeStringToTempFilePathDOE(String content) {
+        try {
+            File tempFile = File.createTempFile("myApp", ".tmp");
+            tempFile.deleteOnExit();
+            writeStringToFile(tempFile, content);
+            return tempFile.getPath();
+        } catch (final IOException e) {
+            e.printStackTrace();
+            throw new RuntimeException(e); // Good enough for test code?
+        }
+    }
+    public static String writeStringToTempFileAbsolutePath(String content) {
+        try {
+            File tempFile = File.createTempFile("myApp", ".tmp");
+            writeStringToFile(tempFile, content);
+            return tempFile.getAbsolutePath();
+        } catch (final IOException e) {
+            e.printStackTrace();
+            throw new RuntimeException(e); // Good enough for test code?
+        }
+    }
+
+    /**
+     * Utility method to take a string and put it in a file.
+     *
+     * @param content The content of the file to create.
+     * @return The URL of the file created.
+     */
+    public static String writeStringToTempFileURL(String content) {
+        try {
+            File tempFile = File.createTempFile("myApp", ".tmp");
+            writeStringToFile(tempFile, content);
+            return URLEncoder.encode(tempFile.getPath(), "UTF-8");
+        } catch (final IOException e) {
+            e.printStackTrace();
+            throw new RuntimeException(e); // Good enough for test code?
+        }
+    }
+    public static String writeStringToTempFileURLDOE(String content) {
+        try {
+            File tempFile = File.createTempFile("myApp", ".tmp");
+            tempFile.deleteOnExit();
+            writeStringToFile(tempFile, content);
+            return URLEncoder.encode(tempFile.getPath(), "UTF-8");
+
+        } catch (final IOException e) {
+            e.printStackTrace();
+            throw new RuntimeException(e); // Good enough for test code?
+        }
+    }
+
+    public static FileInputStream writeStringToTempFileInputStream(String content) {
+        try {
+            return new FileInputStream(writeStringToTempFile(content));
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+            throw new RuntimeException(e); // Good enough for test code?
+        }
+    }
+
+    /**
+     * Utility method to take a string and put it in the named file.
+     *
+     * @param content The content of the file to create.
+     * @return A reference to the file created.
+     */
+    public static File writeStringToPath(String path, String content) {
+        File file = new File(path);
+        writeStringToFile(file, content);
+        return file;
+    }
+
+    private static void writeStringToFile(File file, String content) {
+        try {
+            FileWriter writer = new FileWriter(file);
+            writer.write(content);
+            writer.close();
+        } catch (final IOException e) {
+            e.printStackTrace();
+            throw new RuntimeException(e); // Good enough for test code?
+        }
     }
 
     /**
@@ -956,4 +1075,5 @@ public class MiscUtils {
         return String.format("%d days %02d:%02d:%02d.%03d",
                 days, hours, minutes, seconds, remainingMs);
     }
+
 }

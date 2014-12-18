@@ -42,7 +42,6 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.compiler.DeploymentBuilder;
-import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
 
 public class TestLiveTableSchemaMigration extends TestCase {
@@ -90,10 +89,10 @@ public class TestLiveTableSchemaMigration extends TestCase {
             // disable logging
             depBuilder.configureLogging("/tmp/foobar", "/tmp/foobar", false, false, 1, 1, 3);
             String deployment = depBuilder.getXML();
-            File deploymentFile = VoltProjectBuilder.writeStringToTempFile(deployment);
+            String deploymentFile = MiscUtils.writeStringToTempFileAbsolutePath(deployment);
 
             VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToDeployment = deploymentFile.getAbsolutePath();
+            config.m_pathToDeployment = deploymentFile;
             config.m_pathToCatalog = catPath1;
             config.m_ipcPort = 10000;
             //config.m_backend = BackendTarget.NATIVE_EE_IPC;
@@ -166,10 +165,10 @@ public class TestLiveTableSchemaMigration extends TestCase {
             // disable logging
             depBuilder.configureLogging("/tmp/foobar", "/tmp/foobar", false, false, 1, 1, 3);
             String deployment = depBuilder.getXML();
-            File deploymentFile = VoltProjectBuilder.writeStringToTempFile(deployment);
+            String deploymentFile = MiscUtils.writeStringToTempFileAbsolutePath(deployment);
 
             VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToDeployment = deploymentFile.getAbsolutePath();
+            config.m_pathToDeployment = deploymentFile;
             config.m_pathToCatalog = catPath1;
             config.m_ipcPort = 10000;
             //config.m_backend = BackendTarget.NATIVE_EE_IPC;

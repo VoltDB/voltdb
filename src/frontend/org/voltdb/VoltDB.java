@@ -102,6 +102,46 @@ public class VoltDB {
     /** Encapsulates VoltDB configuration parameters */
     public static class Configuration {
 
+        @Override
+        public String toString() {
+            return "" + m_ipcPort +
+                    m_backend +
+                    m_leader +
+                    m_pathToCatalog +
+                    m_pathToDeployment +
+                    m_deploymentDefault +
+                    m_pathToLicense +
+                    m_noLoadLibVOLTDB +
+                    m_zkInterface +
+                    m_port +
+                    m_clientInterface +
+                    m_adminPort +
+                    m_adminInterface +
+                    m_internalPort +
+                    m_internalPortInterface +
+                    m_externalInterface +
+                    m_internalInterface +
+                    m_drAgentPortStart +
+                    m_drInterface +
+                    m_httpPort +
+                    m_httpPortInterface +
+                    m_isEnterprise +
+                    m_deadHostTimeoutMS +
+                    m_startAction +
+                    m_startMode +
+                    m_replicationRole +
+                    m_selectedRejoinInterface +
+                    m_quietAdhoc +
+                    m_commitLogDir +
+                    m_timestampTestingSalt +
+                    m_isRejoinTest +
+                    m_networkCoreBindings +
+                    m_computationCoreBindings +
+                    m_executionCoreBindings +
+                    m_commandLogBinding +
+                    m_versionStringOverrideForTest +
+                    m_versionCompatibilityRegexOverrideForTest;
+    }
         public int m_ipcPort = DEFAULT_IPC_PORT;
 
         protected static final VoltLogger hostLog = new VoltLogger("HOST");

@@ -23,6 +23,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.StringWriter;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.ByteBuffer;
@@ -40,7 +41,9 @@ import java.util.TreeSet;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBElement;
 import javax.xml.bind.JAXBException;
+import javax.xml.bind.Marshaller;
 import javax.xml.bind.Unmarshaller;
+import javax.xml.namespace.QName;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
@@ -106,12 +109,9 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.ConstraintType;
+import org.xml.sax.SAXException;
 
 import com.google_voltpatches.common.base.Charsets;
-import java.io.StringWriter;
-import javax.xml.bind.Marshaller;
-import javax.xml.namespace.QName;
-import org.xml.sax.SAXException;
 
 /**
  *

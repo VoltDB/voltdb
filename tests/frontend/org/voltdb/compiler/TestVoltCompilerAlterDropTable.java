@@ -38,6 +38,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.utils.BuildDirectoryUtils;
+import org.voltdb.utils.MiscUtils;
 
 public class TestVoltCompilerAlterDropTable extends TestCase {
 
@@ -58,9 +59,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
 
     //Utility to get projectPath for ddl
     public String getSimpleProjectPathForDDL(String ddl) {
-        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(ddl);
-        final String schemaPath = schemaFile.getPath();
-
+        final String schemaPath = MiscUtils.writeStringToTempFilePath(ddl);
         final String simpleProject
                 = "<?xml version=\"1.0\"?>\n"
                 + "<project>"
@@ -72,8 +71,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "</database>"
                 + "</project>";
 
-        final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
-        final String projectPath = projectFile.getPath();
+        final String projectPath = MiscUtils.writeStringToTempFilePath(simpleProject);
         return projectPath;
     }
 
@@ -154,15 +152,27 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
         assertNotNull(table);
     }
 
+    public VoltCompiler compileSimpleDdlProject(final String simpleSchema) {
+        final String projectPath = getSimpleProjectPathForDDL(simpleSchema);
+        final VoltCompiler compiler = new VoltCompiler();
+        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        assertTrue(success);
+        return compiler;
+    }
+
+    public void failToCompileSimpleDdlProject(final String simpleSchema) {
+        final String projectPath = getSimpleProjectPathForDDL(simpleSchema);
+        final VoltCompiler compiler = new VoltCompiler();
+        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        assertFalse(success);
+    }
+
     public void testAlterTable() throws IOException {
         final String simpleSchema1
                 = "create table mytable  (pkey integer, column2_integer integer);\n"
                 + "alter table mytable add column newcol varchar(50);\n";
 
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final VoltCompiler compiler = compileSimpleDdlProject(simpleSchema1);
         verifyTableColumnType(compiler, "mytable", "newcol", VoltType.STRING);
         verifyTableColumnSize(compiler, "mytable", "newcol", 50);
     }
@@ -173,10 +183,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "alter table mytable add column newcol varchar(50);\n"
                 + myproc;
 
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final VoltCompiler compiler = compileSimpleDdlProject(simpleSchema1);
         verifyTableColumnType(compiler, "mytable", "newcol", VoltType.STRING);
         verifyTableColumnSize(compiler, "mytable", "newcol", 50);
     }
@@ -187,10 +194,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "alter table mytable drop column column2_integer;\n"
                 + myproc;
 
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertFalse(success);
+        final VoltCompiler compiler = compileSimpleDdlProject(simpleSchema1);
         //Failed to plan for statement
         int foundPlanError = 0;
         for (VoltCompiler.Feedback f : compiler.m_errors) {
@@ -207,10 +211,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "alter table mytable drop column pkey;\n"
                 + myproc;
 
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final VoltCompiler compiler = compileSimpleDdlProject(simpleSchema1);
         verifyTableColumnGone(compiler, "mytable", "pkey");
     }
 
@@ -230,10 +231,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + ";"
                 + "alter table v_mytable drop column column2_integer;\n";
 
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertFalse(success);
+        final VoltCompiler compiler = compileSimpleDdlProject(simpleSchema1);
         //user lacks privilege or object not found: V_MYTABLE
         int foundDropError = 0;
         for (VoltCompiler.Feedback f : compiler.m_errors) {
@@ -260,10 +258,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + ";"
                 + "alter table mytable drop column column2_integer;\n";
 
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final VoltCompiler compiler = compileSimpleDdlProject(simpleSchema1);
         verifyTableColumnGone(compiler, "mytable", "column2_integer");
     }
 
@@ -283,10 +278,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + ";"
                 + "alter table mytable drop column pkey;\n";
 
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertFalse(success);
+        final VoltCompiler compiler = compileSimpleDdlProject(simpleSchema1);
         //column is referenced in: PUBLIC.V_MYTABLE
         int foundDropError = 0;
         for (VoltCompiler.Feedback f : compiler.m_errors) {
@@ -313,10 +305,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + ";"
                 + "alter table mytable drop column pkey cascade;\n";
 
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final VoltCompiler compiler = compileSimpleDdlProject(simpleSchema1);
         verifyTableColumnGone(compiler, "mytable", "pkey");
     }
 
@@ -336,10 +325,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + ";"
                 + "alter table mytable alter column pkey VARCHAR(20);\n";
 
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertFalse(success);
+        final VoltCompiler compiler = compileSimpleDdlProject(simpleSchema1);
         //dependent objects exist
         int foundDepError = 0;
         for (VoltCompiler.Feedback f : compiler.m_errors) {
@@ -366,10 +352,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + ";"
                 + "alter table mytable alter column pkey VARCHAR(20);\n";
 
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertFalse(success);
+        final VoltCompiler compiler = compileSimpleDdlProject(simpleSchema1);
         //dependent objects exist
         int foundDepError = 0;
         for (VoltCompiler.Feedback f : compiler.m_errors) {
@@ -396,10 +379,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + ";"
                 + "alter table mytable alter column pkey smallint;\n";
 
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertFalse(success);
+        final VoltCompiler compiler = compileSimpleDdlProject(simpleSchema1);
         //dependent objects exist - This should technically be ok as int to smallint with count should work....
         int foundDepError = 0;
         for (VoltCompiler.Feedback f : compiler.m_errors) {
@@ -417,10 +397,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "create unique index pkey_idx on mytable(pkey);\n"
                 + "alter table mytable drop column column2_integer;\n";
 
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final VoltCompiler compiler = compileSimpleDdlProject(simpleSchema1);
         verifyTableColumnGone(compiler, "mytable", "column2_integer");
         verifyIndexExists(compiler, "mytable", "pkey_idx");
     }
@@ -432,10 +409,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "alter table mytable drop column pkey;\n"
                 + "alter table mytable add column pkey integer;\n";
 
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final VoltCompiler compiler = compileSimpleDdlProject(simpleSchema1);
         verifyTableColumnExists(compiler, "mytable", "pkey");
         verifyIndexGone(compiler, "mytable", "pkey_idx");
     }
@@ -447,10 +421,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "create unique index pkey_idxx on mytable(column2_integer);\n" //This index should remain
                 + "alter table mytable drop column pkey;\n";
 
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final VoltCompiler compiler = compileSimpleDdlProject(simpleSchema1);
         verifyTableColumnGone(compiler, "mytable", "pkey");
         verifyIndexExists(compiler, "mytable", "pkey_idxx");
         verifyIndexGone(compiler, "mytable", "pkey_idx");
@@ -461,10 +432,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 = "create table mytable  (pkey integer, column2_integer integer);\n"
                 + "alter table mytable add column newcol varchar(0);\n";
 
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertFalse(success);
+        final VoltCompiler compiler = compileSimpleDdlProject(simpleSchema1);
         //precision or scale out of range
         int foundSZError = 0;
         for (VoltCompiler.Feedback f : compiler.m_errors) {
@@ -480,10 +448,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 = "create table mytable  (pkey varchar(50), column2_integer integer);\n"
                 + "alter table mytable alter column pkey varchar(50) NOT NULL;\n";
 
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final VoltCompiler compiler = compileSimpleDdlProject(simpleSchema1);
         // Check that constraint is now valid.
         verifyTableColumnNullable(compiler, "mytable", "pkey", false);
     }
@@ -493,10 +458,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 = "create table mytable  (pkey varchar(50) NOT NULL, column2_integer integer);\n"
                 + "alter table mytable alter column pkey varchar(50) NOT NULL;\n";
 
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final VoltCompiler compiler = compileSimpleDdlProject(simpleSchema1);
         // Check that constraint is still valid.
         verifyTableColumnNullable(compiler, "mytable", "pkey", false);
     }
@@ -506,10 +468,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 = "create table mytable  (pkey integer, column2_integer integer);\n"
                 + "alter table mytable add column newcol varchar(" + String.valueOf(VoltType.MAX_VALUE_LENGTH + 1) + ");\n";
 
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertFalse(success);
+        final VoltCompiler compiler = compileSimpleDdlProject(simpleSchema1);
         //> 1048576 char maximum.
         int foundSZError = 0;
         for (VoltCompiler.Feedback f : compiler.m_errors) {
@@ -525,10 +484,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 = "create table mytable  (pkey integer, column2 varchar(50));\n"
                 + "alter table mytable alter column column2 varchar(" + String.valueOf(VoltType.MAX_VALUE_LENGTH + 1) + ");\n";
 
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertFalse(success);
+        final VoltCompiler compiler = compileSimpleDdlProject(simpleSchema1);
         //> 1048576 char maximum.
         int foundSZError = 0;
         for (VoltCompiler.Feedback f : compiler.m_errors) {
@@ -553,10 +509,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
         br.close();
         ddl1.append("alter table JUST_ENOUGH_WIDE_COLUMNS add column COL01022 INTEGER DEFAULT '0' NOT NULL;");
 
-        final String projectPath = getSimpleProjectPathForDDL(ddl1.toString());
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertFalse(success);
+        final VoltCompiler compiler = compileSimpleDdlProject(ddl1.toString());
         //(max is 1024)
         int foundSZError = 0;
         for (VoltCompiler.Feedback f : compiler.m_errors) {
@@ -581,47 +534,32 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
         br.close();
         ddl1.append("alter table MANY_COLUMNS drop column COL01022;");
 
-        final String projectPath = getSimpleProjectPathForDDL(ddl1.toString());
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final VoltCompiler compiler = compileSimpleDdlProject(ddl1.toString());
         verifyTableColumnGone(compiler, "MANY_COLUMNS", "COL01022");
     }
 
     public void testAlterTableRowLimit() throws IOException {
         //Just enough big row one byte over and we will fail to compile.
         String simpleSchema1 = "create table mytable (val1 varchar(1048572), val2 varchar(1048572));\n";
-        String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        VoltCompiler compiler = new VoltCompiler();
-        boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        compileSimpleDdlProject(simpleSchema1);
 
         //Still over after alter
         simpleSchema1 = "create table mytable (val1 varchar(1048576), val2 varchar(1048576));"
                 + "alter table mytable alter column val1 varchar(1048572);\n";
-        projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        compiler = new VoltCompiler();
-        success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertFalse(success);
+        failToCompileSimpleDdlProject(simpleSchema1);
 
         //Going under after alter
         simpleSchema1 = "create table mytable (val1 varchar(1048576), val2 varchar(1048576));"
                 + "alter table mytable alter column val1 varchar(1048572);\n"
                 + "alter table mytable alter column val2 varchar(1048572);\n";
-        projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        compiler = new VoltCompiler();
-        success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        compileSimpleDdlProject(simpleSchema1);
 
         //Going over: after alter going under and back over
         simpleSchema1 = "create table mytable (val1 varchar(1048576), val2 varchar(1048576));"
                 + "alter table mytable alter column val1 varchar(1048572);\n"
                 + "alter table mytable alter column val2 varchar(1048572);\n"
                 + "alter table mytable alter column val1 varchar(1048576);\n";
-        projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        compiler = new VoltCompiler();
-        success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertFalse(success);
+        failToCompileSimpleDdlProject(simpleSchema1);
     }
 
     //We will be successful in compiling but a WARN should appear.
@@ -631,10 +569,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "create table ftable  (pkey integer, column2_integer integer UNIQUE);\n"
                 + "ALTER TABLE mytable ADD FOREIGN KEY (column2_integer) REFERENCES ftable(column2_integer);\n";
 
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final VoltCompiler compiler = compileSimpleDdlProject(simpleSchema1);
         verifyTableColumnType(compiler, "mytable", "pkey", VoltType.INTEGER);
         verifyTableColumnType(compiler, "ftable", "pkey", VoltType.INTEGER);
 
@@ -694,10 +629,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "create table mytable  (pkey integer, column2_integer integer);\n"
                 + "alter table mytable add column newcol varchar(50);\n";
 
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final VoltCompiler compiler = compileSimpleDdlProject(simpleSchema1);
         verifyTableColumnType(compiler, "mytable", "pkey", VoltType.INTEGER);
     }
 
@@ -727,10 +659,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "PARTITION TABLE mytable ON COLUMN pkey;"
                 + "alter table mytable drop column pkey;\n";
 
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final VoltCompiler compiler = compileSimpleDdlProject(simpleSchema1);
     }
 
     public void testAlterTableSizeChangeAndConstraintChangeOfPartitionColumn() throws IOException {
@@ -759,10 +688,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "PARTITION TABLE mytable ON COLUMN pkey;"
                 + "alter table mytable alter column pkey varchar(50) NOT NULL;\n";
 
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final VoltCompiler compiler = compileSimpleDdlProject(simpleSchema1);
         // Check that constraint is still valid.
         verifyTableColumnNullable(compiler, "mytable", "pkey", false);
     }
@@ -773,10 +699,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "PARTITION TABLE mytable ON COLUMN pkey;"
                 + "alter table mytable alter column pkey set data type varchar(50);\n";
 
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final VoltCompiler compiler = compileSimpleDdlProject(simpleSchema1);
         // Check that constraint is still valid.
         verifyTableColumnNullable(compiler, "mytable", "pkey", false);
     }
@@ -808,10 +731,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "alter table mytable add column pkey2 varchar(500) NOT NULL;\n"
                 + "PARTITION TABLE mytable ON COLUMN pkey2;\n";
 
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final VoltCompiler compiler = compileSimpleDdlProject(simpleSchema1);
         verifyTableColumnSize(compiler, "mytable", "pkey2", 500);
         // Check that constraint is valid.
         verifyTableColumnNullable(compiler, "mytable", "pkey2", false);
@@ -823,10 +743,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "alter table mytable alter column pkey varchar(20) NOT NULL;\n"
                 + "PARTITION TABLE mytable ON COLUMN pkey;\n";
 
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final VoltCompiler compiler = compileSimpleDdlProject(simpleSchema1);
         // Check that constraint is valid.
         verifyTableColumnNullable(compiler, "mytable", "pkey", false);
     }
@@ -837,10 +754,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "alter table mytable alter column pkey set NOT NULL;\n"
                 + "PARTITION TABLE mytable ON COLUMN pkey;\n";
 
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final VoltCompiler compiler = compileSimpleDdlProject(simpleSchema1);
         // Check that constraint is valid.
         verifyTableColumnNullable(compiler, "mytable", "pkey", false);
     }
@@ -851,10 +765,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "alter table mytable alter column pkey set NOT NULL;\n"
                 + "PARTITION TABLE mytable ON COLUMN pkey;\n";
 
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final VoltCompiler compiler = compileSimpleDdlProject(simpleSchema1);
         // Check that constraint is valid.
         verifyTableColumnNullable(compiler, "mytable", "pkey", false);
     }
@@ -902,10 +813,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 = "create table mytable  (pkey integer, column2_integer integer);\n"
                 + "drop table mytable;\n";
 
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final VoltCompiler compiler = compileSimpleDdlProject(simpleSchema1);
         verifyTableGone(compiler, "mytable");
     }
 
@@ -925,10 +833,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 = "create table mytable  (pkey integer, column2_integer integer);\n"
                 + "drop table mytablenonexistant if exists;\n";
 
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final VoltCompiler compiler = compileSimpleDdlProject(simpleSchema1);
         verifyTableColumnType(compiler, "mytable", "pkey", VoltType.INTEGER);
     }
 
@@ -938,10 +843,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "create unique index pkey_idx on mytable(pkey);\n"
                 + "drop table mytable;\n";
 
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final VoltCompiler compiler = compileSimpleDdlProject(simpleSchema1);
         verifyTableGone(compiler, "mytable");
         verifyIndexGone(compiler, "mytable", "pkey_idx");
     }
@@ -953,10 +855,7 @@ public class TestVoltCompilerAlterDropTable extends TestCase {
                 + "drop table mytable;\n"
                 + "create table mytable  (pkey integer, column2_integer integer);\n";
 
-        final String projectPath = getSimpleProjectPathForDDL(simpleSchema1);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+        final VoltCompiler compiler = compileSimpleDdlProject(simpleSchema1);
         verifyTableExists(compiler, "mytable");
         verifyIndexGone(compiler, "mytable", "pkey_idx");
     }
