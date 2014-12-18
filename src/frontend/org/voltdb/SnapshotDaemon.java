@@ -103,9 +103,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         INDEX,
         FILE,
         CSV,
+        LOG,            // Truncation Request from Command log (occupies the same slot as FILE)
         EMPTY
     }
-    private static final int m_queueSlots = SNAPSHOT_TYPE.values().length - 1;
+    private static final int m_queueSlots = SNAPSHOT_TYPE.values().length - 2;
 
     private class ByteArrayWrapper {
         public ByteArrayWrapper(byte[] snapshotDetails) {
@@ -265,7 +266,15 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             ByteBuffer nodeList;
             boolean queueChanged = false;
             for (SNAPSHOT_TYPE snapshotReq : m_localPendingSnapshots) {
+                if (snapshotReq == SNAPSHOT_TYPE.FILE && m_pendingSnapshotsQueue.contains(SNAPSHOT_TYPE.LOG)) {
+                    // We already have a CommandLog request in the queue
+                    break;
+                }
                 if (!m_pendingSnapshotsQueue.contains(snapshotReq)) {
+                    if (snapshotReq == SNAPSHOT_TYPE.LOG) {
+                        // Easier to remove even if it is not there
+                        m_pendingSnapshotsQueue.remove(SNAPSHOT_TYPE.FILE);
+                    }
                     m_pendingSnapshotsQueue.add(snapshotReq);
                     queueChanged = true;
                 }
@@ -305,7 +314,16 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             int nodeId = buildSnapshotNode(getPathFromType(reqType), snapshotDetails);
 
             if (m_localPendingSnapshots.size() == 0 && requestLock()) {
+                if (reqType == SNAPSHOT_TYPE.FILE && m_pendingSnapshotsQueue.contains(SNAPSHOT_TYPE.LOG)) {
+                    // We already have a CommandLog request in the queue
+                    return nodeId;
+                }
+
                 if (!m_pendingSnapshotsQueue.contains(reqType)) {
+                    if (reqType == SNAPSHOT_TYPE.LOG) {
+                        // Easier to remove even if it is not there
+                        m_pendingSnapshotsQueue.remove(SNAPSHOT_TYPE.FILE);
+                    }
                     m_pendingSnapshotsQueue.add(reqType);
                     ByteBuffer nodeList = getCurrentState();
                     nodeList.position(nodeList.position()+m_queueSlots+1);
@@ -388,6 +406,14 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 nodeList.putInt(requestNodeId);
             }
             ByteBuffer newQueue = buildProposalFromUpdatedQueue(nodeList);
+        }
+
+        public boolean snapshotPending(SNAPSHOT_TYPE type) {
+            return m_pendingSnapshotsQueue.contains(type);
+        }
+
+        public SNAPSHOT_TYPE getActiveSnapshotType() {
+            return m_activeSnapshot;
         }
     }
 
