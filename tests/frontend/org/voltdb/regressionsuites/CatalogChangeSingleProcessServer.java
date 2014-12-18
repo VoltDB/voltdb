@@ -25,15 +25,12 @@ package org.voltdb.regressionsuites;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.regressionsuites.LocalSingleProcessServer;
 
 /**
  * Implementation of a LocalSingleProcessServer that supports changing the
  * VoltProjectBuilder used to construct the catalog
  */
-@SuppressWarnings("deprecation")
-public class CatalogChangeSingleProcessServer extends LocalSingleProcessServer
-{
+public class CatalogChangeSingleProcessServer extends LocalCluster {
     VoltProjectBuilder m_origBuilder;
     private int m_originalSiteCount = 0;
 
@@ -41,21 +38,19 @@ public class CatalogChangeSingleProcessServer extends LocalSingleProcessServer
                                             int siteCount,
                                             BackendTarget target)
     {
-        super(jarFileName, siteCount, target);
+        super(jarFileName, siteCount, 1, 0, target);
     }
 
     @Override
     public boolean compile(VoltProjectBuilder builder) {
         m_origBuilder = builder;
         boolean compiled = m_origBuilder.compile(m_jarFileName, m_siteCount, 0);
-        m_pathToDeployment = m_origBuilder.getPathToDeployment();
         return compiled;
     }
 
     public boolean recompile(VoltProjectBuilder builder)
     {
         boolean compiled = builder.compile(m_jarFileName, m_siteCount, 0);
-        m_pathToDeployment = builder.getPathToDeployment();
         return compiled;
     }
 
@@ -64,16 +59,6 @@ public class CatalogChangeSingleProcessServer extends LocalSingleProcessServer
         m_originalSiteCount = m_siteCount;
         m_siteCount = siteCount;
         boolean compiled = m_origBuilder.compile(m_jarFileName, siteCount, 0);
-        m_pathToDeployment = m_origBuilder.getPathToDeployment();
-        return compiled;
-    }
-
-    public boolean recompile(VoltProjectBuilder builder, int siteCount)
-    {
-        m_originalSiteCount = m_siteCount;
-        m_siteCount = siteCount;
-        boolean compiled = builder.compile(m_jarFileName, siteCount, 0);
-        m_pathToDeployment = builder.getPathToDeployment();
         return compiled;
     }
 
@@ -83,7 +68,6 @@ public class CatalogChangeSingleProcessServer extends LocalSingleProcessServer
             m_siteCount = m_originalSiteCount;
         }
         boolean compiled = m_origBuilder.compile(m_jarFileName, m_siteCount, 0);
-        m_pathToDeployment = m_origBuilder.getPathToDeployment();
         return compiled;
     }
 

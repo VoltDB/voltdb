@@ -87,6 +87,7 @@ public class LocalCluster implements VoltServerConfig {
     private final boolean m_debug;
     FailureState m_failureState;
     int m_requestedAdminPortOverride = 0;
+    int m_usableAdminPortOverride = 0;
     int m_nextIPCPort = 10000;
     ArrayList<Process> m_cluster = new ArrayList<Process>();
     int perLocalClusterExtProcessIndex = 0;
@@ -332,7 +333,6 @@ public class LocalCluster implements VoltServerConfig {
         return m_compiled;
     }
 
-    @Override
     public boolean compileWithAdminMode(VoltProjectBuilder builder, int adminPort, boolean adminOnStartup)
     {
         // ATTN: LocalCluster does not normally consult the deployment file to determine
@@ -532,6 +532,8 @@ public class LocalCluster implements VoltServerConfig {
         m_cmdLines.clear();
         int oopStartIndex = 0;
 
+        // A requested admin port is usable once per startup.
+        m_usableAdminPortOverride = m_requestedAdminPortOverride;
         // create the in-process server instance.
         if (m_hasLocalServer) {
             startLocalServer(oopStartIndex, clearLocalDataDirectories);
@@ -766,14 +768,14 @@ public class LocalCluster implements VoltServerConfig {
     }
 
     private int considerAdminPortOverride(int adminPort) {
-        if (m_requestedAdminPortOverride != 0) {
-            if (m_requestedAdminPortOverride == -1) {
+        if (m_usableAdminPortOverride != 0) {
+            if (m_usableAdminPortOverride == -1) {
                 //Oops. the requested admin port has already been used up.
                 throw new RuntimeException(
                         "LocalCluster multi-host simulation can not support a fixed admin port.");
             }
-            adminPort = m_requestedAdminPortOverride;
-            m_requestedAdminPortOverride = -1; // disallow reuse
+            adminPort = m_usableAdminPortOverride;
+            m_usableAdminPortOverride = -1; // disallow reuse
         }
         return adminPort;
     }

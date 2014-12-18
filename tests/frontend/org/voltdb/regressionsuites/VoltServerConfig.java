@@ -105,9 +105,6 @@ public interface VoltServerConfig {
      */
     public boolean isValgrind();
 
-    boolean compileWithAdminMode(VoltProjectBuilder builder, int adminPort,
-                                 boolean adminOnStartup);
-
     /**
      * Create a directory so it is accessible
      * to all voltdb instances represented by this config from within each instances
