@@ -22,6 +22,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.net.BindException;
 import java.net.ServerSocket;
 import java.net.URISyntaxException;
@@ -85,7 +86,8 @@ public class MiscUtils {
      */
     public static File writeStringToTempFile(String content) {
         try {
-            File tempFile = File.createTempFile("myApp", ".tmp");
+            File tempFile = File.createTempFile("VoltMiscUtils", ".tmp");
+            tempFile.deleteOnExit();
             writeStringToFile(tempFile, content);
             return tempFile;
         } catch (final IOException e) {
@@ -101,35 +103,13 @@ public class MiscUtils {
      * @return The path name of the file created.
      */
     public static String writeStringToTempFilePath(String content) {
-        try {
-            File tempFile = File.createTempFile("myApp", ".tmp");
-            writeStringToFile(tempFile, content);
-            return tempFile.getPath();
-        } catch (final IOException e) {
-            e.printStackTrace();
-            throw new RuntimeException(e); // Good enough for test code?
-        }
+        File tempFile = writeStringToTempFile(content);
+        return tempFile.getPath();
     }
-    public static String writeStringToTempFilePathDOE(String content) {
-        try {
-            File tempFile = File.createTempFile("myApp", ".tmp");
-            tempFile.deleteOnExit();
-            writeStringToFile(tempFile, content);
-            return tempFile.getPath();
-        } catch (final IOException e) {
-            e.printStackTrace();
-            throw new RuntimeException(e); // Good enough for test code?
-        }
-    }
+
     public static String writeStringToTempFileAbsolutePath(String content) {
-        try {
-            File tempFile = File.createTempFile("myApp", ".tmp");
-            writeStringToFile(tempFile, content);
-            return tempFile.getAbsolutePath();
-        } catch (final IOException e) {
-            e.printStackTrace();
-            throw new RuntimeException(e); // Good enough for test code?
-        }
+        File tempFile = writeStringToTempFile(content);
+        return tempFile.getAbsolutePath();
     }
 
     /**
@@ -139,23 +119,10 @@ public class MiscUtils {
      * @return The URL of the file created.
      */
     public static String writeStringToTempFileURL(String content) {
+        String path = writeStringToTempFilePath(content);
         try {
-            File tempFile = File.createTempFile("myApp", ".tmp");
-            writeStringToFile(tempFile, content);
-            return URLEncoder.encode(tempFile.getPath(), "UTF-8");
-        } catch (final IOException e) {
-            e.printStackTrace();
-            throw new RuntimeException(e); // Good enough for test code?
-        }
-    }
-    public static String writeStringToTempFileURLDOE(String content) {
-        try {
-            File tempFile = File.createTempFile("myApp", ".tmp");
-            tempFile.deleteOnExit();
-            writeStringToFile(tempFile, content);
-            return URLEncoder.encode(tempFile.getPath(), "UTF-8");
-
-        } catch (final IOException e) {
+            return URLEncoder.encode(path, "UTF-8");
+        } catch (UnsupportedEncodingException e) {
             e.printStackTrace();
             throw new RuntimeException(e); // Good enough for test code?
         }

@@ -39,7 +39,7 @@ public class EmptyProjectBuilder extends VoltProjectBuilder
     {
         super();
         if (s_ddlURL == null) {
-            s_ddlURL = MiscUtils.writeStringToTempFileURLDOE("");
+            s_ddlURL = MiscUtils.writeStringToTempFileURL("");
         }
         addSchema(s_ddlURL);
     }

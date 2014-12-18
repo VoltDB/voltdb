@@ -41,7 +41,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
     String testout_jar;
 
     private VoltCompiler compileForDDLTest2(String ddl) throws Exception {
-        String ddlPath = MiscUtils.writeStringToTempFilePathDOE(ddl);
+        String ddlPath = MiscUtils.writeStringToTempFilePath(ddl);
         final VoltCompiler compiler = new VoltCompiler();
         boolean success = compiler.compileFromDDL(testout_jar, ddlPath);
         assertTrue("Catalog compile failed!", success);

@@ -1083,7 +1083,7 @@ public class TestVoltCompiler extends TestCase {
             "</database>" +
             "</project>";
 
-        final String projectPath = MiscUtils.writeStringToTempFilePathDOE(simpleProject);
+        final String projectPath = MiscUtils.writeStringToTempFilePath(simpleProject);
         final VoltCompiler compiler = new VoltCompiler();
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
         assertEquals(expectSuccess, success);

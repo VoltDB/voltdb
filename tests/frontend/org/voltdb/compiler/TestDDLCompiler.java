@@ -233,7 +233,7 @@ public class TestDDLCompiler extends TestCase {
 
         String schema = String.format("IMPORT CLASS %s;", importStmt);
 
-        String schemaPath = MiscUtils.writeStringToTempFilePathDOE(schema);
+        String schemaPath = MiscUtils.writeStringToTempFilePath(schema);
 
         // compile and fail on bad import
         VoltCompiler compiler = new VoltCompiler();
@@ -271,10 +271,10 @@ public class TestDDLCompiler extends TestCase {
         jarOut.deleteOnExit();
 
         String schema1 = String.format("IMPORT CLASS %s;", importStmt1);
-        String schemaPath1 = MiscUtils.writeStringToTempFilePathDOE(schema1);
+        String schemaPath1 = MiscUtils.writeStringToTempFilePath(schema1);
 
         String schema2 = String.format("IMPORT CLASS %s;", importStmt2);
-        String schemaPath2 = MiscUtils.writeStringToTempFilePathDOE(schema2);
+        String schemaPath2 = MiscUtils.writeStringToTempFilePath(schema2);
 
         // compile and fail on bad import
         VoltCompiler compiler = new VoltCompiler();
