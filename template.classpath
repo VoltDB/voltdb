@@ -44,6 +44,8 @@
     <classpathentry kind="lib" path="lib/kafka_2.8.0-0.8.1.jar"/>
     <classpathentry kind="lib" path="lib/metrics-core-2.2.0.jar"/>
     <classpathentry kind="lib" path="lib/scala-library.jar"/>
+    <classpathentry kind="lib" path="lib/jackson-core-asl-1.9.13.jar"/>
+    <classpathentry kind="lib" path="lib/jackson-mapper-asl-1.9.13.jar"/>
 
     <classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER">
         <attributes>

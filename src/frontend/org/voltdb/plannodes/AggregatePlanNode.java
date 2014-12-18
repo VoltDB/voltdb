@@ -174,15 +174,15 @@ public class AggregatePlanNode extends AbstractPlanNode {
         m_hasSignificantOutputSchema = true;
     }
 
-
     @Override
     public void generateOutputSchema(Database db)
     {
+        // aggregate's output schema is pre-determined
         if (m_children.size() == 1) {
             m_children.get(0).generateOutputSchema(db);
-            // aggregate's output schema is pre-determined, don't touch
+
+            assert(m_hasSignificantOutputSchema);
         }
-        return;
     }
 
     @Override
@@ -294,10 +294,10 @@ public class AggregatePlanNode extends AbstractPlanNode {
 
     public void addGroupByExpression(AbstractExpression expr)
     {
-        if (expr != null)
-        {
-            m_groupByExpressions.add((AbstractExpression) expr.clone());
+        if (expr == null) {
+            return;
         }
+        m_groupByExpressions.add((AbstractExpression) expr.clone());
     }
 
     @Override

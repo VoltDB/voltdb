@@ -219,7 +219,6 @@ CTX.INPUT['executors'] = """
  abstractexecutor.cpp
  aggregateexecutor.cpp
  deleteexecutor.cpp
- distinctexecutor.cpp
  executorutil.cpp
  indexscanexecutor.cpp
  indexcountexecutor.cpp
@@ -255,7 +254,6 @@ CTX.INPUT['plannodes'] = """
  abstractscannode.cpp
  aggregatenode.cpp
  deletenode.cpp
- distinctnode.cpp
  indexscannode.cpp
  indexcountnode.cpp
  tablecountnode.cpp

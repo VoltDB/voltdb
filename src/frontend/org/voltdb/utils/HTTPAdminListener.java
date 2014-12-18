@@ -45,10 +45,9 @@ import org.voltdb.compilereport.ReportMaker;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.io.Resources;
-import java.io.ByteArrayInputStream;
 import java.net.InetAddress;
-import org.apache.zookeeper_voltpatches.KeeperException;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
+import java.util.List;
+import org.codehaus.jackson.JsonGenerator;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.map.JsonMappingException;
 import org.codehaus.jackson.map.ObjectMapper;
@@ -59,9 +58,12 @@ import org.eclipse.jetty.server.bio.SocketConnector;
 import org.voltdb.AuthenticationResult;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
+import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.common.Permission;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.UsersType;
+import org.voltdb.compiler.deploymentfile.UsersType.User;
 
 public class HTTPAdminListener {
 
@@ -114,6 +116,15 @@ public class HTTPAdminListener {
             response.setHeader("Host", getHostHeader());
         }
 
+        //Build a client response based json response
+        protected String buildClientResponse(String jsonp, byte code, String msg) {
+            ClientResponseImpl rimpl = new ClientResponseImpl(code, new VoltTable[0], msg);
+            if (jsonp != null) {
+                return String.format("%s( %s )", jsonp, rimpl.toJSONString());
+            }
+            return rimpl.toJSONString();
+        }
+
     }
 
     class DBMonitorHandler extends VoltRequestHandler {
@@ -122,7 +133,6 @@ public class HTTPAdminListener {
         public void handle(String target, Request baseRequest,
                            HttpServletRequest request, HttpServletResponse response)
                             throws IOException, ServletException {
-            VoltLogger logger = new VoltLogger("HOST");
             super.handle(target, baseRequest, request, response);
             try{
 
@@ -250,6 +260,64 @@ public class HTTPAdminListener {
 
     }
 
+    //This is a wrapper to generate JSON for profile of authenticated user.
+    private final class Profile {
+        private final String user;
+        private final String permissions[];
+        public Profile(String u, String[] p) {
+            user = u;
+            permissions = p;
+        }
+        public String getUser() {
+            return user;
+        }
+        public String[] getPermissions() {
+            return permissions;
+        }
+    }
+
+    // /profile handler
+    class UserProfileHandler extends VoltRequestHandler {
+        private final ObjectMapper m_mapper;
+
+        public UserProfileHandler() {
+            m_mapper = new ObjectMapper();
+            //We want jackson to stop closing streams
+            m_mapper.configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false);
+        }
+
+        // GET on /profile resources.
+        @Override
+        public void handle(String target,
+                           Request baseRequest,
+                           HttpServletRequest request,
+                           HttpServletResponse response)
+                           throws IOException, ServletException {
+            //jsonp is specified when response is expected to go to javascript function.
+            String jsonp = request.getParameter("jsonp");
+
+            try {
+                response.setContentType("application/json;charset=utf-8");
+                response.setStatus(HttpServletResponse.SC_OK);
+                AuthenticationResult authResult = authenticate(baseRequest);
+                if (!authResult.isAuthenticated()) {
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, authResult.m_message));
+                } else {
+                    if (jsonp != null) {
+                        response.getWriter().write(jsonp + "(");
+                    }
+                    m_mapper.writeValue(response.getWriter(), new Profile(authResult.m_user, authResult.m_perms));
+                    if (jsonp != null) {
+                        response.getWriter().write(")");
+                    }
+                }
+                baseRequest.setHandled(true);
+            } catch (Exception ex) {
+              logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage(), ex);
+            }
+        }
+    }
+
     //This is for password on User not to be reported.
     abstract class IgnorePasswordMixIn {
         @JsonIgnore abstract String getPassword();
@@ -259,12 +327,13 @@ public class HTTPAdminListener {
 
         final ObjectMapper m_mapper;
         String m_schema = "";
-        private DeploymentType m_deployment = null;
 
         public DeploymentRequestHandler() {
             m_mapper = new ObjectMapper();
+            //Mixin for to not output passwords.
             m_mapper.getSerializationConfig().addMixInAnnotations(UsersType.User.class, IgnorePasswordMixIn.class);
-            m_mapper.getDeserializationConfig().addMixInAnnotations(UsersType.User.class, IgnorePasswordMixIn.class);
+            //We want jackson to stop closing streams
+            m_mapper.configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false);
             try {
                 JsonSchema schema = m_mapper.generateJsonSchema(DeploymentType.class);
                 m_schema = schema.toString();
@@ -273,34 +342,14 @@ public class HTTPAdminListener {
             }
         }
 
-        //Get deployment from zookeeper next time
-        public void notifyOfCatalogUpdate() {
-            m_deployment = null;
+        //Get deployment from catalog context
+        private DeploymentType getDeployment() {
+            return VoltDB.instance().getCatalogContext().getDeployment();
         }
 
-        //Get deployment from zookeeper.
-        private DeploymentType getDeployment() {
-            if (m_deployment == null) {
-                ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
-                byte deploymentBytes[] = null;
-
-                try {
-                    //Let us get bytes from ZK
-                    CatalogUtil.CatalogAndIds catalogStuff = CatalogUtil.getCatalogFromZK(zk);
-                    deploymentBytes = catalogStuff.deploymentBytes;
-                } catch (KeeperException | InterruptedException ex) {
-                    m_log.warn("Failed to get deployment from zookeeper for HTTP interface.", ex);
-                }
-                if (deploymentBytes != null) {
-                    m_deployment = CatalogUtil.getDeployment(new ByteArrayInputStream(deploymentBytes));
-                }
-                // wasn't a valid xml deployment file or zookeeper is gone to town.
-                if (m_deployment == null) {
-                    //Get stale version from RealVoltDB
-                    m_log.warn("Failed to get deployment from zookeeper for HTTP interface. /deployment will not serve deployment information.");
-                }
-            }
-            return m_deployment;
+        //Get deployment bytes from catalog context
+        private byte[] getDeploymentBytes() {
+            return VoltDB.instance().getCatalogContext().getDeploymentBytes();
         }
 
         // TODO - subresources.
@@ -327,64 +376,97 @@ public class HTTPAdminListener {
 
             super.handle(target, baseRequest, request, response);
 
-            handleGet(target, baseRequest, request, response);
-        }
-
-        // GET on /deployment resources.
-        public void handleGet(String target,
-                           Request baseRequest,
-                           HttpServletRequest request,
-                           HttpServletResponse response)
-                           throws IOException, ServletException {
             //jsonp is specified when response is expected to go to javascript function.
             String jsonp = request.getParameter("jsonp");
 
             try {
-                //schema request does not require authentication.
-                if (baseRequest.getRequestURI().contains("/schema")) {
-                    String msg = m_schema;
-                    if (jsonp != null) {
-                        msg = String.format("%s( %s )", jsonp, m_schema);
-                    }
-                    response.getWriter().print(msg);
-                    response.setStatus(HttpServletResponse.SC_OK);
+                response.setContentType("application/json;charset=utf-8");
+                response.setStatus(HttpServletResponse.SC_OK);
+
+                //Requests require authentication.
+                AuthenticationResult authResult = authenticate(baseRequest);
+                if (!authResult.isAuthenticated()) {
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, authResult.m_message));
+                    baseRequest.setHandled(true);
+                    return;
+                }
+                //Authenticated but has no permissions.
+                if (!authResult.m_authUser.hasPermission(Permission.ADMIN)) {
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Permission denied"));
                     baseRequest.setHandled(true);
                     return;
                 }
 
-                AuthenticationResult authResult = authenticate(baseRequest);
-                if (!authResult.isAuthenticated()) {
-                    String msg = authResult.m_message;
-                    ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg);
-                    msg = rimpl.toJSONString();
-                    if (jsonp != null) {
-                        msg = String.format("%s( %s )", jsonp, msg);
-                    }
-                    response.setStatus(HttpServletResponse.SC_OK);
-                    response.getWriter().print(msg);
-                    baseRequest.setHandled(true);
+                //Authenticated and has ADMIN permission
+                if (baseRequest.getRequestURI().contains("/download")) {
+                    //Deployment xml is text/xml
+                    response.setContentType("text/xml;charset=utf-8");
+                    response.getWriter().write(new String(getDeploymentBytes()));
                 } else {
-                    DeploymentType d = getDeployment();
-                    if (d == null) {
-                        String msg = "Deployment Information unavailable.";
-                        ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg);
-                        msg = rimpl.toJSONString();
-                        if (jsonp != null) {
-                            msg = String.format("%s( %s )", jsonp, msg);
-                        }
-                        response.getWriter().print(msg);
+                    if (request.getMethod().equalsIgnoreCase("POST")) {
+                        handleUpdateDeployment(jsonp, target, baseRequest, request, response, authResult.m_client);
                     } else {
-                        String msg = m_mapper.writeValueAsString(d);
+                        //non POST
                         if (jsonp != null) {
-                            msg = String.format("%s( %s )", jsonp, msg);
+                            response.getWriter().write(jsonp + "(");
                         }
-                        response.getWriter().print(msg);
+                        m_mapper.writeValue(response.getWriter(), getDeployment());
+                        if (jsonp != null) {
+                            response.getWriter().write(")");
+                        }
                     }
-                    response.setStatus(HttpServletResponse.SC_OK);
-                    baseRequest.setHandled(true);
                 }
+                baseRequest.setHandled(true);
             } catch (Exception ex) {
-              logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage());
+              logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage(), ex);
+            }
+        }
+
+        //Update the deployment
+        public void handleUpdateDeployment(String jsonp, String target,
+                           Request baseRequest,
+                           HttpServletRequest request,
+                           HttpServletResponse response, Client client)
+                           throws IOException, ServletException {
+            String deployment = request.getParameter("deployment");
+            if (deployment == null || deployment.length() == 0) {
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Failed to get deployment information."));
+                return;
+            }
+            try {
+                DeploymentType newDeployment = m_mapper.readValue(deployment, DeploymentType.class);
+                if (newDeployment == null) {
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Failed to build deployment information."));
+                    return;
+                }
+                //For users that are listed if they exists without password set their password to current else password will get changed for existing user.
+                //New users if valid will get updated.
+                //For Scrambled passowrd this will work also but new passwords will be unscrambled
+                //TODO: add switch to post to scramble??
+                if (newDeployment.getSecurity().isEnabled()) {
+                    DeploymentType currentDeployment = this.getDeployment();
+                    List<User> users = currentDeployment.getUsers().getUser();
+                    for (UsersType.User user : newDeployment.getUsers().getUser()) {
+                        if (user.getPassword() == null || user.getPassword().trim().length() == 0) {
+                            for (User u : users) {
+                                if (user.getName().equalsIgnoreCase(u.getName())) {
+                                    user.setPassword(u.getPassword());
+                                }
+                            }
+                        }
+                    }
+                }
+
+                String dep = CatalogUtil.getDeployment(newDeployment);
+                Object[] params = new Object[2];
+                params[0] = null;
+                params[1] = dep;
+                //Call sync as nothing else can happen when this is going on.
+                client.callProcedure("@UpdateApplicationCatalog", params);
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.SUCCESS, "Deployment Updated."));
+            } catch (Exception ex) {
+                logger.error("Failed to update deployment from API", ex);
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, ex.toString()));
             }
         }
     }
@@ -414,7 +496,7 @@ public class HTTPAdminListener {
                 }
 
             } catch(Exception ex){
-                logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage());
+                logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage(), ex);
             }
         }
     }
@@ -516,12 +598,17 @@ public class HTTPAdminListener {
             m_deploymentHandler = new DeploymentRequestHandler();
             deploymentRequestHandler.setHandler(m_deploymentHandler);
 
+            ///profile
+            ContextHandler profileRequestHandler = new ContextHandler("/profile");
+            profileRequestHandler.setHandler(new UserProfileHandler());
+
             ContextHandlerCollection handlers = new ContextHandlerCollection();
             handlers.setHandlers(new Handler[] {
                     apiRequestHandler,
                     catalogRequestHandler,
                     ddlRequestHandler,
                     deploymentRequestHandler,
+                    profileRequestHandler,
                     dbMonitorHandler
             });
 
@@ -572,7 +659,5 @@ public class HTTPAdminListener {
     {
         //Notify to clean any cached clients so new security can be enforced.
         httpClientInterface.notifyOfCatalogUpdate();
-        //Notify deployment handler
-        m_deploymentHandler.notifyOfCatalogUpdate();
     }
 }

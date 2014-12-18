@@ -30,12 +30,11 @@ import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.ParsedSelectStmt;
-import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
+import org.voltdb.planner.ParsedColInfo;
 import org.voltdb.planner.ParsedUnionStmt;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
@@ -320,7 +319,7 @@ public class StmtSubqueryScan extends StmtTableScan {
 
         // Now If query has LIMIT/OFFSET/DISTINCT on a replicated table column,
         // we should get rid of the receive node.
-        if (selectStmt.hasLimitOrOffset() || selectStmt.hasDistinct()) {
+        if (selectStmt.hasLimitOrOffset() || selectStmt.hasDistinctWithGroupBy()) {
             return root;
         }
 
@@ -418,10 +417,6 @@ public class StmtSubqueryScan extends StmtTableScan {
 
             assert(child.getChildCount() == 1);
             child = child.getChild(0);
-            if (child instanceof ProjectionPlanNode) {
-                assert(child.getChildCount() == 1);
-                child = child.getChild(0);
-            }
             child.clearParents();
             if (current.getParentCount() == 0) {
                 return child;
