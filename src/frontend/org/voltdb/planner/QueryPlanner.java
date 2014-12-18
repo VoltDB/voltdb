@@ -153,7 +153,7 @@ public class QueryPlanner {
         // and subsequent placement of UPSERT_TAG should be pushed down
         // into getXMLCompiledStatement)
         m_sql = m_sql.trim();
-        if (m_sql.toUpperCase().startsWith("UPSERT")) { // ENG-7395
+        if (m_sql.length() > 6 && m_sql.substring(0,6).toUpperCase().startsWith("UPSERT")) { // ENG-7395
             m_isUpsert = true;
             m_sql = "INSERT" + m_sql.substring(6);
         }
