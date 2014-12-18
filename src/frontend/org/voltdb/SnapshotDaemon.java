@@ -361,7 +361,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
         public void requestLockedTask(Runnable onLockGranted) throws Exception {
             if (requestLock()) {
-                onLockGranted.call();
+                onLockGranted.run();
             }
             else {
                 m_lockGrantedTask = onLockGranted;
