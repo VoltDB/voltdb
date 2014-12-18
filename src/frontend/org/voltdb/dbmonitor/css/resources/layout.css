@@ -593,6 +593,7 @@ div.popup {background: #fff;box-shadow: 0 3px 10px #222;}
 
 .overlay-title{background:#fbfbfb; height:42px; line-height:42px; padding:4px 4px 4px 20px; border-bottom:1px solid #dbdbdb; font-size:16px;/* font-weight:bold;*/ color:#3e3a3a;}
 .overlay-content{ padding:20px; min-width:450px;height:auto; overflow:auto; line-height:18px;}
+.graphPop { height:110px; margin-bottom:20px;}
 .overlay-btns{ text-align:right; padding:5px 20px 20px 20px;}
 
 
@@ -1046,6 +1047,7 @@ ul.adminClusterList li { margin:0; padding-top:15px; float:left; width:67px; hei
  @media (min-width: 480px) and (max-width: 700px) {
 		 .adminRight{ padding-top:15px;}
 		 #serverConfigAdmin{ top:99px;}
+		 
  }
 
 @media (width: 320px) {
@@ -1066,7 +1068,7 @@ ul.adminClusterList li { margin:0; padding-top:15px; float:left; width:67px; hei
 	 @media screen and (orientation:landscape) {
 		 
 		.overlay-content {/*height: 150px;*/height:20%;}
-		.graphPop { height:130px; margin-bottom:20px;}
+		.graphPop { height:110px; margin-bottom:20px;}
 		.restoreInfo .overlay-content { height:125px;}
 		.restoreCont {height:125px;}
 		
@@ -1079,6 +1081,7 @@ ul.adminClusterList li { margin:0; padding-top:15px; float:left; width:67px; hei
 		.VDBQueryHelp { height:150px; overflow:auto;}
 			
 
-}		 
+}
+ 
 
 
