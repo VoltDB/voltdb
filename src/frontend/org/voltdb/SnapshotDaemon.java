@@ -116,9 +116,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         public byte[] m_byteArray;
     }
 
-    public void LeaderHasQueueLockForNextSnapshot() {
-    }
-
     private class SnapshotQueue extends StateMachineInstance {
         // Unused required abstracts
         @Override
@@ -144,7 +141,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         private final String m_indexSnapshotPrefix;
         private final String m_fileSnapshotPrefix;
         private final String m_csvSnapshotPrefix;
-        private boolean m_completedSnapshotPending = false;
+        private Runnable m_lockGrantedTask = null;
+        private Runnable m_queueChanged = null;
         private ArrayList<Integer> m_coalescedSnapshotRequestNodes = null;
         private SNAPSHOT_TYPE m_activeSnapshot = SNAPSHOT_TYPE.EMPTY;
         private final LinkedHashSet<SNAPSHOT_TYPE> m_pendingSnapshotsQueue = new LinkedHashSet<SNAPSHOT_TYPE>();
@@ -154,7 +152,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             (byte)SNAPSHOT_TYPE.EMPTY.ordinal(), (byte)SNAPSHOT_TYPE.EMPTY.ordinal(), 0};
 
 
-        public SnapshotQueue(SynchronizedStatesManager ssm) throws KeeperException, InterruptedException {
+        public SnapshotQueue(SynchronizedStatesManager ssm, Runnable queueChangeCallback) throws KeeperException, InterruptedException {
             ssm.super("snapshot_queue", SNAP_LOG);
             m_streamSnapshotPrefix = ZKUtil.joinZKPath(m_statePath, "stream_snapshots");
             ssm.addIfMissing(m_streamSnapshotPrefix, CreateMode.PERSISTENT, null);
@@ -164,9 +162,14 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             ssm.addIfMissing(m_fileSnapshotPrefix, CreateMode.PERSISTENT, null);
             m_csvSnapshotPrefix = ZKUtil.joinZKPath(m_statePath, "csv_snapshots");
             ssm.addIfMissing(m_csvSnapshotPrefix, CreateMode.PERSISTENT, null);
+            m_queueChanged = queueChangeCallback;
 
             // Start with an empty queue
             registerStateMachineWithManager(ByteBuffer.wrap(m_startQueue));
+        }
+
+        public void setQueueChangeCallback(Runnable queueChangeCallback) {
+            m_queueChanged = queueChangeCallback;
         }
 
         private String getPathFromType(SNAPSHOT_TYPE type) {
@@ -280,11 +283,23 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 }
             }
             m_localPendingSnapshots.clear();
-            if (m_completedSnapshotPending) {
+            if (m_lockGrantedTask != null) {
                 // We are the leader and we finished the last snapshot so start the next one in the queue
-                LeaderHasQueueLockForNextSnapshot();
+                try {
+                    m_lockGrantedTask.run();
+                    if (isProposalInProgress()) {
+                        // The task updated the queue for us
+                        queueChanged = false;
+                    }
+                }
+                catch (Exception e) {
+                    if (isProposalInProgress()) {
+                        // Proposal was started so don't do
+                        queueChanged = false;
+                    }
+                }
             }
-            else
+
             if (queueChanged) {
                 nodeList = getCurrentState();
                 nodeList.position(nodeList.position()+m_queueSlots+1);
@@ -308,6 +323,9 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 return;
             }
             processCurrentQueueState(proposedState);
+            if (m_queueChanged != null) {
+                m_queueChanged.run();
+            }
         }
 
         public int requestSnapshot(SNAPSHOT_TYPE reqType, byte[] snapshotDetails) throws KeeperException, InterruptedException {
@@ -341,14 +359,13 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             return (SNAPSHOT_TYPE) m_pendingSnapshotsQueue.toArray()[0];
         }
 
-        public boolean requestLockForCompletedSnapshot() {
+        public void requestLockedTask(Runnable onLockGranted) throws Exception {
             if (requestLock()) {
-                return true;
+                onLockGranted.call();
             }
             else {
-                m_completedSnapshotPending = true;
+                m_lockGrantedTask = onLockGranted;
             }
-            return false;
         }
 
         public ArrayList<Integer> getNodeListFor(SNAPSHOT_TYPE type) {
@@ -406,6 +423,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 nodeList.putInt(requestNodeId);
             }
             ByteBuffer newQueue = buildProposalFromUpdatedQueue(nodeList);
+            proposeStateChange(newQueue);
         }
 
         public boolean snapshotPending(SNAPSHOT_TYPE type) {

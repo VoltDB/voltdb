@@ -1197,6 +1197,13 @@ public class SynchronizedStatesManager {
             return initialized;
         }
 
+        protected boolean isProposalInProgress() {
+            boolean proposalInProgress;
+            lockLocalState();
+            proposalInProgress = m_pendingProposal != null;
+            unlockLocalState();
+            return proposalInProgress;
+        }
         /*
          * Notifies of full participation and the current agreed state
          */
