@@ -556,20 +556,36 @@ public class SQLCommand
         // so much statement queueing.
         StringBuilder query = new StringBuilder();
         while (true) {
+            if (m_debug) {
+                reportElapsedTime("pre-read");
+            }
             String line = lineInputReader.readLine();
             if (line == null) {
+                if (m_debug) {
+                    reportElapsedTime("finished reading");
+                }
                 //* enable to debug */     System.err.println("Read null batch line.");
                 List<String> parsedQueries = parseQuery(query.toString());
-                for (String parsedQuery : parsedQueries) {
-                    executeQuery(parsedQuery);
+                if (m_debug) {
+                    reportElapsedTime("post-parse");
                 }
+                for (String parsedQuery : parsedQueries) {
+                    if (m_debug) {
+                        reportElapsedTime("pre-execute");
+                    }
+                    executeQuery(parsedQuery);
+                    if (m_debug) {
+                        reportElapsedTime("post-execute");
+                    }
+                }
+                reportElapsedTime("finished execute");
                 return;
             }
             //* enable to debug */ else System.err.println("Read non-null batch line: (" + line + ")");
             if (m_debug) {
                 reportElapsedTime("line read");
                 // second debug delay is on each successful read line.
-                try { 
+                try {
                     long delay2 = Long.parseLong(m_debugDelay[1]);
                     Thread.sleep(delay2);
                     reportElapsedTime("post line read delay");
@@ -980,7 +996,7 @@ public class SQLCommand
             exc.printStackTrace(System.err);
             // third debug delay is on each detected error.
             reportElapsedTime("caught error");
-            try { 
+            try {
                 long delay3 = Long.parseLong(m_debugDelay[2]);
                 Thread.sleep(delay3);
                 reportElapsedTime("post error delay");
@@ -1415,7 +1431,7 @@ public class SQLCommand
                 m_debugStartTime = System.currentTimeMillis();
                 m_debugDelay = optionValue.split(",");
                 // first debug delay is immediate/unconditional.
-                try { 
+                try {
                     long delay1 = Long.parseLong(m_debugDelay[0]);
                     Thread.sleep(delay1);
                     reportElapsedTime("post initial delay");

@@ -233,29 +233,15 @@ public class TestSqlCmdErrorHandling extends TestCase {
                     }
                 }
                 if (m_verboseForDebug && exitValue != 0) {
-                    byte[] transfer = new byte[1000];
-
                     System.err.println("Standard input for timed out " + commandPath + ":");
-                    FileInputStream cmdIn = new FileInputStream(f);
-                    while (cmdIn.read(transfer) != -1) {
-                        System.err.write(transfer);
-                    }
+                    streamFileToErr(f);
                     System.err.println("-----");
-                    cmdIn.close();
                     System.err.println("Standard output from failed " + commandPath + ":");
-                    FileInputStream cmdOut = new FileInputStream(out);
-                    while (cmdOut.read(transfer) != -1) {
-                        System.err.write(transfer);
-                    }
+                    streamFileToErr(out);
                     System.err.println("-----");
-                    cmdOut.close();
                     System.err.println("Error output from failed " + commandPath + ":");
-                    FileInputStream cmdErr = new FileInputStream(error);
-                    while (cmdErr.read(transfer) != -1) {
-                        System.err.write(transfer);
-                    }
+                    streamFileToErr(error);
                     System.err.println("-----");
-                    cmdErr.close();
                 }
                 f.delete();
                 out.delete();
@@ -271,35 +257,36 @@ public class TestSqlCmdErrorHandling extends TestCase {
 
         process.destroy();
 
-        byte[] transfer = new byte[1000];
-
         System.err.println("Standard input for timed out " + commandPath + ":");
+        streamFileToErr(f);
+        f.delete();
+        System.err.println("-----");
+        System.err.println("Standard output from timed out " + commandPath + ":");
+        streamFileToErr(out);
+        out.delete();
+        System.err.println("-----");
+        System.err.println("Error output from timed out " + commandPath + ":");
+        streamFileToErr(out);
+        error.delete();
+        System.err.println("-----");
+        dumpProcessTree();
+        System.err.println("-----");
+        fail("External process (" + commandPath + ") timed out after " + elapsedtime + "ms on input:\n" + inputText);
+        return 0;
+    }
+
+    /**
+     * @param f
+     * @throws FileNotFoundException
+     * @throws IOException
+     */
+    private static void streamFileToErr(File f) throws FileNotFoundException, IOException {
+        byte[] transfer = new byte[1000];
         FileInputStream cmdIn = new FileInputStream(f);
         while (cmdIn.read(transfer) != -1) {
             System.err.write(transfer);
         }
-        System.err.println("-----");
         cmdIn.close();
-        f.delete();
-        System.err.println("Standard output from timed out " + commandPath + ":");
-        FileInputStream cmdOut = new FileInputStream(out);
-        while (cmdOut.read(transfer) != -1) {
-            System.err.write(transfer);
-        }
-        System.err.println("-----");
-        cmdOut.close();
-        out.delete();
-        System.err.println("Error output from timed out " + commandPath + ":");
-        FileInputStream cmdErr = new FileInputStream(error);
-        while (cmdErr.read(transfer) != -1) {
-            System.err.write(transfer);
-        }
-        System.err.println("-----");
-        cmdErr.close();
-        error.delete();
-        dumpProcessTree();
-        fail("External process (" + commandPath + ") timed out after " + elapsedtime + "ms on input:\n" + inputText);
-        return 0;
     }
 
     /**
