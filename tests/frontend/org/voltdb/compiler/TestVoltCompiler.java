@@ -674,9 +674,15 @@ public class TestVoltCompiler extends TestCase {
         }
     }
 
-    private boolean compileFromDDL(VoltCompiler compiler, String... schemaPaths)
+    private boolean compileFromDDL(VoltCompiler compiler, String schemaPath)
     {
-        return compileFromDDL(testout_jar, compiler, schemaPaths);
+        return compileFromDDL(testout_jar, compiler, schemaPath);
+    }
+
+    private boolean compileFromLiteralSchema(VoltCompiler compiler, String literalSchema)
+    {
+        final String schemaPath = MiscUtils.writeStringToTempFilePath(literalSchema);
+        return compileFromDDL(testout_jar, compiler, schemaPath);
     }
 
     public static boolean compileFromDDL(String pathToJar, VoltCompiler compiler, String... schemaPaths) {
@@ -1687,9 +1693,9 @@ public class TestVoltCompiler extends TestCase {
 
     }
 
-    private void checkDDLErrorMessage(String ddl, String errorMsg) {
+    private void checkDDLErrorMessage(String literalSchema, String errorMsg) {
         final VoltCompiler compiler = new VoltCompiler();
-        boolean success = compileFromDDL(compiler, ddl);
+        boolean success = compileFromLiteralSchema(compiler, literalSchema);
         checkCompilerErrorMessages(errorMsg, compiler, success);
     }
 
@@ -1946,7 +1952,7 @@ public class TestVoltCompiler extends TestCase {
     void compileLimitDeleteStmtAndCheckCatalog(String ddl, String expectedMessage, String tblName,
             int expectedLimit, String expectedStmt) {
         VoltCompiler compiler = new VoltCompiler();
-        boolean success = compileFromDDL(compiler, ddl);
+        boolean success = compileFromLiteralSchema(compiler, ddl);
         checkCompilerErrorMessages(expectedMessage, compiler, success);
 
         if (success) {
@@ -2156,7 +2162,7 @@ public class TestVoltCompiler extends TestCase {
         ArrayList<Feedback> fbs;
         String expectedError;
 
-        fbs = checkInvalidProcedureDDL(
+        fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NonExistentPartitionParamInteger;" +
@@ -2165,7 +2171,7 @@ public class TestVoltCompiler extends TestCase {
         expectedError = "Cannot load class for procedure: org.voltdb.compiler.procedures.NonExistentPartitionParamInteger";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        fbs = checkInvalidProcedureDDL(
+        fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "PARTITION PROCEDURE NotDefinedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY;"
@@ -2173,7 +2179,7 @@ public class TestVoltCompiler extends TestCase {
         expectedError = "Partition in referencing an undefined procedure \"NotDefinedPartitionParamInteger\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        fbs = checkInvalidProcedureDDL(
+        fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.PartitionParamInteger;" +
@@ -2183,7 +2189,7 @@ public class TestVoltCompiler extends TestCase {
                 "\"org.voltdb.compiler.procedures.PartitionParamInteger\" and in the schema defintion file(s)";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        fbs = checkInvalidProcedureDDL(
+        fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
@@ -2194,7 +2200,7 @@ public class TestVoltCompiler extends TestCase {
                 "in schema which can't be found.";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        fbs = checkInvalidProcedureDDL(
+        fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
@@ -2205,7 +2211,7 @@ public class TestVoltCompiler extends TestCase {
                 "in schema which can't be found.";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        fbs = checkInvalidProcedureDDL(
+        fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
@@ -2215,7 +2221,7 @@ public class TestVoltCompiler extends TestCase {
                 "org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        fbs = checkInvalidProcedureDDL(
+        fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM GLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
@@ -2226,7 +2232,7 @@ public class TestVoltCompiler extends TestCase {
                 ", expected syntax: \"CREATE PROCEDURE";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        fbs = checkInvalidProcedureDDL(
+        fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
@@ -2238,7 +2244,7 @@ public class TestVoltCompiler extends TestCase {
                 "TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        fbs = checkInvalidProcedureDDL(
+        fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
@@ -2250,7 +2256,7 @@ public class TestVoltCompiler extends TestCase {
                 "TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        fbs = checkInvalidProcedureDDL(
+        fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
@@ -2262,7 +2268,7 @@ public class TestVoltCompiler extends TestCase {
                 "TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        fbs = checkInvalidProcedureDDL(
+        fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
@@ -2275,7 +2281,7 @@ public class TestVoltCompiler extends TestCase {
                 "TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        fbs = checkInvalidProcedureDDL(
+        fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE OUTOF CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
@@ -2286,7 +2292,7 @@ public class TestVoltCompiler extends TestCase {
                 ", expected syntax: \"CREATE PROCEDURE";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        fbs = checkInvalidProcedureDDL(
+        fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "MAKE PROCEDURE OUTOF CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
@@ -2295,7 +2301,7 @@ public class TestVoltCompiler extends TestCase {
         expectedError = "DDL Error: \"unexpected token: MAKE\" in statement starting on lineno: 1";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        fbs = checkInvalidProcedureDDL(
+        fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE 1PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
@@ -2305,7 +2311,7 @@ public class TestVoltCompiler extends TestCase {
                 "contains invalid identifier \"1PKEY_INTEGER\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        fbs = checkInvalidProcedureDDL(
+        fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN 2PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
@@ -2315,7 +2321,7 @@ public class TestVoltCompiler extends TestCase {
                 "contains invalid identifier \"2PKEY\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        fbs = checkInvalidProcedureDDL(
+        fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS 0rg.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
@@ -2326,7 +2332,7 @@ public class TestVoltCompiler extends TestCase {
                 "\" contains invalid identifier \"0rg.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        fbs = checkInvalidProcedureDDL(
+        fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.3compiler.procedures.NotAnnotatedPartitionParamInteger;" +
@@ -2337,7 +2343,7 @@ public class TestVoltCompiler extends TestCase {
                 "\" contains invalid identifier \"org.voltdb.3compiler.procedures.NotAnnotatedPartitionParamInteger\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        fbs = checkInvalidProcedureDDL(
+        fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.4NotAnnotatedPartitionParamInteger;" +
@@ -2348,7 +2354,7 @@ public class TestVoltCompiler extends TestCase {
                 "\" contains invalid identifier \"org.voltdb.compiler.procedures.4NotAnnotatedPartitionParamInteger\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        fbs = checkInvalidProcedureDDL(
+        fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
@@ -2359,7 +2365,7 @@ public class TestVoltCompiler extends TestCase {
                 "\" contains invalid identifier \"5NotAnnotatedPartitionParamInteger\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        fbs = checkInvalidProcedureDDL(
+        fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
@@ -2370,7 +2376,7 @@ public class TestVoltCompiler extends TestCase {
                 "\" contains invalid identifier \"6PKEY_INTEGER\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        fbs = checkInvalidProcedureDDL(
+        fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
@@ -2381,7 +2387,7 @@ public class TestVoltCompiler extends TestCase {
                 "\" contains invalid identifier \"7PKEY\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        fbs = checkInvalidProcedureDDL(
+        fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
@@ -2398,7 +2404,7 @@ public class TestVoltCompiler extends TestCase {
         ArrayList<Feedback> fbs;
         String expectedError;
 
-        fbs = checkInvalidProcedureDDL(
+        fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE Foo AS BANBALOO pkey FROM PKEY_INTEGER;" +
@@ -2407,7 +2413,7 @@ public class TestVoltCompiler extends TestCase {
         expectedError = "Failed to plan for statement (sql) BANBALOO pkey FROM PKEY_INTEGER";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        fbs = checkInvalidProcedureDDL(
+        fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE Foo AS SELEC pkey FROM PKEY_INTEGER;" +
@@ -2416,7 +2422,7 @@ public class TestVoltCompiler extends TestCase {
         expectedError = "Failed to plan for statement (sql) SELEC pkey FROM PKEY_INTEGER";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        fbs = checkInvalidProcedureDDL(
+        fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE Foo AS DELETE FROM PKEY_INTEGER WHERE PKEY = ?;" +
@@ -2425,7 +2431,7 @@ public class TestVoltCompiler extends TestCase {
         expectedError = "PartitionInfo specifies invalid parameter index for procedure: Foo";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        fbs = checkInvalidProcedureDDL(
+        fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE Foo AS DELETE FROM PKEY_INTEGER;" +
@@ -2434,7 +2440,7 @@ public class TestVoltCompiler extends TestCase {
         expectedError = "PartitionInfo specifies invalid parameter index for procedure: Foo";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        fbs = checkInvalidProcedureDDL(
+        fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE org.kanamuri.Foo AS DELETE FROM PKEY_INTEGER;" +
@@ -2443,7 +2449,7 @@ public class TestVoltCompiler extends TestCase {
         expectedError = "PartitionInfo specifies invalid parameter index for procedure: org.kanamuri.Foo";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        fbs = checkInvalidProcedureDDL(
+        fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE 7Foo AS DELETE FROM PKEY_INTEGER WHERE PKEY = ?;" +
@@ -2461,7 +2467,7 @@ public class TestVoltCompiler extends TestCase {
 
         if (Float.parseFloat(System.getProperty("java.specification.version")) < 1.7) return;
 
-        fbs = checkInvalidProcedureDDL(
+        fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE Foo AS ###\n" +
@@ -2476,7 +2482,7 @@ public class TestVoltCompiler extends TestCase {
         expectedError = "user lacks privilege or object not found: PKEY";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        fbs = checkInvalidProcedureDDL(
+        fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE Foo AS ###\n" +
@@ -2491,7 +2497,7 @@ public class TestVoltCompiler extends TestCase {
         expectedError = "Procedure \"Foo\" code block has syntax errors";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        fbs = checkInvalidProcedureDDL(
+        fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE Foo AS ###\n" +
@@ -2506,7 +2512,7 @@ public class TestVoltCompiler extends TestCase {
         expectedError = "Procedure \"Foo\" code block does not contain the required \"transactOn\" closure";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        fbs = checkInvalidProcedureDDL(
+        fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE Foo AS ###\n" +
@@ -2539,7 +2545,7 @@ public class TestVoltCompiler extends TestCase {
         expectedError = "Procedure \"voltkv.procedures.Put\" is not a groovy script";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        fbs = checkInvalidProcedureDDL(
+        fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE Foo AS ###\n" +
@@ -2551,7 +2557,7 @@ public class TestVoltCompiler extends TestCase {
         expectedError = "Procedure \"Foo\" code block does not contain the required \"transactOn\" closure";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        fbs = checkInvalidProcedureDDL(
+        fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE Foo AS ###\n" +
@@ -2567,7 +2573,7 @@ public class TestVoltCompiler extends TestCase {
         expectedError = "Schema file ended mid-statement (no semicolon found)";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        fbs = checkInvalidProcedureDDL(
+        fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE Foo AS ##\n" +
@@ -2582,7 +2588,7 @@ public class TestVoltCompiler extends TestCase {
         expectedError = "Schema file ended mid-statement (no semicolon found)";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        fbs = checkInvalidProcedureDDL(
+        fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE Foo AS ###\n" +
@@ -2709,7 +2715,7 @@ public class TestVoltCompiler extends TestCase {
         proc = db.getProcedures().get("p1");
         assertNull(proc);
 
-        ArrayList<Feedback> fbs = checkInvalidProcedureDDL(
+        ArrayList<Feedback> fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "creAte PrOcEdUrE FrOm CLasS org.voltdb.compiler.procedures.AddBook; " +
@@ -2719,7 +2725,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
         // Make sure we can't drop a CRUD procedure (full name)
-        fbs = checkInvalidProcedureDDL(
+        fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "DROP PROCEDURE PKEY_INTEGER.insert;"
@@ -2729,7 +2735,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
         // Make sure we can't drop a CRUD procedure (partial name)
-        fbs = checkInvalidProcedureDDL(
+        fbs = checkInvalidLiteralSchema(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "DROP PROCEDURE insert;"
@@ -2748,7 +2754,7 @@ public class TestVoltCompiler extends TestCase {
         assertNull(proc);
     }
 
-    private ArrayList<Feedback> checkInvalidProcedureDDL(String ddl) {
+    private ArrayList<Feedback> checkInvalidLiteralSchema(String ddl) {
         final String schemaPath = MiscUtils.writeStringToTempFilePath(ddl);
         final VoltCompiler compiler = new VoltCompiler();
         final boolean success = compileFromDDL(compiler, schemaPath);
@@ -3155,14 +3161,19 @@ public class TestVoltCompiler extends TestCase {
 
         final VoltCompiler compiler = new VoltCompiler();
 
-        boolean success = compileFromDDL(compiler, schemaPath);
-        assertTrue(success);
+        assertTrue(compileFromDDL(compiler, schemaPath));
 
-        success = compileFromDDL(compiler, schemaPath + "???");
-        assertFalse(success);
+        assertFalse(compileFromDDL(compiler, schemaPath + "???"));
 
-        success = compileFromDDL(compiler);
-        assertFalse(success);
+        // Trivially test that VoltCompiler politely refuses to compile 0 schema files.
+        // Should we care?
+        try {
+            assertFalse(compiler.compileFromDDL(testout_jar));
+        }
+        catch (VoltCompilerException e) {
+            e.printStackTrace();
+            fail();
+        }
     }
 
     private int countStringsMatching(List<String> diagnostics, String pattern) {

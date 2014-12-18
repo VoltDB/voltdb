@@ -179,6 +179,9 @@ public class VoltCompiler {
             this.lineNo = lineNo;
         }
 
+        @Override
+        public String toString() { return getStandardFeedbackLine(); }
+
         public String getStandardFeedbackLine() {
             String retval = "";
             if (severityLevel == Severity.INFORMATIONAL)
