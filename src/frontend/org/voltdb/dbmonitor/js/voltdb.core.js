@@ -153,7 +153,7 @@
                         callback({ "status": -1, "statusstring": "Error: Please specify parameters", "results": [] });
                     }
 
-                    uri = 'http://' + this.server + ':' + this.port + '/' + shortApiCallDetails.apiPath + '/?admin=true&jsonp=?';
+                    uri = 'http://' + this.server + ':' + this.port + '/' + shortApiCallDetails.apiPath + '/?admin=true';
                     
                     if (VoltDBCore.isServerConnected) {
                         var ah = null;
@@ -556,7 +556,7 @@ jQuery.extend({
                 type: 'POST',
                 url: url,
                 data: formData,
-                dataType: 'jsonp',
+                dataType: 'json',
                 beforeSend: function (request) {
                     if (authorization != null) {
                         request.setRequestHeader("Authorization", authorization);
@@ -567,7 +567,7 @@ jQuery.extend({
                     callback(data, host);
                 },
                 error: function (e) {
-                    console.log(e.message);
+                    console.log(e);
                 }
             });
 
