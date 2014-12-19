@@ -24,9 +24,10 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
+import java.util.EnumMap;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -101,14 +102,44 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         private boolean finished;
     }
 
-    private enum SNAPSHOT_TYPE {
-        STREAM,
-        INDEX,
-        FILE,
-        CSV,
-        LOG,            // Truncation Request from Command log (occupies the same slot as FILE)
-        EMPTY
+    static enum SNAPSHOT_TYPE {
+
+        STREAM(SnapshotFormat.STREAM),
+        INDEX(SnapshotFormat.INDEX),
+        FILE(SnapshotFormat.NATIVE),
+        CSV(SnapshotFormat.CSV),
+        LOG(SnapshotFormat.NATIVE),            // Truncation Request from Command log (occupies the same slot as FILE)
+        EMPTY(null);
+
+        final static private Map<SnapshotFormat,SNAPSHOT_TYPE> formatMap;
+
+        static {
+            formatMap = new EnumMap<>(SnapshotFormat.class);
+            formatMap.put(SnapshotFormat.STREAM, STREAM);
+            formatMap.put(SnapshotFormat.INDEX, INDEX);
+            formatMap.put(SnapshotFormat.NATIVE, FILE);
+            formatMap.put(SnapshotFormat.CSV, CSV);
+        }
+
+        final SnapshotFormat m_format;
+
+        SNAPSHOT_TYPE(SnapshotFormat format) {
+            m_format = format;
+        }
+
+        public String requestId(int id) {
+            return String.format("%s_SR_%d", name(), id);
+        }
+
+        public SnapshotFormat format() {
+            return m_format;
+        }
+
+        public static SNAPSHOT_TYPE valueOf(SnapshotFormat format) {
+            return formatMap.get(format);
+        }
     }
+
     private static final int m_queueSlots = SNAPSHOT_TYPE.values().length - 2;
 
     private class ByteArrayWrapper {
@@ -2091,28 +2122,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         }
     }
 
-    private final static boolean isTruncationRequest(JSONObject jo) throws JSONException {
-        if (jo == null) return false;
-
-        String sdata = jo.optString("data");
-        if (sdata == null || sdata.trim().isEmpty()) return false;
-
-        JSONObject jodata = new JSONObject(sdata);
-        return jodata.has("truncReqId");
-    }
-
-    private final static boolean isAutoRequest(JSONObject jo) {
-        return jo.optBoolean("isAuto",false);
-    }
-
     byte [] coalesceDefaultSnapshot( NavigableMap<Integer, ByteArrayWrapper> map)  {
         if (map == null || map.isEmpty()) return null;
 
-        final int requestId = map.lastKey();
-        Set<String> discerners = new HashSet<String>();
-        JSONObject candidate = null;
-        String discerner;
-        boolean hasTruncationRequest = false;
+        final int requestId = map.lastKey() + 1;
+        Map<Integer, JSONObject> discerners = new LinkedHashMap<>();
 
         for (Map.Entry<Integer, ByteArrayWrapper> e: map.entrySet()) {
             ByteArrayWrapper baw = e.getValue();
@@ -2121,22 +2135,46 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             }
             try {
                 JSONObject jo = new JSONObject(new String(baw.m_byteArray, StandardCharsets.UTF_8));
-                boolean isTruncationRequest = isTruncationRequest(jo);
-                if (isTruncationRequest(jo)) {
-                    discerner = "truncationSnapshot";
-                } else if (jo.optBoolean("isAuto",false)) {
-                    discerner = "autoSnapshot";
+                if (jo.optBoolean("isTruncation", false)) {
+                    discerners.put(requestId, jo);
                 } else {
-                    discerner = jo.getString("nonce") + ":" + jo.getString("path");
+                    discerners.put(e.getKey(), jo);
                 }
-
             } catch (JSONException exc) {
                 VoltDB.crashLocalVoltDB("zk snapshot request has malformed json", true, exc);
             }
         }
+        if (!discerners.containsKey(requestId)) {
+            discerners.put(requestId, discerners.remove(map.lastKey()));
+        }
+        if (discerners.size() > 1) {
+            JSONObject hardLinks = new JSONObject();
+            try {
+                for (Map.Entry<Integer, JSONObject> e: discerners.entrySet()) {
+                    if (e.getKey() != requestId) {
+                        JSONObject hardLink = new JSONObject();
+                        hardLink.put("nonce", e.getValue().get("nonce"));
+                        hardLink.put("path", e.getValue().get("path"));
+                        hardLinks.put(SNAPSHOT_TYPE.FILE.requestId(e.getKey()), hardLink);
+                    }
+                }
+                discerners.get(requestId).put("hardLinks", hardLinks);
+            } catch (JSONException exc) {
+                VoltDB.crashLocalVoltDB("snapshot request missing required nonce or path", true, exc);
+            }
+        }
+        byte [] request = new byte[0];
+        try {
+            request = discerners.get(requestId).toString(4).getBytes(StandardCharsets.UTF_8);
+        } catch (JSONException exc) {
+            VoltDB.crashLocalVoltDB("unable to coalesce snapshot request", true, exc);
+        }
 
+        return request;
+    }
 
-        return null;
+    private String queueRequestNode(SnapshotInitiationInfo snapInfo) {
+
     }
 
     /**

@@ -253,6 +253,7 @@ public class SnapshotInitiationInfo
         jsObj.put("block", m_blocking);
         jsObj.put("format", m_format.toString());
         jsObj.putOpt("data", m_data);
+        if (m_truncationRequest) jsObj.put("isTruncation", true);
         return jsObj;
     }
 }
