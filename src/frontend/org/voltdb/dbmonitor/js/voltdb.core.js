@@ -153,7 +153,7 @@
                         callback({ "status": -1, "statusstring": "Error: Please specify parameters", "results": [] });
                     }
 
-                    uri = 'http://' + this.server + ':' + this.port + '/' + shortApiCallDetails.apiPath + '/';
+                    uri = 'http://' + this.server + ':' + this.port + '/' + shortApiCallDetails.apiPath + '/?admin=true&jsonp=?';
                     
                     if (VoltDBCore.isServerConnected) {
                         var ah = null;
