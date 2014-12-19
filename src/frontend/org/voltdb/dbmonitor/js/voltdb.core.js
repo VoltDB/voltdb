@@ -121,6 +121,7 @@
                     if (shortApiCallDetails.apiPath == null || shortApiCallDetails.apiPath == "") {
                         callback({ "status": -1, "statusstring": "Error: Please specify apiPath.", "results": [] });
                     }
+
                     uri = 'http://' + this.server + ':' + this.port + '/' + shortApiCallDetails.apiPath + '/';
                 } else {
                     uri = 'http://' + this.server + ':' + this.port + '/api/1.0/';
@@ -147,13 +148,13 @@
                     if (shortApiCallDetails.apiPath == null || shortApiCallDetails.apiPath == "") {
                         callback({ "status": -1, "statusstring": "Error: Please specify apiPath.", "results": [] });
                     }
-                    uri = 'http://' + this.server + ':' + this.port + '/' + shortApiCallDetails.apiPath + '/';
-                } else {
-                    uri = 'http://' + this.server + ':' + this.port + '/api/1.0/';
-                }
+                    
+                    if (shortApiCallDetails.updatedData == null) {
+                        callback({ "status": -1, "statusstring": "Error: Please specify parameters", "results": [] });
+                    }
 
-                var params = this.BuildParamSet(procedure, parameters, shortApiCallDetails);
-                if (typeof (params) == 'string') {
+                    uri = 'http://' + this.server + ':' + this.port + '/' + shortApiCallDetails.apiPath + '/';
+                    
                     if (VoltDBCore.isServerConnected) {
                         var ah = null;
                         if (this.authorization != null) {
@@ -161,10 +162,25 @@
                         } else {
                             VoltDBService.BuildAuthorization(this.user, this.isHashedPassword, this.password);
                         }
-                        jQuery.postJSON(uri, params, callback, ah);
+                        jQuery.postJSON(uri, shortApiCallDetails.updatedData, callback, ah);
                     }
-                } else if (callback != null)
-                    callback({ "status": -1, "statusstring": "PrepareStatement error: " + params[0], "results": [] });
+                } else {
+                    uri = 'http://' + this.server + ':' + this.port + '/api/1.0/';
+
+                    var params = this.BuildParamSet(procedure, parameters, shortApiCallDetails);
+                    if (typeof(params) == 'string') {
+                        if (VoltDBCore.isServerConnected) {
+                            var ah = null;
+                            if (this.authorization != null) {
+                                ah = this.authorization;
+                            } else {
+                                VoltDBService.BuildAuthorization(this.user, this.isHashedPassword, this.password);
+                            }
+                            jQuery.postJSON(uri, params, callback, ah);
+                        }
+                    } else if (callback != null)
+                        callback({ "status": -1, "statusstring": "PrepareStatement error: " + params[0], "results": [] });
+                }
             };
 
             var callbackWrapper = function (userCallback) {
@@ -182,7 +198,7 @@
                 return this;
             };
 
-            this.BeginExecute = function (procedure, parameters, callback, shortApiCallDetails) {
+            this.BeginExecute = function(procedure, parameters, callback, shortApiCallDetails) {
                 this.CallExecute(procedure, parameters, (new callbackWrapper(callback)).Callback, shortApiCallDetails);
             };
 
@@ -212,9 +228,11 @@
                         stack.splice(0, 1);
                     if (stack.length > 0 && (success || continueOnFailure)) {
                         var item = stack[0];
-                        Connection.CallExecute(item[0], item[1], (new callbackWrapper(
-                            (function (queue, item) {
-                                return function (response, headerInfo) {
+                        var shortApiCallDetails = item[3];
+                        var callback =
+                        (new callbackWrapper(
+                            (function(queue, item) {
+                                return function(response, headerInfo) {
                                     try {
 
                                         if (VoltDBCore.hostIP == "") {
@@ -227,12 +245,18 @@
                                             item[2](response);
 
                                         queue.EndExecute();
-                                    } catch (x) {
+                                    } catch(x) {
                                         success = false;
                                         queue.EndExecute();
                                     }
                                 };
-                            })(this, item))).Callback, item[3]);
+                            })(this, item))).Callback;
+
+                        if (shortApiCallDetails != null && shortApiCallDetails.isShortApiCall && shortApiCallDetails.isUpdateConfiguration)
+                            Connection.CallExecuteUpdate(item[0], item[1], callback, item[3]);
+                        else
+                            Connection.CallExecute(item[0], item[1], callback, item[3]);
+                        
                     } else {
                         executing = false;
                         if (onCompleteHandler != null) {

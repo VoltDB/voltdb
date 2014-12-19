@@ -323,7 +323,7 @@ var loadPage = function (serverName, portid) {
     };
     
     //Load Admin configurations
-    voltDbRenderer.GetAdminDeploymentInformation(true, function (adminConfigValues) {
+    voltDbRenderer.GetAdminDeploymentInformation(true, function (adminConfigValues, rawConfigValues) {
         securityChecks.securityChecked = true;
 
         //Show admin page if security is turned off.
@@ -509,8 +509,8 @@ var loadPage = function (serverName, portid) {
         voltDbRenderer.GetSystemInformation(loadClusterHealth, loadAdminTabPortAndOverviewDetails, loadAdminServerList);
 
         //Load Admin configurations
-        voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues) {
-            VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues);
+        voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues, rawConfigValues) {
+            VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues, rawConfigValues);
         });
     };
 

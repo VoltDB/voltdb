@@ -325,7 +325,11 @@ function alertNodeClicked(obj) {
         this.GetAdminDeploymentInformation = function (checkSecurity, onInformationLoaded) {
             if (VoltDbAdminConfig.isAdmin || checkSecurity) {
                 VoltDBService.GetShortApiDeployment(function (connection) {
-                    onInformationLoaded(loadAdminDeploymentInformation(connection));
+                    var rawData;
+                    if (connection != null)
+                        rawData = connection.Metadata['SHORTAPI_DEPLOYMENT'];
+                    
+                    onInformationLoaded(loadAdminDeploymentInformation(connection), rawData);
                 });
             }
         };
@@ -1921,6 +1925,12 @@ function alertNodeClicked(obj) {
 
         this.getAdminconfiguration = function (onInformationLoaded) {
             VoltDBService.GetSystemInformationDeployment(function (connection) {
+                onInformationLoaded(connection);
+            });
+        };
+        
+        this.updateAdminConfiguration = function (updatedData, onInformationLoaded) {
+            VoltDBService.UpdateAdminConfiguration(updatedData, function (connection) {
                 onInformationLoaded(connection);
             });
         };

@@ -444,6 +444,16 @@ function loadAdminPage() {
 
                 adminEditObjects.tBoxHeartbeatTimeoutValue = adminEditObjects.tBoxHeartbeatTimeout.val();
                 adminEditObjects.spanHeartbeatTimeOut.html(adminEditObjects.tBoxHeartbeatTimeoutValue);
+                
+                var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();
+                if (!adminConfigurations.hasOwnProperty("heartbeat")) {
+                    adminConfigurations.heartbeat = {};
+                }
+                
+                adminConfigurations.heartbeat.timeout = adminEditObjects.tBoxHeartbeatTimeoutValue;
+                voltDbRenderer.updateAdminConfiguration(adminConfigurations, function () {
+                    alert("Heartbeat update response received");
+                });
 
                 //Close the popup
                 $($(this).siblings()[0]).trigger("click");
@@ -560,6 +570,8 @@ function loadAdminPage() {
 
 (function (window) {
     var iVoltDbAdminConfig = (function () {
+
+        var currentRawAdminConfigurations;
         this.isAdmin = false;
         this.registeredElements = [];
         this.idleServers = [];
@@ -577,11 +589,16 @@ function loadAdminPage() {
             this.runningServerState = serverStateValue;
         };
 
-        this.displayAdminConfiguration = function (adminConfigValues) {
+        this.displayAdminConfiguration = function (adminConfigValues, rawConfigValues) {
             if (adminConfigValues != undefined && VoltDbAdminConfig.isAdmin) {
                 configureAdminValues(adminConfigValues);
                 configureDirectoryValues(adminConfigValues);
+                currentRawAdminConfigurations = rawConfigValues;
             }
+        };
+
+        this.getLatestRawAdminConfigurations = function () {
+            return currentRawAdminConfigurations;
         };
 
         this.displayPortAndOverviewDetails = function (portAndOverviewValues) {
