@@ -1880,13 +1880,15 @@ function alertNodeClicked(obj) {
 
                 $.each(VoltDbAdminConfig.runningServers, function (id, value) {
                     if (voltDbRenderer.currentHost != value.runningServerName) {
-                        if (runningServerCounter == VoltDbAdminConfig.runningServers.length - 1)
+                        if (runningServerCounter == 0)
                             VoltDbAdminConfig.runningServerIds = VoltDbAdminConfig.runningServerIds.concat("#stopServer_", value.runningServerName);
                         else {
-                            VoltDbAdminConfig.runningServerIds = VoltDbAdminConfig.runningServerIds.concat("#stopServer_", value.runningServerName, ",");
+                            VoltDbAdminConfig.runningServerIds = VoltDbAdminConfig.runningServerIds.concat(",","#stopServer_", value.runningServerName);
                         }
+                        runningServerCounter++;
+
                     }
-                    runningServerCounter++;
+                    
                 });
 
                 //$($(this)[0].ele).attr("href", "javascript:void()");
