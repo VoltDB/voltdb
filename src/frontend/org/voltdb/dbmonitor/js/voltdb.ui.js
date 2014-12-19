@@ -471,16 +471,20 @@ var loadPage = function (serverName, portid) {
                     $("#StopConfirmOK").on("click", function () {
                         //API Request                                
                         voltDbRenderer.stopServer(hostId, function (success) {
-                            if (success) {
-                                //VoltDbAdminConfig.registeredElements.splice(VoltDbAdminConfig.registeredElements.indexOf('stopServer_' + val), 1);
+                            if (success) {                               
                                 $("#stopServer_" + hostName).addClass('disableServer');
+                                $("#stopServer_" + hostName + " span").addClass('shutdownServer');
+                                $("#stopServer_" + hostName + " span").addClass('stopDisable');
+                                
+                                
                                 idleServerDetails = new VoltDbAdminConfig.idleServer(hostId, hostName, "MISSING");
                                 VoltDbAdminConfig.idleServers.push(idleServerDetails);
 
                                 if (VoltDbAdminConfig.runningServers.length > 0) {
                                     $.each(VoltDbAdminConfig.runningServers, function (runningServerId, runningServer) {
                                         console.log("runnnig server:" + runningServer);
-                                        //sometimes updates on running server data occurs concurrently can cause running server to be undefined
+
+                                        //error: updates on runningServer list  occurs concurrently and can cause "runningserver" in a loop to be undefined
                                         if (runningServer != undefined) {  
                                             if (runningServer.runningServerName == hostName)
                                                 VoltDbAdminConfig.runningServers.splice(runningServerId, 1);

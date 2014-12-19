@@ -858,6 +858,7 @@ ul.adminClusterList li a:hover{color:#000;}
 #serverConfigAdmin{ position:absolute;right:20px; top:49px; z-index:99; width:500px;}
 .txt-bold{font-weight:bold;}
 
+
 .btn-gray { background-color:#999; cursor:pointer; padding:8px 10px; text-align:center; color:#fff; font:14px Arial, Helvetica, sans-serif; text-shadow:none; text-decoration:none; border-radius:0; border:none;} 
 input.exitableTxtBx{width:35px; /*position:relative; top:6px;*/ padding:2px 3px;}
 .tblSave { border:none}
@@ -874,7 +875,13 @@ input.exitableTxtBx{width:35px; /*position:relative; top:6px;*/ padding:2px 3px;
 .tblRestore th { padding:10px; font-weight:bold;}
 .tblRestore tr td { padding:10px 5px;border:none;}
 
+/*a.serverHighlight {color:#76bd1d;}*/
+.stopDisable { color: #aaaaaa!important;}
 .tblshutdown tr {border:1px solid #CCCCCC;}
+.tblshutdown tr:hover, .tblshutdown tr.activeHost { background: #F0F3F4}
+.tblshutdown tr.activeHost td a { color:#76bd1d;}
+
+
 .tblshutdown tr td  { border:none;}
 .tblshutdown tr td a.shutdown { display:inline-block;background-position:-740px -105px; width:40px; height:36px;line-height:39px; }
 .tblshutdown tr td a.disableServer { display:inline-block;background-position:-933px -150px; width:40px; height:36px;line-height:39px; }
@@ -1043,6 +1050,7 @@ ul.adminClusterList li { margin:0; padding-top:15px; float:left; width:67px; hei
 .restoreCont {overflow:auto; height:146px}
 .restoreInfo .overlay-content {  height:auto;}		
 	 }
+
 	 
  @media (min-width: 480px) and (max-width: 700px) {
 		 .adminRight{ padding-top:15px;}
