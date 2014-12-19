@@ -646,13 +646,16 @@ public abstract class CatalogUtil {
 
     public static void populateDefaultDeployment(DeploymentType deployment) {
             //partition detection
-            if (deployment.getPartitionDetection() == null) {
-                PartitionDetectionType pd = new PartitionDetectionType();
+            PartitionDetectionType pd = deployment.getPartitionDetection();
+            if (pd == null) {
+                pd = new PartitionDetectionType();
                 pd.setEnabled(true);
+                deployment.setPartitionDetection(pd);
+            }
+            if (pd.getSnapshot() == null) {
                 PartitionDetectionType.Snapshot sshot = new PartitionDetectionType.Snapshot();
                 sshot.setPrefix("partition_detection");
                 pd.setSnapshot(sshot);
-                deployment.setPartitionDetection(pd);
             }
             //admin mode
             if (deployment.getAdminMode() == null) {
@@ -1018,7 +1021,8 @@ public abstract class CatalogUtil {
                 }
             }
         }
-
+        //Set class back in deployment for display
+        exportType.setExportconnectorclass(exportClientClassName);
         if (!adminstate) {
             hostLog.info("Export configuration is present and is " +
                "configured to be disabled. Export will be disabled.");
@@ -1367,25 +1371,6 @@ public abstract class CatalogUtil {
         byte[] hash = md.digest();
         assert(hash.length == 20); // sha-1 length
         return hash;
-    }
-
-    /**
-     * This code appeared repeatedly.  Extract method to take bytes for the catalog
-     * or deployment file, do the irritating exception crash test, jam the bytes in,
-     * and get the SHA-1 hash.
-     */
-    public static Pair<byte[],byte[]> getDefaultPopulatedDeploymentAndHash(byte[] inbytes)
-    {
-        MessageDigest md = null;
-        try {
-            md = MessageDigest.getInstance("SHA-1");
-        } catch (NoSuchAlgorithmException e) {
-            VoltDB.crashLocalVoltDB("Bad JVM has no SHA-1 hash.", true, e);
-        }
-        md.update(inbytes);
-        byte[] hash = md.digest();
-        assert(hash.length == 20); // sha-1 length
-        return new Pair(hash, inbytes);
     }
 
     private static ByteBuffer makeCatalogVersionAndBytes(
