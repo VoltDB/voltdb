@@ -448,8 +448,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         }
 
         public void initiateNewSnapshot(SNAPSHOT_TYPE type, boolean satisfiesAllNodes, List<Integer> satisfyingNodes) {
-            if (satisfiesAllNodes) {
-                m_pendingSnapshotsQueue.remove(type);
+            m_pendingSnapshotsQueue.remove(type);
+            if (!satisfiesAllNodes) {
+                // re-queue at the tail
+                m_pendingSnapshotsQueue.add(type);
             }
             m_activeSnapshot = type;
             ByteBuffer nodeList = ByteBuffer.allocate(satisfyingNodes.size()*4);

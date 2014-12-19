@@ -66,7 +66,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
     public static volatile boolean m_simulateFullDiskWritingHeader = false;
     public static volatile boolean m_simulateFullDiskWritingChunk = false;
 
-    private final File m_file;
+    protected final File m_file;
     private final FileChannel m_channel;
     private final FileOutputStream m_fos;
     private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");

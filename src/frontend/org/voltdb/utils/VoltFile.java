@@ -16,14 +16,15 @@
  */
 package org.voltdb.utils;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
-
-import java.io.File;
-import java.io.IOException;
-import java.io.*;
-import java.nio.*;
-import java.nio.channels.*;
 
 /*
  * Extend the File class and override its constructors to allow a property to be specified
@@ -221,7 +222,7 @@ public class VoltFile extends File {
      * Given the requested pathname, come up with the altered one based on the value
      * of m_voltFilePrefix
      */
-    private static String getFixedPathname(final String pathname) {
+    public static String getFixedPathname(final String pathname) {
         if (pathname == null) {
             return pathname;
         }
