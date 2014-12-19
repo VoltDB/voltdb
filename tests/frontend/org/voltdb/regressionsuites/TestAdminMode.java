@@ -192,7 +192,7 @@ public class TestAdminMode extends RegressionSuite
     }
 
     // Somewhat hacky test of the LIVECLIENTS @Statistics selector
-    public void notestBacklogAndPolling() throws Exception
+    public void testBacklogAndPolling() throws Exception
     {
         if (isValgrind()) {
             // no reasonable way to get the timing right in valgrind
@@ -326,9 +326,11 @@ public class TestAdminMode extends RegressionSuite
      * LocalSingleProcessServer is verboten, but it needs to be used here because
      * LocalCluster doesn't yet do the right admin mode thing yet.
      */
-    static class ForcedInProcessServer extends LocalCluster {
-        public ForcedInProcessServer(String jarFileName, int siteCount) {
-            super(jarFileName, siteCount, 1, 0, BackendTarget.NATIVE_EE_JNI);
+    @SuppressWarnings("deprecation")
+    static class ForcedLocalSingleProcessServer extends LocalSingleProcessServer {
+        public ForcedLocalSingleProcessServer(String jarFileName,
+                int siteCount, BackendTarget target) {
+            super(jarFileName, siteCount, target);
         }
 
         @Override
@@ -337,6 +339,7 @@ public class TestAdminMode extends RegressionSuite
         }
     }
 
+    @SuppressWarnings("deprecation")
     static public Test suite() throws IOException {
         // Set system property for 4sec CLIENT_HANGUP_TIMEOUT
         System.setProperty("CLIENT_HANGUP_TIMEOUT", "4000");
@@ -347,7 +350,8 @@ public class TestAdminMode extends RegressionSuite
         // build up a project builder for the workload
         VoltProjectBuilder project = getBuilderForTest();
         boolean success;
-        LocalCluster config = new ForcedInProcessServer("admin-mode1.jar", 2);
+        ForcedLocalSingleProcessServer config =
+                new ForcedLocalSingleProcessServer("admin-mode1.jar", 2, BackendTarget.NATIVE_EE_JNI);
 
         // Start in admin mode
         success = config.compileWithAdminMode(project, 32323, true);
