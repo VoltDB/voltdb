@@ -148,13 +148,13 @@
                     if (shortApiCallDetails.apiPath == null || shortApiCallDetails.apiPath == "") {
                         callback({ "status": -1, "statusstring": "Error: Please specify apiPath.", "results": [] });
                     }
-                    
+
                     if (shortApiCallDetails.updatedData == null) {
                         callback({ "status": -1, "statusstring": "Error: Please specify parameters", "results": [] });
                     }
 
                     uri = 'http://' + this.server + ':' + this.port + '/' + shortApiCallDetails.apiPath + '/?admin=true';
-                    
+
                     if (VoltDBCore.isServerConnected) {
                         var ah = null;
                         if (this.authorization != null) {
@@ -256,7 +256,7 @@
                             Connection.CallExecuteUpdate(item[0], item[1], callback, item[3]);
                         else
                             Connection.CallExecute(item[0], item[1], callback, item[3]);
-                        
+
                     } else {
                         executing = false;
                         if (onCompleteHandler != null) {
@@ -549,7 +549,6 @@
 
 jQuery.extend({
     postJSON: function (url, formData, callback, authorization) {
-
         if (VoltDBCore.hostIP == "") {
 
             jQuery.ajax({

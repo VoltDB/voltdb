@@ -57,6 +57,7 @@ import org.json_voltpatches.JSONObject;
 import org.eclipse.jetty.server.bio.SocketConnector;
 import org.voltdb.AuthenticationResult;
 import org.voltdb.ClientResponseImpl;
+import static org.voltdb.HTTPClientInterface.PARAM_ADMIN;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
@@ -108,7 +109,12 @@ public class HTTPAdminListener {
         }
 
         public AuthenticationResult authenticate(Request request) {
-            return httpClientInterface.authenticate(request);
+            String admin = request.getParameter(PARAM_ADMIN);
+
+            if (request.getMethod().equalsIgnoreCase("POST")) {
+                admin = "false";
+            }
+            return httpClientInterface.authenticate(request, admin);
         }
 
         @Override
@@ -382,7 +388,6 @@ public class HTTPAdminListener {
             try {
                 response.setContentType("application/json;charset=utf-8");
                 response.setStatus(HttpServletResponse.SC_OK);
-
                 //Requests require authentication.
                 AuthenticationResult authResult = authenticate(baseRequest);
                 if (!authResult.isAuthenticated()) {
@@ -444,7 +449,7 @@ public class HTTPAdminListener {
                 //New users if valid will get updated.
                 //For Scrambled passowrd this will work also but new passwords will be unscrambled
                 //TODO: add switch to post to scramble??
-                if (newDeployment.getSecurity().isEnabled()) {
+                if (newDeployment.getSecurity() != null && newDeployment.getSecurity().isEnabled()) {
                     DeploymentType currentDeployment = this.getDeployment();
                     List<User> users = currentDeployment.getUsers().getUser();
                     for (UsersType.User user : newDeployment.getUsers().getUser()) {

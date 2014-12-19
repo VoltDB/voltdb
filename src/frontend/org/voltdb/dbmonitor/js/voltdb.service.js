@@ -420,7 +420,7 @@
             }
 
         };
-        
+
         this.GetShortApiProfile = function (onConnectionAdded) {
             try {
                 var processName = "SHORTAPI_PROFILE";
@@ -454,7 +454,7 @@
             }
 
         };
-        
+
         this.GetShortApiDeployment = function (onConnectionAdded) {
             try {
                 var processName = "SHORTAPI_DEPLOYMENT";
@@ -488,7 +488,7 @@
             }
 
         };
-        
+
         //Update admin configuration
         this.UpdateAdminConfiguration = function (updatedData, onConnectionAdded) {
             try {
@@ -500,7 +500,7 @@
                     isShortApiCall: true,
                     isUpdateConfiguration: true,
                     apiPath: 'deployment',
-                    updatedData: updatedData
+                    updatedData: 'deployment=' + JSON.stringify(updatedData)
                 };
 
                 _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
@@ -555,7 +555,7 @@
                         break;
 
                 }
-                
+
                 _connection = VoltDBCore.HasConnection(server, port, isAdmin, user, processName);
                 if (_connection == null) {
                     VoltDBCore.TestConnection(server, port, isAdmin, user, password, isHashedPassword, processName, function (result) {
@@ -587,7 +587,7 @@
                 var procedureNames = ['@StopNode'];
                 var parameters = [nodeId.toString()];
                 var values=[undefined];
-               
+
                 _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
                 if (_connection == null) {
                     VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
@@ -598,8 +598,8 @@
                                 if (!(status == "" || status == undefined)) {
                                     onConnectionAdded(connection, status);
                                 }
-                            
-                                
+
+
                             });
                         }
 

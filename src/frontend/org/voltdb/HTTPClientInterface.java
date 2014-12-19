@@ -135,7 +135,8 @@ public class HTTPClientInterface {
                 return;
             }
 
-            authResult = getAuthenticationResult(request);
+            String admin = request.getParameter(PARAM_ADMIN);
+            authResult = getAuthenticationResult(request, admin);
             if (!authResult.isAuthenticated()) {
                 String msg = authResult.m_message;
                 m_rate_limited_log.log("JSON interface exception: " + msg, EstTime.currentTimeMillis());
@@ -216,7 +217,7 @@ public class HTTPClientInterface {
         }
     }
 
-    public AuthenticationResult getAuthenticationResult(Request request) {
+    public AuthenticationResult getAuthenticationResult(Request request, String admin) {
         boolean adminMode = false;
 
         String username = null;
@@ -251,7 +252,6 @@ public class HTTPClientInterface {
             hashedPassword = request.getParameter(PARAM_HASHEDPASSWORD);
             password = request.getParameter(PARAM_PASSWORD);
         }
-        String admin = request.getParameter(PARAM_ADMIN);
 
         // first check for a catalog update and purge the cached connections
         // if one has happened since we were here last
@@ -335,11 +335,11 @@ public class HTTPClientInterface {
         }
     }
 
-    public AuthenticationResult authenticate(Request request) {
+    public AuthenticationResult authenticate(Request request, String admin) {
         AuthenticationResult authResult = null;
 
         try {
-            authResult = getAuthenticationResult(request);
+            authResult = getAuthenticationResult(request, admin);
             if (!authResult.isAuthenticated()) {
                 m_rate_limited_log.log("JSON interface exception: " + authResult.m_message, EstTime.currentTimeMillis());
             }
