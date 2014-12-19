@@ -576,7 +576,7 @@ jQuery.extend({
                 type: 'POST',
                 url: url,
                 data: formData,
-                dataType: 'jsonp',
+                dataType: 'json',
                 beforeSend: function (request) {
                     if (authorization != null) {
                         request.setRequestHeader("Authorization", authorization);
