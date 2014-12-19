@@ -25,6 +25,7 @@ package vmcTest.pages
 
 import geb.navigator.Navigator
 import geb.waiting.WaitTimeoutException
+import org.openqa.selenium.support.ui.Select
 
 /**
  * This class represents the 'SQL Query' tab of the VoltDB Management Center
@@ -52,6 +53,9 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         queryInput  { $('#theQueryText') }
         runButton   { $('#runBTn') }
         clearButton { $('#clearQuery') }
+        qrFormatDropDown    { $('#exportType') }
+        qrfddOptions    { qrFormatDropDown.find('option') }
+        qrfddSelected   { qrFormatDropDown.find('option', selected: "selected") }
         queryResHtml { $('#resultHtml') }
         queryTables  (required: false) { queryResHtml.find('table') }
         queryErrHtml (required: false) { queryResHtml.find('span') }
@@ -371,6 +375,45 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
     def runQuery(String queryText) {
         setQueryText(queryText)
         runQuery()
+    }
+
+    /**
+     * Returns a list of (the text of) the options available on query result
+     * format drop-down menu. (Typically, these are "HTML", "CSV" and
+     * "Monospace".)
+     */
+    def List<String> getQueryResultFormatOptions() {
+        List<String> options = []
+        qrfddOptions.each { options.add(it.text()) }
+        return options
+    }
+    
+    /**
+     * Returns a list of the values of the options available on query result
+     * format drop-down menu. (Typically, these are the same as the text
+     * values, i.e., normally "HTML", "CSV" and "Monospace".)
+     */
+    def List<String> getQueryResultFormatOptionValues() {
+        List<String> values = []
+        qrfddOptions.each { values.add(it.value()) }
+        return values
+    }
+
+    /**
+     * Returns the value of the currently selected option of the query result
+     * format drop-down menu. (Typically, "HTML", "CSV" or "Monospace".)
+     */
+    def String getSelectedQueryResultFormat() {
+        return qrFormatDropDown.value()
+    }
+
+    /**
+     * Sets the query result format drop-down menu to the specified value.
+     * @param format - the value to which the menu should be set (typically
+     * "HTML", "CSV" or "Monospace").
+     */
+    def selectQueryResultFormat(String format) {
+        qrFormatDropDown.value(format)
     }
 
     /**
