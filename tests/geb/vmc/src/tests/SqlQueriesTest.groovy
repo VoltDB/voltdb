@@ -35,8 +35,8 @@ import vmcTest.pages.*
  */
 class SqlQueriesTest extends TestBase {
 
-    static final boolean INSERT_JSON_VALUES = false
-    static final int NUM_ROWS_TO_INSERT = 4
+    static final int DEFAULT_NUM_ROWS_TO_INSERT = 2
+    static final boolean DEFAULT_INSERT_JSON = false
 
     static final String SQL_QUERY_FILE = 'src/resources/sqlQueries.txt';
     static final String TABLES_FILE = 'src/resources/expectedTables.txt';
@@ -86,6 +86,7 @@ class SqlQueriesTest extends TestBase {
     }
 
     def setup() { // called before each test
+
         setup: 'Open VMC page'
         to VoltDBManagementCenterPage
         expect: 'to be on VMC page'
@@ -95,6 +96,21 @@ class SqlQueriesTest extends TestBase {
         page.openSqlQueryPage()
         then: 'should be on SQL Query page'
         at SqlQueryPage
+/*
+        setup: 'check if we are on SQL Query page'
+        if (!browser.isAt(SqlQueryPage.class)) {
+
+            when: 'Open VMC page'
+            to VoltDBManagementCenterPage
+            then: 'should be on VMC page'
+            at VoltDBManagementCenterPage
+    
+            when: 'click the SQL Query link (if needed)'
+            page.openSqlQueryPage()
+        }
+        expect: 'should be on SQL Query page'
+        at SqlQueryPage
+*/
     }
 
     /**
@@ -134,17 +150,28 @@ class SqlQueriesTest extends TestBase {
      * @param query - the query to be run.
      * @return the query result (as a Map of Lists of Strings).
      */
-    static Map<String,List<String>> runQuery(SqlQueryPage sqp, String query) {
+    def Map<String,List<String>> runQuery(SqlQueryPage sqp, String query) {
         sqp.runQuery(query)
         def qResult = sqp.getQueryResult()
 
-        debugPrint "\nQuery:\n  " + query
-        debugPrint "Result:\n  " + qResult
+        // If 'sleepSeconds' property is set and greater than zero, sleep
+        int sleepSeconds = getIntSystemProperty("sleepSeconds", 0)
+        if (sleepSeconds > 0) {
+            try {
+                Thread.sleep(1000 * sleepSeconds)
+            } catch (InterruptedException e) {
+                println "\nIn SqlQueriesTest.runQuery, caught:\n  " + e.toString() + "\nSee standard error for stack trace."
+                e.printStackTrace()
+            }
+        }
+
+        debugPrint "\nQuery : " + query
+        debugPrint "Result: " + qResult
+        debugPrint "Duration: " + sqp.getQueryDuration()
         def error = sqp.getQueryError()
         if (error != null) {
-            debugPrint "Error: " + error
+            debugPrint "Error : " + error
         }
-        debugPrint "Duration: " + sqp.getQueryDuration()
 
         return qResult
     }
@@ -160,7 +187,7 @@ class SqlQueriesTest extends TestBase {
      * @param tableOrView - this should be "Table" or "View" - whichever is
      * contained in the list.
      */
-    static def queryFrom(SqlQueryPage sqp, List<String> tables, String tableOrView) {
+    def queryFrom(SqlQueryPage sqp, List<String> tables, String tableOrView) {
         tables.each {
             def columnNames = sqp.getTableColumnNames(it)
             def columnTypes = sqp.getTableColumnTypes(it)
@@ -184,7 +211,7 @@ class SqlQueriesTest extends TestBase {
      * @param sqp - the SqlQueryPage on which to run the query.
      * @param tables - the list of tables or views to be queried.
      */
-    static List<Integer> queryCount(SqlQueryPage sqp, List<String> tables) {
+    def List<Integer> queryCount(SqlQueryPage sqp, List<String> tables) {
         def cqResults = []
         tables.each {
             def result = runQuery(sqp, 'select count(*) as numrows from ' + it)
@@ -201,7 +228,7 @@ class SqlQueriesTest extends TestBase {
      * @param sqp - the SqlQueryPage on which to run the query.
      * @param tables - the list of tables (or views) to be queried.
      */
-    static def deleteFrom(SqlQueryPage sqp, List<String> tables) {
+    def deleteFrom(SqlQueryPage sqp, List<String> tables) {
         tables.each {
             runQuery(sqp, 'delete from ' + it)
         }
@@ -209,27 +236,33 @@ class SqlQueriesTest extends TestBase {
 
     /**
      * Runs, on the specified SqlQueryPage, and for each specified table (or
-     * view), the specified number of 'insert into ...' queries. (Also, if
-     * DEBUG is true, prints everything that runQuery prints, namely: the
-     * query, the result, an error message, if any, and the query duration.)
+     * view), the specified number of 'insert into ...' or 'upsert into ...'
+     * queries. (Also, if debugPrint is true, prints everything that runQuery
+     * prints, namely: the query, the result, an error message, if any, and
+     * the query duration.)
      * @param sqp - the SqlQueryPage on which to run the query.
      * @param tables - the list of tables (or views) to be queried.
+     * @param numToInsert - the number of rows to be inserted (or upserted).
+     * @param minIntValue - the minimum int value to be inserted (or upserted).
+     * @param insertOrUpsert - must be either 'insert' or 'upsert'.
      */
-    static def insertInto(SqlQueryPage sqp, List<String> tables, int numToInsert) {
+    def insertOrUpsertInto(SqlQueryPage sqp, List<String> tables, int numToInsert,
+                           int minIntValue, String insertOrUpsert) {
+        def insertJson = getBooleanSystemProperty('insertJson', DEFAULT_INSERT_JSON)
         tables.each {
             def columns = sqp.getTableColumns(it)
             def count = 0
             for (int i = 1; i <= numToInsert; i++) {
-                String query = "insert into " + it + " values ("
+                String query = insertOrUpsert + " into " + it + " values ("
                 for (int j = 0; j < columns.size(); j++) {
                     if (columns.get(j).contains('varchar')) {
-                        if (INSERT_JSON_VALUES) {
-                            query += (j > 0 ? ", " : "") + "'{\"id\":\"a" + i + "\"}'"
+                        if (insertJson) {
+                            query += (j > 0 ? ", " : "") + "'{\"id\":\"z" + i + "\"}'"
                         } else {
-                            query += (j > 0 ? ", " : "") + "'a" + i + "'"
+                            query += (j > 0 ? ", " : "") + "'z" + i + "'"
                         }
                     } else {
-                        query += (j > 0 ? ", " : "") + i
+                        query += (j > 0 ? ", " : "") + (minIntValue + i)
                     }
                 }
                 query += ")"
@@ -239,53 +272,164 @@ class SqlQueriesTest extends TestBase {
     }
 
     /**
-     * Runs delete from, insert into, query from, count query, and (again)
-     * delete from queries, for every Table listed on the SQL Query page of
-     * the VMC; and, when appropriate, for every View.<p>
-     * Note: unlike the '#testName' tests, this will run against any VoltDB
+     * Runs, on the specified SqlQueryPage, and for each specified table (or
+     * view), the specified number of 'insert into ...' queries. (Also, if
+     * debugPrint is true, prints everything that runQuery prints, namely: the
+     * query, the result, an error message, if any, and the query duration.)
+     * @param sqp - the SqlQueryPage on which to run the query.
+     * @param tables - the list of tables (or views) to be queried.
+     * @param numToInsert - the number of rows to be inserted.
+     * @param minIntValue - the minimum int value to be inserted.
+     */
+    def insertInto(SqlQueryPage sqp, List<String> tables, int numToInsert, int minIntValue) {
+        insertOrUpsertInto(sqp, tables, numToInsert, minIntValue, 'insert')
+    }
+
+    /**
+     * Runs, on the specified SqlQueryPage, and for each specified table (or
+     * view), the specified number of 'upsert into ...' queries. (Also, if
+     * debugPrint is true, prints everything that runQuery prints, namely: the
+     * query, the result, an error message, if any, and the query duration.)
+     * @param sqp - the SqlQueryPage on which to run the query.
+     * @param tables - the list of tables (or views) to be queried.
+     * @param numToInsert - the number of rows to be upserted.
+     * @param minIntValue - the minimum int value to be upserted.
+     */
+    def upsertInto(SqlQueryPage sqp, List<String> tables, int numToInsert, int minIntValue) {
+        insertOrUpsertInto(sqp, tables, numToInsert, minIntValue, 'upsert')
+    }
+    
+    /**
+     * Tests the query result format options (which normally are "HTML", "CSV"
+     * and "Monospace").
+     */
+    def queryResultFormat() {
+        when: 'get the query result format options (text)'
+        def options = page.getQueryResultFormatOptions()
+        debugPrint "\nQuery result format options (text): " + options
+
+        and: 'get the query result format options values'
+        def values = page.getQueryResultFormatOptionValues()
+        debugPrint "Query result format option values: " + values
+
+        and: 'get the initially selected query result format'
+        def format = page.getSelectedQueryResultFormat()
+        debugPrint "Initially selected query result format: " + format
+
+        then: 'the query result format options (text) should match the values'
+        options == values
+
+        and: 'the query result format options should match the expected list'
+        options == ['HTML', 'CSV', 'Monospace']
+
+        and: 'the HTML format option should be selected initially'
+        format == 'HTML'
+
+        options.each {
+            when: 'select one of the query result format to the options'
+            page.selectQueryResultFormat(it)
+            format = page.getSelectedQueryResultFormat()
+            debugPrint "Currently selected query result format: " + format
+
+            then: 'the query result format should be set to the selected option'
+            format == it
+        }
+
+        cleanup: 'reset the query result format to the default option'
+        page.selectQueryResultFormat('HTML')
+        format = page.getSelectedQueryResultFormat()
+        debugPrint "Final     selected query result format: " + format
+        assert format == 'HTML'
+    }
+
+    /**
+     * Runs insert into, upsert into, query from, count query, and delete from
+     * queries, for every Table listed on the SQL Query page of the VMC; and,
+     * when appropriate, for every View.
+     * <p>Note: unlike the '#testName' tests, this can run against any VoltDB
      * database, since it gets the Table and View names from the UI.
      */
     def 'insert into, query from, count query, and delete from, all Tables and Views'() {
         setup: 'get list of all Tables (plus optional debug print)'
         boolean startedWithEmptyDatabase = false
         def tables = getTables(page)
-        debugPrint "\n\nIn 'insert into, query from, count query, and delete from, all Tables and Views'..."
-        debugPrint "\nTables:\n  " + tables
+        debugPrint "\nTables:  " + tables
         
         when: 'perform initial count queries on all Tables'
         def cqResults = queryCount(page, tables)
 
-        then: 'all Tables should empty, for this test (otherwise, delete at end would be dangerous)'
+        then: 'number of count query results should match number of Tables'
         cqResults.size() == tables.size()
-        cqResults.each { assert it ==  0}
 
-        when: 'insert data into all Tables'
-        startedWithEmptyDatabase = true  // true, if we made it this far
-        insertInto(page, tables, NUM_ROWS_TO_INSERT)
+        when: 'check whether all Tables are empty (otherwise, delete at end would be dangerous)'
+        boolean allTablesEmpty = true
+        def minValuesForEachTable = [:]
+        cqResults.eachWithIndex { res, i ->
+            if (res > 0) {
+                allTablesEmpty = false
+                // TODO: finish this
+                //def 
+                //minValuesForEachTable.put(tables[i], getFirstColumnAndMaxValue(tables[i]))
+            }
+        }
+        startedWithEmptyDatabase = allTablesEmpty
 
-        and: 'perform queries from all Tables'
+        and: 'insert data into all Tables'
+        //startedWithEmptyDatabase = true  // true, if we made it this far
+        def numRows = getIntSystemProperty('numRowsToInsert', DEFAULT_NUM_ROWS_TO_INSERT)
+        insertInto(page, tables, numRows, 100)
+
+        and: 'perform queries from all Tables (after insert)'
         queryFrom(page, tables, "Table")
 
-        and: 'perform queries from all Views'
+        and: 'perform queries from all Views (after insert)'
         def views = getViews(page)
         queryFrom(page, views, "View")
 
-        and: 'perform count queries on all Tables'
+        and: 'perform count queries on all Tables (after insert)'
         cqResults = queryCount(page, tables)
 
         then: 'all Tables should have the number of rows that were inserted above'
         cqResults.size() == tables.size()
-        cqResults.each { assert it ==  NUM_ROWS_TO_INSERT}
+        cqResults.each { assert it ==  numRows}
 
-        when: 'perform count queries on all Views'
+        when: 'perform count queries on all Views (after insert)'
         cqResults = queryCount(page, views)
-        debugPrint "\nViews:\n  " + views
+        debugPrint "\nViews:  " + views
 
         then: 'all Views should have the number of rows that were inserted above'
         cqResults.size() == views.size()
         // Note: this might not always be true, but it works for 'genqa'
         if (runningGenqa) {
-            cqResults.each { assert it ==  NUM_ROWS_TO_INSERT}
+            cqResults.each { assert it ==  numRows}
+        }
+
+        when: 'upsert data into all Tables'
+        startedWithEmptyDatabase = true  // true, if we made it this far
+        upsertInto(page, tables, numRows, 101)
+
+        and: 'perform queries from all Tables (after upsert)'
+        queryFrom(page, tables, "Table")
+
+        and: 'perform queries from all Views (after upsert)'
+        queryFrom(page, views, "View")
+
+        and: 'perform count queries on all Tables (after upsert)'
+        cqResults = queryCount(page, tables)
+
+        then: 'all Tables should have the number of rows that were inserted/upserted above'
+        cqResults.size() == tables.size()
+        cqResults.each { assert it == numRows + 1}
+
+        when: 'perform count queries on all Views (after upsert)'
+        cqResults = queryCount(page, views)
+        debugPrint "\nViews:  " + views
+
+        then: 'all Views should have the number of rows that were inserted/upserted above'
+        cqResults.size() == views.size()
+        // Note: this might not always be true, but it works for 'genqa'
+        if (runningGenqa) {
+            cqResults.each { assert it == numRows + 1}
         }
 
         cleanup: 'delete all data added to all Tables (only if database was empty)'
@@ -310,7 +454,7 @@ class SqlQueriesTest extends TestBase {
      * @return true if the test completed successfully; otherwise, throws an
      * AssertionError.
      */
-    static <T> boolean printAndCompare(String typesToCompare, String fileName,
+    def <T> boolean printAndCompare(String typesToCompare, String fileName,
                                        boolean compare, List<T> expected, List<T> actual) {
         // Print out the list of (actual) items - if DEBUG is true
         debugPrint '\n# ' + typesToCompare + ': (compare with ' + fileName + ')'
@@ -393,8 +537,7 @@ class SqlQueriesTest extends TestBase {
         when: 'get the Query Result'
         def qResult = page.getQueryResult()
 
-        debugPrint "\ntestName      : " + testName
-        debugPrint "query         : " + query
+        debugPrint "\nquery         : " + query
         debugPrint "expect status : " + expectedResponse.status
         debugPrint "expect result : " + expectedResponse.result
         debugPrint "\nactual results: " + page.getQueryResults()
