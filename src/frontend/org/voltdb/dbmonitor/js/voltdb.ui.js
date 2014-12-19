@@ -1,4 +1,7 @@
-﻿$(document).ready(function () {
+﻿var ispopupRevoked = false;
+$(document).ready(function () {
+
+
 
     if ($.cookie("username") != undefined && $.cookie("username") != 'null') {
         $("#logOut").css('display', 'block');
@@ -280,9 +283,9 @@ var loadPage = function (serverName, portid) {
         });
     };
     loadSchemaTab();
-    
+
     var showAdminPage = function () {
-        
+
         if (!VoltDbAdminConfig.isAdmin) {
             VoltDbAdminConfig.isAdmin = true;
             $("#navAdmin").show();
@@ -321,7 +324,7 @@ var loadPage = function (serverName, portid) {
         securityChecked: false,
         previlegesChecked: false
     };
-    
+
     //Load Admin configurations
     voltDbRenderer.GetAdminDeploymentInformation(true, function (adminConfigValues, rawConfigValues) {
         securityChecks.securityChecked = true;
@@ -448,63 +451,67 @@ var loadPage = function (serverName, portid) {
 
         var loadAdminServerList = function (serverList) {
             VoltDbAdminConfig.refreshServerList(serverList);
-            registerConfirmationPopup();
-        };
-
-        var registerConfirmationPopup = function () {
-            var i = 0;
-            var hostName = "";
-            var hostId = -1;
-            var idleServerDetails;
-            var popupRef;
-            $.each(voltDbRenderer.hostNames, function (id, val) {
-                if (voltDbRenderer.currentHost != val) {
-                    if (!isNodeButtonRegistered($('#stopServer_' + val).attr('id'))) {
-                        $('#stopServer_' + val).popup({
-                            afterOpen: function (event) {
-                                hostName = $($(this)[0].ele).data("hostname");
-                                hostId = $($(this)[0].ele).data("hostid");
-
-                                $("#StoptConfirmOK").unbind("click");
-                                $("#StoptConfirmOK").on("click", function () {
-                                    //API Request                                
-                                    voltDbRenderer.stopServer(hostId, function (success) {
-                                        if (success) {
-                                            $("#stopServer_" + hostName).addClass('disableServer');
-                                            idleServerDetails = new VoltDbAdminConfig.idleServer(id, hostName, "MISSING");
-                                            VoltDbAdminConfig.idleServers.push(idleServerDetails);
-                                            $.each(VoltDbAdminConfig.runningServers, function (runningServerId, runningServer) {
-                                                if (runningServer.runningServerName == hostName)
-                                                    VoltDbAdminConfig.runningServers.splice(runningServerId, 1);
-                                                
-                                            });
-
-                                            popupRef.open = function () {
-                                                return false;
-                                            };
-                                        }
-
-                                    });
-
-                                    //Close the popup                                            
-                                    $($(this).siblings()[0]).trigger("click");
-
-                                });
-                            },
-
-                            afterClose: function () {
-                                popupRef = $(this)[0];
-                            }
-                        });
-                        VoltDbAdminConfig.registeredElements.push('stopServer_' + val);
-                    }
-                } else {
-                    //idleServerDetails = new VoltDbAdminConfig.idleServer(id, hostName, "RUNNING");
-                    //VoltDbAdminConfig.idleServers.push(idleServerDetails);
-                }
+            $(VoltDbAdminConfig.runningServerIds).on('click', function () {
+                openPopup($(this));
             });
 
         };
+
+        var openPopup = function (srcElement) {
+            var i = 0;
+            var hostName = srcElement.attr('data-HostName');
+            var hostId = srcElement.attr('data-HostId');
+            var idleServerDetails;
+
+            var popup = new $.Popup({
+                content: "#stopConfirmationPop",
+
+                afterOpen: function () {
+                    $("#StopConfirmOK").unbind("click");
+                    $("#StopConfirmOK").on("click", function () {
+                        //API Request                                
+                        voltDbRenderer.stopServer(hostId, function (success) {
+                            if (success) {
+                                //VoltDbAdminConfig.registeredElements.splice(VoltDbAdminConfig.registeredElements.indexOf('stopServer_' + val), 1);
+                                $("#stopServer_" + hostName).addClass('disableServer');
+                                idleServerDetails = new VoltDbAdminConfig.idleServer(hostId, hostName, "MISSING");
+                                VoltDbAdminConfig.idleServers.push(idleServerDetails);
+
+                                if (VoltDbAdminConfig.runningServers.length > 0) {
+                                    $.each(VoltDbAdminConfig.runningServers, function (runningServerId, runningServer) {
+                                        console.log("runnnig server:" + runningServer);
+                                        //sometimes updates on running server data occurs concurrently can cause running server to be undefined
+                                        if (runningServer != undefined) {  
+                                            if (runningServer.runningServerName == hostName)
+                                                VoltDbAdminConfig.runningServers.splice(runningServerId, 1);
+                                        }
+                                    });
+                                } else {
+                                    console.log("Running Server:" + VoltDbAdminConfig.runningServers);
+                                }
+
+                            }
+                            else {
+                                console.log("Success status not returned");
+                            }
+
+                        });
+
+                        //Close the popup                                            
+                        $($(this).siblings()[0]).trigger("click");
+
+                    });
+
+                    $("#StopConfirmCancel").unbind("click");
+                    $("#StopConfirmCancel").on("click", function () {
+                        popup.close();
+                    });
+                }
+
+            });
+            popup.open("#stopConfirmationPop", undefined, srcElement);
+        };
+
 
         voltDbRenderer.GetSystemInformation(loadClusterHealth, loadAdminTabPortAndOverviewDetails, loadAdminServerList);
 
@@ -1570,6 +1577,8 @@ var adjustGraphSpacing = function () {
             REFRESH_TABLEDATA_NONE: 11
         };
 
+        this.popups = [];
+        this.isPopupRevoked = false;
 
         this.CurrentTab = NavigationTabs.DBMonitor;
 

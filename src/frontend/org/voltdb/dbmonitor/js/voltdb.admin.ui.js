@@ -576,6 +576,7 @@ function loadAdminPage() {
         this.registeredElements = [];
         this.idleServers = [];
         this.runningServers = [];
+        this.runningServerIds = "";
         
         this.idleServer = function(hostIdvalue,serverNameValue,serverStateValue) {
             this.hostId = hostIdvalue;
@@ -584,7 +585,7 @@ function loadAdminPage() {
         };
         
         this.runningServer = function (hostIdValue, serverNameValue, serverStateValue) {
-            this.runningHostId = hostIdValue;
+            this.runningHostId = hostIdValue;            
             this.runningServerName = serverNameValue;
             this.runningServerState = serverStateValue;
         };
