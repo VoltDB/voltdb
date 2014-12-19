@@ -24,20 +24,31 @@
 apply plugin: "groovy"
 
 // The drivers to use
-ext.drivers = ["firefox", "chrome", "safari"]
+ext.drivers = ["firefox", "chrome", /*"ie", "htmlunit", "phantomjs",*/ "safari"]
 
 repositories {
     mavenCentral() 
 }
 
+// Returns the specified project property value, if it is defined; otherwise,
+// returns the specified default value
+def getProjectPropertyOrDefaultValue(String projectPropertyName, Object defaultValue) {
+    if (project.hasProperty(projectPropertyName)) {
+        return project.getProperties()[projectPropertyName]
+    } else {
+        return defaultValue
+    }
+}
+
 dependencies {
-    def gebVersion = "0.10.0"
-    def seleniumVersion = "2.44.0"
-    def spockVersion = "0.7-groovy-2.0"
+    def gebVersion = getProjectPropertyOrDefaultValue("gebVersion", "0.10.0")
+    def seleniumVersion = getProjectPropertyOrDefaultValue("seleniumVersion", "2.44.0")
+    def spockVersion = getProjectPropertyOrDefaultValue("spockVersion", "0.7-groovy-2.0")
 
     // GEB & Spock
     testCompile "org.gebish:geb-spock:$gebVersion"
     testCompile "org.spockframework:spock-core:$spockVersion"
+    testCompile "org.seleniumhq.selenium:selenium-support:$seleniumVersion"
 
     // Drivers
     drivers.each { driver ->
@@ -59,11 +70,22 @@ sourceSets {
 
 drivers.each { driver ->
     task "${driver}Test"(type: Test) {
-        testReportDir = reporting.file("$name/tests")
-        testResultsDir = file("$buildDir/test-results/$name")
+        reports.html.destination = reporting.file("$name/tests")
+        reports.junitXml.destination = file("$buildDir/test-results/$name")
 
         systemProperty "geb.build.reportsDir", reporting.file("$name/geb")
         systemProperty "geb.env", driver
 
+        // Set various system properties, either to project property values
+        // set on the command line (via -P), or to their default values; for
+        // example, to set 'url', use: -Purl=http://my.web.site/
+        systemProperty "geb.build.baseUrl", getProjectPropertyOrDefaultValue("url", "http://localhost:8080/")
+        systemProperty "debugPrint", getProjectPropertyOrDefaultValue("debugPrint", false)
+        systemProperty "windowWidth", getProjectPropertyOrDefaultValue("windowWidth", 1500)
+        systemProperty "windowHeight", getProjectPropertyOrDefaultValue("windowHeight", 1000)
+        systemProperty "timeoutSeconds", getProjectPropertyOrDefaultValue("timeoutSeconds", 5)
+        systemProperty "sleepSeconds", getProjectPropertyOrDefaultValue("sleepSeconds", 0)
+        systemProperty "numRowsToInsert", getProjectPropertyOrDefaultValue("numRowsToInsert", 3)
+        systemProperty "insertJson", getProjectPropertyOrDefaultValue("insertJson", false)
     }
 }
