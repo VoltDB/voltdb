@@ -2174,7 +2174,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     }
 
     private String queueRequestNode(SnapshotInitiationInfo snapInfo) {
-
+        return null;
     }
 
     /**
