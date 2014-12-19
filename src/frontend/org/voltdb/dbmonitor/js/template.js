@@ -69,10 +69,6 @@ $(document).ready(function () {
         $('ul.catalogNav').children().removeClass('active');
         $("#" + hash + "-nav").addClass('active');
     }
-    
-    $('body').bind('touchmove', function (e) {
-        e.preventDefault();
-    });
 
     $(window).bind('hashchange', function () {
         
