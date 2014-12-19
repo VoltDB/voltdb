@@ -26,15 +26,23 @@ package vmcTest.config
 import org.openqa.selenium.chrome.ChromeDriver
 import org.openqa.selenium.firefox.FirefoxDriver
 //import org.openqa.selenium.htmlunit.HtmlUnitDriver
+//import org.openqa.selenium.ie.InternetExplorerDriver
+//import org.openqa.selenium.phantomjs.PhantomJSDriver
 import org.openqa.selenium.safari.SafariDriver
 
+import org.openqa.selenium.remote.DesiredCapabilities
+import org.openqa.selenium.remote.RemoteWebDriver
+//import com.thoughtworks.selenium.DefaultSelenium
+import org.openqa.selenium.remote.CommandExecutor
+//import org.openqa.selenium.SeleneseCommandExecutor
 
 waiting {
     timeout = 5
+    //timeout = getProjectPropertyOrDefaultValue("timeoutSeconds", 5)
 }
 
 environments {
-    
+
     firefox {
         driver = { new FirefoxDriver() }
     }
@@ -46,8 +54,26 @@ environments {
     htmlunit {
         driver = { new HtmlUnitDriver(true) }
     }
+
+    ie {
+        driver = { new InternetExplorerDriver() }
+    }
+
+    phantomjs {
+        driver = { new PhantomJSDriver() }
+    }
 */
     safari {
+/*
+        baseURL = "http://localhost:8080/"
+        def sel = new DefaultSelenium("localhost", 4444, "*safari", baseURL)
+        CommandExecutor executor = new SeleneseCommandExecutor(sel)
+        DesiredCapabilities dc = new DesiredCapabilities()
+        dc.setBrowsername("safari")
+        dc.setCapability("platform", org.openqa.selenium.Platform.MAC)
+        dc.setJavascriptEnabled(true)
+        driver = new RemoteWebDriver(executor, dc)
+*/
         driver = { new SafariDriver() }
     }
 
