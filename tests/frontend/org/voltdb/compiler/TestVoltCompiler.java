@@ -81,6 +81,46 @@ public class TestVoltCompiler extends TestCase {
         tjar.delete();
     }
 
+    public static VoltCompiler checkDDLErrorMessage(String jar_out,
+            String literalSchema, String expectedError) {
+        final VoltCompiler compiler = new VoltCompiler();
+        boolean success = compileFromLiteralSchema(jar_out, compiler, literalSchema);
+        if (expectedError == null) {
+            assertTrue("Expected no compilation errors but got these:\n" +
+                    feedbackToString(compiler.m_errors), success);
+        } else {
+            assertFalse("Expected failure but got success", success);
+            if ( ! isFeedbackPresent(expectedError, compiler.m_errors)) {
+                fail("Expected text (" + expectedError + ") not found in output:\n" +
+                        feedbackToString(compiler.m_errors));
+            }
+        }
+        return compiler;
+    }
+
+    public static VoltCompiler checkDDLWarningMessage(String jar_out,
+            String literalSchema, String expectedWarning) {
+        assert(expectedWarning != null);
+        final VoltCompiler compiler = new VoltCompiler();
+        boolean success = compileFromLiteralSchema(jar_out, compiler, literalSchema);
+        assertTrue("Expected only a warning but got error(s):\n" +
+                feedbackToString(compiler.m_errors), success);
+        if ( ! isFeedbackPresent(expectedWarning, compiler.m_warnings)) {
+            fail("Expected text (" + expectedWarning + ") not found in warning output:\n" +
+                    feedbackToString(compiler.m_warnings));
+        }
+        return compiler;
+    }
+
+    private VoltCompiler checkDDLErrorMessage(String literalSchema, String errorMsg) {
+        return checkDDLErrorMessage(testout_jar, literalSchema, errorMsg);
+    }
+
+    private void checkValidUniqueAndAssumeUnique(String ddl, String errorUnique, String errorAssumeUnique) {
+        checkDDLErrorMessage(ddl, errorUnique);
+        checkDDLErrorMessage(ddl.replace("UNIQUE", "ASSUMEUNIQUE"), errorAssumeUnique);
+    }
+
     public void testBrokenLineParsing() {
         final String simpleSchema1 =
             "create table table1r_el  (pkey integer, column2_integer integer, PRIMARY KEY(pkey));\n" +
@@ -131,15 +171,15 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(success);
     }
 
-    private String feedbackToString(List<Feedback> fbs) {
+    private static String feedbackToString(List<Feedback> fbs) {
         StringBuilder sb = new StringBuilder();
         for (Feedback fb : fbs) {
-            sb.append(fb.getStandardFeedbackLine() + "\n");
+            sb.append(fb.toString()).append("\n");
         }
         return sb.toString();
     }
 
-    private boolean isFeedbackPresent(String expectedError,
+    private static boolean isFeedbackPresent(String expectedError,
             ArrayList<Feedback> fbs) {
         for (Feedback fb : fbs) {
             if (fb.getStandardFeedbackLine().contains(expectedError)) {
@@ -150,116 +190,99 @@ public class TestVoltCompiler extends TestCase {
     }
 
     public void testMismatchedPartitionParams() {
-        String expectedError;
-        ArrayList<Feedback> fbs;
-
-        fbs = compileLiteralSchemaForErrors("CREATE TABLE PKEY_BIGINT ( PKEY BIGINT NOT NULL, PRIMARY KEY (PKEY) );" +
+        checkDDLErrorMessage(
+                "CREATE TABLE PKEY_BIGINT ( PKEY BIGINT NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_BIGINT ON COLUMN PKEY;" +
-                "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.PartitionParamBigint;");
-        expectedError =
-                "Type mismatch between partition column and partition parameter for procedure " +
+                "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.PartitionParamBigint;"
+                , "Type mismatch between partition column and partition parameter for procedure " +
                 "org.voltdb.compiler.procedures.PartitionParamBigint may cause overflow or loss of precision.\n" +
-                "Partition column is type VoltType.BIGINT and partition parameter is type VoltType.STRING";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                "Partition column is type VoltType.BIGINT and partition parameter is type VoltType.STRING");
 
-        fbs = compileLiteralSchemaForErrors("CREATE TABLE PKEY_BIGINT ( PKEY BIGINT NOT NULL, PRIMARY KEY (PKEY) );" +
+        checkDDLErrorMessage(
+                "CREATE TABLE PKEY_BIGINT ( PKEY BIGINT NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_BIGINT ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamBigint;" +
-                "PARTITION PROCEDURE NotAnnotatedPartitionParamBigint ON TABLE PKEY_BIGINT COLUMN PKEY;");
-        expectedError =
-                "Type mismatch between partition column and partition parameter for procedure " +
+                "PARTITION PROCEDURE NotAnnotatedPartitionParamBigint ON TABLE PKEY_BIGINT COLUMN PKEY;"
+                , "Type mismatch between partition column and partition parameter for procedure " +
                 "org.voltdb.compiler.procedures.NotAnnotatedPartitionParamBigint may cause overflow or loss of precision.\n" +
-                "Partition column is type VoltType.BIGINT and partition parameter is type VoltType.STRING";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                "Partition column is type VoltType.BIGINT and partition parameter is type VoltType.STRING");
 
-        fbs = compileLiteralSchemaForErrors("CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
+        checkDDLErrorMessage(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
-                "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.PartitionParamInteger;");
-        expectedError =
-                "Type mismatch between partition column and partition parameter for procedure " +
+                "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.PartitionParamInteger;"
+                , "Type mismatch between partition column and partition parameter for procedure " +
                 "org.voltdb.compiler.procedures.PartitionParamInteger may cause overflow or loss of precision.\n" +
                 "Partition column is type VoltType.INTEGER and partition parameter " +
-                "is type VoltType.BIGINT";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                "is type VoltType.BIGINT");
 
-        fbs = compileLiteralSchemaForErrors("CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
+        checkDDLErrorMessage(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
-                "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY;");
-        expectedError =
-                "Type mismatch between partition column and partition parameter for procedure " +
+                "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY;"
+                , "Type mismatch between partition column and partition parameter for procedure " +
                 "org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger may cause overflow or loss of precision.\n" +
                 "Partition column is type VoltType.INTEGER and partition parameter " +
-                "is type VoltType.BIGINT";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                "is type VoltType.BIGINT");
 
-        fbs = compileLiteralSchemaForErrors("CREATE TABLE PKEY_SMALLINT ( PKEY SMALLINT NOT NULL, PRIMARY KEY (PKEY) );" +
+        checkDDLErrorMessage(
+                "CREATE TABLE PKEY_SMALLINT ( PKEY SMALLINT NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_SMALLINT ON COLUMN PKEY;" +
-                "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.PartitionParamSmallint;");
-        expectedError =
-                "Type mismatch between partition column and partition parameter for procedure " +
+                "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.PartitionParamSmallint;"
+                , "Type mismatch between partition column and partition parameter for procedure " +
                 "org.voltdb.compiler.procedures.PartitionParamSmallint may cause overflow or loss of precision.\n" +
                 "Partition column is type VoltType.SMALLINT and partition parameter " +
-                "is type VoltType.BIGINT";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                "is type VoltType.BIGINT");
 
-        fbs = compileLiteralSchemaForErrors("CREATE TABLE PKEY_SMALLINT ( PKEY SMALLINT NOT NULL, PRIMARY KEY (PKEY) );" +
+        checkDDLErrorMessage(
+                "CREATE TABLE PKEY_SMALLINT ( PKEY SMALLINT NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_SMALLINT ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamSmallint;" +
-                "PARTITION PROCEDURE NotAnnotatedPartitionParamSmallint ON TABLE PKEY_SMALLINT COLUMN PKEY;");
-        expectedError =
-                "Type mismatch between partition column and partition parameter for procedure " +
+                "PARTITION PROCEDURE NotAnnotatedPartitionParamSmallint ON TABLE PKEY_SMALLINT COLUMN PKEY;"
+                , "Type mismatch between partition column and partition parameter for procedure " +
                 "org.voltdb.compiler.procedures.NotAnnotatedPartitionParamSmallint may cause overflow or loss of precision.\n" +
                 "Partition column is type VoltType.SMALLINT and partition parameter " +
-                "is type VoltType.BIGINT";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                "is type VoltType.BIGINT");
 
-        fbs = compileLiteralSchemaForErrors("CREATE TABLE PKEY_TINYINT ( PKEY TINYINT NOT NULL, PRIMARY KEY (PKEY) );" +
+        checkDDLErrorMessage(
+                "CREATE TABLE PKEY_TINYINT ( PKEY TINYINT NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_TINYINT ON COLUMN PKEY;" +
-                "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.PartitionParamTinyint;");
-        expectedError =
-                "Type mismatch between partition column and partition parameter for procedure " +
+                "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.PartitionParamTinyint;"
+                , "Type mismatch between partition column and partition parameter for procedure " +
                 "org.voltdb.compiler.procedures.PartitionParamTinyint may cause overflow or loss of precision.\n" +
                 "Partition column is type VoltType.TINYINT and partition parameter " +
-                "is type VoltType.SMALLINT";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                "is type VoltType.SMALLINT");
 
-        fbs = compileLiteralSchemaForErrors("CREATE TABLE PKEY_TINYINT ( PKEY TINYINT NOT NULL, PRIMARY KEY (PKEY) );" +
+        checkDDLErrorMessage(
+                "CREATE TABLE PKEY_TINYINT ( PKEY TINYINT NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_TINYINT ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamTinyint;" +
-                "PARTITION PROCEDURE NotAnnotatedPartitionParamTinyint ON TABLE PKEY_TINYINT COLUMN PKEY;");
-        expectedError =
-                "Type mismatch between partition column and partition parameter for procedure " +
+                "PARTITION PROCEDURE NotAnnotatedPartitionParamTinyint ON TABLE PKEY_TINYINT COLUMN PKEY;"
+                , "Type mismatch between partition column and partition parameter for procedure " +
                 "org.voltdb.compiler.procedures.NotAnnotatedPartitionParamTinyint may cause overflow or loss of precision.\n" +
                 "Partition column is type VoltType.TINYINT and partition parameter " +
-                "is type VoltType.SMALLINT";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                "is type VoltType.SMALLINT");
 
-        fbs = compileLiteralSchemaForErrors("CREATE TABLE PKEY_STRING ( PKEY VARCHAR(32) NOT NULL, PRIMARY KEY (PKEY) );" +
+        checkDDLErrorMessage(
+                "CREATE TABLE PKEY_STRING ( PKEY VARCHAR(32) NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_STRING ON COLUMN PKEY;" +
-                "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.PartitionParamString;");
-        expectedError =
-                "Type mismatch between partition column and partition parameter for procedure " +
+                "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.PartitionParamString;"
+                , "Type mismatch between partition column and partition parameter for procedure " +
                 "org.voltdb.compiler.procedures.PartitionParamString may cause overflow or loss of precision.\n" +
                 "Partition column is type VoltType.STRING and partition parameter " +
-                "is type VoltType.INTEGER";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                "is type VoltType.INTEGER");
 
-        fbs = compileLiteralSchemaForErrors("CREATE TABLE PKEY_STRING ( PKEY VARCHAR(32) NOT NULL, PRIMARY KEY (PKEY) );" +
+        checkDDLErrorMessage(
+                "CREATE TABLE PKEY_STRING ( PKEY VARCHAR(32) NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_STRING ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamString;" +
-                "PARTITION PROCEDURE NotAnnotatedPartitionParamString ON TABLE PKEY_STRING COLUMN PKEY;");
-        expectedError =
-                "Type mismatch between partition column and partition parameter for procedure " +
+                "PARTITION PROCEDURE NotAnnotatedPartitionParamString ON TABLE PKEY_STRING COLUMN PKEY;"
+                , "Type mismatch between partition column and partition parameter for procedure " +
                 "org.voltdb.compiler.procedures.NotAnnotatedPartitionParamString may cause overflow or loss of precision.\n" +
                 "Partition column is type VoltType.STRING and partition parameter " +
-                "is type VoltType.INTEGER";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                "is type VoltType.INTEGER");
 
-    }
-
-    private ArrayList<Feedback> compileLiteralSchemaForErrors(String ddl) {
-        return compileLiteralSchemaForErrors(testout_jar, ddl);
     }
 
     public static ArrayList<Feedback> compileLiteralSchemaForErrors(String pathToJar, String ddl) {
@@ -678,13 +701,15 @@ public class TestVoltCompiler extends TestCase {
         return compileFromDDL(testout_jar, compiler, schemaPath);
     }
 
-    private boolean compileFromLiteralSchema(VoltCompiler compiler, String literalSchema)
+    private static boolean compileFromLiteralSchema(String jarPath,
+            VoltCompiler compiler, String literalSchema)
     {
         final String schemaPath = MiscUtils.writeStringToTempFilePath(literalSchema);
-        return compileFromDDL(testout_jar, compiler, schemaPath);
+        return compileFromDDL(jarPath, compiler, schemaPath);
     }
 
-    public static boolean compileFromDDL(String pathToJar, VoltCompiler compiler, String... schemaPaths) {
+    private static boolean compileFromDDL(String pathToJar,
+            VoltCompiler compiler, String... schemaPaths) {
         try {
             return compiler.compileFromDDL(pathToJar, schemaPaths);
         }
@@ -1682,27 +1707,6 @@ public class TestVoltCompiler extends TestCase {
         checkValidUniqueAndAssumeUnique(schema, msgP, null);
     }
 
-    private void checkCompilerErrorMessages(String expectedError, VoltCompiler compiler, boolean success) {
-        if (expectedError == null) {
-            assertTrue("Expected no compilation errors but got these:\n" + feedbackToString(compiler.m_errors), success);
-        } else {
-            assertFalse("Expected failure but got success", success);
-            assertTrue(isFeedbackPresent(expectedError, compiler.m_errors));
-        }
-
-    }
-
-    private void checkDDLErrorMessage(String literalSchema, String errorMsg) {
-        final VoltCompiler compiler = new VoltCompiler();
-        boolean success = compileFromLiteralSchema(compiler, literalSchema);
-        checkCompilerErrorMessages(errorMsg, compiler, success);
-    }
-
-    private void checkValidUniqueAndAssumeUnique(String ddl, String errorUnique, String errorAssumeUnique) {
-        checkDDLErrorMessage(ddl, errorUnique);
-        checkDDLErrorMessage(ddl.replace("UNIQUE", "ASSUMEUNIQUE"), errorAssumeUnique);
-    }
-
     public void testUniqueIndexGiveException() {
         String schema;
 
@@ -1950,48 +1954,47 @@ public class TestVoltCompiler extends TestCase {
 
     void compileLimitDeleteStmtAndCheckCatalog(String ddl, String expectedMessage, String tblName,
             int expectedLimit, String expectedStmt) {
-        VoltCompiler compiler = new VoltCompiler();
-        boolean success = compileFromLiteralSchema(compiler, ddl);
-        checkCompilerErrorMessages(expectedMessage, compiler, success);
+        VoltCompiler compiler = checkDDLErrorMessage(ddl, expectedMessage);
 
-        if (success) {
-            // We expected  success and got it.  Verify that the catalog looks how we expect
-            Catalog cat = compiler.getCatalog();
+        if (compiler == null) {
+            return;
+        }
+        // We expected success and got it.  Verify that the catalog looks how we expect
+        Catalog cat = compiler.getCatalog();
 
-            Table tbl = cat.getClusters().get("cluster").getDatabases().get("database").getTables().getIgnoreCase(tblName);
+        Table tbl = cat.getClusters().get("cluster").getDatabases().get("database").getTables().getIgnoreCase(tblName);
 
-            if (expectedLimit != -1) {
-                assertEquals(expectedLimit, tbl.getTuplelimit());
+        if (expectedLimit != -1) {
+            assertEquals(expectedLimit, tbl.getTuplelimit());
+        }
+        else {
+            // no limit is represented as a limit of max int.
+            assertEquals(Integer.MAX_VALUE, tbl.getTuplelimit());
+        }
+
+        Statement stmt = null;
+        try {
+            stmt = tbl.getTuplelimitdeletestmt().iterator().next();
+        }
+        catch (NoSuchElementException nse) {
+        }
+
+        if (expectedStmt == null) {
+            assertTrue("Did not expect to find a LIMIT DELETE statement, but found this one:\n"
+                    + (stmt != null ? stmt.getSqltext() : ""),
+                    stmt == null);
+        }
+        else {
+            // Make sure we have the delete statement that we expected
+            assertTrue("Expected to find LIMIT DELETE statement, found none", stmt != null);
+
+            String sql = stmt.getSqltext();
+            if (sql.endsWith(";")) {
+                // We seem to add a semicolon somewhere.  I guess that's okay.
+                sql = sql.substring(0, sql.length() - 1);
             }
-            else {
-                // no limit is represented as a limit of max int.
-                assertEquals(Integer.MAX_VALUE, tbl.getTuplelimit());
-            }
 
-            Statement stmt = null;
-            try {
-                stmt = tbl.getTuplelimitdeletestmt().iterator().next();
-            }
-            catch (NoSuchElementException nse) {
-            }
-
-            if (expectedStmt == null) {
-                assertTrue("Did not expect to find a LIMIT DELETE statement, but found this one:\n"
-                        + (stmt != null ? stmt.getSqltext() : ""),
-                        stmt == null);
-            } else {
-                // Make sure we have the delete statement that we expected
-                assertTrue("Expected to find LIMIT DELETE statement, found none", stmt != null);
-
-                String sql = stmt.getSqltext();
-                if (sql.endsWith(";")) {
-                    // We seem to add a semicolon somewhere.  I guess that's okay.
-                    sql = sql.substring(0, sql.length() - 1);
-                }
-
-                assertEquals("Did not find the LIMIT DELETE statement that we expected",
-                        expectedStmt, sql);
-            }
+            assertEquals("Did not find the LIMIT DELETE statement that we expected", expectedStmt, sql);
         }
     }
 
@@ -2158,315 +2161,252 @@ public class TestVoltCompiler extends TestCase {
 
 
     public void testInvalidCreateProcedureDDL() throws Exception {
-        ArrayList<Feedback> fbs;
-        String expectedError;
-
-        fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NonExistentPartitionParamInteger;" +
                 "PARTITION PROCEDURE NonExistentPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY;"
-                );
-        expectedError = "Cannot load class for procedure: org.voltdb.compiler.procedures.NonExistentPartitionParamInteger";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                , "Cannot load class for procedure: org.voltdb.compiler.procedures.NonExistentPartitionParamInteger");
 
-        fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "PARTITION PROCEDURE NotDefinedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY;"
-                );
-        expectedError = "Partition in referencing an undefined procedure \"NotDefinedPartitionParamInteger\"";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                , "Partition in referencing an undefined procedure \"NotDefinedPartitionParamInteger\"");
 
-        fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.PartitionParamInteger;" +
                 "PARTITION PROCEDURE PartitionParamInteger ON TABLE PKEY_WHAAAT COLUMN PKEY;"
-                );
-        expectedError = "PartitionParamInteger has partition properties defined both in class " +
-                "\"org.voltdb.compiler.procedures.PartitionParamInteger\" and in the schema defintion file(s)";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                , "PartitionParamInteger has partition properties defined both in class " +
+                "\"org.voltdb.compiler.procedures.PartitionParamInteger\" and in the schema defintion file(s)");
 
-        fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_WHAAAT COLUMN PKEY;"
-                );
-        expectedError = "PartitionInfo for procedure " +
+                , "PartitionInfo for procedure " +
                 "org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger refers to a column " +
-                "in schema which can't be found.";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                "in schema which can't be found.");
 
-        fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PSURROGATE;"
-                );
-        expectedError = "PartitionInfo for procedure " +
+                , "PartitionInfo for procedure " +
                 "org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger refers to a column " +
-                "in schema which can't be found.";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                "in schema which can't be found.");
 
-        fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY PARAMETER 8;"
-                );
-        expectedError = "PartitionInfo specifies invalid parameter index for procedure: " +
-                "org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                , "PartitionInfo specifies invalid parameter index for procedure: " +
+                "org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger");
 
-        fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM GLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY;"
-                );
-        expectedError = "Invalid CREATE PROCEDURE statement: " +
+                , "Invalid CREATE PROCEDURE statement: " +
                 "\"CREATE PROCEDURE FROM GLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger\"" +
-                ", expected syntax: \"CREATE PROCEDURE";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                ", expected syntax: \"CREATE PROCEDURE");
 
-        fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger FOR TABLE PKEY_INTEGER COLUMN PKEY;"
-                );
-        expectedError = "Invalid PARTITION statement: \"PARTITION PROCEDURE " +
+                , "Invalid PARTITION statement: \"PARTITION PROCEDURE " +
                 "NotAnnotatedPartitionParamInteger FOR TABLE PKEY_INTEGER COLUMN PKEY\", " +
                 "expected syntax: PARTITION PROCEDURE <procedure> ON " +
-                "TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                "TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]");
 
-        fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER CLUMN PKEY PARMTR 0;"
-                );
-        expectedError = "Invalid PARTITION statement: \"PARTITION PROCEDURE " +
+                , "Invalid PARTITION statement: \"PARTITION PROCEDURE " +
                 "NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER CLUMN PKEY PARMTR 0\", " +
                 "expected syntax: PARTITION PROCEDURE <procedure> ON " +
-                "TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                "TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]");
 
-        fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY PARAMETER hello;"
-                );
-        expectedError = "Invalid PARTITION statement: \"PARTITION PROCEDURE " +
+                , "Invalid PARTITION statement: \"PARTITION PROCEDURE " +
                 "NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY PARAMETER hello\", " +
                 "expected syntax: PARTITION PROCEDURE <procedure> ON " +
-                "TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                "TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]");
 
-        fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROGEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY PARAMETER hello;"
-                );
-        expectedError = "Invalid PARTITION statement: " +
+                , "Invalid PARTITION statement: " +
                 "\"PARTITION PROGEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER " +
                 "COLUMN PKEY PARAMETER hello\", expected syntax: \"PARTITION TABLE <table> " +
                 "ON COLUMN <column>\" or \"PARTITION PROCEDURE <procedure> ON " +
-                "TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]\"";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                "TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]\"");
 
-        fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE OUTOF CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY PARAMETER 2;"
-                );
-        expectedError = "Invalid CREATE PROCEDURE statement: " +
+                , "Invalid CREATE PROCEDURE statement: " +
                 "\"CREATE PROCEDURE OUTOF CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger\"" +
-                ", expected syntax: \"CREATE PROCEDURE";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                ", expected syntax: \"CREATE PROCEDURE");
 
-        fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "MAKE PROCEDURE OUTOF CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY PARAMETER 2;"
-                );
-        expectedError = "DDL Error: \"unexpected token: MAKE\" in statement starting on lineno: 1";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                , "DDL Error: \"unexpected token: MAKE\" in statement starting on lineno: 1");
 
-        fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE 1PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN;"
-                );
-        expectedError = "Unknown indentifier in DDL: \"PARTITION TABLE 1PKEY_INTEGER ON COLUMN PKEY\" " +
-                "contains invalid identifier \"1PKEY_INTEGER\"";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                , "Unknown indentifier in DDL: \"PARTITION TABLE 1PKEY_INTEGER ON COLUMN PKEY\" " +
+                "contains invalid identifier \"1PKEY_INTEGER\"");
 
-        fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN 2PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY;"
-                );
-        expectedError = "Unknown indentifier in DDL: \"PARTITION TABLE PKEY_INTEGER ON COLUMN 2PKEY\" " +
-                "contains invalid identifier \"2PKEY\"";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                , "Unknown indentifier in DDL: \"PARTITION TABLE PKEY_INTEGER ON COLUMN 2PKEY\" " +
+                "contains invalid identifier \"2PKEY\"");
 
-        fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS 0rg.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY;"
-                );
-        expectedError = "Unknown indentifier in DDL: \""+
+                , "Unknown indentifier in DDL: \""+
                 "CREATE PROCEDURE FROM CLASS 0rg.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger" +
-                "\" contains invalid identifier \"0rg.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger\"";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                "\" contains invalid identifier \"0rg.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger\"");
 
-        fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.3compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY;"
-                );
-        expectedError = "Unknown indentifier in DDL: \""+
+                , "Unknown indentifier in DDL: \""+
                 "CREATE PROCEDURE FROM CLASS org.voltdb.3compiler.procedures.NotAnnotatedPartitionParamInteger" +
-                "\" contains invalid identifier \"org.voltdb.3compiler.procedures.NotAnnotatedPartitionParamInteger\"";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                "\" contains invalid identifier \"org.voltdb.3compiler.procedures.NotAnnotatedPartitionParamInteger\"");
 
-        fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.4NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY;"
-                );
-        expectedError = "Unknown indentifier in DDL: \""+
+                , "Unknown indentifier in DDL: \""+
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.4NotAnnotatedPartitionParamInteger" +
-                "\" contains invalid identifier \"org.voltdb.compiler.procedures.4NotAnnotatedPartitionParamInteger\"";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                "\" contains invalid identifier \"org.voltdb.compiler.procedures.4NotAnnotatedPartitionParamInteger\"");
 
-        fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE 5NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY;"
-                );
-        expectedError = "Unknown indentifier in DDL: \""+
+                , "Unknown indentifier in DDL: \""+
                 "PARTITION PROCEDURE 5NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY" +
-                "\" contains invalid identifier \"5NotAnnotatedPartitionParamInteger\"";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                "\" contains invalid identifier \"5NotAnnotatedPartitionParamInteger\"");
 
-        fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE 6PKEY_INTEGER COLUMN PKEY;"
-                );
-        expectedError = "Unknown indentifier in DDL: \""+
+                , "Unknown indentifier in DDL: \""+
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE 6PKEY_INTEGER COLUMN PKEY" +
-                "\" contains invalid identifier \"6PKEY_INTEGER\"";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                "\" contains invalid identifier \"6PKEY_INTEGER\"");
 
-        fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN 7PKEY;"
-                );
-        expectedError = "Unknown indentifier in DDL: \""+
+                , "Unknown indentifier in DDL: \""+
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN 7PKEY" +
-                "\" contains invalid identifier \"7PKEY\"";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                "\" contains invalid identifier \"7PKEY\"");
 
-        fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
                 "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger TABLE PKEY_INTEGER ON TABLE PKEY_INTEGER COLUMN PKEY;"
-                );
-        expectedError = "Invalid PARTITION statement: \"PARTITION PROCEDURE " +
+                , "Invalid PARTITION statement: \"PARTITION PROCEDURE " +
                 "NotAnnotatedPartitionParamInteger TABLE PKEY_INTEGER ON TABLE PKEY_INTEGER COLUMN PKEY\", " +
                 "expected syntax: PARTITION PROCEDURE <procedure> ON " +
-                "TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                "TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]");
     }
 
     public void testInvalidSingleStatementCreateProcedureDDL() throws Exception {
-        ArrayList<Feedback> fbs;
-        String expectedError;
-
-        fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE Foo AS BANBALOO pkey FROM PKEY_INTEGER;" +
                 "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
-                );
-        expectedError = "Failed to plan for statement (sql) BANBALOO pkey FROM PKEY_INTEGER";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                , "Failed to plan for statement (sql) BANBALOO pkey FROM PKEY_INTEGER");
 
-        fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE Foo AS SELEC pkey FROM PKEY_INTEGER;" +
                 "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY PARAMETER 0;"
-                );
-        expectedError = "Failed to plan for statement (sql) SELEC pkey FROM PKEY_INTEGER";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                , "Failed to plan for statement (sql) SELEC pkey FROM PKEY_INTEGER");
 
-        fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE Foo AS DELETE FROM PKEY_INTEGER WHERE PKEY = ?;" +
                 "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY PARAMETER 2;"
-                );
-        expectedError = "PartitionInfo specifies invalid parameter index for procedure: Foo";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                , "PartitionInfo specifies invalid parameter index for procedure: Foo");
 
-        fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE Foo AS DELETE FROM PKEY_INTEGER;" +
                 "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
-                );
-        expectedError = "PartitionInfo specifies invalid parameter index for procedure: Foo";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                , "PartitionInfo specifies invalid parameter index for procedure: Foo");
 
-        fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE org.kanamuri.Foo AS DELETE FROM PKEY_INTEGER;" +
                 "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
-                );
-        expectedError = "PartitionInfo specifies invalid parameter index for procedure: org.kanamuri.Foo";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                , "PartitionInfo specifies invalid parameter index for procedure: org.kanamuri.Foo");
 
-        fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE 7Foo AS DELETE FROM PKEY_INTEGER WHERE PKEY = ?;" +
                 "PARTITION PROCEDURE 7Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
-                );
-        expectedError = "Unknown indentifier in DDL: \""+
+                , "Unknown indentifier in DDL: \""+
                 "CREATE PROCEDURE 7Foo AS DELETE FROM PKEY_INTEGER WHERE PKEY = ?" +
-                "\" contains invalid identifier \"7Foo\"";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                "\" contains invalid identifier \"7Foo\"");
     }
 
-    public void testInvalidGtroovyProcedureDDL() throws Exception {
-        ArrayList<Feedback> fbs;
-        String expectedError;
+    public void testInvalidGroovyProcedureDDL() throws Exception {
+        if (Float.parseFloat(System.getProperty("java.specification.version")) < 1.7) {
+            return;
+        }
 
-        if (Float.parseFloat(System.getProperty("java.specification.version")) < 1.7) return;
-
-        fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE Foo AS ###\n" +
@@ -2477,11 +2417,9 @@ public class TestVoltCompiler extends TestCase {
                 "    }\n" +
                 "### LANGUAGE GROOVY;\n" +
                 "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
-                );
-        expectedError = "user lacks privilege or object not found: PKEY";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                , "user lacks privilege or object not found: PKEY");
 
-        fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE Foo AS ###\n" +
@@ -2492,11 +2430,9 @@ public class TestVoltCompiler extends TestCase {
                 "    \n" +
                 "### LANGUAGE GROOVY;\n" +
                 "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
-                );
-        expectedError = "Procedure \"Foo\" code block has syntax errors";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                , "Procedure \"Foo\" code block has syntax errors");
 
-        fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE Foo AS ###\n" +
@@ -2507,11 +2443,9 @@ public class TestVoltCompiler extends TestCase {
                 "    }\n" +
                 "### LANGUAGE GROOVY;\n" +
                 "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
-                );
-        expectedError = "Procedure \"Foo\" code block does not contain the required \"transactOn\" closure";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                , "Procedure \"Foo\" code block does not contain the required \"transactOn\" closure");
 
-        fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE Foo AS ###\n" +
@@ -2540,11 +2474,9 @@ public class TestVoltCompiler extends TestCase {
                 "    }\n" +
                 "}\n" +
                 "### LANGUAGE GROOVY;\n"
-                );
-        expectedError = "Procedure \"voltkv.procedures.Put\" is not a groovy script";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                , "Procedure \"voltkv.procedures.Put\" is not a groovy script");
 
-        fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE Foo AS ###\n" +
@@ -2552,11 +2484,9 @@ public class TestVoltCompiler extends TestCase {
                 "    transactOn = 'Is it me that you wanted instead?'\n" +
                 "### LANGUAGE GROOVY;\n" +
                 "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
-                );
-        expectedError = "Procedure \"Foo\" code block does not contain the required \"transactOn\" closure";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                , "Procedure \"Foo\" code block does not contain the required \"transactOn\" closure");
 
-        fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE Foo AS ###\n" +
@@ -2568,11 +2498,9 @@ public class TestVoltCompiler extends TestCase {
                 "    }\n" +
                 "### LANGUAGE GROOVY;\n" +
                 "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
-                );
-        expectedError = "Schema file ended mid-statement (no semicolon found)";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                , "Schema file ended mid-statement (no semicolon found)");
 
-        fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE Foo AS ##\n" +
@@ -2583,11 +2511,9 @@ public class TestVoltCompiler extends TestCase {
                 "    }\n" +
                 "### LANGUAGE GROOVY;\n" +
                 "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
-                );
-        expectedError = "Schema file ended mid-statement (no semicolon found)";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                , "Schema file ended mid-statement (no semicolon found)");
 
-        fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE Foo AS ###\n" +
@@ -2598,9 +2524,7 @@ public class TestVoltCompiler extends TestCase {
                 "    }\n" +
                 "### LANGUAGE KROOVY;\n" +
                 "PARTITION PROCEDURE Foo ON TABLE PKEY_INTEGER COLUMN PKEY;"
-                );
-        expectedError = "### LANGUAGE KROOVY\", expected syntax: \"CREATE PROCEDURE [ALLOW";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                , "### LANGUAGE KROOVY\", expected syntax: \"CREATE PROCEDURE [ALLOW");
     }
 
     public void testValidGroovyProcedureDDL() throws Exception {
@@ -2714,34 +2638,26 @@ public class TestVoltCompiler extends TestCase {
         proc = db.getProcedures().get("p1");
         assertNull(proc);
 
-        ArrayList<Feedback> fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "creAte PrOcEdUrE FrOm CLasS org.voltdb.compiler.procedures.AddBook; " +
-                "DROP PROCEDURE NotAnnotatedAddBook;");
-        String expectedError =
-                "Dropped Procedure \"NotAnnotatedAddBook\" is not defined";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                "DROP PROCEDURE NotAnnotatedAddBook;"
+                , "Dropped Procedure \"NotAnnotatedAddBook\" is not defined");
 
         // Make sure we can't drop a CRUD procedure (full name)
-        fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "DROP PROCEDURE PKEY_INTEGER.insert;"
-                );
-        expectedError =
-                "Dropped Procedure \"PKEY_INTEGER.insert\" is not defined";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                , "Dropped Procedure \"PKEY_INTEGER.insert\" is not defined");
 
         // Make sure we can't drop a CRUD procedure (partial name)
-        fbs = checkInvalidLiteralSchema(
+        checkDDLErrorMessage(
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "DROP PROCEDURE insert;"
-                );
-        expectedError =
-                "Dropped Procedure \"insert\" is not defined";
-        assertTrue(isFeedbackPresent(expectedError, fbs));
+                , "Dropped Procedure \"insert\" is not defined");
 
         // check if exists
         db = goodDDLAgainstSimpleSchema(
@@ -2751,14 +2667,6 @@ public class TestVoltCompiler extends TestCase {
                 );
         proc = db.getProcedures().get("p1");
         assertNull(proc);
-    }
-
-    private ArrayList<Feedback> checkInvalidLiteralSchema(String ddl) {
-        final String schemaPath = MiscUtils.writeStringToTempFilePath(ddl);
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compileFromDDL(compiler, schemaPath);
-        assertFalse(success);
-        return compiler.m_errors;
     }
 
     public void testValidAnnotatedProcedureDLL() throws Exception {

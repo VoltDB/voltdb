@@ -181,6 +181,10 @@ public class TestAdminMode extends RegressionSuite
             results = adminclient.callProcedure("@SystemInformation").getResults();
             checkSystemInformationClusterState(results[0], "Paused");
         }
+        catch (Exception e) {
+            e.printStackTrace();
+            fail(e.toString());
+        }
         finally {
             adminclient.close();
             client.close();
