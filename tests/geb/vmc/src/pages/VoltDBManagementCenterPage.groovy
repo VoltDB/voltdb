@@ -35,7 +35,7 @@ import org.openqa.selenium.JavascriptExecutor
  */
 class VoltDBManagementCenterPage extends Page {
 
-    static url = 'http://localhost:8080/'
+    static url = '/'  // relative to the baseUrl
     static content = {
         navTabs { $('#nav') }
         dbMonitorTab { navTabs.find('#navDbmonitor') }
