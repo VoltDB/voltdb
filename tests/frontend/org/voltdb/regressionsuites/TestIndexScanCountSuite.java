@@ -460,33 +460,33 @@ public class TestIndexScanCountSuite extends RegressionSuite {
 
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(BatchedMultiPartitionTest.class.getResource("sqlindex-ddl.sql"));
-        project.addProcedures(PROCEDURES);
+        project.catBuilder().addSchema(BatchedMultiPartitionTest.class.getResource("sqlindex-ddl.sql"))
+        .addProcedures(PROCEDURES)
 
-        project.addStmtProcedure("TU1_LT",       "SELECT COUNT(ID) FROM TU1 WHERE POINTS < ?");
-        project.addStmtProcedure("TU1_LET",       "SELECT COUNT(ID) FROM TU1 WHERE POINTS <= ?");
-        project.addStmtProcedure("TU1_GT",       "SELECT COUNT(ID) FROM TU1 WHERE POINTS > ?");
-        project.addStmtProcedure("TU1_GET",       "SELECT COUNT(ID) FROM TU1 WHERE POINTS >= ?");
+        .addStmtProcedure("TU1_LT",      "SELECT COUNT(ID) FROM TU1 WHERE POINTS < ?")
+        .addStmtProcedure("TU1_LET",     "SELECT COUNT(ID) FROM TU1 WHERE POINTS <= ?")
+        .addStmtProcedure("TU1_GT",      "SELECT COUNT(ID) FROM TU1 WHERE POINTS > ?")
+        .addStmtProcedure("TU1_GET",     "SELECT COUNT(ID) FROM TU1 WHERE POINTS >= ?")
 
-        project.addStmtProcedure("TU3_LT",       "SELECT COUNT(ID) FROM TU3 WHERE TEL = ? AND POINTS < ?");
-        project.addStmtProcedure("TU3_LET",       "SELECT COUNT(ID) FROM TU3 WHERE TEL = ? AND POINTS <= ?");
-        project.addStmtProcedure("TU3_GT_LT",       "SELECT COUNT(ID) FROM TU3 WHERE TEL = ? AND POINTS > ? AND POINTS < ?");
-        project.addStmtProcedure("TU3_GT_LET",       "SELECT COUNT(ID) FROM TU3 WHERE TEL = ? AND POINTS > ? AND POINTS <= ?");
-        project.addStmtProcedure("TU3_GET_LT",       "SELECT COUNT(ID) FROM TU3 WHERE TEL = ? AND POINTS >= ? AND POINTS < ?");
-        project.addStmtProcedure("TU3_GET_LET",       "SELECT COUNT(ID) FROM TU3 WHERE TEL = ? AND POINTS >= ? AND POINTS <= ?");
+        .addStmtProcedure("TU3_LT",      "SELECT COUNT(ID) FROM TU3 WHERE TEL = ? AND POINTS < ?")
+        .addStmtProcedure("TU3_LET",     "SELECT COUNT(ID) FROM TU3 WHERE TEL = ? AND POINTS <= ?")
+        .addStmtProcedure("TU3_GT_LT",   "SELECT COUNT(ID) FROM TU3 WHERE TEL = ? AND POINTS > ? AND POINTS < ?")
+        .addStmtProcedure("TU3_GT_LET",  "SELECT COUNT(ID) FROM TU3 WHERE TEL = ? AND POINTS > ? AND POINTS <= ?")
+        .addStmtProcedure("TU3_GET_LT",  "SELECT COUNT(ID) FROM TU3 WHERE TEL = ? AND POINTS >= ? AND POINTS < ?")
+        .addStmtProcedure("TU3_GET_LET", "SELECT COUNT(ID) FROM TU3 WHERE TEL = ? AND POINTS >= ? AND POINTS <= ?")
 
-        project.addStmtProcedure("TM1_LT",       "SELECT COUNT(ID) FROM TM1 WHERE POINTS < ?");
-        project.addStmtProcedure("TM1_LET",       "SELECT COUNT(ID) FROM TM1 WHERE POINTS <= ?");
-        project.addStmtProcedure("TM1_GT",       "SELECT COUNT(ID) FROM TM1 WHERE POINTS > ?");
-        project.addStmtProcedure("TM1_GET",       "SELECT COUNT(ID) FROM TM1 WHERE POINTS >= ?");
+        .addStmtProcedure("TM1_LT",      "SELECT COUNT(ID) FROM TM1 WHERE POINTS < ?")
+        .addStmtProcedure("TM1_LET",     "SELECT COUNT(ID) FROM TM1 WHERE POINTS <= ?")
+        .addStmtProcedure("TM1_GT",      "SELECT COUNT(ID) FROM TM1 WHERE POINTS > ?")
+        .addStmtProcedure("TM1_GET",     "SELECT COUNT(ID) FROM TM1 WHERE POINTS >= ?")
 
-        project.addStmtProcedure("TM2_LT",       "SELECT COUNT(ID) FROM TM2 WHERE UNAME = ? AND POINTS < ?");
-        project.addStmtProcedure("TM2_LET",       "SELECT COUNT(ID) FROM TM2 WHERE UNAME = ? AND POINTS <= ?");
-        project.addStmtProcedure("TM2_GT_LT",       "SELECT COUNT(ID) FROM TM2 WHERE UNAME = ? AND POINTS > ? AND POINTS < ?");
-        project.addStmtProcedure("TM2_GT_LET",       "SELECT COUNT(ID) FROM TM2 WHERE UNAME = ? AND POINTS > ? AND POINTS <= ?");
-        project.addStmtProcedure("TM2_GET_LT",       "SELECT COUNT(ID) FROM TM2 WHERE UNAME = ? AND POINTS >= ? AND POINTS < ?");
-        project.addStmtProcedure("TM2_GET_LET",       "SELECT COUNT(ID) FROM TM2 WHERE UNAME = ? AND POINTS >= ? AND POINTS <= ?");
-        boolean success;
+        .addStmtProcedure("TM2_LT",      "SELECT COUNT(ID) FROM TM2 WHERE UNAME = ? AND POINTS < ?")
+        .addStmtProcedure("TM2_LET",     "SELECT COUNT(ID) FROM TM2 WHERE UNAME = ? AND POINTS <= ?")
+        .addStmtProcedure("TM2_GT_LT",   "SELECT COUNT(ID) FROM TM2 WHERE UNAME = ? AND POINTS > ? AND POINTS < ?")
+        .addStmtProcedure("TM2_GT_LET",  "SELECT COUNT(ID) FROM TM2 WHERE UNAME = ? AND POINTS > ? AND POINTS <= ?")
+        .addStmtProcedure("TM2_GET_LT",  "SELECT COUNT(ID) FROM TM2 WHERE UNAME = ? AND POINTS >= ? AND POINTS < ?")
+        .addStmtProcedure("TM2_GET_LET", "SELECT COUNT(ID) FROM TM2 WHERE UNAME = ? AND POINTS >= ? AND POINTS <= ?")
+        ;
 
         /////////////////////////////////////////////////////////////
         // CONFIG #1: 1 Local Site/Partitions running on JNI backend
@@ -494,11 +494,8 @@ public class TestIndexScanCountSuite extends RegressionSuite {
 
         // get a server config for the native backend with one sites/partitions
         config = new LocalCluster("sqlIndex-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-
         // build the jarfile
-        success = config.compile(project);
-        assert(success);
-
+        assertTrue(config.compile(project));
         // add this config to the set of tests to run
         builder.addServerConfig(config);
 
@@ -507,16 +504,14 @@ public class TestIndexScanCountSuite extends RegressionSuite {
         /////////////////////////////////////////////////////////////
 
         config = new LocalCluster("sqlIndex-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        success = config.compile(project);
-        assert(success);
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
 
         /////////////////////////////////////////////////////////////
         // CONFIG #3: 2 Local Site/Partitions running on JNI backend
         /////////////////////////////////////////////////////////////
         config = new LocalCluster("sql-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assert(success);
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
 
         return builder;

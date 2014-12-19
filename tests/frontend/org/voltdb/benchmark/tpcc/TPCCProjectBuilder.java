@@ -44,6 +44,7 @@ import org.voltdb.benchmark.tpcc.procedures.paymentByCustomerNameC;
 import org.voltdb.benchmark.tpcc.procedures.paymentByCustomerNameW;
 import org.voltdb.benchmark.tpcc.procedures.slev;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.BuildDirectoryUtils;
 
@@ -68,6 +69,11 @@ public class TPCCProjectBuilder extends VoltProjectBuilder {
         paymentByCustomerName.class, paymentByCustomerId.class
     };
 
+    // procedures used by TestUpdateDeployment
+    private static Class<?>[] BASEPROCS = { org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
+        org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
+        org.voltdb.benchmark.tpcc.procedures.delivery.class };
+
     public static String partitioning[][] = new String[][] {
         {"WAREHOUSE", "W_ID"},
         {"DISTRICT", "D_W_ID"},
@@ -86,38 +92,48 @@ public class TPCCProjectBuilder extends VoltProjectBuilder {
     /**
      * Add the TPC-C procedures to the VoltProjectBuilder base class.
      */
-    public void addDefaultProcedures() {
-        addProcedures(PROCEDURES);
-        addStmtProcedure("InsertCustomer", "INSERT INTO CUSTOMER VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", "CUSTOMER.C_W_ID: 2");
-        addStmtProcedure("InsertWarehouse", "INSERT INTO WAREHOUSE VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);", "WAREHOUSE.W_ID: 0");
-        addStmtProcedure("InsertStock", "INSERT INTO STOCK VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", "STOCK.S_W_ID: 1");
-        addStmtProcedure("InsertOrders", "INSERT INTO ORDERS VALUES (?, ?, ?, ?, ?, ?, ?, ?);", "ORDERS.O_W_ID: 2");
-        addStmtProcedure("InsertOrderLine", "INSERT INTO ORDER_LINE VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", "ORDER_LINE.OL_W_ID: 2");
-        addStmtProcedure("InsertNewOrder", "INSERT INTO NEW_ORDER VALUES (?, ?, ?);", "NEW_ORDER.NO_W_ID: 2");
-        addStmtProcedure("InsertItem", "INSERT INTO ITEM VALUES (?, ?, ?, ?, ?);");
-        addStmtProcedure("InsertHistory", "INSERT INTO HISTORY VALUES (?, ?, ?, ?, ?, ?, ?, ?);", "HISTORY.H_W_ID: 4");
-        addStmtProcedure("InsertDistrict", "INSERT INTO DISTRICT VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", "DISTRICT.D_W_ID: 1");
-        addStmtProcedure("InsertCustomerName", "INSERT INTO CUSTOMER_NAME VALUES (?, ?, ?, ?, ?);");
+    public TPCCProjectBuilder addDefaultProcedures() {
+        catBuilder().addProcedures(PROCEDURES)
+        .addStmtProcedure("InsertCustomer", "INSERT INTO CUSTOMER VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", "CUSTOMER.C_W_ID: 2")
+        .addStmtProcedure("InsertWarehouse", "INSERT INTO WAREHOUSE VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);", "WAREHOUSE.W_ID: 0")
+        .addStmtProcedure("InsertStock", "INSERT INTO STOCK VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", "STOCK.S_W_ID: 1")
+        .addStmtProcedure("InsertOrders", "INSERT INTO ORDERS VALUES (?, ?, ?, ?, ?, ?, ?, ?);", "ORDERS.O_W_ID: 2")
+        .addStmtProcedure("InsertOrderLine", "INSERT INTO ORDER_LINE VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", "ORDER_LINE.OL_W_ID: 2")
+        .addStmtProcedure("InsertNewOrder", "INSERT INTO NEW_ORDER VALUES (?, ?, ?);", "NEW_ORDER.NO_W_ID: 2")
+        .addStmtProcedure("InsertItem", "INSERT INTO ITEM VALUES (?, ?, ?, ?, ?);")
+        .addStmtProcedure("InsertHistory", "INSERT INTO HISTORY VALUES (?, ?, ?, ?, ?, ?, ?, ?);", "HISTORY.H_W_ID: 4")
+        .addStmtProcedure("InsertDistrict", "INSERT INTO DISTRICT VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", "DISTRICT.D_W_ID: 1")
+        .addStmtProcedure("InsertCustomerName", "INSERT INTO CUSTOMER_NAME VALUES (?, ?, ?, ?, ?);")
+        ;
+        return this;
+    }
+
+    public TPCCProjectBuilder addBaseProcedures() {
+        catBuilder().addProcedures(BASEPROCS);
+        return this;
     }
 
     /**
      * Add the TPC-C partitioning to the VoltProjectBuilder base class.
      */
-    public void addDefaultPartitioning() {
+    public TPCCProjectBuilder addDefaultPartitioning() {
+        CatalogBuilder cb = catBuilder();
         for (String pair[] : partitioning) {
-            addPartitionInfo(pair[0], pair[1]);
+            cb.addPartitionInfo(pair[0], pair[1]);
         }
+        return this;
     }
 
     /**
      * Add the TPC-C schema to the VoltProjectBuilder base class.
      */
-    public void addDefaultSchema() {
-        addSchema(ddlURL);
+    public TPCCProjectBuilder addDefaultSchema() {
+        catBuilder().addSchema(ddlURL);
+        return this;
     }
 
     public void addDefaultExport() {
-        addExport(true /* enabled */);
+        depBuilder().addExport(true /* enabled */, null, null);
 
         /* Fixed after the loader completes. */
         // setTableAsExportOnly("WAREHOUSE");
@@ -133,26 +149,15 @@ public class TPCCProjectBuilder extends VoltProjectBuilder {
         // setTableAsExportOnly("NEW_ORDER");     // 1 insert per new order; 10 deletes per delivery (4%)
         // setTableAsExportOnly("ORDER_LINE");    // 10 inserts per new order */
 
-        setTableAsExportOnly("HISTORY");
+        catBuilder().setTableAsExportOnly("HISTORY");
     }
 
-    public String[] compileAllCatalogs(int sitesPerHost,
-                                       int length,
-                                       int kFactor,
-                                       String voltRoot) {
-        addAllDefaults();
-        Catalog catalog = compile(m_jarFileName, sitesPerHost,
-                                  length, kFactor, voltRoot);
-        if (catalog == null) {
-            throw new RuntimeException("Bingo project builder failed app compilation.");
-        }
-        return new String[] {m_jarFileName};
-    }
-
-    public void addAllDefaults() {
-        addDefaultProcedures();
-        addDefaultPartitioning();
-        addDefaultSchema();
+    // factory method
+    public static TPCCProjectBuilder defaultBuilder() {
+        return new TPCCProjectBuilder()
+        .addDefaultSchema()
+        .addDefaultProcedures()
+        .addDefaultPartitioning();
         // addDefaultExport();
     }
 
@@ -161,25 +166,17 @@ public class TPCCProjectBuilder extends VoltProjectBuilder {
     /**
      * Get a pointer to a compiled catalog for TPCC with all the procedures.
      */
-    public Catalog createTPCCSchemaCatalog() throws IOException {
+    static public Catalog createTPCCSchemaCatalog() throws IOException {
         // compile a catalog
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         String catalogJar = testDir + File.separator + "tpcc-jni.jar";
 
-        addDefaultSchema();
-        addDefaultPartitioning();
-        addDefaultProcedures();
+        TPCCProjectBuilder builder = defaultBuilder();
+        Catalog catalog = builder.compileToCatalog(catalogJar);
+        builder.setDeploymentPath(builder.compileToDeployment(1, 1, 0));
 
-        Catalog catalog = compile(catalogJar, 1, 1, 0, null);
         assert(catalog != null);
         return catalog;
     }
 
-    /**
-     * Get a pointer to a compiled catalog for TPCC with all the procedures.
-     * This can be run without worrying about setting up anything else in this class.
-     */
-    static public Catalog getTPCCSchemaCatalog() throws IOException {
-        return (new TPCCProjectBuilder().createTPCCSchemaCatalog());
-    }
 }

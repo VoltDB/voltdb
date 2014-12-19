@@ -83,50 +83,37 @@ public class TestFailureDetectSuite extends RegressionSuite
             new MultiConfigSuiteBuilder(TestFailureDetectSuite.class);
 
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(SelectEmptyTable.class.getResource("replication-ddl.sql"));
-        project.addPartitionInfo("P1", "ID");
-        project.addStmtProcedure("InsertSinglePart",
-                                 "INSERT INTO P1 VALUES (?, ?, ?, ?);",
-                                 "P1.ID: 0");
-        project.addStmtProcedure("UpdateSinglePart",
-                                 "UPDATE P1 SET P1.NUM = ? WHERE P1.ID = ?",
-                                 "P1.ID: 0");
-        project.addStmtProcedure("SelectSinglePart",
-                                 "SELECT * FROM P1 WHERE P1.ID = ?",
-                                 "P1.ID: 0");
-        project.addStmtProcedure("InsertMultiPart",
-                                 "INSERT INTO P1 VALUES (?, ?, ?, ?);");
-        project.addStmtProcedure("SelectMultiPart", "SELECT * FROM P1");
-        project.addStmtProcedure("UpdateMultiPart",
-                                 "UPDATE P1 SET P1.NUM = ?");
-        project.addStmtProcedure("InsertMultiPartRepl",
-                                 "INSERT INTO R1 VALUES (?, ?, ?, ?);");
-        project.addStmtProcedure("SelectMultiPartRepl", "SELECT * FROM R1");
-        project.addStmtProcedure("UpdateMultiPartRepl",
-                                 "UPDATE R1 SET R1.NUM = ?");
+        project.catBuilder().addSchema(SelectEmptyTable.class.getResource("replication-ddl.sql"))
+        .addPartitionInfo("P1", "ID")
+        .addStmtProcedure("InsertSinglePart", "INSERT INTO P1 VALUES (?, ?, ?, ?);", "P1.ID: 0")
+        .addStmtProcedure("UpdateSinglePart", "UPDATE P1 SET P1.NUM = ? WHERE P1.ID = ?", "P1.ID: 0")
+        .addStmtProcedure("SelectSinglePart", "SELECT * FROM P1 WHERE P1.ID = ?", "P1.ID: 0")
+        .addStmtProcedure("InsertMultiPart", "INSERT INTO P1 VALUES (?, ?, ?, ?);")
+        .addStmtProcedure("SelectMultiPart", "SELECT * FROM P1")
+        .addStmtProcedure("UpdateMultiPart", "UPDATE P1 SET P1.NUM = ?")
+        .addStmtProcedure("InsertMultiPartRepl", "INSERT INTO R1 VALUES (?, ?, ?, ?);")
+        .addStmtProcedure("SelectMultiPartRepl", "SELECT * FROM R1")
+        .addStmtProcedure("UpdateMultiPartRepl", "UPDATE R1 SET R1.NUM = ?")
+        ;
 
         // CLUSTER, two hosts, each with two sites, replication of 1
-        config = new LocalCluster("replication-1-cluster.jar", 2, 2,
-                                  1, BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
+        config = new LocalCluster("replication-1-cluster.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
 
         // CLUSTER, three hosts, each with two sites, replication of 2
-        config = new LocalCluster("replication-2-cluster.jar", 2, 3,
-                                  2, BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
+        config = new LocalCluster("replication-2-cluster.jar", 2, 3, 2, BackendTarget.NATIVE_EE_JNI);
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
 
 //        // CLUSTER, four hosts, each with three sites, replication of 2
-//        config = new LocalCluster("replication-2-cluster.jar", 3, 4,
-//                                  2, BackendTarget.NATIVE_EE_JNI);
-//        config.compile(project);
+//        config = new LocalCluster("replication-2-cluster.jar", 3, 4, 2, BackendTarget.NATIVE_EE_JNI);
+//        assertTrue(config.compile(project));
 //        builder.addServerConfig(config);
 //
 //        // CLUSTER, 3 hosts, each with one site, replication of 1
-//        config = new LocalCluster("replication-odd-cluster.jar", 1, 3,
-//                                  1, BackendTarget.NATIVE_EE_JNI);
-//        config.compile(project);
+//        config = new LocalCluster("replication-odd-cluster.jar", 1, 3, 1, BackendTarget.NATIVE_EE_JNI);
+//        assertTrue(config.compile(project));
 //        builder.addServerConfig(config);
 
         return builder;

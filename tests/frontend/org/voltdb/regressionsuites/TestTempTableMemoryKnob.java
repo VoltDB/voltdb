@@ -93,23 +93,21 @@ public class TestTempTableMemoryKnob extends RegressionSuite {
         // the suite made here will all be using the tests from this class
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestTempTableMemoryKnob.class);
 
+        // build up a project builder for the workload
+        VoltProjectBuilder project = new VoltProjectBuilder();
+        project.catBuilder().addSchema(FetchTooMuch.class.getResource("failures-ddl.sql"))
+        .addProcedures(PROCEDURES)
+        ;
         /////////////////////////////////////////////////////////////
         // CONFIG #1: 1 Local Site/Partitions running on JNI backend
         /////////////////////////////////////////////////////////////
 
         // get a server config for the native backend with two sites/partitions
-        VoltServerConfig config = new LocalCluster("tempknob-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-
-        // build up a project builder for the workload
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(FetchTooMuch.class.getResource("failures-ddl.sql"));
-        project.addProcedures(PROCEDURES);
+        LocalCluster config = new LocalCluster("tempknob-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
         // Give ourselves a little leeway for slop over 300 MB
-        project.setMaxTempTableMemory(320);
+        project.depBuilder().setMaxTempTableMemory(320);
         // build the jarfile
-        if (!config.compile(project))
-            fail();
-
+        assertTrue(config.compile(project));
         // add this config to the set of tests to run
         builder.addServerConfig(config);
 

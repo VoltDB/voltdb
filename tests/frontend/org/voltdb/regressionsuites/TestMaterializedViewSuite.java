@@ -1200,12 +1200,10 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
         //project.setBackendTarget(BackendTarget.NATIVE_EE_IPC);
-        project.addSchema(schemaPath);
-
-        project.addProcedures(PROCEDURES);
+        project.catBuilder().addSchema(schemaPath)
+        .addProcedures(PROCEDURES);
         // build the jarfile
-        boolean success = config.compile(project);
-        assertTrue(success);
+        assertTrue(config.compile(project));
 
         // add this config to the set of tests to run
         builder.addServerConfig(config);
@@ -1215,16 +1213,14 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         /////////////////////////////////////////////////////////////
 
         config = new LocalCluster("matview-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        success = config.compile(project);
-        assertTrue(success);
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
 
         /////////////////////////////////////////////////////////////
         // CONFIG #3: 3-node k=1 cluster
         /////////////////////////////////////////////////////////////
         config = new LocalCluster("matview-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
 
         return builder;

@@ -50,10 +50,9 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
     {
         final URL url = TestDDLFeatures.class.getResource("fullDDL.sql");
         String schemaPath = URLDecoder.decode(url.getPath(), "UTF-8");
-        builder.addSchema(schemaPath);
+        builder.catBuilder().addSchema(schemaPath);
 
-        boolean success = builder.compile(pathToCatalog);
-        assertTrue(success);
+        assertTrue(builder.compile(pathToCatalog));
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
 
         VoltDB.Configuration config = new VoltDB.Configuration();
@@ -173,7 +172,6 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
     public void testCreateTableConstraint() throws Exception {
         ClientResponse resp;
         boolean threw;
-        VoltTable vt;
 
         // Test for T9
         assertTrue(findTableInSystemCatalogResults("T9"));
@@ -378,7 +376,6 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
     public void testAlterTableDropConstraint() throws Exception {
         ClientResponse resp;
         boolean threw;
-        VoltTable vt;
 
         // Test for T35
         assertTrue(findTableInSystemCatalogResults("T35"));
@@ -478,7 +475,6 @@ public class TestDDLFeatures extends AdhocDDLTestBase {
     public void testAlterTableAddConstraint() throws Exception {
         ClientResponse resp;
         boolean threw;
-        VoltTable vt;
 
         // Test for T40
         assertTrue(findTableInSystemCatalogResults("T40"));

@@ -444,37 +444,34 @@ public class TestUnionSuite extends RegressionSuite {
     }
 
     static public junit.framework.Test suite() {
-        VoltServerConfig config = null;
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(
-                TestUnionSuite.class);
+        LocalCluster config = null;
+        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestUnionSuite.class);
         VoltProjectBuilder project = new VoltProjectBuilder();
 
-        project.addSchema(TestUnionSuite.class.getResource("testunion-ddl.sql"));
-        project.addStmtProcedure("InsertA", "INSERT INTO A VALUES(?, ?);");
-        project.addStmtProcedure("InsertB", "INSERT INTO B VALUES(?, ?);");
-        project.addStmtProcedure("InsertC", "INSERT INTO C VALUES(?, ?);");
-        project.addStmtProcedure("InsertD", "INSERT INTO D VALUES(?, ?);");
+        project.catBuilder().addSchema(TestUnionSuite.class.getResource("testunion-ddl.sql"))
+        .addStmtProcedure("InsertA", "INSERT INTO A VALUES(?, ?);")
+        .addStmtProcedure("InsertB", "INSERT INTO B VALUES(?, ?);")
+        .addStmtProcedure("InsertC", "INSERT INTO C VALUES(?, ?);")
+        .addStmtProcedure("InsertD", "INSERT INTO D VALUES(?, ?);")
         // Test that parameterized query with union compiles properly.
-        project.addStmtProcedure("UnionBCD",
+        .addStmtProcedure("UnionBCD",
                 "((SELECT I FROM B WHERE PKEY = ?) UNION " +
                 "    (SELECT I FROM C WHERE PKEY = CHAR_LENGTH(''||?))) UNION " +
-                "        SELECT I FROM D WHERE PKEY = ?");
-
+                "        SELECT I FROM D WHERE PKEY = ?")
+        ;
         // local
         config = new LocalCluster("testunion-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        if (!config.compile(project)) {
-            fail();
-        }
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
 
         // Cluster
         config = new LocalCluster("testunion-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        if (!config.compile(project)) fail();
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
 
         // HSQLDB
         config = new LocalCluster("testunion-cluster.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        if (!config.compile(project)) fail();
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
 
         return builder;

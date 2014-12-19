@@ -54,11 +54,6 @@ public class TestUpdateDeployment extends RegressionSuite {
     static final int HOSTS = 2;
     static final int K = MiscUtils.isPro() ? 1 : 0;
 
-    // procedures used by these tests
-    static Class<?>[] BASEPROCS = { org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
-                                    org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
-                                    org.voltdb.benchmark.tpcc.procedures.delivery.class };
-
     /**
      * Constructor needed for JUnit. Should just pass on parameters to superclass.
      * @param name The name of the method to test. This is just passed to the superclass.
@@ -340,20 +335,17 @@ public class TestUpdateDeployment extends RegressionSuite {
         /////////////////////////////////////////////////////////////
 
         // get a server config for the native backend with one sites/partitions
-        VoltServerConfig config = new LocalCluster("catalogupdate-cluster-base.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        LocalCluster config = new LocalCluster("catalogupdate-cluster-base.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
 
         // Catalog upgrade test(s) sporadically fail if there's a local server because
         // a file pipe isn't available for grepping local server output.
-        ((LocalCluster) config).setHasLocalServer(true);
+        config.setHasLocalServer(true);
 
         // build up a project builder for the workload
-        TPCCProjectBuilder project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
+        TPCCProjectBuilder project = new TPCCProjectBuilder().addDefaultSchema().addDefaultPartitioning();
+        project.addBaseProcedures();
         // build the jarfile
-        boolean basecompile = config.compile(project);
-        assertTrue(basecompile);
+        assertTrue(config.compile(project));
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-base.xml"));
 
         // add this config to the set of tests to run
@@ -368,70 +360,54 @@ public class TestUpdateDeployment extends RegressionSuite {
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
-        project.addLiteralSchema("CREATE TABLE NEWTABLE (A1 INTEGER, PRIMARY KEY (A1));");
-        project.setDeadHostTimeout(6);
-        boolean compile = config.compile(project);
-        assertTrue(compile);
+        project.catBuilder().addLiteralSchema("CREATE TABLE NEWTABLE (A1 INTEGER, PRIMARY KEY (A1));");
+        project.depBuilder().setDeadHostTimeout(6);
+        assertTrue(config.compile(project));
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-addtable.xml"));
 
         // A catalog change that enables snapshots
         config = new LocalCluster("catalogupdate-cluster-enable_snapshot.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
-        project.setSnapshotSettings( "1s", 3, "/tmp/snapshotdir1", "foo1");
+        project = new TPCCProjectBuilder().addDefaultSchema().addDefaultPartitioning();
+        project.addBaseProcedures();
+        project.depBuilder().setSnapshotSettings("1s", 3, "/tmp/snapshotdir1", "foo1");
         // build the jarfile
-        compile = config.compile(project);
-        assertTrue(compile);
+        assertTrue(config.compile(project));
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-enable_snapshot.xml"));
 
         //Another catalog change to modify the schedule
         config = new LocalCluster("catalogupdate-cluster-change_snapshot.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
+        project = new TPCCProjectBuilder().addDefaultSchema().addDefaultPartitioning();
+        project.addBaseProcedures();
         project.setSnapshotSettings( "1s", 3, "/tmp/snapshotdir2", "foo2");
         // build the jarfile
-        compile = config.compile(project);
-        assertTrue(compile);
+        assertTrue(config.compile(project));
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot.xml"));
 
         //Another catalog change to modify the schedule
         config = new LocalCluster("catalogupdate-cluster-change_snapshot_dir_not_exist.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
+        project = new TPCCProjectBuilder().addDefaultSchema().addDefaultPartitioning();
+        project.addBaseProcedures();
         project.setSnapshotSettings( "1s", 3, "/tmp/snapshotdirasda2", "foo2");
         // build the jarfile
-        compile = config.compile(project);
-        assertTrue(compile);
+        assertTrue(config.compile(project));
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot_dir_not_exist.xml"));
 
         // A deployment change that changes the schema change mechanism
         config = new LocalCluster("catalogupdate-cluster-change_schema_update.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
+        project = new TPCCProjectBuilder().addDefaultSchema().addDefaultPartitioning();
+        project.addBaseProcedures();
         project.setUseDDLSchema(true);
         // build the jarfile
-        compile = config.compile(project);
-        assertTrue(compile);
+        assertTrue(config.compile(project));
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_schema_update.xml"));
 
         // A deployment change that changes the schema change mechanism
         config = new LocalCluster("catalogupdate-security-no-users.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
-        project.setSecurityEnabled(true, false);
+        project = new TPCCProjectBuilder().addDefaultSchema().addDefaultPartitioning();
+        project.addBaseProcedures();
+        project.depBuilder().setSecurityEnabled(true, false);
         // build the jarfile
-        compile = config.compile(project);
-        assertTrue(compile);
+        assertTrue(config.compile(project));
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-security-no-users.xml"));
 
         return builder;

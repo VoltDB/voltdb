@@ -168,25 +168,24 @@ public class TestProcedureAPISuite extends RegressionSuite {
      * @return The TestSuite containing all the tests to be run.
      */
     static public Test suite() {
+        LocalCluster config = null;
         // the suite made here will all be using the tests from this class
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestProcedureAPISuite.class);
 
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(TestProcedureAPISuite.class.getResource("procedureapisuite-ddl.sql"));
-        project.addPartitionInfo("P1", "ID");
-        project.addProcedures(PROCEDURES);
-
+        project.catBuilder().addSchema(TestProcedureAPISuite.class.getResource("procedureapisuite-ddl.sql"))
+        .addPartitionInfo("P1", "ID")
+        .addProcedures(PROCEDURES)
+        ;
         /////////////////////////////////////////////////////////////
         // CONFIG #1: 2 Local Site/Partitions running on JNI backend
         /////////////////////////////////////////////////////////////
 
         // get a server config for the native backend with two sites/partitions
-        VoltServerConfig config = new LocalCluster("failures-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-
+        config = new LocalCluster("failures-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
         // build the jarfile (note the reuse of the TPCC project)
-        if (!config.compile(project)) fail();
-
+        assertTrue(config.compile(project));
         // add this config to the set of tests to run
         builder.addServerConfig(config);
 
@@ -196,10 +195,8 @@ public class TestProcedureAPISuite extends RegressionSuite {
 
         // get a server config that similar, but doesn't use the same backend
         config = new LocalCluster("failures-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-
         // build the jarfile (note the reuse of the TPCC project)
-        if (!config.compile(project)) fail();
-
+        assertTrue(config.compile(project));
         // add this config to the set of tests to run
         builder.addServerConfig(config);
 
@@ -207,7 +204,7 @@ public class TestProcedureAPISuite extends RegressionSuite {
         // CONFIG #3: N=2 K=1 Cluster
         /////////////////////////////////////////////////////////////
         config = new LocalCluster("failures-cluster.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
-        if (!config.compile(project)) fail();
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
 
         return builder;

@@ -42,8 +42,7 @@ public class TestPlannerTool extends TestCase {
     PlannerTool m_pt = null;
 
     public void testSimple() throws IOException {
-        TPCCProjectBuilder builder = new TPCCProjectBuilder();
-        builder.addAllDefaults();
+        TPCCProjectBuilder builder = TPCCProjectBuilder.defaultBuilder();
         final File jar = new File("tpcc-oop.jar");
         jar.deleteOnExit();
 

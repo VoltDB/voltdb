@@ -18,7 +18,6 @@
 package org.voltdb.compiler;
 
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
@@ -33,6 +32,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 
+import org.jfree.util.Log;
 import org.voltdb.ProcInfoData;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.utils.MiscUtils;
@@ -56,7 +56,7 @@ public class CatalogBuilder {
         private final String m_sql;
         private final String m_partitionInfo;
 
-        public ProcedureInfo(final String roles[], final Class<?> cls) {
+        public ProcedureInfo(final Class<?> cls, final String... roles) {
             m_roles = roles;
             m_class = cls;
             m_name = cls.getSimpleName();
@@ -151,11 +151,7 @@ public class CatalogBuilder {
 
     private List<String> m_diagnostics;
 
-    public void addAllDefaults() {
-        // does nothing in the base class
-    }
-
-    public void addRoles(final RoleInfo roles[]) {
+    public CatalogBuilder addRoles(final RoleInfo... roles) {
         for (final RoleInfo info : roles) {
             transformer.append("CREATE ROLE " + info.name);
             if(info.sql || info.sqlread || info.defaultproc || info.admin || info.defaultprocread || info.allproc) {
@@ -184,31 +180,39 @@ public class CatalogBuilder {
                 transformer.append(";");
             }
         }
+        return this;
     }
 
-    public void addSchema(final URL schemaURL) {
+    public CatalogBuilder addSchema(final URL schemaURL) {
         assert(schemaURL != null);
         addSchema(schemaURL.getPath());
+        return this;
     }
 
     /**
      * This is test code written by Ryan, even though it was
      * committed by John.
      */
-    public void addLiteralSchema(String ddlText) throws IOException {
-        File temp = File.createTempFile("literalschema", "sql");
-        temp.deleteOnExit();
-        FileWriter out = new FileWriter(temp);
-        out.write(ddlText);
-        out.close();
-        addSchema(URLEncoder.encode(temp.getAbsolutePath(), "UTF-8"));
+    public CatalogBuilder addLiteralSchema(String ddlText) {
+        File temp;
+        try {
+            temp = File.createTempFile("literalschema", "sql");
+            temp.deleteOnExit();
+            MiscUtils.writeStringToFile(temp, ddlText);
+            addSchema(URLEncoder.encode(temp.getAbsolutePath(), "UTF-8"));
+            return this;
+        } catch (IOException e) {
+            Log.error("Failed write to temporary schema file.");
+            e.printStackTrace();
+            throw new RuntimeException(e); // good enough for tests
+        }
     }
 
     /**
      * Add a schema based on a URL.
      * @param schemaURL Schema file URL
      */
-    public void addSchema(String schemaURL) {
+    public CatalogBuilder addSchema(String schemaURL) {
         try {
             schemaURL = URLDecoder.decode(schemaURL, "UTF-8");
         } catch (final UnsupportedEncodingException e) {
@@ -224,31 +228,35 @@ public class CatalogBuilder {
         //    : "can't read file: " + schemaPath;
 
         m_schemas.add(schemaURL);
+        return this;
     }
 
-    public void addStmtProcedure(String name, String sql) {
+    public CatalogBuilder addStmtProcedure(String name, String sql) {
         addStmtProcedure(name, sql, null);
+        return this;
     }
 
-    public void addStmtProcedure(String name, String sql, String partitionInfo) {
+    public CatalogBuilder addStmtProcedure(String name, String sql, String partitionInfo) {
         addProcedures(new ProcedureInfo(new String[0], name, sql, partitionInfo));
+        return this;
     }
 
-    public void addProcedures(final Class<?>... procedures) {
-        final ArrayList<ProcedureInfo> procArray = new ArrayList<ProcedureInfo>();
-        for (final Class<?> procedure : procedures)
-            procArray.add(new ProcedureInfo(new String[0], procedure));
-        addProcedures(procArray);
+    public CatalogBuilder addProcedures(final Class<?>... procedures) {
+        for (final Class<?> procedure : procedures) {
+            addProcedures(new ProcedureInfo(procedure));
+        }
+        return this;
     }
 
     /*
      * List of roles permitted to invoke the procedure
      */
-    public void addProcedures(final ProcedureInfo... procedures) {
+    public CatalogBuilder addProcedures(final ProcedureInfo... procedures) {
         addProcedures(Arrays.asList(procedures));
+        return this;
     }
 
-    public void addProcedures(final Iterable<ProcedureInfo> procedures) {
+    public CatalogBuilder addProcedures(final Iterable<ProcedureInfo> procedures) {
         // check for duplicates and existings
         final HashSet<ProcedureInfo> newProcs = new HashSet<ProcedureInfo>();
         for (final ProcedureInfo procedure : procedures) {
@@ -287,16 +295,18 @@ public class CatalogBuilder {
                 transformer.append("PARTITION PROCEDURE " + procedure.m_name + " ON TABLE " + token[0] + " COLUMN " + token[1] + position + ";");
             }
         }
+        return this;
     }
 
-    public void addSupplementalClasses(final Class<?>... supplementals) {
+    public CatalogBuilder addSupplementalClasses(final Class<?>... supplementals) {
         final ArrayList<Class<?>> suppArray = new ArrayList<Class<?>>();
         for (final Class<?> supplemental : supplementals)
             suppArray.add(supplemental);
         addSupplementalClasses(suppArray);
+        return this;
     }
 
-    public void addSupplementalClasses(final Iterable<Class<?>> supplementals) {
+    public CatalogBuilder addSupplementalClasses(final Iterable<Class<?>> supplementals) {
         // check for duplicates and existings
         final HashSet<Class<?>> newSupps = new HashSet<Class<?>>();
         for (final Class<?> supplemental : supplementals) {
@@ -308,23 +318,28 @@ public class CatalogBuilder {
         // add the supplemental classes
         for (final Class<?> supplemental : supplementals)
             m_supplementals.add(supplemental);
+        return this;
     }
 
-    public void addPartitionInfo(final String tableName, final String partitionColumnName) {
+    public CatalogBuilder addPartitionInfo(final String tableName, final String partitionColumnName) {
         transformer.append("PARTITION TABLE " + tableName + " ON COLUMN " + partitionColumnName + ";");
+        return this;
     }
 
-    public void setTableAsExportOnly(String name) {
+    public CatalogBuilder setTableAsExportOnly(String name) {
         assert(name != null);
         transformer.append("Export TABLE " + name + ";");
+        return this;
     }
 
-    public void addExport(List<String> groups) {
+    public CatalogBuilder addExport(List<String> groups) {
         m_elAuthGroups = groups;
+        return this;
     }
 
-    public void setCompilerDebugPrintStream(final PrintStream out) {
+    public CatalogBuilder setCompilerDebugPrintStream(final PrintStream out) {
         m_compilerDebugPrintStream = out;
+        return this;
     }
 
     public byte[] compileToBytes() {
@@ -351,13 +366,8 @@ public class CatalogBuilder {
         assert(jarPath != null);
 
         // Add the DDL in the transformer to the schema files before compilation
-        try {
-            addLiteralSchema(transformer.toString());
-            transformer = new StringBuffer();
-        } catch (IOException e) {
-            e.printStackTrace();
-            return false;
-        }
+        addLiteralSchema(transformer.toString());
+        transformer = new StringBuffer();
 
         String[] schemaPath = m_schemas.toArray(new String[0]);
 
@@ -386,10 +396,11 @@ public class CatalogBuilder {
     }
 
     /** Provide a feedback path to monitor the VoltCompiler's plan output via harvestDiagnostics */
-    public void enableDiagnostics() {
+    public CatalogBuilder enableDiagnostics() {
         // This empty dummy value enables the feature and provides a default fallback return value,
         // but gets replaced in the normal code path.
         m_diagnostics = new ArrayList<String>();
+        return this;
     }
 
     /** Access the VoltCompiler's recent plan output, for diagnostic purposes */

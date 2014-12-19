@@ -50,12 +50,13 @@
 
 package org.voltdb;
 
+import org.voltdb.VoltDB.Configuration;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 
 public class TPCCServer {
     public static void main(String[] args) throws InterruptedException {
         VoltDB.Configuration config = new VoltDB.Configuration();
-        config.setPathToCatalogForTest("tpcc.jar");
+        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("tpcc.jar");
 
         int partitions = 1;
         boolean doCompile = true;
@@ -73,10 +74,7 @@ public class TPCCServer {
         }
 
         if (doCompile) {
-            TPCCProjectBuilder project = new TPCCProjectBuilder();
-            project.addDefaultSchema();
-            project.addDefaultProcedures();
-            project.addDefaultPartitioning();
+            TPCCProjectBuilder project = TPCCProjectBuilder.defaultBuilder();
             project.setCompilerDebugPrintStream(System.out);
             if(!project.compile(config.m_pathToCatalog, partitions, 0)) {
                 System.out.println("Compilation failed");

@@ -27,9 +27,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
-import java.security.SecureRandom;
 
-import static junit.framework.Assert.fail;
 import junit.framework.TestCase;
 
 import org.voltdb.BackendTarget;
@@ -49,7 +47,7 @@ public class TestSecurityNoAdminUser extends TestCase {
             //Build the catalog
             VoltProjectBuilder builder = new VoltProjectBuilder();
             builder.addLiteralSchema("");
-            builder.setSecurityEnabled(true, false);
+            builder.depBuilder().setSecurityEnabled(true, false);
             String catalogJar = "dummy.jar";
 
             LocalCluster config = new LocalCluster(catalogJar, 2, 1, 0, BackendTarget.NATIVE_EE_JNI);

@@ -84,12 +84,12 @@ public class TestGiantDeleteSuite extends RegressionSuite {
             new MultiConfigSuiteBuilder(TestGiantDeleteSuite.class);
 
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(Insert.class.getResource("giant-delete-ddl.sql"));
-        project.addProcedures(PROCEDURES);
-        project.addStmtProcedure("Delete", "DELETE FROM ASSET WHERE ASSET_ID > -1;");
+        project.catBuilder().addSchema(Insert.class.getResource("giant-delete-ddl.sql"))
+        .addProcedures(PROCEDURES)
+        .addStmtProcedure("Delete", "DELETE FROM ASSET WHERE ASSET_ID > -1;");
 
         config = new LocalCluster("giantdelete-onesite.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
 
         return builder;

@@ -111,10 +111,9 @@ public class TestIndexColumnLessThanSuite extends RegressionSuite {
 
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(BatchedMultiPartitionTest.class.getResource("sqlindex-ddl.sql"));
-        project.addProcedures(PROCEDURES);
-
-        boolean success;
+        project.catBuilder().addSchema(BatchedMultiPartitionTest.class.getResource("sqlindex-ddl.sql"))
+        .addProcedures(PROCEDURES)
+        ;
 
         /////////////////////////////////////////////////////////////
         // CONFIG #1: 1 Local Site/Partitions running on JNI backend
@@ -122,11 +121,8 @@ public class TestIndexColumnLessThanSuite extends RegressionSuite {
 
         // get a server config for the native backend with one sites/partitions
         config = new LocalCluster("sql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-
         // build the jarfile
-        success = config.compile(project);
-        assert(success);
-
+        assertTrue(config.compile(project));
         // add this config to the set of tests to run
         builder.addServerConfig(config);
 
@@ -135,18 +131,15 @@ public class TestIndexColumnLessThanSuite extends RegressionSuite {
         /////////////////////////////////////////////////////////////
 
         config = new LocalCluster("sqlCountingIndex-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        success = config.compile(project);
-        assert(success);
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
 
         /////////////////////////////////////////////////////////////
         // CONFIG #3: 2 Local Site/Partitions running on JNI backend
         /////////////////////////////////////////////////////////////
         config = new LocalCluster("sql-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assert(success);
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
-
 
         return builder;
     }

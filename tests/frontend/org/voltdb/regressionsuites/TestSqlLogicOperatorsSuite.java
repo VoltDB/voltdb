@@ -201,8 +201,8 @@ public class TestSqlLogicOperatorsSuite extends RegressionSuite {
             new MultiConfigSuiteBuilder(TestSqlLogicOperatorsSuite.class);
 
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(Insert.class.getResource("sql-update-ddl.sql"));
-        project.addProcedures(PROCEDURES);
+        project.catBuilder().addSchema(Insert.class.getResource("sql-update-ddl.sql"))
+        .addProcedures(PROCEDURES);
 
         config = new LocalCluster("sqllogic-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         if (!config.compile(project)) fail();

@@ -92,27 +92,28 @@ public class TestJDBCDriver {
                              "PRIMARY KEY(A1));" +
             "CREATE TABLE ALL_TYPES(A1 TINYINT NOT NULL, A2 SMALLINT, A3 INTEGER, A4 BIGINT, " +
                              "A5 FLOAT, A6 VARCHAR(10), A7 VARBINARY(10), A8 TIMESTAMP, " +
-                             "A9 DECIMAL, PRIMARY KEY(A1));" +
-            "CREATE UNIQUE INDEX UNIQUE_ORDERS_HASH ON ORDERS (A1, A2_ID); " +
-            "CREATE INDEX IDX_ORDERS_HASH ON ORDERS (A2_ID);";
+                             "A9 DECIMAL, PRIMARY KEY(A1));\n" +
+            "PARTITION TABLE TT ON COLUMN A1;\n" +
+            "PARTITION TABLE ORDERS ON COLUMN A1;\n" +
+            "PARTITION TABLE LAST ON COLUMN A1;\n" +
+            "PARTITION TABLE BLAST_IT ON COLUMN A1;\n" +
+            "PARTITION TABLE ROBBIE_MUSTOE ON COLUMN A1;\n" +
+            "PARTITION TABLE CUSTOMER ON COLUMN A1;\n" +
+            "PARTITION TABLE NUMBER_NINE ON COLUMN A1;\n" +
+            "CREATE UNIQUE INDEX UNIQUE_ORDERS_HASH ON ORDERS (A1, A2_ID); \n" +
+            "CREATE INDEX IDX_ORDERS_HASH ON ORDERS (A2_ID); \n" +
+            "";
 
 
         pb = new VoltProjectBuilder();
-        pb.addLiteralSchema(ddl);
-        pb.addSchema(TestClientFeatures.class.getResource("clientfeatures.sql"));
-        pb.addProcedures(ArbitraryDurationProc.class);
-        pb.addPartitionInfo("TT", "A1");
-        pb.addPartitionInfo("ORDERS", "A1");
-        pb.addPartitionInfo("LAST", "A1");
-        pb.addPartitionInfo("BLAST_IT", "A1");
-        pb.addPartitionInfo("ROBBIE_MUSTOE", "A1");
-        pb.addPartitionInfo("CUSTOMER", "A1");
-        pb.addPartitionInfo("NUMBER_NINE", "A1");
-        pb.addStmtProcedure("InsertA", "INSERT INTO TT VALUES(?,?);", "TT.A1: 0");
-        pb.addStmtProcedure("SelectB", "SELECT * FROM TT;");
-        pb.addStmtProcedure("SelectC", "SELECT * FROM ALL_TYPES;");
-        boolean success = pb.compile(Configuration.getPathToCatalogForTest("jdbcdrivertest.jar"), 3, 1, 0);
-        assert(success);
+        pb.catBuilder().addLiteralSchema(ddl)
+        .addSchema(TestClientFeatures.class.getResource("clientfeatures.sql"))
+        .addProcedures(ArbitraryDurationProc.class)
+        .addStmtProcedure("InsertA", "INSERT INTO TT VALUES(?,?);", "TT.A1: 0")
+        .addStmtProcedure("SelectB", "SELECT * FROM TT;")
+        .addStmtProcedure("SelectC", "SELECT * FROM ALL_TYPES;")
+        ;
+        assertTrue(pb.compile(Configuration.getPathToCatalogForTest("jdbcdrivertest.jar"), 3, 1, 0));
         MiscUtils.copyFile(pb.getPathToDeployment(), Configuration.getPathToCatalogForTest("jdbcdrivertest.xml"));
         testjar = Configuration.getPathToCatalogForTest("jdbcdrivertest.jar");
 

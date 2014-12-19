@@ -64,13 +64,15 @@ public class TestCatalogDiffs extends TestCase {
         TPCCProjectBuilder builder = new TPCCProjectBuilder();
         builder.addDefaultSchema();
         builder.addDefaultPartitioning();
-        builder.addProcedures(procList);
-        builder.setSecurityEnabled(securityEnabled, true);
+        builder.catBuilder().addProcedures(procList);
+        builder.depBuilder().setSecurityEnabled(securityEnabled, true);
 
-        if (gi != null && gi.length > 0)
-            builder.addRoles(gi);
-        if (ui != null && ui.length > 0)
-            builder.addUsers(ui);
+        if (gi != null && gi.length > 0) {
+            builder.catBuilder().addRoles(gi);
+        }
+        if (ui != null && ui.length > 0) {
+            builder.depBuilder().addUsers(ui);
+        }
 
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         String retval = testDir + File.separator + "tpcc-catalogcheck-" + name + ".jar";

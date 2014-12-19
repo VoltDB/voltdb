@@ -57,7 +57,7 @@ public class TestCatalogUtil extends TestCase {
 
     @Override
     protected void setUp() throws Exception {
-        catalog = TPCCProjectBuilder.getTPCCSchemaCatalog();
+        catalog = TPCCProjectBuilder.createTPCCSchemaCatalog();
         assertNotNull(catalog);
         catalog_db = catalog.getClusters().get("cluster").getDatabases().get("database");
         assertNotNull(catalog_db);

@@ -45,10 +45,8 @@ public class ProcedureCallMicrobench {
     public static void main(String[] args) throws Exception {
         int siteCount = 1;
 
-        TPCCProjectBuilder pb = new TPCCProjectBuilder();
-        pb.addDefaultSchema();
-        pb.addDefaultPartitioning();
-        pb.addProcedures(EmptyProcedure.class, MultivariateEmptyProcedure.class);
+        TPCCProjectBuilder pb = new TPCCProjectBuilder().addDefaultSchema().addDefaultPartitioning();
+        pb.catBuilder().addProcedures(EmptyProcedure.class, MultivariateEmptyProcedure.class);
 
         pb.compile("procedureCallMicrobench.jar", siteCount, 0);
 
@@ -107,6 +105,7 @@ public class ProcedureCallMicrobench {
 
                 for (int i = 0; i < clientCount; i++) {
                     futures.add(executor.submit(new Callable<Integer>() {
+                        @Override
                         public Integer call() {
                             try {
                                 ClientConfig config = new ClientConfig("program", "none");

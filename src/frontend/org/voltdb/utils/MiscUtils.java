@@ -149,7 +149,7 @@ public class MiscUtils {
         return file;
     }
 
-    private static void writeStringToFile(File file, String content) {
+    public static void writeStringToFile(File file, String content) {
         try {
             FileWriter writer = new FileWriter(file);
             writer.write(content);

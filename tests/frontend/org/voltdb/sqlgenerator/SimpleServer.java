@@ -35,7 +35,6 @@ import org.voltdb.utils.MiscUtils;
 
 public class SimpleServer {
     public static void main(String[] args) throws NumberFormatException, Exception {
-        VoltProjectBuilder builder = null;
         String[] arg;
         String schemaFileName = "DDL.sql"; // default
         ArrayList<String> host_manager_args = new ArrayList<String>();
@@ -79,15 +78,15 @@ public class SimpleServer {
             k_factor = 0;
         }
 
-        builder = new VoltProjectBuilder();
-        builder.addSchema(SimpleServer.class.getResource(schemaFileName));
-        builder.setCompilerDebugPrintStream(System.out);
+        VoltProjectBuilder project = new VoltProjectBuilder();
+        project.catBuilder().addSchema(SimpleServer.class.getResource(schemaFileName))
+        .setCompilerDebugPrintStream(System.out);
 
-        if (!builder.compile(Configuration.getPathToCatalogForTest("simple.jar"), sites, hosts, k_factor)) {
+        if ( ! project.compile(Configuration.getPathToCatalogForTest("simple.jar"), sites, hosts, k_factor)) {
             System.err.println("Compilation failed");
             System.exit(-1);
         }
-        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("simple.xml"));
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("simple.xml"));
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("simple.jar");
         System.out.println("catalog path: " + config.m_pathToCatalog);
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("simple.xml");

@@ -998,17 +998,17 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         /////////////////////////////////////////////////////////////
 
         // get a server config for the native backend with one sites/partitions
-        VoltServerConfig config = new LocalCluster("catalogupdate-cluster-base.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        LocalCluster config = new LocalCluster("catalogupdate-cluster-base.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
 
         // Catalog upgrade test(s) sporadically fail if there's a local server because
         // a file pipe isn't available for grepping local server output.
-        ((LocalCluster) config).setHasLocalServer(true);
+        config.setHasLocalServer(true);
 
         // build up a project builder for the workload
         TPCCProjectBuilder project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
+        project.catBuilder().addProcedures(BASEPROCS);
         // build the jarfile
         boolean basecompile = config.compile(project);
         assertTrue(basecompile);
@@ -1023,33 +1023,32 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
 
         // As catalogupdate-cluster-base but with security enabled. This requires users and groups..
         // We piggy-back the heartbeat change here.
-        RoleInfo groups[] = new RoleInfo[] {new RoleInfo("group1", false, false, true, false, false, false)};
-        UserInfo users[] = new UserInfo[] {new UserInfo("user1", "userpass1", new String[] {"group1"})};
-        ProcedureInfo procInfo = new ProcedureInfo(new String[] {"group1"}, InsertNewOrder.class);
+        ProcedureInfo procInfo = new ProcedureInfo(InsertNewOrder.class, "group1");
 
         config = new LocalCluster("catalogupdate-cluster-base-secure.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
-        project.addUsers(users);
-        project.addRoles(groups);
-        project.addProcedures(procInfo);
-        project.setSecurityEnabled(true, true);
-        project.setDeadHostTimeout(6000);
-        boolean compile = config.compile(project);
-        assertTrue(compile);
+
+        project.depBuilder().addUsers(new UserInfo("user1", "userpass1", "group1"))
+        .setSecurityEnabled(true, true).setDeadHostTimeout(6000);
+
+        project.catBuilder().addRoles(new RoleInfo("group1", false, false, true, false, false, false))
+        .addProcedures(procInfo);
+
+        assertTrue(config.compile(project));
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-base-secure.xml"));
 
         config = new LocalCluster("catalogupdate-cluster-addtables.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
+        project.depBuilder().setElasticDuration(100).setElasticThroughput(50);
+
         project.addDefaultSchema();
-        project.addSchema(TestCatalogUpdateSuite.class.getResource("testorderby-ddl.sql").getPath());
         project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS_OPROCS);
-        project.setElasticDuration(100);
-        project.setElasticThroughput(50);
-        compile = config.compile(project);
-        assertTrue(compile);
+        project.catBuilder().addSchema(TestCatalogUpdateSuite.class.getResource("testorderby-ddl.sql").getPath())
+        .addProcedures(BASEPROCS_OPROCS);
+
+        assertTrue(config.compile(project));
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-addtables.xml"));
 
         // as above but also with a materialized view added to O1
@@ -1057,12 +1056,11 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
             config = new LocalCluster("catalogupdate-cluster-addtableswithmatview.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
             project = new TPCCProjectBuilder();
             project.addDefaultSchema();
-            project.addSchema(TestCatalogUpdateSuite.class.getResource("testorderby-ddl.sql").getPath());
-            project.addLiteralSchema("CREATE VIEW MATVIEW_O1(C1, C2, NUM) AS SELECT A_INT, PKEY, COUNT(*) FROM O1 GROUP BY A_INT, PKEY;");
             project.addDefaultPartitioning();
-            project.addProcedures(BASEPROCS_OPROCS);
-            compile = config.compile(project);
-            assertTrue(compile);
+            project.catBuilder().addSchema(TestCatalogUpdateSuite.class.getResource("testorderby-ddl.sql").getPath())
+            .addLiteralSchema("CREATE VIEW MATVIEW_O1(C1, C2, NUM) AS SELECT A_INT, PKEY, COUNT(*) FROM O1 GROUP BY A_INT, PKEY;")
+            .addProcedures(BASEPROCS_OPROCS);
+            assertTrue(config.compile(project));
             MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-addtableswithmatview.xml"));
         } catch (IOException e) {
             fail();
@@ -1071,60 +1069,55 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         config = new LocalCluster("catalogupdate-cluster-addindex.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
-        project.addLiteralSchema("CREATE INDEX NEWINDEX ON NEW_ORDER (NO_O_ID);");
-        // history is good because this new index is the only one (no pkey)
-        project.addLiteralSchema("CREATE INDEX NEWINDEX2 ON HISTORY (H_C_ID);");
-        // unique index
-        project.addLiteralSchema("CREATE UNIQUE INDEX NEWINDEX3 ON STOCK (S_I_ID, S_W_ID, S_QUANTITY);");
-
         project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
-        compile = config.compile(project);
-        assertTrue(compile);
+        project.catBuilder().addLiteralSchema("CREATE INDEX NEWINDEX ON NEW_ORDER (NO_O_ID);")
+        // history is good because this new index is the only one (no pkey)
+        .addLiteralSchema("CREATE INDEX NEWINDEX2 ON HISTORY (H_C_ID);")
+        // unique index
+        .addLiteralSchema("CREATE UNIQUE INDEX NEWINDEX3 ON STOCK (S_I_ID, S_W_ID, S_QUANTITY);")
+        .addProcedures(BASEPROCS);
+
+        assertTrue(config.compile(project));
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-addindex.xml"));
 
         config = new LocalCluster("catalogupdate-cluster-addexpressindex.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
-        project.addLiteralSchema("CREATE INDEX NEWEXPRESSINDEX ON NEW_ORDER ((NO_O_ID+NO_O_ID)-NO_O_ID);");
+        project.addDefaultPartitioning();
+        project.catBuilder().addLiteralSchema("CREATE INDEX NEWEXPRESSINDEX ON NEW_ORDER ((NO_O_ID+NO_O_ID)-NO_O_ID);")
         // history is good because this new index is the only one (no pkey)
-        project.addLiteralSchema("CREATE INDEX NEWEXPRESSINDEX2 ON HISTORY ((H_C_ID+H_C_ID)-H_C_ID);");
+        .addLiteralSchema("CREATE INDEX NEWEXPRESSINDEX2 ON HISTORY ((H_C_ID+H_C_ID)-H_C_ID);")
         // unique index
         // This needs to wait until the test for unique index coverage for indexed expressions can parse out any simple column expressions
         // and discover a unique index on some subset.
-        //TODO: project.addLiteralSchema("CREATE UNIQUE INDEX NEWEXPRESSINDEX3 ON STOCK (S_I_ID, S_W_ID, S_QUANTITY+S_QUANTITY-S_QUANTITY);");
-
-        project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
-        compile = config.compile(project);
-        assertTrue(compile);
+        //TODO: .addLiteralSchema("CREATE UNIQUE INDEX NEWEXPRESSINDEX3 ON STOCK (S_I_ID, S_W_ID, S_QUANTITY+S_QUANTITY-S_QUANTITY);");
+        .addProcedures(BASEPROCS)
+        ;
+        assertTrue(config.compile(project));
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-addexpressindex.xml"));
 
         config = new LocalCluster("catalogupdate-cluster-expanded.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
-        project.addProcedures(EXPANDEDPROCS);
-        compile = config.compile(project);
-        assertTrue(compile);
+        project.catBuilder().addProcedures(EXPANDEDPROCS);
+        assertTrue(config.compile(project));
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-expanded.xml"));
 
         config = new LocalCluster("catalogupdate-cluster-conflict.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
-        project.addProcedures(CONFLICTPROCS);
-        compile = config.compile(project);
-        assertTrue(compile);
+        project.catBuilder().addProcedures(CONFLICTPROCS);
+        assertTrue(config.compile(project));
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-conflict.xml"));
 
         config = new LocalCluster("catalogupdate-cluster-many.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
-        project.addProcedures(SOMANYPROCS);
-        compile = config.compile(project);
-        assertTrue(compile);
+        project.catBuilder().addProcedures(SOMANYPROCS);
+        assertTrue(config.compile(project));
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-many.xml"));
 
 
@@ -1133,11 +1126,10 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
-        project.setSnapshotSettings( "1s", 3, "/tmp/snapshotdir1", "foo1");
+        project.catBuilder().addProcedures(BASEPROCS);
+        project.depBuilder().setSnapshotSettings( "1s", 3, "/tmp/snapshotdir1", "foo1");
         // build the jarfile
-        compile = config.compile(project);
-        assertTrue(compile);
+        assertTrue(config.compile(project));
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-enable_snapshot.xml"));
 
         //Another catalog change to modify the schedule
@@ -1145,51 +1137,41 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
-        project.setSnapshotSettings( "1s", 3, "/tmp/snapshotdir2", "foo2");
+        project.catBuilder().addProcedures(BASEPROCS);
+        project.depBuilder().setSnapshotSettings( "1s", 3, "/tmp/snapshotdir2", "foo2");
         // build the jarfile
-        compile = config.compile(project);
-        assertTrue(compile);
+        assertTrue(config.compile(project));
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot.xml"));
 
         //Another catalog change to modify the schedule
         config = new LocalCluster("catalogupdate-cluster-change_snapshot_dir_not_exist.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
+        project = new TPCCProjectBuilder().addDefaultSchema().addDefaultPartitioning();
+        project.catBuilder().addProcedures(BASEPROCS);
         project.setSnapshotSettings( "1s", 3, "/tmp/snapshotdirasda2", "foo2");
         // build the jarfile
-        compile = config.compile(project);
-        assertTrue(compile);
+        assertTrue(config.compile(project));
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot_dir_not_exist.xml"));
 
         //A huge catalog update to test size limits
         config = new LocalCluster("catalogupdate-cluster-huge.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        project = new TPCCProjectBuilder();
+        project = new TPCCProjectBuilder().addDefaultSchema().addDefaultPartitioning();
         long t = System.currentTimeMillis();
         String hugeSchemaURL = generateRandomDDL("catalogupdate-cluster-huge",
                                                   HUGE_TABLES, HUGE_COLUMNS, HUGE_NAME_SIZE);
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
-        project.addSchema(hugeSchemaURL);
-        project.addProcedures(BASEPROCS);
-        compile = config.compile(project);
-        assertTrue(compile);
+        project.catBuilder().addSchema(hugeSchemaURL)
+        .addProcedures(BASEPROCS);
+        assertTrue(config.compile(project));
         hugeCompileElapsed = (System.currentTimeMillis() - t) / 1000.0;
         hugeCatalogXMLPath = Configuration.getPathToCatalogForTest("catalogupdate-cluster-huge.xml");
         hugeCatalogJarPath = Configuration.getPathToCatalogForTest("catalogupdate-cluster-huge.jar");
         MiscUtils.copyFile(project.getPathToDeployment(), hugeCatalogXMLPath);
 
         config = new LocalCluster("catalogupdate-cluster-change_snapshot_dir_not_exist.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-        project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
-        project.addProcedures(BASEPROCS);
-        project.setSnapshotSettings( "1s", 3, "/tmp/snapshotdirasda2", "foo2");
+        project = new TPCCProjectBuilder().addDefaultSchema().addDefaultPartitioning();
+        project.catBuilder().addProcedures(BASEPROCS);
+        project.depBuilder().setSnapshotSettings("1s", 3, "/tmp/snapshotdirasda2", "foo2");
         // build the jarfile
-        compile = config.compile(project);
-        assertTrue(compile);
+        assertTrue(config.compile(project));
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-change_snapshot_dir_not_exist.xml"));
 
         // Catalogs with different system settings on query time out
@@ -1197,24 +1179,21 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.setQueryTimeout(1000);
-        compile = config.compile(project);
-        assertTrue(compile);
+        assertTrue(config.compile(project));
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-timeout-1000.xml"));
 
         config = new LocalCluster("catalogupdate-cluster-timeout-5000.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.setQueryTimeout(5000);
-        compile = config.compile(project);
-        assertTrue(compile);
+        assertTrue(config.compile(project));
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-timeout-5000.xml"));
 
         config = new LocalCluster("catalogupdate-cluster-timeout-600.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.setQueryTimeout(600);
-        compile = config.compile(project);
-        assertTrue(compile);
+        assertTrue(config.compile(project));
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-timeout-600.xml"));
 
         // elastic duration and throughput catalog update tests
@@ -1224,8 +1203,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         // build the jarfile
         project.setElasticDuration(100);
         project.setElasticThroughput(5);
-        compile = config.compile(project);
-        assertTrue(compile);
+        assertTrue(config.compile(project));
         MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("catalogupdate-cluster-elastic-100-5.xml"));
 
 

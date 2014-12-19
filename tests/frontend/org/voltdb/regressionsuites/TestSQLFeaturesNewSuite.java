@@ -513,11 +513,11 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
 
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(BatchedMultiPartitionTest.class.getResource("sqlfeatures-new-ddl.sql"));
-        project.addProcedures(PROCEDURES);
-        project.setUseDDLSchema(true);
-
-        boolean success;
+        project.catBuilder().addSchema(BatchedMultiPartitionTest.class.getResource("sqlfeatures-new-ddl.sql"))
+        .addProcedures(PROCEDURES);
+        ;
+        project.depBuilder().setUseDDLSchema(true)
+        ;
 
         //* <-- Change this comment to 'block style' to toggle over to just the one single-server IPC DEBUG config.
         // IF (! DEBUG config) ...
@@ -529,11 +529,8 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         // get a server config for the native backend with one sites/partitions
         config = new LocalCluster("sqlfeatures-new-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         config.setMaxHeap(3300);
-
         // build the jarfile
-        success = config.compile(project);
-        assert(success);
-
+        assertTrue(config.compile(project));
         // add this config to the set of tests to run
         builder.addServerConfig(config);
 
@@ -543,8 +540,7 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
 
         config = new LocalCluster("sqlfeatures-new-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
         config.setMaxHeap(3300);
-        success = config.compile(project);
-        assert(success);
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
 
         /////////////////////////////////////////////////////////////
@@ -556,8 +552,7 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         // Commented out until ENG-3076, ENG-3434 are resolved.
         //config = new LocalCluster("sqlfeatures-cluster-rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI,
         //                          LocalCluster.FailureState.ONE_FAILURE, false);
-        success = config.compile(project);
-        assert(success);
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
 
         /*/ // ... ELSE (DEBUG config) ... [ FRAGILE! This is a structured comment. Do not break it. ]
@@ -567,8 +562,7 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         /////////////////////////////////////////////////////////////
         config = new LocalCluster("sqlfeatures-new-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
         // build the jarfile
-        success = config.compile(project);
-        assert(success);
+        assertTrue(config.compile(project));
         // add this config to the set of tests to run
         builder.addServerConfig(config);
 

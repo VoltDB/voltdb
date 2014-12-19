@@ -174,22 +174,17 @@ public class TestUpdateClasses extends AdhocDDLTestBase {
 
         String pathToCatalog = Configuration.getPathToCatalogForTest("updateclasses.jar");
         String pathToDeployment = Configuration.getPathToCatalogForTest("updateclasses.xml");
+
         VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("-- Don't care");
-        builder.setUseDDLSchema(true);
-        RoleInfo groups[] = new RoleInfo[] {
-            new RoleInfo("adhoc", true, false, false, false, false, false)
-        };
-        UserInfo users[] = new UserInfo[] {
-            new UserInfo("adhocuser", "adhocuser", new String[] {"adhoc"}),
-            new UserInfo("sysuser", "sysuser", new String[] {"ADMINISTRATOR"})
-        };
-        builder.addRoles(groups);
-        builder.addUsers(users);
-        // Test defines its own ADMIN user
-        builder.setSecurityEnabled(true, false);
-        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
-        assertTrue("Schema compilation failed", success);
+        builder.catBuilder().addLiteralSchema("-- Don't care")
+        .addRoles(new RoleInfo("adhoc", true, false, false, false, false, false));
+
+        // TEST DEFINES ITS OWN ADMIN USER
+        builder.depBuilder().setUseDDLSchema(true).setSecurityEnabled(true, false)
+        .addUsers(new UserInfo("adhocuser", "adhocuser", "adhoc"),
+                new UserInfo("sysuser", "sysuser", "ADMINISTRATOR"));
+
+        assertTrue("Schema compilation failed", builder.compile(pathToCatalog, 2, 1, 0));
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
 
         // This is maybe cheating a little bit?

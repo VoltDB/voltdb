@@ -587,18 +587,6 @@ public class VoltDB {
             return isValid;
         }
 
-        /**
-         * Helper to set the path for compiled jar files.
-         *  Could also live in VoltProjectBuilder but any code that creates
-         *  a catalog will probably start VoltDB with a Configuration
-         *  object. Perhaps this is more convenient?
-         * @return the path chosen for the catalog.
-         */
-        public String setPathToCatalogForTest(String jarname) {
-            m_pathToCatalog = getPathToCatalogForTest(jarname);
-            return m_pathToCatalog;
-        }
-
         public static String getPathToCatalogForTest(String jarname) {
 
             // first try to get the "right" place to put the thing

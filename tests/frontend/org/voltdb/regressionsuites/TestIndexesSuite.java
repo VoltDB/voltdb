@@ -1155,79 +1155,73 @@ public class TestIndexesSuite extends RegressionSuite {
             new MultiConfigSuiteBuilder(TestIndexesSuite.class);
 
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(Insert.class.getResource("indexes-ddl.sql"));
-        project.addProcedures(PROCEDURES);
-        project.addStmtProcedure("Eng397LimitIndexR1", "select * from R1 where R1.ID > 2 Limit ?");
-        project.addStmtProcedure("Eng397LimitIndexP1", "select * from P1 where P1.ID > 2 Limit ?");
-        project.addStmtProcedure("Eng397LimitIndexR2", "select * from R2 where R2.ID > 2 Limit ?");
-        project.addStmtProcedure("Eng397LimitIndexP2", "select * from P2 where P2.ID > 2 Limit ?");
-        project.addStmtProcedure("Eng2914BigKeyP1", "select * from P1 where ID < 600000000000");
-        project.addStmtProcedure("Eng506UpdateRange",
-                                 "UPDATE R1IX SET NUM = ? WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.NUM>?)");
-        project.addStmtProcedure("InsertR1IX", "insert into R1IX values (?, ?, ?, ?);");
+        project.catBuilder().addSchema(Insert.class.getResource("indexes-ddl.sql"))
+        .addProcedures(PROCEDURES)
+        .addStmtProcedure("Eng397LimitIndexR1", "select * from R1 where R1.ID > 2 Limit ?")
+        .addStmtProcedure("Eng397LimitIndexP1", "select * from P1 where P1.ID > 2 Limit ?")
+        .addStmtProcedure("Eng397LimitIndexR2", "select * from R2 where R2.ID > 2 Limit ?")
+        .addStmtProcedure("Eng397LimitIndexP2", "select * from P2 where P2.ID > 2 Limit ?")
+        .addStmtProcedure("Eng2914BigKeyP1", "select * from P1 where ID < 600000000000")
+        .addStmtProcedure("Eng506UpdateRange",
+                                 "UPDATE R1IX SET NUM = ? WHERE (R1IX.ID>R1IX.NUM) AND (R1IX.NUM>?)")
+        .addStmtProcedure("InsertR1IX", "insert into R1IX values (?, ?, ?, ?);")
 
-        project.addStmtProcedure("InlinedInListP3with5DESCs",
+        .addStmtProcedure("InlinedInListP3with5DESCs",
                                  "select * from P3 T where T.DESC IN (?, ?, ?, ?, ?)" +
-                                 " and T.NUM IN (100, 200, 300, 400, 500)");
+                                 " and T.NUM IN (100, 200, 300, 400, 500)")
 
-        project.addStmtProcedure("InlinedInListR3with5DESCs",
+        .addStmtProcedure("InlinedInListR3with5DESCs",
                                  "select * from R3 T where T.DESC IN (?, ?, ?, ?, ?)" +
-                                 " and T.NUM IN (100, 200, 300, 400, 500)");
+                                 " and T.NUM IN (100, 200, 300, 400, 500)")
 
-        project.addStmtProcedure("InlinedInListP3withDESCs",
+        .addStmtProcedure("InlinedInListP3withDESCs",
                                  "select * from P3 T where T.DESC IN ?" +
-                                 " and T.NUM IN (100, 200, 300, 400, 500)");
+                                 " and T.NUM IN (100, 200, 300, 400, 500)")
 
 
-        project.addStmtProcedure("InlinedInListP3with5NUMs",
+        .addStmtProcedure("InlinedInListP3with5NUMs",
                                  "select * from P3 T where T.DESC IN ('a', 'b', 'c', 'g', " +
                                  "'this here is a longish string to force a permanent object allocation'" +
                                  ")" +
-                                 " and T.NUM IN (?, ?, ?, ?, ?)");
+                                 " and T.NUM IN (?, ?, ?, ?, ?)")
 
-        project.addStmtProcedure("InlinedInListR3with5NUMs",
+        .addStmtProcedure("InlinedInListR3with5NUMs",
                                  "select * from R3 T where T.DESC IN ('a', 'b', 'c', 'g', " +
                                  "'this here is a longish string to force a permanent object allocation'" +
                                  ")" +
-                                 " and T.NUM IN (?, ?, ?, ?, ?)");
+                                 " and T.NUM IN (?, ?, ?, ?, ?)")
 
-        project.addStmtProcedure("InlinedInListP3withNUMs",
+        .addStmtProcedure("InlinedInListP3withNUMs",
                                  "select * from P3 T where T.DESC IN ('a', 'b', 'c', 'g', " +
                                  "'this here is a longish string to force a permanent object allocation'" +
                                  ")" +
-                                 " and T.NUM IN ?");
-
-        //project.addStmtProcedure("InlinedUpdateInListP3with5NUMs",
+                                 " and T.NUM IN ?")
+        //.addStmtProcedure("InlinedUpdateInListP3with5NUMs",
         //        "update P3 set NUM = 0 where DESC IN ('a', 'b', 'c', 'g', " +
         //        "'this here is a longish string to force a permanent object allocation'" +
         //        ")" +
         //        " and NUM IN (111,222,333,444,555)");
-
-        boolean success;
+        ;
 
         //* CONFIG #1: HSQL -- keep this enabled by default with //
         config = new LocalCluster("testindexes-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        success = config.compile(project);
-        assertTrue(success);
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
         // end of easy-to-disable code section */
 
         //* CONFIG #2: JNI -- keep this enabled by default with //
         config = new LocalCluster("testindexes-threesite.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
         // end of easy-to-disable code section */
 
         /*/ CONFIG #3: IPC -- keep this normally disabled with / * vs. //
         config = new LocalCluster("testindexes-threesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
-        success = config.compile(project);
-        assertTrue(success);
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
         // end of normally disabled section */
 
         // no clustering tests for indexes
-
         return builder;
     }
 

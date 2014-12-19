@@ -156,16 +156,14 @@ public class TestTableCountSuite extends RegressionSuite {
      * @return The TestSuite containing all the tests to be run.
      */
     static public Test suite() {
-        VoltServerConfig config = null;
+        LocalCluster config = null;
 
         // the suite made here will all be using the tests from this class
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestTableCountSuite.class);
 
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(BatchedMultiPartitionTest.class.getResource("sqlindex-ddl.sql"));
-
-        boolean success;
+        project.catBuilder().addSchema(BatchedMultiPartitionTest.class.getResource("sqlindex-ddl.sql"));
 
         /////////////////////////////////////////////////////////////
         // CONFIG #1: 1 Local Site/Partitions running on JNI backend
@@ -173,11 +171,8 @@ public class TestTableCountSuite extends RegressionSuite {
 
         // get a server config for the native backend with one sites/partitions
         config = new LocalCluster("sqlCountingIndex-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-
         // build the jarfile
-        success = config.compile(project);
-        assert(success);
-
+        assertTrue(config.compile(project));
         // add this config to the set of tests to run
         builder.addServerConfig(config);
 
@@ -186,16 +181,14 @@ public class TestTableCountSuite extends RegressionSuite {
         /////////////////////////////////////////////////////////////
 
         config = new LocalCluster("sqlCountingIndex-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        success = config.compile(project);
-        assert(success);
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
 
         /////////////////////////////////////////////////////////////
         // CONFIG #3: 2 Local Site/Partitions running on JNI backend
         /////////////////////////////////////////////////////////////
         config = new LocalCluster("sql-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assert(success);
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
 
         return builder;

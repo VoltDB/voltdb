@@ -196,23 +196,15 @@ public class TestVoltDB extends TestCase {
      * don't yet exist don't render the deployment file invalid.
      */
     public void testCompileDeploymentAddUserToNonExistentGroup() throws IOException {
-        TPCCProjectBuilder project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
-        project.addDefaultProcedures();
+        TPCCProjectBuilder project = TPCCProjectBuilder.defaultBuilder();
 
-        project.setSecurityEnabled(true, true);
-        RoleInfo groups[] = new RoleInfo[] {
-                new RoleInfo("foo", false, false, false, false, false, false),
-                new RoleInfo("blah", false, false, false, false, false, false)
-        };
-        project.addRoles(groups);
-        UserInfo users[] = new UserInfo[] {
-                new UserInfo("john", "hugg", new String[] {"foo"}),
-                new UserInfo("ryan", "betts", new String[] {"foo", "bar"}),
-                new UserInfo("ariel", "weisberg", new String[] {"bar"})
-        };
-        project.addUsers(users);
+        project.catBuilder().addRoles(new RoleInfo("foo", false, false, false, false, false, false),
+                new RoleInfo("blah", false, false, false, false, false, false));
+
+        project.depBuilder().setSecurityEnabled(true, true).addUsers(
+                new UserInfo("john", "hugg", "foo"),
+                new UserInfo("ryan", "betts", "foo", "bar"),
+                new UserInfo("ariel", "weisberg", "bar"));
 
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         String jarName = "compile-deployment.jar";

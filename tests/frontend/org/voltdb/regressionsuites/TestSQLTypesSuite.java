@@ -1360,36 +1360,32 @@ public class TestSQLTypesSuite extends RegressionSuite {
                 TestSQLTypesSuite.class);
 
         final VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(TestSQLTypesSuite.class
-                .getResource("sqltypessuite-ddl.sql"));
-        project.addSchema(TestSQLTypesSuite.class
-                .getResource("sqltypessuite-nonulls-ddl.sql"));
-        project.addPartitionInfo("NO_NULLS", "PKEY");
-        project.addPartitionInfo("ALLOW_NULLS", "PKEY");
-        project.addPartitionInfo("WITH_DEFAULTS", "PKEY");
-        project.addPartitionInfo("WITH_NULL_DEFAULTS", "PKEY");
-        project.addPartitionInfo("EXPRESSIONS_WITH_NULLS", "PKEY");
-        project.addPartitionInfo("EXPRESSIONS_NO_NULLS", "PKEY");
-        project.addPartitionInfo("JUMBO_ROW", "PKEY");
-        project.addProcedures(PROCEDURES);
-        project.addStmtProcedure(
-                "PassObjectNull",
+        project.catBuilder().addSchema(TestSQLTypesSuite.class
+                .getResource("sqltypessuite-ddl.sql"))
+        .addSchema(TestSQLTypesSuite.class
+                .getResource("sqltypessuite-nonulls-ddl.sql"))
+        .addPartitionInfo("NO_NULLS", "PKEY")
+        .addPartitionInfo("ALLOW_NULLS", "PKEY")
+        .addPartitionInfo("WITH_DEFAULTS", "PKEY")
+        .addPartitionInfo("WITH_NULL_DEFAULTS", "PKEY")
+        .addPartitionInfo("EXPRESSIONS_WITH_NULLS", "PKEY")
+        .addPartitionInfo("EXPRESSIONS_NO_NULLS", "PKEY")
+        .addPartitionInfo("JUMBO_ROW", "PKEY")
+        .addStmtProcedure("PassObjectNull",
                 "insert into ALLOW_NULLS values ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
-                "NO_NULLS.PKEY: 0");
-        project.addStmtProcedure("InsertDecimal", "INSERT INTO WITH_DEFAULTS (PKEY, A_DECIMAL) VALUES (?, ?);");
-
-        boolean success;
+                "NO_NULLS.PKEY: 0")
+        .addStmtProcedure("InsertDecimal", "INSERT INTO WITH_DEFAULTS (PKEY, A_DECIMAL) VALUES (?, ?);")
+        .addProcedures(PROCEDURES)
+        ;
 
         // JNI
         config = new LocalCluster("sqltypes-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
 
         // CLUSTER?
         config = new LocalCluster("sqltypes-cluster.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
 
         return builder;

@@ -33,7 +33,6 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.utils.MiscUtils;
 
 public class TestSimpleCJK extends TestCase {
     public static final String POORLY_TRANSLATED_CHINESE =
@@ -69,25 +68,26 @@ public class TestSimpleCJK extends TestCase {
             "sval1 varchar(1024) not null, " +
             "sval2 varchar(1024) default 'foo', " +
             "sval3 varchar(1024) default 'bar', " +
-            "PRIMARY KEY(sval1));";
+            "PRIMARY KEY(sval1));\n" +
+            "PARTITION TABLE cjk ON COLUMN sval1;\n" +
+            "";
 
         /*String simpleSchema =
             "create table cjk (" +
             "sval1 varchar(20) not null, " +
             "sval2 varchar(20) default 'foo', " +
             "sval3 varchar(20) default 'bar', " +
-            "PRIMARY KEY(sval1));";*/
-
-        String schemaPath = MiscUtils.writeStringToTempFileURL(simpleSchema);
+            "PRIMARY KEY(sval1));\n" +
+            "PARTITION TABLE cjk ON COLUMN sval1;\n" +
+            "";*/
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addSchema(schemaPath);
-        builder.addPartitionInfo("cjk", "sval1");
-        builder.addStmtProcedure("Insert", "insert into cjk values (?,?,?);");
-        builder.addStmtProcedure("Select", "select * from cjk;");
-        builder.setHTTPDPort(8095);
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("cjk.jar"), 1, 1, 0);
-        assertTrue(success);
+        builder.catBuilder().addLiteralSchema(simpleSchema)
+        .addStmtProcedure("Insert", "insert into cjk values (?,?,?);")
+        .addStmtProcedure("Select", "select * from cjk;")
+        ;
+        builder.depBuilder().setHTTPDPort(8095);
+        assertTrue(builder.compile(Configuration.getPathToCatalogForTest("cjk.jar"), 1, 1, 0));
 
         VoltDB.Configuration config = new VoltDB.Configuration();
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("cjk.jar");

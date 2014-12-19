@@ -425,33 +425,32 @@ public class TestSqlAggregateSuite extends RegressionSuite {
     }
 
     static public junit.framework.Test suite() {
-
-        VoltServerConfig config = null;
+        LocalCluster config = null;
         MultiConfigSuiteBuilder builder =
             new MultiConfigSuiteBuilder(TestSqlAggregateSuite.class);
 
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(Insert.class.getResource("aggregate-sql-ddl.sql"));
-        project.addPartitionInfo("P1", "ID");
-        project.addProcedures(PROCEDURES);
-
+        project.catBuilder().addSchema(Insert.class.getResource("aggregate-sql-ddl.sql"))
+        .addPartitionInfo("P1", "ID")
+        .addProcedures(PROCEDURES)
+        ;
         config = new LocalCluster("sqlaggregate-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        if (!config.compile(project)) fail();
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
 
         config = new LocalCluster("sqlaggregate-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        if (!config.compile(project)) fail();
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
 
         config = new LocalCluster("sqlaggregate-twosites.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        if (!config.compile(project)) fail();
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
 
         // HSQL backend testing fails a few cases,
         // probably due to differences in null representation -- it doesn't support MIN_VALUE as null
         // These specific cases are qualified with if ( ! isHSQL()).
         config = new LocalCluster("sqlaggregate-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        if (!config.compile(project)) fail();
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
 
         return builder;

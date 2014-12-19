@@ -783,25 +783,22 @@ public class TestOrderBySuite extends RegressionSuite {
 
     static public junit.framework.Test suite() {
         LocalCluster config = null;
-        boolean success;
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(
-                TestOrderBySuite.class);
+        MultiConfigSuiteBuilder builder =
+                new MultiConfigSuiteBuilder(TestOrderBySuite.class);
         VoltProjectBuilder project = new VoltProjectBuilder();
 
-        project.addSchema(TestOrderBySuite.class.getResource("testorderby-ddl.sql"));
-        project.addProcedures(PROCEDURES);
+        project.catBuilder().addSchema(TestOrderBySuite.class.getResource("testorderby-ddl.sql"))
+        .addProcedures(PROCEDURES);
 
         //* Single-server configuration  -- please do not remove or corrupt this structured comment
         config = new LocalCluster("testorderby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
         // End single-server configuration  -- please do not remove or corrupt this structured comment */
 
         //* HSQL backend server configuration  -- please do not remove or corrupt this structured comment
         config = new LocalCluster("testorderby-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        success = config.compile(project);
-        assertTrue(success);
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
         // End HSQL backend server configuration  -- please do not remove or corrupt this structured comment */
 
@@ -810,8 +807,7 @@ public class TestOrderBySuite extends RegressionSuite {
         // Disable hasLocalServer -- with hasLocalServer enabled,
         // multi-server pro configs mysteriously hang at startup under eclipse.
         config.setHasLocalServer(false);
-        success = config.compile(project);
-        assertTrue(success);
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
         // End multi-server configuration  -- please do not remove or corrupt this structured comment */
 

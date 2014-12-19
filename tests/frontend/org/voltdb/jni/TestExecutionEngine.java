@@ -322,7 +322,6 @@ public class TestExecutionEngine extends TestCase {
     private static final int CLUSTER_ID = 2;
     private static final long NODE_ID = 1;
 
-    TPCCProjectBuilder m_project;
     Catalog m_catalog;
 
     @Override
@@ -338,8 +337,7 @@ public class TestExecutionEngine extends TestCase {
                         "",
                         100,
                         new HashinatorConfig(HashinatorType.LEGACY, LegacyHashinator.getConfigureBytes(1), 0, 0));
-        m_project = new TPCCProjectBuilder();
-        m_catalog = m_project.createTPCCSchemaCatalog();
+        m_catalog = new TPCCProjectBuilder().createTPCCSchemaCatalog();
     }
 
     @Override

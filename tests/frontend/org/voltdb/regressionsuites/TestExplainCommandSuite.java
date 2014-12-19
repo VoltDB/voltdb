@@ -107,27 +107,21 @@ public class TestExplainCommandSuite extends RegressionSuite {
 
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(TestExplainCommandSuite.class.getResource("testExplainCommand-ddl.sql"));
-        project.addPartitionInfo("t1", "PKEY");
-        project.addPartitionInfo("t2", "PKEY");
-        project.addPartitionInfo("t3", "PKEY");
-
-        boolean success;
+        project.catBuilder().addSchema(TestExplainCommandSuite.class.getResource("testExplainCommand-ddl.sql"))
+        .addPartitionInfo("t1", "PKEY")
+        .addPartitionInfo("t2", "PKEY")
+        .addPartitionInfo("t3", "PKEY")
+        ;
 
         /////////////////////////////////////////////////////////////
         // CONFIG #1: 1 Local Site/Partitions running on JNI backend
         /////////////////////////////////////////////////////////////
-
         // get a server config for the native backend with one sites/partitions
         config = new LocalCluster("testExplainCommand-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-
         // build the jarfile
-        success = config.compile(project);
-        assert(success);
-
+        assertTrue(config.compile(project));
         // add this config to the set of tests to run
         builder.addServerConfig(config);
-
         return builder;
     }
 }

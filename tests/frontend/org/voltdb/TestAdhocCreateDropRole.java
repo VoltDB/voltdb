@@ -65,9 +65,9 @@ public class TestAdhocCreateDropRole extends AdhocDDLTestBase {
         builder.addPartitionInfo("FOO", "ID");
         dbuilder.setUseDDLSchema(true);
         // Use random caps in role names to check case-insensitivity
-        dbuilder.addUsers(new DeploymentBuilder.UserInfo[]
-                {new DeploymentBuilder.UserInfo("admin", "admin", new String[] {"Administrator"})});
-        dbuilder.setSecurityEnabled(true);
+        dbuilder.addUsers(
+                new DeploymentBuilder.UserInfo("admin", "admin", new String[] {"Administrator"}));
+        dbuilder.setSecurityEnabled(true, false);
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue("Schema compilation failed", success);
         dbuilder.writeXML(pathToDeployment);

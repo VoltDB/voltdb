@@ -75,10 +75,8 @@ public class TestTwoSitePlans extends TestCase {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         String catalogJar = testDir + File.separator + JAR;
 
-        TPCCProjectBuilder pb = new TPCCProjectBuilder();
-        pb.addDefaultSchema();
-        pb.addDefaultPartitioning();
-        pb.addProcedures(MultiSiteSelect.class, InsertNewOrder.class);
+        TPCCProjectBuilder pb = new TPCCProjectBuilder().addDefaultSchema().addDefaultPartitioning();
+        pb.catBuilder().addProcedures(MultiSiteSelect.class, InsertNewOrder.class);
 
         pb.compile(catalogJar, 2, 0);
 

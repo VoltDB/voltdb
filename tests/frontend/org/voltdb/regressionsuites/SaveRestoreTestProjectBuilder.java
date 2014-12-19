@@ -23,15 +23,9 @@
 
 package org.voltdb.regressionsuites;
 
-import java.io.File;
-import java.io.IOException;
 import java.net.URL;
 
-import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.utils.BuildDirectoryUtils;
-import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.saverestore.GetTxnId;
 import org.voltdb_testprocs.regressionsuites.saverestore.MatView;
 import org.voltdb_testprocs.regressionsuites.saverestore.SaveRestoreSelect;
@@ -54,22 +48,24 @@ public class SaveRestoreTestProjectBuilder extends VoltProjectBuilder
         MatView.class.getResource("saverestore-ddl.sql");
     public static final String jarFilename = "saverestore.jar";
 
-    public void addDefaultProcedures()
+    public SaveRestoreTestProjectBuilder addDefaultProcedures()
     {
-        addProcedures(PROCEDURES);
+        catBuilder().addProcedures(PROCEDURES);
+        return this;
     }
 
-    public void addDefaultProceduresNoPartitioning()
+    public SaveRestoreTestProjectBuilder addDefaultProceduresNoPartitioning()
     {
-        addProcedures(PROCEDURES_NOPARTITIONING);
+        catBuilder().addProcedures(PROCEDURES_NOPARTITIONING);
+        return this;
     }
 
-    public void addDefaultPartitioning()
+    public SaveRestoreTestProjectBuilder addDefaultPartitioning()
     {
-        for (String pair[] : partitioning)
-        {
+        for (String pair[] : partitioning) {
             addPartitionInfo(pair[0], pair[1]);
         }
+        return this;
     }
 
     public void addPartitioning(String tableName, String partitionColumnName)
@@ -79,10 +75,20 @@ public class SaveRestoreTestProjectBuilder extends VoltProjectBuilder
 
     public void addDefaultSchema()
     {
-        addSchema(ddlURL);
+        catBuilder().addSchema(ddlURL);
     }
 
-    public void addAllDefaults()
+    // factory method
+    static public SaveRestoreTestProjectBuilder defaultBuilder() {
+        return new SaveRestoreTestProjectBuilder().addAllDefaults();
+    }
+
+    // factory method
+    static public SaveRestoreTestProjectBuilder noPartitioningBuilder() {
+        return new SaveRestoreTestProjectBuilder().addAllDefaultsNoPartitioning();
+    }
+
+    private SaveRestoreTestProjectBuilder addAllDefaults()
     {
         addDefaultSchema();
         addDefaultPartitioning();
@@ -92,15 +98,17 @@ public class SaveRestoreTestProjectBuilder extends VoltProjectBuilder
         addStmtProcedure("JumboCount", "SELECT COUNT(*) FROM JUMBO_ROW");
         addStmtProcedure("JumboInsertChars", "INSERT INTO JUMBO_ROW_UTF8 VALUES ( ?, ?, ?)", "JUMBO_ROW.PKEY: 0");
         addStmtProcedure("JumboSelectChars", "SELECT * FROM JUMBO_ROW_UTF8 WHERE PKEY = ?", "JUMBO_ROW.PKEY: 0");
+        return this;
     }
 
     /*
      * Different default set for the test of ENG-696 TestReplicatedSaveRestoreSysprocSuite
      * Has no partitioned tables.
      */
-    public void addAllDefaultsNoPartitioning() {
+    private SaveRestoreTestProjectBuilder addAllDefaultsNoPartitioning() {
         addDefaultProceduresNoPartitioning();
         addDefaultSchema();
+        return this;
     }
 
     public String getJARFilename()
@@ -108,25 +116,4 @@ public class SaveRestoreTestProjectBuilder extends VoltProjectBuilder
         return jarFilename;
     }
 
-    public Catalog createSaveRestoreSchemaCatalog() throws IOException
-    {
-        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
-        String catalogJar = testDir + File.separator + "saverestore-jni.jar";
-
-        addAllDefaults();
-
-        boolean status = compile(catalogJar);
-        assert(status);
-
-        // read in the catalog
-        byte[] bytes = MiscUtils.fileToBytes(new File(catalogJar));
-        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes).getFirst());
-        assert(serializedCatalog != null);
-
-        // create the catalog (that will be passed to the ClientInterface
-        Catalog catalog = new Catalog();
-        catalog.execute(serializedCatalog);
-
-        return catalog;
-    }
 }

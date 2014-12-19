@@ -493,9 +493,10 @@ public class TestFailuresSuite extends RegressionSuite {
 
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(DivideByZero.class.getResource("failures-ddl.sql"));
-        project.addProcedures(PROCEDURES);
-        project.addStmtProcedure("InsertNewOrder", "INSERT INTO NEW_ORDER VALUES (?, ?, ?);", "NEW_ORDER.NO_W_ID: 2");
+        project.catBuilder().addSchema(DivideByZero.class.getResource("failures-ddl.sql"))
+        .addProcedures(PROCEDURES)
+        .addStmtProcedure("InsertNewOrder", "INSERT INTO NEW_ORDER VALUES (?, ?, ?);", "NEW_ORDER.NO_W_ID: 2")
+        ;
 
         /////////////////////////////////////////////////////////////
         // CONFIG #1: 2 Local Site/Partitions running on JNI backend
@@ -503,10 +504,8 @@ public class TestFailuresSuite extends RegressionSuite {
 
         // get a server config for the native backend with two sites/partitions
         VoltServerConfig config = new LocalCluster("failures-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-
         // build the jarfile (note the reuse of the TPCC project)
-        if (!config.compile(project)) fail();
-
+        assertTrue(config.compile(project));
         // add this config to the set of tests to run
         builder.addServerConfig(config);
 
@@ -516,10 +515,8 @@ public class TestFailuresSuite extends RegressionSuite {
 
         // get a server config that similar, but doesn't use the same backend
         config = new LocalCluster("failures-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-
         // build the jarfile (note the reuse of the TPCC project)
-        if (!config.compile(project)) fail();
-
+        assertTrue(config.compile(project));
         // add this config to the set of tests to run
         builder.addServerConfig(config);
 
@@ -527,7 +524,7 @@ public class TestFailuresSuite extends RegressionSuite {
         // CONFIG #3: N=2 K=1 Cluster
         /////////////////////////////////////////////////////////////
         config = new LocalCluster("failures-cluster.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
-        if (!config.compile(project)) fail();
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
 
         return builder;

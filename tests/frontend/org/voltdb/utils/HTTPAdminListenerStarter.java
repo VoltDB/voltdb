@@ -35,16 +35,18 @@ public class HTTPAdminListenerStarter {
      */
     public static void main(String[] args) throws Exception {
         String simpleSchema =
-            "create table blah (" +
-            "ival bigint default 0 not null, " +
-            "PRIMARY KEY(ival));";
+                "CREATE TABLE blah (" +
+                "ival bigint default 0 not null, " +
+                "PRIMARY KEY(ival));\n" +
+                "PARTITION TABLE blah ON COLUMN  ;\n" +
+                "PARTITION TABLE  ON COLUMN ival;\n" +
+                "";
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(simpleSchema);
-        builder.addPartitionInfo("blah", "ival");
-        builder.addStmtProcedure("Insert", "insert into blah values (?);", null);
-        builder.setHTTPDPort(8080);
-        builder.setJSONAPIEnabled(true);
+        builder.catBuilder().addLiteralSchema(simpleSchema)
+        .addStmtProcedure("Insert", "insert into blah values (?);", null);
+
+        builder.depBuilder().setHTTPDPort(8080).setJSONAPIEnabled(true);
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("rejoin.jar"), 1, 1, 0);
         assert(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));

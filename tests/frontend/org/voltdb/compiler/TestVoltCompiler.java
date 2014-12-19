@@ -290,18 +290,17 @@ public class TestVoltCompiler extends TestCase {
             System.exit(-1);
         }
 
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-
-        builder.addProcedures(org.voltdb.compiler.procedures.TPCCTestProc.class);
-        builder.setSnapshotSettings("32m", 5, "/tmp", "woobar");
-        builder.addSchema(schemaPath);
+        VoltProjectBuilder project = new VoltProjectBuilder();
+        project.depBuilder().setSnapshotSettings("32m", 5, "/tmp", "woobar");
+        project.catBuilder().addSchema(schemaPath)
+        .addProcedures(org.voltdb.compiler.procedures.TPCCTestProc.class);
         try {
-            assertTrue(builder.compile("/tmp/snapshot_settings_test.jar"));
+            assertTrue(project.compile("/tmp/snapshot_settings_test.jar"));
             final String catalogContents =
                 VoltCompilerUtils.readFileFromJarfile("/tmp/snapshot_settings_test.jar", "catalog.txt");
             final Catalog cat = new Catalog();
             cat.execute(catalogContents);
-            CatalogUtil.compileDeployment(cat, builder.getPathToDeployment(), false);
+            CatalogUtil.compileDeployment(cat, project.getPathToDeployment(), false);
             SnapshotSchedule schedule =
                 cat.getClusters().get("cluster").getDatabases().
                     get("database").getSnapshotschedule().get("default");
@@ -320,13 +319,12 @@ public class TestVoltCompiler extends TestCase {
     // that a disabled connector is really disabled and that auth data is correct.
     public void testExportSetting() throws IOException {
         final VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(getClass().getResource("ExportTester-ddl.sql"));
-        project.addExport(false /* disabled */);
-        project.setTableAsExportOnly("A");
-        project.setTableAsExportOnly("B");
+        project.catBuilder().addSchema(getClass().getResource("ExportTester-ddl.sql"))
+        .setTableAsExportOnly("A")
+        .setTableAsExportOnly("B");
+        project.depBuilder().addExport(false /* disabled */, null, null);
         try {
-            boolean success = project.compile("/tmp/exportsettingstest.jar");
-            assertTrue(success);
+            assertTrue(project.compile("/tmp/exportsettingstest.jar"));
             final String catalogContents =
                 VoltCompilerUtils.readFileFromJarfile("/tmp/exportsettingstest.jar", "catalog.txt");
             final Catalog cat = new Catalog();
@@ -346,18 +344,18 @@ public class TestVoltCompiler extends TestCase {
     // test that Export configuration is insensitive to the case of the table name
     public void testExportTableCase() throws IOException {
         final VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(TestVoltCompiler.class.getResource("ExportTester-ddl.sql"));
-        project.addStmtProcedure("Dummy", "insert into a values (?, ?, ?);",
-                                "a.a_id: 0");
-        project.addPartitionInfo("A", "A_ID");
-        project.addPartitionInfo("B", "B_ID");
-        project.addPartitionInfo("e", "e_id");
-        project.addPartitionInfo("f", "f_id");
-        project.addExport(true /* enabled */);
-        project.setTableAsExportOnly("A"); // uppercase DDL, uppercase export
-        project.setTableAsExportOnly("b"); // uppercase DDL, lowercase export
-        project.setTableAsExportOnly("E"); // lowercase DDL, uppercase export
-        project.setTableAsExportOnly("f"); // lowercase DDL, lowercase export
+        project.catBuilder().addSchema(TestVoltCompiler.class.getResource("ExportTester-ddl.sql"))
+        .addStmtProcedure("Dummy", "insert into a values (?, ?, ?);",
+                "a.a_id: 0")
+        .addPartitionInfo("A", "A_ID")
+        .addPartitionInfo("B", "B_ID")
+        .addPartitionInfo("e", "e_id")
+        .addPartitionInfo("f", "f_id")
+        .setTableAsExportOnly("A") // uppercase DDL, uppercase export
+        .setTableAsExportOnly("b") // uppercase DDL, lowercase export
+        .setTableAsExportOnly("E") // lowercase DDL, uppercase export
+        .setTableAsExportOnly("f"); // lowercase DDL, lowercase export
+        project.depBuilder().addExport(true /* enabled */, null, null);
         try {
             assertTrue(project.compile("/tmp/exportsettingstest.jar"));
             final String catalogContents =
@@ -382,10 +380,11 @@ public class TestVoltCompiler extends TestCase {
     // test that the source table for a view is not export only
     public void testViewSourceNotExportOnly() throws IOException {
         final VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
-        project.addStmtProcedure("Dummy", "select * from v_table1r_el_only");
-        project.addExport(true /* enabled */);
-        project.setTableAsExportOnly("table1r_el_only");
+        project.catBuilder().addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"))
+        .addStmtProcedure("Dummy", "select * from v_table1r_el_only")
+        .setTableAsExportOnly("table1r_el_only")
+        ;
+        project.depBuilder().addExport(true /* enabled */, null, null);
         try {
             assertFalse(project.compile("/tmp/exporttestview.jar"));
         }
@@ -398,10 +397,10 @@ public class TestVoltCompiler extends TestCase {
     // test that a view is not export only
     public void testViewNotExportOnly() throws IOException {
         final VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"));
-        project.addStmtProcedure("Dummy", "select * from table1r_el_only");
-        project.addExport(true /* enabled */);
-        project.setTableAsExportOnly("v_table1r_el_only");
+        project.catBuilder().addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"))
+        .addStmtProcedure("Dummy", "select * from table1r_el_only")
+        .setTableAsExportOnly("v_table1r_el_only");
+        project.depBuilder().addExport(true /* enabled */, null, null);
         try {
             assertFalse(project.compile("/tmp/exporttestview.jar"));
         }

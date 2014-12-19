@@ -1856,31 +1856,30 @@ public class TestFixedSQLSuite extends RegressionSuite {
         boolean success;
 
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(Insert.class.getResource("fixed-sql-ddl.sql"));
-        project.addProcedures(PROCEDURES);
+        project.catBuilder().addSchema(Insert.class.getResource("fixed-sql-ddl.sql"))
+        .addProcedures(PROCEDURES)
 
         // Now that this fails to compile with an overflow error, it should be migrated to a
         // Failures suite.
         //project.addStmtProcedure("Crap", "insert into COUNT_NULL values (" + Long.MIN_VALUE + ", 1, 200)");
 
-        project.addStmtProcedure("Eng397Limit1", "Select P1.NUM from P1 order by P1.NUM limit ?;");
-        //project.addStmtProcedure("Eng490Select", "SELECT A.ASSET_ID, A.OBJECT_DETAIL_ID,  OD.OBJECT_DETAIL_ID FROM ASSET A, OBJECT_DETAIL OD WHERE A.OBJECT_DETAIL_ID = OD.OBJECT_DETAIL_ID;");
-        project.addStmtProcedure("InsertNullString", "Insert into STRINGPART values (?, ?, ?);",
-                                 "STRINGPART.NAME: 0");
-        project.addStmtProcedure("Eng993Insert", "insert into P1 (ID,DESC,NUM,RATIO) VALUES(1+?,'NULL',NULL,1+?);");
-        project.addStmtProcedure("Eng5926Insert", "insert into PWEE (ID,WEE,NUM,RATIO) VALUES(1+?,?||'WEE',NULL,1+?);");
+        .addStmtProcedure("Eng397Limit1", "Select P1.NUM from P1 order by P1.NUM limit ?;")
+        //.addStmtProcedure("Eng490Select", "SELECT A.ASSET_ID, A.OBJECT_DETAIL_ID,  OD.OBJECT_DETAIL_ID FROM ASSET A, OBJECT_DETAIL OD WHERE A.OBJECT_DETAIL_ID = OD.OBJECT_DETAIL_ID;")
+        .addStmtProcedure("InsertNullString", "Insert into STRINGPART values (?, ?, ?);",
+                                 "STRINGPART.NAME: 0")
+        .addStmtProcedure("Eng993Insert", "insert into P1 (ID,DESC,NUM,RATIO) VALUES(1+?,'NULL',NULL,1+?);")
+        .addStmtProcedure("Eng5926Insert", "insert into PWEE (ID,WEE,NUM,RATIO) VALUES(1+?,?||'WEE',NULL,1+?);")
 
-        project.addStmtProcedure("Eng1316Insert_R", "insert into R1 values (?, ?, ?, ?);");
-        project.addStmtProcedure("Eng1316Update_R", "update R1 set num = num + 1 where id < 104");
-        project.addStmtProcedure("Eng1316Insert_P", "insert into P1 values (?, ?, ?, ?);");
-        project.addStmtProcedure("Eng1316Update_P", "update P1 set num = num + 1 where id < 104");
-        project.addStmtProcedure("Eng1316Insert_P1", "insert into P1 values (?, ?, ?, ?);", "P1.ID: 0");
-        project.addStmtProcedure("Eng1316Update_P1", "update P1 set num = num + 1 where id = ?", "P1.ID: 0");
+        .addStmtProcedure("Eng1316Insert_R", "insert into R1 values (?, ?, ?, ?);")
+        .addStmtProcedure("Eng1316Update_R", "update R1 set num = num + 1 where id < 104")
+        .addStmtProcedure("Eng1316Insert_P", "insert into P1 values (?, ?, ?, ?);")
+        .addStmtProcedure("Eng1316Update_P", "update P1 set num = num + 1 where id < 104")
+        .addStmtProcedure("Eng1316Insert_P1", "insert into P1 values (?, ?, ?, ?);", "P1.ID: 0")
+        .addStmtProcedure("Eng1316Update_P1", "update P1 set num = num + 1 where id = ?", "P1.ID: 0");
 
         //* CONFIG #1: JNI -- keep this enabled by default with / / vs. / *
         config = new LocalCluster("fixedsql-threesite.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
 
         /*/ // CONFIG #1b: IPC -- keep this normally disabled with / * vs. //
@@ -1892,8 +1891,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
         // CONFIG #2: HSQL
         config = new LocalCluster("fixedsql-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        success = config.compile(project);
-        assertTrue(success);
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
 
         return builder;

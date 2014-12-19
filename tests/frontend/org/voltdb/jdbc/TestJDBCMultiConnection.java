@@ -59,21 +59,20 @@ public class TestJDBCMultiConnection {
         // TPCC schema
         String ddl =
             "CREATE TABLE TT(A1 INTEGER NOT NULL, A2_ID INTEGER, PRIMARY KEY(A1));" +
-            "CREATE TABLE ORDERS(A1 INTEGER NOT NULL, A2_ID INTEGER, PRIMARY KEY(A1));" +
+            "CREATE TABLE ORDERS(A1 INTEGER NOT NULL, A2_ID INTEGER, PRIMARY KEY(A1)); \n" +
             "CREATE UNIQUE INDEX UNIQUE_ORDERS_HASH ON ORDERS (A1, A2_ID); " +
-            "CREATE INDEX IDX_ORDERS_HASH ON ORDERS (A2_ID);";
-
+            "CREATE INDEX IDX_ORDERS_HASH ON ORDERS (A2_ID); \n" +
+            "PARTITION TABLE TT ON COLUMN A1; \n" +
+            "PARTITION TABLE ORDERS ON COLUMN A1;\n" +
+            "";
 
         m_projectBuilder = new VoltProjectBuilder();
-        m_projectBuilder.addLiteralSchema(ddl);
-        m_projectBuilder.addSchema(TestClientFeatures.class.getResource("clientfeatures.sql"));
-        m_projectBuilder.addProcedures(ArbitraryDurationProc.class);
-        m_projectBuilder.addPartitionInfo("TT", "A1");
-        m_projectBuilder.addPartitionInfo("ORDERS", "A1");
-        m_projectBuilder.addStmtProcedure("InsertA", "INSERT INTO TT VALUES(?,?);", "TT.A1: 0");
-        m_projectBuilder.addStmtProcedure("SelectB", "SELECT * FROM TT;");
-        boolean success = m_projectBuilder.compile(Configuration.getPathToCatalogForTest("jdbcreconnecttest.jar"), 3, 1, 0);
-        assert(success);
+        m_projectBuilder.catBuilder().addLiteralSchema(ddl)
+        .addSchema(TestClientFeatures.class.getResource("clientfeatures.sql"))
+        .addProcedures(ArbitraryDurationProc.class)
+        .addStmtProcedure("InsertA", "INSERT INTO TT VALUES(?,?);", "TT.A1: 0")
+        .addStmtProcedure("SelectB", "SELECT * FROM TT;");
+        assertTrue(m_projectBuilder.compile(Configuration.getPathToCatalogForTest("jdbcreconnecttest.jar"), 3, 1, 0));
         MiscUtils.copyFile(m_projectBuilder.getPathToDeployment(), Configuration.getPathToCatalogForTest("jdbcreconnecttest.xml"));
         m_testJar = Configuration.getPathToCatalogForTest("jdbcreconnecttest.jar");
 

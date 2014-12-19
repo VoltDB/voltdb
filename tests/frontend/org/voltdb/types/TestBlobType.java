@@ -39,6 +39,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
 
@@ -208,18 +209,18 @@ public class TestBlobType extends TestCase {
         final byte D_ID = 7;
         final int C_ID = 42;
 
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addSchema(TPCCProjectBuilder.ddlURL);
+        VoltProjectBuilder project = new VoltProjectBuilder();
+        CatalogBuilder cb = project.catBuilder().addSchema(TPCCProjectBuilder.ddlURL)
+        .addStmtProcedure("InsertCustomer", "INSERT INTO CUSTOMER VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", "CUSTOMER.C_W_ID: 2")
+        .addStmtProcedure("Fake1", "SELECT C_ID, C_FIRST, C_MIDDLE, C_LAST, C_STREET_1, C_STREET_2, C_CITY, C_STATE, C_ZIP, C_PHONE, C_SINCE, C_CREDIT, C_CREDIT_LIM, C_DISCOUNT, C_BALANCE, C_YTD_PAYMENT, C_PAYMENT_CNT, C_DATA FROM CUSTOMER WHERE C_LAST = ? AND C_D_ID = ? AND C_W_ID = ? ORDER BY C_FIRST;")
+        .addProcedures(FakeCustomerLookup.class)
+        ;
         for (String pair[] : TPCCProjectBuilder.partitioning) {
-            builder.addPartitionInfo(pair[0], pair[1]);
+            cb.addPartitionInfo(pair[0], pair[1]);
         }
-        builder.addStmtProcedure("InsertCustomer", "INSERT INTO CUSTOMER VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", "CUSTOMER.C_W_ID: 2");
-        builder.addStmtProcedure("Fake1", "SELECT C_ID, C_FIRST, C_MIDDLE, C_LAST, C_STREET_1, C_STREET_2, C_CITY, C_STATE, C_ZIP, C_PHONE, C_SINCE, C_CREDIT, C_CREDIT_LIM, C_DISCOUNT, C_BALANCE, C_YTD_PAYMENT, C_PAYMENT_CNT, C_DATA FROM CUSTOMER WHERE C_LAST = ? AND C_D_ID = ? AND C_W_ID = ? ORDER BY C_FIRST;");
 
-        builder.addProcedures(FakeCustomerLookup.class);
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("binarytest2.jar"), 1, 1, 0);
-        assert(success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("binarytest2.xml"));
+        assertTrue(project.compile(Configuration.getPathToCatalogForTest("binarytest2.jar"), 1, 1, 0));
+        MiscUtils.copyFile(project.getPathToDeployment(), Configuration.getPathToCatalogForTest("binarytest2.xml"));
 
         ServerThread localServer = null;
         Client client = null;

@@ -20,10 +20,8 @@ package org.voltdb.compiler;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Properties;
 
 import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.CatalogBuilder.ProcedureInfo;
@@ -83,25 +81,12 @@ public class VoltProjectBuilder {
         m_cb.addRoles(roles);
     }
 
-    public void addSchema(final URL schemaURL) {
-        assert(schemaURL != null);
-        addSchema(schemaURL.getPath());
-    }
-
     /**
      * This is test code written by Ryan, even though it was
      * committed by John.
      */
     public void addLiteralSchema(String ddlText) throws IOException {
         m_cb.addLiteralSchema(ddlText);
-    }
-
-    /**
-     * Add a schema based on a URL.
-     * @param schemaURL Schema file URL
-     */
-    public void addSchema(String schemaURL) {
-        m_cb.addSchema(schemaURL);
     }
 
     public void addStmtProcedure(String name, String sql) {
@@ -146,41 +131,12 @@ public class VoltProjectBuilder {
         m_db.setHTTPDPort(port);
     }
 
-    public void setJSONAPIEnabled(final boolean enabled) {
-        m_db.setJSONAPIEnabled(enabled);
-    }
-
-    public void setSecurityEnabled(final boolean enabled, boolean createAdminUser) {
-        m_db.setSecurityEnabled(enabled);
-        if (createAdminUser) {
-            m_db.addUsers(new UserInfo[]
-                    {new UserInfo("defaultadmin", "admin", new String[] {"ADMINISTRATOR"})});
-        }
-    }
-
-    public void setSecurityProvider(final String provider) {
-        m_db.setSecurityProvider(provider);
-    }
-
     public void setSnapshotSettings(
             String frequency,
             int retain,
             String path,
             String prefix) {
         m_db.setSnapshotSettings(frequency, retain, path, prefix);
-    }
-
-    public void setPartitionDetectionSettings(final String snapshotPath, final String ppdPrefix)
-    {
-        m_db.setPartitionDetectionSettings(snapshotPath, ppdPrefix);
-    }
-
-    public void addExport(boolean enabled, String exportTarget, Properties config) {
-        m_db.addExport(enabled, exportTarget, config);
-    }
-
-    public void addExport(boolean enabled) {
-        m_db.addExport(enabled, null, null);
     }
 
     public void setTableAsExportOnly(String name) {
@@ -197,64 +153,77 @@ public class VoltProjectBuilder {
     }
 
     public boolean compile(final String jarPath) {
-        return compile(jarPath, 1, 1, 0, null) != null;
+        if (compileToCatalog(jarPath) == null) {
+            return false;
+        }
+        m_pathToDeployment = compileToDeployment(1, 1, 0);
+        return true;
     }
 
     public boolean compile(final String jarPath,
             final int sitesPerHost,
             final int replication) {
-        return compile(jarPath, sitesPerHost, 1, replication, null) != null;
+        if (compileToCatalog(jarPath) == null) {
+            return false;
+        }
+        m_pathToDeployment = compileToDeployment(sitesPerHost, 1, replication);
+        return true;
     }
 
     public boolean compile(final String jarPath,
             final int sitesPerHost,
             final int hostCount,
             final int replication) {
-        return compile(jarPath, sitesPerHost, hostCount, replication, null) != null;
+        if (compileToCatalog(jarPath) == null) {
+            return false;
+        }
+        m_pathToDeployment = compileToDeployment(sitesPerHost, hostCount, replication);
+        return true;
     }
 
-    public Catalog compile(final String jarPath,
+    public Catalog compileToCatalogAndSaveDeployment(final String jarPath,
             final int sitesPerHost,
             final int hostCount,
-            final int replication,
-            final String voltRoot) {
-        assert(hostCount >= 1);
-        assert(sitesPerHost >= 1);
-        VoltCompiler compiler = new VoltCompiler();
-        m_db.resetFromVPB(sitesPerHost, hostCount, replication);
+            final int replication) {
+        Catalog catalog = compileToCatalog(jarPath);
+        if (catalog == null) {
+            return null;
+        }
+        m_pathToDeployment = compileToDeployment(sitesPerHost, hostCount, replication);
+        return catalog;
+    }
+
+    public VoltProjectBuilder setVoltRoot(String voltRoot) {
         if (voltRoot != null) {
             m_db.setVoltRoot(voltRoot);
         }
-        if (compile(compiler, jarPath, voltRoot)) {
+        return this;
+    }
+
+    public Catalog compileToCatalog(final String jarPath) {
+        assert(jarPath != null);
+        VoltCompiler compiler = new VoltCompiler();
+        if (m_cb.compile(compiler, jarPath)) {
             return compiler.getCatalog();
         } else {
             return null;
         }
     }
 
+    public String compileToDeployment(int sitesPerHost, int hostCount, int replication) {
+        assert(hostCount >= 1);
+        assert(sitesPerHost >= 1);
+        m_db.resetFromVPB(sitesPerHost, hostCount, replication);
+        return m_db.writeXMLToTempFile();
+    }
+
+    public void setDeploymentPath(String deploymentPath) {
+        m_pathToDeployment = deploymentPath;
+    }
+
     public void useCustomAdmin(int adminPort, boolean adminOnStartup)
     {
         m_db.useCustomAdmin(adminPort, adminOnStartup);
-    }
-
-    private boolean compile(final VoltCompiler compiler,
-                           final String jarPath,
-                           final String voltRoot)
-    {
-        assert(jarPath != null);
-        if ( ! m_cb.compile(compiler, jarPath)) {
-            return false;
-        }
-
-        try {
-            m_pathToDeployment = m_db.writeXMLToTempFile();
-        } catch (Exception e) {
-            System.out.println("Failed to create deployment file in testcase.");
-            e.printStackTrace();
-            // sufficient to escape and fail test cases?
-            throw new RuntimeException(e);
-        }
-        return true;
     }
 
     /**
@@ -286,6 +255,14 @@ public class VoltProjectBuilder {
     /** Access the VoltCompiler's recent plan output, for diagnostic purposes */
     public List<String> harvestDiagnostics() {
         return m_cb.harvestDiagnostics();
+    }
+
+    public DeploymentBuilder depBuilder() {
+        return m_db;
+    }
+
+    public CatalogBuilder catBuilder() {
+        return m_cb;
     }
 
 }

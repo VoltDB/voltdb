@@ -959,14 +959,12 @@ public class TestRollbackSuite extends RegressionSuite {
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestRollbackSuite.class);
 
         // build up a project builder for the workload
-        TPCCProjectBuilder project = new TPCCProjectBuilder();
-        project.addSchema(SinglePartitionJavaError.class.getResource("tpcc-extraview-ddl.sql"));
-        project.addDefaultPartitioning();
-        project.addPartitionInfo("ALL_TYPES", "ID");
-        project.addProcedures(PROCEDURES);
-        project.addStmtProcedure("InsertNewOrder", "INSERT INTO NEW_ORDER VALUES (?, ?, ?);", "NEW_ORDER.NO_W_ID: 2");
-
-        boolean success;
+        TPCCProjectBuilder project = new TPCCProjectBuilder().addDefaultPartitioning();
+        project.catBuilder().addSchema(SinglePartitionJavaError.class.getResource("tpcc-extraview-ddl.sql"))
+        .addPartitionInfo("ALL_TYPES", "ID")
+        .addProcedures(PROCEDURES)
+        .addStmtProcedure("InsertNewOrder", "INSERT INTO NEW_ORDER VALUES (?, ?, ?);", "NEW_ORDER.NO_W_ID: 2")
+        ;
 
         /////////////////////////////////////////////////////////////
         // CONFIG #1: 2 Local Site/Partitions running on JNI backend
@@ -974,11 +972,8 @@ public class TestRollbackSuite extends RegressionSuite {
 
         // get a server config for the native backend with two sites/partitions
         config = new LocalCluster("rollback-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-
         // build the jarfile (note the reuse of the TPCC project)
-        success = config.compile(project);
-        assert(success);
-
+        assertTrue(config.compile(project));
         // add this config to the set of tests to run
         builder.addServerConfig(config);
 
@@ -987,8 +982,7 @@ public class TestRollbackSuite extends RegressionSuite {
         /////////////////////////////////////////////////////////////
 
         config = new LocalCluster("rollback-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assert(success);
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
 
         return builder;

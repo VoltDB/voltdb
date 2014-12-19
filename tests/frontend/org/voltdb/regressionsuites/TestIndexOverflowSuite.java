@@ -108,39 +108,37 @@ public class TestIndexOverflowSuite extends RegressionSuite {
             new MultiConfigSuiteBuilder(TestIndexOverflowSuite.class);
 
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(TestIndexOverflowSuite.class.getResource("indexoverflowsuite-ddl.sql"));
-        project.addPartitionInfo("P1", "ID");
-        project.addStmtProcedure("BasicEQParam",           "select * from P1 where ID = ?");
-        project.addStmtProcedure("BasicGTParam",           "select * from P1 where ID > ?");
-        project.addStmtProcedure("BasicLTParam",           "select * from P1 where ID < ?");
+        project.catBuilder().addSchema(TestIndexOverflowSuite.class.getResource("indexoverflowsuite-ddl.sql"))
+        .addPartitionInfo("P1", "ID")
+        .addStmtProcedure("BasicEQParam",           "select * from P1 where ID = ?")
+        .addStmtProcedure("BasicGTParam",           "select * from P1 where ID > ?")
+        .addStmtProcedure("BasicLTParam",           "select * from P1 where ID < ?")
 
-        project.addStmtProcedure("BasicUnderflowEQ",       "select * from P1 where ID = -6000000000");
-        project.addStmtProcedure("BasicUnderflowGT",       "select * from P1 where ID > -6000000000");
-        project.addStmtProcedure("BasicUnderflowLT",       "select * from P1 where ID < -6000000000");
+        .addStmtProcedure("BasicUnderflowEQ",       "select * from P1 where ID = -6000000000")
+        .addStmtProcedure("BasicUnderflowGT",       "select * from P1 where ID > -6000000000")
+        .addStmtProcedure("BasicUnderflowLT",       "select * from P1 where ID < -6000000000")
 
-        project.addStmtProcedure("BasicOverflowEQ",        "select * from P1 where ID = 6000000000");
-        project.addStmtProcedure("BasicOverflowGT",        "select * from P1 where ID > 6000000000");
-        project.addStmtProcedure("BasicOverflowLT",        "select * from P1 where ID < 6000000000");
+        .addStmtProcedure("BasicOverflowEQ",        "select * from P1 where ID = 6000000000")
+        .addStmtProcedure("BasicOverflowGT",        "select * from P1 where ID > 6000000000")
+        .addStmtProcedure("BasicOverflowLT",        "select * from P1 where ID < 6000000000")
 
-        project.addStmtProcedure("TwoColUnderflowEQ",      "select * from P1 where ID = ? and TINY = -200");
-        project.addStmtProcedure("TwoColUnderflowGT",      "select * from P1 where ID = ? and TINY > -200");
-        project.addStmtProcedure("TwoColUnderflowLT",      "select * from P1 where ID = ? and TINY < -200");
+        .addStmtProcedure("TwoColUnderflowEQ",      "select * from P1 where ID = ? and TINY = -200")
+        .addStmtProcedure("TwoColUnderflowGT",      "select * from P1 where ID = ? and TINY > -200")
+        .addStmtProcedure("TwoColUnderflowLT",      "select * from P1 where ID = ? and TINY < -200")
 
-        project.addStmtProcedure("TwoColOverflowEQ",       "select * from P1 where ID = ? and TINY = 200");
-        project.addStmtProcedure("TwoColOverflowGT",       "select * from P1 where ID = ? and TINY > 200");
-        project.addStmtProcedure("TwoColOverflowLT",       "select * from P1 where ID = ? and TINY < 200");
+        .addStmtProcedure("TwoColOverflowEQ",       "select * from P1 where ID = ? and TINY = 200")
+        .addStmtProcedure("TwoColOverflowGT",       "select * from P1 where ID = ? and TINY > 200")
+        .addStmtProcedure("TwoColOverflowLT",       "select * from P1 where ID = ? and TINY < 200")
 
-        project.addStmtProcedure("Join",                   "select * from P1, R1 where P1.ID = R1.TINY");
-        project.addStmtProcedure("JoinReverse",            "select * from P1, R1 where P1.TINY = R1.ID");
-        project.addStmtProcedure("JoinWithOrderOverflow",  "select * from P1, R1 where P1.ID = R1.ID and P1.TINY >= 200");
-        project.addStmtProcedure("JoinWithOrderUnderflow", "select * from P1, R1 where P1.ID = R1.ID and P1.TINY >= -200");
-
-        boolean success;
+        .addStmtProcedure("Join",                   "select * from P1, R1 where P1.ID = R1.TINY")
+        .addStmtProcedure("JoinReverse",            "select * from P1, R1 where P1.TINY = R1.ID")
+        .addStmtProcedure("JoinWithOrderOverflow",  "select * from P1, R1 where P1.ID = R1.ID and P1.TINY >= 200")
+        .addStmtProcedure("JoinWithOrderUnderflow", "select * from P1, R1 where P1.ID = R1.ID and P1.TINY >= -200")
+        ;
 
         // JNI
         config = new LocalCluster("testindexes-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
 
         return builder;

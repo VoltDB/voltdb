@@ -210,25 +210,25 @@ public class TestSqlUpdateSuite extends RegressionSuite {
 
     static public junit.framework.Test suite() {
 
-        VoltServerConfig config = null;
+        LocalCluster config = null;
         MultiConfigSuiteBuilder builder =
             new MultiConfigSuiteBuilder(TestSqlUpdateSuite.class);
 
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(Insert.class.getResource("sql-update-ddl.sql"));
-        project.addProcedures(PROCEDURES);
+        project.catBuilder().addSchema(Insert.class.getResource("sql-update-ddl.sql"))
+        .addProcedures(PROCEDURES);
 
         config = new LocalCluster("sqlupdate-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        if (!config.compile(project)) fail();
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
 
         config = new LocalCluster("sqlupdate-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        if (!config.compile(project)) fail();
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
 
         // Cluster
         config = new LocalCluster("sqlupdate-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        if (!config.compile(project)) fail();
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
 
         return builder;

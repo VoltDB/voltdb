@@ -325,7 +325,7 @@ public class LocalCluster implements VoltServerConfig {
 
     public boolean compileWithPartitionDetection(VoltProjectBuilder builder, String ppdPrefix) {
         if (!m_compiled) {
-            builder.setPartitionDetectionSettings("/tmp", ppdPrefix);
+            builder.depBuilder().setPartitionDetectionSettings("/tmp", ppdPrefix);
             m_compiled = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor);
             templateCmdLine.pathToDeployment(builder.getPathToDeployment());
             m_voltdbroot = builder.getPathToVoltRoot().getAbsolutePath();

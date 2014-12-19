@@ -138,28 +138,23 @@ public class TestIndexMemoryOwnershipSuite extends RegressionSuite {
     }
 
     static public junit.framework.Test suite() {
-
-        VoltServerConfig config = null;
         MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestIndexMemoryOwnershipSuite.class);
+                new MultiConfigSuiteBuilder(TestIndexMemoryOwnershipSuite.class);
 
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(TestIndexMemoryOwnershipSuite.class.getResource("testindexmemoryownership-ddl.sql"));
-        project.addPartitionInfo("t1", "a");
-        project.addStmtProcedure("InsertT1", "insert into t1 values (?, ?, ?);", "t1.a:0");
-        project.addStmtProcedure("UpdateT1c", "update t1 set c = ? where a = ?;", "t1.a:1");
-        project.addStmtProcedure("UpdateT1b", "update t1 set b = ? where a = ?;", "t1.a:1");
-        project.addStmtProcedure("DeleteT1", "delete from t1 where c = ?;");
-        project.addStmtProcedure("LookupT1b", "select * from t1 where b = ?;");
-        project.addStmtProcedure("MVLookup", "select * from mv where b = ? and a = ?;", "t1.a:1");
-        project.addStmtProcedure("MVAll", "select * from mv;");
-
-        boolean success;
-
+        project.catBuilder().addSchema(TestIndexMemoryOwnershipSuite.class.getResource("testindexmemoryownership-ddl.sql"))
+        .addPartitionInfo("t1", "a")
+        .addStmtProcedure("InsertT1", "insert into t1 values (?, ?, ?);", "t1.a:0")
+        .addStmtProcedure("UpdateT1c", "update t1 set c = ? where a = ?;", "t1.a:1")
+        .addStmtProcedure("UpdateT1b", "update t1 set b = ? where a = ?;", "t1.a:1")
+        .addStmtProcedure("DeleteT1", "delete from t1 where c = ?;")
+        .addStmtProcedure("LookupT1b", "select * from t1 where b = ?;")
+        .addStmtProcedure("MVLookup", "select * from mv where b = ? and a = ?;", "t1.a:1")
+        .addStmtProcedure("MVAll", "select * from mv;")
+        ;
         // JNI
-        config = new LocalCluster("updatememoryownership.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
+        LocalCluster config = new LocalCluster("updatememoryownership.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
 
         return builder;

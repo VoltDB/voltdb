@@ -24,7 +24,6 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
-import java.util.ArrayList;
 
 import junit.framework.Test;
 
@@ -394,26 +393,31 @@ public class TestSecuritySuite extends RegressionSuite {
         TPCCProjectBuilder project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
-        ArrayList<ProcedureInfo> procedures = new ArrayList<ProcedureInfo>();
-        procedures.add(new ProcedureInfo(new String[0], PROCEDURES[0]));
-        procedures.add(new ProcedureInfo(new String[] {"group1"}, PROCEDURES[1]));
-        procedures.add(new ProcedureInfo(new String[] {"group1", "group2"}, PROCEDURES[2]));
-        project.addProcedures(procedures);
+        // suite defines its own ADMINISTRATOR user
+        project.depBuilder().setSecurityEnabled(true, false)
+        .addUsers(
+                new UserInfo("user1", "password", "grouP1"),
+                new UserInfo("user2", "password", "grouP2"),
+                new UserInfo("user3", "password", "grouP3"),
+                new UserInfo("user4", "password", "AdMINISTRATOR"),
+                new UserInfo("userWithDefaultUserPerm", "password", "User"),
+                new UserInfo("userWithAllProc", "password", "GroupWithAllProcPerm"),
+                new UserInfo("userWithDefaultProcPerm", "password", "groupWithDefaultProcPerm"),
+                new UserInfo("userWithoutDefaultProcPerm", "password", "groupWiThoutDefaultProcPerm"),
+                new UserInfo("userWithDefaultProcReadPerm", "password", "groupWiThDefaultProcReadPerm"));
 
-        UserInfo users[] = new UserInfo[] {
-                new UserInfo("user1", "password", new String[] {"grouP1"}),
-                new UserInfo("user2", "password", new String[] {"grouP2"}),
-                new UserInfo("user3", "password", new String[] {"grouP3"}),
-                new UserInfo("user4", "password", new String[] {"AdMINISTRATOR"}),
-                new UserInfo("userWithDefaultUserPerm", "password", new String[] {"User"}),
-                new UserInfo("userWithAllProc", "password", new String[] {"GroupWithAllProcPerm"}),
-                new UserInfo("userWithDefaultProcPerm", "password", new String[] {"groupWithDefaultProcPerm"}),
-                new UserInfo("userWithoutDefaultProcPerm", "password", new String[] {"groupWiThoutDefaultProcPerm"}),
-                new UserInfo("userWithDefaultProcReadPerm", "password", new String[] {"groupWiThDefaultProcReadPerm"})
-        };
-        project.addUsers(users);
+        // export disabled in community
+        if (MiscUtils.isPro()) {
+            project.depBuilder().addExport(true /*enabled*/, null, null);
+        }
 
-        RoleInfo groups[] = new RoleInfo[] {
+        project.catBuilder().addProcedures(
+                new ProcedureInfo(PROCEDURES[0]),
+                new ProcedureInfo(PROCEDURES[1], "group1"),
+                new ProcedureInfo(PROCEDURES[2], "group1", "group2")
+                )
+
+        .addRoles(
                 new RoleInfo("Group1", false, false, false, false, false, false),
                 new RoleInfo("Group2", true, false, false, false, false, false),
                 new RoleInfo("Group3", true, false, false, false, false, false),
@@ -421,16 +425,7 @@ public class TestSecuritySuite extends RegressionSuite {
                 new RoleInfo("GroupWithAllProcPerm", false, false, false, false, false, true),
                 new RoleInfo("GroupWithDefaultProcPerm", false, false, false, true, false, false),
                 new RoleInfo("GroupWithoutDefaultProcPerm", false, false, false, false, false, false),
-                new RoleInfo("GroupWithDefaultProcReadPerm", false, false, false, false, true, false)
-        };
-        project.addRoles(groups);
-        // suite defines its own ADMINISTRATOR user
-        project.setSecurityEnabled(true, false);
-
-        // export disabled in community
-        if (MiscUtils.isPro()) {
-            project.addExport(true /*enabled*/);
-        }
+                new RoleInfo("GroupWithDefaultProcReadPerm", false, false, false, false, true, false));
 
         /////////////////////////////////////////////////////////////
         // CONFIG #1: 1 Local Site/Partitions running on JNI backend
@@ -440,13 +435,12 @@ public class TestSecuritySuite extends RegressionSuite {
         config = new LocalCluster("security-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
 
         // build the jarfile
-        if (!config.compile(project)) fail();
+        assertTrue(config.compile(project));
 
         // add this config to the set of tests to run
         builder.addServerConfig(config);
 
         // Not testing a cluster and assuming security shouldn't be affected by this
-
         return builder;
     }
 

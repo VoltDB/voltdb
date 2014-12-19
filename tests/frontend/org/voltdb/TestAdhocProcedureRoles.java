@@ -32,7 +32,6 @@ import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.catalog.Catalog;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
@@ -51,21 +50,21 @@ public class TestAdhocProcedureRoles extends AdhocDDLTestBase {
 
     private class Tester
     {
-        final VoltProjectBuilder builder;
+        final VoltProjectBuilder m_builder;
 
         Tester()
         {
             if (VERBOSE) {
                 System.out.println("================= Begin Test ==================");
             }
-            this.builder = new VoltProjectBuilder();
-            this.builder.setSecurityEnabled(true, true);
-            this.builder.setUseDDLSchema(true);
+            m_builder = new VoltProjectBuilder();
+            m_builder.depBuilder().setSecurityEnabled(true, true);
+            m_builder.setUseDDLSchema(true);
         }
 
         void createTable(String name) throws IOException
         {
-            this.builder.addLiteralSchema(String.format(
+            m_builder.addLiteralSchema(String.format(
                     "create table %s (" +
                         "ID integer not null," +
                         "VAL bigint, " +
@@ -75,12 +74,12 @@ public class TestAdhocProcedureRoles extends AdhocDDLTestBase {
 
         void createRoles(final RoleInfo template, String... roles)
         {
-            this.builder.addRoles(RoleInfo.fromTemplate(template, roles));
+            m_builder.addRoles(RoleInfo.fromTemplate(template, roles));
         }
 
         void createUser(String user, String password, String... roles)
         {
-            this.builder.addUsers(new UserInfo[] {new UserInfo(user, password, roles)});
+            m_builder.addUsers(new UserInfo[] {new UserInfo(user, password, roles)});
         }
 
         void createProcedureAdHoc(String procName, String role, String tableName, boolean drop) throws Exception
@@ -106,17 +105,15 @@ public class TestAdhocProcedureRoles extends AdhocDDLTestBase {
 
         void compile() throws Exception
         {
+            assertTrue("Schema compilation failed",
+                    m_builder.compile(CATALOG_PATH, 2, 1, 0));
             if (VERBOSE) {
                 System.out.println(":::Deployment:::");
-            }
-            Catalog catalog = this.builder.compile(CATALOG_PATH, 2, 1, 0, null);
-            if (VERBOSE) {
-                for (String line : Files.readAllLines(Paths.get(this.builder.getPathToDeployment()), Charset.defaultCharset())) {
+                for (String line : Files.readAllLines(Paths.get(m_builder.getPathToDeployment()), Charset.defaultCharset())) {
                     System.out.println(line);
                 }
             }
-            assertNotNull("Schema compilation failed", catalog);
-            MiscUtils.copyFile(this.builder.getPathToDeployment(), DEPLOYMENT_PATH);
+            MiscUtils.copyFile(m_builder.getPathToDeployment(), DEPLOYMENT_PATH);
         }
 
         void start() throws Exception

@@ -19,6 +19,7 @@ package org.voltdb.compiler;
 
 import java.io.File;
 import java.io.FileWriter;
+import java.io.IOException;
 import java.io.StringWriter;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
@@ -64,7 +65,7 @@ public class DeploymentBuilder {
         public String password;
         public final String roles[];
 
-        public UserInfo (final String name, final String password, final String roles[]){
+        public UserInfo (final String name, final String password, final String... roles){
             this.name = name;
             this.password = password;
             this.roles = roles;
@@ -190,7 +191,7 @@ public class DeploymentBuilder {
         m_replication = replication;
     }
 
-    DeploymentBuilder useCustomAdmin(int adminPort, boolean adminOnStartup)
+    public DeploymentBuilder useCustomAdmin(int adminPort, boolean adminOnStartup)
     {
         m_useCustomAdmin = true;
         m_adminPort = adminPort;
@@ -249,7 +250,7 @@ public class DeploymentBuilder {
         return this;
     }
 
-    public DeploymentBuilder addUsers(final UserInfo users[]) {
+    public DeploymentBuilder addUsers(final UserInfo... users) {
         for (final UserInfo info : users) {
             final boolean added = m_users.add(info);
             if (!added) {
@@ -280,8 +281,11 @@ public class DeploymentBuilder {
         return this;
     }
 
-    public DeploymentBuilder setSecurityEnabled(final boolean enabled) {
+    public DeploymentBuilder setSecurityEnabled(final boolean enabled, boolean createAdminUser) {
         m_securityEnabled = enabled;
+        if (createAdminUser) {
+            addUsers(new UserInfo("defaultadmin", "admin", new String[] {"ADMINISTRATOR"}));
+        }
         return this;
     }
 
@@ -563,7 +567,15 @@ public class DeploymentBuilder {
 
     public String writeXMLToTempFile() {
         String xml = getXML();
-        return MiscUtils.writeStringToTempFilePath(xml);
+        try {
+            File tempFile = File.createTempFile("VoltDeployment", ".xml");
+            MiscUtils.writeStringToFile(tempFile, xml);
+            return tempFile.getPath();
+        } catch (IOException e) {
+            System.out.println("Failed to create deployment file.");
+            e.printStackTrace();
+            throw new RuntimeException(e); // Good enough for test code?
+        }
     }
 
     public File writeXMLToFile(String path) {

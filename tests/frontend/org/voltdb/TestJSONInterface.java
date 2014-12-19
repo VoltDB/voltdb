@@ -346,31 +346,29 @@ public class TestJSONInterface extends TestCase {
 
     public void testAdminMode() throws Exception {
         try {
-            String simpleSchema
-                    = "create table blah ("
-                    + "ival bigint default 23 not null, "
-                    + "sval varchar(200) default 'foo', "
-                    + "dateval timestamp, "
-                    + "fval float, "
-                    + "decval decimal, "
-                    + "PRIMARY KEY(ival));";
-
-            String schemaPath = MiscUtils.writeStringToTempFileURL(simpleSchema);
+            String simpleSchema =
+                    "create table blah (" +
+                    "ival bigint default 23 not null, " +
+                    "sval varchar(200) default 'foo', " +
+                    "dateval timestamp, " +
+                    "fval float, " +
+                    "decval decimal, " +
+                    "PRIMARY KEY(ival));\n" +
+                    "PARTITION TABLE blah ON COLUMN ival;\n" +
+                    "";
 
             VoltDB.Configuration config = new VoltDB.Configuration();
 
-            VoltProjectBuilder builder = new VoltProjectBuilder();
-            builder.addSchema(schemaPath);
-            builder.addPartitionInfo("blah", "ival");
-            builder.addStmtProcedure("Insert", "insert into blah values (?,?,?,?,?);");
-            builder.addProcedures(CrazyBlahProc.class);
-            builder.setHTTPDPort(8095);
-            builder.useCustomAdmin(21213, true);
-            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"), 1, 1, 0);
-            assertTrue(success);
+            VoltProjectBuilder project = new VoltProjectBuilder();
+            project.catBuilder().addLiteralSchema(simpleSchema)
+            .addStmtProcedure("Insert", "insert into blah values (?,?,?,?,?);")
+            .addProcedures(CrazyBlahProc.class)
+            ;
+            project.depBuilder().setHTTPDPort(8095).useCustomAdmin(21213, true);
+            assertTrue(project.compile(Configuration.getPathToCatalogForTest("json.jar"), 1, 1, 0));
 
-            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
-            config.m_pathToDeployment = builder.getPathToDeployment();
+            config.m_pathToCatalog = Configuration.getPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = project.getPathToDeployment();
 
             server = new ServerThread(config);
             server.start();
@@ -446,31 +444,28 @@ public class TestJSONInterface extends TestCase {
 
     public void testSimple() throws Exception {
         try {
-            String simpleSchema
-                    = "create table blah ("
-                    + "ival bigint default 23 not null, "
-                    + "sval varchar(200) default 'foo', "
-                    + "dateval timestamp, "
-                    + "fval float, "
-                    + "decval decimal, "
-                    + "PRIMARY KEY(ival));";
-
-            String schemaPath = MiscUtils.writeStringToTempFileURL(simpleSchema);
+            String simpleSchema =
+                    "create table blah (" +
+                    "ival bigint default 23 not null, " +
+                    "sval varchar(200) default 'foo', " +
+                    "dateval timestamp, " +
+                    "fval float, " +
+                    "decval decimal, " +
+                    "PRIMARY KEY(ival));\n" +
+                    "PARTITION TABLE blah ON COLUMN ival;" +
+                    "";
 
             VoltDB.Configuration config = new VoltDB.Configuration();
 
-            VoltProjectBuilder builder = new VoltProjectBuilder();
-            builder.addSchema(schemaPath);
-            builder.addPartitionInfo("blah", "ival");
-            builder.addStmtProcedure("Insert", "insert into blah values (?,?,?,?,?);");
-            builder.addProcedures(CrazyBlahProc.class);
-            builder.setHTTPDPort(8095);
-            builder.useCustomAdmin(21213, false);
-            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"), 1, 1, 0);
-            assertTrue(success);
+            VoltProjectBuilder project = new VoltProjectBuilder();
+            project.catBuilder().addLiteralSchema(simpleSchema)
+            .addStmtProcedure("Insert", "insert into blah values (?,?,?,?,?);")
+            .addProcedures(CrazyBlahProc.class);
+            project.depBuilder().setHTTPDPort(8095).useCustomAdmin(21213, false);
+            assertTrue(project.compile(Configuration.getPathToCatalogForTest("json.jar"), 1, 1, 0));
 
-            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
-            config.m_pathToDeployment = builder.getPathToDeployment();
+            config.m_pathToCatalog = Configuration.getPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = project.getPathToDeployment();
 
             server = new ServerThread(config);
             server.start();
@@ -647,29 +642,27 @@ public class TestJSONInterface extends TestCase {
 
     public void testJapaneseNastiness() throws Exception {
         try {
-            String simpleSchema
-                    = "CREATE TABLE HELLOWORLD (\n"
-                    + "    HELLO VARCHAR(15),\n"
-                    + "    WORLD VARCHAR(15),\n"
-                    + "    DIALECT VARCHAR(15) NOT NULL,\n"
-                    + "    PRIMARY KEY (DIALECT)\n"
-                    + ");";
+            String simpleSchema =
+                    "CREATE TABLE HELLOWORLD (\n" +
+                    "    HELLO VARCHAR(15),\n" +
+                    "    WORLD VARCHAR(15),\n" +
+                    "    DIALECT VARCHAR(15) NOT NULL,\n" +
+                    "    PRIMARY KEY (DIALECT)\n" +
+                    ");\n" +
+                    "PARTITION TABLE HELLOWORLD ON COLUMN DIALECT;\n" +
+                    "";
+            VoltProjectBuilder project = new VoltProjectBuilder();
+            project.catBuilder().addLiteralSchema(simpleSchema)
+            .addStmtProcedure("Insert", "insert into HELLOWORLD values (?,?,?);")
+            .addStmtProcedure("Select", "select * from HELLOWORLD;")
+            .addProcedures(SelectStarHelloWorld.class);
 
-            String schemaPath = MiscUtils.writeStringToTempFileURL(simpleSchema);
-
-            VoltProjectBuilder builder = new VoltProjectBuilder();
-            builder.addSchema(schemaPath);
-            builder.addPartitionInfo("HELLOWORLD", "DIALECT");
-            builder.addStmtProcedure("Insert", "insert into HELLOWORLD values (?,?,?);");
-            builder.addStmtProcedure("Select", "select * from HELLOWORLD;");
-            builder.addProcedures(SelectStarHelloWorld.class);
-            builder.setHTTPDPort(8095);
-            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
-            assertTrue(success);
+            project.depBuilder().setHTTPDPort(8095);
+            assertTrue(project.compile(Configuration.getPathToCatalogForTest("json.jar")));
 
             VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
-            config.m_pathToDeployment = builder.getPathToDeployment();
+            config.m_pathToCatalog = Configuration.getPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = project.getPathToDeployment();
             server = new ServerThread(config);
             server.start();
             server.waitForInitialization();
@@ -705,46 +698,35 @@ public class TestJSONInterface extends TestCase {
 
     public void testJSONAuth() throws Exception {
         try {
-            String simpleSchema
-                    = "CREATE TABLE HELLOWORLD (\n"
-                    + "    HELLO VARCHAR(15),\n"
-                    + "    WORLD VARCHAR(20),\n"
-                    + "    DIALECT VARCHAR(15) NOT NULL,\n"
-                    + "    PRIMARY KEY (DIALECT)\n"
-                    + ");";
-
-            String schemaPath = MiscUtils.writeStringToTempFileURL(simpleSchema);
-
-            VoltProjectBuilder builder = new VoltProjectBuilder();
-            builder.addSchema(schemaPath);
-            builder.addPartitionInfo("HELLOWORLD", "DIALECT");
-
-            RoleInfo gi = new RoleInfo("foo", true, false, true, true, false, false);
-            builder.addRoles(new RoleInfo[]{gi});
-
+            String simpleSchema =
+                    "CREATE TABLE HELLOWORLD (\n" +
+                    "    HELLO VARCHAR(15),\n" +
+                    "    WORLD VARCHAR(20),\n" +
+                    "    DIALECT VARCHAR(15) NOT NULL,\n" +
+                    "    PRIMARY KEY (DIALECT)\n" +
+                    ");\n" +
+                    "PARTITION TABLE HELLOWORLD ON COLUMN DIALECT;\n" +
+                    "";
             // create 20 users, only the first one has an interesting user/pass
             UserInfo[] ui = new UserInfo[15];
             ui[0] = new UserInfo("ry@nlikesthe", "y@nkees", new String[]{"foo"});
             for (int i = 1; i < ui.length; i++) {
                 ui[i] = new UserInfo("USER" + String.valueOf(i), "PASS" + String.valueOf(i), new String[]{"foo"});
             }
-            builder.addUsers(ui);
+            RoleInfo gi = new RoleInfo("foo", true, false, true, true, false, false);
+            ProcedureInfo[] pi = new ProcedureInfo[]{
+                    new ProcedureInfo(new String[]{"foo"}, "Insert", "insert into HELLOWORLD values (?,?,?);", null),
+                    new ProcedureInfo(new String[]{"foo"}, "Select", "select * from HELLOWORLD;", null)};
 
-            builder.setSecurityEnabled(true, true);
+            VoltProjectBuilder project = new VoltProjectBuilder();
+            project.catBuilder().addLiteralSchema(simpleSchema).addRoles(gi).addProcedures(pi);
+            project.depBuilder().addUsers(ui).setSecurityEnabled(true, true).setHTTPDPort(8095);
 
-            ProcedureInfo[] pi = new ProcedureInfo[2];
-            pi[0] = new ProcedureInfo(new String[]{"foo"}, "Insert", "insert into HELLOWORLD values (?,?,?);", null);
-            pi[1] = new ProcedureInfo(new String[]{"foo"}, "Select", "select * from HELLOWORLD;", null);
-            builder.addProcedures(pi);
-
-            builder.setHTTPDPort(8095);
-
-            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
-            assertTrue(success);
+            assertTrue(project.compile(Configuration.getPathToCatalogForTest("json.jar")));
 
             VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
-            config.m_pathToDeployment = builder.getPathToDeployment();
+            config.m_pathToCatalog = Configuration.getPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = project.getPathToDeployment();
             server = new ServerThread(config);
             server.start();
             server.waitForInitialization();
@@ -807,15 +789,7 @@ public class TestJSONInterface extends TestCase {
                 return;
             }
 
-        // ENG-963 below here
-            // do enough to get a new deployment file
-            VoltProjectBuilder builder2 = new VoltProjectBuilder();
-            builder2.addSchema(schemaPath);
-            builder2.addPartitionInfo("HELLOWORLD", "DIALECT");
-
-            // Same groups
-            builder2.addRoles(new RoleInfo[]{gi});
-
+            // ENG-963 below here
             // create same 15 users, hack the last 14 passwords
             ui = new UserInfo[15];
             ui[0] = new UserInfo("ry@nlikesthe", "y@nkees", new String[]{"foo"});
@@ -824,14 +798,16 @@ public class TestJSONInterface extends TestCase {
                         "welcomehackers" + String.valueOf(i),
                         new String[]{"foo"});
             }
-            builder2.addUsers(ui);
+            // do enough to get a new deployment file
+            VoltProjectBuilder builder2 = new VoltProjectBuilder();
+            builder2.catBuilder().addLiteralSchema(simpleSchema)
+            .addProcedures(pi)
+            // Same groups
+            .addRoles(gi);
 
-            builder2.setSecurityEnabled(true, true);
-            builder2.addProcedures(pi);
-            builder2.setHTTPDPort(8095);
+            builder2.depBuilder().addUsers(ui).setSecurityEnabled(true, true).setHTTPDPort(8095);
 
-            success = builder2.compile(Configuration.getPathToCatalogForTest("json-update.jar"));
-            assertTrue(success);
+            assertTrue(builder2.compile(Configuration.getPathToCatalogForTest("json-update.jar")));
 
             pset = ParameterSet.fromArrayNoCopy(Encoder.hexEncode(MiscUtils.fileToBytes(new File(config.m_pathToCatalog))),
                     new String(MiscUtils.fileToBytes(new File(builder2.getPathToDeployment())), "UTF-8"));
@@ -858,31 +834,27 @@ public class TestJSONInterface extends TestCase {
 
     public void testJSONDisabled() throws Exception {
         try {
-            String simpleSchema
-                    = "CREATE TABLE HELLOWORLD (\n"
-                    + "    HELLO VARCHAR(15),\n"
-                    + "    WORLD VARCHAR(15),\n"
-                    + "    DIALECT VARCHAR(15) NOT NULL,\n"
-                    + "    PRIMARY KEY (DIALECT)\n"
-                    + ");";
+            String simpleSchema =
+                    "CREATE TABLE HELLOWORLD (\n" +
+                    "    HELLO VARCHAR(15),\n" +
+                    "    WORLD VARCHAR(15),\n" +
+                    "    DIALECT VARCHAR(15) NOT NULL,\n" +
+                    "    PRIMARY KEY (DIALECT)\n" +
+                    ");\n" +
+                    "PARTITION TABLE HELLOWORLD ON COLUMN DIALECT;\n" +
+                    "";
+            VoltProjectBuilder project = new VoltProjectBuilder();
+            project.catBuilder().addLiteralSchema(simpleSchema)
+            .addStmtProcedure("Insert", "insert into HELLOWORLD values (?,?,?);");
 
-            String schemaPath = MiscUtils.writeStringToTempFileURL(simpleSchema);
+            project.depBuilder().setHTTPDPort(8095).setJSONAPIEnabled(false);
 
-            VoltProjectBuilder builder = new VoltProjectBuilder();
-            builder.addSchema(schemaPath);
-            builder.addPartitionInfo("HELLOWORLD", "DIALECT");
-
-            builder.addStmtProcedure("Insert", "insert into HELLOWORLD values (?,?,?);");
-
-            builder.setHTTPDPort(8095);
-            builder.setJSONAPIEnabled(false);
-
-            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            boolean success = project.compile(Configuration.getPathToCatalogForTest("json.jar"));
             assertTrue(success);
 
             VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
-            config.m_pathToDeployment = builder.getPathToDeployment();
+            config.m_pathToCatalog = Configuration.getPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = project.getPathToDeployment();
             server = new ServerThread(config);
             server.start();
             server.waitForInitialization();
@@ -906,23 +878,23 @@ public class TestJSONInterface extends TestCase {
 
     public void testLongProc() throws Exception {
         try {
-            String simpleSchema
-                    = "CREATE TABLE foo (\n"
-                    + "    bar BIGINT NOT NULL,\n"
-                    + "    PRIMARY KEY (bar)\n"
-                    + ");";
+            String simpleSchema =
+                    "CREATE TABLE foo (\n" +
+                    "    bar BIGINT NOT NULL,\n" +
+                    "    PRIMARY KEY (bar)\n" +
+                    ");" +
+                    "PARTITION TABLE foo ON COLUMN bar;\n" +
+                    "";
 
-            VoltProjectBuilder builder = new VoltProjectBuilder();
-            builder.addLiteralSchema(simpleSchema);
-            builder.addPartitionInfo("foo", "bar");
-            builder.addProcedures(DelayProc.class);
-            builder.setHTTPDPort(8095);
-            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
-            assertTrue(success);
+            VoltProjectBuilder project = new VoltProjectBuilder();
+            project.catBuilder().addLiteralSchema(simpleSchema)
+            .addProcedures(DelayProc.class);
+            project.depBuilder().setHTTPDPort(8095);
+            assertTrue(project.compile(Configuration.getPathToCatalogForTest("json.jar")));
 
             VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
-            config.m_pathToDeployment = builder.getPathToDeployment();
+            config.m_pathToCatalog = Configuration.getPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = project.getPathToDeployment();
             server = new ServerThread(config);
             server.start();
             server.waitForInitialization();
@@ -942,24 +914,23 @@ public class TestJSONInterface extends TestCase {
 
     public void testBinaryProc() throws Exception {
         try {
-            String simpleSchema
-                    = "CREATE TABLE foo (\n"
-                    + "    bar BIGINT NOT NULL,\n"
-                    + "    b VARBINARY(256) DEFAULT NULL,\n"
-                    + "    PRIMARY KEY (bar)\n"
-                    + ");";
-
-            VoltProjectBuilder builder = new VoltProjectBuilder();
-            builder.addLiteralSchema(simpleSchema);
-            builder.addPartitionInfo("foo", "bar");
-            builder.addStmtProcedure("Insert", "insert into foo values (?, ?);");
-            builder.setHTTPDPort(8095);
-            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
-            assertTrue(success);
+            String simpleSchema =
+                    "CREATE TABLE foo (\n" +
+                    "    bar BIGINT NOT NULL,\n" +
+                    "    b VARBINARY(256) DEFAULT NULL,\n" +
+                    "    PRIMARY KEY (bar)\n" +
+                    ");\n" +
+                    "PARTITION TABLE foo ON COLUMN bar;\n" +
+                    "";
+            VoltProjectBuilder project = new VoltProjectBuilder();
+            project.catBuilder().addLiteralSchema(simpleSchema)
+            .addStmtProcedure("Insert", "insert into foo values (?, ?);");
+            project.depBuilder().setHTTPDPort(8095);
+            assertTrue(project.compile(Configuration.getPathToCatalogForTest("json.jar")));
 
             VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
-            config.m_pathToDeployment = builder.getPathToDeployment();
+            config.m_pathToCatalog = Configuration.getPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = project.getPathToDeployment();
             server = new ServerThread(config);
             server.start();
             server.waitForInitialization();
@@ -1000,25 +971,23 @@ public class TestJSONInterface extends TestCase {
 
     public void testGarbageProcs() throws Exception {
         try {
-            String simpleSchema
-                    = "CREATE TABLE foo (\n"
-                    + "    bar BIGINT NOT NULL,\n"
-                    + "    PRIMARY KEY (bar)\n"
-                    + ");";
+            String simpleSchema =
+                    "CREATE TABLE foo (\n" +
+                    "    bar BIGINT NOT NULL,\n" +
+                    "    PRIMARY KEY (bar)\n" +
+                    ");\n" +
+                    "PARTITION TABLE foo ON COLUMN bar;\n" +
+                    "";
 
-            String schemaPath = MiscUtils.writeStringToTempFileURL(simpleSchema);
-
-            VoltProjectBuilder builder = new VoltProjectBuilder();
-            builder.addSchema(schemaPath);
-            builder.addPartitionInfo("foo", "bar");
-            builder.addProcedures(DelayProc.class);
-            builder.setHTTPDPort(8095);
-            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
-            assertTrue(success);
+            VoltProjectBuilder project = new VoltProjectBuilder();
+            project.catBuilder().addLiteralSchema(simpleSchema)
+            .addProcedures(DelayProc.class);
+            project.depBuilder().setHTTPDPort(8095);
+            assertTrue(project.compile(Configuration.getPathToCatalogForTest("json.jar")));
 
             VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
-            config.m_pathToDeployment = builder.getPathToDeployment();
+            config.m_pathToCatalog = Configuration.getPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = project.getPathToDeployment();
             server = new ServerThread(config);
             server.start();
             server.waitForInitialization();
@@ -1036,25 +1005,25 @@ public class TestJSONInterface extends TestCase {
 
     public void testDeployment() throws Exception {
         try {
-            String simpleSchema
-                    = "CREATE TABLE foo (\n"
-                    + "    bar BIGINT NOT NULL,\n"
-                    + "    PRIMARY KEY (bar)\n"
-                    + ");";
+            String simpleSchema =
+                    "CREATE TABLE foo (\n" +
+                    "    bar BIGINT NOT NULL,\n" +
+                    "    PRIMARY KEY (bar)\n" +
+                    ");" +
+                    "PARTITION TABLE foo ON COLUMN bar;\n" +
+                    "";
 
             String schemaPath = MiscUtils.writeStringToTempFileURL(simpleSchema);
 
-            VoltProjectBuilder builder = new VoltProjectBuilder();
-            builder.addSchema(schemaPath);
-            builder.addPartitionInfo("foo", "bar");
-            builder.addProcedures(DelayProc.class);
-            builder.setHTTPDPort(8095);
-            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
-            assertTrue(success);
+            VoltProjectBuilder project = new VoltProjectBuilder();
+            project.catBuilder().addSchema(schemaPath)
+            .addProcedures(DelayProc.class);
+            project.depBuilder().setHTTPDPort(8095);
+            assertTrue(project.compile(Configuration.getPathToCatalogForTest("json.jar")));
 
             VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
-            config.m_pathToDeployment = builder.getPathToDeployment();
+            config.m_pathToCatalog = Configuration.getPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = project.getPathToDeployment();
             server = new ServerThread(config);
             server.start();
             server.waitForInitialization();
@@ -1107,33 +1076,26 @@ public class TestJSONInterface extends TestCase {
 
     public void testDeploymentSecurity() throws Exception {
         try {
-            String simpleSchema
-                    = "CREATE TABLE foo (\n"
-                    + "    bar BIGINT NOT NULL,\n"
-                    + "    PRIMARY KEY (bar)\n"
-                    + ");";
+            String simpleSchema =
+                    "CREATE TABLE foo (\n" +
+                    "    bar BIGINT NOT NULL,\n" +
+                    "    PRIMARY KEY (bar)\n" +
+                    ");\n" +
+                    "PARTITION TABLE foo ON COLUMN bar;\n" +
+                    "";
 
-            String schemaPath = MiscUtils.writeStringToTempFileURL(simpleSchema);
-
-            VoltProjectBuilder builder = new VoltProjectBuilder();
-            builder.addSchema(schemaPath);
-            builder.addPartitionInfo("foo", "bar");
-            builder.addProcedures(DelayProc.class);
-            builder.setHTTPDPort(8095);
-            UserInfo users[] = new UserInfo[] {
-                    new UserInfo("user1", "admin", new String[] {"user"}),
-                    new UserInfo("user2", "admin", new String[] {"administrator"}),
-            };
-            builder.addUsers(users);
-
+            VoltProjectBuilder project = new VoltProjectBuilder();
+            project.catBuilder().addLiteralSchema(simpleSchema)
+            .addProcedures(DelayProc.class);
+            project.depBuilder().setHTTPDPort(8095).setSecurityEnabled(true, false)
+            .addUsers(new UserInfo("user1", "admin", "user"),
+                    new UserInfo("user2", "admin", "administrator"));
             // suite defines its own ADMINISTRATOR user
-            builder.setSecurityEnabled(true, false);
-            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
-            assertTrue(success);
+            assertTrue(project.compile(Configuration.getPathToCatalogForTest("json.jar")));
 
             VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
-            config.m_pathToDeployment = builder.getPathToDeployment();
+            config.m_pathToCatalog = Configuration.getPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = project.getPathToDeployment();
             server = new ServerThread(config);
             server.start();
             server.waitForInitialization();
@@ -1167,33 +1129,26 @@ public class TestJSONInterface extends TestCase {
 
     public void testDeploymentSecurityAuthorizationHashed() throws Exception {
         try {
-            String simpleSchema
-                    = "CREATE TABLE foo (\n"
-                    + "    bar BIGINT NOT NULL,\n"
-                    + "    PRIMARY KEY (bar)\n"
-                    + ");";
-
-            String schemaPath = MiscUtils.writeStringToTempFileURL(simpleSchema);
-
-            VoltProjectBuilder builder = new VoltProjectBuilder();
-            builder.addSchema(schemaPath);
-            builder.addPartitionInfo("foo", "bar");
-            builder.addProcedures(DelayProc.class);
-            builder.setHTTPDPort(8095);
-            UserInfo users[] = new UserInfo[] {
-                    new UserInfo("user1", "admin", new String[] {"user"}),
-                    new UserInfo("user2", "admin", new String[] {"administrator"}),
-            };
-            builder.addUsers(users);
+            String simpleSchema =
+                    "CREATE TABLE foo (\n" +
+                    "    bar BIGINT NOT NULL,\n" +
+                    "    PRIMARY KEY (bar)\n" +
+                    ");\n" +
+                    "PARTITION TABLE foo ON COLUMN bar;\n" +
+                    "";
+            VoltProjectBuilder project = new VoltProjectBuilder();
+            project.catBuilder().addLiteralSchema(simpleSchema)
+            .addProcedures(DelayProc.class);
 
             // suite defines its own ADMINISTRATOR user
-            builder.setSecurityEnabled(true, false);
-            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
-            assertTrue(success);
+            project.depBuilder().setHTTPDPort(8095).setSecurityEnabled(true, false)
+            .addUsers(new UserInfo("user1", "admin", "user"),
+                    new UserInfo("user2", "admin", "administrator"));
+            assertTrue(project.compile(Configuration.getPathToCatalogForTest("json.jar")));
 
             VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
-            config.m_pathToDeployment = builder.getPathToDeployment();
+            config.m_pathToCatalog = Configuration.getPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = project.getPathToDeployment();
             server = new ServerThread(config);
             server.start();
             server.waitForInitialization();
@@ -1222,33 +1177,30 @@ public class TestJSONInterface extends TestCase {
 
     public void testDeploymentSecurityAuthorizationBasic() throws Exception {
         try {
-            String simpleSchema
-                    = "CREATE TABLE foo (\n"
-                    + "    bar BIGINT NOT NULL,\n"
-                    + "    PRIMARY KEY (bar)\n"
-                    + ");";
+            String simpleSchema =
+                    "CREATE TABLE foo (\n" +
+                    "    bar BIGINT NOT NULL,\n" +
+                    "    PRIMARY KEY (bar)\n" +
+                    ");\n" +
+                    "PARTITION TABLE foo ON COLUMN bar;\n" +
+                    "";
+            VoltProjectBuilder project = new VoltProjectBuilder();
+            project.catBuilder()
+            .addLiteralSchema(simpleSchema)
+            .addProcedures(DelayProc.class);
 
-            String schemaPath = MiscUtils.writeStringToTempFileURL(simpleSchema);
-
-            VoltProjectBuilder builder = new VoltProjectBuilder();
-            builder.addSchema(schemaPath);
-            builder.addPartitionInfo("foo", "bar");
-            builder.addProcedures(DelayProc.class);
-            builder.setHTTPDPort(8095);
-            UserInfo users[] = new UserInfo[] {
-                    new UserInfo("user1", "admin", new String[] {"user"}),
-                    new UserInfo("user2", "admin", new String[] {"administrator"}),
-            };
-            builder.addUsers(users);
+            project.depBuilder()
+            .setHTTPDPort(8095)
+            .addUsers(new UserInfo("user1", "admin", "user"),
+                    new UserInfo("user2", "admin", "administrator"))
 
             // suite defines its own ADMINISTRATOR user
-            builder.setSecurityEnabled(true, false);
-            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
-            assertTrue(success);
+            .setSecurityEnabled(true, false);
+            assertTrue(project.compile(Configuration.getPathToCatalogForTest("json.jar")));
 
             VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
-            config.m_pathToDeployment = builder.getPathToDeployment();
+            config.m_pathToCatalog = Configuration.getPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = project.getPathToDeployment();
             server = new ServerThread(config);
             server.start();
             server.waitForInitialization();
@@ -1278,25 +1230,23 @@ public class TestJSONInterface extends TestCase {
 
     public void testProfile() throws Exception {
         try {
-            String simpleSchema
-                    = "CREATE TABLE foo (\n"
-                    + "    bar BIGINT NOT NULL,\n"
-                    + "    PRIMARY KEY (bar)\n"
-                    + ");";
+            String simpleSchema =
+                    "CREATE TABLE foo (\n" +
+                    "    bar BIGINT NOT NULL,\n" +
+                    "    PRIMARY KEY (bar)\n" +
+                    ");" +
+                    "PARTITION TABLE foo ON COLUMN bar;\n" +
+                    "";
 
-            String schemaPath = MiscUtils.writeStringToTempFileURL(simpleSchema);
-
-            VoltProjectBuilder builder = new VoltProjectBuilder();
-            builder.addSchema(schemaPath);
-            builder.addPartitionInfo("foo", "bar");
-            builder.addProcedures(DelayProc.class);
-            builder.setHTTPDPort(8095);
-            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
-            assertTrue(success);
+            VoltProjectBuilder project = new VoltProjectBuilder();
+            project.catBuilder().addLiteralSchema(simpleSchema)
+            .addProcedures(DelayProc.class);
+            project.depBuilder().setHTTPDPort(8095);
+            assertTrue(project.compile(Configuration.getPathToCatalogForTest("json.jar")));
 
             VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
-            config.m_pathToDeployment = builder.getPathToDeployment();
+            config.m_pathToCatalog = Configuration.getPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = project.getPathToDeployment();
             server = new ServerThread(config);
             server.start();
             server.waitForInitialization();

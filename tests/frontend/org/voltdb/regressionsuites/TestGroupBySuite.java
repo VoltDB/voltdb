@@ -758,30 +758,26 @@ public class TestGroupBySuite extends RegressionSuite {
                 TestGroupBySuite.class);
         VoltProjectBuilder project = new VoltProjectBuilder();
 
-        project.addSchema(TestPlansGroupBy.class
-                .getResource("testplans-groupby-ddl.sql"));
-        project.addProcedures(PROCEDURES);
-        project.addStmtProcedure("T1Insert", "INSERT INTO T1 VALUES (?, ?);");
-        project.addStmtProcedure("BInsert", "INSERT INTO B VALUES (?, ?);");
-
+        project.catBuilder().addSchema(TestPlansGroupBy.class.getResource("testplans-groupby-ddl.sql"))
+        .addProcedures(PROCEDURES)
+        .addStmtProcedure("T1Insert", "INSERT INTO T1 VALUES (?, ?);")
+        .addStmtProcedure("BInsert", "INSERT INTO B VALUES (?, ?);")
+        ;
         // config = new LocalSingleProcessServer("plansgroupby-ipc.jar", 1, BackendTarget.NATIVE_EE_IPC);
         // config.compile(project);
         // builder.addServerConfig(config);
 
         config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        boolean success = config.compile(project);
-        assertTrue(success);
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
 
         config = new LocalCluster("plansgroupby-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        success = config.compile(project);
-        assertTrue(success);
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
 
         // Cluster
         config = new LocalCluster("plansgroupby-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
+        assertTrue(config.compile(project));
 
         return builder;
     }
