@@ -19,16 +19,19 @@ package org.voltdb;
 
 import java.io.File;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
@@ -385,7 +388,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             return nodeList;
         }
 
-        public Map<Integer, ByteArrayWrapper> getDetailsFromSnapshotNodeByType(SNAPSHOT_TYPE type) {
+        public NavigableMap<Integer, ByteArrayWrapper> getDetailsFromSnapshotNodeByType(SNAPSHOT_TYPE type) {
             byte[] nodeData = null;
             String path = getPathFromType(type);
             assert(path != null);
@@ -667,6 +670,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 final long timeoutMs = 10 * 1000; // 10s timeout
                 final long endTime = System.currentTimeMillis() + timeoutMs;
                 SnapshotCheckResponseMessage response;
+                // TRAIL [ImplementationHints:3] need to do feasibility tests for hard links
                 while ((response = (SnapshotCheckResponseMessage) m_mb.recvBlocking(timeoutMs)) != null) {
                     // ignore responses to previous requests
                     if (jsObj.getString("path").equals(response.getPath()) &&
@@ -1279,6 +1283,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     } catch (Exception e) {
                         SNAP_LOG.error("Error processing user snapshot request", e);
                         try {
+                            // TRAIL [RequestSnap:8] on error reset watcher
                             userSnapshotRequestExistenceCheck(true);
                         } catch (Exception e2) {
                             VoltDB.crashLocalVoltDB("Error resetting watch for user snapshots", true, e2);
@@ -1286,6 +1291,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     }
                 }
             });
+            // TRAIL [RequestSnap:7] watcher fires on zk node creation
             initiateSnapshotSave(handle, new Object[]{jsObj.toString(4)}, blocking);
             return;
         }
@@ -1516,9 +1522,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      * request for a snapshot
      */
     void userSnapshotRequestExistenceCheck(boolean deleteExistingRequest) throws Exception {
+        // TRAIL [RequestSnap:6] clears the request node. Reset so you can watch it later
         if (deleteExistingRequest) {
             m_zk.delete(VoltZK.user_snapshot_request, -1, null, null);
         }
+        // TRAIL [RequestSnap:5] sets watcher on on request node, or if present process it
         if (m_zk.exists(VoltZK.user_snapshot_request, m_userSnapshotRequestExistenceWatcher) != null) {
             processUserSnapshotRequestEvent(new WatchedEvent(
                     EventType.NodeCreated,
@@ -1701,6 +1709,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             jsObj.put("path", m_path);
             jsObj.put("nonce", nonce);
             jsObj.put("perPartitionTxnIds", retrievePerPartitionTransactionIds());
+            jsObj.put("isAuto", true);
             m_snapshots.offer(new Snapshot(m_path, nonce, now));
             long handle = m_nextCallbackHandle++;
             m_procedureCallbacks.put(handle, new ProcedureCallback() {
@@ -2038,6 +2047,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                           SnapshotInitiationInfo snapInfo,
                                           boolean notifyChanges) throws ForwardClientException {
         boolean requestExists = false;
+        // TRAIL [RequestSnap:2] get request id from generated node
         final String requestId = createRequestNode(snapInfo);
         if (requestId == null) {
             requestExists = true;
@@ -2081,6 +2091,54 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         }
     }
 
+    private final static boolean isTruncationRequest(JSONObject jo) throws JSONException {
+        if (jo == null) return false;
+
+        String sdata = jo.optString("data");
+        if (sdata == null || sdata.trim().isEmpty()) return false;
+
+        JSONObject jodata = new JSONObject(sdata);
+        return jodata.has("truncReqId");
+    }
+
+    private final static boolean isAutoRequest(JSONObject jo) {
+        return jo.optBoolean("isAuto",false);
+    }
+
+    byte [] coalesceDefaultSnapshot( NavigableMap<Integer, ByteArrayWrapper> map)  {
+        if (map == null || map.isEmpty()) return null;
+
+        final int requestId = map.lastKey();
+        Set<String> discerners = new HashSet<String>();
+        JSONObject candidate = null;
+        String discerner;
+        boolean hasTruncationRequest = false;
+
+        for (Map.Entry<Integer, ByteArrayWrapper> e: map.entrySet()) {
+            ByteArrayWrapper baw = e.getValue();
+            if (baw == null || baw.m_byteArray == null || baw.m_byteArray.length == 0) {
+                VoltDB.crashLocalVoltDB("zk snapshot request node is null or empty", true, null);;
+            }
+            try {
+                JSONObject jo = new JSONObject(new String(baw.m_byteArray, StandardCharsets.UTF_8));
+                boolean isTruncationRequest = isTruncationRequest(jo);
+                if (isTruncationRequest(jo)) {
+                    discerner = "truncationSnapshot";
+                } else if (jo.optBoolean("isAuto",false)) {
+                    discerner = "autoSnapshot";
+                } else {
+                    discerner = jo.getString("nonce") + ":" + jo.getString("path");
+                }
+
+            } catch (JSONException exc) {
+                VoltDB.crashLocalVoltDB("zk snapshot request has malformed json", true, exc);
+            }
+        }
+
+
+        return null;
+    }
+
     /**
      * Try to create the ZK node to request the snapshot.
      *
@@ -2098,13 +2156,15 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 jsObj.put("requestId", requestId);
                 String zkString = jsObj.toString(4);
                 byte zkBytes[] = zkString.getBytes("UTF-8");
-
+                // TRAIL [RequestSnap:3] writes  the request JSON to one ZookeperRequest
                 m_zk.create(VoltZK.user_snapshot_request, zkBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
             }
             else {
                 m_zk.create(VoltZK.request_truncation_snapshot_node, null,
                         Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT_SEQUENTIAL);
             }
+        // TRAIL [RequestSnap:4] it throws if it already exists
+        // TRAIL [ImplementationHints:2] queue insertion here???
         } catch (KeeperException.NodeExistsException e) {
             return null;
         } catch (Exception e) {

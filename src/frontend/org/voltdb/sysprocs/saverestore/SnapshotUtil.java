@@ -1374,6 +1374,7 @@ public class SnapshotUtil {
                                        final SnapshotResponseHandler handler,
                                        final boolean notifyChanges)
     {
+        // TRAIL [ImplementationHints:1] extend SnapshotInitiationInfo to describe auto snapshots
         final SnapshotInitiationInfo snapInfo = new SnapshotInitiationInfo(path, nonce, blocking, format, data);
         final SimpleClientResponseAdapter adapter =
                 new SimpleClientResponseAdapter(ClientInterface.SNAPSHOT_UTIL_CID, "SnapshotUtilAdapter", true);
@@ -1397,6 +1398,7 @@ public class SnapshotUtil {
                 while (System.currentTimeMillis() - startTime <= TimeUnit.HOURS.toMillis(2)) {
                     try {
                         if (!hasRequested) {
+                            // TRAIL [RequestSnap:1] create a request node
                             sd.createAndWatchRequestNode(clientHandle, adapter, snapInfo, notifyChanges);
                             hasRequested = true;
                         }
