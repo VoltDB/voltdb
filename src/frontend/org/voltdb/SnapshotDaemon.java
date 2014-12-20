@@ -74,6 +74,7 @@ import org.voltdb.client.ProcedureCallback;
 import org.voltdb.messaging.SnapshotCheckRequestMessage;
 import org.voltdb.messaging.SnapshotCheckResponseMessage;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.utils.SusceptibleRunnable;
 import org.voltdb.utils.VoltTableUtil;
 
 import com.google_voltpatches.common.base.Throwables;
@@ -473,6 +474,33 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
     static int m_periodicWorkInterval = 2000;
     public static volatile int m_userSnapshotRetryInterval = 30;
+
+    private Runnable m_onQueueChange = new Runnable() {
+        @Override
+        public void run() {
+            m_es.submit(new SusceptibleRunnable() {
+                @Override
+                public void susceptibleRun() throws Exception {
+                    m_snapshotQueue.requestLockedTask(m_onQueueLockGrant);
+                }
+            });
+        }
+    };
+
+    private Runnable m_onQueueLockGrant = new Runnable() {
+
+        @Override
+        public void run() {
+            // get the type at the list head
+            // get the active list nodes
+            // if type is file coalesce nodes
+            // set head active and make the current head nodes actives
+            //  ... by calling void initiateNewSnapshot(SNAPSHOT_TYPE type, boolean satisfiesAllNodes, List<Integer> satisfyingNodes)
+            // start snapshot
+
+        }
+
+    };
 
     /*
      * Something that initiates procedures for the snapshot daemon.
@@ -1212,6 +1240,154 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         try {
             loggingLog.info("Initiating @SnapshotSave for log truncation");
             initiateSnapshotSave(handle, new Object[]{jsObj.toString(4)}, false);
+        } catch (JSONException e) {
+            /*
+             * Should never happen, so fail fast
+             */
+            VoltDB.crashLocalVoltDB("", true, e);
+        }
+        return;
+    }
+
+    /*
+     * A ZK event occured requestion a truncation snapshot be taken
+     */
+    private void truncationSnapshotPrelude(final JSONObject joRequest) {
+        loggingLog.info("Snapshot truncation leader received snapshot truncation request");
+        String snapshotPathTemp;
+        try {
+            snapshotPathTemp = new String(m_zk.getData(VoltZK.truncation_snapshot_path, false, null), "UTF-8");
+        } catch (Exception e) {
+            loggingLog.error("Unable to retrieve truncation snapshot path from ZK, log can't be truncated");
+            return;
+        }
+        // Get the truncation request ID which is the truncation request node path.
+        final String truncReqId = joRequest.optString("coalescedToRequestId", null);
+        if (truncReqId == null) {
+            loggingLog.error("Unable to retrieve truncation snapshot request id from ZK, log can't be truncated");
+            return;
+
+        }
+        m_truncationSnapshotPath = snapshotPathTemp;
+        final String snapshotPath = snapshotPathTemp;
+        final long now = System.currentTimeMillis();
+        final String nonce = Long.toString(now);
+        //Allow nodes to check and see if the nonce incoming for a snapshot is
+        //for a truncation snapshot. In that case they will mark the completion node
+        //to be for a truncation snapshot. SnapshotCompletionMonitor notices the mark.
+        try {
+            ByteBuffer payload = ByteBuffer.allocate(8);
+            payload.putLong(0, now);
+            m_zk.setData(VoltZK.request_truncation_snapshot, payload.array(), -1);
+        } catch (Exception e) {
+            //Cause a cascading failure?
+            VoltDB.crashLocalVoltDB("Setting data on the truncation snapshot request in ZK should never fail", true, e);
+        }
+        // for the snapshot save invocations
+        try {
+            String sData = "";
+            if (truncReqId != null) {
+                JSONObject jsData = new JSONObject();
+                jsData.put("truncReqId", truncReqId);
+                sData = jsData.toString();
+            }
+            joRequest.put("path", snapshotPath );
+            joRequest.put("nonce", nonce);
+            joRequest.put("perPartitionTxnIds", retrievePerPartitionTransactionIds());
+            joRequest.put("data", sData);
+
+        } catch (JSONException e) {
+            /*
+             * Should never happen, so fail fast
+             */
+            VoltDB.crashLocalVoltDB("", true, e);
+        }
+
+        // for the snapshot save invocations
+        long handle = m_nextCallbackHandle++;
+
+        // for the snapshot save invocation
+        m_procedureCallbacks.put(handle, new ProcedureCallback() {
+
+            @Override
+            public void clientCallback(ClientResponse clientResponse)
+                    throws Exception {
+                m_lastInitiationTs = null;
+                if (clientResponse.getStatus() != ClientResponse.SUCCESS){
+                    loggingLog.warn(
+                            "Attempt to initiate a truncation snapshot was not successful: " +
+                            clientResponse.getStatusString());
+                    loggingLog.warn("Retrying log truncation snapshot in 5 minutes");
+                    m_es.schedule(new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                truncationSnapshotPrelude(joRequest);
+                            } catch (Exception e) {
+                                VoltDB.crashLocalVoltDB("Error processing snapshot truncation request event", true, e);
+                            }
+                        }
+                    }, 5, TimeUnit.MINUTES);
+                    return;
+                }
+
+                final VoltTable results[] = clientResponse.getResults();
+                final VoltTable result = results[0];
+                boolean success = true;
+
+                final String err = SnapshotUtil.didSnapshotRequestFailWithErr(results);
+                if (err != null) {
+                    if (err.trim().equalsIgnoreCase("SNAPSHOT IN PROGRESS")) {
+                        loggingLog.info("Snapshot is in progress");
+                    } else {
+                        loggingLog.warn("Snapshot failed with failure response: " + err);
+                    }
+                    success = false;
+                }
+
+                if (success) {
+                    while (result.advanceRow()) {
+                        if (!result.getString("RESULT").equals("SUCCESS")) {
+                            success = false;
+                            loggingLog.warn("Snapshot save feasibility test failed for host "
+                                    + result.getLong("HOST_ID") + " table " + result.getString("TABLE") +
+                                    " with error message " + result.getString("ERR_MSG"));
+                        }
+                    }
+                }
+
+                if (success) {
+                    loggingLog.info("Snapshot initiation for log truncation was successful");
+
+                    JSONObject obj = new JSONObject(clientResponse.getAppStatusString());
+                    final long snapshotTxnId = Long.valueOf(obj.getLong("txnId"));
+                    TruncationSnapshotAttempt snapshotAttempt =
+                            m_truncationSnapshotAttempts.get(snapshotTxnId);
+                    if (snapshotAttempt == null) {
+                        snapshotAttempt = new TruncationSnapshotAttempt();
+                        m_truncationSnapshotAttempts.put(snapshotTxnId, snapshotAttempt);
+                    }
+                    snapshotAttempt.nonce = nonce;
+                    snapshotAttempt.path = snapshotPath;
+                } else {
+                    loggingLog.info("Retrying log truncation snapshot in 60 seconds");
+                    m_es.schedule(new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                truncationSnapshotPrelude(joRequest);
+                            } catch (Exception e) {
+                                VoltDB.crashLocalVoltDB("Exception processing truncation request event", true, e);
+                            }
+                        }
+                    }, 1, TimeUnit.MINUTES);
+                }
+            }
+
+        });
+        try {
+            loggingLog.info("Initiating @SnapshotSave for log truncation");
+            initiateSnapshotSave(handle, new Object[]{joRequest.toString(4)}, false);
         } catch (JSONException e) {
             /*
              * Should never happen, so fail fast
@@ -2124,10 +2300,12 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         }
     }
 
-    byte [] coalesceDefaultSnapshot( NavigableMap<Integer, ByteArrayWrapper> map)  {
+    static byte [] coalesceDefaultSnapshot(NavigableMap<Integer, ByteArrayWrapper> map)  {
         if (map == null || map.isEmpty()) return null;
 
-        final int requestId = map.lastKey() + 1;
+        int requestId = map.lastKey();
+        JSONObject joRequest = null;
+
         Map<Integer, JSONObject> discerners = new LinkedHashMap<>();
 
         for (Map.Entry<Integer, ByteArrayWrapper> e: map.entrySet()) {
@@ -2138,7 +2316,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             try {
                 JSONObject jo = new JSONObject(new String(baw.m_byteArray, StandardCharsets.UTF_8));
                 if (jo.optBoolean("isTruncation", false)) {
-                    discerners.put(requestId, jo);
+                    requestId = e.getKey();
+                    joRequest = jo;
                 } else {
                     discerners.put(e.getKey(), jo);
                 }
@@ -2146,28 +2325,27 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 VoltDB.crashLocalVoltDB("zk snapshot request has malformed json", true, exc);
             }
         }
-        if (!discerners.containsKey(requestId)) {
-            discerners.put(requestId, discerners.remove(map.lastKey()));
+        if (joRequest == null) {
+            joRequest = discerners.remove(map.lastKey());
         }
-        if (discerners.size() > 1) {
-            JSONObject hardLinks = new JSONObject();
-            try {
-                for (Map.Entry<Integer, JSONObject> e: discerners.entrySet()) {
-                    if (e.getKey() != requestId) {
+        try {
+            if (discerners.size() > 1) {
+                JSONObject hardLinks = new JSONObject();
+                    for (Map.Entry<Integer, JSONObject> e: discerners.entrySet()) {
                         JSONObject hardLink = new JSONObject();
                         hardLink.put("nonce", e.getValue().get("nonce"));
                         hardLink.put("path", e.getValue().get("path"));
                         hardLinks.put(SNAPSHOT_TYPE.FILE.requestId(e.getKey()), hardLink);
                     }
-                }
-                discerners.get(requestId).put("hardLinks", hardLinks);
-            } catch (JSONException exc) {
-                VoltDB.crashLocalVoltDB("snapshot request missing required nonce or path", true, exc);
+                    joRequest.put("coalescedToRequestId", SNAPSHOT_TYPE.FILE.requestId(requestId));
+                    joRequest.put("hardLinks", hardLinks);
             }
+        } catch (JSONException exc) {
+            VoltDB.crashLocalVoltDB("snapshot request missing required nonce or path", true, exc);
         }
         byte [] request = new byte[0];
         try {
-            request = discerners.get(requestId).toString(4).getBytes(StandardCharsets.UTF_8);
+            request = joRequest.toString(4).getBytes(StandardCharsets.UTF_8);
         } catch (JSONException exc) {
             VoltDB.crashLocalVoltDB("unable to coalesce snapshot request", true, exc);
         }
@@ -2176,7 +2354,22 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     }
 
     private String queueRequestNode(SnapshotInitiationInfo snapInfo) {
-        return null;
+        SNAPSHOT_TYPE stype = snapInfo.isTruncationRequest() ?
+                SNAPSHOT_TYPE.LOG : SNAPSHOT_TYPE.valueOf(snapInfo.getFormat());
+
+        String jsonStr = null;
+        try {
+            jsonStr = snapInfo.getJSONObjectForZK().toString(4);
+        } catch (JSONException exc) {
+            VoltDB.crashLocalVoltDB("unable to serialize snapshot request for zk", true, exc);
+        }
+        int id = -1;
+        try {
+            id = m_snapshotQueue.requestSnapshot(stype, jsonStr.getBytes(StandardCharsets.UTF_8));
+        } catch (KeeperException | InterruptedException exc) {
+            VoltDB.crashLocalVoltDB("unable to queue snapshot request: \n" + jsonStr, true, exc);
+        }
+        return stype.requestId(id);
     }
 
     /**
@@ -2327,6 +2520,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
     @Override
     public CountDownLatch snapshotCompleted(final SnapshotCompletionEvent event) {
+
         if (!event.truncationSnapshot || !event.didSucceed) {
             return new CountDownLatch(0);
         }
