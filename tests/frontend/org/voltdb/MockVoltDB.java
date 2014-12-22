@@ -46,6 +46,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
+import org.voltcore.zk.SynchronizedStatesManager;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltZK.MailboxType;
@@ -639,5 +640,10 @@ public class MockVoltDB implements VoltDBInterface
 
     @Override
     public void onSyncSnapshotCompletion() {
+    }
+
+    @Override
+    public SynchronizedStatesManager getPerHostStatesManager() {
+        return null;
     }
 }
