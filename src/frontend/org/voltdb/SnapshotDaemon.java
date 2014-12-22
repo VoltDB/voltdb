@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -41,6 +42,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -68,6 +71,7 @@ import org.voltcore.utils.RateLimitedLogger;
 import org.voltcore.zk.SynchronizedStatesManager;
 import org.voltcore.zk.SynchronizedStatesManager.StateMachineInstance;
 import org.voltcore.zk.ZKUtil;
+import org.voltcore.zk.ZKUtil.StringCallback;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
@@ -77,7 +81,9 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.SusceptibleRunnable;
 import org.voltdb.utils.VoltTableUtil;
 
+import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableSortedMap;
 import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.util.concurrent.Callables;
@@ -113,6 +119,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         EMPTY(null);
 
         final static private Map<SnapshotFormat,SNAPSHOT_TYPE> formatMap;
+        final static private EnumSet<SNAPSHOT_TYPE> defaultTypes =
+                EnumSet.<SNAPSHOT_TYPE>of(FILE,LOG);
 
         static {
             formatMap = new EnumMap<>(SnapshotFormat.class);
@@ -128,16 +136,99 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             m_format = format;
         }
 
-        public String requestId(int id) {
-            return String.format("%s_SR_%d", name(), id);
+        public RequestId requestId(int id) {
+            return new RequestId(this,id);
         }
 
         public SnapshotFormat format() {
             return m_format;
         }
 
+        public boolean isDefaultType() {
+            return defaultTypes.contains(this);
+        }
+
         public static SNAPSHOT_TYPE valueOf(SnapshotFormat format) {
             return formatMap.get(format);
+        }
+    }
+
+    public final static class RequestId implements Comparable<RequestId>{
+        final int m_id;
+        final SNAPSHOT_TYPE m_type;
+
+        final static Pattern REQUEST_ID_RE = Pattern
+                .compile("(?<type>STREAM|INDEX|FILE|CSV|LOG)_SR_(?<id>\\d+)");
+
+        public RequestId(SNAPSHOT_TYPE type, int id) {
+            Preconditions.checkArgument(type != null, "type is null");
+            m_type = type;
+            m_id = id;
+        }
+
+        public static RequestId valueOf(String reqId) {
+            if (reqId == null || reqId.trim().isEmpty()) {
+                return null;
+            }
+            Matcher mtc = REQUEST_ID_RE.matcher(reqId);
+            if (!mtc.find()) return null;
+
+            return new RequestId(
+                    SNAPSHOT_TYPE.valueOf(mtc.group("type")),
+                    Integer.parseInt(mtc.group("id"))
+                    );
+        }
+
+        public int getId() {
+            return m_id;
+        }
+
+        public SNAPSHOT_TYPE getType() {
+            return m_type;
+        }
+
+        public String name() {
+            return String.format("%s_SR_%d", m_type.name(), m_id);
+        }
+
+        @Override
+        public String toString() {
+            return name();
+        }
+
+        @Override
+        public int hashCode() {
+            final int prime = 31;
+            int result = 1;
+            result = prime * result + m_id;
+            result = prime * result
+                    + ((m_type == null) ? 0 : m_type.hashCode());
+            return result;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj)
+                return true;
+            if (obj == null)
+                return false;
+            if (getClass() != obj.getClass())
+                return false;
+            RequestId other = (RequestId) obj;
+            if (m_id != other.m_id)
+                return false;
+            if (m_type != other.m_type)
+                return false;
+            return true;
+        }
+
+        @Override
+        public int compareTo(RequestId o) {
+            int cmp = this.m_type.ordinal() - o.m_type.ordinal();
+            if (cmp == 0) {
+                cmp = this.m_id - o.m_id;
+            }
+            return cmp;
         }
     }
 
@@ -434,6 +525,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 }
             }
             catch (KeeperException | InterruptedException e) {
+               SNAP_LOG.error("failed to get request details for " + type, e);
             }
             return ImmutableSortedMap.copyOf(results);
         }
@@ -487,10 +579,32 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         }
     };
 
-    private Runnable m_onQueueLockGrant = new Runnable() {
+    private Runnable m_onQueueLockGrant = new SusceptibleRunnable() {
 
         @Override
-        public void run() {
+        public void susceptibleRun() throws Exception {
+            SNAPSHOT_TYPE atHeadType = m_snapshotQueue.getPendingSnapshotType();
+            NavigableMap<Integer,ByteArrayWrapper> requestNodes =
+                    m_snapshotQueue.getDetailsFromSnapshotNodeByType(atHeadType);
+            ImmutableList.Builder<Integer> active = ImmutableList.builder();
+            ByteArrayWrapper first = requestNodes.firstEntry().getValue();
+            if (first == null || first.m_byteArray == null || first.m_byteArray.length == 0) {
+                VoltDB.crashLocalVoltDB("snapshot request has no content", true, null);
+            }
+            byte [] candidate = first.m_byteArray;
+            if (atHeadType.isDefaultType()) {
+                candidate = coalesceDefaultSnapshot(requestNodes);
+                active.addAll(requestNodes.keySet());
+            } else {
+                active.add(requestNodes.firstKey());
+            }
+            JSONObject joRequest = new JSONObject(new String(candidate,StandardCharsets.UTF_8));
+            String requestId = joRequest.optString(
+                    "coalescedToRequestId",
+                    atHeadType.requestId(requestNodes.firstKey()).name()
+                    );
+            joRequest.put("requestIdAtHead",requestId);
+
             // get the type at the list head
             // get the active list nodes
             // if type is file coalesce nodes
@@ -786,6 +900,37 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 Ids.OPEN_ACL_UNSAFE,
                 CreateMode.PERSISTENT);
         userSnapshotRequestExistenceCheck(true);
+    }
+
+    private void saveResponseToZK(JSONObject jo, ClientResponseImpl response)
+               throws JSONException, KeeperException, InterruptedException {
+        String requestId = jo.getString("requestIdAtHead");
+        JSONObject joHardlinks = jo.optJSONObject("hardLinks");
+
+        ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize());
+        byte [] flattened = response.flattenToBuffer(buf).array();
+
+        StringCallback lastCallback = new StringCallback();
+
+        m_zk.create(VoltZK.user_snapshot_response + requestId,
+                flattened,
+                Ids.OPEN_ACL_UNSAFE,
+                CreateMode.PERSISTENT,
+                lastCallback, null);
+        if (joHardlinks != null) {
+            @SuppressWarnings("unchecked")
+            Iterator<String> itr = joHardlinks.keys();
+            while (itr.hasNext()) {
+                requestId = itr.next();
+                lastCallback = new StringCallback();
+                m_zk.create(VoltZK.user_snapshot_response + requestId,
+                        flattened,
+                        Ids.OPEN_ACL_UNSAFE,
+                        CreateMode.PERSISTENT,
+                        lastCallback, null);
+            }
+        }
+        lastCallback.get();
     }
 
     /*
@@ -1497,6 +1642,61 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                         } catch (Exception e2) {
                             VoltDB.crashLocalVoltDB("Error resetting watch for user snapshots", true, e2);
                         }
+                    }
+                }
+            });
+            // TRAIL [RequestSnap:7] watcher fires on zk node creation
+            initiateSnapshotSave(handle, new Object[]{jsObj.toString(4)}, blocking);
+            return;
+        }
+    }
+
+    /*
+     * Process the event generated when the node for a user snapshot request
+     * is created.
+     */
+    private void processUserSnapshotPrelude(final JSONObject jsObj, final WatchedEvent event) throws Exception {
+        if (event.getType() == EventType.NodeCreated) {
+            final RequestId requestId = RequestId.valueOf(jsObj.getString("requestIdAtHead"));
+            final boolean blocking = jsObj.getBoolean("block");
+
+            /*
+             * Going to reuse the request object, remove the requestId
+             * field now that it is consumed
+             */
+            jsObj.remove("requestId");
+            jsObj.put("perPartitionTxnIds", retrievePerPartitionTransactionIds());
+            final long handle = m_nextCallbackHandle++;
+            m_procedureCallbacks.put(handle, new ProcedureCallback() {
+
+                @Override
+                public void clientCallback(ClientResponse clientResponse) {
+                    m_lastInitiationTs = null;
+                    try {
+                        /*
+                         * If there is an error then we are done.
+                         */
+                        if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+                            ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
+                            saveResponseToZK(jsObj, rimpl);
+                            return;
+                        }
+
+                        /*
+                         * Now analyze the response. If a snapshot was in progress
+                         * we have to reattempt it later, and send a response to the client
+                         * saying it was queued. Otherwise, forward the response
+                         * failure/success to the client.
+                         */
+                        if (isSnapshotInProgressResponse(clientResponse)) {
+                            scheduleSnapshotForLater(jsObj.toString(4), requestId.name(), true);
+                        } else {
+                            ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
+                            saveResponseToZK(jsObj, rimpl);
+                            return;
+                        }
+                    } catch (Exception e) {
+                        SNAP_LOG.error("Error processing user snapshot request", e);
                     }
                 }
             });
@@ -2335,9 +2535,9 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                         JSONObject hardLink = new JSONObject();
                         hardLink.put("nonce", e.getValue().get("nonce"));
                         hardLink.put("path", e.getValue().get("path"));
-                        hardLinks.put(SNAPSHOT_TYPE.FILE.requestId(e.getKey()), hardLink);
+                        hardLinks.put(SNAPSHOT_TYPE.FILE.requestId(e.getKey()).name(), hardLink);
                     }
-                    joRequest.put("coalescedToRequestId", SNAPSHOT_TYPE.FILE.requestId(requestId));
+                    joRequest.put("coalescedToRequestId", SNAPSHOT_TYPE.FILE.requestId(requestId).name());
                     joRequest.put("hardLinks", hardLinks);
             }
         } catch (JSONException exc) {
@@ -2369,7 +2569,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         } catch (KeeperException | InterruptedException exc) {
             VoltDB.crashLocalVoltDB("unable to queue snapshot request: \n" + jsonStr, true, exc);
         }
-        return stype.requestId(id);
+        return stype.requestId(id).name();
     }
 
     /**
