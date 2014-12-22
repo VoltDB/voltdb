@@ -47,6 +47,7 @@ public class RegisterSet {
     public final static int REGISTER_SIZE = 5;
 
     private final byte[] bytes;
+    private boolean dirty = false;
 
     public RegisterSet(int count) {
         int bitsNeeded = count * REGISTER_SIZE;
@@ -69,17 +70,25 @@ public class RegisterSet {
         return bytes.length;
     }
 
-    int getBit(int bitPos) {
-        byte b = bytes[bitPos / 8];
-        return (b >>> (bitPos % 8)) & 1;
+    public boolean getDirty() {
+        return dirty;
+    }
+
+    int getBit(final int bitPos) {
+        // bitPos >>> 3 == bitPos / 8
+        // bitpos & 7 == bitpos % 8
+        final byte b = bytes[bitPos >>> 3];
+        return (b >>> (bitPos & 7)) & 1;
     }
 
     void setBit(int bitPos, int value) {
+        // bitPos >>> 3 == bitPos / 8
+        // bitpos & 7 == bitpos % 8
         if (value > 0) {
-            bytes[bitPos / 8] |= 1 << (bitPos % 8);
+            bytes[bitPos >>> 3] |= 1 << (bitPos & 7);
         }
         else {
-            bytes[bitPos / 8] &= ~(1 << (bitPos % 8));
+            bytes[bitPos >>> 3] &= ~(1 << (bitPos & 7));
         }
     }
 
@@ -88,17 +97,18 @@ public class RegisterSet {
         assert (value >= 0);
         assert (value < (1 << REGISTER_SIZE));
 
+        dirty = true;
         int bitPos = position * REGISTER_SIZE;
         for (int i = 0; i < REGISTER_SIZE; i++) {
             setBit(bitPos + i, value & (1 << i));
         }
     }
 
-    public int get(int position) {
+    public int get(final int position) {
         assert (position < count());
 
         int retval = 0;
-        int bitPos = position * REGISTER_SIZE;
+        final int bitPos = position * REGISTER_SIZE;
         for (int i = 0; i < REGISTER_SIZE; i++) {
             retval |= getBit(bitPos + i) << i;
         }

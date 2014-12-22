@@ -106,9 +106,6 @@ public class AsyncBenchmark {
         @Option(desc = "Maximum TPS rate for benchmark.")
         int ratelimit = Integer.MAX_VALUE;
 
-        @Option(desc = "Report latency for async benchmark run.")
-        boolean latencyreport = false;
-
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
 
@@ -164,9 +161,6 @@ public class AsyncBenchmark {
         System.out.println(" Command Line Configuration");
         System.out.println(HORIZONTAL_RULE);
         System.out.println(config.getConfigDumpString());
-        if(config.latencyreport) {
-            System.out.println("NOTICE: Option latencyreport is ON for async run; please set a reasonable ratelimit.\n");
-        }
     }
 
     /**
@@ -247,10 +241,6 @@ public class AsyncBenchmark {
         System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
         System.out.printf("Aborts/Failures %d/%d",
                 stats.getInvocationAborts(), stats.getInvocationErrors());
-        if(this.config.latencyreport) {
-            System.out.printf(", Avg/95%% Latency %.2f/%.2fms", stats.getAverageLatency(),
-                stats.kPercentileLatencyAsDouble(0.95));
-        }
         System.out.printf("\n");
     }
 
@@ -303,24 +293,6 @@ public class AsyncBenchmark {
         System.out.println("\n" + HORIZONTAL_RULE + " Client Workload Statistics\n" + HORIZONTAL_RULE);
 
         System.out.printf("Average throughput:            %,9d txns/sec\n", stats.getTxnThroughput());
-        if(this.config.latencyreport) {
-            System.out.printf("Average latency:               %,9.2f ms\n", stats.getAverageLatency());
-            System.out.printf("10th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.1));
-            System.out.printf("25th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.25));
-            System.out.printf("50th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.5));
-            System.out.printf("75th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.75));
-            System.out.printf("90th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.9));
-            System.out.printf("95th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.95));
-            System.out.printf("99th percentile latency:       %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.99));
-            System.out.printf("99.5th percentile latency:     %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.995));
-            System.out.printf("99.9th percentile latency:     %,9.2f ms\n", stats.kPercentileLatencyAsDouble(.999));
-
-            System.out.println("\n" + HORIZONTAL_RULE + " System Server Statistics\n" + HORIZONTAL_RULE);
-            System.out.printf("Reported Internal Avg Latency: %,9.2f ms\n", stats.getAverageInternalLatency());
-
-            System.out.println("\n" + HORIZONTAL_RULE + " Latency Histogram\n" + HORIZONTAL_RULE);
-            System.out.println(stats.latencyHistoReport());
-        }
         System.out.println();
 
         // 4. Write stats to file if requested
@@ -341,6 +313,8 @@ public class AsyncBenchmark {
             }
             else {
                 failedVotes.incrementAndGet();
+                System.err.println("Procedure returned with error: " + response.getStatusString());
+                System.err.flush();
             }
         }
     }
@@ -358,8 +332,6 @@ public class AsyncBenchmark {
 
         // connect to one or more servers, loop until success
         connect(config.servers);
-
-
 
         System.out.print(HORIZONTAL_RULE);
         System.out.println(" Starting Benchmark");
@@ -385,7 +357,7 @@ public class AsyncBenchmark {
             long hashedValue = MurmurHash.hash64(nextValue);
 
             client.callProcedure(new CountCallback(),
-                                 "CountDevice",
+                                 "CountDeviceEstimate",
                                  appId,
                                  hashedValue);
         }

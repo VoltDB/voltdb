@@ -123,11 +123,9 @@ function client() {
     java -classpath $CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
         uniquedevices.AsyncBenchmark \
         --displayinterval=5 \
-        --duration=30 \
+        --duration=120 \
         --servers=localhost:21212 \
         --appcount=100
-#        --latencyreport=true \
-#        --ratelimit=100000
 }
 
 # Asynchronous benchmark sample

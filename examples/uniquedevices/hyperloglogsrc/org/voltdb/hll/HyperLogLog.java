@@ -114,6 +114,10 @@ public class HyperLogLog {
         return registerSet.toBytes();
     }
 
+    public boolean getDirty() {
+        return registerSet.getDirty();
+    }
+
     /**
      * Create a new HyperLogLog instance.  The log2m parameter defines the accuracy of
      * the counter.  The larger the log2m the better the accuracy.
@@ -165,13 +169,16 @@ public class HyperLogLog {
         double zeros = 0.0;
         for (int j = 0; j < count; j++) {
             int val = registerSet.get(j);
-            registerSum += 1.0 / (1 << val);
             if (val == 0) {
+                registerSum++;
                 zeros++;
+            }
+            else {
+                registerSum += 1.0 / (1 << val);
             }
         }
 
-        double estimate = getAlphaMM() * (1 / registerSum);
+        double estimate = getAlphaMM() * (1.0 / registerSum);
 
         if (estimate <= (5.0 / 2.0) * count) {
             // Small Range Estimate

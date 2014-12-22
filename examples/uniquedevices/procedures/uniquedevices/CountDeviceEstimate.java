@@ -30,44 +30,42 @@ import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.hll.HyperLogLog;
 
-public class CountDevice extends VoltProcedure {
+public class CountDeviceEstimate extends VoltProcedure {
 
-    final static SQLStmt selectHLL = new SQLStmt("select hll from estimates where appid = ?;");
-    final static SQLStmt upsertHLL = new SQLStmt("upsert into estimates (appid, hll) values (?, ?);");
+    public final static long MAX_EXACT_COUNT = 1000;
 
-    public VoltTable[] run(long appId, long hashedDeviceId) {
+    final static SQLStmt estimatesSelect = new SQLStmt("select devicecount, hll from estimates where appid = ?;");
+    final static SQLStmt estimatesUpsert = new SQLStmt("upsert into estimates (appid, devicecount, hll) values (?, ?, ?);");
 
-        // get the bytes for the HLL
-        voltQueueSQL(selectHLL, EXPECT_ZERO_OR_ONE_ROW, appId);
-        VoltTable hllBytesTable = voltExecuteSQL()[0];
+    public long run(long appId, long hashedDeviceId) throws IOException {
 
+        long current = 0;
         HyperLogLog hll = null;
-        byte[] hllBytes = null;
 
-        if (hllBytesTable.getRowCount() == 0) {
-            hll = new HyperLogLog(12);
+        // get the HLL from the db or create one if needed
+        voltQueueSQL(estimatesSelect, EXPECT_ZERO_OR_ONE_ROW, appId);
+        VoltTable estimatesTable = voltExecuteSQL()[0];
+
+        if (estimatesTable.advanceRow()) {
+            estimatesTable.advanceRow();
+            current = estimatesTable.getLong("devicecount");
+            byte[]  hllBytes = estimatesTable.getVarbinary("hll");
+            hll = HyperLogLog.fromBytes(hllBytes);
         }
         else {
-            hllBytes = hllBytesTable.fetchRow(0).getVarbinary("hll");
-            try {
-                hll = HyperLogLog.fromBytes(hllBytes);
-            } catch (IOException e) {
-                e.printStackTrace();
-                throw new VoltAbortException(e);
-            }
+            hll = new HyperLogLog(12);
         }
-        assert(hll != null);
 
+        // offer the hashed device id to the HLL
         hll.offerHashed(hashedDeviceId);
 
-        try {
-            hllBytes = hll.toBytes();
-        } catch (IOException e) {
-            e.printStackTrace();
-            throw new VoltAbortException(e);
+        // if the estimates row needs updating, upsert it
+        if (hll.getDirty()) {
+            current = Math.max(MAX_EXACT_COUNT, hll.cardinality());
+            voltQueueSQL(estimatesUpsert, EXPECT_SCALAR_MATCH(1), appId, current, hll.toBytes());
+            voltExecuteSQL(true);
         }
 
-        voltQueueSQL(upsertHLL, EXPECT_SCALAR_MATCH(1), appId, hllBytes);
-        return voltExecuteSQL(true);
+        return current;
     }
 }

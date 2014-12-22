@@ -30,6 +30,8 @@ public class UniqueIdGenerator {
     final int appCount;
     final long counts[];
     final int nextSubCounts[];
+    final long realCardinality[];
+    final int shuffleMap[];
 
     // deterministically seeded PRNG
     Random rand = new Random(0);
@@ -38,10 +40,29 @@ public class UniqueIdGenerator {
         this.appCount = appCount;
         counts = new long[appCount];
         nextSubCounts = new int[appCount];
+        realCardinality = new long[appCount];
+        shuffleMap = new int[appCount];
+
+        // create a random shuffling map so the distribution of popular
+        //  apps seems random in a top-N list format
+        for (int i = 0; i < appCount; i++) {
+            shuffleMap[i] = i;
+        }
+        for (int i = 0; i < appCount * 5; i++) {
+            int index1 = rand.nextInt(appCount);
+            int index2 = rand.nextInt(appCount);
+            int temp = shuffleMap[index2];
+            shuffleMap[index2] = shuffleMap[index1];
+            shuffleMap[index1] = temp;
+        }
     }
 
     long[] getNextAppIdAndUniqueDeviceId() {
-        int appId = Math.min((int) Math.abs(rand.nextGaussian() * appCount / 3), appCount - 1);
+        int appId = Integer.MAX_VALUE;
+        while (appId >= appCount) {
+            appId = Math.min((int) Math.abs(rand.nextGaussian() * appCount / 3), appCount - 1);
+            appId = shuffleMap[appId];
+        }
 
         long value = -1;
 
@@ -63,10 +84,14 @@ public class UniqueIdGenerator {
             }
         }
 
+        if (nextSubCounts[appId] == 1) {
+            realCardinality[appId]++;
+        }
+
         return new long[] { appId, value };
     }
 
     long expectedCountForApp(int appId) {
-        return counts[appId];
+        return realCardinality[appId];
     }
 }
