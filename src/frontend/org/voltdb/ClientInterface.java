@@ -20,6 +20,8 @@ package org.voltdb;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -33,6 +35,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -47,6 +50,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Multimap;
+import com.google_voltpatches.common.collect.TreeMultimap;
 import org.HdrHistogram_voltpatches.AbstractHistogram;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONObject;
@@ -93,6 +99,7 @@ import org.voltdb.compiler.AsyncCompilerResult;
 import org.voltdb.compiler.AsyncCompilerWork.AsyncCompilerWorkCompletionHandler;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
+import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
@@ -1244,12 +1251,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     public void initializeSnapshotDaemon(HostMessenger messenger, GlobalServiceElector gse) {
         m_snapshotDaemon.init(this, messenger, new Runnable() {
-            @Override
-            public void run() {
-                bindAdapter(m_snapshotDaemonAdapter);
-            }
-        },
-        gse);
+                                  @Override
+                                  public void run()
+                                  {
+                                      bindAdapter(m_snapshotDaemonAdapter);
+                                  }
+                              },
+                              gse);
     }
 
     /**
@@ -1270,7 +1278,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             final ListenableFuture<Void> future = m_snapshotDaemon.mayGoActiveOrInactive(schedule);
             future.addListener(new Runnable() {
                 @Override
-                public void run() {
+                public void run()
+                {
                     try {
                         future.get();
                     } catch (InterruptedException e) {
@@ -1516,6 +1525,39 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                           buf.capacity(),
                           System.nanoTime());
         return null;
+    }
+
+    ClientResponseImpl dispatchRebalance(final StoredProcedureInvocation task,
+                                         ClientInputHandler handler,
+                                         Connection ccxn)
+    {
+        final Object[] params = task.getParams().toArray();
+        final Map<Integer, Integer> p = Maps.newTreeMap();
+        for (int i = 0; i < params.length; i = i + 2) {
+            p.put((int) params[i], (int) params[i + 1]);
+        }
+
+        try {
+            final Class<?> elastic = MiscUtils.loadProClass("org.voltdb.join.ElasticJoinUtils", "Elastic", true);
+            final Method plan = elastic.getMethod("plan", ElasticHashinator.class, Map.class);
+            final Method resume = elastic.getMethod("resumeRebalance", ZooKeeper.class, ElasticHashinator.class);
+            VoltDB.instance().scheduleWork(new Runnable() {
+                @Override
+                public void run()
+                {
+                    try {
+                        resume.invoke(null, m_zk, plan.invoke(null, new ElasticHashinator(TheHashinator.getCurrentConfig().configBytes, false), p));
+                    } catch (IllegalAccessException | InvocationTargetException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }, 0, -1, TimeUnit.DAYS);
+            return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "Good", task.clientHandle);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                                          new VoltTable[0], e.getMessage(), task.clientHandle);
+        }
     }
 
     /**
@@ -1774,6 +1816,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             else if (task.procName.equals("@LoadSinglepartitionTable")) {
                 // FUTURE: When we get rid of the legacy hashinator, this should go away
                 return dispatchLoadSinglepartitionTable(buf, catProc, task, handler, ccxn);
+            }
+            else if (task.procName.equals("@Rebalance")) {
+                return dispatchRebalance(task, handler, ccxn);
             }
 
             // ERROR MESSAGE FOR PRO SYSPROC USE IN COMMUNITY

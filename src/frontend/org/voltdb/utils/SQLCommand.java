@@ -1096,6 +1096,8 @@ public class SQLCommand
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
         Procedures.put("@ApplyBinaryLogSP",
                 ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("varbinary", "varbinary")).build());
+        Procedures.put("@Rebalance",
+                       ImmutableMap.<Integer, List<String>>builder().put(8, Arrays.asList("int", "int", "int", "int", "int", "int", "int", "int")).build());
     }
 
     public static Client getClient(ClientConfig config, String[] servers, int port) throws Exception

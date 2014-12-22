@@ -131,7 +131,7 @@ public class ElasticHashinator extends TheHashinator {
      * partitions from existing hashinator.
      * @param tokens
      */
-    private ElasticHashinator(SortedMap<Integer, Integer> tokens) {
+    public ElasticHashinator(SortedMap<Integer, Integer> tokens) {
         m_tokensMap = Suppliers.ofInstance(ImmutableSortedMap.copyOf(tokens));
         Preconditions.checkArgument(m_tokensMap.get().firstEntry().getKey().equals(Integer.MIN_VALUE));
         final int bytes = 8 * tokens.size();
