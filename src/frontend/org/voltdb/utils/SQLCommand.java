@@ -1475,6 +1475,10 @@ public class SQLCommand
         ClientConfig config = new ClientConfig(user, password);
         config.setProcedureCallTimeout(0);  // Set procedure all to infinite timeout, see ENG-2670
 
+        if (m_debug) {
+            reportElapsedTime("pre-client init");
+        }
+
         try {
             // if specified enable kerberos
             if (!kerberos.isEmpty()) {
@@ -1486,12 +1490,20 @@ public class SQLCommand
             System.exit(-1);
         }
 
+        if (m_debug) {
+            reportElapsedTime("post-client init");
+        }
+
         try {
             // Load system procedures
             loadSystemProcedures();
 
             // Load user stored procs
             loadStoredProcedures(Procedures, Classlist);
+
+            if (m_debug) {
+                reportElapsedTime("post-metadata load");
+            }
 
             in = new FileInputStream(FileDescriptor.in);
             out = System.out;
@@ -1525,6 +1537,10 @@ public class SQLCommand
                     }
                 }
             });
+
+            if (m_debug) {
+                reportElapsedTime("post-reader init");
+            }
 
             // Removed code to prevent Ctrl-C from exiting. The original code is visible
             // in Git history hash 837df236c059b5b4362ffca7e7a5426fba1b7f20.
