@@ -81,6 +81,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.Pair;
 import org.voltcore.utils.ShutdownHooks;
+import org.voltcore.zk.SynchronizedStatesManager;
 import org.voltcore.zk.ZKCountdownLatch;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.TheHashinator.HashinatorType;
@@ -324,6 +325,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private ScheduledThreadPoolExecutor m_periodicWorkThread;
     private ScheduledThreadPoolExecutor m_periodicPriorityWorkThread;
 
+    private SynchronizedStatesManager m_perHostStatesManager;
+    private final int m_perHostStateMachines = 1;
+
     // The configured license api: use to decide enterprise/community edition feature enablement
     LicenseApi m_licenseApi;
     private LatencyStats m_latencyStats;
@@ -509,6 +513,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 m_globalServiceElector.start();
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Unable to start GlobalServiceElector", true, e);
+            }
+
+            // Create global StateMachineManager. Do this after GlobalServiceElector in case a state machine depends
+            // on it being there.
+            String hostIdStr = "Host_" + m_messenger.getHostId();
+            try {
+                m_perHostStatesManager = new SynchronizedStatesManager(m_messenger.getZK(),
+                        "PER_HOST_STATES", hostIdStr, m_perHostStateMachines);
+            }
+            catch (KeeperException | InterruptedException e)
+            {
+                m_perHostStatesManager = null;
             }
 
             // Always create a mailbox for elastic join data transfer
@@ -2663,6 +2679,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     @Override
     public void onSyncSnapshotCompletion() {
         m_leaderAppointer.onSyncSnapshotCompletion();
+    }
+
+    @Override
+    public SynchronizedStatesManager getPerHostStatesManager() {
+        return m_perHostStatesManager;
     }
 
     @Override
