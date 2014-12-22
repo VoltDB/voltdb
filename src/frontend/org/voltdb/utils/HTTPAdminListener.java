@@ -57,7 +57,6 @@ import org.json_voltpatches.JSONObject;
 import org.eclipse.jetty.server.bio.SocketConnector;
 import org.voltdb.AuthenticationResult;
 import org.voltdb.ClientResponseImpl;
-import static org.voltdb.HTTPClientInterface.PARAM_ADMIN;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
@@ -109,12 +108,7 @@ public class HTTPAdminListener {
         }
 
         public AuthenticationResult authenticate(Request request) {
-            String admin = request.getParameter(PARAM_ADMIN);
-
-            if (request.getMethod().equalsIgnoreCase("POST")) {
-                admin = "false";
-            }
-            return httpClientInterface.authenticate(request, admin);
+            return httpClientInterface.authenticate(request);
         }
 
         @Override
@@ -390,6 +384,7 @@ public class HTTPAdminListener {
             try {
                 response.setContentType("application/json;charset=utf-8");
                 response.setStatus(HttpServletResponse.SC_OK);
+
                 //Requests require authentication.
                 authResult = authenticate(baseRequest);
                 if (!authResult.isAuthenticated()) {
@@ -407,8 +402,7 @@ public class HTTPAdminListener {
                 //Authenticated and has ADMIN permission
                 if (baseRequest.getRequestURI().contains("/download")) {
                     //Deployment xml is text/xml
-                    response.setContentType("application/xml;charset=utf-8");
-                    response.addHeader("Content-Disposition", "attachment");
+                    response.setContentType("text/xml;charset=utf-8");
                     response.getWriter().write(new String(getDeploymentBytes()));
                 } else {
                     if (request.getMethod().equalsIgnoreCase("POST")) {
