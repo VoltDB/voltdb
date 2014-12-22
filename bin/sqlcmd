@@ -135,4 +135,5 @@ jvmOPTS+=("-Xmx512m" "-Dlog4j.configuration=file://${LOG4J_CONFIG_PATH}")
 jvmOPTS+=("-classpath" "${CLASSPATH}" "org.voltdb.utils.SQLCommand")
 
 # run it
+echo running SqlCommand.java with options "${programOPTS[@]}" 1>&2
 exec $JAVA "${jvmOPTS[@]}" "${programOPTS[@]}"
