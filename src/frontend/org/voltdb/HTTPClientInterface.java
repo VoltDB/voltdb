@@ -138,7 +138,6 @@ public class HTTPClientInterface {
             authResult = authenticate(request);
             if (!authResult.isAuthenticated()) {
                 String msg = authResult.m_message;
-                m_rate_limited_log.log("JSON interface exception: " + msg, EstTime.currentTimeMillis());
                 ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg);
                 msg = rimpl.toJSONString();
                 if (jsonp != null) {
