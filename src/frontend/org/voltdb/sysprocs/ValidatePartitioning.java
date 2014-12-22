@@ -24,11 +24,13 @@ import java.util.Map;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.DependencyPair;
+import org.voltdb.ElasticHashinator;
 import org.voltdb.LegacyHashinator;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TheHashinator;
+import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -38,6 +40,9 @@ import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltTableUtil;
 
+import com.google_voltpatches.common.collect.MapDifference;
+import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.SortedMapDifference;
 import com.google_voltpatches.common.primitives.Longs;
 
 /**
@@ -106,6 +111,49 @@ public class ValidatePartitioning extends VoltSystemProcedure {
             byte [] configBytes = (byte[])params.toArray()[1];
             if (configBytes == null) {
                 configBytes = LegacyHashinator.getConfigureBytes(0);
+            }
+
+            if (TheHashinator.getConfiguredHashinatorType() == HashinatorType.ELASTIC) {
+                int partitionId = context.getPartitionId();
+                ElasticHashinator givenHashinator = (ElasticHashinator)TheHashinator.constructHashinator(ElasticHashinator.class, configBytes, false);
+                ElasticHashinator currentHashinator = (ElasticHashinator)context.getCurrentHashinator();
+                SortedMapDifference<Integer, Integer> hashinatorDiff = Maps.difference(givenHashinator.getTokens(), currentHashinator.getTokens());
+                boolean hasMismatch = false;
+                if (hashinatorDiff.entriesOnlyOnLeft().containsValue(partitionId)) {
+                    for (Map.Entry<Integer, Integer> e : hashinatorDiff.entriesOnlyOnLeft().entrySet()) {
+                        if (e.getValue() == partitionId) {
+                            HOST_LOG.warn("Hashinator mismatch for partition " + partitionId +
+                                    ". Global hashinator on the MPI node says this partition should own " + e.getKey() +
+                                    ", which isn't in this site's token map. Site hashinator says it's owned by partition " +
+                                    currentHashinator.partitionForToken(e.getKey()));
+                            hasMismatch = true;
+                        }
+                    }
+                }
+                if (hashinatorDiff.entriesOnlyOnRight().containsValue(partitionId)) {
+                    for (Map.Entry<Integer, Integer> e : hashinatorDiff.entriesOnlyOnRight().entrySet()) {
+                        if (e.getValue() == partitionId) {
+                            HOST_LOG.warn("Hashinator mismatch for partition " + partitionId +
+                                    ". Site hashinator says this partition owns " + e.getKey() +
+                                    ", which isn't in the global hashinator's token map on the MPI node. " +
+                                    " That hashinator says it's owned by partition" + givenHashinator.partitionForToken(e.getKey()));
+                            hasMismatch = true;
+                        }
+                    }
+                }
+                for (Map.Entry<Integer, MapDifference.ValueDifference<Integer>> e : hashinatorDiff.entriesDiffering().entrySet()) {
+                    MapDifference.ValueDifference<Integer> partitionDiff = e.getValue();
+                    if (partitionDiff.leftValue() == partitionId || partitionDiff.rightValue() == partitionId) {
+                        HOST_LOG.warn("Hashinator mismatch for partition " + partitionId +
+                                ". Site hashinator says " + e.getKey() + " is owned by partition " + partitionDiff.rightValue() +
+                                ", but global hashinator on the MPI node says it's owned by partition " + partitionDiff.leftValue());
+                        hasMismatch = true;
+                    }
+                }
+                if (hasMismatch) {
+                    HOST_LOG.warn("Found mismatches for partition " + partitionId + ".\nSite hashinator signature: " + currentHashinator.pGetConfigurationSignature() +
+                            "\nMPI node hashinator signature: " + givenHashinator.pGetConfigurationSignature());
+                }
             }
 
             final long givenConfigurationSignature =
