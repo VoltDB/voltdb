@@ -481,9 +481,7 @@ var loadPage = function (serverName, portid) {
                                 VoltDbAdminConfig.idleServers.push(idleServerDetails);
 
                                 if (VoltDbAdminConfig.runningServers.length > 0) {
-                                    $.each(VoltDbAdminConfig.runningServers, function (runningServerId, runningServer) {
-                                        console.log("runnnig server:" + runningServer);
-
+                                    $.each(VoltDbAdminConfig.runningServers, function (runningServerId, runningServer) {                                       
                                         //error: updates on runningServer list  occurs concurrently and can cause "runningserver" in a loop to be undefined
                                         if (runningServer != undefined) {  
                                             if (runningServer.runningServerName == hostName)
@@ -491,7 +489,7 @@ var loadPage = function (serverName, portid) {
                                         }
                                     });
                                 } else {
-                                    console.log("Running Server:" + VoltDbAdminConfig.runningServers);
+                                   
                                 }
 
                             }
