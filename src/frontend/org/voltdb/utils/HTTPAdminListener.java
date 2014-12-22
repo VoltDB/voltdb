@@ -301,11 +301,11 @@ public class HTTPAdminListener {
                            throws IOException, ServletException {
             //jsonp is specified when response is expected to go to javascript function.
             String jsonp = request.getParameter("jsonp");
-
+            AuthenticationResult authResult = null;
             try {
                 response.setContentType("application/json;charset=utf-8");
                 response.setStatus(HttpServletResponse.SC_OK);
-                AuthenticationResult authResult = authenticate(baseRequest);
+                authResult = authenticate(baseRequest);
                 if (!authResult.isAuthenticated()) {
                     response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, authResult.m_message));
                 } else {
@@ -320,6 +320,8 @@ public class HTTPAdminListener {
                 baseRequest.setHandled(true);
             } catch (Exception ex) {
               logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage(), ex);
+            } finally {
+                httpClientInterface.releaseClient(authResult);
             }
         }
     }
@@ -384,12 +386,12 @@ public class HTTPAdminListener {
 
             //jsonp is specified when response is expected to go to javascript function.
             String jsonp = request.getParameter("jsonp");
-
+            AuthenticationResult authResult = null;
             try {
                 response.setContentType("application/json;charset=utf-8");
                 response.setStatus(HttpServletResponse.SC_OK);
                 //Requests require authentication.
-                AuthenticationResult authResult = authenticate(baseRequest);
+                authResult = authenticate(baseRequest);
                 if (!authResult.isAuthenticated()) {
                     response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, authResult.m_message));
                     baseRequest.setHandled(true);
@@ -425,6 +427,8 @@ public class HTTPAdminListener {
                 baseRequest.setHandled(true);
             } catch (Exception ex) {
               logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage(), ex);
+            } finally {
+                httpClientInterface.releaseClient(authResult);
             }
         }
 
