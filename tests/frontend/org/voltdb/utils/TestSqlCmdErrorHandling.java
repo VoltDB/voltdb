@@ -165,7 +165,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
     }
 
     private String createFileWithContent(String inputText) throws IOException {
-        File created = File.createTempFile("sqlcmdInput", "txt");
+        File created = File.createTempFile("sqlcmdInput", ".txt");
         created.deleteOnExit();
         FileOutputStream fostr = new FileOutputStream(created);
         byte[] bytes = inputText.getBytes("UTF-8");
@@ -196,10 +196,10 @@ public class TestSqlCmdErrorHandling extends TestCase {
         fos.write(inputText.getBytes());
         fos.close();
 
-        File out = File.createTempFile("testsqlcmdout", "log");
+        File out = File.createTempFile("testsqlcmdout", ".log");
         out.deleteOnExit();
 
-        File error = File.createTempFile("testsqlcmderr", "log");
+        File error = File.createTempFile("testsqlcmderr", ".log");
         error.deleteOnExit();
 
         ProcessBuilder pb =
@@ -280,13 +280,18 @@ public class TestSqlCmdErrorHandling extends TestCase {
      * @throws FileNotFoundException
      * @throws IOException
      */
-    private static void streamFileToErr(File f) throws FileNotFoundException, IOException {
+    private static void streamFileToErr(File f) throws IOException {
         byte[] transfer = new byte[1000];
-        FileInputStream cmdIn = new FileInputStream(f);
-        while (cmdIn.read(transfer) != -1) {
-            System.err.write(transfer);
+        try {
+            FileInputStream cmdIn = new FileInputStream(f);
+            while (cmdIn.read(transfer) != -1) {
+                System.err.write(transfer);
+            }
+            cmdIn.close();
         }
-        cmdIn.close();
+        catch (FileNotFoundException fnfe) {
+            System.err.println("ERROR: TestSqlCmdErrorHandling could not find file " + f.getPath());
+        }
     }
 
     /**
