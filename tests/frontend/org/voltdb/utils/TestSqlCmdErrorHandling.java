@@ -266,7 +266,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
         out.delete();
         System.err.println("-----");
         System.err.println("Error output from timed out " + commandPath + ":");
-        streamFileToErr(out);
+        streamFileToErr(error);
         error.delete();
         System.err.println("-----");
         dumpProcessTree();
