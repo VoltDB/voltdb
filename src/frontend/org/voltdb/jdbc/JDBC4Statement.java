@@ -45,10 +45,8 @@ public class JDBC4Statement implements java.sql.Statement
     static class VoltSQL
     {
         public static final byte TYPE_SELECT = 1;
-//        public static final byte TYPE_INSERT = 2;
-        public static final byte TYPE_UPDATE = 3;
-//        public static final byte TYPE_DELETE = 4;
-        public static final byte TYPE_EXEC = 5;
+        public static final byte TYPE_UPDATE = 2;
+        public static final byte TYPE_EXEC = 3;
 
         private final String[] sql;
         private final int parameterCount;
