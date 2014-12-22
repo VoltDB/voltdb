@@ -84,6 +84,8 @@ import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
+import org.voltdb.compiler.deploymentfile.SystemSettingsType;
+import org.voltdb.compiler.deploymentfile.SystemSettingsType.Query;
 import org.voltdb.compiler.procedures.CrazyBlahProc;
 import org.voltdb.compiler.procedures.DelayProc;
 import org.voltdb.compiler.procedures.SelectStarHelloWorld;
@@ -1153,6 +1155,43 @@ public class TestJSONInterface extends TestCase {
             deptype = mapper.readValue(jdep, DeploymentType.class);
             int nto = deptype.getHeartbeat().getTimeout();
             assertEquals(nto, 99);
+
+            //Test change Query timeout
+            SystemSettingsType ss = deptype.getSystemsettings();
+            if (ss == null) {
+                ss = new SystemSettingsType();
+                deptype.setSystemsettings(ss);
+            }
+            Query qv = ss.getQuery();
+            if (qv == null) {
+                qv = new Query();
+                ss.setQuery(qv);
+                qv.setTimeout(99);
+            }
+            ndeptype = mapper.writeValueAsString(deptype);
+            params.put("deployment", ndeptype);
+            pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            System.out.println("POST result is: " + pdep);
+            assertTrue(pdep.contains("Deployment Updated"));
+            jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            assertTrue(jdep.contains("cluster"));
+            deptype = mapper.readValue(jdep, DeploymentType.class);
+            nto = deptype.getSystemsettings().getQuery().getTimeout();
+            assertEquals(nto, 99);
+
+            qv.setTimeout(88);
+            ss.setQuery(qv);
+            deptype.setSystemsettings(ss);
+            ndeptype = mapper.writeValueAsString(deptype);
+            params.put("deployment", ndeptype);
+            pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            System.out.println("POST result is: " + pdep);
+            assertTrue(pdep.contains("Deployment Updated"));
+            jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            assertTrue(jdep.contains("cluster"));
+            deptype = mapper.readValue(jdep, DeploymentType.class);
+            nto = deptype.getSystemsettings().getQuery().getTimeout();
+            assertEquals(nto, 88);
 
         } finally {
             if (server != null) {
