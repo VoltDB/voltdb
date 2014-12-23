@@ -38,14 +38,22 @@ import java.util.Arrays;
 
 public class TestSqlDeleteSuite extends RegressionSuite {
 
-    /** Procedures used by this suite */
-    static final Class<?>[] PROCEDURES = { Insert.class };
-
     static final int ROWS = 10;
 
-    private static void insertRows(Client client, String tableName, int numRows) throws Exception {
+    private static void insertOneRow(Client client, String tableName,
+            long id, String desc, long num, double ratio) throws Exception {
+        VoltTable vt = client.callProcedure("@AdHoc",
+                "insert into " + tableName + " values ("
+                + id + ", '" + desc + "', " + num + ", " + ratio + ")")
+                .getResults()[0];
+        vt.advanceRow();
+        assertEquals(vt.getLong(0), 1);
+    }
+
+    private static void insertRows(Client client, String tableName, int numRows)
+            throws Exception {
         for (int i = 0; i < numRows; ++i) {
-            client.callProcedure("Insert", tableName, i, "desc", i, 14.5);
+            insertOneRow(client, tableName, i, "desc", i, 14.5);
         }
 
     }
@@ -76,39 +84,39 @@ public class TestSqlDeleteSuite extends RegressionSuite {
     }
 
     public void testDelete()
-    throws Exception
+            throws Exception
     {
         String[] tables = {"P1", "R1"};
         for (String table : tables)
         {
             String delete = String.format("delete from %s",
-                                          table, table);
+                    table, table);
             // Expect all rows to be deleted
             executeAndTestDelete(table, delete, ROWS);
         }
     }
 
     public void testDeleteWithEqualToIndexPredicate()
-    throws Exception
+            throws Exception
     {
         String[] tables = {"P1", "R1"};
         for (String table : tables)
         {
             String delete = String.format("delete from %s where %s.ID = 5",
-                                          table, table);
+                    table, table);
             // Only row with ID = 5 should be deleted
             executeAndTestDelete(table, delete, 1);
         }
     }
 
     public void testDeleteWithEqualToNonIndexPredicate()
-    throws Exception
+            throws Exception
     {
         String[] tables = {"P1", "R1"};
         for (String table : tables)
         {
             String delete = String.format("delete from %s where %s.NUM = 5",
-                                          table, table);
+                    table, table);
             // Only row with NUM = 5 should be deleted
             executeAndTestDelete(table, delete, 1);
         }
@@ -118,39 +126,39 @@ public class TestSqlDeleteSuite extends RegressionSuite {
     // which generates the XML eaten by the planner didn't generate
     // anything in the <condition> element output for > or >= on an index
     public void testDeleteWithGreaterThanIndexPredicate()
-    throws Exception
+            throws Exception
     {
         String[] tables = {"P1", "R1"};
         for (String table : tables)
         {
             String delete = String.format("delete from %s where %s.ID > 5",
-                                          table, table);
+                    table, table);
             // Rows 6-9 should be deleted
             executeAndTestDelete(table, delete, 4);
         }
     }
 
     public void testDeleteWithGreaterThanNonIndexPredicate()
-    throws Exception
+            throws Exception
     {
         String[] tables = {"P1", "R1"};
         for (String table : tables)
         {
             String delete = String.format("delete from %s where %s.NUM > 5",
-                                          table, table);
+                    table, table);
             // rows 6-9 should be deleted
             executeAndTestDelete(table, delete, 4);
         }
     }
 
     public void testDeleteWithLessThanIndexPredicate()
-    throws Exception
+            throws Exception
     {
         String[] tables = {"P1", "R1"};
         for (String table : tables)
         {
             String delete = String.format("delete from %s where %s.ID < 5",
-                                          table, table);
+                    table, table);
             // Rows 0-4 should be deleted
             executeAndTestDelete(table, delete, 5);
         }
@@ -162,7 +170,7 @@ public class TestSqlDeleteSuite extends RegressionSuite {
     // would end up only seeing the first subnode written to the <condition>
     // element
     public void testDeleteWithOnePredicateAgainstIndexAndOneFalse()
-    throws Exception
+            throws Exception
     {
         String[] tables = {"P1", "R1"};
         for (String table : tables)
@@ -178,25 +186,27 @@ public class TestSqlDeleteSuite extends RegressionSuite {
     // the index begin and end conditions, so the planner would only see the
     // begin condition in the <condition> element.
     public void testDeleteWithRangeAgainstIndex()
-    throws Exception
+            throws Exception
     {
         String[] tables = {"P1", "R1"};
         for (String table : tables)
         {
-            String delete = String.format("delete from %s where %s.ID < 8 and %s.ID > 5",
-                                          table, table, table);
+            String delete =
+                    String.format("delete from %s where %s.ID < 8 and %s.ID > 5",
+                            table, table, table);
             executeAndTestDelete(table, delete, 2);
         }
     }
 
     public void testDeleteWithRangeAgainstNonIndex()
-    throws Exception
+            throws Exception
     {
         String[] tables = {"P1", "R1"};
         for (String table : tables)
         {
-            String delete = String.format("delete from %s where %s.NUM < 8 and %s.NUM > 5",
-                                          table, table, table);
+            String delete =
+                    String.format("delete from %s where %s.NUM < 8 and %s.NUM > 5",
+                            table, table, table);
             executeAndTestDelete(table, delete, 2);
         }
     }
@@ -208,15 +218,14 @@ public class TestSqlDeleteSuite extends RegressionSuite {
         }
 
         Client client = getClient();
-        String[] stmtTemplates = {
-                "DELETE FROM %s ORDER BY NUM ASC LIMIT 1",
+        String[] stmtTemplates = { "DELETE FROM %s ORDER BY NUM ASC LIMIT 1",
                 "DELETE FROM %s ORDER BY NUM DESC LIMIT 2",
-                "DELETE FROM %s ORDER BY NUM LIMIT 3"};
+                "DELETE FROM %s ORDER BY NUM LIMIT 3" };
         // Table starts with 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
         long[][] expectedResults = {
-                new long[] {1, 2, 3, 4, 5, 6, 7, 8, 9},
-                new long[] {1, 2, 3, 4, 5, 6, 7},
-                new long[] {4, 5, 6, 7}};
+                new long[] { 1, 2, 3, 4, 5, 6, 7, 8, 9 },
+                new long[] { 1, 2, 3, 4, 5, 6, 7 },
+                new long[] { 4, 5, 6, 7 } };
 
         insertRows(client, "P1", 10);
         insertRows(client, "R1", 10);
@@ -229,23 +238,28 @@ public class TestSqlDeleteSuite extends RegressionSuite {
             int len = replStmt.length();
             long expectedRows = Long.valueOf(replStmt.substring(len - 1, len));
             vt = client.callProcedure("@AdHoc", replStmt).getResults()[0];
-            validateTableOfScalarLongs(vt, new long[] {expectedRows});
+            validateTableOfScalarLongs(vt, new long[] { expectedRows });
 
-            vt = client.callProcedure("@AdHoc", "SELECT NUM FROM R1 ORDER BY NUM ASC").getResults()[0];
+            vt = client.callProcedure("@AdHoc",
+                    "SELECT NUM FROM R1 ORDER BY NUM ASC").getResults()[0];
             validateTableOfScalarLongs(vt, expectedResults[i]);
 
             // In the partitioned case, we expect to get an error
             String partStmt = String.format(stmtTemplates[i], "P1");
-            verifyStmtFails(client, partStmt, "Only single-partition DELETE statements "
-                    + "may contain ORDER BY with LIMIT and/or OFFSET clauses.");
+            verifyStmtFails(
+                    client,
+                    partStmt,
+                    "Only single-partition DELETE statements "
+                            + "may contain ORDER BY with LIMIT and/or OFFSET clauses.");
         }
     }
 
-    private static void insertMoreRows(Client client, String tableName, int tens, int ones)
-            throws Exception {
+    private static void insertMoreRows(Client client, String tableName,
+            int tens, int ones) throws Exception {
         for (int i = 0; i < tens; ++i) {
             for (int j = 0; j < ones; ++j) {
-                client.callProcedure("Insert", tableName, i * 10, "desc", i * 10 + j, 14.5);
+                insertOneRow(client, tableName,
+                        i * 10, "desc", i * 10 + j, 14.5);
             }
         }
     }
@@ -287,55 +301,68 @@ public class TestSqlDeleteSuite extends RegressionSuite {
 
             /// ---------------------------------------------------------------------------------
             // Delete rows where num is 12, 11
-            stmt = "DELETE FROM " + table +
-                    " WHERE DESC LIKE 'de%' AND ID = 10 ORDER BY NUM DESC LIMIT 2";
+            stmt = "DELETE FROM "
+                    + table
+                    + " WHERE DESC LIKE 'de%' AND ID = 10 ORDER BY NUM DESC LIMIT 2";
             vt = client.callProcedure("@AdHoc", stmt).getResults()[0];
-            validateTableOfScalarLongs(vt, new long[] {2});
+            validateTableOfScalarLongs(vt, new long[] { 2 });
 
             // verify the rows that are left are what we expect
-            vt = client.callProcedure("@AdHoc",
-                    "select num from " + table + " where id = 10 order by num asc" ).getResults()[0];
-            validateTableOfScalarLongs(vt, new long[] {10});
+            vt = client.callProcedure(
+                    "@AdHoc",
+                    "select num from " + table
+                            + " where id = 10 order by num asc").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] { 10 });
 
             // Total row count-- make sure we didn't delete any other rows
-            vt = client.callProcedure("@AdHoc", "select count(*) from " + table ).getResults()[0];
-            validateTableOfScalarLongs(vt, new long[] {27});
+            vt = client
+                    .callProcedure("@AdHoc", "select count(*) from " + table)
+                    .getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] { 27 });
 
             /// ---------------------------------------------------------------------------------
             // Delete rows where num is 22
-            stmt = "DELETE FROM " + table +
-                    " WHERE ID = 20 ORDER BY NUM LIMIT 10 OFFSET 2";
+            stmt = "DELETE FROM " + table
+                    + " WHERE ID = 20 ORDER BY NUM LIMIT 10 OFFSET 2";
             vt = client.callProcedure("@AdHoc", stmt).getResults()[0];
-            validateTableOfScalarLongs(vt, new long[] {1});
+            validateTableOfScalarLongs(vt, new long[] { 1 });
 
             // verify the rows that are left are what we expect
-            vt = client.callProcedure("@AdHoc",
-                    "select num from " + table + " where id = 20 order by num asc" ).getResults()[0];
-            validateTableOfScalarLongs(vt, new long[] {20, 21});
+            vt = client.callProcedure(
+                    "@AdHoc",
+                    "select num from " + table
+                            + " where id = 20 order by num asc").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] { 20, 21 });
 
             // Total row count-- make sure we didn't delete any other rows
-            vt = client.callProcedure("@AdHoc", "select count(*) from " + table ).getResults()[0];
-            validateTableOfScalarLongs(vt, new long[] {26});
+            vt = client
+                    .callProcedure("@AdHoc", "select count(*) from " + table)
+                    .getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] { 26 });
 
             /// ---------------------------------------------------------------------------------
             // Delete rows where num is 31
-            stmt = "DELETE FROM " + table +
-                    " WHERE ID = 30 ORDER BY NUM LIMIT 1 OFFSET 1";
+            stmt = "DELETE FROM " + table
+                    + " WHERE ID = 30 ORDER BY NUM LIMIT 1 OFFSET 1";
             vt = client.callProcedure("@AdHoc", stmt).getResults()[0];
-            validateTableOfScalarLongs(vt, new long[] {1});
+            validateTableOfScalarLongs(vt, new long[] { 1 });
 
             // verify the rows that are left are what we expect
-            vt = client.callProcedure("@AdHoc",
-                    "select num from " + table + " where id = 30 order by num asc" ).getResults()[0];
-            validateTableOfScalarLongs(vt, new long[] {30, 32});
+            vt = client.callProcedure(
+                    "@AdHoc",
+                    "select num from " + table
+                            + " where id = 30 order by num asc").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] { 30, 32 });
 
             // Total row count-- make sure we didn't delete any other rows
-            vt = client.callProcedure("@AdHoc", "select count(*) from " + table ).getResults()[0];
-            validateTableOfScalarLongs(vt, new long[] {25});
+            vt = client
+                    .callProcedure("@AdHoc", "select count(*) from " + table)
+                    .getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] { 25 });
         }
     }
 
-    public void testDeleteWithOrderByNegative() throws Exception {
+    public void testDeleteWithOrderByDeterminism() throws Exception {
         if (isHSQL()) {
             return;
         }
@@ -347,31 +374,65 @@ public class TestSqlDeleteSuite extends RegressionSuite {
 
         verifyStmtFails(client, "DELETE FROM R1 ORDER BY NUM ASC",
                 "DELETE statement with ORDER BY but no LIMIT or OFFSET is not allowed.");
-        verifyStmtFails(client, "DELETE FROM R1 LIMIT 1",
+        verifyStmtFails(
+                client,
+                "DELETE FROM R1 LIMIT 1",
                 "DELETE statement with LIMIT or OFFSET but no ORDER BY would produce non-deterministic results.");
 
-        // This fails in a different way due to a bug in HSQL.  OFFSET with no LIMIT confuses HSQL.
+        // This fails in a different way due to a bug in HSQL. OFFSET with no
+        // LIMIT confuses HSQL.
         verifyStmtFails(client, "DELETE FROM R1 OFFSET 1",
                 "PlanningErrorException");
 
-        verifyStmtFails(client, "DELETE FROM R1 LIMIT 1 OFFSET 1",
+        verifyStmtFails(
+                client,
+                "DELETE FROM R1 LIMIT 1 OFFSET 1",
                 "DELETE statement with LIMIT or OFFSET but no ORDER BY would produce non-deterministic results.");
-        verifyStmtFails(client, "DELETE FROM R1 OFFSET 1 LIMIT 1",
+        verifyStmtFails(
+                client,
+                "DELETE FROM R1 OFFSET 1 LIMIT 1",
                 "DELETE statement with LIMIT or OFFSET but no ORDER BY would produce non-deterministic results.");
 
         verifyStmtFails(client, "DELETE FROM P1_VIEW ORDER BY ID ASC LIMIT 1",
                 "INSERT, UPDATE, or DELETE not permitted for view");
 
-        // Check failure for partitioned table where where clause cannot infer partitioning
-        verifyStmtFails(client, "DELETE FROM P1 WHERE ID < 50 ORDER BY NUM DESC LIMIT 1",
+        // Check failure for partitioned table where where clause cannot infer
+        // partitioning
+        verifyStmtFails(
+                client,
+                "DELETE FROM P1 WHERE ID < 50 ORDER BY NUM DESC LIMIT 1",
                 "Only single-partition DELETE statements may contain ORDER BY with LIMIT and/or OFFSET clauses");
 
         // Non-deterministic ordering should fail!
-        // NUM is not unique.
-        // Need:
-        //   - either every column from a unique or PK constraint must appear in the OB clause
-        //   - Every column from the table is in the OB clause.
-        verifyStmtFails(client, "DELETE FROM P1 WHERE ID = 1 ORDER by NUM LIMIT 1", "Error! non-deterministic DML");
+        // RATIO is not unique.
+        verifyStmtFails(client,
+                "DELETE FROM P1 WHERE ID = 1 ORDER BY RATIO LIMIT 1",
+                "statement manipulates data in a non-deterministic way");
+
+        // Table P4 has a two-column unique constraint on RATIO and NUM
+        // Ordering by only one column in a two column unique constraint should
+        // fail, but both should work.
+        verifyStmtFails(client,
+                "DELETE FROM P4 WHERE ID = 1 ORDER BY RATIO LIMIT 1",
+                "statement manipulates data in a non-deterministic way");
+        verifyStmtFails(client,
+                "DELETE FROM P4 WHERE ID = 1 ORDER BY NUM LIMIT 1",
+                "statement manipulates data in a non-deterministic way");
+
+
+        insertMoreRows(client, "P4", 1, 50);
+        VoltTable vt = client.callProcedure("@AdHoc",
+                "DELETE FROM P4 WHERE ID = 0 ORDER BY RATIO, NUM LIMIT 9")
+                .getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] { 9 });
+
+        // Ordering by all columns should be ok.
+        // P5 has no unique or primary key constraints
+        insertMoreRows(client, "P5", 1, 20);
+        vt = client.callProcedure("@AdHoc",
+                "DELETE FROM P5 WHERE ID = 0 ORDER BY NUM, DESC, ID, RATIO LIMIT 13")
+                .getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] { 13 });
     }
 
     //
@@ -389,7 +450,6 @@ public class TestSqlDeleteSuite extends RegressionSuite {
 
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(Insert.class.getResource("sql-update-ddl.sql"));
-        project.addProcedures(PROCEDURES);
 
         config = new LocalCluster("sqldelete-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         if (!config.compile(project)) fail();

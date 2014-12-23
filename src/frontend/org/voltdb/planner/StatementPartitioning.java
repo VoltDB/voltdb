@@ -535,4 +535,17 @@ public class StatementPartitioning implements Cloneable{
         m_countOfIndependentlyPartitionedTables = m_countOfPartitionedTables;
     }
 
+    
+    public void resetAnalysisState() {
+        m_countOfIndependentlyPartitionedTables = -1;
+        m_countOfPartitionedTables = -1;
+        m_fullColumnName = null;
+        m_inferredExpression.clear();
+        m_inferredParameterIndex = -1;
+        m_inferredValue = null;
+        m_isDML = false;
+        m_joinValid = true;
+        m_partitionColForDML = null;
+    }
+
 }

@@ -67,9 +67,16 @@ public class DeletePlanNode extends AbstractOperationPlanNode {
         }
         return "DELETE " + m_targetTableName;
     }
-
+    
     @Override
     public boolean isOrderDeterministic() {
+        assert(m_children != null);
+        for (AbstractPlanNode child : m_children) {
+            if (! child.isOrderDeterministic()) {
+                m_nondeterminismDetail = child.m_nondeterminismDetail;
+                return false;
+            }
+        }
         return true;
     }
 }

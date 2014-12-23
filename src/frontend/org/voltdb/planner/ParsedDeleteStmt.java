@@ -19,10 +19,16 @@ package org.voltdb.planner;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Table;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
 
@@ -85,18 +91,63 @@ public class ParsedDeleteStmt extends AbstractParsedStmt {
         return Collections.unmodifiableList(m_orderColumns);
     }
 
-    public LimitPlanNode limitPlanNode() {
-        return m_limitPlanNode;
+    @Override
+    public boolean hasLimitOrOffset() {
+        return m_limitPlanNode != null;
     }
 
-    public AbstractPlanNode handleLimit(AbstractPlanNode root) {
-        if (m_limitPlanNode != null) {
-            // XXX fail here if no ORDER BY present
-            assert (m_limitPlanNode.getChildCount() == 0);
-            m_limitPlanNode.addAndLinkChild(root);
-            return m_limitPlanNode;
+    public LimitPlanNode limitPlanNode() {
+        assert(m_limitPlanNode != null);
+        return new LimitPlanNode(m_limitPlanNode);
+    }
+
+    /**
+     * Returns true if the ORDER BY clause on this
+     * statement contains all the columns in the target table.
+     * Used to determine if rows are ordered deterministically.
+     * @return
+     */
+    private boolean orderByCoversAllColumns() {
+        // SELECT statements do a check that is somewhat similar
+        // But we are restricted here to a single table with no
+        // table or column aliases allowed.
+        //
+        // Just build a set of all column names
+
+        // There could be non-trivial expressions in the order by clause
+        Set<String> allCols = new HashSet<>();
+        Table t = m_tableList.get(0);
+        for (Column c : t.getColumns()) {
+            allCols.add(c.getName());
         }
 
-        return root;
+        for (ParsedColInfo col : orderByColumns()) {
+            AbstractExpression e = col.expression;
+            if (!(e instanceof TupleValueExpression)) {
+                continue;
+            }
+            TupleValueExpression tve = (TupleValueExpression)e;
+            allCols.remove(tve.getColumnName());
+        }
+
+        return allCols.isEmpty();
+    }
+
+    @Override
+    public boolean isOrderDeterministic() {
+
+        if (! hasOrderByColumns()) {
+            return false;
+        }
+
+        if (orderByColumnsCoverUniqueKeys()) {
+            return true;
+        }
+
+        if (orderByCoversAllColumns()) {
+            return true;
+        }
+
+        return false;
     }
 }

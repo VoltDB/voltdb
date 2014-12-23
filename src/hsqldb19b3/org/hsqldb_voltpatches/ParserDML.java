@@ -1064,8 +1064,6 @@ public class ParserDML extends ParserDQL {
      *   DELETE FROM tab ORDER BY c LIMIT 1
      * Adds a SortAndSlice object to the statement if the next tokens
      * are ORDER BY, LIMIT or OFFSET.
-     * Also does some guarding against nonsense constructs (e.g.,
-     * limit with no ORDER BY would be non-deterministic).
      * @param deleteStmt
      */
     private void voltAppendDeleteSortAndSlice(StatementDML deleteStmt) {

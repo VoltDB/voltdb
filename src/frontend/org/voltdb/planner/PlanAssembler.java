@@ -348,28 +348,30 @@ public class PlanAssembler {
         // of the question).
         // Subqueries in WHERE clauses of DML will also be relevant here.
 
-        if (plan == null || plan.getReadOnly() || plan.isOrderDeterministic()) {
+        if (plan == null || plan.getReadOnly()) {
             return;
         }
 
-        if (parsedStmt instanceof ParsedInsertStmt) {
+        if (parsedStmt instanceof ParsedInsertStmt  && !plan.isOrderDeterministic()) {
             if (parsedStmt.m_isUpsert) {
                 throw new PlanningErrorException(
-                        "UPSERT statement maniupulates data in a non-deterministic way.  "
+                        "UPSERT statement manipulates data in a non-deterministic way.  "
                         + "Adding an ORDER BY clause to UPSERT INTO ... SELECT may address this issue.");
             }
             else if (plan.hasLimitOrOffset()) {
                 throw new PlanningErrorException(
-                        "INSERT statement maniupulates data in a content non-deterministic way.  "
+                        "INSERT statement manipulates data in a content non-deterministic way.  "
                         + "Adding an ORDER BY clause to INSERT INTO ... SELECT may address this issue.");
             }
         }
 
-        if (parsedStmt instanceof ParsedDeleteStmt) {
-            throw new PlanningErrorException(
-                    "DELETE statement manipulates data in a non-deterministic way.  This may happen "
-                    + "when the DELETE has an ORDER BY clause with a LIMIT, but the order is not "
-                    + "well-defined.");
+        if (parsedStmt instanceof ParsedDeleteStmt
+                && parsedStmt.hasLimitOrOffset()
+                && !parsedStmt.isOrderDeterministic()) {
+                throw new PlanningErrorException(
+                        "DELETE statement manipulates data in a non-deterministic way.  This may happen "
+                                + "when the DELETE has an ORDER BY clause with a LIMIT, but the order is not "
+                                + "well-defined.");
         }
     }
 
@@ -497,6 +499,11 @@ public class PlanAssembler {
         } else if (m_parsedInsert != null) {
             nextStmt = m_parsedInsert;
             retval = getNextInsertPlan();
+        } else if (m_parsedDelete != null) {
+            nextStmt = m_parsedDelete;
+            retval = getNextDeletePlan();
+            // note that for replicated tables, multi-fragment plans
+            // need to divide the result by the number of partitions
         } else {
             //TODO: push CompiledPlan construction into getNextUpdatePlan/getNextDeletePlan
             //
@@ -504,11 +511,6 @@ public class PlanAssembler {
             if (m_parsedUpdate != null) {
                 nextStmt = m_parsedUpdate;
                 retval.rootPlanGraph = getNextUpdatePlan();
-                // note that for replicated tables, multi-fragment plans
-                // need to divide the result by the number of partitions
-            } else if (m_parsedDelete != null) {
-                nextStmt = m_parsedDelete;
-                retval.rootPlanGraph = getNextDeletePlan();
                 // note that for replicated tables, multi-fragment plans
                 // need to divide the result by the number of partitions
             } else {
@@ -898,14 +900,14 @@ public class PlanAssembler {
             return false;
         }
 
-        if (stmt.limitPlanNode() != null) {
+        if (stmt.hasLimitOrOffset()) {
             return false;
         }
 
         return true;
     }
 
-    private AbstractPlanNode getNextDeletePlan() {
+    private CompiledPlan getNextDeletePlan() {
         assert (subAssembler != null);
 
         // figure out which table we're deleting from
@@ -949,10 +951,6 @@ public class PlanAssembler {
             }
 
             boolean needsOrderByNode = isOrderByNodeRequired(m_parsedDelete, subSelectRoot);
-            // Somewhere (after partitioning has been inferred), fail if this is a MP plan
-            // on a partitioned table.
-
-
 
             ProjectionPlanNode projectionNode = new ProjectionPlanNode();
             AbstractExpression addressExpr = new TupleAddressExpression();
@@ -979,10 +977,9 @@ public class PlanAssembler {
                 root = ob;
             }
 
-            LimitPlanNode limitNode = m_parsedDelete.limitPlanNode();
-            if (limitNode != null) {
+            if (m_parsedDelete.hasLimitOrOffset()) {
                 assert(m_parsedDelete.orderByColumns().size() > 0);
-                root.addInlinePlanNode(limitNode);
+                root.addInlinePlanNode(m_parsedDelete.limitPlanNode());
             }
 
             deleteNode.addAndLinkChild(root);
@@ -997,14 +994,24 @@ public class PlanAssembler {
             //subSelectRoot.addInlinePlanNode(projectionNode);
         }
 
+        CompiledPlan plan = new CompiledPlan();
         if (isSinglePartitionPlan) {
-            return deleteNode;
+            plan.rootPlanGraph = deleteNode;
+        }
+        else {
+            // Send the local result counts to the coordinator.
+            AbstractPlanNode recvNode = SubPlanAssembler.addSendReceivePair(deleteNode);
+            // add a sum or a limit and send on top of the union
+            plan.rootPlanGraph = addSumOrLimitAndSendToDMLNode(recvNode, targetTable.getIsreplicated());
         }
 
-        // Send the local result counts to the coordinator.
-        AbstractPlanNode recvNode = SubPlanAssembler.addSendReceivePair(deleteNode);
-        // add a sum or a limit and send on top of the union
-        return addSumOrLimitAndSendToDMLNode(recvNode, targetTable.getIsreplicated());
+        // check non-determinism status
+        plan.setReadOnly(false);
+        boolean orderIsDeterministic = m_parsedDelete.isOrderDeterministic();
+        boolean hasLimitOrOffset = m_parsedDelete.hasLimitOrOffset();
+        plan.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic);
+
+        return plan;
     }
 
     private AbstractPlanNode getNextUpdatePlan() {
