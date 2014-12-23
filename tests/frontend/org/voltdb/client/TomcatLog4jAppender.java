@@ -31,7 +31,7 @@ public class TomcatLog4jAppender {
 
 	private Appender appender;
 
-	// A class to pring out a bunch of messages
+	// A class to print out a bunch of messages
 	static class MessagePritner {
 		public void printMessages() {
 			System.out.println("This is a message");
