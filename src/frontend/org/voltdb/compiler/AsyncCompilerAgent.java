@@ -159,33 +159,31 @@ public class AsyncCompilerAgent {
                     }
                 }
             }
-            // check for conflicting DDL create/drop table statements.
-            if (hasDDL) {
-                if (!conflictTables.isEmpty() && !createdTables.isEmpty()) {
-                    // unhappy if the intersection is empty
-                    conflictTables.retainAll(createdTables);
-                    if (!conflictTables.isEmpty()) {
-                        StringBuilder sb = new StringBuilder();
-                        sb.append("AdHoc DDL contains both DROP and CREATE statements for the following table(s):");
-                        for (String tableName : conflictTables) {
-                            sb.append(" ");
-                            sb.append(tableName);
-                        }
-                        sb.append("\nYou cannot DROP and ADD a table with the same name in a single batch "
-                                + "(via @AdHoc). Issue the DROP and ADD statements as separate commands.");
-                        AsyncCompilerResult errResult =
-                                AsyncCompilerResult.makeErrorResult(w, sb.toString());
-                            w.completionHandler.onCompletion(errResult);
-                            return;
-                    }
-                }
-            }
             if (!hasDDL) {
                 final AsyncCompilerResult result = compileAdHocPlan(w);
                 w.completionHandler.onCompletion(result);
             }
             else {
                 // We have adhoc DDL.  Is it okay to run it?
+
+                // check for conflicting DDL create/drop table statements.
+                // unhappy if the intersection is empty
+                conflictTables.retainAll(createdTables);
+                if (!conflictTables.isEmpty()) {
+                    StringBuilder sb = new StringBuilder();
+                    sb.append("AdHoc DDL contains both DROP and CREATE statements for the following table(s):");
+                    for (String tableName : conflictTables) {
+                        sb.append(" ");
+                        sb.append(tableName);
+                    }
+                    sb.append("\nYou cannot DROP and ADD a table with the same name in a single batch "
+                            + "(via @AdHoc). Issue the DROP and ADD statements as separate commands.");
+                    AsyncCompilerResult errResult =
+                            AsyncCompilerResult.makeErrorResult(w, sb.toString());
+                        w.completionHandler.onCompletion(errResult);
+                        return;
+                }
+
                 // Is it forbidden by the replication role and configured schema change method?
                 // master and UAC method chosen:
                 if (!w.onReplica && !w.useAdhocDDL) {
