@@ -1141,8 +1141,11 @@ public class SQLCommand
     public static Client getClient(ClientConfig config, String[] servers, int port) throws Exception
     {
         final Client client = ClientFactory.createClient(config);
-
+        int ii = 0;
         for (String server : servers) {
+            if (m_debug) {
+                reportElapsedTime("pre-client connect to server (" + server + ") #" + (++ii) + " of " + servers.length);
+            }
             client.createConnection(server.trim(), port);
         }
         return client;
@@ -1486,7 +1489,7 @@ public class SQLCommand
             }
             VoltDB = getClient(config, servers, port);
         } catch (Exception exc) {
-            System.err.println(exc.getMessage());
+            System.err.println(exc.toString());
             System.exit(-1);
         }
 
