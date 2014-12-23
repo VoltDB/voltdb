@@ -443,7 +443,7 @@ var loadPage = function (serverName, portid) {
             showHideGraph(lUserPreferences);
         };
         var loadAdminTabPortAndOverviewDetails = function (portAndOverviewValues) {
-            VoltDbAdminConfig.displayPortAndOverviewDetails(portAndOverviewValues);
+            VoltDbAdminConfig.displayPortAndRefreshClusterState(portAndOverviewValues);
         };
 
         var loadAdminServerList = function (serverList) {

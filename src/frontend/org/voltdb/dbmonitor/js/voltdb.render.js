@@ -315,6 +315,18 @@ function alertNodeClicked(obj) {
             });
         };
 
+        this.GetClusterInformation = function (onInformationLoaded) {
+            var clusterDetails = {};
+            var clusterState = {};
+            VoltDBService.GetClusterInformation(function (connection) {
+                if (VoltDbAdminConfig.isAdmin) {
+                    getClusterDetails(connection, clusterDetails, "CLUSTER_INFORMATION");
+                    getClusterState(clusterDetails,clusterState);
+                    onInformationLoaded(clusterState);
+                }
+            });
+        };
+
         this.CheckAdminPriviledges = function (onInformationLoaded) {
 
             VoltDBService.GetShortApiProfile(function (connection) {
@@ -529,7 +541,6 @@ function alertNodeClicked(obj) {
             var adminConfigValues = {};
             if (connection != null && connection.Metadata['SHORTAPI_DEPLOYMENT'] != null) {
                 var data = connection.Metadata['SHORTAPI_DEPLOYMENT'];
-      
                 //The user does not have permission to view admin details.
                 if (data.status == -3) {
                     adminConfigValues.VMCNoPermission = true;
@@ -1741,6 +1752,37 @@ function alertNodeClicked(obj) {
             });
         };
 
+        var getClusterDetails = function(connection, clusterDetails, processName) {
+            var suffix = "";
+            suffix = "_" + processName;
+            
+            connection.Metadata['@SystemInformation_OVERVIEW' + suffix].data.forEach(function (info) {
+                var singleData = info;
+                var id = singleData[0];
+
+                if (!clusterDetails.hasOwnProperty(id)) {
+                    clusterDetails[id] = {};
+                }
+                if ($.inArray('CLUSTERSTATE', info) > 0) {
+                    clusterDetails[id][singleData[1]] = singleData[2];
+                } else if ($.inArray('HOSTNAME', info) > 0) {
+                    clusterDetails[id][singleData[1]] = singleData[2];
+                }
+            });
+        };
+
+        var getClusterState = function(clusterDetails,clusterState) {
+            var currentServer = getCurrentServer();
+            $.each(clusterDetails, function (key, val) {
+                if (val["HOSTNAME"] == currentServer) {
+                    if (!clusterState.hasOwnProperty('CLUSTERSTATE')) {
+                        clusterState['CLUSTERSTATE'] = {};
+                    }
+                    clusterState['CLUSTERSTATE'] = val["CLUSTERSTATE"];
+                }
+            });
+        };
+
         var getTransactionDetails = function (connection, sysTransaction) {
             var colIndex = {};
             var counter = 0;
@@ -1795,6 +1837,7 @@ function alertNodeClicked(obj) {
                     portConfigValues['internalPort'] = val["INTERNALPORT"];
                     portConfigValues['zookeeperPort'] = val["ZKPORT"];
                     portConfigValues['replicationPort'] = val["DRPORT"];
+                    portConfigValues['clusterState'] = val["CLUSTERSTATE"];
                     return false;
                 }
                 return true;
@@ -1915,6 +1958,22 @@ function alertNodeClicked(obj) {
             VoltDBService.stopServerNode(nodeId, function (connection, status) {
                 if (status == 1) {
                     onServerStopped(true);
+                }
+            });
+        };
+
+        this.pauseCluster = function(onServerPaused) {
+            VoltDBService.PauseClusterState(function(connection, status) {
+                if (status == 1) {
+                    onServerPaused(true);
+                }
+            });
+        };
+
+        this.resumeCluster = function (onServerResumed) {
+            VoltDBService.ResumeClusterState(function (connection, status) {
+                if (status == 1) {
+                    onServerResumed(true);
                 }
             });
         };

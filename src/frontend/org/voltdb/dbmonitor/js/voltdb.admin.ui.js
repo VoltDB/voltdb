@@ -1,7 +1,12 @@
 ﻿var adminDOMObjects = {};
 var adminEditObjects = {};
+var adminClusterObjects = {};
 
 function loadAdminPage() {
+    adminClusterObjects = {
+        btnClusterPause: $('#pauseConfirmation'),
+        btnClusterResume: $('#resumeConfirmation')
+    };
 
     adminDOMObjects = {
         siteNumberHeader: $("#sitePerHost"),
@@ -176,10 +181,26 @@ function loadAdminPage() {
 
             $("#btnPauseConfirmationOk").unbind("click");
             $("#btnPauseConfirmationOk").on("click", function () {
+                $("#overlay").show();
+                voltDbRenderer.GetClusterInformation(function(clusterState) {
+                    if (clusterState.CLUSTERSTATE.toLowerCase() == 'paused') {
+                        alert("The cluster is already in paused state.");
+                        $("#pauseConfirmation").hide();
+                        $("#resumeConfirmation").show();
+                    } else {
+                        voltDbRenderer.pauseCluster(function (success) {
+                            if (success) {
+                                $("#pauseConfirmation").hide();
+                                $("#resumeConfirmation").show();
+                            } else {
+                                alert("Unable to pause cluster.");
+                            }
+                            $("#overlay").hide();
+                        });
 
-                $("#pauseConfirmation").hide();
-                $("#resumeConfirmation").show();
-
+                    }
+                });
+                
                 //Close the popup
                 $($(this).siblings()[0]).trigger("click");                
 
@@ -194,10 +215,24 @@ function loadAdminPage() {
 
             $("#btnResumeConfirmationOk").unbind("click");
             $("#btnResumeConfirmationOk").on("click", function () {
-
-                $("#resumeConfirmation").hide();
-                $("#pauseConfirmation").show();
-
+                $("#overlay").show();
+                voltDbRenderer.GetClusterInformation(function (clusterState) {
+                    if (clusterState.CLUSTERSTATE.toLowerCase() == 'running') {
+                        alert("The cluster is already in running state.");
+                        $("#resumeConfirmation").hide();
+                        $("#pauseConfirmation").show();
+                    } else {
+                        voltDbRenderer.resumeCluster(function (success) {
+                            if (success) {
+                                $("#resumeConfirmation").hide();
+                                $("#pauseConfirmation").show();
+                            } else {
+                                alert("Unable to resume the cluster.");
+                            }
+                            $("#overlay").hide();
+                        });
+                    }
+                });
                 //Close the popup
                 $($(this).siblings()[0]).trigger("click");
             });
@@ -584,9 +619,10 @@ function loadAdminPage() {
             }
         };
 
-        this.displayPortAndOverviewDetails = function (portAndOverviewValues) {
-            if (portAndOverviewValues != undefined && VoltDbAdminConfig.isAdmin) {
-                configurePortAndOverviewValues(portAndOverviewValues);
+        this.displayPortAndRefreshClusterState = function (portAndClusterValues) {
+            if (portAndClusterValues != undefined && VoltDbAdminConfig.isAdmin) {
+                configurePortAndOverviewValues(portAndClusterValues);
+                refreshClusterValues(portAndClusterValues);
             }
         };
 
@@ -728,6 +764,18 @@ function loadAdminPage() {
 
             adminDOMObjects.maxJavaHeap.text(configValues.maxJavaHeap != "" ? parseFloat(configValues.maxJavaHeap/1024) : "");
             adminDOMObjects.maxJavaHeapLabel.text(configValues.maxJavaHeap != "" && configValues.maxJavaHeap != undefined ? "MB" : "");
+        };
+
+        var refreshClusterValues = function (clusterValues) {
+            if (clusterValues != undefined) {
+                if (clusterValues.clusterState.toLowerCase() == "running") {
+                    adminClusterObjects.btnClusterPause.show();
+                    adminClusterObjects.btnClusterResume.hide();
+                } else if (clusterValues.clusterState.toLowerCase() == "paused") {
+                    adminClusterObjects.btnClusterPause.hide();
+                    adminClusterObjects.btnClusterResume.show();
+                }
+            }
         };
 
         var configureDirectoryValues = function (directoryConfigValues) {

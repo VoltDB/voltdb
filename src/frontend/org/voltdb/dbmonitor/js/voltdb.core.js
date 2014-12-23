@@ -29,9 +29,24 @@
                 return (new iQueue(this));
             };
 
+            this.BuildParamSetForClusterState = function(procedure) {
+                var credentials = [];
+                credentials[credentials.length]=encodeURIComponent('Procedure') + '=' + encodeURIComponent(procedure);
+                if (this.user != null)
+                    credentials[credentials.length] = encodeURIComponent('User') + '=' + encodeURIComponent(this.user);
+                if (this.password != null)
+                    credentials[credentials.length] = encodeURIComponent('Password') + '=' + encodeURIComponent(this.password);
+                if (this.isHashedPassword != null)
+                    credentials[credentials.length] = encodeURIComponent('Hashedpassword') + '=' + encodeURIComponent(this.isHashedPassword);
+                if (this.admin)
+                    credentials[credentials.length] = 'admin=true';
+
+                var param = credentials.join('&') + '&jsonp=?';
+                return param;
+            };
+
             this.BuildParamSet = function (procedure, parameters, shortApiCallDetails) {
                 var s = [];
-
                 if (!(shortApiCallDetails != null && shortApiCallDetails != null)) {
                     if (!this.procedures.hasOwnProperty(procedure)) {
                         return ['Procedure "' + procedure + '" is undefined.'];
@@ -125,8 +140,12 @@
                 } else {
                     uri = 'http://' + this.server + ':' + this.port + '/api/1.0/';
                 }
-
-                var params = this.BuildParamSet(procedure, parameters, shortApiCallDetails);
+                var params = '';
+                if (procedure == '@Pause' || procedure == '@Resume') {
+                    params = this.BuildParamSetForClusterState(procedure);
+                } else {
+                    params = this.BuildParamSet(procedure, parameters, shortApiCallDetails);
+                }
                 if (typeof (params) == 'string') {
                     if (VoltDBCore.isServerConnected) {
                         var ah = null;
@@ -151,8 +170,12 @@
                 } else {
                     uri = 'http://' + this.server + ':' + this.port + '/api/1.0/';
                 }
-
-                var params = this.BuildParamSet(procedure, parameters, shortApiCallDetails);
+                var params = '';
+                if (procedure == '@Pause' || procedure == '@Resume') {
+                    params = this.BuildParamSetForClusterState(procedure);
+                } else {
+                    params = this.BuildParamSet(procedure, parameters, shortApiCallDetails);
+                }
                 if (typeof (params) == 'string') {
                     if (VoltDBCore.isServerConnected) {
                         var ah = null;
@@ -463,11 +486,13 @@
             } else {
                 jQuery.each(connection.procedureCommands.procedures, function (id, procedure) {
                     connectionQueue.BeginExecute(procedure['procedure'], (procedure['value'] === undefined ? procedure['parameter'] : [procedure['parameter'], procedure['value']]), function (data) {
-                        var suffix = (processName == "GRAPH_MEMORY" || processName == "GRAPH_TRANSACTION") || processName == "TABLE_INFORMATION" ? "_" + processName : "";
-                        if (processName == "SYSTEMINFORMATION_STOPSERVER")
+                        var suffix = (processName == "GRAPH_MEMORY" || processName == "GRAPH_TRANSACTION") || processName == "TABLE_INFORMATION" || processName == "CLUSTER_INFORMATION" ? "_" + processName : "";
+                        if (processName == "SYSTEMINFORMATION_STOPSERVER" )
                             connection.Metadata[procedure['procedure'] + "_" + procedure['parameter'] + suffix + "_status"] = data.status;
-
-                        connection.Metadata[procedure['procedure'] + "_" + procedure['parameter'] + suffix] = data.results[0];
+                        else if (processName == "SYSTEMINFORMATION_PAUSECLUSTER" || processName == "SYSTEMINFORMATION_RESUMECLUSTER")
+                            connection.Metadata[procedure['procedure'] + "_" + "status"] = data.status;
+                        else
+                            connection.Metadata[procedure['procedure'] + "_" + procedure['parameter'] + suffix] = data.results[0];
                     });
                 });
             }
