@@ -497,6 +497,29 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         validateTableOfScalarLongs(vt, new long[] {5, 6, 8});
     }
 
+    // DELETE .. LIMIT <n> is intended to support the row limit trigger
+    // so let's test it here.
+    public void testLimitPartitionRowsDeleteWithLimit() throws Exception {
+        if (isHSQL())
+            return;
+
+        Client client = getClient();
+
+        VoltTable vt;
+        for (int i = 0; i < 50; ++i) {
+            vt = client.callProcedure("@AdHoc",
+                    "INSERT INTO events_capped VALUES (NOW, " + i + ")")
+                    .getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {1});
+        }
+
+        // Should have the most recent 5 rows.
+        vt = client.callProcedure("@AdHoc",
+                "select info from events_capped order by when_occurred asc")
+                .getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {45, 46, 47, 48, 49});
+    }
+
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
