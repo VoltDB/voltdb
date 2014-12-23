@@ -135,11 +135,9 @@ public class HTTPClientInterface {
                 return;
             }
 
-            String admin = request.getParameter(PARAM_ADMIN);
-            authResult = getAuthenticationResult(request, admin);
+            authResult = authenticate(request);
             if (!authResult.isAuthenticated()) {
                 String msg = authResult.m_message;
-                m_rate_limited_log.log("JSON interface exception: " + msg, EstTime.currentTimeMillis());
                 ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg);
                 msg = rimpl.toJSONString();
                 if (jsonp != null) {
@@ -199,25 +197,11 @@ public class HTTPClientInterface {
                 continuation.complete();
             } catch (IOException e1) {} // Ignore this as browser must have closed.
         } finally {
-            if (authResult != null && authResult.m_client != null) {
-                assert(m_connections != null);
-                // admin connections aren't cached
-                if (authResult.m_adminMode) {
-                    try {
-                        authResult.m_client.close();
-                    } catch (InterruptedException e) {
-                        m_log.warn("JSON interface was interrupted while closing an internal admin client connection.");
-                    }
-                }
-                // other connections are cached
-                else {
-                    m_connections.releaseClient(authResult.m_client);
-                }
-            }
+            releaseClient(authResult);
         }
     }
 
-    public AuthenticationResult getAuthenticationResult(Request request, String admin) {
+    private AuthenticationResult getAuthenticationResult(Request request) {
         boolean adminMode = false;
 
         String username = null;
@@ -252,6 +236,7 @@ public class HTTPClientInterface {
             hashedPassword = request.getParameter(PARAM_HASHEDPASSWORD);
             password = request.getParameter(PARAM_PASSWORD);
         }
+        String admin = request.getParameter(PARAM_ADMIN);
 
         // first check for a catalog update and purge the cached connections
         // if one has happened since we were here last
@@ -335,30 +320,30 @@ public class HTTPClientInterface {
         }
     }
 
-    public AuthenticationResult authenticate(Request request, String admin) {
-        AuthenticationResult authResult = null;
+    //Remember to call releaseClient if you authenticate which will close admin clients and refcount-- others.
+    public AuthenticationResult authenticate(Request request) {
+        AuthenticationResult authResult = getAuthenticationResult(request);
+        if (!authResult.isAuthenticated()) {
+            m_rate_limited_log.log("JSON interface exception: " + authResult.m_message, EstTime.currentTimeMillis());
+        }
+        return authResult;
+    }
 
-        try {
-            authResult = getAuthenticationResult(request, admin);
-            if (!authResult.isAuthenticated()) {
-                m_rate_limited_log.log("JSON interface exception: " + authResult.m_message, EstTime.currentTimeMillis());
+    //Must be called by all who call authenticate.
+    public void releaseClient(AuthenticationResult authResult) {
+        if (authResult != null && authResult.m_client != null) {
+            assert(m_connections != null);
+            // admin connections aren't cached
+            if (authResult.m_adminMode) {
+                try {
+                    authResult.m_client.close();
+                } catch (InterruptedException e) {
+                    m_log.warn("JSON interface was interrupted while closing an internal admin client connection.");
+                }
             }
-            return authResult;
-        } finally {
-            if (authResult != null && authResult.m_client != null) {
-                assert(m_connections != null);
-                // admin connections aren't cached
-                if (authResult.m_adminMode) {
-                    try {
-                        authResult.m_client.close();
-                    } catch (InterruptedException e) {
-                        m_log.warn("JSON interface was interrupted while closing an internal admin client connection.");
-                    }
-                }
-                // other connections are cached
-                else {
-                    m_connections.releaseClient(authResult.m_client);
-                }
+            // other connections are cached
+            else {
+                m_connections.releaseClient(authResult.m_client);
             }
         }
     }
