@@ -382,7 +382,7 @@ public class SQLCommand
     private static final Pattern SemicolonToken = Pattern.compile("^.*\\s*;+\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern RecallToken = Pattern.compile("^\\s*recall\\s*([^;]+)\\s*;*\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern FileToken = Pattern.compile("^\\s*file\\s*['\"]*([^;'\"]+)['\"]*\\s*;*\\s*", Pattern.CASE_INSENSITIVE);
-    private static List<String> Lines = new ArrayList<String>();
+    private static List<String> RecallableSessionLines = new ArrayList<String>();
 
     /**
      * The list of recognized basic tab-complete-able SQL command prefixes.
@@ -440,22 +440,19 @@ public class SQLCommand
         StringBuilder query = new StringBuilder();
         boolean isRecall = false;
 
-        while (true) {
-            String prompt = isRecall ? "" : ((Lines.size() + 1) + "> ");
+        boolean executeImmediate = false;
+        while ( ! executeImmediate) {
+            String prompt = isRecall ? "" : ((RecallableSessionLines.size() + 1) + "> ");
             isRecall = false;
             String line = lineInputReader.readLine(prompt);
 
-            if (line == null) {
-                //* enable to debug */ System.err.println("Read null interactive line.");
-                parsedQueries = parseQuery(query.toString());
-                return parsedQueries;
-            }
+            assert(line != null);
 
             // Was there a line-ending semicolon typed at the prompt?
             // This mostly matters for "non-directive" statements, but, for
             // now, for backward compatibility, it needs to be noted for FILE
             // commands prior to their processing.
-            boolean executeImmediate = SemicolonToken.matcher(line).matches();
+            executeImmediate = SemicolonToken.matcher(line).matches();
 
             // When we are tracking the progress of a multi-line statement,
             // avoid coincidentally recognizing mid-statement SQL content as sqlcmd
@@ -472,23 +469,25 @@ public class SQLCommand
                 if (recallMatcher.matches()) {
                     int recall = -1;
                     try { recall = Integer.parseInt(recallMatcher.group(1))-1; } catch(Exception x){}
-                    if (recall > -1 && recall < Lines.size()) {
-                        line = Lines.get(recall);
+                    if (recall > -1 && recall < RecallableSessionLines.size()) {
+                        line = RecallableSessionLines.get(recall);
                         lineInputReader.putString(line);
                         lineInputReader.flush();
                         isRecall = true;
                     } else {
-                        System.out.printf("%s> Invalid RECALL reference: '" + recallMatcher.group(1) + "'.\n", Lines.size());
+                        System.out.printf("%s> Invalid RECALL reference: '" + recallMatcher.group(1) + "'.\n", RecallableSessionLines.size());
                     }
+                    executeImmediate = false; // let user edit the recalled line.
                     continue;
                 }
 
                 // Queue up the line to the recall stack
                 //TODO: In the future, we may not want to have simple directives count as recallable
                 // lines, so this call would move down a ways.
-                Lines.add(line);
+                RecallableSessionLines.add(line);
 
                 if (executesAsSimpleDirective(line)) {
+                    executeImmediate = false; // return to prompt.
                     continue;
                 }
 
@@ -496,6 +495,7 @@ public class SQLCommand
                 //TODO: to be deprecated in favor of just typing a semicolon on its own line to finalize
                 // a multi-line statement.
                 if (GoToken.matcher(line).matches()) {
+                    executeImmediate = true;
                     line = ";";
                 }
 
@@ -510,11 +510,11 @@ public class SQLCommand
                     if (m_returningToPromptAfterError) {
                         // readScriptFile stopped because of an error. Wipe the slate clean.
                         query = new StringBuilder();
-                        line = null;
                         // Until we execute statements as they are read, there will always be a
                         // chance that errors in queued statements are still waiting to be detected,
                         // so, this reset is not 100% effective (as discovered in ENG-7335).
                         m_returningToPromptAfterError = false;
+                        executeImmediate = false; // return to prompt.
                         continue;
                     }
                     // else treat the line(s) from the file(s) as regular database commands
@@ -529,23 +529,18 @@ public class SQLCommand
                 // very pretty for very long statements, behaved best for line editing (cursor synch)
                 // purposes.
                 // The multiLineStatementBuffer MAY become useful here.
-                Lines.add(line);
+                RecallableSessionLines.add(line);
             }
+
+            //TODO: Here's where we might use multiLineStatementBuffer to note a sql statement
+            // in progress -- if the line(s) so far contained anything more than whitespace.
 
             // Collect lines ...
             query.append(line);
             query.append("\n");
-
-            // ... until there was a line-ending semicolon typed at the prompt.
-            if (executeImmediate) {
-                parsedQueries = parseQuery(query.toString());
-                return parsedQueries;
-            }
-            else {
-                //TODO: Here's where we might use multiLineStatementBuffer to note a sql statement
-                // in progress -- if the line(s) so far contained anything more than whitespace.
-            }
         }
+        parsedQueries = parseQuery(query.toString());
+        return parsedQueries;
     }
 
     /// A stripped down variant of the processing in "interactWithTheUser" suitable for

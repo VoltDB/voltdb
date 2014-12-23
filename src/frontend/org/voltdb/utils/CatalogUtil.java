@@ -787,8 +787,8 @@ public abstract class CatalogUtil {
             }
             else
             {
-                // default to 10 seconds
-                catCluster.setHeartbeattimeout(10);
+                // default to 90 seconds
+                catCluster.setHeartbeattimeout(org.voltcore.common.Constants.DEFAULT_HEARTBEAT_TIMEOUT_SECONDS);
             }
 
             // copy schema modification behavior from xml to catalog
@@ -1478,6 +1478,15 @@ public abstract class CatalogUtil {
         }
     }
 
+    /**
+     * Retrieve the catalog and deployment configuration from zookeeper.
+     * NOTE: In general, people who want the catalog and/or deployment should
+     * be getting it from the current CatalogContext, available from
+     * VoltDB.instance().  This is primarily for startup and for use by
+     * @UpdateApplicationCatalog.  If you think this is where you need to
+     * be getting catalog or deployment from, consider carefully if that's
+     * really what you want to do. --izzy 12/8/2014
+     */
     public static CatalogAndIds getCatalogFromZK(ZooKeeper zk) throws KeeperException, InterruptedException {
         ByteBuffer versionAndBytes =
                 ByteBuffer.wrap(zk.getData(VoltZK.catalogbytes, false, null));

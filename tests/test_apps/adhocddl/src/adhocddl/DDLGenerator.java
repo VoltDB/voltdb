@@ -115,7 +115,7 @@ public class DDLGenerator
      */
     public String DropTable(int tableNo, String prefix)
     {
-        return "DROP TABLE " + prefix + tableNo + ";";
+        return "DROP TABLE " + prefix + tableNo + " IF EXISTS;";
     }
 
     /**
@@ -141,6 +141,6 @@ public class DDLGenerator
     public String DropProcedure(int procNo, int tableNo, String prefix)
     {
         String tableName = prefix + tableNo;
-        return "Drop PROCEDURE P" + procNo + "on" + tableName + ";";
+        return "Drop PROCEDURE P" + procNo + "on" + tableName + " IF EXISTS;";
     }
 }
