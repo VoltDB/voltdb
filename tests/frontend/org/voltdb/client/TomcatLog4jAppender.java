@@ -23,15 +23,40 @@
 
 package org.voltdb.client;
 
-import static org.junit.Assert.fail;
-
+import org.apache.log4j.Appender;
+import org.apache.log4j.Logger;
 import org.junit.Test;
 
 public class TomcatLog4jAppender {
 
+	private Appender appender;
+
+	// A class to pring out a bunch of messages
+	static class MessagePritner {
+		public void printMessages() {
+			System.out.println("This is a message");
+			System.out.println("This is another message");
+		}
+	}
+
 	@Test
 	public void test() {
-		fail("Not yet implemented");
+		// Create an object to print stuff
+		MessagePritner printer = new MessagePritner();
+
+		// Create the custom appender
+		appender = (Appender) new TomcatLog4jAppender();
+
+		// Add it to a logger
+		Logger log = Logger.getLogger(printer.getClass());
+
+		// Log the messages
+		try {
+			printer.printMessages();
+			// TODO: check that volt instance contains string
+		} finally {
+
+		}
 	}
 
 }
