@@ -530,7 +530,6 @@ public abstract class CatalogUtil {
             // Anything that goes wrong anywhere in trying to handle the deployment file
             // should return an error, and let the caller decide what to do (crash or not, for
             // example)
-            e.printStackTrace();
             errmsg = "Error validating deployment configuration: " + e.getMessage();
             hostLog.error(errmsg);
             return errmsg;
@@ -649,7 +648,6 @@ public abstract class CatalogUtil {
             PartitionDetectionType pd = deployment.getPartitionDetection();
             if (pd == null) {
                 pd = new PartitionDetectionType();
-                pd.setEnabled(true);
                 deployment.setPartitionDetection(pd);
             }
             if (pd.getSnapshot() == null) {
@@ -1245,7 +1243,7 @@ public abstract class CatalogUtil {
             voltDbRoot = new VoltFile("voltdbroot");
             if (!voltDbRoot.exists()) {
                 hostLog.info("Creating voltdbroot directory: " + voltDbRoot.getAbsolutePath());
-                if (!voltDbRoot.mkdir()) {
+                if (!voltDbRoot.mkdirs()) {
                     hostLog.fatal("Failed to create voltdbroot directory \"" + voltDbRoot.getAbsolutePath() + "\"");
                 }
             }
@@ -1253,7 +1251,7 @@ public abstract class CatalogUtil {
             voltDbRoot = new VoltFile(paths.getVoltdbroot().getPath());
             if (!voltDbRoot.exists()) {
                 hostLog.info("Creating voltdbroot directory: " + voltDbRoot.getAbsolutePath());
-                if (!voltDbRoot.mkdir()) {
+                if (!voltDbRoot.mkdirs()) {
                     hostLog.fatal("Failed to create voltdbroot directory \"" + voltDbRoot.getAbsolutePath() + "\"");
                 }
             }
