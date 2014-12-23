@@ -479,6 +479,16 @@ function loadAdminPage() {
 
                 adminEditObjects.tBoxHeartbeatTimeoutValue = adminEditObjects.tBoxHeartbeatTimeout.val();
                 adminEditObjects.spanHeartbeatTimeOut.html(adminEditObjects.tBoxHeartbeatTimeoutValue);
+                
+                var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();
+                if (!adminConfigurations.hasOwnProperty("heartbeat")) {
+                    adminConfigurations.heartbeat = {};
+                }
+                
+                adminConfigurations.heartbeat.timeout = adminEditObjects.tBoxHeartbeatTimeoutValue;
+                voltDbRenderer.updateAdminConfiguration(adminConfigurations, function () {
+                    alert("Heartbeat update response received");
+                });
 
                 //Close the popup
                 $($(this).siblings()[0]).trigger("click");
@@ -595,29 +605,31 @@ function loadAdminPage() {
 
 (function (window) {
     var iVoltDbAdminConfig = (function () {
+
+        var currentRawAdminConfigurations;
         this.isAdmin = false;
         this.registeredElements = [];
-        this.idleServers = [];
-        this.runningServers = [];
+        this.servers = [];
+        this.runningServerIds = "";
         
-        this.idleServer = function(hostIdvalue,serverNameValue,serverStateValue) {
+        this.server = function(hostIdvalue,serverNameValue,serverStateValue) {
             this.hostId = hostIdvalue;
             this.serverName = serverNameValue;
             this.serverState = serverStateValue;
         };
         
-        this.runningServer = function (hostIdValue, serverNameValue, serverStateValue) {
-            this.runningHostId = hostIdValue;
-            this.runningServerName = serverNameValue;
-            this.runningServerState = serverStateValue;
-        };
-
-        this.displayAdminConfiguration = function (adminConfigValues) {
+        this.displayAdminConfiguration = function (adminConfigValues, rawConfigValues) {
             if (adminConfigValues != undefined && VoltDbAdminConfig.isAdmin) {
                 configureAdminValues(adminConfigValues);
                 configureDirectoryValues(adminConfigValues);
+                currentRawAdminConfigurations = rawConfigValues;
             }
         };
+
+        this.getLatestRawAdminConfigurations = function () {
+            return currentRawAdminConfigurations;
+        };
+        
 
         this.displayPortAndRefreshClusterState = function (portAndClusterValues) {
             if (portAndClusterValues != undefined && VoltDbAdminConfig.isAdmin) {

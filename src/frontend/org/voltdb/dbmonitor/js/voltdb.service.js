@@ -448,7 +448,7 @@
             }
 
         };
-        
+
         this.GetShortApiProfile = function (onConnectionAdded) {
             try {
                 var processName = "SHORTAPI_PROFILE";
@@ -482,7 +482,7 @@
             }
 
         };
-        
+
         this.GetShortApiDeployment = function (onConnectionAdded) {
             try {
                 var processName = "SHORTAPI_DEPLOYMENT";
@@ -492,6 +492,43 @@
                 var shortApiDetails = {
                     isShortApiCall : true,
                     apiPath : 'deployment'
+                };
+
+                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
+                if (_connection == null) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
+                        if (result == true) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                                onConnectionAdded(connection, status);
+                            }, shortApiDetails);
+                        }
+                    });
+
+                } else {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
+                        onConnectionAdded(connection, status);
+                    }, shortApiDetails);
+
+                }
+
+            } catch (e) {
+                console.log(e.message);
+            }
+
+        };
+
+        //Update admin configuration
+        this.UpdateAdminConfiguration = function (updatedData, onConnectionAdded) {
+            try {
+                var processName = "SHORTAPI_UPDATEDEPLOYMENT";
+                var procedureNames = [];
+                var parameters = [];
+                var values = [];
+                var shortApiDetails = {
+                    isShortApiCall: true,
+                    isUpdateConfiguration: true,
+                    apiPath: 'deployment',
+                    updatedData: 'deployment=' + JSON.stringify(updatedData)
                 };
 
                 _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
@@ -546,7 +583,7 @@
                         break;
 
                 }
-                
+
                 _connection = VoltDBCore.HasConnection(server, port, isAdmin, user, processName);
                 if (_connection == null) {
                     VoltDBCore.TestConnection(server, port, isAdmin, user, password, isHashedPassword, processName, function (result) {
@@ -578,7 +615,7 @@
                 var procedureNames = ['@StopNode'];
                 var parameters = [nodeId.toString()];
                 var values=[undefined];
-               
+
                 _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
                 if (_connection == null) {
                     VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
@@ -589,8 +626,8 @@
                                 if (!(status == "" || status == undefined)) {
                                     onConnectionAdded(connection, status);
                                 }
-                            
-                                
+
+
                             });
                         }
 
