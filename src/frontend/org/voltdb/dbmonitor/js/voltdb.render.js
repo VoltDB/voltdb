@@ -328,7 +328,7 @@ function alertNodeClicked(obj) {
                     var rawData;
                     if (connection != null)
                         rawData = connection.Metadata['SHORTAPI_DEPLOYMENT'];
-                    
+
                     onInformationLoaded(loadAdminDeploymentInformation(connection), rawData);
                 });
             }
@@ -1824,23 +1824,25 @@ function alertNodeClicked(obj) {
 
         var getAdminServerList = function () {
             var htmlServerListHtml = "";
-            var runningServerDetails;
+            var serverDetails;
             var className;
             var currentServerRowClass;
             var currentServerColumnClass;
-            
-            this.setRunningServers = function (hostId, serverInfo) {
+
+            this.setServerDetails = function (hostId, serverInfo) {
                 var count = 0;
-                if ((VoltDbAdminConfig.runningServers != "" || VoltDbAdminConfig.runningServers != null || VoltDbAdminConfig.runningServers != undefined)
-                    && VoltDbAdminConfig.runningServers.length > 0) {
-                    $.each(VoltDbAdminConfig.runningServers, function (id, value) {
+                if ((VoltDbAdminConfig.servers != "" || VoltDbAdminConfig.servers != null || VoltDbAdminConfig.servers != undefined)
+                    && VoltDbAdminConfig.servers.length > 0) {
+                    $.each(VoltDbAdminConfig.servers, function (id, value) {
                         {
-                            if (value.runningServerName != serverInfo['HOSTNAME'] && count == VoltDbAdminConfig.runningServers.length - 1) {
-                                runningServerDetails = new VoltDbAdminConfig.runningServer(hostId, serverInfo['HOSTNAME'], serverInfo['CLUSTERSTATE']);
-                                VoltDbAdminConfig.runningServers.push(runningServerDetails);
+                            if (value.serverName != serverInfo['HOSTNAME'] && count == VoltDbAdminConfig.servers.length - 1) {
+                                serverDetails = new VoltDbAdminConfig.server(hostId, serverInfo['HOSTNAME'],"RUNNING");
+                                VoltDbAdminConfig.servers.push(serverDetails);
 
                             }
-                            else if (value.runningServerName == serverInfo['HOSTNAME']) {
+                            else if (value.serverName == serverInfo['HOSTNAME']) {
+                                value.hostId = hostId;
+                                value.serverState = "RUNNING";
                                 return false;
                             }
                         }
@@ -1848,59 +1850,56 @@ function alertNodeClicked(obj) {
 
                     });
 
+
                 } else {
-                    runningServerDetails = new VoltDbAdminConfig.runningServer(hostId, serverInfo['HOSTNAME'], serverInfo['CLUSTERSTATE']);
-                    VoltDbAdminConfig.runningServers.push(runningServerDetails);
+                    serverDetails = new VoltDbAdminConfig.server(hostId, serverInfo['HOSTNAME'], serverInfo['CLUSTERSTATE']);
+                    VoltDbAdminConfig.servers.push(serverDetails);
 
                 }
             };
 
-            var updateAdminServerList = function (renderedIdleServers) {
-                if ((VoltDbAdminConfig.idleServers != "" || VoltDbAdminConfig.idleServers != null || VoltDbAdminConfig.idleServers != undefined)
-                    && VoltDbAdminConfig.idleServers.length > 0) {
-                    $.each(VoltDbAdminConfig.idleServers, function (id, value) {
-                        if (VoltDbAdminConfig.runningServers.length > 0) {
-                            $.each(VoltDbAdminConfig.runningServers, function (nestId, nestValue) {
-                                if (nestValue.runningServerName == value.serverName && nestValue.runningServerState == 'RUNNING') {
-                                    VoltDbAdminConfig.idleServers.splice(id, 1);
-
-                                } else if (nestValue.runningServerName == value.serverName && value.serverState == 'MISSING') {
-                                    VoltDbAdminConfig.runningServers.splice(nestId, 1);
-                                }
-                            });
-
+            this.updateServers = function (hostId, hostName, serverState) {
+                if ((VoltDbAdminConfig.servers != "" || VoltDbAdminConfig.servers != null || VoltDbAdminConfig.servers != undefined)
+                    && VoltDbAdminConfig.servers.length > 0) {
+                    $.each(VoltDbAdminConfig.servers, function (id, value) {
+                        if (value.serverName == hostName) {
+                            value.hostId = hostId;
+                            value.serverState = serverState;
+                            return false;
                         }
-
                     });
-
                 }
+            };
 
+            var updateAdminServerList = function () {
                 VoltDbAdminConfig.runningServerIds = "";
                 var runningServerCounter = 0;
 
-                $.each(VoltDbAdminConfig.runningServers, function (id, value) {
-                    if (voltDbRenderer.currentHost != value.runningServerName) {
-                        if (runningServerCounter == 0)
-                            VoltDbAdminConfig.runningServerIds = VoltDbAdminConfig.runningServerIds.concat("#stopServer_", value.runningServerName);
-                        else {
-                            VoltDbAdminConfig.runningServerIds = VoltDbAdminConfig.runningServerIds.concat(",","#stopServer_", value.runningServerName);
+                $.each(VoltDbAdminConfig.servers, function (id, value) {
+                    if (voltDbRenderer.currentHost != value.serverName) {
+                        if (value.serverState == "RUNNING") {
+                            if (runningServerCounter == 0)
+                                VoltDbAdminConfig.runningServerIds = VoltDbAdminConfig.runningServerIds.concat("#stopServer_", value.serverName);
+                            else {
+                                VoltDbAdminConfig.runningServerIds = VoltDbAdminConfig.runningServerIds.concat(",", "#stopServer_", value.serverName);
+                            }
+                            runningServerCounter++;
                         }
-                        runningServerCounter++;
 
                     }
-                    
+
                 });
 
-                //$($(this)[0].ele).attr("href", "javascript:void()");
-                if (VoltDbAdminConfig.idleServers.length > 0) {
-                    $.each(VoltDbAdminConfig.idleServers, function (id, value) {                       
-                        htmlServerListHtml = htmlServerListHtml.concat("<tr><td class=\"configLabel\" width=\"85%\"><a href=\"#\">" + value.serverName + "</a></td>" +
-                            "<td align=\"right\"><a href=\"javascript:void(0);\" data-HostId=\"" + id + "\" data-HostName=\"" + value.serverName + "\" class=\"disableServer\"  id=\"stopServer_" + value.serverName + "\ onclick=\"VoltDbUI.openPopup(this);\">" +
-                            "<span class=\"shutdownServer stopDisable\">Stop</span></a></td></tr>");
-                        
+                if (VoltDbAdminConfig.servers.length > 0) {
+                    $.each(VoltDbAdminConfig.servers, function (id, value) {
+                        if (value.serverState == "MISSING") {
+                            htmlServerListHtml = htmlServerListHtml.concat("<tr><td class=\"configLabel\" width=\"85%\"><a href=\"#\">" + value.serverName + "</a></td>" +
+                                "<td align=\"right\"><a href=\"javascript:void(0);\" data-HostId=\"" + id + "\" data-HostName=\"" + value.serverName + "\" class=\"disableServer\"  id=\"stopServer_" + value.serverName + "\ onclick=\"VoltDbUI.openPopup(this);\">" +
+                                "<span class=\"shutdownServer stopDisable\">Stop</span></a></td></tr>");
+                        }
                     });
                 }
-               
+
             };
 
 
@@ -1910,19 +1909,19 @@ function alertNodeClicked(obj) {
                         className = voltDbRenderer.currentHost == val['HOSTNAME'] ? "disableServer" : "shutdown";
                         currentServerRowClass = voltDbRenderer.currentHost == val['HOSTNAME'] ? "activeHost" : "";
                         currentServerColumnClass = voltDbRenderer.currentHost == val['HOSTNAME'] ? "shutdownServer stopDisable" : "shutdownServer";
-                        
+
                         htmlServerListHtml = htmlServerListHtml.concat("<tr class=\"" + currentServerRowClass + "\"><td class=\"configLabel\" width=\"85%\"><a href=\"#\" >" + val['HOSTNAME'] + "</a></td>" +
                             "<td align=\"right\"><a href=\"javascript:void(0);\" data-HostId=\"" + id + "\" data-HostName=\"" + val['HOSTNAME'] + "\" class=\"" + className + "\" id=\"stopServer_" + val['HOSTNAME'] + "\">" +
-                            "<span class=\"" + currentServerColumnClass  + "\">Stop</span></a></td></tr>");
-                        setRunningServers(id, val);
+                            "<span class=\"" + currentServerColumnClass + "\">Stop</span></a></td></tr>");
+                        setServerDetails(id, val);
 
 
                     } else if ((val['HOSTNAME'] != null || val['HOSTNAME'] != "") && val['CLUSTERSTATE'] == 'JOINING') {
                         htmlServerListHtml = htmlServerListHtml.concat("<tr><td class=\"configLabel\" width=\"85%\"><a href=\"#\">" + val['HOSTNAME'] + "</a></td>" +
                             "<td align=\"right\"><a href=\"javascript:void(0);\" class=\"shutdownDisabled\">" +
                             "<span>Stop</span></a></td></tr>");
-
-                    } 
+                        console.log("in joining state");
+                    }
 
                 });
 
@@ -1949,7 +1948,7 @@ function alertNodeClicked(obj) {
                 onInformationLoaded(connection);
             });
         };
-        
+
         this.updateAdminConfiguration = function (updatedData, onInformationLoaded) {
             VoltDBService.UpdateAdminConfiguration(updatedData, function (connection) {
                 onInformationLoaded(connection);

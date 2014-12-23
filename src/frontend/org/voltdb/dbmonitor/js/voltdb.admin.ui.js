@@ -574,22 +574,15 @@ function loadAdminPage() {
         var currentRawAdminConfigurations;
         this.isAdmin = false;
         this.registeredElements = [];
-        this.idleServers = [];
-        this.runningServers = [];
+        this.servers = [];
         this.runningServerIds = "";
         
-        this.idleServer = function(hostIdvalue,serverNameValue,serverStateValue) {
+        this.server = function(hostIdvalue,serverNameValue,serverStateValue) {
             this.hostId = hostIdvalue;
             this.serverName = serverNameValue;
             this.serverState = serverStateValue;
         };
         
-        this.runningServer = function (hostIdValue, serverNameValue, serverStateValue) {
-            this.runningHostId = hostIdValue;            
-            this.runningServerName = serverNameValue;
-            this.runningServerState = serverStateValue;
-        };
-
         this.displayAdminConfiguration = function (adminConfigValues, rawConfigValues) {
             if (adminConfigValues != undefined && VoltDbAdminConfig.isAdmin) {
                 configureAdminValues(adminConfigValues);
