@@ -569,6 +569,7 @@ function alertNodeClicked(obj) {
                     adminConfigValues['snapshotEnabled'] = data.snapshot.enabled;
                     adminConfigValues['frequency'] = data.snapshot.frequency;
                     adminConfigValues['retained'] = data.snapshot.retain;
+                    adminConfigValues['filePrefix'] = data.snapshot.prefix;
                 }
 
                 //Command Logging

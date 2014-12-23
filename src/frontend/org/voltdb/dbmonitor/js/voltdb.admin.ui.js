@@ -21,6 +21,7 @@ function loadAdminPage() {
         jsonAPILabel: $("#txtJsonAPI"),
         autoSnapshot: $("#autoSnapshotIcon"),
         autoSnapshotLabel: $("#txtAutoSnapshot"),
+        filePrefix: $("#prefixSpan"),
         frequency: $("#txtFrequency"),
         frequencyLabel: $("#spanFrequencyUnit"),
         retained: $("#retainedSpan"),
@@ -63,7 +64,6 @@ function loadAdminPage() {
     };
 
     adminEditObjects = {
-
         //Edit Security objects
         btnEditSecurityOk: $("#btnEditSecurityOk"),
         btnEditSecurityCancel: $("#btnEditSecurityCancel"),
@@ -81,6 +81,10 @@ function loadAdminPage() {
         chkAutoSnapshotValue: $("#chkAutoSnapshot").is(":checked"),
         iconAutoSnapshotOption: $("#autoSnapshotIcon"),
         txtAutoSnapshot: $("#txtAutoSnapshot"),
+        //File Prefix objects
+        tBoxFilePrefix: $("#txtPrefix"),
+        tBoxFilePrefixValue: $("#txtPrefix").text(),
+        spanAutoSnapshotFilePrefix: $("#prefixSpan"),
         //Frequency objects
         tBoxAutoSnapshotFreq: $("#txtFrequency"),
         tBoxAutoSnapshotFreqValue: $("#frequencySpan").text(),
@@ -353,6 +357,7 @@ function loadAdminPage() {
 
         adminEditObjects.tBoxAutoSnapshotFreq.val(adminEditObjects.tBoxAutoSnapshotFreqValue);
         adminEditObjects.tBoxAutoSnapshotRetained.val(adminEditObjects.tBoxAutoSnapshotRetainedValue);
+        adminEditObjects.tBoxFilePrefix.val(adminEditObjects.tBoxFilePrefixValue);
         adminEditObjects.ddlAutoSnapshotFreqUnit.val(adminEditObjects.ddlAutoSnapshotFreqUnitValue);
         adminEditObjects.txtAutoSnapshot.text(getOnOffText(adminEditObjects.chkAutoSnapshotValue));
 
@@ -366,9 +371,11 @@ function loadAdminPage() {
             adminEditObjects.tBoxAutoSnapshotFreq.hide();
             adminEditObjects.ddlAutoSnapshotFreqUnit.hide();
             adminEditObjects.tBoxAutoSnapshotRetained.hide();
+            adminEditObjects.tBoxFilePrefix.hide();
             adminEditObjects.spanAutoSnapshotFreq.show();
             adminEditObjects.spanAutoSnapshotFreqUnit.show();
             adminEditObjects.spanAutoSnapshotRetained.show();
+            adminEditObjects.spanAutoSnapshotFilePrefix.show();
         } else {
             adminEditObjects.iconAutoSnapshotOption.hide();
             adminEditObjects.LinkAutoSnapshotEdit.hide();
@@ -379,9 +386,11 @@ function loadAdminPage() {
             adminEditObjects.spanAutoSnapshotFreqUnit.hide();
             adminEditObjects.spanAutoSnapshotFreq.hide();
             adminEditObjects.spanAutoSnapshotRetained.hide();
+            adminEditObjects.spanAutoSnapshotFilePrefix.hide();
             adminEditObjects.tBoxAutoSnapshotFreq.show();
             adminEditObjects.ddlAutoSnapshotFreqUnit.show();
             adminEditObjects.tBoxAutoSnapshotRetained.show();
+            adminEditObjects.tBoxFilePrefix.show();
         }
     };
 
@@ -396,6 +405,12 @@ function loadAdminPage() {
 
             $("#btnSaveSnapshot").unbind("click");
             $("#btnSaveSnapshot").on("click", function () {
+                var regex = new RegExp("^[a-zA-Z0-9_]+$");
+                if (!regex.test(adminEditObjects.tBoxFilePrefix.val())) {
+                    alert("Invalid input characters.");
+                    $($(this).siblings()[0]).trigger("click");
+                    return false;
+                }
 
                 if (adminEditObjects.chkAutoSnapsot.is(':checked')) {
                     adminEditObjects.iconAutoSnapshotOption.removeClass().addClass("onIcon");
@@ -408,10 +423,12 @@ function loadAdminPage() {
                 adminEditObjects.tBoxAutoSnapshotFreqValue = adminEditObjects.tBoxAutoSnapshotFreq.val();
                 adminEditObjects.ddlAutoSnapshotFreqUnitValue = adminEditObjects.ddlAutoSnapshotFreqUnit.val();
                 adminEditObjects.tBoxAutoSnapshotRetainedValue = adminEditObjects.tBoxAutoSnapshotRetained.val();
+                adminEditObjects.tBoxFilePrefixValue = adminEditObjects.tBoxFilePrefix.val();
 
                 adminEditObjects.spanAutoSnapshotFreq.html(adminEditObjects.tBoxAutoSnapshotFreqValue);
                 adminEditObjects.spanAutoSnapshotFreqUnit.html(adminEditObjects.ddlAutoSnapshotFreqUnitValue);
                 adminEditObjects.spanAutoSnapshotRetained.html(adminEditObjects.tBoxAutoSnapshotRetainedValue);
+                adminEditObjects.spanAutoSnapshotFilePrefix.html(adminEditObjects.tBoxFilePrefixValue);
 
                 //Close the popup
                 $($(this).siblings()[0]).trigger("click");
@@ -655,11 +672,13 @@ function loadAdminPage() {
             adminDOMObjects.jsonAPILabel.text(getOnOffText(adminConfigValues.jsonEnabled));
             adminDOMObjects.autoSnapshot.removeClass().addClass(getOnOffClass(adminConfigValues.snapshotEnabled));
             adminDOMObjects.autoSnapshotLabel.text(getOnOffText(adminConfigValues.snapshotEnabled));
+            adminDOMObjects.filePrefix.text(adminConfigValues.filePrefix != "" ? adminConfigValues.filePrefix : "");
             adminDOMObjects.frequency.text(adminConfigValues.frequency != "" ? adminConfigValues.frequency : "");
             adminDOMObjects.frequencyLabel.text(adminConfigValues.frequency != "" ? "Hrs" : "");
             adminDOMObjects.retained.text(adminConfigValues.retained != "" ? adminConfigValues.retained : "");
             adminDOMObjects.retainedLabel.text(adminConfigValues.retained != "" && adminConfigValues.retained != undefined ? "Copies" : "");
             adminEditObjects.tBoxAutoSnapshotRetainedValue = adminConfigValues.retained;
+            adminEditObjects.tBoxFilePrefixValue = adminConfigValues.filePrefix;
             adminDOMObjects.commandLog.removeClass().addClass(getOnOffClass(adminConfigValues.commandLogEnabled));
             adminDOMObjects.commandLogLabel.text(adminConfigValues.commandLogEnabled == true ? 'On' : 'Off');
             adminDOMObjects.commandLogFrequencyTime.text(adminConfigValues.commandLogFrequencyTime != "" ? adminConfigValues.commandLogFrequencyTime : "");
@@ -779,7 +798,7 @@ function loadAdminPage() {
         };
 
         var refreshClusterValues = function (clusterValues) {
-            if (clusterValues != undefined) {
+            if (clusterValues != undefined && clusterValues.length != 0) {
                 if (clusterValues.clusterState.toLowerCase() == "running") {
                     adminClusterObjects.btnClusterPause.show();
                     adminClusterObjects.btnClusterResume.hide();
