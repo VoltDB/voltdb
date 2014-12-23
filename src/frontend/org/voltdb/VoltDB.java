@@ -157,6 +157,8 @@ public class VoltDB {
         public int m_httpPort = Integer.MAX_VALUE;
         public String m_httpPortInterface = "";
 
+        public String m_publicInterface = "";
+
         /** running the enterprise version? */
         public final boolean m_isEnterprise = org.voltdb.utils.MiscUtils.isPro();
 
@@ -335,6 +337,10 @@ public class VoltDB {
                     } else {
                         m_zkInterface = "127.0.0.1:" + portStr.trim();
                     }
+                } else if (arg.equals("publicinterface")) {
+                    m_publicInterface = args[++i].trim();
+                } else if (arg.startsWith("publicinterface ")) {
+                    m_publicInterface = arg.substring("publicinterface ".length()).trim();
                 } else if (arg.equals("externalinterface")) {
                     m_externalInterface = args[++i].trim();
                 }
@@ -464,6 +470,10 @@ public class VoltDB {
                     System.out.flush();
                     System.exit(-1);
                 }
+            }
+
+            if (!m_publicInterface.isEmpty()) {
+                m_httpPortInterface = m_publicInterface;
             }
 
             // If no action is specified, issue an error.
