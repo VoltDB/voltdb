@@ -253,7 +253,7 @@
     <xs:attribute name="frequency" type="xs:string" use="optional" default="10m" />
     <xs:attribute name="retain" type="snapshotRetainType" use="optional" default="1" />
     <xs:attribute name="prefix" type="xs:string" use="optional" default="SNAPSHOTNONCE" />
-    <xs:attribute name="enabled" type="xs:boolean" default="false"/>
+    <xs:attribute name="enabled" type="xs:boolean" default="true"/>
   </xs:complexType>
 
   <!-- <export> -->

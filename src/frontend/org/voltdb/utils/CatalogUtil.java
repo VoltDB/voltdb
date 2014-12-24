@@ -686,6 +686,7 @@ public abstract class CatalogUtil {
             //snapshot
             if (deployment.getSnapshot() == null) {
                 SnapshotType snap = new SnapshotType();
+                snap.setEnabled(false);
                 deployment.setSnapshot(snap);
             }
             //Security
