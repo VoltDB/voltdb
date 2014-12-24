@@ -798,7 +798,7 @@ function loadAdminPage() {
         };
 
         var refreshClusterValues = function (clusterValues) {
-            if (clusterValues != undefined && clusterValues.length != 0) {
+            if (clusterValues != undefined && clusterValues.hasOwnProperty('clusterState')) {
                 if (clusterValues.clusterState.toLowerCase() == "running") {
                     adminClusterObjects.btnClusterPause.show();
                     adminClusterObjects.btnClusterResume.hide();
