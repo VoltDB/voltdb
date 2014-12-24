@@ -87,7 +87,7 @@ public class JDBC4PreparedStatement extends JDBC4Statement implements java.sql.P
     public void addBatch() throws SQLException
     {
         checkClosed();
-        if (this.Query.isOfType(VoltSQL.TYPE_SELECT)) {
+        if (this.Query.isOfType(VoltSQL.TYPE_EXEC,VoltSQL.TYPE_SELECT)) {
             throw SQLError.get(SQLError.ILLEGAL_STATEMENT, this.Query.toSqlString());
         }
         this.addBatch(this.Query.getExecutableQuery(this.parameters));
