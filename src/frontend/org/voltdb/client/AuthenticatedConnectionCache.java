@@ -241,6 +241,8 @@ public class AuthenticatedConnectionCache {
             } catch (InterruptedException ex) {
                 throw new RuntimeException("Unable to close unauthenticated client.", ex);
             }
+            //Clear unauth client. unauth server mostly rolls over on JSON api after catalog update.
+            m_unauthClient = null;
         }
         for (Entry<String, Connection> e : m_connections.entrySet())
         {
