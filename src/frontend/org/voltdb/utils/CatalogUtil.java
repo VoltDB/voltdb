@@ -652,30 +652,31 @@ public abstract class CatalogUtil {
             }
             if (pd.getSnapshot() == null) {
                 PartitionDetectionType.Snapshot sshot = new PartitionDetectionType.Snapshot();
-                sshot.setPrefix("partition_detection");
                 pd.setSnapshot(sshot);
             }
             //admin mode
             if (deployment.getAdminMode() == null) {
                 AdminModeType amode = new AdminModeType();
-                amode.setPort(VoltDB.DEFAULT_ADMIN_PORT);
                 deployment.setAdminMode(amode);
             }
             //heartbeat
             if (deployment.getHeartbeat() == null) {
                 HeartbeatType hb = new HeartbeatType();
-                hb.setTimeout(org.voltcore.common.Constants.DEFAULT_HEARTBEAT_TIMEOUT_SECONDS);
                 deployment.setHeartbeat(hb);
             }
             //httpd
-            if (deployment.getHttpd() == null) {
-                HttpdType httpd = new HttpdType();
-                httpd.setEnabled(false);
+            HttpdType httpd = deployment.getHttpd();
+            if (httpd == null) {
+                httpd = new HttpdType();
+                //-1 means find next port from 8080
                 httpd.setPort(-1);
-                HttpdType.Jsonapi jsonApi = new HttpdType.Jsonapi();
-                jsonApi.setEnabled(false);
-                httpd.setJsonapi(jsonApi);
                 deployment.setHttpd(httpd);
+            }
+            //jsonApi
+            HttpdType.Jsonapi jsonApi = httpd.getJsonapi();
+            if (jsonApi == null) {
+                jsonApi = new HttpdType.Jsonapi();
+                httpd.setJsonapi(jsonApi);
             }
             //replication
             if (deployment.getReplication() == null) {
@@ -685,17 +686,11 @@ public abstract class CatalogUtil {
             //snapshot
             if (deployment.getSnapshot() == null) {
                 SnapshotType snap = new SnapshotType();
-                snap.setFrequency("10m");
-                snap.setPrefix("SNAPSHOTNONCE");
-                snap.setRetain(1);
-                snap.setEnabled(false);
                 deployment.setSnapshot(snap);
             }
             //Security
             if (deployment.getSecurity() == null) {
                 SecurityType sec = new SecurityType();
-                sec.setEnabled(false);
-                sec.setProvider(SecurityProviderString.HASH);
                 deployment.setSecurity(sec);
             }
             //Paths
@@ -707,7 +702,6 @@ public abstract class CatalogUtil {
             PathsType paths = deployment.getPaths();
             if (paths.getVoltdbroot() == null) {
                 PathsType.Voltdbroot root = new PathsType.Voltdbroot();
-                root.setPath("voltdbroot");
                 paths.setVoltdbroot(root);
             }
             //snapshot
@@ -743,8 +737,6 @@ public abstract class CatalogUtil {
                 }
                 CommandLogType cl = new CommandLogType();
                 cl.setEnabled(enabled);
-                cl.setSynchronous(false);
-                cl.setLogsize(1024);
                 Frequency freq = new Frequency();
                 cl.setFrequency(freq);
                 deployment.setCommandlog(cl);

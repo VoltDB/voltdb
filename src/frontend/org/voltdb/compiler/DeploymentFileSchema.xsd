@@ -103,7 +103,7 @@
       <xs:minInclusive value="1"/>
     </xs:restriction>
   </xs:simpleType>
-  
+
   <xs:simpleType name="latencyType">
     <xs:restriction base="xs:int">
       <xs:minInclusive value="0"/>
@@ -175,7 +175,7 @@
       <xs:all>
           <xs:element name="snapshot" minOccurs="0" maxOccurs="1">
              <xs:complexType>
-                 <xs:attribute name="prefix" type="xs:string" use="required"/>
+                 <xs:attribute name="prefix" type="xs:string" use="optional" default="partition_detection" />
              </xs:complexType>
           </xs:element>
       </xs:all>
@@ -184,7 +184,7 @@
 
   <!-- <heartbeat-config> -->
   <xs:complexType name="heartbeatType">
-    <xs:attribute name="timeout" type="timeoutType" use="required"/>
+    <xs:attribute name="timeout" type="timeoutType" use="optional" default="90"/>
   </xs:complexType>
 
   <xs:simpleType name="timeoutType">
@@ -250,10 +250,10 @@
 
   <!-- <snapshot> -->
   <xs:complexType name="snapshotType">
-    <xs:attribute name="frequency" type="xs:string" use="required"/>
-    <xs:attribute name="retain" type="snapshotRetainType" use="required"/>
-    <xs:attribute name="prefix" type="xs:string" use="required"/>
-    <xs:attribute name="enabled" type="xs:boolean" default="true"/>
+    <xs:attribute name="frequency" type="xs:string" use="optional" default="10m" />
+    <xs:attribute name="retain" type="snapshotRetainType" use="optional" default="1" />
+    <xs:attribute name="prefix" type="xs:string" use="optional" default="SNAPSHOTNONCE" />
+    <xs:attribute name="enabled" type="xs:boolean" default="false"/>
   </xs:complexType>
 
   <!-- <export> -->
