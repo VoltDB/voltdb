@@ -26,10 +26,16 @@ package org.voltdb.client;
 import org.apache.log4j.Appender;
 import org.apache.log4j.Logger;
 import org.junit.Test;
+import org.voltdb.ServerThread;
+import org.voltdb.VoltDB;
 
 public class TomcatLog4jAppender {
 
 	private Appender appender;
+
+	private ServerThread m_localServer;
+	private Client m_client;
+
 
 	// A class to print out a bunch of messages
 	static class MessagePritner {
@@ -37,6 +43,41 @@ public class TomcatLog4jAppender {
 			System.out.println("This is a message");
 			System.out.println("This is another message");
 		}
+	}
+
+	// Configure & start a blank volt instance
+	private void startServer() {
+		// Create a configuration
+		VoltDB.Configuration config = new VoltDB.Configuration();
+
+		// Start the server
+		m_localServer = new ServerThread(config);
+        m_localServer.start();
+        m_localServer.waitForInitialization();
+
+	}
+
+	// Start a volt client
+	private void startClient() throws Exception{
+		m_client = ClientFactory.createClient();
+		m_client.createConnection("localhost");
+	}
+
+	// Stop a running volt server
+	private void stopServer() throws Exception{
+		if (m_localServer != null) {
+            m_localServer.shutdown();
+            m_localServer.join();
+            m_localServer = null;
+        }
+	}
+
+	// Stop a running volt client
+	private void stopClient() throws Exception {
+		if (m_client != null) {
+            m_client.close();
+            m_client = null;
+        }
 	}
 
 	@Test
