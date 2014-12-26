@@ -82,22 +82,24 @@ public class TomcatLog4jAppender {
 	}
 
 	@Test
-	public void test() {
-		// Create an object to print stuff
-		MessagePritner printer = new MessagePritner();
-
-		// Create the custom appender
-		appender = new TomcatVoltdbAppender();
-
-		// Add it to a logger
-		Logger log = Logger.getLogger(printer.getClass());
-
-		// Log the messages
+	public void test() throws Exception{
 		try {
-			printer.printMessages();
-			// TODO: check that volt instance contains string
-		} finally {
+			// Initiate volt server & client
+			startServer();
+			startClient();
 
+			// Create an object to print stuff
+			MessagePritner printer = new MessagePritner();
+
+			// Create the custom appender
+			appender = new TomcatVoltdbAppender();
+
+			// Add it to a logger
+			Logger log = Logger.getLogger(printer.getClass());
+		} finally {
+			// We're done, turn off the server
+			stopClient();
+			stopServer();
 		}
 	}
 
