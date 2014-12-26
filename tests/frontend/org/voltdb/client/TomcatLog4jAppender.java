@@ -28,6 +28,7 @@ import org.apache.log4j.Logger;
 import org.junit.Test;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
+import org.voltdb.tomcat.TomcatVoltdbAppender;
 
 public class TomcatLog4jAppender {
 
@@ -86,7 +87,7 @@ public class TomcatLog4jAppender {
 		MessagePritner printer = new MessagePritner();
 
 		// Create the custom appender
-		appender = (Appender) new TomcatLog4jAppender();
+		appender = new TomcatVoltdbAppender();
 
 		// Add it to a logger
 		Logger log = Logger.getLogger(printer.getClass());
