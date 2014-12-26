@@ -535,7 +535,7 @@ public class StatementPartitioning implements Cloneable{
         m_countOfIndependentlyPartitionedTables = m_countOfPartitionedTables;
     }
 
-    
+
     public void resetAnalysisState() {
         m_countOfIndependentlyPartitionedTables = -1;
         m_countOfPartitionedTables = -1;
