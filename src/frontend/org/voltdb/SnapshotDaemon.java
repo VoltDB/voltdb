@@ -259,9 +259,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
          *  Layout of queue:
          *        1 byte of currently active snapshot category
          *        4 byte ordering of pending snapshot categories for round robin processing
-         *        1 byte number of requests the current snapshot is satisfying
-         *        n entries of:
-         *          1 int representing node id that this current snapshot is satisfying
+         *        n bytes of active snapshot data
          */
         private final String m_streamSnapshotPrefix;
         private final String m_indexSnapshotPrefix;
@@ -269,7 +267,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         private final String m_csvSnapshotPrefix;
         private Runnable m_lockGrantedTask = null;
         private Runnable m_queueChanged = null;
-        private ArrayList<Integer> m_coalescedSnapshotRequestNodes = null;
         private SNAPSHOT_TYPE m_activeSnapshot = SNAPSHOT_TYPE.EMPTY;
         private final LinkedHashSet<SNAPSHOT_TYPE> m_pendingSnapshotsQueue = new LinkedHashSet<SNAPSHOT_TYPE>();
         private final LinkedHashSet<SNAPSHOT_TYPE> m_localPendingSnapshots = new LinkedHashSet<SNAPSHOT_TYPE>();
@@ -328,7 +325,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             return Integer.valueOf(nodeNum);
         }
 
-        public void updateNodeData(int nodeId, byte [] nodeData)
+        public void updateActiveNodeData(int nodeId, byte [] nodeData)
                 throws KeeperException, InterruptedException {
             String activePath = getPathFromType(m_activeSnapshot);
             m_zk.setData(getPathFromNodeId(activePath, nodeId), nodeData, -1);
@@ -374,23 +371,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             return m_zk.getData(getPathFromNodeId(snapshotDirPrefix, nodeId), false, null);
         }
 
-        private void recoverCurrentSnapshotNodes() {
-            assert(ownDistributedLock());
-            m_coalescedSnapshotRequestNodes = new ArrayList<Integer>();
-            if (m_activeSnapshot != SNAPSHOT_TYPE.EMPTY) {
-                ByteBuffer currentQueue = getCurrentState();
-                currentQueue.position(currentQueue.position()+m_queueSlots);
-                int nodeCnt = currentQueue.get();
-                for (int ii=0; ii<nodeCnt; ii++) {
-                    m_coalescedSnapshotRequestNodes.add(currentQueue.getInt());
-                }
-            }
-        }
-
-        private ByteBuffer buildProposalFromUpdatedQueue(ByteBuffer inprogressNodeList) {
+        private ByteBuffer buildProposalFromUpdatedQueue(ByteBuffer activeSnapshotdata) {
             assert(ownDistributedLock());
             ByteBuffer newQueue = null;
-            newQueue = ByteBuffer.allocate(1 + m_queueSlots + inprogressNodeList.remaining());
+            newQueue = ByteBuffer.allocate(1 + m_queueSlots + activeSnapshotdata.remaining());
             newQueue.put((byte) m_activeSnapshot.ordinal());   // snapshot in progress
             for (SNAPSHOT_TYPE slot : m_pendingSnapshotsQueue) {
                 newQueue.put((byte) slot.ordinal());
@@ -399,7 +383,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 newQueue.put((byte) SNAPSHOT_TYPE.EMPTY.ordinal());
             }
             // append nodes list in process with current snapshot
-            newQueue.put(inprogressNodeList);
+            newQueue.put(activeSnapshotdata);
             return newQueue;
         }
 
@@ -420,7 +404,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         @Override
         protected void lockRequestCompleted() {
             ByteBuffer newQueue;
-            ByteBuffer nodeList;
+            ByteBuffer activeNodeData;
             boolean queueChanged = false;
             for (SNAPSHOT_TYPE snapshotReq : m_localPendingSnapshots) {
                 if (snapshotReq == SNAPSHOT_TYPE.FILE && m_pendingSnapshotsQueue.contains(SNAPSHOT_TYPE.LOG)) {
@@ -455,9 +439,9 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             }
 
             if (queueChanged) {
-                nodeList = getCurrentState();
-                nodeList.position(nodeList.position()+m_queueSlots+1);
-                newQueue = buildProposalFromUpdatedQueue(nodeList);
+                activeNodeData = getCurrentState();
+                activeNodeData.position(activeNodeData.position()+m_queueSlots+1);
+                newQueue = buildProposalFromUpdatedQueue(activeNodeData);
                 newQueue.flip();
                 proposeStateChange(newQueue);
             }
@@ -497,9 +481,9 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                         m_pendingSnapshotsQueue.remove(SNAPSHOT_TYPE.FILE);
                     }
                     m_pendingSnapshotsQueue.add(reqType);
-                    ByteBuffer nodeList = getCurrentState();
-                    nodeList.position(nodeList.position()+m_queueSlots+1);
-                    ByteBuffer newQueue = buildProposalFromUpdatedQueue(nodeList);
+                    ByteBuffer activeNodeData = getCurrentState();
+                    activeNodeData.position(activeNodeData.position()+m_queueSlots+1);
+                    ByteBuffer newQueue = buildProposalFromUpdatedQueue(activeNodeData);
                     proposeStateChange(newQueue);
                 }
             }
@@ -558,28 +542,21 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             return ImmutableSortedMap.copyOf(results);
         }
 
-        public void removeSnapshotNodeList(List<Integer> satisfyingNodes, boolean clearActive) {
+        public void removeActiveSnapshotNodeList(List<Integer> satisfyingNodes) {
             String activePath = getPathFromType(m_activeSnapshot);
             for (Integer nodeId : satisfyingNodes) {
                 deleteSnapshotNode(activePath, nodeId);
             }
-            if (clearActive) {
-                proposeStateChange(ByteBuffer.wrap(m_startQueue));
-            }
         }
 
-        public void initiateNewSnapshot(SNAPSHOT_TYPE type, boolean satisfiesAllNodes, List<Integer> satisfyingNodes) {
+        public void initiateNewSnapshot(SNAPSHOT_TYPE type, boolean satisfiesAllNodes, ByteBuffer activeSnapshotData) {
             m_pendingSnapshotsQueue.remove(type);
             if (!satisfiesAllNodes) {
                 // re-queue at the tail
                 m_pendingSnapshotsQueue.add(type);
             }
             m_activeSnapshot = type;
-            ByteBuffer nodeList = ByteBuffer.allocate(satisfyingNodes.size()*4);
-            for (Integer requestNodeId : satisfyingNodes) {
-                nodeList.putInt(requestNodeId);
-            }
-            ByteBuffer newQueue = buildProposalFromUpdatedQueue(nodeList);
+            ByteBuffer newQueue = buildProposalFromUpdatedQueue(activeSnapshotData);
             proposeStateChange(newQueue);
         }
 
@@ -595,7 +572,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     static int m_periodicWorkInterval = 2000;
     public static volatile int m_userSnapshotRetryInterval = 30;
 
-    private Runnable m_onQueueChange = new Runnable() {
+    private final Runnable m_onQueueChange = new Runnable() {
         @Override
         public void run() {
             m_es.submit(new SusceptibleRunnable() {
@@ -607,7 +584,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         }
     };
 
-    private Runnable m_onQueueLockGrant = new SusceptibleRunnable() {
+    private final Runnable m_onQueueLockGrant = new SusceptibleRunnable() {
 
         @Override
         public void susceptibleRun() throws Exception {
