@@ -47,8 +47,6 @@ import javax.xml.bind.Unmarshaller;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
-import com.google_voltpatches.common.collect.Maps;
-import com.google_voltpatches.common.collect.Sets;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -116,6 +114,8 @@ import org.voltdb.types.ConstraintType;
 import org.xml.sax.SAXException;
 
 import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Sets;
 
 /**
  *
@@ -1255,9 +1255,18 @@ public abstract class CatalogUtil {
         if (dr != null) {
             Cluster cluster = catalog.getClusters().get("cluster");
             String drSource = dr.getConnection().getSource();
+            cluster.setDrproducerenabled(dr.isListen());
+            cluster.setDrclusterid(dr.getId());
+            cluster.setDrproducerport(dr.getPort());
             if (dr.getConnection().isEnabled()) {
-                cluster.setDrmasterhost(drSource);
-                hostLog.info("Configured connection for DR replica role to host " + drSource);
+                if (dr.isListen()) {
+                    hostLog.error("DR Active-Active or Daisy-Chain clusters are unsupported." +
+                            " Disabling DR Consumer service until DR Listen is disabled.");
+                }
+                else {
+                    cluster.setDrmasterhost(drSource);
+                    hostLog.info("Configured connection for DR replica role to host " + drSource);
+                }
             } else {
                 hostLog.info("DR data source " + drSource + " disabled for DR replica role. " +
                         "Starting cluster as replica will be disabled.");

@@ -29,6 +29,8 @@ import java.util.TreeMap;
 
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.CatalogType;
+import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.CatalogChangeGroup.FieldChange;
 import org.voltdb.catalog.CatalogChangeGroup.TypeChanges;
 import org.voltdb.expressions.AbstractExpression;
@@ -584,8 +586,26 @@ public class CatalogDiffEngine {
             return null;
         if (suspect instanceof Cluster && field.equals("heartbeatTimeout"))
             return null;
-        if (suspect instanceof Cluster && field.equals("drMasterHost"))
+        if (suspect instanceof Cluster && field.equals("drProducerEnabled"))
             return null;
+        if (suspect instanceof Cluster && field.equals("drClusterId") || 
+                suspect instanceof Cluster && field.equals("drProducerPort")) {
+            // Don't allow changes to ClusterId or ProducerPort while not transitioning to or from Disabled
+            if ((Boolean)prevType.getField("drProducerEnabled") && (Boolean)suspect.getField("drProducerEnabled")) {
+                restrictionQualifier = " while DR is enabled";
+            }
+            else {
+                return null;
+            }
+        }
+        if (suspect instanceof Cluster && field.equals("drMasterHost")) {
+            if ((Boolean)suspect.getField("drProducerEnabled")) {
+                restrictionQualifier = " active-active and daisy-chained DR unsupported";
+            }
+            else {
+                return null;
+            }
+        }
         if (suspect instanceof Constraint && field.equals("index"))
             return null;
         if (suspect instanceof Table) {
@@ -665,14 +685,14 @@ public class CatalogDiffEngine {
                 }
                 if (oldTypeInt == newTypeInt) {
                     if (oldType == VoltType.STRING && oldInBytes == false && newInBytes == true) {
-                        restrictionQualifier = "narrowing from " + oldSize + "CHARACTERS to "
+                        restrictionQualifier = " narrowing from " + oldSize + "CHARACTERS to "
                     + newSize * CatalogSizing.MAX_BYTES_PER_UTF8_CHARACTER + " BYTES";
                     } else {
-                        restrictionQualifier = "narrowing from " + oldSize + " to " + newSize;
+                        restrictionQualifier = " narrowing from " + oldSize + " to " + newSize;
                     }
                 }
                 else {
-                    restrictionQualifier = "from " + oldType.toSQLString() +
+                    restrictionQualifier = " from " + oldType.toSQLString() +
                                            " to " + newType.toSQLString();
                 }
             }
