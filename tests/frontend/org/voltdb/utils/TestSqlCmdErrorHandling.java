@@ -38,9 +38,7 @@ import java.io.IOException;
 
 import junit.framework.TestCase;
 
-import org.voltdb.ServerThread;
-import org.voltdb.VoltDB;
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
@@ -48,98 +46,116 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.regressionsuites.LocalCluster;
 
 public class TestSqlCmdErrorHandling extends TestCase {
 
     private static final String m_lastError = "ThisIsObviouslyNotAnAdHocSQLCommand;\n";
 
-    private static ServerThread m_server;
-    private static Client m_client;
-    private static boolean m_verboseForDebug = false;
-/*
+    private LocalCluster m_cluster;
+    private Client m_client;
+    private boolean m_verboseForDebug = false;
+
+    private String m_serversString = "localhost";
+    private String m_portString = "21212";
+    private String m_addressString;
+
     @Override
-    public void setUp() throws Exception
-    */
-    static
-    {
-        try {
-            String[] mytype = new String[] { "integer", "varbinary", "decimal", "float" };
-            String simpleSchema =
-                    "create table intkv (" +
-                    "  key integer, " +
-                    "  myinteger integer default 0, " +
-                    "  myvarbinary varbinary default 'ff', " +
-                    "  mydecimal decimal default 10.10, " +
-                    "  myfloat float default 9.9, " +
-                    "  PRIMARY KEY(key) );" +
-                    "\n" +
-                    "";
+    protected void setUp() throws Exception {
+        System.out.println("Starting setUp()");
+        super.setUp();
+        String[] mytype = new String[] { "integer", "varbinary", "decimal", "float" };
+        String simpleSchema =
+                "create table intkv (" +
+                        "  key integer, " +
+                        "  myinteger integer default 0, " +
+                        "  myvarbinary varbinary default 'ff', " +
+                        "  mydecimal decimal default 10.10, " +
+                        "  myfloat float default 9.9, " +
+                        "  PRIMARY KEY(key) );" +
+                        "\n" +
+                        "";
 
-            // Define procs that to complain when sqlcmd passes them garbage parameters.
-            for (String type : mytype) {
-                simpleSchema += "create procedure myfussy_" + type + "_proc as" +
-                        " insert into intkv (key, my" + type + ") values (?, ?);" +
-                        "\n";
-            }
-
-            VoltProjectBuilder builder = new VoltProjectBuilder();
-            builder.addLiteralSchema(simpleSchema);
-            builder.setUseDDLSchema(false);
-            String catalogPath = Configuration.getPathToCatalogForTest("sqlcmderror.jar");
-            assertTrue(builder.compile(catalogPath, 1, 1, 0));
-
-            VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToCatalog = catalogPath;
-            config.m_pathToDeployment = builder.getPathToDeployment();
-            m_server = new ServerThread(config);
-            m_server.start();
-            m_server.waitForInitialization();
-
-            m_client = ClientFactory.createClient();
-            m_client.createConnection("localhost");
-
-            // Execute the constrained write to end all constrained writes.
-            // This poisons all future executions of the badWriteCommand() query.
-            ClientResponse response = m_client.callProcedure("@AdHoc", badWriteCommand());
-            assertEquals(ClientResponse.SUCCESS, response.getStatus());
-            VoltTable[] results = response.getResults();
-            assertEquals(1, results.length);
-            VoltTable result = results[0];
-            assertEquals(1, result.asScalarLong());
-
-            assertEquals("sqlcmd dry run failed -- maybe some sqlcmd component (the voltdb jar file?) needs to be rebuilt.",
-                    0, callSQLcmd(true, /**/"\n"));//";\n"));
-
-            assertEquals("sqlcmd --stop-on-error=false dry run failed.",
-                    0, callSQLcmd(false, /**/"\n"));//";\n"));
-
-            // Assert that the procs don't complain when fed good parameters.
-            // Keep these dry run key values out of range of the test cases.
-            // Also make sure they have an even number of digits so they can be used as hex byte values.
-            int goodValue = 1000;
-            for (String type : mytype) {
-                response = m_client.callProcedure("myfussy_" + type + "_proc", goodValue, "" + goodValue);
-                ++goodValue; // keeping keys unique
-                assertEquals(ClientResponse.SUCCESS, response.getStatus());
-                results = response.getResults();
-                assertEquals(1, results.length);
-                result = results[0];
-                assertEquals(1, result.asScalarLong());
-            }
-        } catch (Exception e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+        // Define procs that to complain when sqlcmd passes them garbage parameters.
+        for (String type : mytype) {
+            simpleSchema += "create procedure myfussy_" + type + "_proc as" +
+                    " insert into intkv (key, my" + type + ") values (?, ?);" +
+                    "\n";
         }
+
+        startServer(simpleSchema);
+
+        m_client = ClientFactory.createClient();
+
+        m_addressString = m_cluster.getListenerAddresses().get(0);
+        String[] split =  m_addressString.split(":");
+        m_serversString = split[0];
+        if (split.length > 1) {
+            m_portString = split[1];
+        }
+        else {
+            m_portString = "21212";
+        }
+        m_client.createConnection(m_addressString);
+
+        // Execute the constrained write to end all constrained writes.
+        // This poisons all future executions of the badWriteCommand() query.
+        ClientResponse response = m_client.callProcedure("@AdHoc", badWriteCommand());
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        VoltTable[] results = response.getResults();
+        assertEquals(1, results.length);
+        VoltTable result = results[0];
+        assertEquals(1, result.asScalarLong());
+
+        assertEquals("sqlcmd dry run failed -- maybe some sqlcmd component (the voltdb jar file?) needs to be rebuilt.",
+                0, callSQLcmd(true, /**/"\n"));//";\n"));
+
+        assertEquals("sqlcmd --stop-on-error=false dry run failed.",
+                0, callSQLcmd(false, /**/"\n"));//";\n"));
+
+        // Assert that the procs don't complain when fed good parameters.
+        // Keep these dry run key values out of range of the test cases.
+        // Also make sure they have an even number of digits so they can be used as hex byte values.
+        int goodValue = 1000;
+        for (String type : mytype) {
+            response = m_client.callProcedure("myfussy_" + type + "_proc", goodValue, "" + goodValue);
+            ++goodValue; // keeping keys unique
+            assertEquals(ClientResponse.SUCCESS, response.getStatus());
+            results = response.getResults();
+            assertEquals(1, results.length);
+            result = results[0];
+            assertEquals(1, result.asScalarLong());
+        }
+        System.out.println("Exiting setUp()");
     }
-/*
+
+    /**
+     * @param simpleSchema
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    private void startServer(String simpleSchema) throws IOException,
+            InterruptedException {
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(simpleSchema);
+        builder.setUseDDLSchema(false);
+        m_cluster = new LocalCluster("TestSqlCmdErrorHandling" + ".jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        assertTrue(m_cluster.compile(builder));
+        m_cluster.setHasLocalServer(false);
+        m_cluster.startUp();
+        Thread.sleep(1000);
+    }
+
     @Override
-    public void tearDown() throws InterruptedException
+    protected void tearDown() throws Exception
     {
+        System.out.println("Starting tearDown()");
         m_client.close();
-        m_server.shutdown();
-        m_server.join();
+        m_cluster.shutDown();
+        super.tearDown();
+        System.out.println("Exiting tearDown()");
     }
-*/
+
     public String writeCommand(int id)
     {
         return "insert into intkv (key, myinteger) values(" + id + ", " + id + ");\n";
@@ -185,7 +201,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
         return 1 == result.asScalarLong();
     }
 
-    static private int callSQLcmd(boolean stopOnError, String inputText) throws Exception
+    private int callSQLcmd(boolean stopOnError, String inputText) throws Exception
     {
         final String commandPath = "bin/sqlcmd";
         final long timeout = 10000; // 10,000 millis -- give up after 10 seconds of trying.
@@ -203,11 +219,14 @@ public class TestSqlCmdErrorHandling extends TestCase {
         error.deleteOnExit();
 
         ProcessBuilder pb =
-                // Enable elapsed time reports to stderr.
-                new ProcessBuilder(commandPath, "--debugdelay=0,,", "--stop-on-error=" + (stopOnError ? "true" : "false"));
+//                // Enable elapsed time reports to stderr.
+//                new ProcessBuilder(commandPath, "--debugdelay=0,,",
 //                // Use up all alloted time on the first error to selectively exercise timeout diagnostics."
-//                new ProcessBuilder(commandPath, "--debugdelay=,,10000", "--stop-on-error=" + (stopOnError ? "true" : "false"));
-//                new ProcessBuilder(commandPath, "--stop-on-error=" + (stopOnError ? "true" : "false"));
+//                new ProcessBuilder(commandPath, "--debugdelay=,,10000",
+                new ProcessBuilder(commandPath,
+                        "--stop-on-error=" + (stopOnError ? "true" : "false"),
+                        "--servers=" + m_serversString,
+                        "--port=" + m_portString);
         pb.redirectInput(f);
         pb.redirectOutput(out);
         pb.redirectError(error);
@@ -228,20 +247,21 @@ public class TestSqlCmdErrorHandling extends TestCase {
                     System.err.println("External process (" + commandPath + ") exited after being polled " +
                             pollcount + " times over " + elapsedtime + "ms");
 
-                    if (pollcount % 10 == 0) {
-                        dumpProcessTree();
-                    }
+                    //*/enable for debug*/ if (pollcount % 10 == 0) {
+                    //*/enable for debug*/     dumpProcessTree();
+                    //*/enable for debug*/ }
                 }
                 if (m_verboseForDebug && exitValue != 0) {
-                    System.err.println("Standard input for timed out " + commandPath + ":");
+                    System.err.println("Standard input for failed " + commandPath + ":");
                     streamFileToErr(f);
-                    System.err.println("-----");
+                    System.err.println("*****");
                     System.err.println("Standard output from failed " + commandPath + ":");
                     streamFileToErr(out);
-                    System.err.println("-----");
+                    System.err.println("*****");
                     System.err.println("Error output from failed " + commandPath + ":");
                     streamFileToErr(error);
-                    System.err.println("-----");
+                    System.err.println("*****");
+                    System.err.flush();
                 }
                 f.delete();
                 out.delete();
@@ -260,17 +280,17 @@ public class TestSqlCmdErrorHandling extends TestCase {
         System.err.println("Standard input for timed out " + commandPath + ":");
         streamFileToErr(f);
         f.delete();
-        System.err.println("-----");
+        System.err.println("*****");
         System.err.println("Standard output from timed out " + commandPath + ":");
         streamFileToErr(out);
         out.delete();
-        System.err.println("-----");
+        System.err.println("*****");
         System.err.println("Error output from timed out " + commandPath + ":");
         streamFileToErr(error);
         error.delete();
-        System.err.println("-----");
+        System.err.println("*****");
         dumpProcessTree();
-        System.err.println("-----");
+        System.err.println("*****");
         fail("External process (" + commandPath + ") timed out after " + elapsedtime + "ms on input:\n" + inputText);
         return 0;
     }
@@ -281,16 +301,19 @@ public class TestSqlCmdErrorHandling extends TestCase {
      * @throws IOException
      */
     private static void streamFileToErr(File f) throws IOException {
-        byte[] transfer = new byte[1000];
         try {
+            byte[] transfer = new byte[1000];
+            int asRead = -1;
             FileInputStream cmdIn = new FileInputStream(f);
-            while (cmdIn.read(transfer) != -1) {
-                System.err.write(transfer);
+            while ((asRead = cmdIn.read(transfer)) != -1) {
+                System.err.write(transfer, 0, asRead);
             }
             cmdIn.close();
         }
         catch (FileNotFoundException fnfe) {
             System.err.println("ERROR: TestSqlCmdErrorHandling could not find file " + f.getPath());
+        } finally {
+            System.err.flush();
         }
     }
 

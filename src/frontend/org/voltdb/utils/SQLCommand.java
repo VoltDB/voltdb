@@ -1144,7 +1144,7 @@ public class SQLCommand
         int ii = 0;
         for (String server : servers) {
             if (m_debug) {
-                reportElapsedTime("pre-client connect to server (" + server + ") #" + (++ii) + " of " + servers.length);
+                reportElapsedTime("pre-client connect to server (" + server + ":" + port + ") #" + (++ii) + " of " + servers.length);
             }
             client.createConnection(server.trim(), port);
         }
