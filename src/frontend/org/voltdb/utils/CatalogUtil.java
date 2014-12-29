@@ -87,11 +87,9 @@ import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ExportType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
-import org.voltdb.compiler.deploymentfile.PathEntry;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PropertyType;
 import org.voltdb.compiler.deploymentfile.SchemaType;
-import org.voltdb.compiler.deploymentfile.SecurityProviderString;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
@@ -707,26 +705,22 @@ public abstract class CatalogUtil {
             }
             //snapshot
             if (paths.getSnapshots() == null) {
-                PathEntry snap = new PathEntry();
-                snap.setPath("snapshots");
+                PathsType.Snapshots snap = new PathsType.Snapshots();
                 paths.setSnapshots(snap);
             }
             if (paths.getCommandlog() == null) {
                 //cl
-                PathEntry cl = new PathEntry();
-                cl.setPath("command_log");
+                PathsType.Commandlog cl = new PathsType.Commandlog();
                 paths.setCommandlog(cl);
             }
             if (paths.getCommandlogsnapshot() == null) {
                 //cl snap
-                PathEntry clsnap = new PathEntry();
-                clsnap.setPath("command_log_snapshot");
+                PathsType.Commandlogsnapshot clsnap = new PathsType.Commandlogsnapshot();
                 paths.setCommandlogsnapshot(clsnap);
             }
             if (paths.getExportoverflow() == null) {
                 //export overflow
-                PathEntry exp = new PathEntry();
-                exp.setPath("export_overflow");
+                PathsType.Exportoverflow exp = new PathsType.Exportoverflow();
                 paths.setExportoverflow(exp);
             }
 
@@ -1105,31 +1099,6 @@ public abstract class CatalogUtil {
         schedule.setRetain(retain);
     }
 
-    private static File getFeaturePath(PathsType paths, PathEntry pathEntry,
-                                       File voltDbRoot,
-                                       String pathDescription, String defaultPath)
-    {
-        File featurePath;
-        if (paths == null || pathEntry == null) {
-            featurePath = new VoltFile(voltDbRoot, defaultPath);
-        } else {
-            featurePath = new VoltFile(pathEntry.getPath());
-            if (!featurePath.isAbsolute())
-            {
-                featurePath = new VoltFile(voltDbRoot, pathEntry.getPath());
-            }
-        }
-        if (!featurePath.exists()) {
-            hostLog.info("Creating " + pathDescription + " directory: " +
-                         featurePath.getAbsolutePath());
-            if (!featurePath.mkdirs()) {
-                hostLog.fatal("Failed to create " + pathDescription + " directory \"" +
-                              featurePath + "\"");
-            }
-        }
-        return featurePath;
-    }
-
     /**
      * Set voltroot path, and set the path overrides for export overflow, partition, etc.
      * @param catalog The catalog to be updated.
@@ -1141,62 +1110,15 @@ public abstract class CatalogUtil {
         final Cluster cluster = catalog.getClusters().get("cluster");
         // Handles default voltdbroot (and completely missing "paths" element).
         voltDbRoot = getVoltDbRoot(paths);
-
-        validateDirectory("volt root", voltDbRoot);
-
-        PathEntry path_entry = null;
-        if (paths != null)
-        {
-            path_entry = paths.getSnapshots();
-        }
-        File snapshotPath =
-            getFeaturePath(paths, path_entry, voltDbRoot,
-                           "snapshot", "snapshots");
-        validateDirectory("snapshot path", snapshotPath);
-
-        path_entry = null;
-        if (paths != null)
-        {
-            path_entry = paths.getExportoverflow();
-        }
-        File exportOverflowPath =
-            getFeaturePath(paths, path_entry, voltDbRoot, "export overflow",
-                           "export_overflow");
-        validateDirectory("export overflow", exportOverflowPath);
-
+        //Snapshot
+        File snapshotPath = getSnapshot(paths.getSnapshots(), voltDbRoot);
+        //export overflow
+        File exportOverflowPath = getExportOverflow(paths.getExportoverflow(), voltDbRoot);
         // only use these directories in the enterprise version
         File commandLogPath = null;
         File commandLogSnapshotPath = null;
-
-        path_entry = null;
-        if (paths != null)
-        {
-            path_entry = paths.getCommandlog();
-        }
-        if (VoltDB.instance().getConfig().m_isEnterprise) {
-            commandLogPath =
-                    getFeaturePath(paths, path_entry, voltDbRoot, "command log", "command_log");
-            validateDirectory("command log", commandLogPath);
-        }
-        else {
-            // dumb defaults if you ask for logging in community version
-            commandLogPath = new VoltFile(voltDbRoot, "command_log");
-        }
-
-        path_entry = null;
-        if (paths != null)
-        {
-            path_entry = paths.getCommandlogsnapshot();
-        }
-        if (VoltDB.instance().getConfig().m_isEnterprise) {
-            commandLogSnapshotPath =
-                getFeaturePath(paths, path_entry, voltDbRoot, "command log snapshot", "command_log_snapshot");
-            validateDirectory("command log snapshot", commandLogSnapshotPath);
-        }
-        else {
-            // dumb defaults if you ask for logging in community version
-            commandLogSnapshotPath = new VoltFile(voltDbRoot, "command_log_snapshot");;
-        }
+        commandLogPath = getCommandLog(paths.getCommandlog(), voltDbRoot);
+        commandLogSnapshotPath = getCommandLogSnapshot(paths.getCommandlogsnapshot(), voltDbRoot);
 
         //Set the volt root in the catalog
         catalog.getClusters().get("cluster").setVoltroot(voltDbRoot.getPath());
@@ -1249,7 +1171,105 @@ public abstract class CatalogUtil {
                 }
             }
         }
+        validateDirectory("volt root", voltDbRoot);
+
         return voltDbRoot;
+    }
+
+    public static File getSnapshot(PathsType.Snapshots paths, File voltDbRoot) {
+        File snapshotPath;
+        snapshotPath = new VoltFile(paths.getPath());
+        if (!snapshotPath.isAbsolute())
+        {
+            snapshotPath = new VoltFile(voltDbRoot, paths.getPath());
+        }
+
+        if (!snapshotPath.exists()) {
+            hostLog.info("Creating snapshot path directory: " +
+                         snapshotPath.getAbsolutePath());
+            if (!snapshotPath.mkdirs()) {
+                hostLog.fatal("Failed to create snapshot path directory \"" +
+                              snapshotPath + "\"");
+            }
+        }
+        validateDirectory("snapshot path", snapshotPath);
+
+        return snapshotPath;
+
+    }
+
+    public static File getCommandLog(PathsType.Commandlog paths, File voltDbRoot) {
+        if (!VoltDB.instance().getConfig().m_isEnterprise) {
+            // dumb defaults if you ask for logging in community version
+            return new VoltFile(voltDbRoot, "command_log");
+        }
+        File commandlogPath;
+        commandlogPath = new VoltFile(paths.getPath());
+        if (!commandlogPath.isAbsolute())
+        {
+            commandlogPath = new VoltFile(voltDbRoot, paths.getPath());
+        }
+
+        if (!commandlogPath.exists()) {
+            hostLog.info("Creating command log directory: " +
+                         commandlogPath.getAbsolutePath());
+            if (!commandlogPath.mkdirs()) {
+                hostLog.fatal("Failed to create command log path directory \"" +
+                              commandlogPath + "\"");
+            }
+        }
+        validateDirectory("command log", commandlogPath);
+
+        return commandlogPath;
+
+    }
+
+    public static File getCommandLogSnapshot(PathsType.Commandlogsnapshot paths, File voltDbRoot) {
+        if (!VoltDB.instance().getConfig().m_isEnterprise) {
+            // dumb defaults if you ask for logging in community version
+            return new VoltFile(voltDbRoot, "command_log_snapshot");
+        }
+
+        File commandlogSnapshotPath;
+        commandlogSnapshotPath = new VoltFile(paths.getPath());
+        if (!commandlogSnapshotPath.isAbsolute())
+        {
+            commandlogSnapshotPath = new VoltFile(voltDbRoot, paths.getPath());
+        }
+
+        if (!commandlogSnapshotPath.exists()) {
+            hostLog.info("Creating command log snapshot directory: " +
+                         commandlogSnapshotPath.getAbsolutePath());
+            if (!commandlogSnapshotPath.mkdirs()) {
+                hostLog.fatal("Failed to create command log snapshot path directory \"" +
+                              commandlogSnapshotPath + "\"");
+            }
+        }
+        validateDirectory("command log snapshot", commandlogSnapshotPath);
+
+        return commandlogSnapshotPath;
+
+    }
+
+    public static File getExportOverflow(PathsType.Exportoverflow paths, File voltDbRoot) {
+        File exportOverflowPath;
+        exportOverflowPath = new VoltFile(paths.getPath());
+        if (!exportOverflowPath.isAbsolute())
+        {
+            exportOverflowPath = new VoltFile(voltDbRoot, paths.getPath());
+        }
+
+        if (!exportOverflowPath.exists()) {
+            hostLog.info("Creating export overflow directory: " +
+                         exportOverflowPath.getAbsolutePath());
+            if (!exportOverflowPath.mkdirs()) {
+                hostLog.fatal("Failed to create export overflow path directory \"" +
+                              exportOverflowPath + "\"");
+            }
+        }
+        validateDirectory("export overflow", exportOverflowPath);
+        return exportOverflowPath;
+
     }
 
     /**

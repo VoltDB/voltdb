@@ -79,10 +79,26 @@
               <xs:attribute name="path" type="xs:string" default="voltdbroot"/>
             </xs:complexType>
         </xs:element>
-        <xs:element name="snapshots" type="pathEntry" minOccurs="0" maxOccurs="1"/>
-        <xs:element name="exportoverflow" type="pathEntry" minOccurs="0" maxOccurs="1"/>
-        <xs:element name="commandlog" type="pathEntry" minOccurs="0" maxOccurs="1"/>
-        <xs:element name="commandlogsnapshot" type="pathEntry" minOccurs="0" maxOccurs="1"/>
+        <xs:element name="snapshots" minOccurs="0" maxOccurs="1">
+            <xs:complexType>
+              <xs:attribute name="path" type="xs:string" default="snapthots"/>
+            </xs:complexType>
+        </xs:element>
+        <xs:element name="exportoverflow" minOccurs="0" maxOccurs="1">
+            <xs:complexType>
+              <xs:attribute name="path" type="xs:string" default="export_overflow"/>
+            </xs:complexType>
+        </xs:element>
+        <xs:element name="commandlog" minOccurs="0" maxOccurs="1">
+            <xs:complexType>
+              <xs:attribute name="path" type="xs:string" default="command_log"/>
+            </xs:complexType>
+        </xs:element>
+        <xs:element name="commandlogsnapshot" minOccurs="0" maxOccurs="1">
+            <xs:complexType>
+              <xs:attribute name="path" type="xs:string" default="command_log_snapshot"/>
+            </xs:complexType>
+        </xs:element>
     </xs:all>
   </xs:complexType>
 

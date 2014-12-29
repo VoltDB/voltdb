@@ -264,6 +264,7 @@ public class AuthenticatedConnectionCache {
                 if (e.getValue().refCount <= 0) {
                     m_connections.remove(e.getKey());
                     try {
+                        e.getValue().client.drain();
                         e.getValue().client.close();
                     } catch (InterruptedException ex) {
                         throw new RuntimeException("Unable to close client from pool.", ex);
