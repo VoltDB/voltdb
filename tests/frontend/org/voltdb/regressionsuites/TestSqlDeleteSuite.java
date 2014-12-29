@@ -27,8 +27,10 @@ import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb_testprocs.regressionsuites.delete.DeleteOrderByLimit;
 import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
 
+import java.io.IOException;
 import java.util.Arrays;
 
 /**
@@ -37,6 +39,9 @@ import java.util.Arrays;
  */
 
 public class TestSqlDeleteSuite extends RegressionSuite {
+
+    /** Procedures used by this suite */
+    static final Class<?>[] PROCEDURES = { DeleteOrderByLimit.class };
 
     static final int ROWS = 10;
 
@@ -81,6 +86,16 @@ public class TestSqlDeleteSuite extends RegressionSuite {
                                      tableName, deleteWhereClause);
         results = client.callProcedure("@AdHoc", query).getResults();
         assertEquals(0, results[0].asScalarLong());
+    }
+
+    private static void insertMoreRows(Client client, String tableName,
+            int tens, int ones) throws Exception {
+        for (int i = 0; i < tens; ++i) {
+            for (int j = 0; j < ones; ++j) {
+                insertOneRow(client, tableName,
+                        i * 10, "desc", i * 10 + j, 14.5);
+            }
+        }
     }
 
     public void testDelete()
@@ -251,16 +266,6 @@ public class TestSqlDeleteSuite extends RegressionSuite {
                     partStmt,
                     "Only single-partition DELETE statements "
                             + "may contain ORDER BY with LIMIT and/or OFFSET clauses.");
-        }
-    }
-
-    private static void insertMoreRows(Client client, String tableName,
-            int tens, int ones) throws Exception {
-        for (int i = 0; i < tens; ++i) {
-            for (int j = 0; j < ones; ++j) {
-                insertOneRow(client, tableName,
-                        i * 10, "desc", i * 10 + j, 14.5);
-            }
         }
     }
 
@@ -435,6 +440,24 @@ public class TestSqlDeleteSuite extends RegressionSuite {
         validateTableOfScalarLongs(vt, new long[] { 13 });
     }
 
+    public void testDeleteOrderLimitParam() throws Exception {
+        Client client = getClient();
+
+        // insert rows where ID is 0..19
+        insertRows(client, "R1", 20);
+
+        VoltTable vt;
+
+        // delete the first 10 rows, ordered by ID
+        vt = client.callProcedure("DeleteOrderByLimit", 10)
+                .getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] { 10 });
+
+        vt = client.callProcedure("@AdHoc", "select id from R1 order by id asc")
+                .getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] { 10, 11, 12, 13, 14, 15, 16, 17, 18, 19 });
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -450,6 +473,7 @@ public class TestSqlDeleteSuite extends RegressionSuite {
 
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(Insert.class.getResource("sql-update-ddl.sql"));
+        project.addProcedures(PROCEDURES);
 
         config = new LocalCluster("sqldelete-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         if (!config.compile(project)) fail();

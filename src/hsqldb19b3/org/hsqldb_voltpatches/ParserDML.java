@@ -440,11 +440,17 @@ public class ParserDML extends ParserDQL {
             rangeVariables = resolver.rangeVariables;
         }
 
+        // VoltDB Extension:
+        // This needs to be done before building the compiled statement
+        // so that parameters in LIMIT or OFFSET are retrieved from
+        // the compileContext
+        SortAndSlice sas = voltGetSortAndSliceForDelete(rangeVariables);
+
         StatementDMQL cs = new StatementDML(session, table, rangeVariables,
                                             compileContext, restartIdentity);
 
         // VoltDB Extension:
-        voltAppendDeleteSortAndSlice((StatementDML)cs);
+        voltAppendDeleteSortAndSlice((StatementDML)cs, sas);
 
         return cs;
     }
@@ -1066,10 +1072,10 @@ public class ParserDML extends ParserDQL {
      * are ORDER BY, LIMIT or OFFSET.
      * @param deleteStmt
      */
-    private void voltAppendDeleteSortAndSlice(StatementDML deleteStmt) {
+    private SortAndSlice voltGetSortAndSliceForDelete(RangeVariable[] rangeVariables) {
         SortAndSlice sas = XreadOrderByExpression();
         if (sas == null || sas == SortAndSlice.noSort)
-            return;
+            return SortAndSlice.noSort;
 
         // Resolve columns in the ORDER BY clause.  This code modified
         // from how compileDelete resolves columns in its WHERE clause
@@ -1078,14 +1084,17 @@ public class ParserDML extends ParserDQL {
             HsqlList unresolved =
                 e.resolveColumnReferences(RangeVariable.emptyArray, null);
 
-            unresolved = Expression.resolveColumnSet(deleteStmt.rangeVariables,
+            unresolved = Expression.resolveColumnSet(rangeVariables,
                     unresolved, null);
 
             ExpressionColumn.checkColumnsResolved(unresolved);
             e.resolveTypes(session, null);
         }
 
+        return sas;
+    }
 
+    private void voltAppendDeleteSortAndSlice(StatementDML deleteStmt, SortAndSlice sas) {
         deleteStmt.setSortAndSlice(sas);
     }
     /**********************************************************************/
