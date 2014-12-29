@@ -114,6 +114,16 @@ public class SnapshotUtil {
         new ColumnInfo("ERR_MSG", VoltType.STRING)
     };
 
+    public static final ColumnInfo hardlinkResultsColumns[] =
+    new ColumnInfo[] {
+        new ColumnInfo(VoltSystemProcedure.CNAME_HOST_ID, VoltSystemProcedure.CTYPE_ID),
+        new ColumnInfo("HOSTNAME", VoltType.STRING),
+        new ColumnInfo("REQUESTID", VoltType.STRING),
+        new ColumnInfo("RESULT", VoltType.STRING),
+        // "" means make a new copy file, "str" is requestId of hardlink target
+        new ColumnInfo("HARDLINKTO", VoltType.STRING),
+    };
+
     public static final VoltTable constructNodeResultsTable()
     {
         return new VoltTable(nodeResultsColumns);
@@ -122,6 +132,11 @@ public class SnapshotUtil {
     public static final VoltTable constructPartitionResultsTable()
     {
         return new VoltTable(partitionResultsColumns);
+    }
+
+    public static final VoltTable constructHardlinkResultsTable()
+    {
+        return new VoltTable(hardlinkResultsColumns);
     }
 
     /**

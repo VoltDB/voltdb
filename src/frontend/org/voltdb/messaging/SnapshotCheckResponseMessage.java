@@ -32,6 +32,7 @@ public class SnapshotCheckResponseMessage extends VoltMessage {
     private byte [] m_path;
     private byte [] m_nonce;
     private VoltTable m_response;
+    private VoltTable m_hardLinkResults;
 
     /** Empty constructor for de-serialization */
     SnapshotCheckResponseMessage()
@@ -39,18 +40,21 @@ public class SnapshotCheckResponseMessage extends VoltMessage {
         super();
     }
 
-    public SnapshotCheckResponseMessage(String path, String nonce, VoltTable response)
+    public SnapshotCheckResponseMessage(String path, String nonce, VoltTable response, VoltTable hardLinkResults)
     {
         super();
         m_path = path.getBytes(Charsets.UTF_8);
         m_nonce = nonce.getBytes(Charsets.UTF_8);
         m_response = response;
         m_response.resetRowPosition();
+        m_hardLinkResults = hardLinkResults;
+        m_hardLinkResults.resetRowPosition();
     }
 
     public String getPath() { return new String(m_path, Charsets.UTF_8); }
     public String getNonce() { return new String(m_nonce, Charsets.UTF_8); }
     public VoltTable getResponse() { return m_response; }
+    public VoltTable getHardLinkResults() { return m_hardLinkResults; }
 
     @Override
     public int getSerializedSize()
@@ -58,7 +62,11 @@ public class SnapshotCheckResponseMessage extends VoltMessage {
         int size = super.getSerializedSize();
         size += 4 + m_path.length
                 + 4 + m_nonce.length
-                + m_response.getSerializedSize();
+                + m_response.getSerializedSize()
+                + 1;
+        if (m_hardLinkResults != null) {
+            size += m_hardLinkResults.getSerializedSize();
+        }
         return size;
     }
 
@@ -70,6 +78,13 @@ public class SnapshotCheckResponseMessage extends VoltMessage {
         m_nonce = new byte[buf.getInt()];
         buf.get(m_nonce);
         m_response = PrivateVoltTableFactory.createVoltTableFromSharedBuffer(buf);
+        byte hasHardLinkResults = buf.get();
+        if (hasHardLinkResults == 1) {
+            m_hardLinkResults = PrivateVoltTableFactory.createVoltTableFromSharedBuffer(buf);
+        }
+        else {
+            m_hardLinkResults = null;
+        }
     }
 
     @Override
@@ -81,5 +96,12 @@ public class SnapshotCheckResponseMessage extends VoltMessage {
         buf.putInt(m_nonce.length);
         buf.put(m_nonce);
         m_response.flattenToBuffer(buf);
+        if (m_hardLinkResults == null) {
+            buf.put((byte)0);
+        }
+        else {
+            buf.put((byte)1);
+            m_hardLinkResults.flattenToBuffer(buf);
+        }
     }
 }
