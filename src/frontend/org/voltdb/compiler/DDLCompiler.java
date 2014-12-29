@@ -70,13 +70,14 @@ import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.groovy.GroovyCodeBlockCompiler;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.ParsedSelectStmt;
-import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
+import org.voltdb.planner.ParsedColInfo;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
+import org.voltdb.utils.CatalogSchemaTools;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
@@ -448,12 +449,6 @@ public class DDLCompiler {
     HashMap<String, Index> indexMap = new HashMap<String, Index>();
     HashMap<Table, String> matViewMap = new HashMap<Table, String>();
 
-    // Track the original CREATE TABLE statement for each table
-    // Currently used for catalog report generation.
-    // There's specifically no cleanup here because I don't think
-    // any is needed.
-    Map<String, String> m_tableNameToDDL = new TreeMap<String, String>();
-
     /** A cache of the XML used to do validation on LIMIT DELETE statements
      * Preserved here to avoid having to re-parse for planning */
     private final Map<Statement, VoltXMLElement> m_limitDeleteStmtToXml = new HashMap<>();
@@ -508,32 +503,6 @@ public class DDLCompiler {
             }
             if (!processed) {
                 try {
-                    // Check for CREATE TABLE, CREATE VIEW, ALTER or DROP TABLE.
-                    // We sometimes choke at parsing statements with newlines, so
-                    // check against a newline free version of the stmt.
-                    String oneLinerStmt = stmt.statement.replace("\n", " ");
-                    Matcher tableMatcher = createTablePattern.matcher(oneLinerStmt);
-                    if (tableMatcher.find()) {
-                        String tableName = tableMatcher.group(2);
-                        m_tableNameToDDL.put(tableName.toUpperCase(), stmt.statement);
-                    } else {
-                        Matcher atableMatcher = alterOrDropTablePattern.matcher(oneLinerStmt);
-                        if (atableMatcher.find()) {
-                            String op = atableMatcher.group(1);
-                            String tableName = atableMatcher.group(3);
-                            if (op.equalsIgnoreCase("DROP")) {
-                                m_tableNameToDDL.remove(tableName.toUpperCase());
-                            } else {
-                                //ALTER - Append the statement
-                                String prevStmt = m_tableNameToDDL.get(tableName.toUpperCase());
-                                if (prevStmt != null) {
-                                    //Append the SQL for report...else would blow up compilation.
-                                    m_tableNameToDDL.put(tableName.toUpperCase(), prevStmt + "\n" + stmt.statement);
-                                }
-                            }
-                        }
-                    }
-
                     // kind of ugly.  We hex-encode each statement so we can
                     // avoid embedded newlines so we can delimit statements
                     // with newline.
@@ -1536,7 +1505,10 @@ public class DDLCompiler {
         if (query != null) {
             annotation.ddl = query;
         } else {
-            annotation.ddl = m_tableNameToDDL.get(name.toUpperCase());
+            // Get the final DDL for the table rebuilt from the catalog object
+            // Don't need a real StringBuilder or export state to get the CREATE for a table
+            annotation.ddl = CatalogSchemaTools.toSchema(new StringBuilder(),
+                    table, query, false);
         }
 
         if (maxRowSize > MAX_ROW_SIZE) {
@@ -2160,7 +2132,7 @@ public class DDLCompiler {
             } else {
                 // add the group by columns from the src table
                 for (int i = 0; i < stmt.m_groupByColumns.size(); i++) {
-                    ParsedSelectStmt.ParsedColInfo gbcol = stmt.m_groupByColumns.get(i);
+                    ParsedColInfo gbcol = stmt.m_groupByColumns.get(i);
                     Column srcCol = srcColumnArray.get(gbcol.index);
                     ColumnRef cref = matviewinfo.getGroupbycols().add(srcCol.getTypeName());
                     // groupByColumns is iterating in order of groups. Store that grouping order
@@ -2173,7 +2145,7 @@ public class DDLCompiler {
 
                 // parse out the group by columns into the dest table
                 for (int i = 0; i < stmt.m_groupByColumns.size(); i++) {
-                    ParsedSelectStmt.ParsedColInfo col = stmt.m_displayColumns.get(i);
+                    ParsedColInfo col = stmt.m_displayColumns.get(i);
                     Column destColumn = destColumnArray.get(i);
                     processMaterializedViewColumn(matviewinfo, srcTable, destColumn,
                             ExpressionType.VALUE_TUPLE, (TupleValueExpression)col.expression);
@@ -2181,7 +2153,7 @@ public class DDLCompiler {
             }
 
             // Set up COUNT(*) column
-            ParsedSelectStmt.ParsedColInfo countCol = stmt.m_displayColumns.get(stmt.m_groupByColumns.size());
+            ParsedColInfo countCol = stmt.m_displayColumns.get(stmt.m_groupByColumns.size());
             assert(countCol.expression.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR);
             assert(countCol.expression.getLeft() == null);
             processMaterializedViewColumn(matviewinfo, srcTable,
@@ -2209,7 +2181,7 @@ public class DDLCompiler {
             boolean hasMinOrMaxAgg = false;
             ArrayList<AbstractExpression> minMaxAggs = new ArrayList<AbstractExpression>();
             for (int i = stmt.m_groupByColumns.size() + 1; i < stmt.m_displayColumns.size(); i++) {
-                ParsedSelectStmt.ParsedColInfo col = stmt.m_displayColumns.get(i);
+                ParsedColInfo col = stmt.m_displayColumns.get(i);
                 AbstractExpression aggExpr = col.expression.getLeft();
                 if (aggExpr.getExpressionType() != ExpressionType.VALUE_TUPLE) {
                     hasAggregationExprs = true;
@@ -2253,7 +2225,7 @@ public class DDLCompiler {
 
             // parse out the aggregation columns into the dest table
             for (int i = stmt.m_groupByColumns.size() + 1; i < stmt.m_displayColumns.size(); i++) {
-                ParsedSelectStmt.ParsedColInfo col = stmt.m_displayColumns.get(i);
+                ParsedColInfo col = stmt.m_displayColumns.get(i);
                 Column destColumn = destColumnArray.get(i);
 
                 AbstractExpression colExpr = col.expression.getLeft();
@@ -2391,8 +2363,8 @@ public class DDLCompiler {
 
         int i;
         for (i = 0; i < groupColCount; i++) {
-            ParsedSelectStmt.ParsedColInfo gbcol = stmt.m_groupByColumns.get(i);
-            ParsedSelectStmt.ParsedColInfo outcol = stmt.m_displayColumns.get(i);
+            ParsedColInfo gbcol = stmt.m_groupByColumns.get(i);
+            ParsedColInfo outcol = stmt.m_displayColumns.get(i);
 
             if (!outcol.expression.equals(gbcol.expression)) {
                 msg += "must exactly match the GROUP BY clause at index " + String.valueOf(i) + " of SELECT list.";
@@ -2408,7 +2380,7 @@ public class DDLCompiler {
         }
 
         for (i++; i < displayColCount; i++) {
-            ParsedSelectStmt.ParsedColInfo outcol = stmt.m_displayColumns.get(i);
+            ParsedColInfo outcol = stmt.m_displayColumns.get(i);
             if ((outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_COUNT) &&
                     (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_SUM) &&
                     (outcol.expression.getExpressionType() != ExpressionType.AGGREGATE_MIN) &&

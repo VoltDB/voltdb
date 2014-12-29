@@ -31,7 +31,6 @@ import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
-import org.voltdb.plannodes.DistinctPlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
@@ -112,24 +111,18 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
     public void testCountA1() {
         pns = compileToFragments("SELECT count(A1) from T1");
-        for (AbstractPlanNode apn: pns) {
-            System.out.println(apn.toExplainPlanString());
-        }
     }
 
-    public void testCountStar()
-    {
+    public void testCountStar() {
         pns = compileToFragments("SELECT count(*) from T1");
-        for (AbstractPlanNode apn: pns) {
-            System.out.println(apn.toExplainPlanString());
-        }
     }
 
     public void testCountDistinctA1() {
         pns = compileToFragments("SELECT count(distinct A1) from T1");
-        for (AbstractPlanNode apn: pns) {
-            System.out.println(apn.toExplainPlanString());
-        }
+    }
+
+    public void testDistinctA1() {
+        pns = compileToFragments("SELECT DISTINCT A1 FROM T1");
     }
 
     public void testDistinctA1_Subquery() {
@@ -146,13 +139,6 @@ public class TestPlansGroupBy extends PlannerTestCase {
         p = pns.get(1).getChild(0);
         assertTrue(p instanceof AbstractScanPlanNode);
         assertNotNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
-    }
-
-    public void testDistinctA1() {
-        pns = compileToFragments("SELECT DISTINCT A1 FROM T1");
-        for (AbstractPlanNode apn: pns) {
-            System.out.println(apn.toExplainPlanString());
-        }
     }
 
     public void testGroupByA1() {
@@ -446,8 +432,12 @@ public class TestPlansGroupBy extends PlannerTestCase {
         // 'inlineLimit' means LIMIT get pushed down for partition table and inlined with aggregate.
 
         AbstractPlanNode apn = pns.get(0).getChild(0);
+        if (apn instanceof ProjectionPlanNode) {
+            apn = apn.getChild(0);
+        }
+
         if (!inlineLimit || twoFragments) {
-            assertEquals(apn.getPlanNodeType(), PlanNodeType.LIMIT);
+            assertEquals(PlanNodeType.LIMIT, apn.getPlanNodeType());
             apn = apn.getChild(0);
         }
 
@@ -455,7 +445,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         if (twoFragments) {
             apn = pns.get(1).getChild(0);
             if (!inlineLimit) {
-                assertEquals(apn.getPlanNodeType(), PlanNodeType.LIMIT);
+                assertEquals(PlanNodeType.LIMIT, apn.getPlanNodeType());
                 apn = apn.getChild(0);
             }
         }
@@ -539,9 +529,6 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         // Useless order by clause.
         pns = compileToFragments("SELECT count(*)  FROM P1 order by PKEY");
-        for ( AbstractPlanNode nd : pns) {
-            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
-        }
         p = pns.get(0).getChild(0);
         assertTrue(p instanceof AggregatePlanNode);
         assertTrue(p.getChild(0) instanceof ReceivePlanNode);
@@ -554,9 +541,10 @@ public class TestPlansGroupBy extends PlannerTestCase {
         // ENG-5066: now Limit is pushed under Projection
         // Limit is also inlined with Orderby node
         assertTrue(p instanceof ProjectionPlanNode);
-        assertTrue(p.getChild(0) instanceof OrderByPlanNode);
-        assertNotNull(p.getChild(0).getInlinePlanNode(PlanNodeType.LIMIT));
-        assertTrue(p.getChild(0).getChild(0) instanceof AggregatePlanNode);
+        p = p.getChild(0);
+        assertTrue(p instanceof OrderByPlanNode);
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.LIMIT));
+        assertTrue(p.getChild(0) instanceof AggregatePlanNode);
 
         p = pns.get(1).getChild(0);
         // inline aggregate
@@ -565,34 +553,47 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         pns = compileToFragments("SELECT F_D1, count(*) as tag FROM RF group by F_D1 order by tag");
         p = pns.get(0).getChild(0);
-        /*/ to debug */ System.out.println("DEBUG: " + p.toExplainPlanString());
+        //*/ to debug */ System.out.println("DEBUG: " + p.toExplainPlanString());
         assertTrue(p instanceof ProjectionPlanNode);
-        assertTrue(p.getChild(0) instanceof OrderByPlanNode);
-        p = p.getChild(0).getChild(0);
+        p = p.getChild(0);
+        assertTrue(p instanceof OrderByPlanNode);
+        p = p.getChild(0);
         assertTrue(p instanceof IndexScanPlanNode);
         assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
 
         pns = compileToFragments("SELECT F_D1, count(*) FROM RF group by F_D1 order by 2");
         p = pns.get(0).getChild(0);
-        /*/ to debug */ System.out.println("DEBUG: " + p.toExplainPlanString());
+        //*/ to debug */ System.out.println("DEBUG: " + p.toExplainPlanString());
         assertTrue(p instanceof ProjectionPlanNode);
-        //assertTrue(p.getChild(0) instanceof LimitPlanNode);
-        assertTrue(p.getChild(0) instanceof OrderByPlanNode);
-        p = p.getChild(0).getChild(0);
+        p = p.getChild(0);
+        assertTrue(p instanceof OrderByPlanNode);
+        p = p.getChild(0);
         assertTrue(p instanceof IndexScanPlanNode);
         assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
     }
 
     private void checkHasComplexAgg(List<AbstractPlanNode> pns) {
+        checkHasComplexAgg(pns, false);
+    }
+
+    private void checkHasComplexAgg(List<AbstractPlanNode> pns, boolean projectPushdown) {
         assertTrue(pns.size() > 0);
         boolean isDistributed = pns.size() > 1 ? true: false;
 
-        for ( AbstractPlanNode nd : pns) {
-            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
+        if (projectPushdown) {
+            assertTrue(isDistributed);
         }
 
         AbstractPlanNode p = pns.get(0).getChild(0);
-        assertTrue(p instanceof ProjectionPlanNode);
+        if (p instanceof LimitPlanNode) {
+            p = p.getChild(0);
+        }
+        if (p instanceof OrderByPlanNode) {
+            p = p.getChild(0);
+        }
+        if (! projectPushdown) {
+            assertTrue(p instanceof ProjectionPlanNode);
+        }
         while ( p.getChildCount() > 0) {
             p = p.getChild(0);
             assertFalse(p instanceof ProjectionPlanNode);
@@ -600,7 +601,17 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         if (isDistributed) {
             p = pns.get(1).getChild(0);
-            assertFalse(p instanceof ProjectionPlanNode);
+            int projectCount = 0;
+            while ( p.getChildCount() > 0) {
+                p = p.getChild(0);
+                if (p instanceof ProjectionPlanNode) {
+                    projectCount++;
+                    assertTrue(projectPushdown);
+                }
+            }
+            if (projectPushdown) {
+                assertEquals(1, projectCount);
+            }
         }
     }
 
@@ -610,9 +621,9 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         // Test limit is not pushed down
         AbstractPlanNode p = pns.get(0).getChild(0);
-        assertTrue(p instanceof ProjectionPlanNode);
-        assertTrue(p.getChild(0) instanceof OrderByPlanNode);
-        assertNotNull(p.getChild(0).getInlinePlanNode(PlanNodeType.LIMIT));
+        assertTrue(p instanceof OrderByPlanNode);
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.LIMIT));
+        assertTrue(p.getChild(0) instanceof ProjectionPlanNode);
         assertTrue(p.getChild(0).getChild(0) instanceof AggregatePlanNode);
 
         p = pns.get(1).getChild(0);
@@ -632,8 +643,8 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         // Test aggregation node not push down with distinct
         AbstractPlanNode p = pns.get(0).getChild(0);
-        assertTrue(p instanceof ProjectionPlanNode);
-        assertTrue(p.getChild(0) instanceof OrderByPlanNode);
+        assertTrue(p instanceof OrderByPlanNode);
+        assertTrue(p.getChild(0) instanceof ProjectionPlanNode);
         assertTrue(p.getChild(0).getChild(0) instanceof AggregatePlanNode);
 
         p = pns.get(1).getChild(0);
@@ -646,9 +657,9 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         // Test no limit push down
         AbstractPlanNode p = pns.get(0).getChild(0);
-        assertTrue(p instanceof ProjectionPlanNode);
-        assertTrue(p.getChild(0) instanceof OrderByPlanNode);
-        assertNotNull(p.getChild(0).getInlinePlanNode(PlanNodeType.LIMIT));
+        assertTrue(p instanceof OrderByPlanNode);
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.LIMIT));
+        assertTrue(p.getChild(0) instanceof ProjectionPlanNode);
         assertTrue(p.getChild(0).getChild(0) instanceof AggregatePlanNode);
 
         p = pns.get(1).getChild(0);
@@ -664,6 +675,16 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         pns = compileToFragments("SELECT A1, SUM(PKEY), COUNT(PKEY), (AVG(PKEY) + 1) as A4 FROM P1 GROUP BY A1");
         checkHasComplexAgg(pns);
+    }
+
+    public void testComplexAggCaseProjectPushdown() {
+        // This complex aggregate case will push down ORDER BY LIMIT
+        // so the projection plan node should be also pushed down
+        pns = compileToFragments("SELECT PKEY, sum(A1) + 1 FROM P1 GROUP BY PKEY order by 1, 2 Limit 10");
+        checkHasComplexAgg(pns, true);
+
+        pns = compileToFragments("SELECT PKEY, AVG(A1) FROM P1 GROUP BY PKEY order by 1, 2 Limit 10");
+        checkHasComplexAgg(pns, true);
     }
 
     public void testComplexGroupby() {
@@ -881,21 +902,21 @@ public class TestPlansGroupBy extends PlannerTestCase {
         checkQueriesPlansAreTheSame(sql1, sql2);
     }
 
-    private void checkMVNoFix_NoAgg(
+    private void checkMVNoFix_NoAgg_NormalQueries(
             String sql) {
         // the first '-1' indicates that there is no top aggregation node.
         checkMVReaggreateFeature(sql, false,
                 -1, -1,
                 -1, -1,
-                true, false, false);
+                false, false);
     }
 
     private void checkMVNoFix_NoAgg(
             String sql, int numGroupbyOfTopAggNode, int numAggsOfTopAggNode,
-            boolean projectionNode, boolean aggPushdown, boolean aggInline) {
+            boolean aggPushdown, boolean aggInline) {
 
         checkMVReaggreateFeature(sql, false, numGroupbyOfTopAggNode, numAggsOfTopAggNode,
-                -1, -1, projectionNode, aggPushdown, aggInline);
+                -1, -1, aggPushdown, aggInline);
 
     }
 
@@ -904,34 +925,34 @@ public class TestPlansGroupBy extends PlannerTestCase {
         // (1) Table V_P1_NO_FIX_NEEDED:
 
         // Normal select queries
-        checkMVNoFix_NoAgg("SELECT * FROM V_P1_NO_FIX_NEEDED");
-        checkMVNoFix_NoAgg("SELECT V_SUM_C1 FROM V_P1_NO_FIX_NEEDED ORDER BY V_A1");
-        checkMVNoFix_NoAgg("SELECT V_SUM_C1 FROM V_P1_NO_FIX_NEEDED LIMIT 1");
+        checkMVNoFix_NoAgg_NormalQueries("SELECT * FROM V_P1_NO_FIX_NEEDED");
+        checkMVNoFix_NoAgg_NormalQueries("SELECT V_SUM_C1 FROM V_P1_NO_FIX_NEEDED ORDER BY V_A1");
+        checkMVNoFix_NoAgg_NormalQueries("SELECT V_SUM_C1 FROM V_P1_NO_FIX_NEEDED LIMIT 1");
 
         // Distributed distinct select query
         checkMVNoFix_NoAgg("SELECT DISTINCT V_SUM_C1 FROM V_P1_NO_FIX_NEEDED",
-                1, 0, false, true, true);
+                1, 0, true, true);
 
         // Distributed group by query
         checkMVNoFix_NoAgg("SELECT V_SUM_C1 FROM V_P1_NO_FIX_NEEDED GROUP by V_SUM_C1",
-                1, 0, false, true, true);
+                1, 0, true, true);
 
         checkMVNoFix_NoAgg("SELECT V_SUM_C1, sum(V_CNT) FROM V_P1_NO_FIX_NEEDED " +
-                "GROUP by V_SUM_C1", 1, 1, false, true, true);
+                "GROUP by V_SUM_C1", 1, 1, true, true);
 
         // (2) Table V_P1 and V_P1_NEW:
         pns = compileToFragments("SELECT SUM(V_SUM_C1) FROM V_P1");
-        checkMVReaggregateFeature(false, 0, 1, -1, -1, false, true, true);
+        checkMVReaggregateFeature(false, 0, 1, -1, -1, true, true);
 
         pns = compileToFragments("SELECT MIN(V_MIN_C1) FROM V_P1_NEW");
-        checkMVReaggregateFeature(false, 0, 1, -1, -1, false, true, true);
+        checkMVReaggregateFeature(false, 0, 1, -1, -1, true, true);
 
         pns = compileToFragments("SELECT MAX(V_MAX_D1) FROM V_P1_NEW");
-        checkMVReaggregateFeature(false, 0, 1, -1, -1, false, true, true);
+        checkMVReaggregateFeature(false, 0, 1, -1, -1, true, true);
 
-        checkMVNoFix_NoAgg("SELECT MAX(V_MAX_D1) FROM V_P1_NEW GROUP BY V_A1", 1, 1, true, true, true);
-        checkMVNoFix_NoAgg("SELECT V_A1, MAX(V_MAX_D1) FROM V_P1_NEW GROUP BY V_A1", 1, 1,  false, true, true);
-        checkMVNoFix_NoAgg("SELECT V_A1,V_B1, MAX(V_MAX_D1) FROM V_P1_NEW GROUP BY V_A1, V_B1", 2, 1, false, true, true);
+        checkMVNoFix_NoAgg("SELECT MAX(V_MAX_D1) FROM V_P1_NEW GROUP BY V_A1", 1, 1, true, true);
+        checkMVNoFix_NoAgg("SELECT V_A1, MAX(V_MAX_D1) FROM V_P1_NEW GROUP BY V_A1", 1, 1, true, true);
+        checkMVNoFix_NoAgg("SELECT V_A1,V_B1, MAX(V_MAX_D1) FROM V_P1_NEW GROUP BY V_A1, V_B1", 2, 1, true, true);
 
 
         // (3) Join Query
@@ -947,19 +968,19 @@ public class TestPlansGroupBy extends PlannerTestCase {
                 + " ORDER BY total_votes DESC"
                 + "        , contestant_number ASC"
                 + "        , contestant_name ASC;";
-        checkMVNoFix_NoAgg(sql, 2, 1, true, true, true);
+        checkMVNoFix_NoAgg(sql, 2, 1, true, true);
 
 
         sql = "select sum(v_cnt) from v_p1 INNER JOIN v_r1 using(v_a1)";
-        checkMVNoFix_NoAgg(sql, 0, 1, false, true, true);
+        checkMVNoFix_NoAgg(sql, 0, 1, true, true);
 
         sql = "select v_p1.v_b1, sum(v_p1.v_sum_d1) from v_p1 INNER JOIN v_r1 on v_p1.v_a1 > v_r1.v_a1 " +
                 "group by v_p1.v_b1;";
-        checkMVNoFix_NoAgg(sql, 1, 1, false, true, true);
+        checkMVNoFix_NoAgg(sql, 1, 1, true, true);
 
         sql = "select MAX(v_r1.v_a1) from v_p1 INNER JOIN v_r1 on v_p1.v_a1 = v_r1.v_a1 " +
                 "INNER JOIN r1v on v_p1.v_a1 = r1v.v_a1 ";
-        checkMVNoFix_NoAgg(sql, 0, 1, false, true, true);
+        checkMVNoFix_NoAgg(sql, 0, 1, true, true);
     }
 
     public void testMVBasedQuery_EdgeCases() {
@@ -975,10 +996,10 @@ public class TestPlansGroupBy extends PlannerTestCase {
         checkMVFix_TopAgg_ReAgg("SELECT V_SUM_C1, MAX(V_MAX_D1) FROM V_P1_NEW GROUP BY V_SUM_C1", 1, 1, 2, 2);
 
         // ENG-5669 HAVING edge cases.
-        checkMVFix_TopAgg_ReAgg_with_TopProjection("SELECT SUM(V_SUM_C1) FROM V_P1 HAVING MAX(V_SUM_D1) > 3", 0, 2, 2, 2);
+        checkMVFix_TopAgg_ReAgg("SELECT SUM(V_SUM_C1) FROM V_P1 HAVING MAX(V_SUM_D1) > 3", 0, 2, 2, 2);
 
         pns = compileToFragments("SELECT SUM(V_SUM_C1) FROM V_P1 HAVING SUM(V_SUM_D1) > 3");
-        checkMVReaggregateFeature(false, 0, 2, -1, -1, true, true, true);
+        checkMVReaggregateFeature(false, 0, 2, -1, -1, true, true);
 
         // distinct on the v_a1 (part of the group by columns in the view)
         // aggregate pushed down for optimization
@@ -1007,10 +1028,6 @@ public class TestPlansGroupBy extends PlannerTestCase {
             checkMVFix_reAgg("SELECT v_sum_c1 FROM " + tb + " order by v_sum_d1", 2, 2);
             checkMVFix_reAgg("SELECT v_sum_c1 FROM " + tb + " limit 1", 2, 1);
             checkMVFix_reAgg("SELECT v_sum_c1 FROM " + tb + " order by v_sum_c1 limit 1", 2, 1);
-
-            // test distinct rewrote with aggregate pushed down.
-            checkMVFix_TopAgg_ReAgg("SELECT distinct v_sum_c1 FROM " + tb + " limit 1", 1, 0, 2, 1);
-            checkMVFix_TopAgg_ReAgg("SELECT v_sum_c1 FROM " + tb + " group by v_sum_c1 limit 1", 1, 0, 2, 1);
         }
     }
 
@@ -1027,47 +1044,44 @@ public class TestPlansGroupBy extends PlannerTestCase {
                     " GROUP by V_SUM_C1", 1, 0, 2, 1);
 
             // because we have order by.
-            checkMVFix_TopAgg_ReAgg_with_TopProjection("SELECT V_SUM_C1 FROM " + tb +
+            checkMVFix_TopAgg_ReAgg("SELECT V_SUM_C1 FROM " + tb +
                     " GROUP by V_SUM_C1 ORDER BY V_SUM_C1", 1, 0, 2, 1);
 
-            checkMVFix_TopAgg_ReAgg_with_TopProjection("SELECT V_SUM_C1 FROM " + tb + " GROUP by V_SUM_C1 " +
+            checkMVFix_TopAgg_ReAgg("SELECT V_SUM_C1 FROM " + tb + " GROUP by V_SUM_C1 " +
                     "ORDER BY V_SUM_C1 LIMIT 5", 1, 0, 2, 1);
 
             checkMVFix_TopAgg_ReAgg("SELECT V_SUM_C1 FROM " + tb +
-                    " GROUP by V_SUM_C1 LIMIT 5", 1, 0, 2, 1);
-
-            checkMVFix_TopAgg_ReAgg_with_TopProjection("SELECT distinct V_SUM_C1 FROM " + tb +
                     " GROUP by V_SUM_C1 LIMIT 5", 1, 0, 2, 1);
 
             // Test set (2):
             checkMVFix_TopAgg_ReAgg("SELECT V_SUM_C1, sum(V_CNT) FROM " + tb +
                     " GROUP by V_SUM_C1", 1, 1, 2, 2);
 
-            checkMVFix_TopAgg_ReAgg_with_TopProjection("SELECT V_SUM_C1, sum(V_CNT) FROM " + tb +
+            checkMVFix_TopAgg_ReAgg("SELECT V_SUM_C1, sum(V_CNT) FROM " + tb +
                     " GROUP by V_SUM_C1 ORDER BY V_SUM_C1", 1, 1, 2, 2);
 
-            checkMVFix_TopAgg_ReAgg_with_TopProjection("SELECT V_SUM_C1, sum(V_CNT) FROM " + tb +
+            checkMVFix_TopAgg_ReAgg("SELECT V_SUM_C1, sum(V_CNT) FROM " + tb +
                     " GROUP by V_SUM_C1 ORDER BY V_SUM_C1 limit 2", 1, 1, 2, 2);
 
             // Distinct: No aggregation push down.
-            checkMVFix_TopAgg_ReAgg_with_TopProjection("SELECT V_SUM_C1, sum(distinct V_CNT) " +
+            checkMVFix_TopAgg_ReAgg("SELECT V_SUM_C1, sum(distinct V_CNT) " +
                     "FROM " + tb + " GROUP by V_SUM_C1 ORDER BY V_SUM_C1", 1, 1, 2, 2);
 
             // Test set (3)
             checkMVFix_TopAgg_ReAgg("SELECT V_A1,V_B1, V_SUM_C1, sum(V_SUM_D1) FROM " + tb +
                     " GROUP BY V_A1,V_B1, V_SUM_C1", 3, 1, 2, 2);
 
-            checkMVFix_TopAgg_ReAgg_with_TopProjection("SELECT V_A1,V_B1, V_SUM_C1, sum(V_SUM_D1) FROM " + tb +
+            checkMVFix_TopAgg_ReAgg("SELECT V_A1,V_B1, V_SUM_C1, sum(V_SUM_D1) FROM " + tb +
                     " GROUP BY V_A1,V_B1, V_SUM_C1 ORDER BY V_A1,V_B1, V_SUM_C1", 3, 1, 2, 2);
 
-            checkMVFix_TopAgg_ReAgg_with_TopProjection("SELECT V_A1,V_B1, V_SUM_C1, sum(V_SUM_D1) FROM " + tb +
+            checkMVFix_TopAgg_ReAgg("SELECT V_A1,V_B1, V_SUM_C1, sum(V_SUM_D1) FROM " + tb +
                     " GROUP BY V_A1,V_B1, V_SUM_C1 ORDER BY V_A1,V_B1, V_SUM_C1 LIMIT 5", 3, 1, 2, 2);
 
-            checkMVFix_TopAgg_ReAgg_with_TopProjection("SELECT V_A1,V_B1, V_SUM_C1, sum(V_SUM_D1) FROM " + tb +
+            checkMVFix_TopAgg_ReAgg("SELECT V_A1,V_B1, V_SUM_C1, sum(V_SUM_D1) FROM " + tb +
                     " GROUP BY V_A1,V_B1, V_SUM_C1 ORDER BY V_A1, V_SUM_C1 LIMIT 5", 3, 1, 2, 2);
 
             // Distinct: No aggregation push down.
-            checkMVFix_TopAgg_ReAgg_with_TopProjection("SELECT V_A1,V_B1, V_SUM_C1, sum( distinct V_SUM_D1) FROM " +
+            checkMVFix_TopAgg_ReAgg("SELECT V_A1,V_B1, V_SUM_C1, sum( distinct V_SUM_D1) FROM " +
                     tb + " GROUP BY V_A1,V_B1, V_SUM_C1 ORDER BY V_A1, V_SUM_C1 LIMIT 5", 3, 1, 2, 2);
         }
     }
@@ -1159,25 +1173,13 @@ public class TestPlansGroupBy extends PlannerTestCase {
         AbstractExpression.restoreVerboseExplainForDebugging(asItWas);
     }
 
-    private void checkMVFixWithJoin_reAgg(String sql, int numGroupbyOfReaggNode, int numAggsOfReaggNode,
+    private void checkMVFixWithJoin_ReAgg(String sql, int numGroupbyOfReaggNode, int numAggsOfReaggNode,
             Object aggFilter, String scanFilter) {
         checkMVFixWithJoin(sql, -1, -1, numGroupbyOfReaggNode, numAggsOfReaggNode, aggFilter, scanFilter);
     }
 
-    private void checkMVFixWithJoin_reAgg_noOrder(String sql, int numGroupbyOfReaggNode, int numAggsOfReaggNode,
-            Object aggFilters, Object scanFilters) {
-        checkMVFixWithJoin_noOrder(sql, -1, -1, numGroupbyOfReaggNode, numAggsOfReaggNode, aggFilters, scanFilters);
-    }
-
     private void checkMVFixWithJoin(String sql, int numGroupbyOfTopAggNode, int numAggsOfTopAggNode,
-            int numGroupbyOfReaggNode, int numAggsOfReaggNode, Object aggFilter, Object scanFilter) {
-        checkMVFixWithJoin_noOrder(sql, numGroupbyOfTopAggNode, numAggsOfTopAggNode, numGroupbyOfReaggNode, numAggsOfReaggNode,
-                aggFilter, scanFilter);
-    }
-
-    private void checkMVFixWithJoin_noOrder(String sql, int numGroupbyOfTopAggNode, int numAggsOfTopAggNode,
             int numGroupbyOfReaggNode, int numAggsOfReaggNode, Object aggFilters, Object scanFilters) {
-
         String[] joinType = {"inner join", "left join", "right join"};
 
         for (int i = 0; i < joinType.length; i++) {
@@ -1186,7 +1188,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
             System.err.println("Query:" + newsql);
             // No join node under receive node.
             checkMVReaggregateFeature(true, numGroupbyOfTopAggNode, numAggsOfTopAggNode,
-                    numGroupbyOfReaggNode, numAggsOfReaggNode, false, false, false);
+                    numGroupbyOfReaggNode, numAggsOfReaggNode, false, false);
 
             checkMVFixWithWhere(aggFilters, scanFilters);
         }
@@ -1202,46 +1204,46 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         // Two tables joins.
         sql = "select v_a1 from v_p1 @joinType v_r1 using(v_a1)";
-        checkMVFixWithJoin_reAgg(sql, 2, 0, null, null);
+        checkMVFixWithJoin_ReAgg(sql, 2, 0, null, null);
 
         sql = "select v_a1 from v_p1 @joinType v_r1 using(v_a1) " +
                 "where v_a1 > 1 and v_p1.v_cnt > 2 and v_r1.v_b1 < 3 ";
-        checkMVFixWithJoin_reAgg(sql, 2, 1, "v_cnt > 2", null /* "v_a1 > 1" is optional */);
+        checkMVFixWithJoin_ReAgg(sql, 2, 1, "v_cnt > 2", null /* "v_a1 > 1" is optional */);
 
         sql = "select v_cnt from v_p1 @joinType v_r1 on v_p1.v_cnt = v_r1.v_cnt " +
                 "where v_p1.v_cnt > 1 and v_p1.v_a1 > 2 and v_p1.v_sum_c1 < 3 and v_r1.v_b1 < 4 ";
-        checkMVFixWithJoin_reAgg(sql, 2, 2,
+        checkMVFixWithJoin_ReAgg(sql, 2, 2,
                 new String[] { "v_sum_c1 < 3)", "v_cnt > 1)" }, "v_a1 > 2");
 
         // join on different columns.
         sql = "select v_p1.v_cnt from v_r1 @joinType v_p1 on v_r1.v_sum_c1 = v_p1.v_sum_d1 ";
-        checkMVFixWithJoin_reAgg(sql, 2, 2, null, null);
+        checkMVFixWithJoin_ReAgg(sql, 2, 2, null, null);
 
 
         // Three tables joins.
         sql = "select v_r1.v_a1, v_r1.v_cnt from v_p1 @joinType v_r1 on v_p1.v_a1 = v_r1.v_a1 " +
                 "@joinType r1v on v_p1.v_a1 = r1v.v_a1 ";
-        checkMVFixWithJoin_reAgg(sql, 2, 0, null, null);
+        checkMVFixWithJoin_ReAgg(sql, 2, 0, null, null);
 
         sql = "select v_r1.v_cnt, v_r1.v_a1 from v_p1 @joinType v_r1 on v_p1.v_cnt = v_r1.v_cnt " +
                 "@joinType r1v on v_p1.v_cnt = r1v.v_cnt ";
-        checkMVFixWithJoin_reAgg(sql, 2, 1, null, null);
+        checkMVFixWithJoin_ReAgg(sql, 2, 1, null, null);
 
         // join on different columns.
         sql = "select v_p1.v_cnt from v_r1 @joinType v_p1 on v_r1.v_sum_c1 = v_p1.v_sum_d1 " +
                 "@joinType r1v on v_p1.v_cnt = r1v.v_sum_c1";
-        checkMVFixWithJoin_reAgg(sql, 2, 2, null, null);
+        checkMVFixWithJoin_ReAgg(sql, 2, 2, null, null);
 
         sql = "select v_r1.v_cnt, v_r1.v_a1 from v_p1 @joinType v_r1 on v_p1.v_cnt = v_r1.v_cnt " +
                 "@joinType r1v on v_p1.v_cnt = r1v.v_cnt " +
                 "where v_p1.v_cnt > 1 and v_p1.v_a1 > 2 and v_p1.v_sum_c1 < 3 and v_r1.v_b1 < 4 ";
-        checkMVFixWithJoin_reAgg_noOrder(sql, 2, 2,
+        checkMVFixWithJoin(sql, -1, -1, 2, 2,
                 new String[] {"v_cnt > 1", "v_sum_c1 < 3"}, "v_a1 > 2");
 
         sql = "select v_r1.v_cnt, v_r1.v_a1 from v_p1 @joinType v_r1 on v_p1.v_cnt = v_r1.v_cnt " +
                 "@joinType r1v on v_p1.v_cnt = r1v.v_cnt where v_p1.v_cnt > 1 and v_p1.v_a1 > 2 and " +
                 "v_p1.v_sum_c1 < 3 and v_r1.v_b1 < 4 and r1v.v_sum_c1 > 6";
-        checkMVFixWithJoin_reAgg_noOrder(sql, 2, 2,
+        checkMVFixWithJoin(sql, -1, -1, 2, 2,
                 new String[] {"v_cnt > 1", "v_sum_c1 < 3"}, "v_a1 > 2");
         AbstractExpression.restoreVerboseExplainForDebugging(asItWas);
     }
@@ -1332,7 +1334,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         String sql = "";
 
         sql = "select v_a1 from v_p1 left join v_r1 on v_p1.v_a1 = v_r1.v_a1 AND v_p1.v_cnt = 2 ";
-        checkMVFixWithJoin_reAgg(sql, 2, 1, "v_cnt = 2", null);
+        checkMVFixWithJoin_ReAgg(sql, 2, 1, "v_cnt = 2", null);
 
         // When ENG-5385 is fixed, use the next line to check its plan.
 //        checkMVFixWithJoin_reAgg(sql, 2, 1, null, null);
@@ -1374,9 +1376,6 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
     private void checkHavingClause(String sql, boolean aggInline, Object aggPostFilters) {
         pns = compileToFragments(sql);
-        for (AbstractPlanNode apn: pns) {
-            System.out.println(apn.toExplainPlanString());
-        }
 
         AbstractPlanNode p = pns.get(0);
         AggregatePlanNode aggNode;
@@ -1390,7 +1389,6 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         assertTrue(p instanceof AggregatePlanNode);
         aggNode = (AggregatePlanNode) p;
-
 
         String aggNodeStr = aggNode.toExplainPlanString().toLowerCase();
 
@@ -1416,7 +1414,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
         checkMVReaggreateFeature(sql, true,
                 -1, -1,
                 numGroupbyOfReaggNode, numAggsOfReaggNode,
-                true, false, false);
+                false, false);
     }
 
     private void checkMVFix_TopAgg_ReAgg(
@@ -1427,35 +1425,20 @@ public class TestPlansGroupBy extends PlannerTestCase {
         checkMVReaggreateFeature(sql, true,
                 numGroupbyOfTopAggNode, numAggsOfTopAggNode,
                 numGroupbyOfReaggNode, numAggsOfReaggNode,
-                false, false, false);
+                false, false);
     }
-
-    private void checkMVFix_TopAgg_ReAgg_with_TopProjection(
-            String sql,
-            int numGroupbyOfTopAggNode, int numAggsOfTopAggNode,
-            int numGroupbyOfReaggNode, int numAggsOfReaggNode) {
-
-        checkMVReaggreateFeature(sql, true,
-                numGroupbyOfTopAggNode, numAggsOfTopAggNode,
-                numGroupbyOfReaggNode, numAggsOfReaggNode,
-                true, false, false);
-    }
-
 
     // topNode, reAggNode
     private void checkMVReaggreateFeature(
             String sql, boolean needFix,
             int numGroupbyOfTopAggNode, int numAggsOfTopAggNode,
             int numGroupbyOfReaggNode, int numAggsOfReaggNode,
-            boolean projectionNode, boolean aggPushdown, boolean aggInline) {
+            boolean aggPushdown, boolean aggInline) {
 
         pns = compileToFragments(sql);
-        for (AbstractPlanNode apn: pns) {
-            System.out.println(apn.toExplainPlanString());
-        }
         checkMVReaggregateFeature(needFix, numGroupbyOfTopAggNode, numAggsOfTopAggNode,
                 numGroupbyOfReaggNode, numAggsOfReaggNode,
-                projectionNode, aggPushdown, aggInline);
+                aggPushdown, aggInline);
     }
 
     // topNode, reAggNode
@@ -1463,15 +1446,14 @@ public class TestPlansGroupBy extends PlannerTestCase {
             boolean needFix,
             int numGroupbyOfTopAggNode, int numAggsOfTopAggNode,
             int numGroupbyOfReaggNode, int numAggsOfReaggNode,
-            boolean projectionNode, boolean aggPushdown, boolean aggInline) {
+            boolean aggPushdown, boolean aggInline) {
 
         assertTrue(pns.size() == 2);
         AbstractPlanNode p = pns.get(0);
         assertTrue(p instanceof SendPlanNode);
         p = p.getChild(0);
 
-        if (projectionNode) {
-            assertTrue(p instanceof ProjectionPlanNode);
+        if (p instanceof ProjectionPlanNode) {
             p = p.getChild(0);
         }
 
@@ -1483,10 +1465,6 @@ public class TestPlansGroupBy extends PlannerTestCase {
         if (p instanceof OrderByPlanNode) {
             p = p.getChild(0);
         }
-        if (p instanceof DistinctPlanNode) {
-            p = p.getChild(0);
-        }
-
         HashAggregatePlanNode reAggNode = null;
 
         List<AbstractPlanNode> nodes = p.findAllNodesOfType(PlanNodeType.RECEIVE);
@@ -1514,6 +1492,11 @@ public class TestPlansGroupBy extends PlannerTestCase {
             assertTrue(p instanceof AbstractScanPlanNode);
             return;
         }
+
+        if (p instanceof ProjectionPlanNode) {
+            p = p.getChild(0);
+        }
+
         //
         // Hash top aggregate node
         //

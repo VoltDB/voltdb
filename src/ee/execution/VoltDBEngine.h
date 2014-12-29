@@ -160,6 +160,13 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         inline int64_t pushTuplesProcessedForProgressMonitoring(int64_t tuplesProcessed);
         inline void pushFinalTuplesProcessedForProgressMonitoring(int64_t tuplesProcessed);
 
+        // If an insert will fail due to row limit constraint and user
+        // has defined a delete action to make space, this method
+        // executes the corresponding fragment.
+        //
+        // Returns ENGINE_ERRORCODE_SUCCESS on success
+        int executePurgeFragment(PersistentTable* table);
+
         // -------------------------------------------------
         // Dependency Transfer Functions
         // -------------------------------------------------
@@ -355,6 +362,14 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         void rebuildTableCollections();
 
+        int64_t tempTableMemoryLimit() const {
+            return m_tempTableMemoryLimit;
+        }
+
+        int64_t tempTableLogLimit() const {
+            return (m_tempTableMemoryLimit * 3) / 4;
+        }
+
     private:
         /*
          * Tasks dispatched by executeTask
@@ -367,7 +382,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // Initialization Functions
         // -------------------------------------------------
         void processCatalogDeletes(int64_t timestamp);
-        void initMaterializedViews();
+        void initMaterializedViewsAndLimitDeletePlans();
         bool updateCatalogDatabaseReference();
 
         /**

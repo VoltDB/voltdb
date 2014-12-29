@@ -125,7 +125,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
             }
         }
         assertTrue(found);
-        assertEquals(10, timeout);
+        assertEquals(org.voltcore.common.Constants.DEFAULT_HEARTBEAT_TIMEOUT_SECONDS, timeout);
         ClientResponse results =
             m_client.updateApplicationCatalog(null, new File(m_pathToOtherDeployment));
         assertEquals(ClientResponse.SUCCESS, results.getStatus());

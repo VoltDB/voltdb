@@ -20,6 +20,7 @@ package org.voltdb.expressions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -28,7 +29,7 @@ import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Table;
-import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
+import org.voltdb.planner.ParsedColInfo;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.types.ExpressionType;
 
@@ -675,6 +676,27 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         }
 
         return this;
+    }
+
+    public boolean hasSubExpressionFrom(Set<AbstractExpression> expressionSet) {
+        if (expressionSet.contains(this)) {
+            return true;
+        }
+
+        if (m_left != null && expressionSet.contains(m_left)) {
+            return true;
+        }
+        if (m_right != null && expressionSet.contains(m_right)) {
+            return true;
+        }
+        if (m_args != null) {
+            for (AbstractExpression expr: m_args) {
+                if (expressionSet.contains(expr)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**

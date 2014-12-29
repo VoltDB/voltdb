@@ -37,16 +37,24 @@ import org.voltdb.client.ProcedureCallback;
 import org.voltcore.logging.Level;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
+import org.voltdb.VoltDB.Configuration;
+import org.voltdb.utils.Base64;
 import org.voltdb.utils.Encoder;
 
 public class HTTPClientInterface {
 
-    private static VoltLogger m_log = new VoltLogger("HOST");
+    private static final VoltLogger m_log = new VoltLogger("HOST");
     private static final RateLimitedLogger m_rate_limited_log = new RateLimitedLogger(10 * 1000, m_log, Level.WARN);
 
     AuthenticatedConnectionCache m_connections = null;
     static final int CACHE_TARGET_SIZE = 10;
     private final AtomicBoolean m_shouldUpdateCatalog = new AtomicBoolean(false);
+
+    public static final String PARAM_USERNAME = "User";
+    public static final String PARAM_PASSWORD = "Password";
+    public static final String PARAM_HASHEDPASSWORD = "Hashedpassword";
+    public static final String PARAM_ADMIN = "admin";
+
 
     class JSONProcCallback implements ProcedureCallback {
 
@@ -99,43 +107,12 @@ public class HTTPClientInterface {
     }
 
     public void process(Request request, HttpServletResponse response) {
-        Client client = null;
-        boolean adminMode = false;
+        AuthenticationResult authResult = null;
 
         Continuation continuation = ContinuationSupport.getContinuation(request);
         continuation.suspend(response);
         String jsonp = null;
         try {
-            // first check for a catalog update and purge the cached connections
-            // if one has happened since we were here last
-            if (m_shouldUpdateCatalog.compareAndSet(true, false))
-            {
-                m_connections.closeAll();
-                // Just null the old object so we'll create a new one with
-                // updated state below
-                m_connections = null;
-            }
-
-            if (m_connections == null) {
-                int port = VoltDB.instance().getConfig().m_port;
-                int adminPort = VoltDB.instance().getConfig().m_adminPort;
-                String externalInterface = VoltDB.instance().getConfig().m_externalInterface;
-                String adminInterface = "localhost";
-                String clientInterface = "localhost";
-                if (externalInterface != null && !externalInterface.isEmpty()) {
-                    clientInterface = externalInterface;
-                    adminInterface = externalInterface;
-                }
-                //If individual override is available use them.
-                if (VoltDB.instance().getConfig().m_clientInterface.length() > 0) {
-                    clientInterface = VoltDB.instance().getConfig().m_clientInterface;
-                }
-                if (VoltDB.instance().getConfig().m_adminInterface.length() > 0) {
-                    adminInterface = VoltDB.instance().getConfig().m_adminInterface;
-                }
-                m_connections = new AuthenticatedConnectionCache(10, clientInterface, port, adminInterface, adminPort);
-            }
-
             jsonp = request.getParameter("jsonp");
             if (request.getMethod().equalsIgnoreCase("POST")) {
                 int queryParamSize = request.getContentLength();
@@ -148,19 +125,8 @@ public class HTTPClientInterface {
                 }
             }
 
-            String username = request.getParameter("User");
-            String password = request.getParameter("Password");
-            String hashedPassword = request.getParameter("Hashedpassword");
             String procName = request.getParameter("Procedure");
             String params = request.getParameter("Parameters");
-            String admin = request.getParameter("admin");
-
-            // check for admin mode
-            if (admin != null) {
-                if (admin.compareToIgnoreCase("true") == 0) {
-                    adminMode = true;
-                }
-            }
 
             // null procs are bad news
             if (procName == null) {
@@ -169,38 +135,22 @@ public class HTTPClientInterface {
                 return;
             }
 
-            // The SHA-1 hash of the password
-            byte[] hashedPasswordBytes = null;
-
-            if (password != null) {
+            authResult = authenticate(request);
+            if (!authResult.isAuthenticated()) {
+                String msg = authResult.m_message;
+                ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg);
+                msg = rimpl.toJSONString();
+                if (jsonp != null) {
+                    msg = String.format("%s( %s )", jsonp, msg);
+                }
+                response.setStatus(HttpServletResponse.SC_OK);
+                request.setHandled(true);
                 try {
-                    // Create a MessageDigest every time because MessageDigest is not thread safe (ENG-5438)
-                    MessageDigest md = MessageDigest.getInstance("SHA-1");
-                    hashedPasswordBytes = md.digest(password.getBytes("UTF-8"));
-                } catch (NoSuchAlgorithmException e) {
-                    throw new RuntimeException("JVM doesn't support SHA-1 hashing. Please use a supported JVM", e);
-                } catch (UnsupportedEncodingException e) {
-                    throw new RuntimeException("JVM doesn't support UTF-8. Please use a supported JVM", e);
-                }
+                    response.getWriter().print(msg);
+                    continuation.complete();
+                } catch (IOException e1) {} // Ignore this as browser must have closed.
+                return;
             }
-            // note that HTTP Var "Hashedpassword" has a higher priority
-            // Hashedassword must be a 40-byte hex-encoded SHA-1 hash (20 bytes unencoded)
-            if (hashedPassword != null) {
-                if (hashedPassword.length() != 40) {
-                    throw new Exception("Hashedpassword must be a 40-byte hex-encoded SHA-1 hash (20 bytes unencoded).");
-                }
-                try {
-                    hashedPasswordBytes = Encoder.hexDecode(hashedPassword);
-                }
-                catch (Exception e) {
-                    throw new Exception("Hashedpassword must be a 40-byte hex-encoded SHA-1 hash (20 bytes unencoded).");
-                }
-            }
-
-            assert((hashedPasswordBytes == null) || (hashedPasswordBytes.length == 20));
-
-            // get a connection to localhost from the pool
-            client = m_connections.getClient(username, password, hashedPasswordBytes, adminMode);
 
             JSONProcCallback cb = new JSONProcCallback(request, continuation, jsonp);
             boolean success;
@@ -221,36 +171,18 @@ public class HTTPClientInterface {
                     continuation.complete();
                     return;
                 }
-                success = client.callProcedure(cb, procName, paramSet.toArray());
+                success = authResult.m_client.callProcedure(cb, procName, paramSet.toArray());
             }
             else {
-                success = client.callProcedure(cb, procName);
+                success = authResult.m_client.callProcedure(cb, procName);
             }
             if (!success) {
                 throw new Exception("Server is not accepting work at this time.");
             }
-            if (adminMode) {
+            if (authResult.m_adminMode) {
                 cb.waitForResponse();
             }
-        }
-        catch (java.net.ConnectException c_ex)
-        {
-            // Clients may attempt to connect to VoltDB before the server
-            // is completely initialized (our tests do this, for example).
-            // Don't print a stack trace, and return a server unavailable reason.
-            ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.SERVER_UNAVAILABLE, new VoltTable[0], c_ex.getMessage());
-            String msg = rimpl.toJSONString();
-            if (jsonp != null) {
-                msg = String.format("%s( %s )", jsonp, msg);
-            }
-            response.setStatus(HttpServletResponse.SC_OK);
-            request.setHandled(true);
-            try {
-                response.getWriter().print(msg);
-                continuation.complete();
-            } catch (IOException e1) {}
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             String msg = e.getMessage();
             m_rate_limited_log.log("JSON interface exception: " + msg, EstTime.currentTimeMillis());
             ClientResponseImpl rimpl = new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE, new VoltTable[0], msg);
@@ -263,25 +195,155 @@ public class HTTPClientInterface {
             try {
                 response.getWriter().print(msg);
                 continuation.complete();
-            } catch (IOException e1) {}
+            } catch (IOException e1) {} // Ignore this as browser must have closed.
+        } finally {
+            releaseClient(authResult);
         }
-        finally {
-            if (client != null) {
-                assert(m_connections != null);
-                // admin connections aren't cached
-                if (adminMode) {
-                    if (client != null) {
-                        try {
-                            client.close();
-                        } catch (InterruptedException e) {
-                            m_log.warn("JSON interface was interrupted while closing an internal admin client connection.");
-                        }
+    }
+
+    private AuthenticationResult getAuthenticationResult(Request request) {
+        boolean adminMode = false;
+
+        String username = null;
+        String hashedPassword = null;
+        String password = null;
+        //Check authorization header
+        String auth = request.getHeader("Authorization");
+        boolean validAuthHeader = false;
+        if (auth != null) {
+            String schemeAndHandle[] = auth.split(" ");
+            if (schemeAndHandle.length == 2) {
+                if (schemeAndHandle[0].equalsIgnoreCase("hashed")) {
+                    String up[] = schemeAndHandle[1].split(":");
+                    if (up.length == 2) {
+                        username = up[0];
+                        hashedPassword = up[1];
+                        validAuthHeader = true;
+                    }
+                } else if (schemeAndHandle[0].equalsIgnoreCase("basic")) {
+                    String unpw = new String(Base64.decode(schemeAndHandle[1]));
+                    String up[] = unpw.split(":");
+                    if (up.length == 2) {
+                        username = up[0];
+                        password = up[1];
+                        validAuthHeader = true;
                     }
                 }
-                // other connections are cached
-                else {
-                    m_connections.releaseClient(client);
+            }
+        }
+        if (!validAuthHeader) {
+            username = request.getParameter(PARAM_USERNAME);
+            hashedPassword = request.getParameter(PARAM_HASHEDPASSWORD);
+            password = request.getParameter(PARAM_PASSWORD);
+        }
+        String admin = request.getParameter(PARAM_ADMIN);
+
+        // first check for a catalog update and purge the cached connections
+        // if one has happened since we were here last
+        if (m_shouldUpdateCatalog.compareAndSet(true, false))
+        {
+            if (m_connections != null) {
+                m_connections.closeAll();
+                // Just null the old object so we'll create a new one with
+                // updated state below
+                m_connections = null;
+            }
+        }
+
+        if (m_connections == null) {
+            Configuration config = VoltDB.instance().getConfig();
+            int port = config.m_port;
+            int adminPort = config.m_adminPort;
+            String externalInterface = config.m_externalInterface;
+            String adminInterface = "localhost";
+            String clientInterface = "localhost";
+            if (externalInterface != null && !externalInterface.isEmpty()) {
+                clientInterface = externalInterface;
+                adminInterface = externalInterface;
+            }
+            //If individual override is available use them.
+            if (config.m_clientInterface.length() > 0) {
+                clientInterface = config.m_clientInterface;
+            }
+            if (config.m_adminInterface.length() > 0) {
+                adminInterface = config.m_adminInterface;
+            }
+            m_connections = new AuthenticatedConnectionCache(10, clientInterface, port, adminInterface, adminPort);
+        }
+
+        // check for admin mode
+        if (admin != null) {
+            if (admin.compareToIgnoreCase("true") == 0) {
+                adminMode = true;
+            }
+        }
+
+        // The SHA-1 hash of the password
+        byte[] hashedPasswordBytes = null;
+
+        if (password != null) {
+            try {
+                // Create a MessageDigest every time because MessageDigest is not thread safe (ENG-5438)
+                MessageDigest md = MessageDigest.getInstance("SHA-1");
+                hashedPasswordBytes = md.digest(password.getBytes("UTF-8"));
+            } catch (NoSuchAlgorithmException e) {
+                return new AuthenticationResult(null, adminMode, username, "JVM doesn't support SHA-1 hashing. Please use a supported JVM" + e);
+            } catch (UnsupportedEncodingException e) {
+                return new AuthenticationResult(null, adminMode, username, "JVM doesn't support UTF-8. Please use a supported JVM" + e);
+            }
+        }
+        // note that HTTP Var "Hashedpassword" has a higher priority
+        // Hashedassword must be a 40-byte hex-encoded SHA-1 hash (20 bytes unencoded)
+        if (hashedPassword != null) {
+            if (hashedPassword.length() != 40) {
+                return new AuthenticationResult(null, adminMode, username, "Hashedpassword must be a 40-byte hex-encoded SHA-1 hash (20 bytes unencoded).");
+            }
+            try {
+                hashedPasswordBytes = Encoder.hexDecode(hashedPassword);
+            }
+            catch (Exception e) {
+                return new AuthenticationResult(null, adminMode, username, "Hashedpassword must be a 40-byte hex-encoded SHA-1 hash (20 bytes unencoded).");
+            }
+        }
+
+        assert((hashedPasswordBytes == null) || (hashedPasswordBytes.length == 20));
+
+        try {
+            // get a connection to localhost from the pool
+            Client client = m_connections.getClient(username, password, hashedPasswordBytes, adminMode);
+            if (client != null) {
+                return new AuthenticationResult(client, adminMode, username, "");
+            }
+            return new AuthenticationResult(null, adminMode, username, "Failed to get client.");
+        } catch (IOException ex) {
+            return new AuthenticationResult(null, adminMode, username, ex.getMessage());
+        }
+    }
+
+    //Remember to call releaseClient if you authenticate which will close admin clients and refcount-- others.
+    public AuthenticationResult authenticate(Request request) {
+        AuthenticationResult authResult = getAuthenticationResult(request);
+        if (!authResult.isAuthenticated()) {
+            m_rate_limited_log.log("JSON interface exception: " + authResult.m_message, EstTime.currentTimeMillis());
+        }
+        return authResult;
+    }
+
+    //Must be called by all who call authenticate.
+    public void releaseClient(AuthenticationResult authResult) {
+        if (authResult != null && authResult.m_client != null) {
+            assert(m_connections != null);
+            // admin connections aren't cached
+            if (authResult.m_adminMode) {
+                try {
+                    authResult.m_client.close();
+                } catch (InterruptedException e) {
+                    m_log.warn("JSON interface was interrupted while closing an internal admin client connection.");
                 }
+            }
+            // other connections are cached
+            else {
+                m_connections.releaseClient(authResult.m_client);
             }
         }
     }

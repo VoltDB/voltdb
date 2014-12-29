@@ -34,7 +34,6 @@ import org.eclipse.jetty.server.AsyncContinuation;
 import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.server.bio.SocketConnector;
 import org.eclipse.jetty.server.handler.AbstractHandler;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
@@ -47,16 +46,35 @@ import org.voltdb.compilereport.ReportMaker;
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.io.Resources;
 import java.net.InetAddress;
+import java.util.List;
+import org.codehaus.jackson.JsonGenerator;
+import org.codehaus.jackson.annotate.JsonIgnore;
+import org.codehaus.jackson.map.JsonMappingException;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jackson.schema.JsonSchema;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
+import org.eclipse.jetty.server.bio.SocketConnector;
+import org.voltdb.AuthenticationResult;
+import org.voltdb.ClientResponseImpl;
+import org.voltdb.VoltTable;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.common.Permission;
+import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.UsersType;
+import org.voltdb.compiler.deploymentfile.UsersType.User;
 
 public class HTTPAdminListener {
+
+    private static final VoltLogger m_log = new VoltLogger("HOST");
 
     Server m_server = new Server();
     HTTPClientInterface httpClientInterface = new HTTPClientInterface();
     final boolean m_jsonEnabled;
     Map<String, String> m_htmlTemplates = new HashMap<String, String>();
     final boolean m_mustListen;
+    final DeploymentRequestHandler m_deploymentHandler;
 
     //Somewhat like Filter but we dont have Filter in version and jars we use.
     class VoltRequestHandler extends AbstractHandler {
@@ -89,10 +107,22 @@ public class HTTPAdminListener {
             return m_hostHeader;
         }
 
+        public AuthenticationResult authenticate(Request request) {
+            return httpClientInterface.authenticate(request);
+        }
 
         @Override
         public void handle(String string, Request rqst, HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
             response.setHeader("Host", getHostHeader());
+        }
+
+        //Build a client response based json response
+        protected String buildClientResponse(String jsonp, byte code, String msg) {
+            ClientResponseImpl rimpl = new ClientResponseImpl(code, new VoltTable[0], msg);
+            if (jsonp != null) {
+                return String.format("%s( %s )", jsonp, rimpl.toJSONString());
+            }
+            return rimpl.toJSONString();
         }
 
     }
@@ -103,7 +133,6 @@ public class HTTPAdminListener {
         public void handle(String target, Request baseRequest,
                            HttpServletRequest request, HttpServletResponse response)
                             throws IOException, ServletException {
-            VoltLogger logger = new VoltLogger("HOST");
             super.handle(target, baseRequest, request, response);
             try{
 
@@ -231,13 +260,227 @@ public class HTTPAdminListener {
 
     }
 
+    //This is a wrapper to generate JSON for profile of authenticated user.
+    private final class Profile {
+        private final String user;
+        private final String permissions[];
+        public Profile(String u, String[] p) {
+            user = u;
+            permissions = p;
+        }
+        public String getUser() {
+            return user;
+        }
+        public String[] getPermissions() {
+            return permissions;
+        }
+    }
+
+    // /profile handler
+    class UserProfileHandler extends VoltRequestHandler {
+        private final ObjectMapper m_mapper;
+
+        public UserProfileHandler() {
+            m_mapper = new ObjectMapper();
+            //We want jackson to stop closing streams
+            m_mapper.configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false);
+        }
+
+        // GET on /profile resources.
+        @Override
+        public void handle(String target,
+                           Request baseRequest,
+                           HttpServletRequest request,
+                           HttpServletResponse response)
+                           throws IOException, ServletException {
+            //jsonp is specified when response is expected to go to javascript function.
+            String jsonp = request.getParameter("jsonp");
+            AuthenticationResult authResult = null;
+            try {
+                response.setContentType("application/json;charset=utf-8");
+                response.setStatus(HttpServletResponse.SC_OK);
+                authResult = authenticate(baseRequest);
+                if (!authResult.isAuthenticated()) {
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, authResult.m_message));
+                } else {
+                    if (jsonp != null) {
+                        response.getWriter().write(jsonp + "(");
+                    }
+                    m_mapper.writeValue(response.getWriter(), new Profile(authResult.m_user, authResult.m_perms));
+                    if (jsonp != null) {
+                        response.getWriter().write(")");
+                    }
+                }
+                baseRequest.setHandled(true);
+            } catch (Exception ex) {
+              logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage(), ex);
+            } finally {
+                httpClientInterface.releaseClient(authResult);
+            }
+        }
+    }
+
+    //This is for password on User not to be reported.
+    abstract class IgnorePasswordMixIn {
+        @JsonIgnore abstract String getPassword();
+    }
+
+    class DeploymentRequestHandler extends VoltRequestHandler {
+
+        final ObjectMapper m_mapper;
+        String m_schema = "";
+
+        public DeploymentRequestHandler() {
+            m_mapper = new ObjectMapper();
+            //Mixin for to not output passwords.
+            m_mapper.getSerializationConfig().addMixInAnnotations(UsersType.User.class, IgnorePasswordMixIn.class);
+            //We want jackson to stop closing streams
+            m_mapper.configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, false);
+            try {
+                JsonSchema schema = m_mapper.generateJsonSchema(DeploymentType.class);
+                m_schema = schema.toString();
+            } catch (JsonMappingException ex) {
+                m_log.warn("Failed to generate JSON schema: ", ex);
+            }
+        }
+
+        //Get deployment from catalog context
+        private DeploymentType getDeployment() {
+            return VoltDB.instance().getCatalogContext().getDeployment();
+        }
+
+        //Get deployment bytes from catalog context
+        private byte[] getDeploymentBytes() {
+            return VoltDB.instance().getCatalogContext().getDeploymentBytes();
+        }
+
+        // TODO - subresources.
+        // We support
+        // /deployment/cluster
+        // /deployment/paths
+        // /deployment/partitionDetection
+        // /deployment/adminMode
+        // /deployment/heartbeat
+        // /deployment/httpd
+        // /deployment/replication
+        // /deployment/snapshot
+        // /deployment/export
+        // /deployment/users
+        // /deployment/commandlog
+        // /deployment/systemsettings
+        // /deployment/security
+        @Override
+        public void handle(String target,
+                           Request baseRequest,
+                           HttpServletRequest request,
+                           HttpServletResponse response)
+                           throws IOException, ServletException {
+
+            super.handle(target, baseRequest, request, response);
+
+            //jsonp is specified when response is expected to go to javascript function.
+            String jsonp = request.getParameter("jsonp");
+            AuthenticationResult authResult = null;
+            try {
+                response.setContentType("application/json;charset=utf-8");
+                response.setStatus(HttpServletResponse.SC_OK);
+
+                //Requests require authentication.
+                authResult = authenticate(baseRequest);
+                if (!authResult.isAuthenticated()) {
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, authResult.m_message));
+                    baseRequest.setHandled(true);
+                    return;
+                }
+                //Authenticated but has no permissions.
+                if (!authResult.m_authUser.hasPermission(Permission.ADMIN)) {
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Permission denied"));
+                    baseRequest.setHandled(true);
+                    return;
+                }
+
+                //Authenticated and has ADMIN permission
+                if (baseRequest.getRequestURI().contains("/download")) {
+                    //Deployment xml is text/xml
+                    response.setContentType("text/xml;charset=utf-8");
+                    response.getWriter().write(new String(getDeploymentBytes()));
+                } else {
+                    if (request.getMethod().equalsIgnoreCase("POST")) {
+                        handleUpdateDeployment(jsonp, target, baseRequest, request, response, authResult.m_client);
+                    } else {
+                        //non POST
+                        if (jsonp != null) {
+                            response.getWriter().write(jsonp + "(");
+                        }
+                        m_mapper.writeValue(response.getWriter(), getDeployment());
+                        if (jsonp != null) {
+                            response.getWriter().write(")");
+                        }
+                    }
+                }
+                baseRequest.setHandled(true);
+            } catch (Exception ex) {
+              logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage(), ex);
+            } finally {
+                httpClientInterface.releaseClient(authResult);
+            }
+        }
+
+        //Update the deployment
+        public void handleUpdateDeployment(String jsonp, String target,
+                           Request baseRequest,
+                           HttpServletRequest request,
+                           HttpServletResponse response, Client client)
+                           throws IOException, ServletException {
+            String deployment = request.getParameter("deployment");
+            if (deployment == null || deployment.length() == 0) {
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Failed to get deployment information."));
+                return;
+            }
+            try {
+                DeploymentType newDeployment = m_mapper.readValue(deployment, DeploymentType.class);
+                if (newDeployment == null) {
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Failed to build deployment information."));
+                    return;
+                }
+                //For users that are listed if they exists without password set their password to current else password will get changed for existing user.
+                //New users if valid will get updated.
+                //For Scrambled passowrd this will work also but new passwords will be unscrambled
+                //TODO: add switch to post to scramble??
+                if (newDeployment.getSecurity() != null && newDeployment.getSecurity().isEnabled()) {
+                    DeploymentType currentDeployment = this.getDeployment();
+                    List<User> users = currentDeployment.getUsers().getUser();
+                    for (UsersType.User user : newDeployment.getUsers().getUser()) {
+                        if (user.getPassword() == null || user.getPassword().trim().length() == 0) {
+                            for (User u : users) {
+                                if (user.getName().equalsIgnoreCase(u.getName())) {
+                                    user.setPassword(u.getPassword());
+                                }
+                            }
+                        }
+                    }
+                }
+
+                String dep = CatalogUtil.getDeployment(newDeployment);
+                Object[] params = new Object[2];
+                params[0] = null;
+                params[1] = dep;
+                //Call sync as nothing else can happen when this is going on.
+                client.callProcedure("@UpdateApplicationCatalog", params);
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.SUCCESS, "Deployment Updated."));
+            } catch (Exception ex) {
+                logger.error("Failed to update deployment from API", ex);
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, ex.toString()));
+            }
+        }
+    }
+
     class APIRequestHandler extends VoltRequestHandler {
 
         @Override
         public void handle(String target, Request baseRequest,
                            HttpServletRequest request, HttpServletResponse response)
                             throws IOException, ServletException {
-            VoltLogger logger = new VoltLogger("HOST");
             super.handle(target, baseRequest, request, response);
             try {
                 // http://www.ietf.org/rfc/rfc4627.txt dictates this mime type
@@ -257,7 +500,7 @@ public class HTTPAdminListener {
                 }
 
             } catch(Exception ex){
-                logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage());
+                logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage(), ex);
             }
         }
     }
@@ -354,11 +597,22 @@ public class HTTPAdminListener {
             ContextHandler ddlRequestHandler = new ContextHandler("/ddl");
             ddlRequestHandler.setHandler(new DDLRequestHandler());
 
+            ///deployment
+            ContextHandler deploymentRequestHandler = new ContextHandler("/deployment");
+            m_deploymentHandler = new DeploymentRequestHandler();
+            deploymentRequestHandler.setHandler(m_deploymentHandler);
+
+            ///profile
+            ContextHandler profileRequestHandler = new ContextHandler("/profile");
+            profileRequestHandler.setHandler(new UserProfileHandler());
+
             ContextHandlerCollection handlers = new ContextHandlerCollection();
             handlers.setHandlers(new Handler[] {
                     apiRequestHandler,
                     catalogRequestHandler,
                     ddlRequestHandler,
+                    deploymentRequestHandler,
+                    profileRequestHandler,
                     dbMonitorHandler
             });
 
@@ -407,6 +661,7 @@ public class HTTPAdminListener {
 
     public void notifyOfCatalogUpdate()
     {
+        //Notify to clean any cached clients so new security can be enforced.
         httpClientInterface.notifyOfCatalogUpdate();
     }
 }
