@@ -204,7 +204,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
     private int callSQLcmd(boolean stopOnError, String inputText) throws Exception
     {
         final String commandPath = "bin/sqlcmd";
-        final long timeout = 10000; // 10,000 millis -- give up after 10 seconds of trying.
+        final long timeout = 60000; // 60,000 millis -- give up after 1 minute of trying.
 
         File f = new File("ddl.sql");
         f.deleteOnExit();
@@ -220,10 +220,10 @@ public class TestSqlCmdErrorHandling extends TestCase {
 
         ProcessBuilder pb =
 //                // Enable elapsed time reports to stderr.
-//                new ProcessBuilder(commandPath, "--debugdelay=0,,",
+                new ProcessBuilder(commandPath, "--debugdelay=,,",
 //                // Use up all alloted time on the first error to selectively exercise timeout diagnostics."
 //                new ProcessBuilder(commandPath, "--debugdelay=,,10000",
-                new ProcessBuilder(commandPath,
+//                new ProcessBuilder(commandPath,
                         "--stop-on-error=" + (stopOnError ? "true" : "false"),
                         "--servers=" + m_serversString,
                         "--port=" + m_portString);
