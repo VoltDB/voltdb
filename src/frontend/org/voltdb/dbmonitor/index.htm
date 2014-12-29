@@ -755,6 +755,22 @@
         </div>
     </div>
     <!--Connection popup-->
+    
+    <!--Server Shutdown Information-->
+    <div style="display: none"><a href="#shutdownInfoPopup" id="serverShutdownPopup">Cluster Shutdown</a></div>
+    <div id="shutdownInfoPopup" style="display: none">
+        <div id="shutdownPop">
+            <div class="overlay-title ">
+                <img src="css/resources/images/error.png" class="imgError" />Error</div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorMsg">
+                <p>DB Monitor service has been shutdown. Please click ok when the server is back online. </p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnServerShutdownOk" title="save">Ok</a></div>
+            </div>
+        </div>
+    </div>
+    <!--Server Shutdown Information-->
 
     <!--Server not available popup-->
     <div style="display: none"><a href="#serverUnavailablePopup" id="serUnavailablePopup">Connection Error</a></div>
@@ -837,7 +853,7 @@
             <p>Any data not saved to a snapshot or command log will be lost.</p>
             <p>Continue with the shutdown?</p>
         </div>
-        <div class="overlay-btns"><a class="btn closeBtn" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Ok">Cancel</a></div>
+        <div class="overlay-btns"><a id="btnShutdownConfirmationOk" class="btn closeBtn" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Ok">Cancel</a></div>
     </div>
     <!-- POPUP shutDownConfirmationPop -->
     <!-- POPUP stopConfirmationPop -->
@@ -952,16 +968,16 @@
                     <tr>
                         <td>Directory:</td>
                         <td>
-                            <input type="text" value="D:/VoltDB/Snapshots/" class="editDirLocation" />
+                            <input id="txtSnapshotDirectory" type="text" value="D:/VoltDB/Snapshots/" class="editDirLocation" />
                     </tr>
                     <tr>
                         <td>Snapshot Name:</td>
                         <td>
-                            <input type="text" value="SNAPSHOT_yyyy.mm.dd.hh.mm " /></td>
+                            <input id="txtSnapshotName" type="text" value="SNAPSHOT_yyyy.mm.dd.hh.mm " /></td>
                     </tr>
                 </table>
             </div>
-            <div class="overlay-btns"><a class="btn saveBtn" title="Save">Save</a> <a class="btn btn-gray closeBtn" title="Cancel">Cancel</a> </div>
+            <div class="overlay-btns"><a id="btnSaveSnapshots" class="btn saveBtn" title="Save">Save</a> <a class="btn btn-gray closeBtn" title="Cancel">Cancel</a> </div>
         </div>
         <div class="saveConfirmation" style="display: none;">
             <div class="overlay-content ">

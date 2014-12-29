@@ -730,6 +730,83 @@
 
 
         };
+        
+        this.ShutdownClusterState = function (onConnectionAdded) {
+            try {
+                var processName = "SYSTEMINFORMATION_SHUTDOWNCLUSTER";
+                var procedureNames = ['@Shutdown'];
+                var parameters = [undefined];
+                var values = [undefined];
+
+                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
+                if (_connection == null) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
+                        if (result == true) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                                status = connection.Metadata['@Shutdown_status'];
+                                if (!(status == "" || status == undefined)) {
+                                    onConnectionAdded(connection, status);
+                                }
+                            });
+                        }
+
+                    });
+
+                } else {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
+                        status = connection.Metadata['@Shutdown_status'];
+                        if (!(status == "" || status == undefined)) {
+                            onConnectionAdded(connection, status);
+                        }
+
+                    });
+
+                }
+
+            } catch (e) {
+                console.log(e.message);
+            }
+
+
+        };
+
+        this.SaveSnapShot = function(snapshotDir,snapshotFileName, onConnectionAdded) {
+            try {
+                var processName = "SYSTEMINFORMATION_SAVESNAPSHOT";
+                var procedureNames = ['@SnapshotSave'];
+                var parameters = ["'" + snapshotDir + "'",snapshotFileName, 0];
+                var values = [undefined];
+
+                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
+                if (_connection == null) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
+                        if (result == true) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                                status = connection.Metadata['@SnapshotSave_status'];
+                                if (!(status == "" || status == undefined)) {
+                                    onConnectionAdded(connection, status);
+                                }
+                            });
+                        }
+
+                    });
+
+                } else {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
+                        status = connection.Metadata['@SnapshotSave_status'];
+                        if (!(status == "" || status == undefined)) {
+                            onConnectionAdded(connection, status);
+                        }
+
+                    });
+
+                }
+
+            } catch (e) {
+                console.log(e.message);
+            }
+
+        };
 
         //end admin configuration
 

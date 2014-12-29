@@ -5,7 +5,11 @@ var adminClusterObjects = {};
 function loadAdminPage() {
     adminClusterObjects = {
         btnClusterPause: $('#pauseConfirmation'),
-        btnClusterResume: $('#resumeConfirmation')
+        btnClusterResume: $('#resumeConfirmation'),
+        btnClusterShutdown: $('#shutDownConfirmation'),
+        btnClusterSaveSnapshot: $('#saveConfirmation'),
+        txtSnapshotDirectory: $('#txtSnapshotDirectory'),
+        txtSnapshotName: $('#txtSnapshotName')
     };
 
     adminDOMObjects = {
@@ -176,7 +180,39 @@ function loadAdminPage() {
         height: '225px'
     });
 
-    $('#shutDownConfirmation').popup();
+    $('#shutDownConfirmation').popup({
+        open: function (event, ui, ele) {
+        },
+        afterOpen: function () {
+            $("#btnShutdownConfirmationOk").unbind("click");
+            $("#btnShutdownConfirmationOk").on("click", function () {
+                var shutdownTimeout = setTimeout(function() {
+                    $('#serverShutdownPopup').click();
+                    VoltDBCore.isServerConnected = false;
+                    window.clearInterval(VoltDbUI.connectionTimeInterval);
+                },10000);
+
+                voltDbRenderer.shutdownCluster(function (success) {
+                    if (!success) {
+                        clearTimeout(shutdownTimeout);
+                        alert("Unable to shutdown cluster.");
+                    } 
+                    $("#overlay").hide();
+                });
+                //Close the popup
+                $($(this).siblings()[0]).trigger("click");
+
+            });
+        }
+    });
+
+    $("#serverShutdownPopup").popup({
+        closeDialog: function () {
+            VoltDbUI.isConnectionChecked = false;
+            VoltDbUI.refreshConnectionTime('20000');
+            $('#shutdownInfoPopup').hide();
+        }
+    });
 
     $('#pauseConfirmation').popup({
         open: function (event, ui, ele) {
@@ -309,7 +345,35 @@ function loadAdminPage() {
     });
 
 
-    $('#saveConfirmation').popup();
+    $('#saveConfirmation').popup({
+        open: function (event, ui, ele) {
+        },
+        afterOpen: function (event) {
+            $("#btnSaveSnapshots").unbind("click");
+            $("#btnSaveSnapshots").on("click", function () {
+                var snapShotDirectory = '/var/opt/test/voltdb/83886092/snapshots';// + txtSnapshotDirectory.val();
+                var snapShotFileName = adminClusterObjects.txtSnapshotName.val() + getDateTime();
+                var snapShotDetails = snapShotDirectory.trim() +',' +snapShotFileName.trim();
+                //voltDbRenderer.saveSnapshot(snapShotDirectory, snapShotFileName, function (success) {
+                //    if (success) {
+                //        alert("Snapshot saved successfully.");
+                //    } else {
+                //        alert("Unable to resume the cluster.");
+                //    }
+                //    $("#overlay").hide();
+                //});
+                //Close the popup
+                $($(this).siblings()[0]).trigger("click");
+
+            });
+        }
+    });
+
+    var getDateTime = function() {
+        var currentDate = new Date();
+        return (currentDate.getFullYear() + '.' + (currentDate.getMonth() + 1) + '.' + currentDate.getDate() + '.' + currentDate.getHours() + '.' + currentDate.getMinutes() + '.' + currentDate.getSeconds()).toString();
+    };
+
     $('#restoreConfirmation').popup();
     
     $('#stopConfirmation').popup({
