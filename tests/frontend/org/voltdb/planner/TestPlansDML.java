@@ -28,10 +28,16 @@ import java.util.List;
 
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.DeletePlanNode;
+import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.InsertPlanNode;
+import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
+import org.voltdb.plannodes.SendPlanNode;
+import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.UpdatePlanNode;
 import org.voltdb.types.PlanNodeType;
+
+import java.util.Arrays;
 
 public class TestPlansDML extends PlannerTestCase {
 
@@ -196,6 +202,56 @@ public class TestPlansDML extends PlannerTestCase {
         // Cannot evaluate expression except in EE.
         pns = compileToFragments("INSERT INTO P1 (a, c) values(cast(? + 1 as integer), 100)");
         assertEquals(2, pns.size());
+    }
+
+    private void verifyPlan(List<Class<? extends AbstractPlanNode>> expectedClasses,
+            AbstractPlanNode actualNode) {
+        AbstractPlanNode pn = actualNode;
+        for (Class<? extends AbstractPlanNode> c : expectedClasses) {
+            assertFalse("Actual plan shorter than expected",
+                    pn == null);
+            assertTrue("Expected plan to contain an instance of " + c.getSimpleName() +", "
+                    + "instead found " + pn.getClass().getSimpleName(),
+                    c.isInstance(pn));
+            if (pn.getChildCount() > 0)
+                pn = pn.getChild(0);
+            else
+                pn = null;
+        }
+
+        assertTrue("Actual plan longer than expected", pn == null);
+    }
+
+    public void testDeleteOrderByPlan() {
+        System.out.println("\n\n\nRUNNING testDeleteOrderByPlan\n\n");
+
+        pns = compileToFragments("DELETE FROM R5 ORDER BY A LIMIT ?");
+        assertEquals(2, pns.size());
+
+        // There is a PK index on A, but we don't use it
+        // for sort order here.  We should!
+        AbstractPlanNode collectorRoot = pns.get(1);
+        verifyPlan(Arrays.asList(
+                SendPlanNode.class,
+                DeletePlanNode.class,
+                OrderByPlanNode.class,
+                SeqScanPlanNode.class),
+                collectorRoot
+                );
+
+        pns = compileToFragments("DELETE FROM R5 WHERE A = 1 ORDER BY A LIMIT ?");
+        assertEquals(2, pns.size());
+
+        // The ORDER BY is unnecessary here, since rows are already sorted due
+        // to the index scan.
+        collectorRoot = pns.get(1);
+        verifyPlan(Arrays.asList(
+                SendPlanNode.class,
+                DeletePlanNode.class,
+                OrderByPlanNode.class,
+                IndexScanPlanNode.class),
+                collectorRoot
+                );
     }
 
     private void checkTruncateFlag() {
