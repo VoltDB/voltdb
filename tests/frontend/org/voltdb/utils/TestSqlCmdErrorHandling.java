@@ -62,7 +62,6 @@ public class TestSqlCmdErrorHandling extends TestCase {
 
     @Override
     protected void setUp() throws Exception {
-        System.out.println("Starting setUp()");
         super.setUp();
         String[] mytype = new String[] { "integer", "varbinary", "decimal", "float" };
         String simpleSchema =
@@ -126,7 +125,6 @@ public class TestSqlCmdErrorHandling extends TestCase {
             result = results[0];
             assertEquals(1, result.asScalarLong());
         }
-        System.out.println("Exiting setUp()");
     }
 
     /**
@@ -149,11 +147,9 @@ public class TestSqlCmdErrorHandling extends TestCase {
     @Override
     protected void tearDown() throws Exception
     {
-        System.out.println("Starting tearDown()");
         m_client.close();
         m_cluster.shutDown();
         super.tearDown();
-        System.out.println("Exiting tearDown()");
     }
 
     public String writeCommand(int id)

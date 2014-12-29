@@ -1138,15 +1138,24 @@ public class SQLCommand
                 ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("varbinary", "varbinary")).build());
     }
 
-    public static Client getClient(ClientConfig config, String[] servers, int port) throws Exception
+    private static Client getClient(ClientConfig config, String[] servers, int port) throws Exception
     {
+        if (m_debug) {
+            reportElapsedTime("pre-client create");
+        }
         final Client client = ClientFactory.createClient(config);
+        if (m_debug) {
+            reportElapsedTime("post-client create, pre-connect to " + servers.length + " servers");
+        }
         int ii = 0;
         for (String server : servers) {
             if (m_debug) {
                 reportElapsedTime("pre-client connect to server (" + server + ":" + port + ") #" + (++ii) + " of " + servers.length);
             }
             client.createConnection(server.trim(), port);
+        }
+        if (m_debug) {
+            reportElapsedTime("post-client init");
         }
         return client;
     }
@@ -1491,10 +1500,6 @@ public class SQLCommand
         } catch (Exception exc) {
             System.err.println(exc.toString());
             System.exit(-1);
-        }
-
-        if (m_debug) {
-            reportElapsedTime("post-client init");
         }
 
         try {
