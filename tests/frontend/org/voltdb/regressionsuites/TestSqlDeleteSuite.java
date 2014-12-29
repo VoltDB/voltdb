@@ -28,9 +28,9 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.delete.DeleteOrderByLimit;
+import org.voltdb_testprocs.regressionsuites.delete.DeleteOrderByLimitOffset;
 import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
 
-import java.io.IOException;
 import java.util.Arrays;
 
 /**
@@ -41,7 +41,10 @@ import java.util.Arrays;
 public class TestSqlDeleteSuite extends RegressionSuite {
 
     /** Procedures used by this suite */
-    static final Class<?>[] PROCEDURES = { DeleteOrderByLimit.class };
+    static final Class<?>[] PROCEDURES = {
+        DeleteOrderByLimit.class,
+        DeleteOrderByLimitOffset.class
+        };
 
     static final int ROWS = 10;
 
@@ -440,7 +443,11 @@ public class TestSqlDeleteSuite extends RegressionSuite {
         validateTableOfScalarLongs(vt, new long[] { 13 });
     }
 
-    public void testDeleteOrderLimitParam() throws Exception {
+    public void testDeleteLimitParam() throws Exception {
+        if (isHSQL()) {
+            return;
+        }
+
         Client client = getClient();
 
         // insert rows where ID is 0..19
@@ -456,6 +463,28 @@ public class TestSqlDeleteSuite extends RegressionSuite {
         vt = client.callProcedure("@AdHoc", "select id from R1 order by id asc")
                 .getResults()[0];
         validateTableOfScalarLongs(vt, new long[] { 10, 11, 12, 13, 14, 15, 16, 17, 18, 19 });
+    }
+
+    public void testDeleteLimitOffsetParam() throws Exception {
+        if (isHSQL()) {
+            return;
+        }
+
+        Client client = getClient();
+
+        // insert rows where ID is 0..9
+        insertRows(client, "R1", 10);
+
+        VoltTable vt;
+
+        // delete the first 5 rows, skip first three rows
+        vt = client.callProcedure("DeleteOrderByLimitOffset", 5, 3)
+                .getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] { 5 });
+
+        vt = client.callProcedure("@AdHoc", "select id from R1 order by id asc")
+                .getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] { 0, 1, 2, 8, 9 });
     }
 
     //
