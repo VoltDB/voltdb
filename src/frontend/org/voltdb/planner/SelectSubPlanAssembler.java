@@ -58,7 +58,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     ArrayDeque<AbstractPlanNode> m_plans = new ArrayDeque<AbstractPlanNode>();
 
     /** The list of all possible join orders, assembled by queueAllJoinOrders */
-    ArrayDeque<JoinNode> m_joinOrders = new ArrayDeque<JoinNode>();
+    private ArrayDeque<JoinNode> m_joinOrders = new ArrayDeque<JoinNode>();
 
     /**
      *

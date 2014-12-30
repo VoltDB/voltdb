@@ -204,7 +204,8 @@ public class TestPlansDML extends PlannerTestCase {
         assertEquals(2, pns.size());
     }
 
-    private void verifyPlan(List<Class<? extends AbstractPlanNode>> expectedClasses,
+    private void assertPlanContainsNodes(
+            List<Class<? extends AbstractPlanNode>> expectedClasses,
             AbstractPlanNode actualNode) {
         AbstractPlanNode pn = actualNode;
         for (Class<? extends AbstractPlanNode> c : expectedClasses) {
@@ -225,31 +226,49 @@ public class TestPlansDML extends PlannerTestCase {
     public void testDeleteOrderByPlan() {
         System.out.println("\n\n\nRUNNING testDeleteOrderByPlan\n\n");
 
+        // No ORDER BY node, since we can use index instead
         pns = compileToFragments("DELETE FROM R5 ORDER BY A LIMIT ?");
         assertEquals(2, pns.size());
-
-        // There is a PK index on A, but we don't use it
-        // for sort order here.  We should!
         AbstractPlanNode collectorRoot = pns.get(1);
-        verifyPlan(Arrays.asList(
+        assertPlanContainsNodes(Arrays.asList(
                 SendPlanNode.class,
                 DeletePlanNode.class,
-                OrderByPlanNode.class,
-                SeqScanPlanNode.class),
+                IndexScanPlanNode.class),
                 collectorRoot
                 );
 
+        // No ORDER BY node, since index scan is used to evaluate predicate
         pns = compileToFragments("DELETE FROM R5 WHERE A = 1 ORDER BY A LIMIT ?");
         assertEquals(2, pns.size());
-
-        // The ORDER BY is unnecessary here, since rows are already sorted due
-        // to the index scan.
         collectorRoot = pns.get(1);
-        verifyPlan(Arrays.asList(
+        assertPlanContainsNodes(Arrays.asList(
+                SendPlanNode.class,
+                DeletePlanNode.class,
+                IndexScanPlanNode.class),
+                collectorRoot
+                );
+
+        // Index used to evaluate predicate not suitable for ORDER BY
+        pns = compileToFragments("DELETE FROM R5 WHERE A = 1 ORDER BY B, A, C, D LIMIT ?");
+        assertEquals(2, pns.size());
+        collectorRoot = pns.get(1);
+        assertPlanContainsNodes(Arrays.asList(
                 SendPlanNode.class,
                 DeletePlanNode.class,
                 OrderByPlanNode.class,
                 IndexScanPlanNode.class),
+                collectorRoot
+                );
+
+        // Index can't be used either for predicate evaluation or ORDER BY
+        pns = compileToFragments("DELETE FROM R5 WHERE B = 1 ORDER BY B, A, C, D LIMIT ?");
+        assertEquals(2, pns.size());
+        collectorRoot = pns.get(1);
+        assertPlanContainsNodes(Arrays.asList(
+                SendPlanNode.class,
+                DeletePlanNode.class,
+                OrderByPlanNode.class,
+                SeqScanPlanNode.class),
                 collectorRoot
                 );
     }
