@@ -799,7 +799,8 @@ public abstract class SubPlanAssembler {
             AccessPath retval, int[] orderSpoilers,
             List<AbstractExpression> bindingsForOrder)
     {
-        if (m_parsedStmt.orderByColumns().isEmpty()) {
+        if (!m_parsedStmt.hasOrderByColumns()
+                || m_parsedStmt.orderByColumns().isEmpty()) {
             return 0;
         }
         int nSpoilers = 0;

@@ -294,6 +294,7 @@ public class TestSqlDeleteSuite extends RegressionSuite {
             // 90  91
             // 90  92
 
+            // This statement avoids sorting by using index on NUM
             String stmt = "DELETE FROM " + table + " WHERE ID = 0 ORDER BY NUM ASC LIMIT 1";
             vt = client.callProcedure("@AdHoc", stmt).getResults()[0];
             validateTableOfScalarLongs(vt, new long[] {1});
@@ -363,10 +364,52 @@ public class TestSqlDeleteSuite extends RegressionSuite {
             validateTableOfScalarLongs(vt, new long[] { 30, 32 });
 
             // Total row count-- make sure we didn't delete any other rows
-            vt = client
-                    .callProcedure("@AdHoc", "select count(*) from " + table)
+            vt = client.callProcedure("@AdHoc", "select count(*) from " + table)
                     .getResults()[0];
             validateTableOfScalarLongs(vt, new long[] { 25 });
+
+            /// ---------------------------------------------------------------------------------
+            // index used to evaluate predicate can also be used for order by
+            stmt = "DELETE FROM " + table
+                    + " WHERE ID = 40 AND NUM = 41 ORDER BY NUM LIMIT 1";
+
+            vt = client.callProcedure("@AdHoc", stmt).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] { 1 });
+
+            // verify the rows that are left are what we expect
+            vt = client.callProcedure(
+                    "@AdHoc",
+                    "select num from " + table
+                            + " where id = 40 order by num asc").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] { 40, 42 });
+
+            // Total row count-- make sure we didn't delete any other rows
+            vt = client.callProcedure("@AdHoc", "select count(*) from " + table)
+                    .getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] { 24 });
+
+            /// ---------------------------------------------------------------------------------
+            // Indexes can't be used for either ORDER BY or WHERE
+            stmt = "DELETE FROM " + table
+                    + " WHERE ID = 50 AND RATIO > 0 ORDER BY DESC, NUM LIMIT 1";
+
+            vt = client.callProcedure("@AdHoc", stmt).getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] { 1 });
+
+            // verify the rows that are left are what we expect
+            vt = client.callProcedure(
+                    "@AdHoc",
+                    "select num from " + table
+                            + " where id = 50 order by num asc").getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] { 51, 52 });
+
+            // Total row count-- make sure we didn't delete any other rows
+            vt = client.callProcedure("@AdHoc", "select count(*) from " + table)
+                    .getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] { 23 });
+
+
+
         }
     }
 
@@ -477,7 +520,7 @@ public class TestSqlDeleteSuite extends RegressionSuite {
 
         VoltTable vt;
 
-        // delete the first 5 rows, skip first three rows
+        // delete 5 rows, skipping the first three
         vt = client.callProcedure("DeleteOrderByLimitOffset", 5, 3)
                 .getResults()[0];
         validateTableOfScalarLongs(vt, new long[] { 5 });
