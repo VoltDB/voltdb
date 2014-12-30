@@ -78,14 +78,23 @@ public class CoreUtils {
     public static final int SMALL_STACK_SIZE = 1024 * 256;
     public static final int MEDIUM_STACK_SIZE = 1024 * 512;
 
-    public static volatile Runnable m_threadLocalDeallocator = new Runnable() {
+    public static volatile Runnable m_threadLocalDeallocator = initEmptyRunnable();
+
+    private static Runnable initEmptyRunnable() {
+System.err.println("CoreUtils x01");
+        return new Runnable() {
         @Override
         public void run() {
 
         }
     };
+    }
 
-    public static final ExecutorService SAMETHREADEXECUTOR = new ExecutorService() {
+    public static final ExecutorService SAMETHREADEXECUTOR = initExecutorService();
+
+    private static ExecutorService initExecutorService() {
+System.err.println("CoreUtils x02");
+        return new ExecutorService() {
 
         @Override
         public void execute(Runnable command) {
@@ -239,8 +248,13 @@ public class CoreUtils {
         }
 
     };
+    }
 
-    public static final ListeningExecutorService LISTENINGSAMETHREADEXECUTOR = new ListeningExecutorService() {
+    public static final ListeningExecutorService LISTENINGSAMETHREADEXECUTOR = initListeningExecutorService();
+
+    private static ListeningExecutorService initListeningExecutorService() {
+System.err.println("CoreUtils x03");
+        return new ListeningExecutorService() {
 
         @Override
         public void execute(Runnable command) {
@@ -394,8 +408,13 @@ public class CoreUtils {
         }
 
     };
+    }
 
-    public static final ListenableFuture<Object> COMPLETED_FUTURE = new ListenableFuture<Object>() {
+    public static final ListenableFuture<Object> COMPLETED_FUTURE = initListenableFuture();
+
+    private static ListenableFuture<Object> initListenableFuture() {
+System.err.println("CoreUtils x04");
+        return new ListenableFuture<Object>() {
         @Override
         public void addListener(Runnable listener, Executor executor) { executor.execute(listener); }
         @Override
@@ -409,11 +428,9 @@ public class CoreUtils {
         @Override
         public Object get(long timeout, TimeUnit unit) { return null; }
     };
+    }
 
-    public static final Runnable EMPTY_RUNNABLE = new Runnable() {
-        @Override
-        public void run() {}
-    };
+    public static final Runnable EMPTY_RUNNABLE = initEmptyRunnable();
 
     /**
      * Get a single thread executor that caches it's thread meaning that the thread will terminate
@@ -587,9 +604,9 @@ public class CoreUtils {
     }
 
     public static ThreadFactory getThreadFactory(String name) {
-System.err.println("ThreadFactory x0");
+System.err.println("CoreUtils x1");
         ThreadFactory threadFactory = getThreadFactory(name, SMALL_STACK_SIZE);
-System.err.println("ThreadFactory x1");
+System.err.println("CoreUtils x2");
         return threadFactory;
     }
 
