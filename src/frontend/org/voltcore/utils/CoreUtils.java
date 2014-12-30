@@ -73,7 +73,14 @@ import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 public class CoreUtils {
-    private static final VoltLogger hostLog = new VoltLogger("HOST");
+    static {
+        System.err.println("CoreUtils A00");
+    }
+    private static final VoltLogger hostLog = initHostLog();
+    private static VoltLogger initHostLog() {
+        System.err.println("CoreUtils x00");
+        return new VoltLogger("HOST");
+    }
 
     public static final int SMALL_STACK_SIZE = 1024 * 256;
     public static final int MEDIUM_STACK_SIZE = 1024 * 512;

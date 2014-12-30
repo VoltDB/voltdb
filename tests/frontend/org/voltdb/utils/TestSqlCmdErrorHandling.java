@@ -350,7 +350,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
         assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(false, m_lastError));
     }
 
-    public void notest20ErrorThenWrite() throws Exception
+    public void test20ErrorThenWrite() throws Exception
     {
         System.out.println("Starting test20ErrorThenWrite");
         int id = 20;
@@ -360,7 +360,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
         assertTrue("skipped a post-error write", checkIfWritten(id));
     }
 
-    public void notest30ErrorThenWriteThenError() throws Exception
+    public void test30ErrorThenWriteThenError() throws Exception
     {
         System.out.println("Starting test30ErrorThenWriteThenError");
         int id = 30;
@@ -411,13 +411,13 @@ public class TestSqlCmdErrorHandling extends TestCase {
         assertTrue("skipped a post-error write", checkIfWritten(id));
     }
 
-    public void notest11Error() throws Exception
+    public void test11Error() throws Exception
     {
         System.out.println("Starting test11Error");
         assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(true, m_lastError));
     }
 
-    public void notest21ErrorThenStopBeforeWrite() throws Exception
+    public void test21ErrorThenStopBeforeWrite() throws Exception
     {
         System.out.println("Starting test21ErrorThenStopBeforeWrite");
         int id = 21;
@@ -427,7 +427,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
         assertFalse("did a post-error write", checkIfWritten(id));
     }
 
-    public void notest31ErrorThenStopBeforeWriteOrError() throws Exception
+    public void test31ErrorThenStopBeforeWriteOrError() throws Exception
     {
         System.out.println("Starting test31ErrorThenStopBeforeWriteOrError");
         int id = 31;

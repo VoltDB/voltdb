@@ -86,26 +86,6 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
 
     private volatile boolean m_isShutdown = false;
 
-    private static class D2 extends Distributer {
-        D2(ClientConfig config) {
-            this(verbose(config), false);
-        }
-        D2(ClientConfig config, boolean unused) {
-            super(
-                config.m_heavyweight,
-                config.m_procedureCallTimeoutNanos,
-                config.m_connectionResponseTimeoutMS,
-                config.m_useClientAffinity,
-                config.m_subject);
-            System.err.println("ClientImpl.D2 x2");
-        }
-
-        private static ClientConfig verbose(ClientConfig config) {
-            System.err.println("ClientImpl.D2 x" + ((config == null) ? 0 : 1));
-            return config;
-        }
-    }
-
     /**
      * Create a new client without any initial connections.
      * Also provide a hint indicating the expected serialized size of
@@ -116,15 +96,12 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
      * @param heavyweight Whether to use multiple or a single thread
      */
     ClientImpl(ClientConfig config) {
-System.err.println("ClientImpl x1");
-        m_distributer = new /**/ D2(config);/* Distributer(
+        m_distributer = new Distributer(
                 config.m_heavyweight,
                 config.m_procedureCallTimeoutNanos,
                 config.m_connectionResponseTimeoutMS,
                 config.m_useClientAffinity,
                 config.m_subject);
-                */
-System.err.println("ClientImpl x2");
         m_distributer.addClientStatusListener(m_listener);
         String username = config.m_username;
         if (config.m_subject != null) {

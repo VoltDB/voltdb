@@ -849,11 +849,9 @@ class Distributer {
             boolean useClientAffinity,
             Subject subject) {
 System.err.println("Distributer x0");
-System.err.flush();
-        m_ex =
-                Executors.newSingleThreadScheduledExecutor(
-                        CoreUtils.getThreadFactory("VoltDB Client Reaper Thread"));
-        System.err.println("Distributer x1");
+        m_ex = Executors.newSingleThreadScheduledExecutor(
+                CoreUtils.getThreadFactory("VoltDB Client Reaper Thread"));
+System.err.println("Distributer x1");
         m_useMultipleThreads = useMultipleThreads;
         m_network = new VoltNetworkPool(
                 m_useMultipleThreads ? Math.max(1, CoreUtils.availableProcessors() / 4 ) : 1,
