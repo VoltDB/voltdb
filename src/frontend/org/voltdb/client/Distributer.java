@@ -44,7 +44,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.LockSupport;
 
 import javax.security.auth.Subject;
-import com.google_voltpatches.common.collect.ImmutableList;
 
 import jsr166y.ThreadLocalRandom;
 
@@ -131,9 +130,7 @@ class Distributer {
     public final RateLimiter m_rateLimiter = new RateLimiter();
 
     //private final Timer m_timer;
-    private final ScheduledExecutorService m_ex =
-        Executors.newSingleThreadScheduledExecutor(
-                CoreUtils.getThreadFactory("VoltDB Client Reaper Thread"));
+    private final ScheduledExecutorService m_ex;
     ScheduledFuture<?> m_timeoutReaperHandle;
 
     /**
@@ -853,6 +850,9 @@ class Distributer {
             Subject subject) {
 System.err.println("Distributer x0");
 System.err.flush();
+        m_ex =
+                Executors.newSingleThreadScheduledExecutor(
+                        CoreUtils.getThreadFactory("VoltDB Client Reaper Thread"));
         m_useMultipleThreads = useMultipleThreads;
 System.err.println("Distributer x1");
 System.err.flush();
