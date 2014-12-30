@@ -852,12 +852,15 @@ class Distributer {
             boolean useClientAffinity,
             Subject subject) {
 System.err.println("Distributer x0");
+System.err.flush();
         m_useMultipleThreads = useMultipleThreads;
 System.err.println("Distributer x1");
+System.err.flush();
         m_network = new VoltNetworkPool(
                 m_useMultipleThreads ? Math.max(1, CoreUtils.availableProcessors() / 4 ) : 1,
                 1, null, "Client");
 System.err.println("Distributer x2");
+System.err.flush();
         m_network.start();
 System.err.println("Distributer x3");
         m_procedureCallTimeoutNanos = procedureCallTimeoutNanos;
