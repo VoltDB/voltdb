@@ -314,7 +314,18 @@
 		            p.close();
 		        });
 		    }
-			
+
+		    var serverShutdownBtn = $("a[id=btnServerShutdownOk]");
+		    if (serverShutdownBtn != undefined) {
+		        serverShutdownBtn.unbind('click');
+		        serverShutdownBtn.bind('click', function (e) {
+		            e.preventDefault();
+		            p.o.closeDialog();
+		            VoltDBCore.isServerConnected = true;
+		            p.close();
+		        });
+		    }
+
 			//save cluster
 			$('.saveBtn').click(function(){
 				$('.saveInfo').hide();

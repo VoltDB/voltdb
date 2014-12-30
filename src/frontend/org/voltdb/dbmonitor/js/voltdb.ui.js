@@ -256,7 +256,7 @@ var loadPage = function (serverName, portid) {
 
     var userName = $.cookie('username') != undefined ? $.cookie('username') : "";
     var password = $.cookie('password') != undefined ? $.cookie('password') : "";
-    var isConnectionChecked = false;
+    
     voltDbRenderer.ChangeServerConfiguration(serverName, portid, userName, password, true, true);
     voltDbRenderer.ShowUsername(userName);
 
@@ -1279,43 +1279,16 @@ var loadPage = function (serverName, portid) {
     adjustGraphSpacing();
     saveThreshold();
 
-    var connectionTimeInterval = null;
-    var refreshConnectionTime = function (seconds) {
-        if (connectionTimeInterval != null)
-            window.clearInterval(connectionTimeInterval);
-
-        connectionTimeInterval = window.setInterval(checkServerConnection, seconds);
-    };
-
-    var checkServerConnection = function () {
-        if (!isConnectionChecked) {
-            isConnectionChecked = true;
-            voltDbRenderer.CheckServerConnection(
-                function (result) {
-                    if (result == false) {
-                        VoltDBCore.isServerConnected = false;
-                        if (!$('#conpop').is(':visible')) {
-                            window.clearInterval(connectionTimeInterval);
-                            $('#conPopup').click();
-                        }
-                    } else {
-                        isConnectionChecked = false;
-                    }
-                }
-            );
-        }
-    };
-
     $('#showMyHelp').popup();
     $("#conPopup").popup({
         closeDialog: function () {
-            isConnectionChecked = false;
-            refreshConnectionTime('20000');
+            VoltDbUI.isConnectionChecked = false;
+            VoltDbUI.refreshConnectionTime('20000');
             $('#connectionPopup').hide();
         }
     });
 
-    refreshConnectionTime('20000');
+    VoltDbUI.refreshConnectionTime('20000');
 };
 
 
@@ -1586,6 +1559,34 @@ var adjustGraphSpacing = function () {
         this.CurrentProcedureDataProgress = this.DASHBOARD_PROGRESS_STATES.REFRESH_PROCEDUREDATA_NONE;
         this.sortStatus = this.SORT_STATES.NONE;
         this.tableSortStatus = this.SORT_STATES.NONE;
+        this.isConnectionChecked = false;
+        this.connectionTimeInterval = null;
+        
+        this.refreshConnectionTime = function (seconds) {
+            if (VoltDbUI.connectionTimeInterval != null)
+                window.clearInterval(VoltDbUI.connectionTimeInterval);
+
+            VoltDbUI.connectionTimeInterval = window.setInterval(checkServerConnection, seconds);
+        };
+
+        var checkServerConnection = function () {
+            if (!VoltDbUI.isConnectionChecked) {
+                VoltDbUI.isConnectionChecked = true;
+                voltDbRenderer.CheckServerConnection(
+                    function (result) {
+                        if (result == false) {
+                            VoltDBCore.isServerConnected = false;
+                            if (!$('#conpop').is(':visible') && !$('#shutdownPop').is(':visible')) {
+                                window.clearInterval(VoltDbUI.connectionTimeInterval);
+                                $('#conPopup').click();
+                            }
+                        } else {
+                            VoltDbUI.isConnectionChecked = false;
+                        }
+                    }
+                );
+            }
+        };
 
     });
     window.VoltDbUI = VoltDbUi = new iVoltDbUi();

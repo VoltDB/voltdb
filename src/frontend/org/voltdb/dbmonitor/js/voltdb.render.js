@@ -2004,6 +2004,22 @@ function alertNodeClicked(obj) {
             });
         };
 
+        this.shutdownCluster = function(onServerShutdown) {
+            VoltDBService.ShutdownClusterState(function(connection, status) {
+                if (status == 1) {
+                    onServerShutdown(true);
+                }
+            });
+        };
+
+        this.saveSnapshot = function(snapshotDir, snapshotFileName, onSaveSnapshot) {
+            VoltDBService.SaveSnapShot(snapshotDir, snapshotFileName, function(connection, status) {
+                if (status == 1) {
+                    onSaveSnapshot(true);
+                }
+            });
+        };
+
         this.getAdminconfiguration = function (onInformationLoaded) {
             VoltDBService.GetSystemInformationDeployment(function (connection) {
                 onInformationLoaded(connection);

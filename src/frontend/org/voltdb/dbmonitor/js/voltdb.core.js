@@ -32,12 +32,6 @@
             this.BuildParamSetForClusterState = function(procedure) {
                 var credentials = [];
                 credentials[credentials.length]=encodeURIComponent('Procedure') + '=' + encodeURIComponent(procedure);
-                if (this.user != null)
-                    credentials[credentials.length] = encodeURIComponent('User') + '=' + encodeURIComponent(this.user);
-                if (this.password != null)
-                    credentials[credentials.length] = encodeURIComponent('Password') + '=' + encodeURIComponent(this.password);
-                if (this.isHashedPassword != null)
-                    credentials[credentials.length] = encodeURIComponent('Hashedpassword') + '=' + encodeURIComponent(this.isHashedPassword);
                 if (this.admin)
                     credentials[credentials.length] = 'admin=true';
 
@@ -142,7 +136,7 @@
                     uri = 'http://' + this.server + ':' + this.port + '/api/1.0/';
                 }
                 var params = '';
-                if (procedure == '@Pause' || procedure == '@Resume') {
+                if (procedure == '@Pause' || procedure == '@Resume' || procedure == '@Shutdown') {
                     params = this.BuildParamSetForClusterState(procedure);
                 } else {
                     params = this.BuildParamSet(procedure, parameters, shortApiCallDetails);
@@ -509,7 +503,7 @@
                         var suffix = (processName == "GRAPH_MEMORY" || processName == "GRAPH_TRANSACTION") || processName == "TABLE_INFORMATION" || processName == "CLUSTER_INFORMATION" ? "_" + processName : "";
                         if (processName == "SYSTEMINFORMATION_STOPSERVER" )
                             connection.Metadata[procedure['procedure'] + "_" + procedure['parameter'] + suffix + "_status"] = data.status;
-                        else if (processName == "SYSTEMINFORMATION_PAUSECLUSTER" || processName == "SYSTEMINFORMATION_RESUMECLUSTER")
+                        else if (processName == "SYSTEMINFORMATION_PAUSECLUSTER" || processName == "SYSTEMINFORMATION_RESUMECLUSTER" || processName == "SYSTEMINFORMATION_SHUTDOWNCLUSTER" || processName == "SYSTEMINFORMATION_SAVESNAPSHOT")
                             connection.Metadata[procedure['procedure'] + "_" + "status"] = data.status;
                         else
                             connection.Metadata[procedure['procedure'] + "_" + procedure['parameter'] + suffix] = data.results[0];
@@ -557,7 +551,10 @@
             for (i = 0; i < procedureNames.length; i++) {
                 lConnection.procedureCommands["procedures"][i] = {};
                 lConnection.procedureCommands["procedures"][i]["procedure"] = procedureNames[i];
-                lConnection.procedureCommands["procedures"][i]["parameter"] = parameters[i];
+                if (procedureNames[i] == '@SnapshotSave')
+                    lConnection.procedureCommands["procedures"][i]["parameter"] = [parameters[i], parameters[i + 1], parameters[i + 2]];
+                else
+                    lConnection.procedureCommands["procedures"][i]["parameter"] = parameters[i];
                 lConnection.procedureCommands["procedures"][i]["value"] = values[i];
             }
 
