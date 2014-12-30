@@ -26,7 +26,9 @@ package org.voltdb.client;
 import junit.framework.Assert;
 
 import org.apache.log4j.Appender;
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.junit.Before;
 import org.junit.Test;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
@@ -36,17 +38,17 @@ import org.voltdb.tomcat.TomcatVoltdbAppender;
 
 public class TomcatLog4jAppender {
 
-	private Appender appender;
-
+	private MessagePrinter printer;
 	private ServerThread m_localServer;
 	private Client m_client;
 
-
 	// A class to print out a bunch of messages
-	static class MessagePritner {
+	static class MessagePrinter {
+		private static Logger log = Logger.getLogger(MessagePrinter.class);
+
 		public void printMessages() {
-			System.out.println("This is a message");
-			System.out.println("This is another message");
+			log.info("This is a message");
+			log.info("This is another message");
 		}
 	}
 
@@ -85,6 +87,17 @@ public class TomcatLog4jAppender {
         }
 	}
 
+	// Set up the writer class and its logger
+	@Before
+	public void setup() {
+		printer = new MessagePrinter();
+		Logger rootLogger = Logger.getRootLogger();
+		Appender voltAppender = new TomcatVoltdbAppender();
+		rootLogger.removeAllAppenders();
+		rootLogger.setLevel(Level.INFO);
+		rootLogger.addAppender(voltAppender);
+	}
+
 	@Test
 	public void test() throws Exception{
 		try {
@@ -92,13 +105,7 @@ public class TomcatLog4jAppender {
 			startServer();
 			startClient();
 
-			// Create an object to print stuff
-			MessagePritner printer = new MessagePritner();
-
-			// Create the custom appender & print some messages
-			appender = new TomcatVoltdbAppender();
-			Logger log = Logger.getLogger(printer.getClass());
-
+			// Print our messages
 			printer.printMessages();
 			Thread.sleep(10000);
 
