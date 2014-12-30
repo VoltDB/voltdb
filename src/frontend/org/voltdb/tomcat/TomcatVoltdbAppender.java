@@ -69,6 +69,7 @@ public /*static*/ class TomcatVoltdbAppender extends AppenderSkeleton implements
 		// Insert the log message into Volt
 		try{
 			client.callProcedure("VoltdbInsert", message);
+			System.out.println("MAKING INSERTION");
 		} catch (Exception e) {
 			e.printStackTrace();
 			System.exit(-1);

@@ -23,11 +23,15 @@
 
 package org.voltdb.client;
 
+import junit.framework.Assert;
+
 import org.apache.log4j.Appender;
 import org.apache.log4j.Logger;
 import org.junit.Test;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltTableTestHelpers;
 import org.voltdb.tomcat.TomcatVoltdbAppender;
 
 public class TomcatLog4jAppender {
@@ -91,11 +95,17 @@ public class TomcatLog4jAppender {
 			// Create an object to print stuff
 			MessagePritner printer = new MessagePritner();
 
-			// Create the custom appender
+			// Create the custom appender & print some messages
 			appender = new TomcatVoltdbAppender();
-
-			// Add it to a logger
 			Logger log = Logger.getLogger(printer.getClass());
+
+			printer.printMessages();
+			Thread.sleep(10000);
+
+			// Make sure that we have a bunch of messages in volt
+			VoltTable tables = m_client.callProcedure("@SystemCatalog", "TABLES").getResults()[0];
+	        boolean found = VoltTableTestHelpers.moveToMatchingRow(tables, "TABLE_NAME", "name");
+	        Assert.assertTrue(found);
 		} finally {
 			// We're done, turn off the server
 			stopClient();
