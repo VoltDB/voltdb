@@ -587,7 +587,10 @@ public class CoreUtils {
     }
 
     public static ThreadFactory getThreadFactory(String name) {
-        return getThreadFactory(name, SMALL_STACK_SIZE);
+System.err.println("ThreadFactory x0");
+        ThreadFactory threadFactory = getThreadFactory(name, SMALL_STACK_SIZE);
+System.err.println("ThreadFactory x1");
+        return threadFactory;
     }
 
     public static ThreadFactory getThreadFactory(String groupName, String name) {
