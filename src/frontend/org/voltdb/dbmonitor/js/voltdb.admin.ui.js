@@ -591,7 +591,7 @@ function loadAdminPage() {
                     adminConfigurations.heartbeat = {};
                 }
                 
-                adminConfigurations.heartbeat.timeout = adminEditObjects.tBoxHeartbeatTimeoutValue;
+                adminConfigurations.heartbeat.timeout = adminEditObjects.tBoxHeartbeatTimeout.val();
                 voltDbRenderer.updateAdminConfiguration(adminConfigurations, function (result) {
                     toggleHeartbeatTimeoutEdit(editStates.ShowEdit);
                     if (result.status == "1") {
