@@ -852,17 +852,22 @@ class Distributer {
             boolean useClientAffinity,
             Subject subject) {
         m_useMultipleThreads = useMultipleThreads;
+System.err.println("Distributer x1");
         m_network = new VoltNetworkPool(
                 m_useMultipleThreads ? Math.max(1, CoreUtils.availableProcessors() / 4 ) : 1,
                 1, null, "Client");
+System.err.println("Distributer x2");
         m_network.start();
-        m_procedureCallTimeoutNanos= procedureCallTimeoutNanos;
+System.err.println("Distributer x3");
+        m_procedureCallTimeoutNanos = procedureCallTimeoutNanos;
         m_connectionResponseTimeoutNanos = TimeUnit.MILLISECONDS.toNanos(connectionResponseTimeoutMS);
         m_useClientAffinity = useClientAffinity;
+System.err.println("Distributer x4");
 
         // schedule the task that looks for timed-out proc calls and connections
         m_timeoutReaperHandle = m_ex.scheduleAtFixedRate(new CallExpiration(), 1, 1, TimeUnit.SECONDS);
         m_subject = subject;
+System.err.println("Distributer x5");
     }
 
     void createConnection(String host, String program, String password, int port)

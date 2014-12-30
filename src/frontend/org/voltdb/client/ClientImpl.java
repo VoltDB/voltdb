@@ -105,17 +105,13 @@ System.err.println("ClientImpl x1");
                 config.m_subject);
 System.err.println("ClientImpl x2");
         m_distributer.addClientStatusListener(m_listener);
-System.err.println("ClientImpl x3");
         String username = config.m_username;
         if (config.m_subject != null) {
-System.err.println("ClientImpl x4");
             username = config.m_subject.getPrincipals().iterator().next().getName();
         }
-System.err.println("ClientImpl x5");
         m_username = username;
 
         if (config.m_reconnectOnConnectionLoss) {
-System.err.println("ClientImpl x6");
             m_reconnectStatusListener = new ReconnectStatusListener(this,
                     config.m_initialConnectionRetryIntervalMS, config.m_maxConnectionRetryIntervalMS);
             m_distributer.addClientStatusListener(m_reconnectStatusListener);
@@ -124,29 +120,23 @@ System.err.println("ClientImpl x6");
         }
 
         if (config.m_cleartext) {
-System.err.println("ClientImpl x7");
             m_passwordHash = ConnectionUtil.getHashedPassword(config.m_password);
         } else {
             m_passwordHash = Encoder.hexDecode(config.m_password);
         }
         if (config.m_listener != null) {
-System.err.println("ClientImpl x8");
             m_distributer.addClientStatusListener(config.m_listener);
         }
-System.err.println("ClientImpl x9");
         assert(config.m_maxOutstandingTxns > 0);
         m_blessedThreadIds.addAll(m_distributer.getThreadIds());
         if (config.m_autoTune) {
-System.err.println("ClientImpl x00");
             m_distributer.m_rateLimiter.enableAutoTuning(
                     config.m_autoTuneTargetInternalLatency);
         }
         else {
-System.err.println("ClientImpl x11");
             m_distributer.m_rateLimiter.setLimits(
                     config.m_maxTransactionsPerSecond, config.m_maxOutstandingTxns);
         }
-System.err.println("ClientImpl x22");
     }
 
     private boolean verifyCredentialsAreAlwaysTheSame(String username, byte[] hashedPassword) {
