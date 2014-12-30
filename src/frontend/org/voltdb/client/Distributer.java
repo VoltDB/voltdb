@@ -851,6 +851,7 @@ class Distributer {
             long connectionResponseTimeoutMS,
             boolean useClientAffinity,
             Subject subject) {
+System.err.println("Distributer x0");
         m_useMultipleThreads = useMultipleThreads;
 System.err.println("Distributer x1");
         m_network = new VoltNetworkPool(
