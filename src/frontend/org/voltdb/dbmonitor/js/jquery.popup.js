@@ -295,6 +295,14 @@
 		        });
 		    }
 		    
+		    var btnSaveSnapshotStatus = $("a[id='btnSaveSnapshotStatus']");
+		    if (btnSaveSnapshotStatus != undefined) {
+		        btnSaveSnapshotStatus.unbind('click');
+		        btnSaveSnapshotStatus.bind('click', function () {
+		            p.close();
+		        });
+		    }
+
 		    var cancelBtn = $("a[id='btnCancel']");
 		    if (cancelBtn != undefined) {
 		        cancelBtn.unbind('click');

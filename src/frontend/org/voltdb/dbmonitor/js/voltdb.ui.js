@@ -133,6 +133,9 @@ $(document).ready(function () {
     $('#logOut').popup();
     $('#btnlogOut').popup();
 
+    //Shows Save Snapshot status
+    $('#btnSaveSnapshotPopup').popup();
+
     // Filters Stored Procedures
     $('#filterStoredProc').keyup(function () {
         var that = this;

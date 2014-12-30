@@ -2014,9 +2014,31 @@ function alertNodeClicked(obj) {
 
         this.saveSnapshot = function(snapshotDir, snapshotFileName, onSaveSnapshot) {
             VoltDBService.SaveSnapShot(snapshotDir, snapshotFileName, function(connection, status) {
+                var snapshotStatus = {};
                 if (status == 1) {
-                    onSaveSnapshot(true);
+                    voltDbRenderer.getSaveSnapshotStatus(connection,snapshotStatus);
+                    onSaveSnapshot(true,snapshotStatus);
                 }
+            });
+        };
+
+        this.getSaveSnapshotStatus = function(connection, snapshotStatus) {
+            var colIndex = {};
+            var counter = 0;
+
+            connection.Metadata['@SnapshotSave_data'].schema.forEach(function(columnInfo) {
+                if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "RESULT" || columnInfo["name"] == "ERR_MSG")
+                    colIndex[columnInfo["name"]] = counter;
+                counter++;
+            });
+
+            connection.Metadata['@SnapshotSave_data'].data.forEach(function(info) {
+                var hostName = info[colIndex["HOSTNAME"]];
+                if (!snapshotStatus.hasOwnProperty(hostName)) {
+                    snapshotStatus[hostName] = {};
+                }
+                snapshotStatus[hostName]["RESULT"] = info[colIndex["RESULT"]];
+                snapshotStatus[hostName]["ERR_MSG"] = info[colIndex["ERR_MSG"]];
             });
         };
 
