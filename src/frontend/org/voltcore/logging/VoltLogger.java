@@ -17,14 +17,15 @@
 
 package org.voltcore.logging;
 
-import com.google_voltpatches.common.base.Throwables;
-import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.ShutdownHooks;
-
 import java.io.StringWriter;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.concurrent.ExecutorService;
+
+import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.ShutdownHooks;
+
+import com.google_voltpatches.common.base.Throwables;
 
 /**
  * Class that implements the core functionality of a Log4j logger
@@ -36,11 +37,17 @@ public class VoltLogger {
     final CoreVoltLogger m_logger;
 
     private static final String m_threadName = "Async Logger";
-    private static final ExecutorService m_es = CoreUtils.getSingleThreadExecutor(m_threadName);
-
+    private static final ExecutorService m_es = initExecutorService();
+    private static ExecutorService initExecutorService() {
+        System.err.println("VoltLogger x00");
+        ExecutorService executorService = CoreUtils.getSingleThreadExecutor(m_threadName);
+        System.err.println("VoltLogger x000");
+        return executorService;
+    }
     private static final boolean m_disableAsync = Boolean.getBoolean("DISABLE_ASYNC_LOGGING");
 
     static {
+        System.err.println("VoltLogger x01");
         ShutdownHooks.registerShutdownHook(ShutdownHooks.VOLT_LOGGER, true, new Runnable() {
             @Override
             public void run() {
