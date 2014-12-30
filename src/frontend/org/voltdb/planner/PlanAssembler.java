@@ -505,7 +505,7 @@ public class PlanAssembler {
             // note that for replicated tables, multi-fragment plans
             // need to divide the result by the number of partitions
         } else {
-            //TODO: push CompiledPlan construction into getNextUpdatePlan/getNextDeletePlan
+            //TODO: push CompiledPlan construction into getNextUpdatePlan
             //
             retval = new CompiledPlan();
             if (m_parsedUpdate != null) {
@@ -890,11 +890,13 @@ public class PlanAssembler {
         return false;
     }
 
+    /** Returns true if this DELETE can be executed in the EE as a truncate operation */
     static private boolean deleteIsTruncate(ParsedDeleteStmt stmt, AbstractPlanNode plan) {
         if (!(plan instanceof SeqScanPlanNode)) {
             return false;
         }
 
+        // Assume all index scans have filters in this context, so only consider seq scans.
         SeqScanPlanNode seqScanNode = (SeqScanPlanNode)plan;
         if (seqScanNode.getPredicate() != null) {
             return false;
@@ -937,7 +939,6 @@ public class PlanAssembler {
 
         // If the scan matches all rows, we can throw away the scan
         // nodes and use a truncate delete node.
-        // Assume all index scans have filters in this context, so only consider seq scans.
         if (deleteIsTruncate(m_parsedDelete, subSelectRoot)) {
             deleteNode.setTruncate(true);
         } else {
@@ -983,15 +984,6 @@ public class PlanAssembler {
             }
 
             deleteNode.addAndLinkChild(root);
-
-            // OPTIMIZATION: Projection Inline
-            // If the root node we got back from createSelectTree() is an
-            // AbstractScanNode, then
-            // we put the Projection node we just created inside of it
-            // When we inline this projection into the scan, we're going
-            // to overwrite any original projection that we might have inlined
-            // in order to simply cull the columns from the persistent table.
-            //subSelectRoot.addInlinePlanNode(projectionNode);
         }
 
         CompiledPlan plan = new CompiledPlan();
@@ -1351,6 +1343,7 @@ public class PlanAssembler {
         }
     }
 
+    /** Given a list of ORDER BY columns, construct and return an OrderByPlanNode. */
     private static OrderByPlanNode buildOrderByPlanNode(List<ParsedColInfo> cols) {
         OrderByPlanNode n = new OrderByPlanNode();
 

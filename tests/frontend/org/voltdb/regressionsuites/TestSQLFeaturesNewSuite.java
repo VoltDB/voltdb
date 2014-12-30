@@ -492,7 +492,6 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         vt = client.callProcedure("CAPPED3_LIMIT_EXEC_COMPLEX.insert", 37, 8, 0, "important", 17000).getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {1});
 
-        // my fancy assertTablesAreEqual doesn't work for the below query.  Why?
         vt = client.callProcedure("@AdHoc", "select dept from capped3_limit_exec_complex order by dept asc").getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {5, 6, 8});
     }
@@ -504,6 +503,10 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
             return;
 
         Client client = getClient();
+
+        // The table EVENTS is capped at 5 rows.  Inserts that
+        // would cause the constraint to fail trigger a delete of
+        // the oldest row.
 
         VoltTable vt;
         for (int i = 0; i < 50; ++i) {

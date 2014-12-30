@@ -1293,6 +1293,9 @@ public class StatementDML extends StatementDMQL {
         }
     }
 
+    /**
+     * Appends XML for ORDER BY/LIMIT/OFFSET to this statement's XML.
+     * */
     private void voltAppendSortAndSlice(Session session, VoltXMLElement xml) throws HSQLParseException {
         if (m_sortAndSlice == null || m_sortAndSlice == SortAndSlice.noSort) {
             return;

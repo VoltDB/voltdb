@@ -204,10 +204,13 @@ public class TestPlansDML extends PlannerTestCase {
         assertEquals(2, pns.size());
     }
 
+    /** Given a list of Class objects for plan node subclasses, asserts
+     * if the given plan doesn't contain instances of those classes.
+     */
     private void assertPlanContainsNodes(
             List<Class<? extends AbstractPlanNode>> expectedClasses,
-            AbstractPlanNode actualNode) {
-        AbstractPlanNode pn = actualNode;
+            AbstractPlanNode actualPlan) {
+        AbstractPlanNode pn = actualPlan;
         for (Class<? extends AbstractPlanNode> c : expectedClasses) {
             assertFalse("Actual plan shorter than expected",
                     pn == null);

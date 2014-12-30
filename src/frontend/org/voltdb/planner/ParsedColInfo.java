@@ -134,6 +134,7 @@ public class ParsedColInfo implements Cloneable {
         return orderCol;
     }
 
+    /** Return this as an instance of SchemaColumn */
     public SchemaColumn asSchemaColumn() {
         return new SchemaColumn(tableName, tableAlias, columnName, alias, expression);
     }

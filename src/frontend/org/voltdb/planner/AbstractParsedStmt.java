@@ -852,7 +852,7 @@ public abstract class AbstractParsedStmt {
     {
         // The interface is established on AbstractParsedStmt for support
         // in ParsedSelectStmt, ParsedUnionStmt, and ParsedDeleteStmt.
-        throw new RuntimeException("isOrderDeterministic not supported by DML statements");
+        throw new RuntimeException("isOrderDeterministic not supported by INSERT or UPDATE statements");
     }
 
     public boolean isOrderDeterministicInSpiteOfUnorderedSubqueries() {
@@ -884,6 +884,12 @@ public abstract class AbstractParsedStmt {
         return pve.getParameterIndex();
     }
 
+    /**
+     * Produce a LimitPlanNode from the given XML
+     * @param limitXml    Volt XML for limit
+     * @param offsetXml   Volt XML for offset
+     * @return An instance of LimitPlanNode for the given XML
+     */
     LimitPlanNode limitPlanNodeFromXml(VoltXMLElement limitXml, VoltXMLElement offsetXml) {
 
         if (limitXml == null && offsetXml == null)
@@ -1054,6 +1060,7 @@ public abstract class AbstractParsedStmt {
         return false;
     }
 
+    /** Subclasses should override this method of they have order by columns */
     public List<ParsedColInfo> orderByColumns() {
         assert(false);
         return null;
