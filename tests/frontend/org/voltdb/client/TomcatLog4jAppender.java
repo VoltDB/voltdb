@@ -87,10 +87,21 @@ public class TomcatLog4jAppender {
         }
 	}
 
-	// Set up the writer class and its logger
+	// Set up the volt instance, writer class and its logger
 	@Before
 	public void setup() {
+		// Volt
+		try{
+			startServer();
+			startClient();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		// The printer
 		printer = new MessagePrinter();
+
+		// Its logger
 		Logger rootLogger = Logger.getRootLogger();
 		Appender voltAppender = new TomcatVoltdbAppender();
 		rootLogger.removeAllAppenders();
@@ -101,10 +112,6 @@ public class TomcatLog4jAppender {
 	@Test
 	public void test() throws Exception{
 		try {
-			// Initiate volt server & client
-			startServer();
-			startClient();
-
 			// Print our messages
 			printer.printMessages();
 			Thread.sleep(10000);
