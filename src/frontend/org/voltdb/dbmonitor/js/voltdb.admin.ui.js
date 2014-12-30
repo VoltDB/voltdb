@@ -595,11 +595,19 @@ function loadAdminPage() {
                 //Call the loading image only after setting the new value to be saved.
                 toggleHeartbeatTimeoutEdit(editStates.ShowLoading);
                 voltDbRenderer.updateAdminConfiguration(adminConfigurations, function (result) {
-                    toggleHeartbeatTimeoutEdit(editStates.ShowEdit);
+                    
                     if (result.status == "1") {
                         adminEditObjects.tBoxHeartbeatTimeoutValue = adminEditObjects.tBoxHeartbeatTimeout.val();
                         adminEditObjects.spanHeartbeatTimeOut.html(adminEditObjects.tBoxHeartbeatTimeoutValue);
+                        
+                        //Reload Admin configurations for displaying the updated value
+                        voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues, rawConfigValues) {
+                            VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues, rawConfigValues);
+                            toggleHeartbeatTimeoutEdit(editStates.ShowEdit);
+                        });
+                        
                     } else {
+                        toggleHeartbeatTimeoutEdit(editStates.ShowEdit);
                         adminEditObjects.updateErrorField.text(adminEditObjects.heartbeatTimeoutLabel);
                         $("#updateErrorPopupLink").trigger("click");
                     }
