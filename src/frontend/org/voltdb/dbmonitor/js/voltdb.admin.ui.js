@@ -1,6 +1,11 @@
 ﻿var adminDOMObjects = {};
 var adminEditObjects = {};
 var adminClusterObjects = {};
+var editStates = {
+    ShowEdit: 0,
+    ShowOkCancel: 1,
+    ShowLoading: 2
+};
 
 function loadAdminPage() {
     adminClusterObjects = {
@@ -109,6 +114,7 @@ function loadAdminPage() {
         tBoxHeartbeatTimeout: $("#txtHrtTimeOut"),
         tBoxHeartbeatTimeoutValue: $("#hrtTimeOutSpan").text(),
         spanHeartbeatTimeOut: $("#hrtTimeOutSpan"),
+        loadingHeartbeatTimeout: $("#loadingHeartbeatTimeout"),
 
         //Query Timeout
         rowQueryTimeout: $("#queryTimoutRow"),
@@ -118,6 +124,10 @@ function loadAdminPage() {
         tBoxQueryTimeout: $("#txtQueryTimeout"),
         tBoxQueryTimeoutValue: $("#queryTimeOutSpan").text(),
         spanqueryTimeOut: $("#queryTimeOutSpan"),
+        
+        //Update Error
+        updateErrorField: $("#updateErrorField"),
+        heartbeatTimeoutLabel: $("#heartbeatTimeoutRow").find("td:first-child").text()
     };
     
     //Admin Page download link
@@ -537,34 +547,50 @@ function loadAdminPage() {
     });
 
     //Heartbeat time out
-    var toggleHeartbeatTimeoutEdit = function (showEdit) {
+    var toggleHeartbeatTimeoutEdit = function (state) {
 
         adminEditObjects.tBoxHeartbeatTimeout.val(adminEditObjects.tBoxHeartbeatTimeoutValue);
 
-        if (showEdit) {
+        if (state == editStates.ShowLoading) {
+            adminDOMObjects.heartBeatTimeoutLabel.hide();
+            adminEditObjects.LinkHeartbeatEdit.hide();
+            adminEditObjects.spanHeartbeatTimeOut.hide();
+            adminEditObjects.tBoxHeartbeatTimeout.hide();
             adminEditObjects.btnEditHeartbeatTimeoutOk.hide();
             adminEditObjects.btnEditHeartbeatTimeoutCancel.hide();
-            adminEditObjects.LinkHeartbeatEdit.show();
-
-            adminEditObjects.tBoxHeartbeatTimeout.hide();
-            adminEditObjects.spanHeartbeatTimeOut.show();
-        } else {
+            
+            adminEditObjects.loadingHeartbeatTimeout.show();
+        }
+        else if (state == editStates.ShowOkCancel) {
+            adminEditObjects.loadingHeartbeatTimeout.hide();
             adminEditObjects.LinkHeartbeatEdit.hide();
             adminEditObjects.btnEditHeartbeatTimeoutOk.show();
             adminEditObjects.btnEditHeartbeatTimeoutCancel.show();
 
             adminEditObjects.spanHeartbeatTimeOut.hide();
             adminEditObjects.tBoxHeartbeatTimeout.show();
+            adminDOMObjects.heartBeatTimeoutLabel.show();
         }
+        else {
+            adminEditObjects.loadingHeartbeatTimeout.hide();
+            adminEditObjects.btnEditHeartbeatTimeoutOk.hide();
+            adminEditObjects.btnEditHeartbeatTimeoutCancel.hide();
+            adminEditObjects.LinkHeartbeatEdit.show();
+
+            adminEditObjects.tBoxHeartbeatTimeout.hide();
+            adminEditObjects.spanHeartbeatTimeOut.show();
+            adminDOMObjects.heartBeatTimeoutLabel.show();
+        }
+        
     };
 
     adminEditObjects.LinkHeartbeatEdit.on("click", function () {
-        toggleHeartbeatTimeoutEdit(false);
+        toggleHeartbeatTimeoutEdit(editStates.ShowOkCancel);
         $("td.heartbeattd span").toggleClass("unit");
     });
 
     adminEditObjects.btnEditHeartbeatTimeoutCancel.on("click", function () {
-        toggleHeartbeatTimeoutEdit(true);
+        toggleHeartbeatTimeoutEdit(editStates.ShowEdit);
     });
 
     adminEditObjects.btnEditHeartbeatTimeoutOk.popup({
@@ -572,36 +598,52 @@ function loadAdminPage() {
         },
         afterOpen: function () {
 
+            var popup = $(this)[0];
             $("#btnPopupHeartbeatTimeoutOk").unbind("click");
             $("#btnPopupHeartbeatTimeoutOk").on("click", function () {
 
-                adminEditObjects.tBoxHeartbeatTimeoutValue = adminEditObjects.tBoxHeartbeatTimeout.val();
-                adminEditObjects.spanHeartbeatTimeOut.html(adminEditObjects.tBoxHeartbeatTimeoutValue);
-                
                 var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();
                 if (!adminConfigurations.hasOwnProperty("heartbeat")) {
                     adminConfigurations.heartbeat = {};
                 }
+                //Set the new value to be saved.
+                adminConfigurations.heartbeat.timeout = adminEditObjects.tBoxHeartbeatTimeout.val();
                 
-                adminConfigurations.heartbeat.timeout = adminEditObjects.tBoxHeartbeatTimeoutValue;
-                voltDbRenderer.updateAdminConfiguration(adminConfigurations, function () {
-                    alert("Heartbeat update response received");
+                //Call the loading image only after setting the new value to be saved.
+                toggleHeartbeatTimeoutEdit(editStates.ShowLoading);
+                voltDbRenderer.updateAdminConfiguration(adminConfigurations, function (result) {
+                    
+                    if (result.status == "1") {
+                        adminEditObjects.tBoxHeartbeatTimeoutValue = adminEditObjects.tBoxHeartbeatTimeout.val();
+                        adminEditObjects.spanHeartbeatTimeOut.html(adminEditObjects.tBoxHeartbeatTimeoutValue);
+                        
+                        //Reload Admin configurations for displaying the updated value
+                        voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues, rawConfigValues) {
+                            VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues, rawConfigValues);
+                            toggleHeartbeatTimeoutEdit(editStates.ShowEdit);
+                        });
+                        
+                    } else {
+                        toggleHeartbeatTimeoutEdit(editStates.ShowEdit);
+                        adminEditObjects.updateErrorField.text(adminEditObjects.heartbeatTimeoutLabel);
+                        $("#updateErrorPopupLink").trigger("click");
+                    }
                 });
 
                 //Close the popup
-                $($(this).siblings()[0]).trigger("click");
+                popup.close();
             });
 
             $("#btnPopupHeartbeatTimeoutCancel").on("click", function () {
-                toggleHeartbeatTimeoutEdit(true);
+                toggleHeartbeatTimeoutEdit(editStates.ShowEdit);
             });
 
             $(".popup_back").on("click", function () {
-                toggleHeartbeatTimeoutEdit(true);
+                toggleHeartbeatTimeoutEdit(editStates.ShowEdit);
             });
 
             $(".popup_close").on("click", function () {
-                toggleHeartbeatTimeoutEdit(true);
+                toggleHeartbeatTimeoutEdit(editStates.ShowEdit);
             });
         }
     });
@@ -665,6 +707,8 @@ function loadAdminPage() {
             });
         }
     });
+
+    $("#updateErrorPopupLink").popup();
 
     // Filters servers list
     $('#popServerSearchAdmin').keyup(function () {

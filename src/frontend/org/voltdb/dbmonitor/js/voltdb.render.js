@@ -2050,7 +2050,13 @@ function alertNodeClicked(obj) {
 
         this.updateAdminConfiguration = function (updatedData, onInformationLoaded) {
             VoltDBService.UpdateAdminConfiguration(updatedData, function (connection) {
-                onInformationLoaded(connection);
+                var result = {};
+
+                if (connection != null && connection.Metadata['SHORTAPI_UPDATEDEPLOYMENT'] != null) {
+                    result = connection.Metadata['SHORTAPI_UPDATEDEPLOYMENT'];
+                }
+
+                onInformationLoaded(result);
             });
         };
 

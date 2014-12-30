@@ -487,9 +487,12 @@
                                 </tr>
                                 <tr class="child-row-5 subLabelRow" id="heartbeatTimeoutRow">
                                     <td class="configLabel">Heartbeat time out </td>
-                                    <td align="right" class="heartbeattd"><span id="hrtTimeOutSpan"></span>
+                                    <td align="right" class="heartbeattd">
+                                        <div id="loadingHeartbeatTimeout" style="display: none;" class="loading-small"></div>
+                                        <span id="hrtTimeOutSpan"></span>
                                         <input id="txtHrtTimeOut" class="exitableTxtBx" type="text" style="display: none" />
-                                        <span id="hrtTimeOutUnitSpan"></span></td>
+                                        <span id="hrtTimeOutUnitSpan"></span>
+                                    </td>
                                     <td>&nbsp;</td>
                                     <td><a id="btnEditHeartbeatTimeoutOk" href="#HrtTimeOutPopup" class="editOk" title="Ok" style="">Ok</a> <a id="btnEditHeartbeatTimeoutCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a id="btnEditHrtTimeOut" href="javascript:void(0)" class="edit" title="Edit">&nbsp;</a></td>
                                 </tr>
@@ -1124,6 +1127,24 @@
         </div>
     </div>
     <!-- POPUP SaveSnapshotPopup -->
+
+    <!--Update error Popup-->
+    <div style="display: none"><a href="#updateErrorPopup" id="updateErrorPopupLink">Update Error</a></div>
+    <div id="updateErrorPopup" style="display: none">
+        <div id="updateInnerErrorPopup">
+            <div class="overlay-title ">
+                <img src="css/resources/images/error.png" class="imgError" />Error</div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorMsg">
+                <p>
+                    Could not update the value of "<span id="updateErrorField"></span>". Please try again later.
+                </p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn closeBtn" id="btnUpdateErrorOk" title="Ok">Ok</a></div>
+            </div>
+        </div>
+    </div>
+    <!--Update error Popup-->
 
     <!-- Loading -->
     <div id="overlay" style="display: none;">
