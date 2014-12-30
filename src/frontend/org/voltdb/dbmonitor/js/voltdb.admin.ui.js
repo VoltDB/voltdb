@@ -585,13 +585,15 @@ function loadAdminPage() {
             $("#btnPopupHeartbeatTimeoutOk").unbind("click");
             $("#btnPopupHeartbeatTimeoutOk").on("click", function () {
 
-                toggleHeartbeatTimeoutEdit(editStates.ShowLoading);
                 var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();
                 if (!adminConfigurations.hasOwnProperty("heartbeat")) {
                     adminConfigurations.heartbeat = {};
                 }
-                
+                //Set the new value to be saved.
                 adminConfigurations.heartbeat.timeout = adminEditObjects.tBoxHeartbeatTimeout.val();
+                
+                //Call the loading image only after setting the new value to be saved.
+                toggleHeartbeatTimeoutEdit(editStates.ShowLoading);
                 voltDbRenderer.updateAdminConfiguration(adminConfigurations, function (result) {
                     toggleHeartbeatTimeoutEdit(editStates.ShowEdit);
                     if (result.status == "1") {
