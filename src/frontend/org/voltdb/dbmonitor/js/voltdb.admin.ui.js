@@ -681,7 +681,7 @@ function loadAdminPage() {
                     }
                 });
 
-                //Close the popup
+                //Close the popup 
                 popup.close();
             });
 
