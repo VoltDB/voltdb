@@ -81,7 +81,7 @@
         </xs:element>
         <xs:element name="snapshots" minOccurs="0" maxOccurs="1">
             <xs:complexType>
-              <xs:attribute name="path" type="xs:string" default="snapthots"/>
+              <xs:attribute name="path" type="xs:string" default="snapshots"/>
             </xs:complexType>
         </xs:element>
         <xs:element name="exportoverflow" minOccurs="0" maxOccurs="1">
