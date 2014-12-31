@@ -259,10 +259,12 @@ CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleSinglePartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleMultiPartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleSinglePartitionWithDeletionExport;
 CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleMultiPartitionWithDeletionExport;
+CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportSinglePartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportGroupSinglePartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportMultiPartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.WaitSinglePartition;
 CREATE PROCEDURE FROM CLASS genqa.procedures.WaitMultiPartition;
+CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportDoneTable;
 CREATE PROCEDURE FROM CLASS genqa.procedures.JiggleExportGroupDoneTable;
 
 PARTITION PROCEDURE JiggleSkinnyExportSinglePartition
