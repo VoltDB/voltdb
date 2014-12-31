@@ -271,6 +271,8 @@
                                 <li><a href="#restorePop" id="restoreConfirmation" class="restore">Restore</a></li>
                                 <li><a href="#shutDownConfirmationPop" class="shutdown" id="shutDownConfirmation">Shutdown</a></li>
                             </ul>
+                            <div class="snapshotStatusBar" style="display: none" id="snapshotBar">Snapshot saved successfully.</div>
+                            <div class="clear"></div>
                         </div>
                         <div class="clear"></div>
                     </div>
@@ -821,9 +823,9 @@
                     <li>If any servers are running low on memory</li>
                 </ul>
                 <p>
-                    The cluster health bar also indicates which server you are currently connected to and contains a pulldown menu (from the <span class="helpStyleButton">&raquo;&nbsp;Server</span> button on the right) that lists all of the servers in the cluster and their current memory usage. Click on a server name in the list to switch to view statistics from that server. You can also use the input field and the <span class="helpStyleButton">Set</span> button to set the threashold for out-of-memory alerts. Any servers using more than the threshold percent of total memory will be highlighted with an alert status.
-      <h2 class="help">Performance Graphs</h2>
-                    <p>The second section of the monitor shows graphs for CPU and memory usage of the current server and 99th percentile query latency and transactions per sectond for the entire cluster. You can use the pull down "View" menu to change the scale and update rate of the graphs between seconds, minutes, and days.</p>
+                The cluster health bar also indicates which server you are currently connected to and contains a pulldown menu (from the <span class="helpStyleButton">&raquo;&nbsp;Server</span> button on the right) that lists all of the servers in the cluster and their current memory usage. Click on a server name in the list to switch to view statistics from that server. You can also use the input field and the <span class="helpStyleButton">Set</span> button to set the threashold for out-of-memory alerts. Any servers using more than the threshold percent of total memory will be highlighted with an alert status.
+                <h2 class="help">Performance Graphs</h2>
+                <p>The second section of the monitor shows graphs for CPU and memory usage of the current server and 99th percentile query latency and transactions per sectond for the entire cluster. You can use the pull down "View" menu to change the scale and update rate of the graphs between seconds, minutes, and days.</p>
                 <h2 class="help">Performance Data</h2>
                 <p>The third and last section of the monitor shows data charts of performance metrics for each stored procedure and the number of rows for each table and view. You can sort by any of the columns in the charts by clicking on the column heading. Or you can filter by the procedure names using the search box above the chart. </p>
                 <h2 class="help">Additional Controls</h2>
@@ -849,6 +851,8 @@
             </div>
         </div>
     </div>
+    
+   
     <!--help popup ends-->
 
     <!-- POPUP shutDownConfirmationPop -->
@@ -974,13 +978,13 @@
                 <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblSave">
                     <tr>
                         <td>Directory:</td>
-                        <td>
-                            <input id="txtSnapshotDirectory" type="text" value="D:/VoltDB/Snapshots/" class="editDirLocation" />
+                        <td id="tdSnapshotDirectory">
+                            <!--<input id="txtSnapshotDirectory" type="text" class="editDirLocation" />--></td>
                     </tr>
                     <tr>
                         <td>Snapshot Name:</td>
-                        <td>
-                            <input id="txtSnapshotName" type="text" value="SNAPSHOT_yyyy.mm.dd.hh.mm " /></td>
+                        <td id="tdSnapshotName">
+                            <!--<input id="txtSnapshotName" type="text"/>--></td>
                     </tr>
                 </table>
             </div>
@@ -1112,7 +1116,23 @@
     </div>
     <!-- POPUP RestoreConfirmationPopup -->
     
-    <!--Server not available popup-->
+    <!-- POPUP SaveSnapshotPopup -->
+    <div style="display: none"><a href="#saveSnapShotPopup" id="btnSaveSnapshotPopup">Cluster Shutdown</a></div>
+    <div id="saveSnapShotPopup" style="display: none">
+        <div id="saveSnaps">
+            <div class="overlay-title ">
+                <img src="css/resources/images/Information.png" class="imgError" /><span id="saveSnapshotStatus"></span></div>
+            <div class="clear"></div>
+            <div class="overlay-contentError ">
+                <p id="saveSnapshotMessage" class="snapshotErrorMsg"></p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnSaveSnapshotStatus" title="save">Ok</a></div>
+            </div>
+        </div>
+    </div>
+    <!-- POPUP SaveSnapshotPopup -->
+
+    <!--Update error Popup-->
     <div style="display: none"><a href="#updateErrorPopup" id="updateErrorPopupLink">Update Error</a></div>
     <div id="updateErrorPopup" style="display: none">
         <div id="updateInnerErrorPopup">
@@ -1128,7 +1148,7 @@
             </div>
         </div>
     </div>
-    <!--Server not available popup-->
+    <!--Update error Popup-->
 
     <!-- Loading -->
     <div id="overlay" style="display: none;">

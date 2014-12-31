@@ -372,21 +372,38 @@ function loadAdminPage() {
 
     $('#saveConfirmation').popup({
         open: function (event, ui, ele) {
+            var textName = '<input id="txtSnapshotName" type="text" value=' + 'SNAPSHOT_' + getDateTime() +'  />';
+            $('#tdSnapshotName').html(textName);
+            var textDirectory = '<input id="txtSnapshotDirectory" type="text"/>';
+            $('#tdSnapshotDirectory').html(textDirectory);
         },
         afterOpen: function (event) {
             $("#btnSaveSnapshots").unbind("click");
             $("#btnSaveSnapshots").on("click", function () {
-                var snapShotDirectory = '/var/opt/test/voltdb/83886092/snapshots';// + txtSnapshotDirectory.val();
-                var snapShotFileName = adminClusterObjects.txtSnapshotName.val() + getDateTime();
-                var snapShotDetails = snapShotDirectory.trim() +',' +snapShotFileName.trim();
-                //voltDbRenderer.saveSnapshot(snapShotDirectory, snapShotFileName, function (success) {
-                //    if (success) {
-                //        alert("Snapshot saved successfully.");
-                //    } else {
-                //        alert("Unable to resume the cluster.");
-                //    }
-                //    $("#overlay").hide();
-                //});
+                var snapShotDirectory = ($('#voltdbroot').text() != "" && $('#voltdbroot').text() != undefined && $('#snapshotpath').text() != "" && $('#snapshotpath').text() != undefined) ? ($('#voltdbroot').text() + '/' + $('#snapshotpath').text()) : '';
+                if (snapShotDirectory == "") {
+                    $($(this).siblings()[0]).trigger("click");
+                    $('#saveSnapshotStatus').html('Failed to save snapshot');
+                    $('#saveSnapshotMessage').html('Could not get Voltdb root directory and Snapshot path');
+                    $('#btnSaveSnapshotPopup').click();
+                } else {
+                    snapShotDirectory = $('#txtSnapshotDirectory').val() != "" ? snapShotDirectory + "/" + $('#txtSnapshotDirectory').val() : snapShotDirectory;
+                }
+                var snapShotFileName = $('#txtSnapshotName').val();
+                voltDbRenderer.saveSnapshot(snapShotDirectory, snapShotFileName, function (success,snapshotStatus) {
+                    if (success) {
+                        if (snapshotStatus[getCurrentServer()].RESULT.toLowerCase() == "success") {
+                            $('#snapshotBar').css('display','block');
+                            $('#snapshotBar').fadeOut(4000);
+                        } else {
+                            $('#saveSnapshotStatus').html('Failed to save snapshot');
+                            $('#saveSnapshotMessage').html(snapshotStatus[getCurrentServer()].ERR_MSG);
+                            $('#btnSaveSnapshotPopup').click();
+                        }
+                    } else {
+                        alert("Unable to save snapshot.");
+                    }
+                });
                 //Close the popup
                 $($(this).siblings()[0]).trigger("click");
 
