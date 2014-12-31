@@ -115,7 +115,7 @@ public class ValidatePartitioning extends VoltSystemProcedure {
 
             if (TheHashinator.getConfiguredHashinatorType() == HashinatorType.ELASTIC) {
                 int partitionId = context.getPartitionId();
-                ElasticHashinator givenHashinator = (ElasticHashinator)TheHashinator.constructHashinator(ElasticHashinator.class, configBytes, true);
+                ElasticHashinator givenHashinator = (ElasticHashinator)TheHashinator.constructHashinator(ElasticHashinator.class, configBytes, false);
                 ElasticHashinator currentHashinator = (ElasticHashinator)context.getCurrentHashinator();
                 SortedMapDifference<Integer, Integer> hashinatorDiff = Maps.difference(givenHashinator.getTokens(), currentHashinator.getTokens());
                 boolean hasMismatch = false;
