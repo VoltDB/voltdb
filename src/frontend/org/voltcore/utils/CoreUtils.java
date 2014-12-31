@@ -75,9 +75,9 @@ import com.google_voltpatches.common.util.concurrent.SettableFuture;
 public class CoreUtils {
     private static final VoltLogger hostLog = initHostLog();
     private static VoltLogger initHostLog() {
-        System.err.println("CoreUtils x00");
-        VoltLogger voltLogger = new VoltLogger("HOST");
         System.err.println("CoreUtils x000");
+        VoltLogger voltLogger = new VoltLogger("HOST");
+        System.err.println("CoreUtils x001");
         return voltLogger;
     }
 
@@ -87,20 +87,20 @@ public class CoreUtils {
     public static volatile Runnable m_threadLocalDeallocator = initEmptyRunnable();
 
     private static Runnable initEmptyRunnable() {
-System.err.println("CoreUtils x01");
-        return new Runnable() {
+System.err.println("CoreUtils x010");
+        Runnable runnable = new Runnable() {
         @Override
-        public void run() {
-
-        }
+        public void run() { }
     };
+System.err.println("CoreUtils x011");
+    return runnable;
     }
 
     public static final ExecutorService SAMETHREADEXECUTOR = initExecutorService();
 
     private static ExecutorService initExecutorService() {
-System.err.println("CoreUtils x02");
-        return new ExecutorService() {
+System.err.println("CoreUtils x020");
+        ExecutorService executorService = new ExecutorService() {
 
         @Override
         public void execute(Runnable command) {
@@ -254,13 +254,15 @@ System.err.println("CoreUtils x02");
         }
 
     };
+System.err.println("CoreUtils x021");
+    return executorService;
     }
 
     public static final ListeningExecutorService LISTENINGSAMETHREADEXECUTOR = initListeningExecutorService();
 
     private static ListeningExecutorService initListeningExecutorService() {
-System.err.println("CoreUtils x03");
-        return new ListeningExecutorService() {
+System.err.println("CoreUtils x030");
+        ListeningExecutorService listeningExecutorService = new ListeningExecutorService() {
 
         @Override
         public void execute(Runnable command) {
@@ -414,13 +416,15 @@ System.err.println("CoreUtils x03");
         }
 
     };
+System.err.println("CoreUtils x031");
+    return listeningExecutorService
     }
 
     public static final ListenableFuture<Object> COMPLETED_FUTURE = initListenableFuture();
 
     private static ListenableFuture<Object> initListenableFuture() {
-System.err.println("CoreUtils x04");
-        return new ListenableFuture<Object>() {
+System.err.println("CoreUtils x040");
+        ListenableFuture<Object> lf = new ListenableFuture<Object>() {
         @Override
         public void addListener(Runnable listener, Executor executor) { executor.execute(listener); }
         @Override
@@ -434,6 +438,8 @@ System.err.println("CoreUtils x04");
         @Override
         public Object get(long timeout, TimeUnit unit) { return null; }
     };
+System.err.println("CoreUtils x041");
+    return lf;
     }
 
     public static final Runnable EMPTY_RUNNABLE = initEmptyRunnable();
@@ -459,13 +465,22 @@ System.err.println("CoreUtils x04");
      * Create an unbounded single threaded executor
      */
     public static ExecutorService getSingleThreadExecutor(String name) {
-System.err.println("CoreUtils getSTE 0");
+System.err.println("CoreUtils gSTE 0");
         ExecutorService ste =
                 new ThreadPoolExecutor(1, 1,
                         0L, TimeUnit.MILLISECONDS,
                         new LinkedBlockingQueue<Runnable>(),
                         CoreUtils.getThreadFactory(null, name, SMALL_STACK_SIZE, false, null));
-System.err.println("CoreUtils getSTE 1");
+System.err.println("CoreUtils gSTE 1");
+        return ste;
+    }
+
+    public static ExecutorService getSingleThreadExecutor(String name, int size) {
+        ExecutorService ste =
+                new ThreadPoolExecutor(1, 1,
+                        0L, TimeUnit.MILLISECONDS,
+                        new LinkedBlockingQueue<Runnable>(),
+                        CoreUtils.getThreadFactory(null, name, size, false, null));
         return ste;
     }
 
@@ -633,14 +648,13 @@ System.err.println("CoreUtils x2");
             final int stackSize,
             final boolean incrementThreadNames,
             final Queue<String> coreList) {
-System.err.println("CoreUtils getTF 0");
         ThreadGroup group = null;
         if (groupName != null) {
             group = new ThreadGroup(Thread.currentThread().getThreadGroup(), groupName);
         }
         final ThreadGroup finalGroup = group;
 
-        ThreadFactory threadFactory = new ThreadFactory() {
+        return new ThreadFactory() {
             private final AtomicLong m_createdThreadCount = new AtomicLong(0);
             private final ThreadGroup m_group = finalGroup;
             @Override
@@ -675,8 +689,6 @@ System.err.println("CoreUtils getTF 0");
                 return t;
             }
         };
-System.err.println("CoreUtils getTF 1");
-        return threadFactory;
     }
 
     /**
