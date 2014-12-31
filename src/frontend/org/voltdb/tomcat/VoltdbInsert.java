@@ -23,7 +23,7 @@ import org.voltdb.VoltTable;
 
 public class VoltdbInsert extends VoltProcedure {
 
-	final String insertLog_sql = "INSERT INTO Logs (?,?);";
+	final String insertLog_sql = "INSERT INTO Logs (message) values (?);";
 	public final SQLStmt insertLog = new SQLStmt(insertLog_sql);
 
 	public VoltTable[] run (String message) throws VoltAbortException {
