@@ -1015,3 +1015,4 @@ var getOnOffText = function (isChecked) {
 var getOnOffClass = function (isOn) {
     return (isOn) ? "onIcon" : "offIcon";
 };
+
