@@ -6,6 +6,7 @@ var editStates = {
     ShowOkCancel: 1,
     ShowLoading: 2
 };
+var INT_MAX_VALUE = 2147483647;
 
 function loadAdminPage() {
     adminClusterObjects = {
@@ -115,6 +116,7 @@ function loadAdminPage() {
         tBoxHeartbeatTimeoutValue: $("#hrtTimeOutSpan").text(),
         spanHeartbeatTimeOut: $("#hrtTimeOutSpan"),
         loadingHeartbeatTimeout: $("#loadingHeartbeatTimeout"),
+        errorHeartbeatTimeout: $("#errorHeartbeatTimeout"),
 
         //Query Timeout
         rowQueryTimeout: $("#queryTimoutRow"),
@@ -128,6 +130,19 @@ function loadAdminPage() {
         //Update Error
         updateErrorField: $("#updateErrorField"),
         heartbeatTimeoutLabel: $("#heartbeatTimeoutRow").find("td:first-child").text()
+    };
+
+    var adminValidationRules = {
+        numericRules : {
+            required: true,
+            min: 0,
+            max: INT_MAX_VALUE
+        },
+        numericMessages : {
+            required: "Please enter a valid positive number.",
+            min: "Please enter a valid positive number.",
+            max: "Please enter a positive number between 0 and " + INT_MAX_VALUE + "."
+        }
     };
     
     //Admin Page download link
@@ -546,6 +561,15 @@ function loadAdminPage() {
         toggleAutoSnapshotEdit(false);
     });
 
+    $("#formHeartbeatTimeout").validate({
+        rules: {
+            txtHrtTimeOut: adminValidationRules.numericRules
+        },
+        messages: {
+            txtHrtTimeOut: adminValidationRules.numericMessages
+        }
+    });
+
     //Heartbeat time out
     var toggleHeartbeatTimeoutEdit = function (state) {
 
@@ -558,6 +582,7 @@ function loadAdminPage() {
             adminEditObjects.tBoxHeartbeatTimeout.hide();
             adminEditObjects.btnEditHeartbeatTimeoutOk.hide();
             adminEditObjects.btnEditHeartbeatTimeoutCancel.hide();
+            adminEditObjects.errorHeartbeatTimeout.hide();
             
             adminEditObjects.loadingHeartbeatTimeout.show();
         }
@@ -576,6 +601,7 @@ function loadAdminPage() {
             adminEditObjects.btnEditHeartbeatTimeoutOk.hide();
             adminEditObjects.btnEditHeartbeatTimeoutCancel.hide();
             adminEditObjects.LinkHeartbeatEdit.show();
+            adminEditObjects.errorHeartbeatTimeout.hide();
 
             adminEditObjects.tBoxHeartbeatTimeout.hide();
             adminEditObjects.spanHeartbeatTimeOut.show();
@@ -591,6 +617,21 @@ function loadAdminPage() {
 
     adminEditObjects.btnEditHeartbeatTimeoutCancel.on("click", function () {
         toggleHeartbeatTimeoutEdit(editStates.ShowEdit);
+    });
+
+    adminEditObjects.btnEditHeartbeatTimeoutOk.on("click", function(e) {
+        $("#formHeartbeatTimeout").valid();
+
+        if (adminEditObjects.errorHeartbeatTimeout.is(":visible")) {
+            e.preventDefault();
+            e.stopPropagation();
+            adminEditObjects.tBoxHeartbeatTimeout.focus();
+
+            adminEditObjects.errorHeartbeatTimeout.css("background-color", "yellow");
+            setTimeout(function() {
+                adminEditObjects.errorHeartbeatTimeout.animate({ backgroundColor: 'white' }, 'slow');
+            }, 2000);
+        }
     });
 
     adminEditObjects.btnEditHeartbeatTimeoutOk.popup({
