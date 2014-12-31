@@ -34,7 +34,9 @@ import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableTestHelpers;
+import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.tomcat.TomcatVoltdbAppender;
+import org.voltdb.utils.InMemoryJarfile;
 
 public class TomcatLog4jAppender {
 
@@ -87,26 +89,67 @@ public class TomcatLog4jAppender {
         }
 	}
 
+	// Start up a volt instance & client, with stored procedures
+	private void startUp() {
+		try {
+			startServer();
+			startClient();
+			addProcedure();
+		} catch (Exception e) {
+			// Something went wrong
+			tearDown();
+		}
+	}
+
+	// Stop both a volt instance & client
+	private void tearDown() {
+		try {
+			stopClient();
+			stopServer();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	// Add our custom procedure to volt
+	private void addProcedure() {
+		ClientResponse resp = null;
+		try{
+			InMemoryJarfile jarfile = new InMemoryJarfile();
+			VoltCompiler comp = new VoltCompiler();
+			comp.addClassToJar(jarfile, org.voltdb.tomcat.VoltdbInsert.class);
+			m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
+			m_client.callProcedure("@AdHoc", "CREATE TABLE Logs ( id INT NOT NULL, message VARCHAR(255))");
+			resp = m_client.callProcedure("@AdHoc", "create procedure from class org.voltdb.tomcat.VoltdbInsert");
+			System.out.println(resp.getResults()[0].toString());
+		} catch (Exception e) {
+			// Something went wrong
+			System.out.println(resp.getResults()[0].toString());
+			System.out.println("THIS");
+			System.out.println("THAT");
+			tearDown();
+		}
+
+	}
+
 	// Set up the volt instance, writer class and its logger
 	@Before
 	public void setup() {
 		// Volt
-		try{
-			startServer();
-			startClient();
+		startUp();
+
+		// The printer & its logger
+		try {
+			printer = new MessagePrinter();
+
+			Logger rootLogger = Logger.getRootLogger();
+			Appender voltAppender = new TomcatVoltdbAppender();
+			rootLogger.removeAllAppenders();
+			rootLogger.setLevel(Level.INFO);
+			rootLogger.addAppender(voltAppender);
 		} catch (Exception e) {
-			e.printStackTrace();
+			tearDown();
 		}
-
-		// The printer
-		printer = new MessagePrinter();
-
-		// Its logger
-		Logger rootLogger = Logger.getRootLogger();
-		Appender voltAppender = new TomcatVoltdbAppender();
-		rootLogger.removeAllAppenders();
-		rootLogger.setLevel(Level.INFO);
-		rootLogger.addAppender(voltAppender);
 	}
 
 	@Test
@@ -120,10 +163,12 @@ public class TomcatLog4jAppender {
 			VoltTable tables = m_client.callProcedure("@SystemCatalog", "TABLES").getResults()[0];
 	        boolean found = VoltTableTestHelpers.moveToMatchingRow(tables, "TABLE_NAME", "name");
 	        Assert.assertTrue(found);
+		} catch (Exception e) {
+			// Something went wrong
+			tearDown();
 		} finally {
 			// We're done, turn off the server
-			stopClient();
-			stopServer();
+			tearDown();
 		}
 	}
 
