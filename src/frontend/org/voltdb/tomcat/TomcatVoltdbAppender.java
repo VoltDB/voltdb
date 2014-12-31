@@ -64,11 +64,13 @@ public /*static*/ class TomcatVoltdbAppender extends AppenderSkeleton implements
 	@Override
 	protected void append(LoggingEvent arg0) {
 		// Extract the message information we need
+		long timestamp = arg0.getTimeStamp();
+		String level = arg0.getLevel().toString();
 		String message = arg0.getMessage().toString();
 
 		// Insert the log message into Volt
 		try{
-			client.callProcedure("VoltdbInsert", message);
+			client.callProcedure("VoltdbInsert", timestamp, level, message);
 		} catch (Exception e) {
 			e.printStackTrace();
 			System.exit(-1);

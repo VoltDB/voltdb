@@ -119,7 +119,7 @@ public class TomcatLog4jAppender {
 			VoltCompiler comp = new VoltCompiler();
 			comp.addClassToJar(jarfile, org.voltdb.tomcat.VoltdbInsert.class);
 			m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
-			m_client.callProcedure("@AdHoc", "CREATE TABLE Logs ( id INT, message VARCHAR(255))");
+			m_client.callProcedure("@AdHoc", "CREATE TABLE Logs ( timestamp BIGINT, level VARCHAR(10), message VARCHAR(255))");
 			m_client.callProcedure("@AdHoc", "create procedure from class org.voltdb.tomcat.VoltdbInsert");
 		} catch (Exception e) {
 			tearDown();
