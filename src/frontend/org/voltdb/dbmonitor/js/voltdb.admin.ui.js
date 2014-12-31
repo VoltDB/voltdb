@@ -867,7 +867,15 @@ function loadAdminPage() {
             adminDOMObjects.target.text(adminConfigValues.targets);
             
             adminDOMObjects.heartBeatTimeout.text(adminConfigValues.heartBeatTimeout != "" ? adminConfigValues.heartBeatTimeout : "");
-            adminDOMObjects.heartBeatTimeoutLabel.text(adminConfigValues.heartBeatTimeout != "" && adminConfigValues.heartBeatTimeout != undefined ? "ms" : "");
+
+            if (adminConfigValues.heartBeatTimeout != "" && adminConfigValues.heartBeatTimeout != undefined) {
+                adminDOMObjects.heartBeatTimeoutLabel.text("ms");
+                adminEditObjects.LinkHeartbeatEdit.show();
+            } else {
+                adminDOMObjects.heartBeatTimeoutLabel.text("");
+                adminEditObjects.LinkHeartbeatEdit.hide();
+            }
+
             adminDOMObjects.tempTablesMaxSize.text(adminConfigValues.tempTablesMaxSize != "" ? adminConfigValues.tempTablesMaxSize : "");
             adminDOMObjects.tempTablesMaxSizeLabel.text(adminConfigValues.tempTablesMaxSize != "" && adminConfigValues.tempTablesMaxSize != undefined ? "MB" : "");
             adminDOMObjects.snapshotPriority.text(adminConfigValues.snapshotPriority);
