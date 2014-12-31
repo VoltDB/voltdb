@@ -69,8 +69,8 @@ import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.groovy.GroovyCodeBlockCompiler;
 import org.voltdb.planner.AbstractParsedStmt;
-import org.voltdb.planner.ParsedSelectStmt;
 import org.voltdb.planner.ParsedColInfo;
+import org.voltdb.planner.ParsedSelectStmt;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.ConstraintType;
@@ -81,6 +81,8 @@ import org.voltdb.utils.CatalogSchemaTools;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
+import org.voltdb.utils.SQLLexer;
+import org.voltdb.utils.SQLLexer.HSQLDDLNoun;
 import org.voltdb.utils.VoltTypeUtil;
 
 
@@ -507,9 +509,22 @@ public class DDLCompiler {
                     // avoid embedded newlines so we can delimit statements
                     // with newline.
                     m_fullDDL += Encoder.hexEncode(stmt.statement) + "\n";
+
+                    // figure out what table this DDL might affect to minimize diff processing
+                    SQLLexer.HSQLDDLInfo ddlStmtInfo = SQLLexer.preprocessHSQLDDL(stmt.statement);
+                    String expectedTableAffected = null;
+                    String expectedIndexAffected = null;
+                    // if it's ddl for an index, table name needs to be looked up
+                    if (ddlStmtInfo.noun == HSQLDDLNoun.INDEX) {
+                        expectedIndexAffected = ddlStmtInfo.name;
+                    }
+                    else {
+                        expectedTableAffected = ddlStmtInfo.name;
+                    }
+
                     // Get the diff that results from applying this statement and apply it
                     // to our local tree (with Volt-specific additions)
-                    VoltXMLDiff thisStmtDiff = m_hsql.runDDLCommandAndDiff(stmt.statement);
+                    VoltXMLDiff thisStmtDiff = m_hsql.runDDLCommandAndDiff(expectedTableAffected, expectedIndexAffected, stmt.statement);
                     applyDiff(thisStmtDiff);
                 } catch (HSQLParseException e) {
                     String msg = "DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
