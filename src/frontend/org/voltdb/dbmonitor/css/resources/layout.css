@@ -785,7 +785,7 @@ label.error { color: #c70000; width: auto; display: block; line-height: 0px; fon
 .adminLeft { float:left; width:63%;}
 .adminLeft h1 { float:left; padding-right:20px;}
 .adminClusterProperties { /*float:left;*/}
-ul.adminClusterList { margin:0; padding:0; /*width:366px;*/ height:40px; float:left}
+ul.adminClusterList { margin:0; padding:0; /*width:366px;*/ height:40px;}
 ul.adminClusterList li { margin:0; padding:0; float:left; width:50px; height:100%; line-height:75px; text-align:center; margin-right:5px;}
 ul.adminClusterList li a{display:block;}
 ul.adminClusterList li a.pause { display:inline-block; background-position:-20px -106px; width:40px; height:36px;}
@@ -923,7 +923,17 @@ td.heartbeattd span.unit, td.queryTimeOut span.unit{position:relative;/* top:7px
 .overviewTbl table td{white-space:nowrap !important}
 .confirmationHeight { height:auto!important;}
 .snapshotErrorMsg { padding-bottom: 15px;}
-.snapshotStatusBar {float: right;padding: 10px; width: 22%; background: rgba(78, 141, 181, 1);color: #FFFFFF;font-weight: bold; margin: 3px 0 0 0;   }
+.snapshotStatusBar {    padding: 10px; width:171px; background: rgba(78, 141, 181, 1);
+                        color: #FFFFFF;
+                        font-weight: bold;
+                        margin: 3px 0 0 0;
+                        position: fixed;
+                        left: 44%;
+                        top: 14.5%;
+                         z-index: 1;
+                        font-size: 12px;
+
+}
 
 /*********************************************media Qu********************/
 @media (max-width: 479px) {
@@ -1035,7 +1045,7 @@ top: 3px;}
 	.adminLeft { float:none; width:100%}
 	#serverConfigAdmin{ top:99px; width:421px;}
 	.adminRight{ padding-top:15px;}
-    .snapshotStatusBar { float: right; width: 100%; margin: 20px 0 0 0px; position: relative; left: 3%;}
+   
 }
 @media (min-width: 320px) and (max-width: 479px) {
 #popServerList {width: 100%;position: absolute;right:-1px;top:205px;}
@@ -1057,8 +1067,7 @@ ul.adminClusterList li { margin:0; padding-top:15px; float:left; width:67px; hei
 #serverConfigAdmin{ top:214px; width:261px;}
 .restoreCont {overflow:auto; height:146px}
 .restoreInfo .overlay-content {  height:auto;}	
-ul.adminClusterList { float: none;}	
-.snapshotStatusBar { float: right; width: 100%; margin: 20px 0 0 0px; position: relative; left: 27px;}
+.snapshotStatusBar {left: 18%;}
 	 }
 
 	 
