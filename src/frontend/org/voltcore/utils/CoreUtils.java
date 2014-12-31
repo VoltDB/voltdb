@@ -459,20 +459,13 @@ System.err.println("CoreUtils x04");
      * Create an unbounded single threaded executor
      */
     public static ExecutorService getSingleThreadExecutor(String name) {
+System.err.println("CoreUtils getSTE 0");
         ExecutorService ste =
                 new ThreadPoolExecutor(1, 1,
                         0L, TimeUnit.MILLISECONDS,
                         new LinkedBlockingQueue<Runnable>(),
                         CoreUtils.getThreadFactory(null, name, SMALL_STACK_SIZE, false, null));
-        return ste;
-    }
-
-    public static ExecutorService getSingleThreadExecutor(String name, int size) {
-        ExecutorService ste =
-                new ThreadPoolExecutor(1, 1,
-                        0L, TimeUnit.MILLISECONDS,
-                        new LinkedBlockingQueue<Runnable>(),
-                        CoreUtils.getThreadFactory(null, name, size, false, null));
+System.err.println("CoreUtils getSTE 1");
         return ste;
     }
 
@@ -640,13 +633,14 @@ System.err.println("CoreUtils x2");
             final int stackSize,
             final boolean incrementThreadNames,
             final Queue<String> coreList) {
+System.err.println("CoreUtils getTF 0");
         ThreadGroup group = null;
         if (groupName != null) {
             group = new ThreadGroup(Thread.currentThread().getThreadGroup(), groupName);
         }
         final ThreadGroup finalGroup = group;
 
-        return new ThreadFactory() {
+        ThreadFactory threadFactory = new ThreadFactory() {
             private final AtomicLong m_createdThreadCount = new AtomicLong(0);
             private final ThreadGroup m_group = finalGroup;
             @Override
@@ -681,6 +675,8 @@ System.err.println("CoreUtils x2");
                 return t;
             }
         };
+System.err.println("CoreUtils getTF 1");
+        return threadFactory;
     }
 
     /**
