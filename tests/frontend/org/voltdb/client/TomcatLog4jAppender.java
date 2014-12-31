@@ -119,14 +119,9 @@ public class TomcatLog4jAppender {
 			VoltCompiler comp = new VoltCompiler();
 			comp.addClassToJar(jarfile, org.voltdb.tomcat.VoltdbInsert.class);
 			m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
-			m_client.callProcedure("@AdHoc", "CREATE TABLE Logs ( id INT NOT NULL, message VARCHAR(255))");
-			resp = m_client.callProcedure("@AdHoc", "create procedure from class org.voltdb.tomcat.VoltdbInsert");
-			System.out.println(resp.getResults()[0].toString());
+			m_client.callProcedure("@AdHoc", "CREATE TABLE Logs ( id INT, message VARCHAR(255))");
+			m_client.callProcedure("@AdHoc", "create procedure from class org.voltdb.tomcat.VoltdbInsert");
 		} catch (Exception e) {
-			// Something went wrong
-			System.out.println(resp.getResults()[0].toString());
-			System.out.println("THIS");
-			System.out.println("THAT");
 			tearDown();
 		}
 
@@ -161,7 +156,7 @@ public class TomcatLog4jAppender {
 
 			// Make sure that we have a bunch of messages in volt
 			VoltTable tables = m_client.callProcedure("@SystemCatalog", "TABLES").getResults()[0];
-	        boolean found = VoltTableTestHelpers.moveToMatchingRow(tables, "TABLE_NAME", "name");
+	        boolean found = VoltTableTestHelpers.moveToMatchingRow(tables, "TABLE_NAME", "Logs");
 	        Assert.assertTrue(found);
 		} catch (Exception e) {
 			// Something went wrong
