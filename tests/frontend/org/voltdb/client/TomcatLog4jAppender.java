@@ -33,7 +33,6 @@ import org.junit.Test;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltTableTestHelpers;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.tomcat.TomcatVoltdbAppender;
 import org.voltdb.utils.InMemoryJarfile;
@@ -152,12 +151,10 @@ public class TomcatLog4jAppender {
 		try {
 			// Print our messages
 			printer.printMessages();
-			Thread.sleep(10000);
 
 			// Make sure that we have a bunch of messages in volt
-			VoltTable tables = m_client.callProcedure("@SystemCatalog", "TABLES").getResults()[0];
-	        boolean found = VoltTableTestHelpers.moveToMatchingRow(tables, "TABLE_NAME", "Logs");
-	        Assert.assertTrue(found);
+			VoltTable tables = m_client.callProcedure("@AdHoc", "SELECT messages FROM Logs").getResults()[0];
+			Assert.assertTrue("We have the correct number of insertions", tables.getRowCount() == 2);
 		} catch (Exception e) {
 			// Something went wrong
 			tearDown();
