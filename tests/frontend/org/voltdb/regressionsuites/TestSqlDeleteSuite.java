@@ -245,25 +245,25 @@ public class TestSqlDeleteSuite extends RegressionSuite {
                 new long[] { 1, 2, 3, 4, 5, 6, 7 },
                 new long[] { 4, 5, 6, 7 } };
 
-        insertRows(client, "P1", 10);
-        insertRows(client, "R1", 10);
+        insertRows(client, "P3", 10);
+        insertRows(client, "R3", 10);
 
         VoltTable vt;
         for (int i = 0; i < stmtTemplates.length; ++i) {
 
             // Should succeed on replicated table
-            String replStmt = String.format(stmtTemplates[i], "R1");
+            String replStmt = String.format(stmtTemplates[i], "R3");
             int len = replStmt.length();
             long expectedRows = Long.valueOf(replStmt.substring(len - 1, len));
             vt = client.callProcedure("@AdHoc", replStmt).getResults()[0];
             validateTableOfScalarLongs(vt, new long[] { expectedRows });
 
             vt = client.callProcedure("@AdHoc",
-                    "SELECT NUM FROM R1 ORDER BY NUM ASC").getResults()[0];
+                    "SELECT NUM FROM R3 ORDER BY NUM ASC").getResults()[0];
             validateTableOfScalarLongs(vt, expectedResults[i]);
 
             // In the partitioned case, we expect to get an error
-            String partStmt = String.format(stmtTemplates[i], "P1");
+            String partStmt = String.format(stmtTemplates[i], "P3");
             verifyStmtFails(
                     client,
                     partStmt,
