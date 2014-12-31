@@ -128,7 +128,7 @@ function loadAdminPage() {
         spanqueryTimeOut: $("#queryTimeOutSpan"),
         
         //Update Error
-        updateErrorField: $("#updateErrorField"),
+        updateErrorFieldMsg: $("#updateErrorFieldMsg"),
         heartbeatTimeoutLabel: $("#heartbeatTimeoutRow").find("td:first-child").text()
     };
 
@@ -655,7 +655,7 @@ function loadAdminPage() {
                 //Call the loading image only after setting the new value to be saved.
                 toggleHeartbeatTimeoutEdit(editStates.ShowLoading);
                 voltDbRenderer.updateAdminConfiguration(adminConfigurations, function (result) {
-                    
+
                     if (result.status == "1") {
                         adminEditObjects.tBoxHeartbeatTimeoutValue = adminEditObjects.tBoxHeartbeatTimeout.val();
                         adminEditObjects.spanHeartbeatTimeOut.html(adminEditObjects.tBoxHeartbeatTimeoutValue);
@@ -667,8 +667,16 @@ function loadAdminPage() {
                         });
                         
                     } else {
+                        
                         toggleHeartbeatTimeoutEdit(editStates.ShowEdit);
-                        adminEditObjects.updateErrorField.text(adminEditObjects.heartbeatTimeoutLabel);
+                        var msg = '"' + adminEditObjects.heartbeatTimeoutLabel + '". ';
+                        if (result.status == "-1" && result.statusstring == "Query timeout.") {
+                            msg += "The DB Monitor service is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
+                        } else {
+                            msg += "Please try again later.";
+                        }
+                        
+                        adminEditObjects.updateErrorFieldMsg.text(msg);
                         $("#updateErrorPopupLink").trigger("click");
                     }
                 });
