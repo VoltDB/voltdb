@@ -136,12 +136,14 @@ function loadAdminPage() {
         numericRules : {
             required: true,
             min: 0,
-            max: INT_MAX_VALUE
+            max: INT_MAX_VALUE,
+            digits: true,
         },
         numericMessages : {
             required: "Please enter a valid positive number.",
             min: "Please enter a valid positive number.",
-            max: "Please enter a positive number between 0 and " + INT_MAX_VALUE + "."
+            max: "Please enter a positive number between 0 and " + INT_MAX_VALUE + ".",
+            digits: "Please enter a positive number without any decimal."
         }
     };
     
