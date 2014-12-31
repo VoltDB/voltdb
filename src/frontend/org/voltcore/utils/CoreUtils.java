@@ -73,12 +73,12 @@ import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 public class CoreUtils {
-    private static final VoltLogger hostLog = initHostLog();
-    private static VoltLogger initHostLog() {
+    private static VoltLogger hostLog = null;
+
+    static {
         System.err.println("CoreUtils x000");
-        VoltLogger voltLogger = new VoltLogger("HOST");
+        hostLog = new VoltLogger("HOST");
         System.err.println("CoreUtils x001");
-        return voltLogger;
     }
 
     public static final int SMALL_STACK_SIZE = 1024 * 256;
@@ -417,7 +417,7 @@ System.err.println("CoreUtils x030");
 
     };
 System.err.println("CoreUtils x031");
-    return listeningExecutorService
+    return listeningExecutorService;
     }
 
     public static final ListenableFuture<Object> COMPLETED_FUTURE = initListenableFuture();

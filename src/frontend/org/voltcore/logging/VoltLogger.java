@@ -39,9 +39,9 @@ public class VoltLogger {
     private static final String m_threadName = "Async Logger";
     private static final ExecutorService m_es = initExecutorService();
     private static ExecutorService initExecutorService() {
-        System.err.println("VoltLogger x00");
-        ExecutorService executorService = CoreUtils.getSingleThreadExecutor(m_threadName);
         System.err.println("VoltLogger x000");
+        ExecutorService executorService = CoreUtils.getSingleThreadExecutor(m_threadName);
+        System.err.println("VoltLogger x001");
         return executorService;
     }
     private static final boolean m_disableAsync = Boolean.getBoolean("DISABLE_ASYNC_LOGGING");
