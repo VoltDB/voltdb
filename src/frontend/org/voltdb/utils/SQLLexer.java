@@ -87,6 +87,104 @@ public class SQLLexer
         return ddlToken;
     }
 
+    // Glean some basic info about DDL statements sent to HSQLDB
+    private static final Pattern HSQL_DDL_PREPROCESSOR = Pattern.compile(
+            "^\\s*" +  // start of line, 0 or more whitespace
+            "(create|drop|alter)" + // DDL commands we're looking for
+            "\\s+" + // one or more whitespace
+            "(unique\\s+)?" + // unique for index parsing
+            "(table|view|index)" +
+            "\\s+" + // one or more whitespace
+            "([a-z][a-z0-9_]*)" + // table name symbol
+            ".*$", // all the rest
+            Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL
+            );
+
+    /**
+     * CREATE, ALTER or DROP
+     */
+    public static enum HSQLDDLVerb {
+        CREATE, ALTER, DROP;
+
+        public static HSQLDDLVerb get(String name) {
+            if (name.equalsIgnoreCase("CREATE")) {
+                return CREATE;
+            }
+            else if (name.equalsIgnoreCase("ALTER")) {
+                return ALTER;
+            }
+            else if (name.equalsIgnoreCase("DROP")) {
+                return DROP;
+            }
+            else {
+                return null;
+            }
+        }
+    }
+
+    /**
+     * TABLE, INDEX or VIEW
+     */
+    public static enum HSQLDDLNoun {
+        TABLE, INDEX, VIEW;
+
+        public static HSQLDDLNoun get(String name) {
+            if (name.equalsIgnoreCase("TABLE")) {
+                return TABLE;
+            }
+            else if (name.equalsIgnoreCase("INDEX")) {
+                return INDEX;
+            }
+            else if (name.equalsIgnoreCase("VIEW")) {
+                return VIEW;
+            }
+            else {
+                return null;
+            }
+        }
+    }
+
+    /**
+     *  Information about DDL passed to HSQL that allows it to be better understood by VoltDB
+     */
+    public static class HSQLDDLInfo {
+        public final HSQLDDLVerb verb;
+        public final HSQLDDLNoun noun;
+        public final String name;
+
+        HSQLDDLInfo(HSQLDDLVerb verb, HSQLDDLNoun noun, String name) {
+            this.verb = verb; this.noun = noun; this.name = name;
+        }
+    }
+
+    /**
+     * Glean some basic info about DDL statements sent to HSQLDB
+     */
+    public static HSQLDDLInfo preprocessHSQLDDL(String ddl) {
+        Matcher matcher = HSQL_DDL_PREPROCESSOR.matcher(ddl);
+        if (matcher.find()) {
+            String verbString = matcher.group(1);
+            HSQLDDLVerb verb = HSQLDDLVerb.get(verbString);
+            if (verb == null) {
+                return null;
+            }
+
+            String nounString = matcher.group(3);
+            HSQLDDLNoun noun = HSQLDDLNoun.get(nounString);
+            if (noun == null) {
+                return null;
+            }
+
+            String name = matcher.group(4);
+            if (name == null) {
+                return null;
+            }
+
+            return new HSQLDDLInfo(verb, noun, name.toLowerCase());
+        }
+        return null;
+    }
+
     // Extracts the table name for DDL batch conflicting command checks.
     private static final Pattern CREATE_DROP_TABLE_PREAMBLE = Pattern.compile(
             "^\\s*" +  // start of line, 0 or more whitespace
@@ -98,6 +196,8 @@ public class SQLLexer
             ".*$", // all the rest
             Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL
             );
+
+
 
     /**
      * Get the table name for a CREATE or DROP DDL statement.
