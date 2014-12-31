@@ -778,6 +778,7 @@ ul.helpSchemaList li { list-style:disc; line-height:25px!important; padding:0; m
 .arrow, 
 .labelCollapsed, 
 .labelExpanded { background-image:url(images/admin-icons.png);}
+label.error { color: #c70000; width: auto; display: block; line-height: 0px; font-size: 11px; padding: 10px 5px 0 7px; margin: 0 0 6px 0; height: 10px;}
 
 .adminWrapper{ margin:0; padding:15px 20px;background:#FFFFFF; border-bottom:1px solid #CCCCCC;}
 		  

@@ -36,6 +36,7 @@
     <script type="text/javascript" src="js/jquery.getSelectedText.min.js"></script>
     <script type="text/javascript" src="js/icheck.js"></script>
     <script type="text/javascript" src="js/voltdb.admin.ui.js"></script>
+    <script type="text/javascript" src="js/jquery.validate.min.js"></script>
 </head>
 <body>
     <iframe name="versioncheck" id="versioncheck" style="display: none;" width="1" height="1" frameborder="0" src="about:blank"></iframe>
@@ -486,10 +487,13 @@
                                 <tr class="child-row-5 subLabelRow" id="heartbeatTimeoutRow">
                                     <td class="configLabel">Heartbeat time out </td>
                                     <td align="right" class="heartbeattd">
-                                        <div id="loadingHeartbeatTimeout" style="display: none;" class="loading-small"></div>
-                                        <span id="hrtTimeOutSpan"></span>
-                                        <input id="txtHrtTimeOut" class="exitableTxtBx" type="text" style="display: none" />
-                                        <span id="hrtTimeOutUnitSpan"></span>
+                                        <form id="formHeartbeatTimeout" method="get" action="">
+                                            <div id="loadingHeartbeatTimeout" class="loading-small" style="display: none;"></div>
+                                            <span id="hrtTimeOutSpan"></span>
+                                            <input id="txtHrtTimeOut" name="txtHrtTimeOut" class="exitableTxtBx" type="text" style="display: none" />
+                                            <span id="hrtTimeOutUnitSpan"></span>
+                                            <label id="errorHeartbeatTimeout" for="txtHrtTimeOut" class="error" style="display: none;"></label>
+                                        </form>
                                     </td>
                                     <td>&nbsp;</td>
                                     <td><a id="btnEditHeartbeatTimeoutOk" href="#HrtTimeOutPopup" class="editOk" title="Ok" style="">Ok</a> <a id="btnEditHeartbeatTimeoutCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a id="btnEditHrtTimeOut" href="javascript:void(0)" class="edit" title="Edit">&nbsp;</a></td>
