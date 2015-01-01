@@ -15,7 +15,6 @@ function loadAdminPage() {
         btnClusterShutdown: $('#shutDownConfirmation'),
         btnClusterSaveSnapshot: $('#saveConfirmation'),
         txtSnapshotDirectory: $('#txtSnapshotDirectory'),
-        txtSnapshotName: $('#txtSnapshotName')
     };
 
     adminDOMObjects = {
@@ -144,6 +143,18 @@ function loadAdminPage() {
             min: "Please enter a valid positive number.",
             max: "Please enter a positive number between 0 and " + INT_MAX_VALUE + ".",
             digits: "Please enter a positive number without any decimal."
+        },
+        
+        fileNameRules: {
+            required: true,
+            minlength: 2,
+            regex: /^[a-zA-Z0-9_.]+$/
+            
+        },
+        fileNameMessages: {
+            required: "Please enter a valid file name.",
+            minlength: "Please enter at least 2 characters.",
+            regex: 'Only alphabets, numbers, _ and . are allowed.'
         }
     };
     
@@ -371,17 +382,49 @@ function loadAdminPage() {
         }
     });
 
-
     $('#saveConfirmation').popup({
         open: function (event, ui, ele) {
-            var textName = '<input id="txtSnapshotName" type="text" value=' + 'SNAPSHOT_' + getDateTime() +'  />';
-            $('#tdSnapshotName').html(textName);
+            var textName = '<input id="txtSnapshotName" type="text" name="txtSnapshotName" value=' + 'SNAPSHOT_' + getDateTime() + '  />';
+            var errorMsg = '<div class="errorLabelMsg"><label id="errorSnapshotFileName" for="txtSnapshotName" class="error" style="display: none;">This field is required.</label></div>';
+            $('#tdSnapshotName').html(textName + errorMsg);
             var textDirectory = '<input id="txtSnapshotDirectory" type="text"/>';
             $('#tdSnapshotDirectory').html(textDirectory);
+
+            $("#formSaveSnapshot").validate({
+                rules: {
+                    txtSnapshotName: adminValidationRules.fileNameRules
+                },
+                messages: {
+                    txtSnapshotName: adminValidationRules.fileNameMessages
+                }
+            });
+
+            $.validator.addMethod(
+                "regex",
+                function(value, element, regexp) {
+                    var re = new RegExp(regexp);
+                    return this.optional(element) || re.test(value);
+                },
+                "Please enter only valid characters."
+            );
         },
         afterOpen: function (event) {
             $("#btnSaveSnapshots").unbind("click");
-            $("#btnSaveSnapshots").on("click", function () {
+            $("#btnSaveSnapshots").on("click", function (e) {
+
+                $("#formSaveSnapshot").valid();
+                var errorSnapshotFileName = $("#errorSnapshotFileName");
+                if (errorSnapshotFileName.is(":visible")) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    errorSnapshotFileName.css("background-color", "yellow");
+                    setTimeout(function () {
+                        errorSnapshotFileName.animate({ backgroundColor: 'white' }, 'slow');
+                    }, 2000);
+                    return;
+                }
+
                 var snapShotDirectory = ($('#voltdbroot').text() != "" && $('#voltdbroot').text() != undefined && $('#snapshotpath').text() != "" && $('#snapshotpath').text() != undefined) ? ($('#voltdbroot').text() + '/' + $('#snapshotpath').text()) : '';
                 if (snapShotDirectory == "") {
                     $($(this).siblings()[0]).trigger("click");
