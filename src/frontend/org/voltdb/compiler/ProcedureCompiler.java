@@ -67,25 +67,34 @@ import com.google_voltpatches.common.collect.ImmutableMap;
  */
 public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
 
-    static void compile(VoltCompiler compiler, HSQLInterface hsql,
-            DatabaseEstimates estimates, Catalog catalog, Database db,
-            ProcedureDescriptor procedureDescriptor,
-            InMemoryJarfile jarOutput)
-    throws VoltCompiler.VoltCompilerException {
+    static void compile(VoltCompiler compiler,
+                        HSQLInterface hsql,
+                        DatabaseEstimates estimates,
+                        Catalog catalog,
+                        Database db,
+                        ProcedureDescriptor procedureDescriptor,
+                        Procedure previousProcIfAny,
+                        InMemoryJarfile jarOutput)
+                                throws VoltCompiler.VoltCompilerException
+    {
 
         assert(compiler != null);
         assert(hsql != null);
         assert(estimates != null);
 
         if (procedureDescriptor.m_singleStmt == null)
-            compileJavaProcedure(compiler, hsql, estimates, catalog, db, procedureDescriptor, jarOutput);
+            compileJavaProcedure(compiler, hsql, estimates, catalog, db, procedureDescriptor, previousProcIfAny, jarOutput);
         else
-            compileSingleStmtProcedure(compiler, hsql, estimates, catalog, db, procedureDescriptor);
+            compileSingleStmtProcedure(compiler, hsql, estimates, catalog, db, previousProcIfAny, procedureDescriptor);
     }
 
-    public static Map<String, SQLStmt> getValidSQLStmts(VoltCompiler compiler, String procName, Class<?> procClass, Object procInstance, boolean withPrivate)
-            throws VoltCompilerException {
-
+    public static Map<String, SQLStmt> getValidSQLStmts(VoltCompiler compiler,
+                                                        String procName,
+                                                        Class<?> procClass,
+                                                        Object procInstance,
+                                                        boolean withPrivate)
+                                                                throws VoltCompilerException
+    {
         Map<String, SQLStmt> retval = new HashMap<String, SQLStmt>();
 
         Field[] fields = procClass.getDeclaredFields();
@@ -265,11 +274,16 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
     }
 
 
-    static void compileJavaProcedure(VoltCompiler compiler, HSQLInterface hsql,
-            DatabaseEstimates estimates, Catalog catalog, Database db,
-            ProcedureDescriptor procedureDescriptor,
-            InMemoryJarfile jarOutput)
-    throws VoltCompiler.VoltCompilerException {
+    static void compileJavaProcedure(VoltCompiler compiler,
+                                     HSQLInterface hsql,
+                                     DatabaseEstimates estimates,
+                                     Catalog catalog,
+                                     Database db,
+                                     ProcedureDescriptor procedureDescriptor,
+                                     Procedure previousProcIfAny,
+                                     InMemoryJarfile jarOutput)
+                                             throws VoltCompiler.VoltCompilerException
+    {
 
         final String className = procedureDescriptor.m_className;
         final Language lang = procedureDescriptor.m_language;
@@ -622,11 +636,15 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
         compiler.addClassToJar(jarOutput, ancestor);
     }
 
-    static void compileSingleStmtProcedure(VoltCompiler compiler, HSQLInterface hsql,
-            DatabaseEstimates estimates, Catalog catalog, Database db,
-            ProcedureDescriptor procedureDescriptor)
-    throws VoltCompiler.VoltCompilerException {
-
+    static void compileSingleStmtProcedure(VoltCompiler compiler,
+                                           HSQLInterface hsql,
+                                           DatabaseEstimates estimates,
+                                           Catalog catalog,
+                                           Database db,
+                                           Procedure previousProcIfAny,
+                                           ProcedureDescriptor procedureDescriptor)
+                                                   throws VoltCompiler.VoltCompilerException
+    {
         final String className = procedureDescriptor.m_className;
         if (className.indexOf('@') != -1) {
             throw compiler.new VoltCompilerException("User procedure names can't contain \"@\".");
@@ -669,6 +687,12 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
             }
         }
         assert(info != null);
+
+        // find any previous statement
+        if (previousProcIfAny != null) {
+            Statement previousStatement = previousProcIfAny.getStatements().get(VoltDB.ANON_STMT_NAME);
+
+        }
 
         // ADD THE STATEMENT
 

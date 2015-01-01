@@ -20,6 +20,7 @@ package org.voltdb.compiler;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
+import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Catalog;
@@ -196,6 +197,9 @@ public abstract class StatementCompiler {
 
         // set the explain plan output into the catalog (in hex)
         catalogStmt.setExplainplan(Encoder.hexEncode(plan.explainedPlan));
+
+        // add the touched tables to the catalog
+        catalogStmt.setTablestouched(StringUtils.join(plan.touchedTables, ','));
 
         // compute a hash of the plan
         MessageDigest md = null;

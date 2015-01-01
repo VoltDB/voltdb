@@ -164,6 +164,7 @@ begin Statement           "A parameterized SQL statement embedded in a stored pr
   int cost                  "The cost of this plan measured in arbitrary units"
   int seqscancount          "The number of sequential table scans in the plan"
   string explainplan        "A human-readable plan description"
+  string tablestouched      "A CSV list of tables this statement touches"
 end
 
 begin StmtParameter javaonly   "A parameter for a parameterized SQL statement"
@@ -171,7 +172,6 @@ begin StmtParameter javaonly   "A parameter for a parameterized SQL statement"
   int javatype                 "The Java class of the parameter (int/float/date/etc)"
   bool isarray                 "Is the parameter an array of value"
   int index                    "The index of the parameter in the set of statement parameters"
-  ProcParameter? procparameter "Reference back to original input parameter"
 end
 
 begin PlanFragment               "Instructions to the executor to execute part of an execution plan"
