@@ -15,8 +15,9 @@ function loadAdminPage() {
         btnClusterShutdown: $('#shutDownConfirmation'),
         btnClusterSaveSnapshot: $('#saveConfirmation'),
         txtSnapshotDirectory: $('#txtSnapshotDirectory'),
-        txtSnapshotName: $('#txtSnapshotName')
-    };
+        btnClusterPromote: $('#promoteConfirmation'),
+        enablePromote: false
+};
 
     adminDOMObjects = {
         siteNumberHeader: $("#sitePerHost"),
@@ -133,17 +134,35 @@ function loadAdminPage() {
     };
 
     var adminValidationRules = {
-        numericRules : {
+        numericRules: {
             required: true,
             min: 0,
             max: INT_MAX_VALUE,
             digits: true,
         },
-        numericMessages : {
+        numericMessages: {
             required: "Please enter a valid positive number.",
             min: "Please enter a valid positive number.",
             max: "Please enter a positive number between 0 and " + INT_MAX_VALUE + ".",
             digits: "Please enter a positive number without any decimal."
+        },
+
+        fileNameRules: {
+            required: true,
+            minlength: 2,
+            regex: /^[a-zA-Z0-9_.]+$/            
+        },
+        fileNameMessages: {
+            required: "Please enter a valid file name.",
+            minlength: "Please enter at least 2 characters.",
+            regex: 'Only alphabets, numbers, _ and . are allowed.'
+        },
+
+        directoryPathRules: {
+            required: true
+        },
+        directoryPathMessages: {
+            required: "Please enter a valid directory path."
         }
     };
     
@@ -371,26 +390,72 @@ function loadAdminPage() {
         }
     });
 
-
     $('#saveConfirmation').popup({
         open: function (event, ui, ele) {
-            var textName = '<input id="txtSnapshotName" type="text" value=' + 'SNAPSHOT_' + getDateTime() +'  />';
-            $('#tdSnapshotName').html(textName);
-            var textDirectory = '<input id="txtSnapshotDirectory" type="text"/>';
-            $('#tdSnapshotDirectory').html(textDirectory);
+            var textName = '<input id="txtSnapshotName" type="text" name="txtSnapshotName" value=' + 'SNAPSHOT_' + getDateTime() + '  />';
+            var errorMsg = '<div class="errorLabelMsg"><label id="errorSnapshotFileName" for="txtSnapshotName" class="error" style="display: none;">This field is required.</label></div>';
+            $('#tdSnapshotName').html(textName + errorMsg);
+            var textDirectory = '<input id="txtSnapshotDirectory" name="txtSnapshotDirectory" type="text"/>';
+            var errorDirectoryMsg = '<div class="errorLabelMsg"><label id="errorSnapshotDirectoryPath" for="txtSnapshotDirectory" class="error" style="display: none;">This field is required.</label></div>';
+            $('#tdSnapshotDirectory').html(textDirectory + errorDirectoryMsg);
+
+            $("#formSaveSnapshot").validate({
+                rules: {
+                    txtSnapshotName: adminValidationRules.fileNameRules,
+                    txtSnapshotDirectory: adminValidationRules.directoryPathRules,
+                },
+                messages: {
+                    txtSnapshotName: adminValidationRules.fileNameMessages,
+                    txtSnapshotDirectory: adminValidationRules.directoryPathMessages,
+                }
+            });
+
+            $.validator.addMethod(
+                "regex",
+                function(value, element, regexp) {
+                    var re = new RegExp(regexp);
+                    return this.optional(element) || re.test(value);
+                },
+                "Please enter only valid characters."
+            );
         },
         afterOpen: function (event) {
             $("#btnSaveSnapshots").unbind("click");
-            $("#btnSaveSnapshots").on("click", function () {
-                var snapShotDirectory = ($('#voltdbroot').text() != "" && $('#voltdbroot').text() != undefined && $('#snapshotpath').text() != "" && $('#snapshotpath').text() != undefined) ? ($('#voltdbroot').text() + '/' + $('#snapshotpath').text()) : '';
-                if (snapShotDirectory == "") {
-                    $($(this).siblings()[0]).trigger("click");
-                    $('#saveSnapshotStatus').html('Failed to save snapshot');
-                    $('#saveSnapshotMessage').html('Could not get Voltdb root directory and Snapshot path');
-                    $('#btnSaveSnapshotPopup').click();
-                } else {
-                    snapShotDirectory = $('#txtSnapshotDirectory').val() != "" ? snapShotDirectory + "/" + $('#txtSnapshotDirectory').val() : snapShotDirectory;
+            $("#btnSaveSnapshots").on("click", function (e) {
+
+                $("#formSaveSnapshot").valid();
+                var errorSnapshotFileName = $("#errorSnapshotFileName");
+                var errorDirectoryPath = $("#errorSnapshotDirectoryPath");
+                if (errorSnapshotFileName.is(":visible") || errorDirectoryPath.is(":visible")) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    if (errorSnapshotFileName.is(":visible")) {
+                        errorSnapshotFileName.css("background-color", "yellow");
+                        setTimeout(function() {
+                            errorSnapshotFileName.animate({ backgroundColor: 'white' }, 'slow');
+                        }, 2000);
+                    }
+
+                    if (errorDirectoryPath.is(":visible")) {
+                        errorDirectoryPath.css("background-color", "yellow");
+                        setTimeout(function () {
+                            errorDirectoryPath.animate({ backgroundColor: 'white' }, 'slow');
+                        }, 2000);
+                    }
+                    return;
                 }
+
+                //var snapShotDirectory = ($('#voltdbroot').text() != "" && $('#voltdbroot').text() != undefined && $('#snapshotpath').text() != "" && $('#snapshotpath').text() != undefined) ? ($('#voltdbroot').text() + '/' + $('#snapshotpath').text()) : '';
+                //if (snapShotDirectory == "") {
+                //    $($(this).siblings()[0]).trigger("click");
+                //    $('#saveSnapshotStatus').html('Failed to save snapshot');
+                //    $('#saveSnapshotMessage').html('Could not get Voltdb root directory and Snapshot path');
+                //    $('#btnSaveSnapshotPopup').click();
+                //} else {
+                //    snapShotDirectory = $('#txtSnapshotDirectory').val() != "" ? snapShotDirectory + "/" + $('#txtSnapshotDirectory').val() : snapShotDirectory;
+                //}
+                var snapShotDirectory = $('#txtSnapshotDirectory').val();
                 var snapShotFileName = $('#txtSnapshotName').val();
                 voltDbRenderer.saveSnapshot(snapShotDirectory, snapShotFileName, function (success,snapshotStatus) {
                     if (success) {
@@ -412,6 +477,15 @@ function loadAdminPage() {
             });
         }
     });
+
+    adminClusterObjects.btnClusterPromote.on("click", function (e) {
+        if (!adminClusterObjects.enablePromote) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    });
+
+    adminClusterObjects.btnClusterPromote.popup();
 
     var getDateTime = function() {
         var currentDate = new Date();
@@ -828,6 +902,7 @@ function loadAdminPage() {
             if (portAndClusterValues != undefined && VoltDbAdminConfig.isAdmin) {
                 configurePortAndOverviewValues(portAndClusterValues);
                 refreshClusterValues(portAndClusterValues);
+                configurePromoteAction(portAndClusterValues);
             }
         };
 
@@ -1000,7 +1075,19 @@ function loadAdminPage() {
             adminDOMObjects.commandLogPath.text(directoryConfigValues.commandLogPath);
             adminDOMObjects.commandLogSnapshotPath.text(directoryConfigValues.commandLogSnapshotPath);
         };
-        
+
+        var configurePromoteAction = function (adminConfigValues) {
+            var enable = (adminConfigValues.replicationRole != null && adminConfigValues.replicationRole.toLowerCase() == 'replica');
+
+            if (enable != adminClusterObjects.enablePromote) {
+                adminClusterObjects.enablePromote = enable;
+                if (adminClusterObjects.enablePromote) {
+                    adminClusterObjects.btnClusterPromote.removeClass().addClass("promote");
+                } else {
+                    adminClusterObjects.btnClusterPromote.removeClass().addClass("promote-disabled");
+                }
+            }
+        };
     });
     window.VoltDbAdminConfig = VoltDbAdminConfig = new iVoltDbAdminConfig();
 

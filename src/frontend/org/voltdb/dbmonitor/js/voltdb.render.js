@@ -1845,6 +1845,7 @@ function alertNodeClicked(obj) {
                     portConfigValues['zookeeperPort'] = val["ZKPORT"];
                     portConfigValues['replicationPort'] = val["DRPORT"];
                     portConfigValues['clusterState'] = val["CLUSTERSTATE"];
+                    portConfigValues['replicationRole'] = val["REPLICATIONROLE"];
                     return false;
                 }
                 return true;
