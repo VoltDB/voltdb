@@ -692,6 +692,15 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
         }
         assert(info != null);
 
+        // find any previous statement
+        if (previousProcIfAny != null) {
+            Statement previousStatement = previousProcIfAny.getStatements().get(VoltDB.ANON_STMT_NAME);
+
+        }
+
+        // ADD THE STATEMENT
+
+        // add the statement to the catalog
         Statement catalogStmt = procedure.getStatements().add(VoltDB.ANON_STMT_NAME);
         boolean cacheHit = false;
 
