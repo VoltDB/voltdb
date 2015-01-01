@@ -1874,7 +1874,7 @@ function alertNodeClicked(obj) {
             var currentServerRowClass;
             var currentServerColumnClass;
 
-            this.setServerDetails = function (hostId, serverInfo) {
+            this.setServerDetails = function (hostId, serverInfo,clusterState) {
                 var count = 0;
                 if ((VoltDbAdminConfig.servers != "" || VoltDbAdminConfig.servers != null || VoltDbAdminConfig.servers != undefined)
                     && VoltDbAdminConfig.servers.length > 0) {
@@ -1887,7 +1887,7 @@ function alertNodeClicked(obj) {
                             }
                             else if (value.serverName == serverInfo['HOSTNAME']) {
                                 value.hostId = hostId;
-                                value.serverState = "RUNNING";
+                                value.serverState = clusterState;
                                 return false;
                             }
                         }
@@ -1931,7 +1931,7 @@ function alertNodeClicked(obj) {
                             runningServerCounter++;
                         }
 
-                    }
+                    } 
 
                 });
 
@@ -1951,21 +1951,33 @@ function alertNodeClicked(obj) {
             if (systemOverview != null || systemOverview != undefined) {
                 $.each(systemOverview, function (id, val) {
                     if ((val['HOSTNAME'] != null || val['HOSTNAME'] != "") && val['CLUSTERSTATE'] == 'RUNNING') {
-                        className = voltDbRenderer.currentHost == val['HOSTNAME'] ? "disableServer" : "shutdown";
+                        className = voltDbRenderer.currentHost == val['HOSTNAME'] ? "disableServer" : "shutdown";                        
                         currentServerRowClass = voltDbRenderer.currentHost == val['HOSTNAME'] ? "activeHost" : "";
                         currentServerColumnClass = voltDbRenderer.currentHost == val['HOSTNAME'] ? "shutdownServer stopDisable" : "shutdownServer";
 
                         htmlServerListHtml = htmlServerListHtml.concat("<tr class=\"" + currentServerRowClass + "\"><td class=\"configLabel\" width=\"85%\"><a href=\"#\" >" + val['HOSTNAME'] + "</a></td>" +
                             "<td align=\"right\"><a href=\"javascript:void(0);\" data-HostId=\"" + id + "\" data-HostName=\"" + val['HOSTNAME'] + "\" class=\"" + className + "\" id=\"stopServer_" + val['HOSTNAME'] + "\">" +
                             "<span class=\"" + currentServerColumnClass + "\">Stop</span></a></td></tr>");
-                        setServerDetails(id, val);
+                        setServerDetails(id, val, val['CLUSTERSTATE']);
+                        
 
+                        
+                    }
+                    
+                    else if ((val['HOSTNAME'] != null || val['HOSTNAME'] != "") && val['CLUSTERSTATE'] == 'PAUSED') {
+                        className = voltDbRenderer.currentHost == val['HOSTNAME'] ? "disableServer" : "shutdown";
+                        currentServerRowClass = voltDbRenderer.currentHost == val['HOSTNAME'] ? "activeHost" : "";
+                        currentServerColumnClass = "shutdownServerPause";
+
+                        htmlServerListHtml = htmlServerListHtml.concat("<tr class=\"" + currentServerRowClass + "\"><td class=\"configLabel\" width=\"85%\"><a href=\"#\" >" + val['HOSTNAME'] + "</a></td>" +
+                            "<td align=\"right\" class=\"pauseCursorDefault\"><a href=\"javascript:void(0);\" data-HostId=\"" + id + "\" data-HostName=\"" + val['HOSTNAME'] + "\"class=\"resume\" id=\"stopServer_" + val['HOSTNAME'] + "\">" +
+                            "<span class=\"" + currentServerColumnClass + "\">Stop</span></a></td></tr>");
+                        setServerDetails(id, val, val['CLUSTERSTATE']);
 
                     } else if ((val['HOSTNAME'] != null || val['HOSTNAME'] != "") && val['CLUSTERSTATE'] == 'JOINING') {
                         htmlServerListHtml = htmlServerListHtml.concat("<tr><td class=\"configLabel\" width=\"85%\"><a href=\"#\">" + val['HOSTNAME'] + "</a></td>" +
                             "<td align=\"right\"><a href=\"javascript:void(0);\" class=\"shutdownDisabled\">" +
                             "<span>Stop</span></a></td></tr>");
-                        console.log("in joining state");
                     }
 
                 });
@@ -1979,11 +1991,11 @@ function alertNodeClicked(obj) {
         };
 
         this.stopServer = function (nodeId, onServerStopped) {
-            VoltDBService.stopServerNode(nodeId, function (connection, status) {
+            VoltDBService.stopServerNode(nodeId, function (connection, status, statusString) {
                 if (status == 1) {
-                    onServerStopped(true);
+                    onServerStopped(true, statusString);
                 } else {
-                    onServerStopped(false);
+                    onServerStopped(false, statusString);
                 }
             });
         };

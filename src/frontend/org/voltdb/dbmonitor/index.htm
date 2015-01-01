@@ -46,7 +46,8 @@
             <div class="header" id="headerMain">
                 <div class="headLeft">
                     <div class="logo">
-                        <img src="css/resources/images/voltdb-logo.png" alt="VoltDB" /></div>
+                        <img src="css/resources/images/voltdb-logo.png" alt="VoltDB" />
+                    </div>
                     <div class="menu" id="toggle">
                         <div class="toggleMenu" id="toggleMenu">Menu</div>
                         <nav id="nav">
@@ -733,7 +734,8 @@
     <!--Logout popup-->
     <div id="logoutPopup" style="display: none">
         <div class="overlay-title ">
-            <img src="css/resources/images/Information.png" class="imgError" />Logout</div>
+            <img src="css/resources/images/Information.png" class="imgError" />Logout
+        </div>
         <div class="clear"></div>
         <div class="overlay-contentError errorMsg">
             <p>Do you want to logout?</p>
@@ -755,7 +757,8 @@
     <div id="connectionPopup" style="display: none">
         <div id="conpop">
             <div class="overlay-title ">
-                <img src="css/resources/images/error.png" class="imgError" />Error</div>
+                <img src="css/resources/images/error.png" class="imgError" />Error
+            </div>
             <div class="clear"></div>
             <div class="overlay-contentError errorMsg">
                 <p>Lost connection to DB Monitor service. Please click ok when the server is back online. </p>
@@ -765,13 +768,14 @@
         </div>
     </div>
     <!--Connection popup-->
-    
+
     <!--Server Shutdown Information-->
     <div style="display: none"><a href="#shutdownInfoPopup" id="serverShutdownPopup">Cluster Shutdown</a></div>
     <div id="shutdownInfoPopup" style="display: none">
         <div id="shutdownPop">
             <div class="overlay-title ">
-                <img src="css/resources/images/error.png" class="imgError" />Error</div>
+                <img src="css/resources/images/error.png" class="imgError" />Error
+            </div>
             <div class="clear"></div>
             <div class="overlay-contentError errorMsg">
                 <p>DB Monitor service has been shutdown. Please click ok when the server is back online. </p>
@@ -787,7 +791,8 @@
     <div id="serverUnavailablePopup" style="display: none">
         <div id="servUnavailablePop">
             <div class="overlay-title ">
-                <img src="css/resources/images/error.png" class="imgError" />Error</div>
+                <img src="css/resources/images/error.png" class="imgError" />Error
+            </div>
             <div class="clear"></div>
             <div class="overlay-contentError errorMsg">
                 <p>
@@ -824,9 +829,9 @@
                     <li>If any servers are running low on memory</li>
                 </ul>
                 <p>
-                The cluster health bar also indicates which server you are currently connected to and contains a pulldown menu (from the <span class="helpStyleButton">&raquo;&nbsp;Server</span> button on the right) that lists all of the servers in the cluster and their current memory usage. Click on a server name in the list to switch to view statistics from that server. You can also use the input field and the <span class="helpStyleButton">Set</span> button to set the threashold for out-of-memory alerts. Any servers using more than the threshold percent of total memory will be highlighted with an alert status.
+                    The cluster health bar also indicates which server you are currently connected to and contains a pulldown menu (from the <span class="helpStyleButton">&raquo;&nbsp;Server</span> button on the right) that lists all of the servers in the cluster and their current memory usage. Click on a server name in the list to switch to view statistics from that server. You can also use the input field and the <span class="helpStyleButton">Set</span> button to set the threashold for out-of-memory alerts. Any servers using more than the threshold percent of total memory will be highlighted with an alert status.
                 <h2 class="help">Performance Graphs</h2>
-                <p>The second section of the monitor shows graphs for CPU and memory usage of the current server and 99th percentile query latency and transactions per sectond for the entire cluster. You can use the pull down "View" menu to change the scale and update rate of the graphs between seconds, minutes, and days.</p>
+                    <p>The second section of the monitor shows graphs for CPU and memory usage of the current server and 99th percentile query latency and transactions per sectond for the entire cluster. You can use the pull down "View" menu to change the scale and update rate of the graphs between seconds, minutes, and days.</p>
                 <h2 class="help">Performance Data</h2>
                 <p>The third and last section of the monitor shows data charts of performance metrics for each stored procedure and the number of rows for each table and view. You can sort by any of the columns in the charts by clicking on the column heading. Or you can filter by the procedure names using the search box above the chart. </p>
                 <h2 class="help">Additional Controls</h2>
@@ -852,8 +857,8 @@
             </div>
         </div>
     </div>
-    
-   
+
+
     <!--help popup ends-->
 
     <!-- POPUP shutDownConfirmationPop -->
@@ -1118,13 +1123,14 @@
         <div class="overlay-btns"><a class="btn closeBtn" id="A4" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Cancel">Cancel</a></div>
     </div>
     <!-- POPUP RestoreConfirmationPopup -->
-    
+
     <!-- POPUP SaveSnapshotPopup -->
     <div style="display: none"><a href="#saveSnapShotPopup" id="btnSaveSnapshotPopup">Cluster Shutdown</a></div>
     <div id="saveSnapShotPopup" style="display: none">
         <div id="saveSnaps">
             <div class="overlay-title ">
-                <img src="css/resources/images/Information.png" class="imgError" /><span id="saveSnapshotStatus"></span></div>
+                <img src="css/resources/images/Information.png" class="imgError" /><span id="saveSnapshotStatus"></span>
+            </div>
             <div class="clear"></div>
             <div class="overlay-contentError ">
                 <p id="saveSnapshotMessage" class="snapshotErrorMsg"></p>
@@ -1140,7 +1146,8 @@
     <div id="updateErrorPopup" style="display: none">
         <div id="updateInnerErrorPopup">
             <div class="overlay-title ">
-                <img src="css/resources/images/error.png" class="imgError" />Error</div>
+                <img src="css/resources/images/error.png" class="imgError" />Error
+            </div>
             <div class="clear"></div>
             <div class="overlay-contentError errorMsg">
                 <p>
@@ -1152,6 +1159,19 @@
         </div>
     </div>
     <!--Update error Popup-->
+    <!-- POPUP StopServerErrorPopup-->
+    <div id="divStopServerError" style="display: none; ">
+        <div class="overlay-title icon-alert">Stop Error</div>
+        <div class="clear"></div>
+        <div class="overlay-content resizeCon">
+            <p id="errorLabel" class="txt-bold resizeRestore">Server could not be stopped at the moment</p>
+        </div>
+        <div class="overlay-btns"><a class="btn closeBtn" id="A2" title="Ok">Ok</a></div>
+    </div>
+
+    <!-- POPUP StopServerErrorPopup-->
+
+
 
     <!-- Loading -->
     <div id="overlay" style="display: none;">

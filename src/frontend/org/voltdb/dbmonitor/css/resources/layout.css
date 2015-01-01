@@ -890,6 +890,9 @@ input.exitableFilePrefix{width:155px; /*position:relative; top:6px;*/ padding:2p
 .tblshutdown tr td a.shutdown { display:inline-block;background-position:-740px -105px; width:40px; height:36px;line-height:39px; }
 .tblshutdown tr td a.disableServer { display:inline-block;background-position:-933px -150px; width:40px; height:36px;line-height:39px; }
 .tblshutdown tr td a.startServ { display:inline-block;background-position:-669px -56px; width:40px; height:36px;line-height:39px; }
+.tblshutdown tr td a.resume{display: inline-block;background-position: -20px -151px;width: 40px;height: 36px;}
+.shutdownServerPause {position: relative; top: 27px; right: 9px; color: #cccccc;}
+td.pauseCursorDefault a{cursor: default;}
 .shutdownServer { position:relative; top:17px; right:2px;}
 .startServer { position:relative; top:17px; right:2px;}
 .disableServer { cursor: default;}
@@ -935,6 +938,9 @@ td.heartbeattd span.unit, td.queryTimeOut span.unit{position:relative;/* top:7px
 
 }
 .errorLabelMsg { width: 279px;margin-top: 5px; }
+
+.resizeCon {width:452px}
+.resizeRestore{width:95%}
 
 /*********************************************media Qu********************/
 @media (max-width: 479px) {
@@ -1049,32 +1055,121 @@ top: 3px;}
    
 }
 @media (min-width: 320px) and (max-width: 479px) {
-#popServerList {width: 100%;position: absolute;right:-1px;top:205px;}
-	
-.rightShowhideList li a { margin:0 0 0 46px}  
- .popup_cont {margin: 0 0 0 9px; width: 305px;}
- #loginBox { width:305px;}
- #loginBox input[type=text], #loginBox input[type=password]{ width:160px;}
- .VDBMonitorHelp { height:250px; overflow:auto; }
- .VDBSchemaHelp { height:250px; overflow:auto;}
- .VDBQueryHelp { height:250px; overflow:auto;}	
- .adminMode {margin-top:10px}
- .adminServer {}
- .adminClusterProperties { float:left; margin:10px 0;}
- .overviewTbl { overflow:auto; width:auto;}
- .adminLeft { float:none; width:100%}
-ul.adminClusterList { width:250px;}/*admin*/
-ul.adminClusterList li { margin:0; padding-top:15px; float:left; width:67px; height:100%; line-height:75px;}/*admin*/
-#serverConfigAdmin{ top:214px; width:261px;}
-.restoreCont {overflow:auto; height:146px}
-.restoreInfo .overlay-content {  height:auto;}	
-.snapshotStatusBar {left: 18%;}
-	 }
+    #popServerList {
+        width: 100%;
+        position: absolute;
+        right: -1px;
+        top: 205px;
+    }
+
+    .rightShowhideList li a {
+        margin: 0 0 0 46px;
+    }
+
+    .popup_cont {
+        margin: 0 0 0 9px;
+        width: 305px;
+    }
+
+    #loginBox {
+        width: 305px;
+    }
+
+        #loginBox input[type=text], #loginBox input[type=password] {
+            width: 160px;
+        }
+
+    .VDBMonitorHelp {
+        height: 250px;
+        overflow: auto;
+    }
+
+    .VDBSchemaHelp {
+        height: 250px;
+        overflow: auto;
+    }
+
+    .VDBQueryHelp {
+        height: 250px;
+        overflow: auto;
+    }
+
+    .adminMode {
+        margin-top: 10px;
+    }
+
+    .adminServer {
+    }
+
+    .adminClusterProperties {
+        float: left;
+        margin: 10px 0;
+    }
+
+    .overviewTbl {
+        overflow: auto;
+        width: auto;
+    }
+
+    .adminLeft {
+        float: none;
+        width: 100%;
+    }
+
+    ul.adminClusterList {
+        width: 250px;
+    }
+        /*admin*/
+        ul.adminClusterList li {
+            margin: 0;
+            padding-top: 15px;
+            float: left;
+            width: 67px;
+            height: 100%;
+            line-height: 75px;
+        }
+    /*admin*/
+    #serverConfigAdmin {
+        top: 214px;
+        width: 261px;
+    }
+
+    .restoreCont {
+        overflow: auto;
+        height: 146px;
+    }
+
+    .restoreInfo .overlay-content {
+        height: auto;
+    }
+
+    ul.adminClusterList {
+        float: none;
+    }
+
+    .snapshotStatusBar {
+        float: right;
+        width: 100%;
+        margin: 20px 0 0 0px;
+        position: relative;
+        left: 27px;
+    }
+
+    .resizeCon {
+        width: 280px;
+    }
+
+    .resizeRestore {
+        width: 90%;
+    }
+}
 
 	 
  @media (min-width: 480px) and (max-width: 700px) {
 		 .adminRight{ padding-top:15px;}
 		 #serverConfigAdmin{ top:99px;}
+         .resizeCon {width:330px}
+        .resizeRestore{width:80%}
 		 
  }
 
