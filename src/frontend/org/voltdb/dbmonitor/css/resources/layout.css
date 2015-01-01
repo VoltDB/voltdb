@@ -778,13 +778,14 @@ ul.helpSchemaList li { list-style:disc; line-height:25px!important; padding:0; m
 .arrow, 
 .labelCollapsed, 
 .labelExpanded { background-image:url(images/admin-icons.png);}
+label.error { color: #c70000; width: auto; display: block; line-height: 0px; font-size: 11px; padding: 10px 5px 0 7px; margin: 0 0 6px 0; height: 10px;}
 
 .adminWrapper{ margin:0; padding:15px 20px;background:#FFFFFF; border-bottom:1px solid #CCCCCC;}
 		  
 .adminLeft { float:left; width:63%;}
 .adminLeft h1 { float:left; padding-right:20px;}
 .adminClusterProperties { /*float:left;*/}
-ul.adminClusterList { margin:0; padding:0; /*width:366px;*/ height:40px; float:left}
+ul.adminClusterList { margin:0; padding:0; /*width:366px;*/ height:40px;}
 ul.adminClusterList li { margin:0; padding:0; float:left; width:50px; height:100%; line-height:75px; text-align:center; margin-right:5px;}
 ul.adminClusterList li a{display:block;}
 ul.adminClusterList li a.pause { display:inline-block; background-position:-20px -106px; width:40px; height:36px;}
@@ -925,7 +926,17 @@ td.heartbeattd span.unit, td.queryTimeOut span.unit{position:relative;/* top:7px
 .overviewTbl table td{white-space:nowrap !important}
 .confirmationHeight { height:auto!important;}
 .snapshotErrorMsg { padding-bottom: 15px;}
-.snapshotStatusBar {float: right;padding: 10px; width: 22%; background: rgba(78, 141, 181, 1);color: #FFFFFF;font-weight: bold; margin: 3px 0 0 0;   }
+.snapshotStatusBar {    padding: 10px; width:171px; background: rgba(78, 141, 181, 1);
+                        color: #FFFFFF;
+                        font-weight: bold;
+                        margin: 3px 0 0 0;
+                        position: fixed;
+                        left: 44%;
+                        top: 14.5%;
+                         z-index: 1;
+                        font-size: 12px;
+
+}
 
 .resizeCon {width:452px}
 .resizeRestore{width:95%}
@@ -1040,34 +1051,117 @@ top: 3px;}
 	.adminLeft { float:none; width:100%}
 	#serverConfigAdmin{ top:99px; width:421px;}
 	.adminRight{ padding-top:15px;}
-    .snapshotStatusBar { float: right; width: 100%; margin: 20px 0 0 0px; position: relative; left: 3%;}
+   
 }
 @media (min-width: 320px) and (max-width: 479px) {
-#popServerList {width: 100%;position: absolute;right:-1px;top:205px;}
-	
-.rightShowhideList li a { margin:0 0 0 46px}  
- .popup_cont {margin: 0 0 0 9px; width: 305px;}
- #loginBox { width:305px;}
- #loginBox input[type=text], #loginBox input[type=password]{ width:160px;}
- .VDBMonitorHelp { height:250px; overflow:auto; }
- .VDBSchemaHelp { height:250px; overflow:auto;}
- .VDBQueryHelp { height:250px; overflow:auto;}	
- .adminMode {margin-top:10px}
- .adminServer {}
- .adminClusterProperties { float:left; margin:10px 0;}
- .overviewTbl { overflow:auto; width:auto;}
- .adminLeft { float:none; width:100%}
-ul.adminClusterList { width:250px;}/*admin*/
-ul.adminClusterList li { margin:0; padding-top:15px; float:left; width:67px; height:100%; line-height:75px;}/*admin*/
-#serverConfigAdmin{ top:214px; width:261px;}
-.restoreCont {overflow:auto; height:146px}
-.restoreInfo .overlay-content {  height:auto;}	
-ul.adminClusterList { float: none;}	
-.snapshotStatusBar { float: right; width: 100%; margin: 20px 0 0 0px; position: relative; left: 27px;}
-.resizeCon {width:280px}
-.resizeRestore{width:90%}
+    #popServerList {
+        width: 100%;
+        position: absolute;
+        right: -1px;
+        top: 205px;
+    }
 
-	 }
+    .rightShowhideList li a {
+        margin: 0 0 0 46px;
+    }
+
+    .popup_cont {
+        margin: 0 0 0 9px;
+        width: 305px;
+    }
+
+    #loginBox {
+        width: 305px;
+    }
+
+        #loginBox input[type=text], #loginBox input[type=password] {
+            width: 160px;
+        }
+
+    .VDBMonitorHelp {
+        height: 250px;
+        overflow: auto;
+    }
+
+    .VDBSchemaHelp {
+        height: 250px;
+        overflow: auto;
+    }
+
+    .VDBQueryHelp {
+        height: 250px;
+        overflow: auto;
+    }
+
+    .adminMode {
+        margin-top: 10px;
+    }
+
+    .adminServer {
+    }
+
+    .adminClusterProperties {
+        float: left;
+        margin: 10px 0;
+    }
+
+    .overviewTbl {
+        overflow: auto;
+        width: auto;
+    }
+
+    .adminLeft {
+        float: none;
+        width: 100%;
+    }
+
+    ul.adminClusterList {
+        width: 250px;
+    }
+        /*admin*/
+        ul.adminClusterList li {
+            margin: 0;
+            padding-top: 15px;
+            float: left;
+            width: 67px;
+            height: 100%;
+            line-height: 75px;
+        }
+    /*admin*/
+    #serverConfigAdmin {
+        top: 214px;
+        width: 261px;
+    }
+
+    .restoreCont {
+        overflow: auto;
+        height: 146px;
+    }
+
+    .restoreInfo .overlay-content {
+        height: auto;
+    }
+
+    ul.adminClusterList {
+        float: none;
+    }
+
+    .snapshotStatusBar {
+        float: right;
+        width: 100%;
+        margin: 20px 0 0 0px;
+        position: relative;
+        left: 27px;
+    }
+
+    .resizeCon {
+        width: 280px;
+    }
+
+    .resizeRestore {
+        width: 90%;
+    }
+}
 
 	 
  @media (min-width: 480px) and (max-width: 700px) {

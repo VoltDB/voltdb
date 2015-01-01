@@ -6,6 +6,7 @@ var editStates = {
     ShowOkCancel: 1,
     ShowLoading: 2
 };
+var INT_MAX_VALUE = 2147483647;
 
 function loadAdminPage() {
     adminClusterObjects = {
@@ -115,6 +116,7 @@ function loadAdminPage() {
         tBoxHeartbeatTimeoutValue: $("#hrtTimeOutSpan").text(),
         spanHeartbeatTimeOut: $("#hrtTimeOutSpan"),
         loadingHeartbeatTimeout: $("#loadingHeartbeatTimeout"),
+        errorHeartbeatTimeout: $("#errorHeartbeatTimeout"),
 
         //Query Timeout
         rowQueryTimeout: $("#queryTimoutRow"),
@@ -126,8 +128,23 @@ function loadAdminPage() {
         spanqueryTimeOut: $("#queryTimeOutSpan"),
         
         //Update Error
-        updateErrorField: $("#updateErrorField"),
+        updateErrorFieldMsg: $("#updateErrorFieldMsg"),
         heartbeatTimeoutLabel: $("#heartbeatTimeoutRow").find("td:first-child").text()
+    };
+
+    var adminValidationRules = {
+        numericRules : {
+            required: true,
+            min: 0,
+            max: INT_MAX_VALUE,
+            digits: true,
+        },
+        numericMessages : {
+            required: "Please enter a valid positive number.",
+            min: "Please enter a valid positive number.",
+            max: "Please enter a positive number between 0 and " + INT_MAX_VALUE + ".",
+            digits: "Please enter a positive number without any decimal."
+        }
     };
     
     //Admin Page download link
@@ -546,6 +563,15 @@ function loadAdminPage() {
         toggleAutoSnapshotEdit(false);
     });
 
+    $("#formHeartbeatTimeout").validate({
+        rules: {
+            txtHrtTimeOut: adminValidationRules.numericRules
+        },
+        messages: {
+            txtHrtTimeOut: adminValidationRules.numericMessages
+        }
+    });
+
     //Heartbeat time out
     var toggleHeartbeatTimeoutEdit = function (state) {
 
@@ -558,6 +584,7 @@ function loadAdminPage() {
             adminEditObjects.tBoxHeartbeatTimeout.hide();
             adminEditObjects.btnEditHeartbeatTimeoutOk.hide();
             adminEditObjects.btnEditHeartbeatTimeoutCancel.hide();
+            adminEditObjects.errorHeartbeatTimeout.hide();
             
             adminEditObjects.loadingHeartbeatTimeout.show();
         }
@@ -576,6 +603,7 @@ function loadAdminPage() {
             adminEditObjects.btnEditHeartbeatTimeoutOk.hide();
             adminEditObjects.btnEditHeartbeatTimeoutCancel.hide();
             adminEditObjects.LinkHeartbeatEdit.show();
+            adminEditObjects.errorHeartbeatTimeout.hide();
 
             adminEditObjects.tBoxHeartbeatTimeout.hide();
             adminEditObjects.spanHeartbeatTimeOut.show();
@@ -591,6 +619,21 @@ function loadAdminPage() {
 
     adminEditObjects.btnEditHeartbeatTimeoutCancel.on("click", function () {
         toggleHeartbeatTimeoutEdit(editStates.ShowEdit);
+    });
+
+    adminEditObjects.btnEditHeartbeatTimeoutOk.on("click", function(e) {
+        $("#formHeartbeatTimeout").valid();
+
+        if (adminEditObjects.errorHeartbeatTimeout.is(":visible")) {
+            e.preventDefault();
+            e.stopPropagation();
+            adminEditObjects.tBoxHeartbeatTimeout.focus();
+
+            adminEditObjects.errorHeartbeatTimeout.css("background-color", "yellow");
+            setTimeout(function() {
+                adminEditObjects.errorHeartbeatTimeout.animate({ backgroundColor: 'white' }, 'slow');
+            }, 2000);
+        }
     });
 
     adminEditObjects.btnEditHeartbeatTimeoutOk.popup({
@@ -612,7 +655,7 @@ function loadAdminPage() {
                 //Call the loading image only after setting the new value to be saved.
                 toggleHeartbeatTimeoutEdit(editStates.ShowLoading);
                 voltDbRenderer.updateAdminConfiguration(adminConfigurations, function (result) {
-                    
+
                     if (result.status == "1") {
                         adminEditObjects.tBoxHeartbeatTimeoutValue = adminEditObjects.tBoxHeartbeatTimeout.val();
                         adminEditObjects.spanHeartbeatTimeOut.html(adminEditObjects.tBoxHeartbeatTimeoutValue);
@@ -624,13 +667,21 @@ function loadAdminPage() {
                         });
                         
                     } else {
+                        
                         toggleHeartbeatTimeoutEdit(editStates.ShowEdit);
-                        adminEditObjects.updateErrorField.text(adminEditObjects.heartbeatTimeoutLabel);
+                        var msg = '"' + adminEditObjects.heartbeatTimeoutLabel + '". ';
+                        if (result.status == "-1" && result.statusstring == "Query timeout.") {
+                            msg += "The DB Monitor service is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
+                        } else {
+                            msg += "Please try again later.";
+                        }
+                        
+                        adminEditObjects.updateErrorFieldMsg.text(msg);
                         $("#updateErrorPopupLink").trigger("click");
                     }
                 });
 
-                //Close the popup
+                //Close the popup 
                 popup.close();
             });
 
@@ -816,7 +867,15 @@ function loadAdminPage() {
             adminDOMObjects.target.text(adminConfigValues.targets);
             
             adminDOMObjects.heartBeatTimeout.text(adminConfigValues.heartBeatTimeout != "" ? adminConfigValues.heartBeatTimeout : "");
-            adminDOMObjects.heartBeatTimeoutLabel.text(adminConfigValues.heartBeatTimeout != "" && adminConfigValues.heartBeatTimeout != undefined ? "ms" : "");
+
+            if (adminConfigValues.heartBeatTimeout != "" && adminConfigValues.heartBeatTimeout != undefined) {
+                adminDOMObjects.heartBeatTimeoutLabel.text("ms");
+                adminEditObjects.LinkHeartbeatEdit.show();
+            } else {
+                adminDOMObjects.heartBeatTimeoutLabel.text("");
+                adminEditObjects.LinkHeartbeatEdit.hide();
+            }
+
             adminDOMObjects.tempTablesMaxSize.text(adminConfigValues.tempTablesMaxSize != "" ? adminConfigValues.tempTablesMaxSize : "");
             adminDOMObjects.tempTablesMaxSizeLabel.text(adminConfigValues.tempTablesMaxSize != "" && adminConfigValues.tempTablesMaxSize != undefined ? "MB" : "");
             adminDOMObjects.snapshotPriority.text(adminConfigValues.snapshotPriority);
@@ -956,3 +1015,4 @@ var getOnOffText = function (isChecked) {
 var getOnOffClass = function (isOn) {
     return (isOn) ? "onIcon" : "offIcon";
 };
+

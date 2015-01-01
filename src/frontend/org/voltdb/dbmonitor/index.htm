@@ -36,10 +36,12 @@
     <script type="text/javascript" src="js/jquery.getSelectedText.min.js"></script>
     <script type="text/javascript" src="js/icheck.js"></script>
     <script type="text/javascript" src="js/voltdb.admin.ui.js"></script>
+    <script type="text/javascript" src="js/jquery.validate.min.js"></script>
 </head>
 <body>
     <iframe name="versioncheck" id="versioncheck" style="display: none;" width="1" height="1" frameborder="0" src="about:blank"></iframe>
     <div class="page-wrap">
+         <div class="snapshotStatusBar" style="display: none" id="snapshotBar">Snapshot saved successfully.</div>
         <div id="wrapper">
             <div class="header" id="headerMain">
                 <div class="headLeft">
@@ -62,11 +64,11 @@
                 <div class="headRight">
                     <ul class="topRightList" id="userSection">
                         <li><a href="#logoutPopup" id="btnlogOut">
-                            <div class="userN"></div>
-                        </a></li>
+                                <div class="userN"></div>
+                            </a></li>
                         <li><a href="#logoutPopup" id="logOut">
-                            <div class="user" title="Log Out"></div>
-                        </a></li>
+                                <div class="user" title="Log Out"></div>
+                            </a></li>
                         <li class="line" id="userLine"></li>
                         <li class="help"><a href="#help" id="showMyHelp">Help</a></li>
                         <li class="responsiveMenuPlaceHolder">&nbsp;</li>
@@ -108,7 +110,7 @@
                                         </div>
                                         <div class="thresholdVal">
                                             Alert Threshold
-                    <input type="text" id="threshold" class="theVal" maxlength="3" />
+                                            <input type="text" id="threshold" class="theVal" maxlength="3" />
                                             % <a href="#" id="saveThreshold" class="setVal">Set</a>
                                         </div>
                                         <div class="clear"></div>
@@ -194,9 +196,9 @@
                                         </div>
                                         <div class="pagination">
                                             <a id="previousProcedures" href="javascript:void(0)" class="prev" title="Previous Page">Prev</a>Page
-                    <label id="lblPrevious"></label>
+                                            <label id="lblPrevious"></label>
                                             of
-                    <label id="lblTotalPages"></label>
+                                            <label id="lblTotalPages"></label>
                                             <a id="nextProcedures" href="javascript:void(0)" class="next" title="Next Page">Next</a>
                                         </div>
                                         <div class="clear"></div>
@@ -227,9 +229,9 @@
                                         </div>
                                         <div class="pagination">
                                             <a id="previousTables" href="javascript:void(0)" class="prev" title="Previous Page">Prev</a>Page
-                    <label id="lblPreviousTable"></label>
+                                            <label id="lblPreviousTable"></label>
                                             of
-                    <label id="lblTotalPagesofTables"></label>
+                                            <label id="lblTotalPagesofTables"></label>
                                             <a id="nextTables" href="javascript:void(0)" class="next" title="Next Page">Next</a>
                                         </div>
                                         <div class="clear"></div>
@@ -271,14 +273,14 @@
                                 <li><a href="#restorePop" id="restoreConfirmation" class="restore">Restore</a></li>
                                 <li><a href="#shutDownConfirmationPop" class="shutdown" id="shutDownConfirmation">Shutdown</a></li>
                             </ul>
-                            <div class="snapshotStatusBar" style="display: none" id="snapshotBar">Snapshot saved successfully.</div>
-                            <div class="clear"></div>
+                           
+                            
                         </div>
                         <div class="clear"></div>
                     </div>
                     <div class="adminRight">
                         <div class="downloadConfig">
-                            <a id="downloadAdminConfigurations" href="javascript:void(0)" download="deployment.xml" class="btnDown">Download Configuration</a>
+                            <a id="downloadAdminConfigurations" href="javascript:void(0)" download="deployment.xml"  class="btnDown">Download Configuration</a>
                         </div>
                         <div class="adminServer">
                             <div class="serverName" id="serverName">Server<span class="setServer adminIcons"></span></div>
@@ -489,10 +491,13 @@
                                 <tr class="child-row-5 subLabelRow" id="heartbeatTimeoutRow">
                                     <td class="configLabel">Heartbeat time out </td>
                                     <td align="right" class="heartbeattd">
-                                        <div id="loadingHeartbeatTimeout" style="display: none;" class="loading-small"></div>
-                                        <span id="hrtTimeOutSpan"></span>
-                                        <input id="txtHrtTimeOut" class="exitableTxtBx" type="text" style="display: none" />
-                                        <span id="hrtTimeOutUnitSpan"></span>
+                                        <form id="formHeartbeatTimeout" method="get" action="">
+                                            <div id="loadingHeartbeatTimeout" class="loading-small" style="display: none;"></div>
+                                            <span id="hrtTimeOutSpan"></span>
+                                            <input id="txtHrtTimeOut" name="txtHrtTimeOut" class="exitableTxtBx" type="text" style="display: none" />
+                                            <span id="hrtTimeOutUnitSpan"></span>
+                                            <label id="errorHeartbeatTimeout" for="txtHrtTimeOut" class="error" style="display: none;"></label>
+                                        </form>
                                     </td>
                                     <td>&nbsp;</td>
                                     <td><a id="btnEditHeartbeatTimeoutOk" href="#HrtTimeOutPopup" class="editOk" title="Ok" style="">Ok</a> <a id="btnEditHeartbeatTimeoutCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a id="btnEditHrtTimeOut" href="javascript:void(0)" class="edit" title="Edit">&nbsp;</a></td>
@@ -1146,7 +1151,7 @@
             <div class="clear"></div>
             <div class="overlay-contentError errorMsg">
                 <p>
-                    Could not update the value of "<span id="updateErrorField"></span>". Please try again later.
+                    Could not update the value of <span id="updateErrorFieldMsg"></span>
                 </p>
                 <br />
                 <div class="overlay-btns" style="padding: 0"><a class="btn closeBtn" id="btnUpdateErrorOk" title="Ok">Ok</a></div>
