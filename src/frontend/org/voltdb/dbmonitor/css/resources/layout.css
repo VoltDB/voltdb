@@ -934,6 +934,7 @@ td.heartbeattd span.unit, td.queryTimeOut span.unit{position:relative;/* top:7px
                         font-size: 12px;
 
 }
+.errorLabelMsg { width: 279px;margin-top: 5px; }
 
 /*********************************************media Qu********************/
 @media (max-width: 479px) {
