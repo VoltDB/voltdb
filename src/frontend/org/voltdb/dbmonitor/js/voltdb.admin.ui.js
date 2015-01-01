@@ -15,7 +15,9 @@ function loadAdminPage() {
         btnClusterShutdown: $('#shutDownConfirmation'),
         btnClusterSaveSnapshot: $('#saveConfirmation'),
         txtSnapshotDirectory: $('#txtSnapshotDirectory'),
-    };
+        btnClusterPromote: $('#promoteConfirmation'),
+        enablePromote: false
+};
 
     adminDOMObjects = {
         siteNumberHeader: $("#sitePerHost"),
@@ -476,6 +478,15 @@ function loadAdminPage() {
         }
     });
 
+    adminClusterObjects.btnClusterPromote.on("click", function (e) {
+        if (!adminClusterObjects.enablePromote) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    });
+
+    adminClusterObjects.btnClusterPromote.popup();
+
     var getDateTime = function() {
         var currentDate = new Date();
         return (currentDate.getFullYear() + '.' + (currentDate.getMonth() + 1) + '.' + currentDate.getDate() + '.' + currentDate.getHours() + '.' + currentDate.getMinutes() + '.' + currentDate.getSeconds()).toString();
@@ -891,6 +902,7 @@ function loadAdminPage() {
             if (portAndClusterValues != undefined && VoltDbAdminConfig.isAdmin) {
                 configurePortAndOverviewValues(portAndClusterValues);
                 refreshClusterValues(portAndClusterValues);
+                configurePromoteAction(portAndClusterValues);
             }
         };
 
@@ -1063,7 +1075,19 @@ function loadAdminPage() {
             adminDOMObjects.commandLogPath.text(directoryConfigValues.commandLogPath);
             adminDOMObjects.commandLogSnapshotPath.text(directoryConfigValues.commandLogSnapshotPath);
         };
-        
+
+        var configurePromoteAction = function (adminConfigValues) {
+            var enable = (adminConfigValues.replicationRole != null && adminConfigValues.replicationRole.toLowerCase() == 'replica');
+
+            if (enable != adminClusterObjects.enablePromote) {
+                adminClusterObjects.enablePromote = enable;
+                if (adminClusterObjects.enablePromote) {
+                    adminClusterObjects.btnClusterPromote.removeClass().addClass("promote");
+                } else {
+                    adminClusterObjects.btnClusterPromote.removeClass().addClass("promote-disabled");
+                }
+            }
+        };
     });
     window.VoltDbAdminConfig = VoltDbAdminConfig = new iVoltDbAdminConfig();
 
