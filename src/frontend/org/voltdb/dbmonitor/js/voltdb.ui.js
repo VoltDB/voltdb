@@ -475,27 +475,27 @@ var loadPage = function (serverName, portid) {
                         //API Request
                         try
                         {
-                            voltDbRenderer.stopServer(hostId, function (success) {
-                                console.log("stop server callback called");
+                            voltDbRenderer.stopServer(hostId, function (success,statusString) {
                                 if (success) {
                                     $("#stopServer_" + hostName).addClass('disableServer');
                                     $("#stopServer_" + hostName + " span").addClass('shutdownServer');
                                     $("#stopServer_" + hostName + " span").addClass('stopDisable');
-
                                     updateServers(hostId, hostName, "MISSING");
-                                    console.log("Succcess status returned");
+                                                                       
                                 }
                                 else {
-                                    console.log("failure status returned");
+                                    $('#errorLabel').text(statusString);
+                                    popup.open("#divStopServerError", undefined, srcElement);
+                                    
                                 }
 
                             });
-
-
+                            
                         }
                         catch (error) {
-                            console.log("failure stopping server");
+                            //console.log("failure stopping server");
                         }
+                        
                         //Close the popup                                            
                         $($(this).siblings()[0]).trigger("click");
 
@@ -509,6 +509,8 @@ var loadPage = function (serverName, portid) {
 
             });
             popup.open("#stopConfirmationPop", undefined, srcElement);
+            //$('#errorLabel').text("Cannot stop the requested node. Stopping individual nodes is only allowed on a K-safe cluster. Use shutdown to stop the cluster.");
+            //popup.open("#divStopServerError", undefined, srcElement);
         };
 
 

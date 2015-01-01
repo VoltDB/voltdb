@@ -889,6 +889,9 @@ input.exitableFilePrefix{width:155px; /*position:relative; top:6px;*/ padding:2p
 .tblshutdown tr td a.shutdown { display:inline-block;background-position:-740px -105px; width:40px; height:36px;line-height:39px; }
 .tblshutdown tr td a.disableServer { display:inline-block;background-position:-933px -150px; width:40px; height:36px;line-height:39px; }
 .tblshutdown tr td a.startServ { display:inline-block;background-position:-669px -56px; width:40px; height:36px;line-height:39px; }
+.tblshutdown tr td a.resume{display: inline-block;background-position: -20px -151px;width: 40px;height: 36px;}
+.shutdownServerPause {position: relative; top: 27px; right: 9px; color: #cccccc;}
+td.pauseCursorDefault a{cursor: default;}
 .shutdownServer { position:relative; top:17px; right:2px;}
 .startServer { position:relative; top:17px; right:2px;}
 .disableServer { cursor: default;}
@@ -923,6 +926,9 @@ td.heartbeattd span.unit, td.queryTimeOut span.unit{position:relative;/* top:7px
 .confirmationHeight { height:auto!important;}
 .snapshotErrorMsg { padding-bottom: 15px;}
 .snapshotStatusBar {float: right;padding: 10px; width: 22%; background: rgba(78, 141, 181, 1);color: #FFFFFF;font-weight: bold; margin: 3px 0 0 0;   }
+
+.resizeCon {width:452px}
+.resizeRestore{width:95%}
 
 /*********************************************media Qu********************/
 @media (max-width: 479px) {
@@ -1058,12 +1064,17 @@ ul.adminClusterList li { margin:0; padding-top:15px; float:left; width:67px; hei
 .restoreInfo .overlay-content {  height:auto;}	
 ul.adminClusterList { float: none;}	
 .snapshotStatusBar { float: right; width: 100%; margin: 20px 0 0 0px; position: relative; left: 27px;}
+.resizeCon {width:280px}
+.resizeRestore{width:90%}
+
 	 }
 
 	 
  @media (min-width: 480px) and (max-width: 700px) {
 		 .adminRight{ padding-top:15px;}
 		 #serverConfigAdmin{ top:99px;}
+         .resizeCon {width:330px}
+        .resizeRestore{width:80%}
 		 
  }
 

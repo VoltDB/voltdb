@@ -614,19 +614,21 @@
                 var processName = "SYSTEMINFORMATION_STOPSERVER";
                 var procedureNames = ['@StopNode'];
                 var parameters = [nodeId.toString()];
-                var values=[undefined];
+                var values = [undefined];
+                var statusString = "";
 
                 _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
                 if (_connection == null) {
                     VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
                         if (result == true) {
                             var status = 0;
+                            
                             VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function(connection, status) {
                                 status = connection.Metadata['@StopNode_' + nodeId.toString() + '_status'];
+                                statusString = connection.Metadata['@StopNode_' + nodeId.toString() + '_statusString'];
                                 if (!(status == "" || status == undefined)) {
-                                    onConnectionAdded(connection, status);
+                                    onConnectionAdded(connection, status, statusString);
                                 }
-
 
                             });
                         }
@@ -636,8 +638,10 @@
                 } else {
                     VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
                         status = connection.Metadata['@StopNode_' + nodeId.toString() + '_status'];
+                        statusString = connection.Metadata['@StopNode_' + nodeId.toString() + '_statusString'];
+
                         if (!(status == "" || status == undefined)) {
-                            onConnectionAdded(connection, status);
+                            onConnectionAdded(connection, status, statusString);
                         }
 
                     });
