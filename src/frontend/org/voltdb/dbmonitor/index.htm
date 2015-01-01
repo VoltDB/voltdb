@@ -976,18 +976,20 @@
         <div class="clear"></div>
         <div class="saveInfo">
             <div class="overlay-content ">
-                <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblSave">
-                    <tr>
-                        <td>Directory:</td>
-                        <td id="tdSnapshotDirectory">
-                            <!--<input id="txtSnapshotDirectory" type="text" class="editDirLocation" />--></td>
-                    </tr>
-                    <tr>
-                        <td>Snapshot Name:</td>
-                        <td id="tdSnapshotName">
-                            <!--<input id="txtSnapshotName" type="text"/>--></td>
-                    </tr>
-                </table>
+                <form id="formSaveSnapshot" method="get" action="">
+                    <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblSave">
+                        <tr>
+                            <td>Directory:</td>
+                            <td id="tdSnapshotDirectory">
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Snapshot Name:</td>
+                            <td id="tdSnapshotName">
+                            </td>
+                        </tr>
+                    </table>
+                </form>
             </div>
             <div class="overlay-btns"><a id="btnSaveSnapshots" class="btn saveBtn" title="Save">Save</a> <a class="btn btn-gray closeBtn" title="Cancel">Cancel</a> </div>
         </div>
