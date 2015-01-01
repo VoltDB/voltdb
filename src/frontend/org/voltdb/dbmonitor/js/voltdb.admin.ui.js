@@ -132,29 +132,35 @@ function loadAdminPage() {
     };
 
     var adminValidationRules = {
-        numericRules : {
+        numericRules: {
             required: true,
             min: 0,
             max: INT_MAX_VALUE,
             digits: true,
         },
-        numericMessages : {
+        numericMessages: {
             required: "Please enter a valid positive number.",
             min: "Please enter a valid positive number.",
             max: "Please enter a positive number between 0 and " + INT_MAX_VALUE + ".",
             digits: "Please enter a positive number without any decimal."
         },
-        
+
         fileNameRules: {
             required: true,
             minlength: 2,
-            regex: /^[a-zA-Z0-9_.]+$/
-            
+            regex: /^[a-zA-Z0-9_.]+$/            
         },
         fileNameMessages: {
             required: "Please enter a valid file name.",
             minlength: "Please enter at least 2 characters.",
             regex: 'Only alphabets, numbers, _ and . are allowed.'
+        },
+
+        directoryPathRules: {
+            required: true
+        },
+        directoryPathMessages: {
+            required: "Please enter a valid directory path."
         }
     };
     
@@ -387,15 +393,18 @@ function loadAdminPage() {
             var textName = '<input id="txtSnapshotName" type="text" name="txtSnapshotName" value=' + 'SNAPSHOT_' + getDateTime() + '  />';
             var errorMsg = '<div class="errorLabelMsg"><label id="errorSnapshotFileName" for="txtSnapshotName" class="error" style="display: none;">This field is required.</label></div>';
             $('#tdSnapshotName').html(textName + errorMsg);
-            var textDirectory = '<input id="txtSnapshotDirectory" type="text"/>';
-            $('#tdSnapshotDirectory').html(textDirectory);
+            var textDirectory = '<input id="txtSnapshotDirectory" name="txtSnapshotDirectory" type="text"/>';
+            var errorDirectoryMsg = '<div class="errorLabelMsg"><label id="errorSnapshotDirectoryPath" for="txtSnapshotDirectory" class="error" style="display: none;">This field is required.</label></div>';
+            $('#tdSnapshotDirectory').html(textDirectory + errorDirectoryMsg);
 
             $("#formSaveSnapshot").validate({
                 rules: {
-                    txtSnapshotName: adminValidationRules.fileNameRules
+                    txtSnapshotName: adminValidationRules.fileNameRules,
+                    txtSnapshotDirectory: adminValidationRules.directoryPathRules,
                 },
                 messages: {
-                    txtSnapshotName: adminValidationRules.fileNameMessages
+                    txtSnapshotName: adminValidationRules.fileNameMessages,
+                    txtSnapshotDirectory: adminValidationRules.directoryPathMessages,
                 }
             });
 
@@ -414,26 +423,37 @@ function loadAdminPage() {
 
                 $("#formSaveSnapshot").valid();
                 var errorSnapshotFileName = $("#errorSnapshotFileName");
-                if (errorSnapshotFileName.is(":visible")) {
+                var errorDirectoryPath = $("#errorSnapshotDirectoryPath");
+                if (errorSnapshotFileName.is(":visible") || errorDirectoryPath.is(":visible")) {
                     e.preventDefault();
                     e.stopPropagation();
-                    
-                    errorSnapshotFileName.css("background-color", "yellow");
-                    setTimeout(function () {
-                        errorSnapshotFileName.animate({ backgroundColor: 'white' }, 'slow');
-                    }, 2000);
+
+                    if (errorSnapshotFileName.is(":visible")) {
+                        errorSnapshotFileName.css("background-color", "yellow");
+                        setTimeout(function() {
+                            errorSnapshotFileName.animate({ backgroundColor: 'white' }, 'slow');
+                        }, 2000);
+                    }
+
+                    if (errorDirectoryPath.is(":visible")) {
+                        errorDirectoryPath.css("background-color", "yellow");
+                        setTimeout(function () {
+                            errorDirectoryPath.animate({ backgroundColor: 'white' }, 'slow');
+                        }, 2000);
+                    }
                     return;
                 }
 
-                var snapShotDirectory = ($('#voltdbroot').text() != "" && $('#voltdbroot').text() != undefined && $('#snapshotpath').text() != "" && $('#snapshotpath').text() != undefined) ? ($('#voltdbroot').text() + '/' + $('#snapshotpath').text()) : '';
-                if (snapShotDirectory == "") {
-                    $($(this).siblings()[0]).trigger("click");
-                    $('#saveSnapshotStatus').html('Failed to save snapshot');
-                    $('#saveSnapshotMessage').html('Could not get Voltdb root directory and Snapshot path');
-                    $('#btnSaveSnapshotPopup').click();
-                } else {
-                    snapShotDirectory = $('#txtSnapshotDirectory').val() != "" ? snapShotDirectory + "/" + $('#txtSnapshotDirectory').val() : snapShotDirectory;
-                }
+                //var snapShotDirectory = ($('#voltdbroot').text() != "" && $('#voltdbroot').text() != undefined && $('#snapshotpath').text() != "" && $('#snapshotpath').text() != undefined) ? ($('#voltdbroot').text() + '/' + $('#snapshotpath').text()) : '';
+                //if (snapShotDirectory == "") {
+                //    $($(this).siblings()[0]).trigger("click");
+                //    $('#saveSnapshotStatus').html('Failed to save snapshot');
+                //    $('#saveSnapshotMessage').html('Could not get Voltdb root directory and Snapshot path');
+                //    $('#btnSaveSnapshotPopup').click();
+                //} else {
+                //    snapShotDirectory = $('#txtSnapshotDirectory').val() != "" ? snapShotDirectory + "/" + $('#txtSnapshotDirectory').val() : snapShotDirectory;
+                //}
+                var snapShotDirectory = $('#txtSnapshotDirectory').val();
                 var snapShotFileName = $('#txtSnapshotName').val();
                 voltDbRenderer.saveSnapshot(snapShotDirectory, snapShotFileName, function (success,snapshotStatus) {
                     if (success) {
