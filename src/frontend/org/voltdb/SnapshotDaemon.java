@@ -27,6 +27,7 @@ import java.util.Date;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -234,14 +235,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
     private static final int m_queueSlots = SNAPSHOT_TYPE.values().length - 2;
 
-    private class ByteArrayWrapper {
-        public ByteArrayWrapper(byte[] snapshotDetails) {
-            m_byteArray = snapshotDetails;
-        }
-
-        public byte[] m_byteArray;
-    }
-
     private class SnapshotQueue extends StateMachineInstance {
         // Unused required abstracts
         @Override
@@ -354,12 +347,12 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         }
 
         private void deleteSnapshotNode(String snapshotDirPrefix, int nodeId) {
+            final String path = getPathFromNodeId(snapshotDirPrefix, nodeId);
             try {
-                m_zk.delete(getPathFromNodeId(snapshotDirPrefix, nodeId), -1);
+                m_zk.delete(path, -1);
             }
-            catch (InterruptedException e) {
-            }
-            catch (KeeperException e) {
+            catch (InterruptedException|KeeperException e) {
+               SNAP_LOG.error("could not delete zk node " + path, e);
             }
         }
 
@@ -523,17 +516,17 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             return nodeList;
         }
 
-        public NavigableMap<Integer, ByteArrayWrapper> getDetailsFromSnapshotNodeByType(SNAPSHOT_TYPE type) {
+        public NavigableMap<Integer, ByteBuffer> getDetailsFromSnapshotNodeByType(SNAPSHOT_TYPE type) {
             byte[] nodeData = null;
             String path = getPathFromType(type);
             assert(path != null);
-            Map<Integer, ByteArrayWrapper> results = new HashMap<Integer, ByteArrayWrapper>();
+            Map<Integer, ByteBuffer> results = new HashMap<Integer, ByteBuffer>();
             try {
                 List<String> nodeNames = m_zk.getChildren(path, false);
                 for (String nodeName : nodeNames) {
                     Integer nodeId = Integer.valueOf(nodeName);
                     nodeData = getDetailsFromSnapshotNode(path, nodeId);
-                    results.put(nodeId, new ByteArrayWrapper(nodeData));
+                    results.put(nodeId, ByteBuffer.wrap(nodeData));
                 }
             }
             catch (KeeperException | InterruptedException e) {
@@ -585,41 +578,51 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     };
 
     private final Runnable m_onQueueLockGrant = new SusceptibleRunnable() {
-
         @Override
         public void susceptibleRun() throws Exception {
             SNAPSHOT_TYPE atHeadType = m_snapshotQueue.getPendingSnapshotType();
-            NavigableMap<Integer,ByteArrayWrapper> requestNodes =
+            NavigableMap<Integer,ByteBuffer> requestNodes =
                     m_snapshotQueue.getDetailsFromSnapshotNodeByType(atHeadType);
-            ImmutableList.Builder<Integer> active = ImmutableList.builder();
-            ByteArrayWrapper first = requestNodes.firstEntry().getValue();
-            if (first == null || first.m_byteArray == null || first.m_byteArray.length == 0) {
+
+            int nodesCount = requestNodes.size();
+
+            if (requestNodes.isEmpty()) {
+                m_snapshotQueue.initiateNewSnapshot(atHeadType, true, ByteBuffer.wrap(new byte[0]));
+                return;
+            }
+
+            ByteBuffer first = requestNodes.firstEntry().getValue();
+            if (first == null || first.limit() == 0) {
                 VoltDB.crashLocalVoltDB("snapshot request has no content", true, null);
             }
-            byte [] candidate = first.m_byteArray;
+
+            byte [] candidate = first.array();
             if (atHeadType.isDefaultType()) {
                 candidate = coalesceDefaultSnapshot(requestNodes);
-                active.addAll(requestNodes.keySet());
-            } else {
-                active.add(requestNodes.firstKey());
+                nodesCount = 1;
             }
-            JSONObject joRequest = new JSONObject(new String(candidate,StandardCharsets.UTF_8));
+
+            JSONObject joRequest = new JSONObject(new String(candidate, StandardCharsets.UTF_8));
             String requestId = joRequest.optString(
                     "coalescedToRequestId",
                     atHeadType.requestId(requestNodes.firstKey()).name()
                     );
-            joRequest.put("requestIdAtHead",requestId);
+            joRequest.put("requestIdAtHead", requestId);
 
-            // get the type at the list head
-            // get the active list nodes
-            // if type is file coalesce nodes
-            // set head active and make the current head nodes actives
-            //  ... by calling void initiateNewSnapshot(SNAPSHOT_TYPE type, boolean satisfiesAllNodes, List<Integer> satisfyingNodes)
-            // start snapshot
+            m_snapshotQueue.initiateNewSnapshot(atHeadType, nodesCount == 1, ByteBuffer.wrap(candidate));
 
+            if (joRequest.optBoolean("isTruncation", false)) {
+                truncationSnapshotPrelude(joRequest);
+            } else {
+                processUserSnapshotPrelude(joRequest);
+            }
         }
-
     };
+
+    public boolean isTruncationSnapshotQueuedOrActive() {
+        return m_snapshotQueue.snapshotPending(SNAPSHOT_TYPE.LOG)
+            || m_snapshotQueue.getActiveSnapshotType() == SNAPSHOT_TYPE.LOG;
+    }
 
     /*
      * Something that initiates procedures for the snapshot daemon.
@@ -923,8 +926,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 CreateMode.PERSISTENT,
                 lastCallback, null);
         if (joHardlinks != null) {
-            @SuppressWarnings("unchecked")
-            Iterator<String> itr = joHardlinks.keys();
+            Iterator<String> itr = jsonFieldKeys(joHardlinks);
             while (itr.hasNext()) {
                 requestId = itr.next();
                 lastCallback = new StringCallback();
@@ -1660,58 +1662,44 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      * Process the event generated when the node for a user snapshot request
      * is created.
      */
-    private void processUserSnapshotPrelude(final JSONObject jsObj, final WatchedEvent event) throws Exception {
-        if (event.getType() == EventType.NodeCreated) {
-            final RequestId requestId = RequestId.valueOf(jsObj.getString("requestIdAtHead"));
-            final boolean blocking = jsObj.getBoolean("block");
+    private void processUserSnapshotPrelude(final JSONObject jsObj) throws JSONException {
+        final boolean blocking = jsObj.getBoolean("block");
 
-            /*
-             * Going to reuse the request object, remove the requestId
-             * field now that it is consumed
-             */
-            jsObj.remove("requestId");
-            jsObj.put("perPartitionTxnIds", retrievePerPartitionTransactionIds());
-            final long handle = m_nextCallbackHandle++;
-            m_procedureCallbacks.put(handle, new ProcedureCallback() {
+        /*
+         * Going to reuse the request object, remove the requestId
+         * field now that it is consumed
+         */
+        jsObj.remove("requestId");
+        jsObj.put("perPartitionTxnIds", retrievePerPartitionTransactionIds());
+        final long handle = m_nextCallbackHandle++;
+        m_procedureCallbacks.put(handle, new ProcedureCallback() {
 
-                @Override
-                public void clientCallback(ClientResponse clientResponse) {
-                    m_lastInitiationTs = null;
-                    try {
-                        /*
-                         * If there is an error then we are done.
-                         */
-                        if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-                            ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
-                            saveResponseToZK(jsObj, rimpl);
-                            return;
-                        }
-
-                        /*
-                         * Now analyze the response. If a snapshot was in progress
-                         * we have to reattempt it later, and send a response to the client
-                         * saying it was queued. Otherwise, forward the response
-                         * failure/success to the client.
-                         */
-                        if (isSnapshotInProgressResponse(clientResponse)) {
-                            saveResponseToZK(jsObj, createSnapshotInProgessResponse());
-                            // should we actually requeue if so we should requeue all
-                            // the nodes that don't have the coalesced node
-                            scheduleSnapshotForLater(jsObj.toString(4), requestId.name(), true);
-                        } else {
-                            ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
-                            saveResponseToZK(jsObj, rimpl);
-                            return;
-                        }
-                    } catch (Exception e) {
-                        SNAP_LOG.error("Error processing user snapshot request", e);
+            @Override
+            public void clientCallback(ClientResponse clientResponse) {
+                m_lastInitiationTs = null;
+                try {
+                    /*
+                     * If there is an error then we are done.
+                     */
+                    if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+                        ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
+                        saveResponseToZK(jsObj, rimpl);
+                        return;
                     }
+
+                    if (isSnapshotInProgressResponse(clientResponse)) {
+                        saveResponseToZK(jsObj, createSnapshotInProgessResponse());
+                    } else {
+                        ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
+                        saveResponseToZK(jsObj, rimpl);
+                        return;
+                    }
+                } catch (Exception e) {
+                    SNAP_LOG.error("Error processing user snapshot request:\n" + jsObj.toString(), e);
                 }
-            });
-            // TRAIL [RequestSnap:7] watcher fires on zk node creation
-            initiateSnapshotSave(handle, new Object[]{jsObj.toString(4)}, blocking);
-            return;
-        }
+            }
+        });
+        initiateSnapshotSave(handle, new Object[]{jsObj.toString(4)}, blocking);
     }
 
     private ClientResponseImpl createSnapshotInProgessResponse() {
@@ -1720,11 +1708,25 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 CoreUtils.getHostnameOrAddress(),
                 "",
                 "SUCCESS",
-                "SNAPSHOT REQUEST QUEUED");
+                "SNAPSHOT IN PROGRESS");
         return new ClientResponseImpl(ClientResponseImpl.SUCCESS,
                 new VoltTable[] { result },
                 "Snapshot request could not be fulfilled because a snapshot " +
                 "is in progress. It was queued for execution",
+                0);
+    }
+
+    private ClientResponseImpl createDuplicateSnapshotResponse() {
+        VoltTable result = SnapshotUtil.constructNodeResultsTable();
+        result.addRow(-1,
+                CoreUtils.getHostnameOrAddress(),
+                "",
+                "SUCCESS",
+                "DUPLICATE SNAPSHOT");
+        return new ClientResponseImpl(ClientResponseImpl.SUCCESS,
+                new VoltTable[] { result },
+                "Snapshot request could not be fulfilled because a snapshot " +
+                "for the same nonce and path is already queued",
                 0);
     }
 
@@ -2479,7 +2481,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                           boolean notifyChanges) throws ForwardClientException {
         boolean requestExists = false;
         // TRAIL [RequestSnap:2] get request id from generated node
-        final String requestId = createRequestNode(snapInfo);
+        final String requestId = queueRequestNode(snapInfo);
         if (requestId == null) {
             requestExists = true;
         } else {
@@ -2522,22 +2524,37 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         }
     }
 
-    byte [] coalesceDefaultSnapshot(NavigableMap<Integer, ByteArrayWrapper> map)  {
+    @SuppressWarnings("unchecked")
+    private final static Iterator<String> jsonFieldKeys(JSONObject jo) {
+        return (Iterator<String>)jo.keys();
+    }
+
+    byte [] coalesceDefaultSnapshot(NavigableMap<Integer, ByteBuffer> map)  {
         if (map == null || map.isEmpty()) return null;
 
         final SNAPSHOT_TYPE fileType = SNAPSHOT_TYPE.FILE;
         int requestId = map.lastKey();
         JSONObject joRequest = null;
+        JSONObject johl = new JSONObject();
+        Iterator<String> keys = null;
 
         Map<Integer, JSONObject> discerners = new LinkedHashMap<>();
 
-        for (Map.Entry<Integer, ByteArrayWrapper> e: map.entrySet()) {
-            ByteArrayWrapper baw = e.getValue();
-            if (baw == null || baw.m_byteArray == null || baw.m_byteArray.length == 0) {
+        for (Map.Entry<Integer, ByteBuffer> e: map.entrySet()) {
+            ByteBuffer baw = e.getValue();
+            if (baw == null || baw.limit() == 0) {
                 VoltDB.crashLocalVoltDB("zk snapshot request node is null or empty", true, null);;
             }
             try {
-                JSONObject jo = new JSONObject(new String(baw.m_byteArray, StandardCharsets.UTF_8));
+                JSONObject jo = new JSONObject(new String(baw.array(), StandardCharsets.UTF_8));
+                JSONObject hardLinks = jo.optJSONObject("hardLinks");
+                if (hardLinks != null) {
+                    keys = jsonFieldKeys(hardLinks);
+                    while (keys.hasNext()) {
+                        String rqid = keys.next();
+                        johl.put(rqid, hardLinks.getJSONObject(rqid));
+                    }
+                }
                 if (jo.optBoolean("isTruncation", false)) {
                     requestId = e.getKey();
                     joRequest = jo;
@@ -2552,17 +2569,34 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             joRequest = discerners.remove(map.lastKey());
         }
         try {
-            if (discerners.size() > 0) {
-                JSONObject hardLinks = new JSONObject();
-                    for (Map.Entry<Integer, JSONObject> e: discerners.entrySet()) {
-                        JSONObject hardLink = new JSONObject();
-                        hardLink.put("nonce", e.getValue().get("nonce"));
-                        hardLink.put("path", e.getValue().get("path"));
-                        hardLinks.put(fileType.requestId(e.getKey()).name(), hardLink);
-                    }
-                    joRequest.put("coalescedToRequestId", fileType.requestId(requestId).name());
-                    joRequest.put("hardLinks", hardLinks);
+            for (Map.Entry<Integer, JSONObject> e: discerners.entrySet()) {
+                JSONObject hardLink = new JSONObject();
+                hardLink.put("nonce", e.getValue().get("nonce"));
+                hardLink.put("path", e.getValue().get("path"));
+                johl.put(fileType.requestId(e.getKey()).name(), hardLink);
             }
+            Set<File> deduper = new HashSet<File>();
+            keys = jsonFieldKeys(johl);
+            while (keys.hasNext()) {
+                String rqid = keys.next();
+                JSONObject joReq = johl.getJSONObject(rqid);
+                File nonceFH = new File(joReq.getString("path"),joReq.getString("nonce"));
+                if (deduper.contains(nonceFH)) {
+                    joReq.put("requestIdAtHead", rqid);
+                    try {
+                        saveResponseToZK(joReq, createDuplicateSnapshotResponse());
+                    } catch (KeeperException | InterruptedException exc) {
+                        VoltDB.crashLocalVoltDB("unable to save duplicate request response to zk", true, exc);
+                    }
+                    keys.remove();
+                } else {
+                    deduper.add(nonceFH);
+                }
+            }
+            if (johl.length() > 0) {
+                joRequest.put("hardLinks", johl);
+            }
+            joRequest.put("coalescedToRequestId", fileType.requestId(requestId).name());
         } catch (JSONException exc) {
             VoltDB.crashLocalVoltDB("snapshot request missing required nonce or path", true, exc);
         }
