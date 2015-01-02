@@ -914,12 +914,20 @@ function loadAdminPage() {
         this.isAdmin = false;
         this.registeredElements = [];
         this.servers = [];
+        this.stoppedServer="";
         this.runningServerIds = "";
         
         this.server = function(hostIdvalue,serverNameValue,serverStateValue) {
             this.hostId = hostIdvalue;
             this.serverName = serverNameValue;
             this.serverState = serverStateValue;
+        };
+        
+        this.stoppedServer = function (hostIdvalue, serverNameValue, serverStateValue) {
+            this.hostId = hostIdvalue;
+            this.serverName = serverNameValue;
+            this.serverState = serverStateValue;
+            
         };
         
         this.displayAdminConfiguration = function (adminConfigValues, rawConfigValues) {
