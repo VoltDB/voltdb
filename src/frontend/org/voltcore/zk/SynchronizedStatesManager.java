@@ -199,14 +199,30 @@ public class SynchronizedStatesManager {
         private int m_mutexLine0 = 0;
         private int m_mutexLine1 = 0;
 
-        private void lockLocalState() {
-            m_mutex.lock();
-            assert(m_mutexLockedCnt == 0);
-            m_mutexLockedCnt++;
+        private boolean debugVerifyLockAcquire() {
             m_mutexLocked.set(new Boolean(true));
             m_mutexLine1 = m_mutexLine0;
             StackTraceElement l = new Exception().getStackTrace()[1];
             m_mutexLine0 = l.getLineNumber();
+            return m_mutexLockedCnt++ == 0;
+        }
+
+        private boolean debugVerifyLockRelease() {
+            m_mutexLocked.set(new Boolean(false));
+            return (m_mutexLockedCnt-- == 1);
+        }
+
+        protected boolean debugIsLocalStateLocked() {
+            return m_mutexLocked.get();
+        }
+
+        protected boolean debugIsLocalStateUnlocked() {
+            return !m_mutexLocked.get();
+        }
+
+        private void lockLocalState() {
+            m_mutex.lock();
+            assert(debugVerifyLockAcquire());
         }
 
         // This wrapper resolves getStackTrace correctly when debugging locking
@@ -225,20 +241,8 @@ public class SynchronizedStatesManager {
         }
 
         private void unlockLocalState() {
-            assert(m_mutexLockedCnt == 1);
-            m_mutexLockedCnt--;
-            m_mutexLocked.set(new Boolean(false));
+            assert(debugVerifyLockRelease());
             m_mutex.unlock();
-        }
-
-        protected boolean isLocalStateLocked() {
-            return m_mutexLocked.get();
-//            return true;
-        }
-
-        protected boolean isLocalStateUnlocked() {
-          return !m_mutexLocked.get();
-//            return true;
         }
 
         private class LockWatcher implements Watcher {
@@ -371,18 +375,20 @@ public class SynchronizedStatesManager {
                     m_lastProposalVersion = nodeStat.getVersion();
                     checkForBarrierParticipantsChange();
                 }
-                assert(isLocalStateUnlocked());
+                assert(debugIsLocalStateUnlocked());
             }
         }
 
-        protected void disableMembership() throws InterruptedException {
+        /*
+         * This state machine and all other state machines under this manager are being removed
+         */
+        private void disableMembership() throws InterruptedException {
             lockLocalState();
             try {
                 m_zk.delete(m_myPartiticpantsPath, -1);
                 if (m_ourDistributedLockName != null) {
                     m_zk.delete(m_ourDistributedLockName, -1);
                 }
-                System.out.println(m_stateMachineId + ": Removing " + m_memberId + " from participants (disableMembership)");
             }
             catch (KeeperException e) {
             }
@@ -435,7 +441,7 @@ public class SynchronizedStatesManager {
         }
 
         private void checkForBarrierParticipantsChange() {
-            assert(isLocalStateLocked());
+            assert(debugIsLocalStateLocked());
             try {
                 Set<String> children = ImmutableSet.copyOf(m_zk.getChildren(m_barrierParticipantsPath, m_barrierParticipantsWatcher));
                 Stat nodeStat = new Stat();
@@ -443,7 +449,6 @@ public class SynchronizedStatesManager {
                 // At some point this can be optimized to not examine the proposal all the time
                 byte statePair[] = m_zk.getData(m_barrierResultsPath, false, nodeStat);
                 int proposalVersion = nodeStat.getVersion();
-                System.out.println(m_stateMachineId + ": Waking up partipantMonitor (lastVer "+ m_lastProposalVersion + ") from " + proposalVersion + "/" + m_currentParticipants + " with: " + children.toString());
                 if (proposalVersion != m_lastProposalVersion) {
                     m_lastProposalVersion = proposalVersion;
                     m_currentParticipants = children.size();
@@ -457,7 +462,6 @@ public class SynchronizedStatesManager {
                             // We track the number of people waiting on the results so we know when the result is stale and
                             // the next lock holder can initiate a new state proposal.
                             m_zk.create(m_myPartiticpantsPath, null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
-                            System.out.println(m_stateMachineId + ": Adding " + m_memberId + " to participants (checkForBarrierParticipantsChange)");
 
                             // This member just joined and has not yet been initialized so piggyback the initialization onto
                             // another member's proposal
@@ -489,18 +493,19 @@ public class SynchronizedStatesManager {
                                 // We track the number of people waiting on the results so we know when the result is stale and
                                 // the next lock holder can initiate a new state proposal.
                                 m_zk.create(m_myPartiticpantsPath, null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
-                                System.out.println(m_stateMachineId + ": Adding " + m_memberId + " to participants (checkForBarrierParticipantsChange)");
 
                                 m_pendingProposal = existingAndProposedStates.m_proposal;
                                 ByteBuffer proposedState = m_pendingProposal.asReadOnlyBuffer();
                                 assert(existingAndProposedStates.m_previousState.equals(m_synchronizedState));
                                 unlockLocalState();
                                 if (type == REQUEST_TYPE.STATE_CHANGE_REQUEST) {
-                                    m_log.debug(m_stateMachineId + ": new state proposed");
+                                    m_log.info(m_stateMachineId + " received new state proposal (" +
+                                            stateToString(proposedState.asReadOnlyBuffer()) +")");
                                     stateChangeProposed(proposedState);
                                 }
                                 else {
-                                    m_log.info(m_stateMachineId + ": task Requested");
+                                    m_log.info(m_stateMachineId + " received new task (" +
+                                            taskToString(proposedState.asReadOnlyBuffer()) + ")");
                                     taskRequested(proposedState);
                                 }
                             }
@@ -552,7 +557,7 @@ public class SynchronizedStatesManager {
                 org.voltdb.VoltDB.crashLocalVoltDB(
                         "Unexepected failure in StateMachine.", true, e);
             }
-            assert(isLocalStateUnlocked());
+            assert(debugIsLocalStateUnlocked());
         }
 
         private void monitorParticipantChanges() {
@@ -594,7 +599,6 @@ public class SynchronizedStatesManager {
                 }
                 // Remove ourselves from the participants list to unblock the next distributed lock waiter
                 m_zk.delete(m_myPartiticpantsPath, -1);
-                System.out.println(m_stateMachineId + ": Removing " + m_memberId + " from participants (getUncorrelatedResults)");
             } catch (KeeperException.SessionExpiredException e) {
                 results = new HashSet<ByteBuffer>();
                 e.printStackTrace();
@@ -624,7 +628,6 @@ public class SynchronizedStatesManager {
                 }
                 // Remove ourselves from the participants list to unblock the next distributed lock waiter
                 m_zk.delete(m_myPartiticpantsPath, -1);
-                System.out.println(m_stateMachineId + ": Removing " + m_memberId + " from participants (getCorrelatedResults)");
             } catch (KeeperException.SessionExpiredException e) {
                 results = new HashMap<String, ByteBuffer>();
                 e.printStackTrace();
@@ -702,7 +705,6 @@ public class SynchronizedStatesManager {
 
                     // Remove ourselves from the participants list to unblock the next distributed lock waiter
                     m_zk.delete(m_myPartiticpantsPath, -1);
-                    System.out.println(m_stateMachineId + ": Removing " + m_memberId + " to participants (processResultQuorum1)");
                 } catch (KeeperException.SessionExpiredException e) {
                     e.printStackTrace();
                 } catch (KeeperException.ConnectionLossException e) {
@@ -746,7 +748,6 @@ public class SynchronizedStatesManager {
                         RESULT_CONCENSUS result = resultsAgreeOnSuccess(memberList);
                         // Now that we have a result we can remove ourselves from the participants list.
                         m_zk.delete(m_myPartiticpantsPath, -1);
-                        System.out.println(m_stateMachineId + ": Removing " + m_memberId + " from participants (processResultQuorum2)");
                         if (result == RESULT_CONCENSUS.AGREE) {
                             success = true;
                             m_synchronizedState = m_pendingProposal;
@@ -777,6 +778,8 @@ public class SynchronizedStatesManager {
                     }
                     unlockLocalState();
                     // Notify the derived state machine engine of the current state
+                    m_log.info(m_stateMachineId + " new proposal " + (success?"Accepted":"Rejected") +
+                            " (" + stateToString(attemptedChange.asReadOnlyBuffer()) +")");
                     proposedStateResolved(initiator, attemptedChange, success);
                     monitorParticipantChanges();
                 }
@@ -812,10 +815,9 @@ public class SynchronizedStatesManager {
         }
 
         private void checkForBarrierResultsChanges() {
-            assert(isLocalStateLocked());
+            assert(debugIsLocalStateLocked());
             if (m_pendingProposal == null) {
                 // Don't check for barrier results until we notice the participant list change.
-                System.out.println(m_stateMachineId + ": Canceled Result Monitor");
                 unlockLocalState();
                 return;
             }
@@ -823,7 +825,6 @@ public class SynchronizedStatesManager {
             try {
                 membersWithResults = ImmutableSet.copyOf(m_zk.getChildren(m_barrierResultsPath,
                         m_barrierResultsWatcher));
-                System.out.println(m_stateMachineId + ": Waking up resultMonitor with: " + membersWithResults.toString());
             } catch (KeeperException.SessionExpiredException e) {
                 membersWithResults = new TreeSet<String>(Arrays.asList("We died so avoid Quorum path"));
                 e.printStackTrace();
@@ -840,7 +841,7 @@ public class SynchronizedStatesManager {
             }
             if (Sets.difference(m_knownMembers, membersWithResults).isEmpty()) {
                 processResultQuorum(membersWithResults);
-                assert(isLocalStateUnlocked());
+                assert(debugIsLocalStateUnlocked());
             }
             else {
                 m_memberResults = membersWithResults;
@@ -933,7 +934,6 @@ public class SynchronizedStatesManager {
                 Stat newProposalStat = m_zk.setData(m_barrierResultsPath, proposal, -1);
                 m_zk.create(m_myPartiticpantsPath, null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
                 newProposalVersion = newProposalStat.getVersion();
-                System.out.println(m_stateMachineId + ": Adding " + m_memberId + " to participants (wakeCommunityWithProposal)");
             } catch (KeeperException.SessionExpiredException e) {
                 e.printStackTrace();
             } catch (KeeperException.ConnectionLossException e) {
@@ -952,7 +952,7 @@ public class SynchronizedStatesManager {
             public void run() {
                 lockLocalStateForParticipantRunner();
                 checkForBarrierParticipantsChange();
-                assert(isLocalStateUnlocked());
+                assert(debugIsLocalStateUnlocked());
             }
         };
 
@@ -961,7 +961,7 @@ public class SynchronizedStatesManager {
             public void run() {
                 lockLocalStateForResultsRunner();
                 checkForBarrierResultsChanges();
-                assert(isLocalStateUnlocked());
+                assert(debugIsLocalStateUnlocked());
             }
         };
 
@@ -985,7 +985,7 @@ public class SynchronizedStatesManager {
                 //Process my lower nodes and put a watch on whats live
                 String previous = ZKUtil.joinZKPath(m_lockPath, iter.previous());
                 if (m_zk.exists(previous, m_lockWatcher) != null) {
-                    m_log.info(m_stateMachineId + ": Waiting for " + previous);
+                    m_log.debug(m_stateMachineId + " Waiting for " + previous);
                     nextlower = previous;
                     break;
                 }
@@ -1029,13 +1029,13 @@ public class SynchronizedStatesManager {
                     // lock was cancelled
                     unlockLocalState();
                 }
-                assert(isLocalStateUnlocked());
+                assert(debugIsLocalStateUnlocked());
             }
         };
 
         private void cancelDistributedLock() {
-            assert(isLocalStateLocked());
-            m_log.info(m_stateMachineId + ": cancelLockRequest for " + m_ourDistributedLockName);
+            assert(debugIsLocalStateLocked());
+            m_log.debug(m_stateMachineId + ": cancelLockRequest for " + m_ourDistributedLockName);
             assert(m_ourDistributedLockName != null);
             try {
                 m_zk.delete(m_ourDistributedLockName, -1);
@@ -1052,18 +1052,26 @@ public class SynchronizedStatesManager {
             m_ourDistributedLockName = null;
         }
 
+        /*
+         * Warns about membership change notification waiting in the executor thread
+         */
         private void checkMembership() {
             lockLocalState();
             m_membershipChangePending = true;
-            System.out.println(m_stateMachineId + ": early warning of Membership; old membership was " + m_groupMembers);
             unlockLocalState();
         }
 
+        /*
+         * Callback notification from executor thread of membership change
+         */
         private void membershipChanged(Set<String> knownHosts, Set<String> addedMembers, Set<String> removedMembers) {
             lockLocalState();
             // Even though we got a direct update, membership could have changed again between the
             m_knownMembers = knownHosts;
             m_membershipChangePending = false;
+            m_log.info(m_stateMachineId + " community membership changed " +
+                    (addedMembers!=null && addedMembers.isEmpty()?"":("added " + addedMembers.toString())) +
+                    (removedMembers!=null && removedMembers.isEmpty()?"":("removed " + removedMembers.toString())));
             boolean notInitializing = m_requestedInitialState == null;
             if (m_pendingProposal != null && m_memberResults != null &&
                     Sets.difference(m_knownMembers, m_memberResults).isEmpty()) {
@@ -1076,13 +1084,15 @@ public class SynchronizedStatesManager {
             if (notInitializing) {
                 membershipChanged(addedMembers, removedMembers);
             }
-            assert(isLocalStateUnlocked());
+            assert(debugIsLocalStateUnlocked());
         }
 
+        /*
+         * Retrieves member set from ZooKeeper
+         */
         private void getLatestMembership() {
             try {
                 m_knownMembers = ImmutableSet.copyOf(m_zk.getChildren(m_stateMachineMemberPath, null));
-                System.out.println(m_stateMachineId + ": Membership adjusted after distributed lock " + m_groupMembers);
             } catch (KeeperException.SessionExpiredException e) {
                 e.printStackTrace();
             } catch (KeeperException.ConnectionLossException e) {
@@ -1096,7 +1106,7 @@ public class SynchronizedStatesManager {
         }
 
         private void notifyDistributedLockWaiter() {
-            assert(isLocalStateLocked());
+            assert(debugIsLocalStateLocked());
             assert(m_currentParticipants == 0);
             if (m_membershipChangePending) {
                 getLatestMembership();
@@ -1107,10 +1117,10 @@ public class SynchronizedStatesManager {
                 assert(m_pendingProposal == null);
                 m_pendingProposal = m_requestedInitialState;
                 initializeFromActiveCommunity();
-                assert(isLocalStateUnlocked());
+                assert(debugIsLocalStateUnlocked());
             }
             else {
-                m_log.info(m_stateMachineId + ": granted lockRequest for " + m_ourDistributedLockName);
+                m_log.debug(m_stateMachineId + " granted lockRequest for " + m_ourDistributedLockName);
                 m_lockWaitingOn = null;
                 unlockLocalState();
                 // Notify the derived class that the lock is available
@@ -1121,12 +1131,13 @@ public class SynchronizedStatesManager {
         private boolean requestDistributedLock() {
             try {
                 assert(m_ourDistributedLockName == null);
-                assert(isLocalStateLocked());
-                m_ourDistributedLockName = m_zk.create(ZKUtil.joinZKPath(m_lockPath,"lock_"), null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+                assert(debugIsLocalStateLocked());
+                m_ourDistributedLockName = m_zk.create(ZKUtil.joinZKPath(m_lockPath,"lock_"), null,
+                        Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
                 m_lockWaitingOn = getNextLockNodeFromList();
                 if (m_lockWaitingOn.equals(m_ourDistributedLockName) && m_currentParticipants == 0) {
                     // Prevents a second notification.
-                    m_log.info(m_stateMachineId + ": requestLock returned successfully");
+                    m_log.debug(m_stateMachineId + ": requestLock returned successfully");
                     m_lockWaitingOn = null;
                     if (m_membershipChangePending) {
                         getLatestMembership();
@@ -1162,7 +1173,7 @@ public class SynchronizedStatesManager {
         }
 
         private void assignStateChangeAgreement(boolean acceptable) {
-            assert(isLocalStateLocked());
+            assert(debugIsLocalStateLocked());
             assert(m_pendingProposal != null);
             assert(m_currentRequestType == REQUEST_TYPE.STATE_CHANGE_REQUEST);
             byte result[] = new byte[1];
@@ -1176,7 +1187,6 @@ public class SynchronizedStatesManager {
                 try {
                     // Since we don't care about the outcome remove ourself from the participant list
                     m_zk.delete(m_myPartiticpantsPath, -1);
-                    System.out.println(m_stateMachineId + ": From " + m_memberId + " from participants (assignStateChangeAgreement)");
                 } catch (KeeperException.ConnectionLossException e) {
                     e.printStackTrace();
                 } catch (InterruptedException e) {
@@ -1189,6 +1199,10 @@ public class SynchronizedStatesManager {
             }
         }
 
+        /*
+         * Returns true when this state machine is a full participant of the community and has the
+         * current state of the community
+         */
         protected boolean isInitialized() {
             boolean initialized;
             lockLocalState();
@@ -1227,7 +1241,7 @@ public class SynchronizedStatesManager {
         /*
          * Notifies of the successful completion of a previous lock request
          */
-        protected abstract void lockRequestCompleted();
+        protected void lockRequestCompleted() {}
 
         /*
          * Propose a new state. Only call after successful acquisition of the distributed lock.
@@ -1235,6 +1249,8 @@ public class SynchronizedStatesManager {
         protected void proposeStateChange(ByteBuffer proposedState) {
             assert(proposedState != null);
             assert(proposedState.remaining() < Short.MAX_VALUE);
+            m_log.info(m_stateMachineId + " is requesting a state change (" +
+                    stateToString(proposedState.asReadOnlyBuffer()) + ")");
             lockLocalState();
             // Only the lock owner can initiate a barrier request
             assert(m_requestedInitialState == null);
@@ -1254,12 +1270,15 @@ public class SynchronizedStatesManager {
         /*
          * Notification of a new proposed state change by another member.
          */
-        protected abstract void stateChangeProposed(ByteBuffer proposedState);
+        protected void stateChangeProposed(ByteBuffer proposedState) {}
 
         /*
          * Called to accept or reject a new proposed state change by another member.
          */
         protected void requestedStateChangeAcceptable(boolean acceptable) {
+            if (!acceptable) {
+                m_log.info(m_stateMachineId + " Rejected new state proposal");
+            }
             lockLocalState();
             assert(!m_stateChangeInitiator);
             assignStateChangeAgreement(acceptable);
@@ -1268,7 +1287,7 @@ public class SynchronizedStatesManager {
         /*
          * Notification of the outcome of a previous state change proposal.
          */
-        protected abstract void proposedStateResolved(boolean ourProposal, ByteBuffer proposedState, boolean success);
+        protected void proposedStateResolved(boolean ourProposal, ByteBuffer proposedState, boolean success) {}
 
         /*
          * Propose a new task. Only call after successful acquisition of the distributed lock.
@@ -1298,12 +1317,12 @@ public class SynchronizedStatesManager {
         /*
          * Notification of a new task request by this member or another member.
          */
-        protected abstract void taskRequested(ByteBuffer proposedTask);
+        protected void taskRequested(ByteBuffer proposedTask) {}
 
         /*
          * Notification of a task request for newly joined members.
          */
-        protected abstract void staleTaskRequestNotification(ByteBuffer proposedTask);
+        protected void staleTaskRequestNotification(ByteBuffer proposedTask) {}
 
         /*
          * Called to accept or reject a new proposed state change by another member.
@@ -1319,12 +1338,12 @@ public class SynchronizedStatesManager {
         /*
          * Notification of the outcome of the task by all members sorted by memberId.
          */
-        protected abstract void correlatedTaskCompleted(boolean ourTask, ByteBuffer taskRequest, Map<String, ByteBuffer> results);
+        protected void correlatedTaskCompleted(boolean ourTask, ByteBuffer taskRequest, Map<String, ByteBuffer> results) {}
 
         /*
          * Notification of the outcome of the task by all members.
          */
-        protected abstract void uncorrelatedTaskCompleted(boolean ourTask, ByteBuffer taskRequest, Set<ByteBuffer> results);
+        protected void uncorrelatedTaskCompleted(boolean ourTask, ByteBuffer taskRequest, Set<ByteBuffer> results) {}
 
         protected ByteBuffer getCurrentState() {
             lockLocalState();
@@ -1333,7 +1352,7 @@ public class SynchronizedStatesManager {
             return currentState;
         }
 
-        protected abstract void membershipChanged(Set<String> addedMembers, Set<String> removedMembers);
+        protected void membershipChanged(Set<String> addedMembers, Set<String> removedMembers) {}
 
         protected Set<String> getCurrentMembers() {
             lockLocalState();
@@ -1349,6 +1368,10 @@ public class SynchronizedStatesManager {
         protected String getMemberId() {
             return m_memberId;
         }
+
+        protected abstract String stateToString(ByteBuffer state);
+
+        protected String taskToString(ByteBuffer task) { return ""; }
     }
 
     public SynchronizedStatesManager(ZooKeeper zk, String rootNode, String memberId, int registeredInstances)
@@ -1523,7 +1546,6 @@ public class SynchronizedStatesManager {
             removedMembers = Sets.difference(m_groupMembers, children);
             addedMembers = Sets.difference(children, m_groupMembers);
             m_groupMembers = children;
-            System.out.println(m_ssmRootNode + "/" + m_memberId + ": Membership changed " + m_groupMembers);
             for (StateMachineInstance stateMachine : m_registeredStateMachines) {
                 stateMachine.membershipChanged(m_groupMembers, addedMembers, removedMembers);
             }
