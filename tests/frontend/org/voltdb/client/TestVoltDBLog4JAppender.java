@@ -147,7 +147,7 @@ public class TestVoltDBLog4JAppender {
     }
 
     @Test
-    public void test() throws Exception{
+    public void testAppender() throws Exception{
         try {
             // Print our messages
             printer.printMessages();
