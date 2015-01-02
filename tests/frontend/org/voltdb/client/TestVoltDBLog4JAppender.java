@@ -34,10 +34,10 @@ import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.compiler.VoltCompiler;
-import org.voltdb.tomcat.TomcatVoltDBAppender;
+import org.voltdb.tomcat.VoltDBLog4JAppender;
 import org.voltdb.utils.InMemoryJarfile;
 
-public class TomcatLog4jAppender {
+public class TestVoltDBLog4JAppender {
 
     private MessagePrinter printer;
     private ServerThread m_localServer;
@@ -137,7 +137,7 @@ public class TomcatLog4jAppender {
             printer = new MessagePrinter();
 
             Logger rootLogger = Logger.getRootLogger();
-            Appender voltAppender = new TomcatVoltDBAppender();
+            Appender voltAppender = new VoltDBLog4JAppender();
             rootLogger.removeAllAppenders();
             rootLogger.setLevel(Level.INFO);
             rootLogger.addAppender(voltAppender);

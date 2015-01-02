@@ -27,12 +27,12 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.NoConnectionsException;
 
-public class TomcatVoltDBAppender extends AppenderSkeleton implements Appender {
+public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
     ClientConfig config = null;
     Client client = null;
     ArrayList<LoggingEvent> cache = new ArrayList<LoggingEvent>();
 
-    public TomcatVoltDBAppender() {
+    public VoltDBLog4JAppender() {
         // Create a connection to VoltDB
         try {
             config = new ClientConfig("", "");
