@@ -27,13 +27,13 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.NoConnectionsException;
 
-public class TomcatVoltdbAppender extends AppenderSkeleton implements Appender {
+public class TomcatVoltDBAppender extends AppenderSkeleton implements Appender {
 	ClientConfig config = null;
 	Client client = null;
 	ArrayList<LoggingEvent> cache = new ArrayList<LoggingEvent>();
 
-	public TomcatVoltdbAppender() {
-		// Create a connection to Volt
+	public TomcatVoltDBAppender() {
+		// Create a connection to VoltDB
 		try {
 			config = new ClientConfig("", "");
 			config.setReconnectOnConnectionLoss(true);
@@ -47,7 +47,7 @@ public class TomcatVoltdbAppender extends AppenderSkeleton implements Appender {
 
 	@Override
 	public void close() {
-		// Close the Volt connection
+		// Close the VoltDB connection
 		try {
 			client.drain();
 			client.close();
@@ -68,7 +68,7 @@ public class TomcatVoltdbAppender extends AppenderSkeleton implements Appender {
 		String level = arg0.getLevel().toString();
 		String message = arg0.getMessage().toString();
 
-		// Insert the log message into Volt
+		// Insert the log message into VoltDB
 		try{
 			client.callProcedure("VoltdbInsert", timestamp, level, message);
 		} catch (Exception e) {
