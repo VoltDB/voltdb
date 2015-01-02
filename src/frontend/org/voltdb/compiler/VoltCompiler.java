@@ -1090,6 +1090,13 @@ public class VoltCompiler {
         // and REPLICATE statements.
         final DDLCompiler ddlcompiler = new DDLCompiler(this, hsql, voltDdlTracker, m_classLoader);
 
+        if (cannonicalDDLIfAny != null) {
+            // add the file object's path to the list of files for the jar
+            m_ddlFilePaths.put(cannonicalDDLIfAny.getName(), cannonicalDDLIfAny.getPath());
+
+            ddlcompiler.loadSchema(cannonicalDDLIfAny, db, whichProcs);
+        }
+
         for (final VoltCompilerReader schemaReader : schemaReaders) {
             // add the file object's path to the list of files for the jar
             m_ddlFilePaths.put(schemaReader.getName(), schemaReader.getPath());
@@ -2530,6 +2537,68 @@ public class VoltCompiler {
             }
 
             return null;
+        }
+    }
+
+    /**
+     * Compile the provided jarfile.  Basically, treat the jarfile as a staging area
+     * for the artifacts to be included in the compile, and then compile it in place.
+     *
+     * *NOTE*: Does *NOT* work with project.xml jarfiles.
+     *
+     * @return the compiled catalog is contained in the provided jarfile.
+     *
+     */
+    public void compileInMemoryJarfileWithNewDDL(InMemoryJarfile jarfile, String newDDL, Catalog oldCatalog) throws IOException
+    {
+        String oldDDL = new String(jarfile.get(VoltCompiler.AUTOGEN_DDL_FILE_NAME),
+                Constants.UTF8ENCODING);
+        compilerLog.trace("OLD DDL: " + oldDDL);
+
+        VoltCompilerStringReader cannonicalDDLReader = null;
+        VoltCompilerStringReader newDDLReader = null;
+
+        // Use the in-memory jarfile-provided class loader so that procedure
+        // classes can be found and copied to the new file that gets written.
+        ClassLoader originalClassLoader = m_classLoader;
+        try {
+            cannonicalDDLReader = new VoltCompilerStringReader(VoltCompiler.AUTOGEN_DDL_FILE_NAME, oldDDL);
+            newDDLReader = new VoltCompilerStringReader("ADHOCDDL.sql", newDDL);
+
+            List<VoltCompilerReader> ddlList = new ArrayList<>();
+            ddlList.add(newDDLReader);
+
+            m_classLoader = jarfile.getLoader();
+            // Do the compilation work.
+            InMemoryJarfile jarOut = compileInternal(null, cannonicalDDLReader, oldCatalog, ddlList, jarfile);
+            // Trim the compiler output to try to provide a concise failure
+            // explanation
+            if (jarOut != null) {
+                compilerLog.debug("Successfully recompiled InMemoryJarfile");
+            }
+            else {
+                String errString = "Adhoc DDL failed";
+                if (m_errors.size() > 0) {
+                    errString = m_errors.get(m_errors.size() - 1).getLogString();
+                }
+                int fronttrim = errString.indexOf("DDL Error");
+                if (fronttrim < 0) { fronttrim = 0; }
+                int endtrim = errString.indexOf(" in statement starting");
+                if (endtrim < 0) { endtrim = errString.length(); }
+                String trimmed = errString.substring(fronttrim, endtrim);
+                throw new IOException(trimmed);
+            }
+        }
+        finally {
+            // Restore the original class loader
+            m_classLoader = originalClassLoader;
+
+            if (cannonicalDDLReader != null) {
+                try { cannonicalDDLReader.close(); } catch (IOException ioe) {}
+            }
+            if (newDDLReader != null) {
+                try { newDDLReader.close(); } catch (IOException ioe) {}
+            }
         }
     }
 

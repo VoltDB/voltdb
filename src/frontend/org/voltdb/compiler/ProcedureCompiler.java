@@ -67,6 +67,8 @@ import com.google_voltpatches.common.collect.ImmutableMap;
  */
 public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
 
+    private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
+
     static void compile(VoltCompiler compiler,
                         HSQLInterface hsql,
                         DatabaseEstimates estimates,
@@ -82,10 +84,12 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
         assert(hsql != null);
         assert(estimates != null);
 
-        if (procedureDescriptor.m_singleStmt == null)
+        if (procedureDescriptor.m_singleStmt == null) {
             compileJavaProcedure(compiler, hsql, estimates, catalog, db, procedureDescriptor, previousProcIfAny, jarOutput);
-        else
+        }
+        else {
             compileSingleStmtProcedure(compiler, hsql, estimates, catalog, db, previousProcIfAny, procedureDescriptor);
+        }
     }
 
     public static Map<String, SQLStmt> getValidSQLStmts(VoltCompiler compiler,
@@ -688,25 +692,70 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
         }
         assert(info != null);
 
-        // find any previous statement
-        if (previousProcIfAny != null) {
-            Statement previousStatement = previousProcIfAny.getStatements().get(VoltDB.ANON_STMT_NAME);
+        Statement catalogStmt = procedure.getStatements().add(VoltDB.ANON_STMT_NAME);
+        boolean cacheHit = false;
 
+        // find any previous statement and ensure it's partitioned the same
+        if ((previousProcIfAny != null) && (previousProcIfAny.getPartitionparameter() >= 0)) {
+            Statement previousStatement = previousProcIfAny.getStatements().get(VoltDB.ANON_STMT_NAME);
+            // check if the stmt exists and if it's the same sql text
+            if ((previousStatement != null) && (previousStatement.getSqltext().equals(procedureDescriptor.m_singleStmt))) {
+                // check that no underlying tables have been modified since the proc had been compiled
+                boolean safe = true;
+                String tablesTouched[] = previousStatement.getTablestouched().split(",");
+                for (String tableName : tablesTouched) {
+                    if (compiler.dirtyTables.contains(tableName)) {
+                        safe = false;
+                    }
+                }
+
+                if (safe) {
+                    catalogStmt.setAnnotation(previousStatement.getAnnotation());
+                    catalogStmt.setAttachment(previousStatement.getAttachment());
+                    catalogStmt.setBatched(previousStatement.getBatched());
+                    catalogStmt.setCost(previousStatement.getCost());
+                    catalogStmt.setExplainplan(previousStatement.getExplainplan());
+                    catalogStmt.setIscontentdeterministic(previousStatement.getIscontentdeterministic());
+                    catalogStmt.setIsorderdeterministic(previousStatement.getIsorderdeterministic());
+                    catalogStmt.setNondeterminismdetail(previousStatement.getNondeterminismdetail());
+                    catalogStmt.setParamnum(previousStatement.getParamnum());
+                    catalogStmt.setQuerytype(previousStatement.getQuerytype());
+                    catalogStmt.setReadonly(previousStatement.getReadonly());
+                    catalogStmt.setReplicatedtabledml(previousStatement.getReplicatedtabledml());
+                    catalogStmt.setSeqscancount(previousStatement.getSeqscancount());
+                    catalogStmt.setSinglepartition(previousStatement.getSinglepartition());
+                    catalogStmt.setSqltext(previousStatement.getSqltext());
+                    catalogStmt.setTablestouched(previousStatement.getTablestouched());
+
+                    for (StmtParameter oldSp : previousStatement.getParameters()) {
+                        StmtParameter newSp = catalogStmt.getParameters().add(oldSp.getTypeName());
+                        newSp.setAnnotation(oldSp.getAnnotation());
+                        newSp.setAttachment(oldSp.getAttachment());
+                        newSp.setIndex(oldSp.getIndex());
+                        newSp.setIsarray(oldSp.getIsarray());
+                        newSp.setJavatype(oldSp.getJavatype());
+                        newSp.setSqltype(oldSp.getSqltype());
+                    }
+
+                    cacheHit = true;
+                }
+            }
         }
 
+
         // ADD THE STATEMENT
+        StatementPartitioning partitioning =
+                info.singlePartition ? StatementPartitioning.forceSP() :
+                                       StatementPartitioning.forceMP();
 
         // add the statement to the catalog
-        Statement catalogStmt = procedure.getStatements().add(VoltDB.ANON_STMT_NAME);
-
-        // compile the statement
-        StatementPartitioning partitioning =
-            info.singlePartition ? StatementPartitioning.forceSP() :
-                                   StatementPartitioning.forceMP();
-        // default to FASTER detmode because stmt procs can't feed read output into writes
-        StatementCompiler.compileFromSqlTextAndUpdateCatalog(compiler, hsql, catalog, db,
-                estimates, catalogStmt, procedureDescriptor.m_singleStmt,
-                procedureDescriptor.m_joinOrder, DeterminismMode.FASTER, partitioning);
+        if (!cacheHit) {
+            // compile the statement
+            // default to FASTER detmode because stmt procs can't feed read output into writes
+            StatementCompiler.compileFromSqlTextAndUpdateCatalog(compiler, hsql, catalog, db,
+                    estimates, catalogStmt, procedureDescriptor.m_singleStmt,
+                    procedureDescriptor.m_joinOrder, DeterminismMode.FASTER, partitioning);
+        }
 
         // if the single stmt is not read only, then the proc is not read only
         boolean procHasWriteStmts = (catalogStmt.getReadonly() == false);
