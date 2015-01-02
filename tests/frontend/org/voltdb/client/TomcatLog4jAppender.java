@@ -39,129 +39,129 @@ import org.voltdb.utils.InMemoryJarfile;
 
 public class TomcatLog4jAppender {
 
-	private MessagePrinter printer;
-	private ServerThread m_localServer;
-	private Client m_client;
+    private MessagePrinter printer;
+    private ServerThread m_localServer;
+    private Client m_client;
 
-	// A class to print out a bunch of messages
-	static class MessagePrinter {
-		private static Logger log = Logger.getLogger(MessagePrinter.class);
+    // A class to print out a bunch of messages
+    static class MessagePrinter {
+        private static Logger log = Logger.getLogger(MessagePrinter.class);
 
-		public void printMessages() {
-			log.info("This is a message");
-			log.info("This is another message");
-		}
-	}
+        public void printMessages() {
+            log.info("This is a message");
+            log.info("This is another message");
+        }
+    }
 
-	// Configure & start a blank VoltDB instance
-	private void startServer() {
-		// Create a configuration
-		VoltDB.Configuration config = new VoltDB.Configuration();
+    // Configure & start a blank VoltDB instance
+    private void startServer() {
+        // Create a configuration
+        VoltDB.Configuration config = new VoltDB.Configuration();
 
-		// Start the server
-		m_localServer = new ServerThread(config);
+        // Start the server
+        m_localServer = new ServerThread(config);
         m_localServer.start();
         m_localServer.waitForInitialization();
 
-	}
+    }
 
-	// Start a VoltDB client
-	private void startClient() throws Exception{
-		m_client = ClientFactory.createClient();
-		m_client.createConnection("localhost");
-	}
+    // Start a VoltDB client
+    private void startClient() throws Exception{
+        m_client = ClientFactory.createClient();
+        m_client.createConnection("localhost");
+    }
 
-	// Stop a running VoltDB server
-	private void stopServer() throws Exception{
-		if (m_localServer != null) {
+    // Stop a running VoltDB server
+    private void stopServer() throws Exception{
+        if (m_localServer != null) {
             m_localServer.shutdown();
             m_localServer.join();
             m_localServer = null;
         }
-	}
+    }
 
-	// Stop a running VoltDB client
-	private void stopClient() throws Exception {
-		if (m_client != null) {
+    // Stop a running VoltDB client
+    private void stopClient() throws Exception {
+        if (m_client != null) {
             m_client.close();
             m_client = null;
         }
-	}
+    }
 
-	// Start up a VoltDB instance & client, with stored procedures
-	private void startUp() {
-		try {
-			startServer();
-			startClient();
-			addProcedure();
-		} catch (Exception e) {
-			// Something went wrong
-			tearDown();
-		}
-	}
+    // Start up a VoltDB instance & client, with stored procedures
+    private void startUp() {
+        try {
+            startServer();
+            startClient();
+            addProcedure();
+        } catch (Exception e) {
+            // Something went wrong
+            tearDown();
+        }
+    }
 
-	// Stop both a VoltDB instance & client
-	private void tearDown() {
-		try {
-			stopClient();
-			stopServer();
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-	}
+    // Stop both a VoltDB instance & client
+    private void tearDown() {
+        try {
+            stopClient();
+            stopServer();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 
-	// Add our custom procedure to VoltDB
-	private void addProcedure() {
-		ClientResponse resp = null;
-		try{
-			InMemoryJarfile jarfile = new InMemoryJarfile();
-			VoltCompiler comp = new VoltCompiler();
-			comp.addClassToJar(jarfile, org.voltdb.tomcat.VoltdbInsert.class);
-			m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
-			m_client.callProcedure("@AdHoc", "CREATE TABLE Logs ( timestamp BIGINT, level VARCHAR(10), message VARCHAR(255))");
-			m_client.callProcedure("@AdHoc", "create procedure from class org.voltdb.tomcat.VoltdbInsert");
-		} catch (Exception e) {
-			tearDown();
-		}
+    // Add our custom procedure to VoltDB
+    private void addProcedure() {
+        ClientResponse resp = null;
+        try{
+            InMemoryJarfile jarfile = new InMemoryJarfile();
+            VoltCompiler comp = new VoltCompiler();
+            comp.addClassToJar(jarfile, org.voltdb.tomcat.VoltdbInsert.class);
+            m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
+            m_client.callProcedure("@AdHoc", "CREATE TABLE Logs ( timestamp BIGINT, level VARCHAR(10), message VARCHAR(255))");
+            m_client.callProcedure("@AdHoc", "create procedure from class org.voltdb.tomcat.VoltdbInsert");
+        } catch (Exception e) {
+            tearDown();
+        }
 
-	}
+    }
 
-	// Set up the VoltDB instance, writer class and its logger
-	@Before
-	public void setup() {
-		// VoltDB
-		startUp();
+    // Set up the VoltDB instance, writer class and its logger
+    @Before
+    public void setup() {
+        // VoltDB
+        startUp();
 
-		// The printer & its logger
-		try {
-			printer = new MessagePrinter();
+        // The printer & its logger
+        try {
+            printer = new MessagePrinter();
 
-			Logger rootLogger = Logger.getRootLogger();
-			Appender voltAppender = new TomcatVoltDBAppender();
-			rootLogger.removeAllAppenders();
-			rootLogger.setLevel(Level.INFO);
-			rootLogger.addAppender(voltAppender);
-		} catch (Exception e) {
-			tearDown();
-		}
-	}
+            Logger rootLogger = Logger.getRootLogger();
+            Appender voltAppender = new TomcatVoltDBAppender();
+            rootLogger.removeAllAppenders();
+            rootLogger.setLevel(Level.INFO);
+            rootLogger.addAppender(voltAppender);
+        } catch (Exception e) {
+            tearDown();
+        }
+    }
 
-	@Test
-	public void test() throws Exception{
-		try {
-			// Print our messages
-			printer.printMessages();
+    @Test
+    public void test() throws Exception{
+        try {
+            // Print our messages
+            printer.printMessages();
 
-			// Make sure that we have a bunch of messages in VoltDB
-			VoltTable tables = m_client.callProcedure("@AdHoc", "SELECT messages FROM Logs").getResults()[0];
-			Assert.assertTrue("We have the correct number of insertions", tables.getRowCount() == 2);
-		} catch (Exception e) {
-			// Something went wrong
-			tearDown();
-		} finally {
-			// We're done, turn off the server
-			tearDown();
-		}
-	}
+            // Make sure that we have a bunch of messages in VoltDB
+            VoltTable tables = m_client.callProcedure("@AdHoc", "SELECT messages FROM Logs").getResults()[0];
+            Assert.assertTrue("We have the correct number of insertions", tables.getRowCount() == 2);
+        } catch (Exception e) {
+            // Something went wrong
+            tearDown();
+        } finally {
+            // We're done, turn off the server
+            tearDown();
+        }
+    }
 
 }

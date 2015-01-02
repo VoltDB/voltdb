@@ -28,54 +28,54 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.NoConnectionsException;
 
 public class TomcatVoltDBAppender extends AppenderSkeleton implements Appender {
-	ClientConfig config = null;
-	Client client = null;
-	ArrayList<LoggingEvent> cache = new ArrayList<LoggingEvent>();
+    ClientConfig config = null;
+    Client client = null;
+    ArrayList<LoggingEvent> cache = new ArrayList<LoggingEvent>();
 
-	public TomcatVoltDBAppender() {
-		// Create a connection to VoltDB
-		try {
-			config = new ClientConfig("", "");
-			config.setReconnectOnConnectionLoss(true);
-			client = ClientFactory.createClient(config);
-			client.createConnection("localhost");
-		} catch (java.io.IOException e) {
-			e.printStackTrace();
-			System.exit(-1);
-		}
-	}
+    public TomcatVoltDBAppender() {
+        // Create a connection to VoltDB
+        try {
+            config = new ClientConfig("", "");
+            config.setReconnectOnConnectionLoss(true);
+            client = ClientFactory.createClient(config);
+            client.createConnection("localhost");
+        } catch (java.io.IOException e) {
+            e.printStackTrace();
+            System.exit(-1);
+        }
+    }
 
-	@Override
-	public void close() {
-		// Close the VoltDB connection
-		try {
-			client.drain();
-			client.close();
-		} catch (InterruptedException | NoConnectionsException e) {
-			e.printStackTrace();
-		}
-	}
+    @Override
+    public void close() {
+        // Close the VoltDB connection
+        try {
+            client.drain();
+            client.close();
+        } catch (InterruptedException | NoConnectionsException e) {
+            e.printStackTrace();
+        }
+    }
 
-	@Override
-	public boolean requiresLayout() {
-		return true;
-	}
+    @Override
+    public boolean requiresLayout() {
+        return true;
+    }
 
-	@Override
-	protected void append(LoggingEvent arg0) {
-		// Extract the message information we need
-		long timestamp = arg0.getTimeStamp();
-		String level = arg0.getLevel().toString();
-		String message = arg0.getMessage().toString();
+    @Override
+    protected void append(LoggingEvent arg0) {
+        // Extract the message information we need
+        long timestamp = arg0.getTimeStamp();
+        String level = arg0.getLevel().toString();
+        String message = arg0.getMessage().toString();
 
-		// Insert the log message into VoltDB
-		try{
-			client.callProcedure("VoltdbInsert", timestamp, level, message);
-		} catch (Exception e) {
-			e.printStackTrace();
-			System.exit(-1);
-		}
-	}
+        // Insert the log message into VoltDB
+        try{
+            client.callProcedure("VoltdbInsert", timestamp, level, message);
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.exit(-1);
+        }
+    }
 
 
 }
