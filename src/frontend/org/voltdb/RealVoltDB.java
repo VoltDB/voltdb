@@ -115,6 +115,7 @@ import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.rejoin.Iv2RejoinCoordinator;
 import org.voltdb.rejoin.JoinCoordinator;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.CLibrary;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
@@ -2306,13 +2307,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         }
 
         try {
-            final ZooKeeper zk = m_messenger.getZK();
             boolean logRecoveryCompleted = false;
             if (getCommandLog().getClass().getName().equals("org.voltdb.CommandLogImpl")) {
-                String requestNode = zk.create(VoltZK.request_truncation_snapshot_node, null,
-                        Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT_SEQUENTIAL);
+                String requestId = SnapshotUtil.requestTruncationSnapshot();
                 if (m_rejoinTruncationReqId == null) {
-                    m_rejoinTruncationReqId = requestNode;
+                    m_rejoinTruncationReqId = requestId;
                 }
             } else {
                 logRecoveryCompleted = true;
@@ -2491,9 +2490,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 // If we saw some other truncation request ID, then try the same one again.  As long as we
                 // don't flip the m_rejoining state, all truncation snapshot completions will call back to here.
                 try {
-                    final ZooKeeper zk = m_messenger.getZK();
-                    String requestNode = zk.create(VoltZK.request_truncation_snapshot_node, null,
-                            Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT_SEQUENTIAL);
+                    String requestNode = SnapshotUtil.requestTruncationSnapshot();
                     if (m_rejoinTruncationReqId == null) {
                         m_rejoinTruncationReqId = requestNode;
                     }

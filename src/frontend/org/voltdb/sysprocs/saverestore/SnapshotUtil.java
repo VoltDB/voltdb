@@ -46,6 +46,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.json_voltpatches.JSONArray;
@@ -56,6 +57,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.EstTime;
 import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
 import org.voltdb.ClientInterface;
@@ -1464,6 +1466,32 @@ public class SnapshotUtil {
         ThreadFactory factory = CoreUtils.getThreadFactory("Snapshot Request - " + nonce);
         Thread workThread = factory.newThread(work);
         workThread.start();
+    }
+
+    final static AtomicLong m_queueTruncationRequestOn = new AtomicLong(System.currentTimeMillis());
+
+    public static void suggestTruncationSnapshot() {
+        final long now = EstTime.currentTimeMillis();
+        final long nextRequestOn = m_queueTruncationRequestOn.get();
+
+        final SnapshotDaemon sd = VoltDB.instance().getClientInterface().getSnapshotDaemon();
+
+        if (!sd.isTruncationSnapshotQueuedOrActive()) {
+            if (now > (nextRequestOn + 20000)) {
+                m_queueTruncationRequestOn.compareAndSet(nextRequestOn, now + 10000);
+            } else if (   now > nextRequestOn
+                       && m_queueTruncationRequestOn.compareAndSet(nextRequestOn, now + 10000)
+            ) {
+                sd.queueTruncationRequest();
+            }
+        } else if (now > nextRequestOn){
+            m_queueTruncationRequestOn.compareAndSet(nextRequestOn, now + 15000);
+        }
+    }
+
+    public static String requestTruncationSnapshot() {
+        final SnapshotDaemon sd = VoltDB.instance().getClientInterface().getSnapshotDaemon();
+        return sd.queueTruncationRequest();
     }
 
     public static String formatHumanReadableDate(long timestamp) {
