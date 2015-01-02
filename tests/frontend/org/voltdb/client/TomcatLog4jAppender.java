@@ -34,7 +34,7 @@ import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.compiler.VoltCompiler;
-import org.voltdb.tomcat.TomcatVoltdbAppender;
+import org.voltdb.tomcat.TomcatVoltDBAppender;
 import org.voltdb.utils.InMemoryJarfile;
 
 public class TomcatLog4jAppender {
@@ -53,7 +53,7 @@ public class TomcatLog4jAppender {
 		}
 	}
 
-	// Configure & start a blank volt instance
+	// Configure & start a blank VoltDB instance
 	private void startServer() {
 		// Create a configuration
 		VoltDB.Configuration config = new VoltDB.Configuration();
@@ -65,13 +65,13 @@ public class TomcatLog4jAppender {
 
 	}
 
-	// Start a volt client
+	// Start a VoltDB client
 	private void startClient() throws Exception{
 		m_client = ClientFactory.createClient();
 		m_client.createConnection("localhost");
 	}
 
-	// Stop a running volt server
+	// Stop a running VoltDB server
 	private void stopServer() throws Exception{
 		if (m_localServer != null) {
             m_localServer.shutdown();
@@ -80,7 +80,7 @@ public class TomcatLog4jAppender {
         }
 	}
 
-	// Stop a running volt client
+	// Stop a running VoltDB client
 	private void stopClient() throws Exception {
 		if (m_client != null) {
             m_client.close();
@@ -88,7 +88,7 @@ public class TomcatLog4jAppender {
         }
 	}
 
-	// Start up a volt instance & client, with stored procedures
+	// Start up a VoltDB instance & client, with stored procedures
 	private void startUp() {
 		try {
 			startServer();
@@ -100,7 +100,7 @@ public class TomcatLog4jAppender {
 		}
 	}
 
-	// Stop both a volt instance & client
+	// Stop both a VoltDB instance & client
 	private void tearDown() {
 		try {
 			stopClient();
@@ -110,7 +110,7 @@ public class TomcatLog4jAppender {
 		}
 	}
 
-	// Add our custom procedure to volt
+	// Add our custom procedure to VoltDB
 	private void addProcedure() {
 		ClientResponse resp = null;
 		try{
@@ -126,10 +126,10 @@ public class TomcatLog4jAppender {
 
 	}
 
-	// Set up the volt instance, writer class and its logger
+	// Set up the VoltDB instance, writer class and its logger
 	@Before
 	public void setup() {
-		// Volt
+		// VoltDB
 		startUp();
 
 		// The printer & its logger
@@ -137,7 +137,7 @@ public class TomcatLog4jAppender {
 			printer = new MessagePrinter();
 
 			Logger rootLogger = Logger.getRootLogger();
-			Appender voltAppender = new TomcatVoltdbAppender();
+			Appender voltAppender = new TomcatVoltDBAppender();
 			rootLogger.removeAllAppenders();
 			rootLogger.setLevel(Level.INFO);
 			rootLogger.addAppender(voltAppender);
@@ -152,7 +152,7 @@ public class TomcatLog4jAppender {
 			// Print our messages
 			printer.printMessages();
 
-			// Make sure that we have a bunch of messages in volt
+			// Make sure that we have a bunch of messages in VoltDB
 			VoltTable tables = m_client.callProcedure("@AdHoc", "SELECT messages FROM Logs").getResults()[0];
 			Assert.assertTrue("We have the correct number of insertions", tables.getRowCount() == 2);
 		} catch (Exception e) {
