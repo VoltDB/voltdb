@@ -139,7 +139,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
         builder.setUseDDLSchema(false);
         m_cluster = new LocalCluster("TestSqlCmdErrorHandling" + ".jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         assertTrue(m_cluster.compile(builder));
-        m_cluster.setHasLocalServer(false);
+        // m_cluster.setHasLocalServer(false);
         m_cluster.startUp();
         Thread.sleep(1000);
     }

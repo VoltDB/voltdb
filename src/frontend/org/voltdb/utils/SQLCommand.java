@@ -578,7 +578,9 @@ public class SQLCommand
                         reportElapsedTime("post-execute");
                     }
                 }
-                reportElapsedTime("finished execute");
+                if (m_debug) {
+                    reportElapsedTime("finished execute");
+                }
                 return;
             }
             //* enable to debug */ else System.err.println("Read non-null batch line: (" + line + ")");

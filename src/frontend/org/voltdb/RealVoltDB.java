@@ -84,6 +84,7 @@ import org.voltcore.utils.ShutdownHooks;
 import org.voltcore.zk.ZKCountdownLatch;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.TheHashinator.HashinatorType;
+import org.voltdb.VoltDB.Configuration;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
@@ -140,16 +141,8 @@ import com.google_voltpatches.common.util.concurrent.SettableFuture;
  * namespace. A lot of the global namespace is described by VoltDBInterface
  * to allow test mocking.
  */
-public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
-{
-
-    private static final boolean DISABLE_JMX;
-    static {
-        DISABLE_JMX = Boolean.valueOf(System.getProperty("DISABLE_JMX", "false"));
-    }
-
-    private static final VoltLogger hostLog = new VoltLogger("HOST");
-    private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
+public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
+    private static final boolean DISABLE_JMX = Boolean.valueOf(System.getProperty("DISABLE_JMX", "false"));
 
     /** Default deployment file contents if path to deployment is null */
     private static final String[] defaultDeploymentXML = {
@@ -165,7 +158,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         "</deployment>"
     };
 
-    public VoltDB.Configuration m_config = new VoltDB.Configuration();
+    private final VoltLogger hostLog = new VoltLogger("HOST");
+    private final VoltLogger consoleLog = new VoltLogger("CONSOLE");
+
+    public Configuration m_config = new Configuration();
     int m_configuredNumberOfPartitions;
     int m_configuredReplicationFactor;
     // CatalogContext is immutable, just make sure that accessors see a consistent version
@@ -338,7 +334,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
      * Initialize all the global components, then initialize all the m_sites.
      */
     @Override
-    public void initialize(VoltDB.Configuration config) {
+    public void initialize(Configuration config) {
         ShutdownHooks.enableServerStopLogging();
         synchronized(m_startAndStopLock) {
             // check that this is a 64 bit VM
@@ -351,7 +347,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             // If there's no deployment provide a default and put it under voltdbroot.
             if (config.m_pathToDeployment == null) {
                 try {
-                    config.m_pathToDeployment = setupDefaultDeployment();
+                    config.m_pathToDeployment = setupDefaultDeployment(hostLog);
                     config.m_deploymentDefault = true;
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB("Failed to write default deployment.", false, null);
@@ -811,7 +807,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 VoltDB.crashLocalVoltDB("Error initializing snapshot completion monitor", true, e);
             }
 
-
             /*
              * Make sure the build string successfully validated
              * before continuing to do operations
@@ -849,7 +844,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             // print out a bunch of useful system info
             logDebuggingInfo(m_config.m_adminPort, m_config.m_httpPort, m_httpPortExtraLogMessage, m_jsonEnabled);
-
 
             // warn the user on the console if k=0 or if no command logging
             if (m_configuredReplicationFactor == 0) {
@@ -939,50 +933,58 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     dailyAppender = (DailyRollingFileAppender) appender;
                 }
             }
-            final DailyRollingFileAppender dailyRollingFileAppender = dailyAppender;
-
-            Field field = null;
-            if (dailyRollingFileAppender != null) {
-                try {
-                    field = dailyRollingFileAppender.getClass().getDeclaredField("nextCheck");
-                    field.setAccessible(true);
-                } catch (NoSuchFieldException e) {
-                    hostLog.error("Failed to set daily system info logging: " + e.getMessage());
-                }
-            }
-            final Field nextCheckField = field;
-
-            class DailyLogTask implements Runnable {
-                @Override
-                public void run() {
-                    try {
-                        m_myHostId = m_messenger.getHostId();
-                        hostLog.info(String.format("Host id of this node is: %d", m_myHostId));
-                        hostLog.info("URL of deployment info: " + m_config.m_pathToDeployment);
-                        hostLog.info("Cluster uptime: " + MiscUtils.formatUptime(getClusterUptime()));
-                        logDebuggingInfo(m_config.m_adminPort, m_config.m_httpPort, m_httpPortExtraLogMessage, m_jsonEnabled);
-                        // log system setting information
-                        logSystemSettingFromCatalogContext();
-
-                        long nextCheck = nextCheckField.getLong(dailyRollingFileAppender);
-                        scheduleWork(new DailyLogTask(),
-                                nextCheck - System.currentTimeMillis() + 30 * 1000, 0, TimeUnit.MILLISECONDS);
-                    } catch (IllegalAccessException e) {
-                        hostLog.error("Failed to set daily system info logging: " + e.getMessage());
-                    }
-                }
-            }
-
-            if (dailyRollingFileAppender != null && nextCheckField != null) {
-                try {
-                    long nextCheck = nextCheckField.getLong(dailyRollingFileAppender);
-                    scheduleWork(new DailyLogTask(),
-                            nextCheck - System.currentTimeMillis() + 30 * 1000, 0, TimeUnit.MILLISECONDS);
-                } catch (IllegalAccessException e) {
-                    hostLog.error("Failed to set daily system info logging: " + e.getMessage());
-                }
+            if (dailyAppender != null) {
+////                scheduleDailyLogging(dailyAppender);
             }
         }
+    }
+
+    /**
+     * @param dailyRollingFileAppender
+     * @param field
+     */
+    private void scheduleDailyLogging(final DailyRollingFileAppender dailyRollingFileAppender) {
+        Field field = null;
+        try {
+            field = dailyRollingFileAppender.getClass().getDeclaredField("nextCheck");
+        } catch (NoSuchFieldException e) {
+            hostLog.error("Failed to set daily system info logging: " + e.getMessage());
+            return;
+        }
+        field.setAccessible(true);
+        final Field nextCheckField = field;
+
+        class DailyLogTask implements Runnable {
+            @Override
+            public void run() {
+                hostLog.info(String.format("Host id of this node is: %d", m_myHostId));
+                hostLog.info("URL of deployment info: " + m_config.m_pathToDeployment);
+                hostLog.info("Cluster uptime: " + MiscUtils.formatUptime(getClusterUptime()));
+                logDebuggingInfo(m_config.m_adminPort, m_config.m_httpPort, m_httpPortExtraLogMessage, m_jsonEnabled);
+                // log system setting information
+                logSystemSettingFromCatalogContext();
+                long nextCheck;
+                try {
+                    nextCheck = nextCheckField.getLong(dailyRollingFileAppender);
+                } catch (IllegalAccessException e) {
+                    hostLog.error("Failed to set daily system info logging: " + e.getMessage());
+                    return;
+                }
+                scheduleWork(new DailyLogTask(),
+                        nextCheck + 30 * 1000 - System.currentTimeMillis(), -1, TimeUnit.MILLISECONDS);
+            }
+        };
+
+        long nextCheck;
+        try {
+            nextCheck = nextCheckField.getLong(dailyRollingFileAppender);
+            hostLog.info("Log delay: " + MiscUtils.formatUptime(getClusterUptime()));
+        } catch (IllegalAccessException e) {
+            hostLog.error("Failed to set daily system info logging: " + e.getMessage());
+            return;
+        }
+        scheduleWork(new DailyLogTask(),
+                nextCheck + 30 * 1000 - System.currentTimeMillis(), -1, TimeUnit.MILLISECONDS);
     }
 
     class StartActionWatcher implements Watcher {
@@ -1721,7 +1723,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         }
 
         // print out cluster membership
-        hostLog.info("About to list cluster interfaces for all nodes with format [ip1 ip2 ... ipN] client-port:admin-port:http-port");
+        hostLog.info("About to list cluster interfaces for all nodes with format [ip1 ip2 ... ipN] client-port,admin-port,http-port");
         for (int hostId : m_messenger.getLiveHostIds()) {
             if (hostId == m_messenger.getHostId()) {
                 hostLog.info(
@@ -1752,7 +1754,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
 
-    public static String[] extractBuildInfo() {
+    public static String[] extractBuildInfo(VoltLogger logger) {
         StringBuilder sb = new StringBuilder(64);
         String buildString = "VoltDB";
         String versionString = m_defaultVersionString;
@@ -1786,7 +1788,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 }
             }
             catch (Exception ignored2) {
-                hostLog.l7dlog( Level.ERROR, LogKeys.org_voltdb_VoltDB_FailedToRetrieveBuildString.name(), null);
+                logger.l7dlog(Level.ERROR, LogKeys.org_voltdb_VoltDB_FailedToRetrieveBuildString.name(), null);
             }
         }
         return new String[] { versionString, buildString };
@@ -1794,7 +1796,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     @Override
     public void readBuildInfo(String editionTag) {
-        String buildInfo[] = extractBuildInfo();
+        String buildInfo[] = extractBuildInfo(hostLog);
         m_versionString = buildInfo[0];
         m_buildString = buildInfo[1];
         consoleLog.info(String.format("Build: %s %s %s", m_versionString, m_buildString, editionTag));
@@ -2147,7 +2149,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     @Override
-    public VoltDB.Configuration getConfig() {
+    public Configuration getConfig() {
         return m_config;
     }
 
@@ -2592,7 +2594,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
      * @return path to default deployment file
      * @throws IOException
      */
-    static String setupDefaultDeployment() throws IOException {
+    static String setupDefaultDeployment(VoltLogger logger) throws IOException {
 
         // Since there's apparently no deployment to override the path to voltdbroot it should be
         // safe to assume it's under the working directory.
@@ -2601,7 +2603,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         String pathToDeployment = voltDbRoot.getPath() + File.separator + "deployment.xml";
         File deploymentXMLFile = new File(pathToDeployment);
 
-        hostLog.info("Generating default deployment file \"" + deploymentXMLFile.getAbsolutePath() + "\"");
+        logger.info("Generating default deployment file \"" + deploymentXMLFile.getAbsolutePath() + "\"");
         BufferedWriter bw = new BufferedWriter(new FileWriter(deploymentXMLFile));
         for (String line : defaultDeploymentXML) {
             bw.write(line);

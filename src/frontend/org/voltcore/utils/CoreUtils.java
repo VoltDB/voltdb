@@ -73,11 +73,11 @@ import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 public class CoreUtils {
-    private static VoltLogger hostLog = null;
+    ////private static VoltLogger hostLog = null;
 
     static {
         System.err.println("CoreUtils x000");
-        hostLog = new VoltLogger("HOST");
+        /////*hostLog = */new VoltLogger("HOST");
         System.err.println("CoreUtils x001");
     }
 
@@ -86,21 +86,7 @@ public class CoreUtils {
 
     public static volatile Runnable m_threadLocalDeallocator = initEmptyRunnable();
 
-    private static Runnable initEmptyRunnable() {
-System.err.println("CoreUtils x010");
-        Runnable runnable = new Runnable() {
-        @Override
-        public void run() { }
-    };
-System.err.println("CoreUtils x011");
-    return runnable;
-    }
-
-    public static final ExecutorService SAMETHREADEXECUTOR = initExecutorService();
-
-    private static ExecutorService initExecutorService() {
-System.err.println("CoreUtils x020");
-        ExecutorService executorService = new ExecutorService() {
+    public static final ExecutorService SAMETHREADEXECUTOR = new ExecutorService() {
 
         @Override
         public void execute(Runnable command) {
@@ -254,15 +240,8 @@ System.err.println("CoreUtils x020");
         }
 
     };
-System.err.println("CoreUtils x021");
-    return executorService;
-    }
 
-    public static final ListeningExecutorService LISTENINGSAMETHREADEXECUTOR = initListeningExecutorService();
-
-    private static ListeningExecutorService initListeningExecutorService() {
-System.err.println("CoreUtils x030");
-        ListeningExecutorService listeningExecutorService = new ListeningExecutorService() {
+    public static final ListeningExecutorService LISTENINGSAMETHREADEXECUTOR = new ListeningExecutorService() {
 
         @Override
         public void execute(Runnable command) {
@@ -416,15 +395,8 @@ System.err.println("CoreUtils x030");
         }
 
     };
-System.err.println("CoreUtils x031");
-    return listeningExecutorService;
-    }
 
-    public static final ListenableFuture<Object> COMPLETED_FUTURE = initListenableFuture();
-
-    private static ListenableFuture<Object> initListenableFuture() {
-System.err.println("CoreUtils x040");
-        ListenableFuture<Object> lf = new ListenableFuture<Object>() {
+    public static final ListenableFuture<Object> COMPLETED_FUTURE = new ListenableFuture<Object>() {
         @Override
         public void addListener(Runnable listener, Executor executor) { executor.execute(listener); }
         @Override
@@ -438,11 +410,16 @@ System.err.println("CoreUtils x040");
         @Override
         public Object get(long timeout, TimeUnit unit) { return null; }
     };
-System.err.println("CoreUtils x041");
-    return lf;
-    }
 
     public static final Runnable EMPTY_RUNNABLE = initEmptyRunnable();
+
+    private static Runnable initEmptyRunnable() {
+        Runnable runnable = new Runnable() {
+            @Override
+            public void run() { }
+        };
+        return runnable;
+    }
 
     /**
      * Get a single thread executor that caches it's thread meaning that the thread will terminate
@@ -465,13 +442,13 @@ System.err.println("CoreUtils x041");
      * Create an unbounded single threaded executor
      */
     public static ExecutorService getSingleThreadExecutor(String name) {
-System.err.println("CoreUtils gSTE 0");
+System.err.println("pmartel debugging CoreUtils gSTE 0");
         ExecutorService ste =
                 new ThreadPoolExecutor(1, 1,
                         0L, TimeUnit.MILLISECONDS,
                         new LinkedBlockingQueue<Runnable>(),
                         CoreUtils.getThreadFactory(null, name, SMALL_STACK_SIZE, false, null));
-System.err.println("CoreUtils gSTE 1");
+System.err.println("pmartel debugging CoreUtils gSTE 1");
         return ste;
     }
 
@@ -618,9 +595,9 @@ System.err.println("CoreUtils gSTE 1");
     }
 
     public static ThreadFactory getThreadFactory(String name) {
-System.err.println("CoreUtils x1");
+System.err.println("pmartel debugging CoreUtils x1");
         ThreadFactory threadFactory = getThreadFactory(name, SMALL_STACK_SIZE);
-System.err.println("CoreUtils x2");
+System.err.println("pmartel debugging CoreUtils x2");
         return threadFactory;
     }
 
@@ -677,7 +654,7 @@ System.err.println("CoreUtils x2");
                         try {
                             r.run();
                         } catch (Throwable t) {
-                            hostLog.error("Exception thrown in thread " + threadName, t);
+                            new VoltLogger("HOST").error("Exception thrown in thread " + threadName, t);
                         } finally {
                             m_threadLocalDeallocator.run();
                         }

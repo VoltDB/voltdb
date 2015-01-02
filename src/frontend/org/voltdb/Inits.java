@@ -43,6 +43,7 @@ import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
+import org.voltdb.VoltDB.Configuration;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.export.ExportManager;
@@ -67,7 +68,7 @@ public class Inits {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     final RealVoltDB m_rvdb;
-    final VoltDB.Configuration m_config;
+    final Configuration m_config;
     final boolean m_isRejoin;
     DeploymentType m_deployment = null;
 

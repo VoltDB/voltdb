@@ -214,14 +214,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
     /**
      *
-     * @param network
-     * @param coordinatorIp
-     * @param expectedHosts
-     * @param catalogCRC
-     * @param hostLog
+     * @param config
      */
-    public HostMessenger(
-            Config config)
+    public HostMessenger(Config config)
     {
         m_config = config;
         m_network = new VoltNetworkPool(m_config.networkThreads, 0, m_config.coreBindIds, "Server");
