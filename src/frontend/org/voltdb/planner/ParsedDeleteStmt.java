@@ -143,15 +143,17 @@ public class ParsedDeleteStmt extends AbstractParsedStmt {
         return allCols.isEmpty();
     }
 
-    /** Returns true if the set of rows flowing into the DELETE node
-     * for the plan created by this statement have a deterministic order.
+    /** Returns true if the set of rows deleted by this statement
+     * is deterministic.
      */
-    @Override
-    public boolean isOrderDeterministic() {
+    public boolean sideEffectsAreDeterministic() {
 
-        if (! hasOrderByColumns()) {
-            return false;
+        if (! hasLimitOrOffset()) {
+            return true;
         }
+
+        // Syntax requires LIMIT or OFFSET to have an ORDER BY
+        assert(hasOrderByColumns());
 
         if (orderByColumnsCoverUniqueKeys()) {
             return true;

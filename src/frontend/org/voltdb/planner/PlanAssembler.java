@@ -366,8 +366,7 @@ public class PlanAssembler {
         }
 
         if (parsedStmt instanceof ParsedDeleteStmt
-                && parsedStmt.hasLimitOrOffset()
-                && !parsedStmt.isOrderDeterministic()) {
+                && !((ParsedDeleteStmt)parsedStmt).sideEffectsAreDeterministic()) {
                 throw new PlanningErrorException(
                         "DELETE statement manipulates data in a non-deterministic way.  This may happen "
                                 + "when the DELETE has an ORDER BY clause with a LIMIT, but the order is not "
@@ -999,7 +998,12 @@ public class PlanAssembler {
 
         // check non-determinism status
         plan.setReadOnly(false);
-        boolean orderIsDeterministic = m_parsedDelete.isOrderDeterministic();
+
+        // treat this as deterministic for reporting purposes:
+        // delete statements produce just one row that is the
+        // number of rows affected
+        boolean orderIsDeterministic = true;
+
         boolean hasLimitOrOffset = m_parsedDelete.hasLimitOrOffset();
         plan.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic);
 

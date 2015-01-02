@@ -305,28 +305,17 @@ public class TestDeterminism extends PlannerTestCase {
         assertPlanDeterminismCore(sql, ORDERED, CONSISTENT, DeterminismMode.SAFER);
     }
 
-    private void assertDMLPlanDeterminismUnordered(String sql) {
-        assertPlanDeterminismCore(sql, UNORDERED, CONSISTENT, DeterminismMode.SAFER);
-    }
-
     public void testDeterminismOfWrites() {
         // "LIMIT" not currently supported for some DML.
         assertDMLPlanDeterminism("insert into ttree values (1,2,3,4)");
         assertDMLPlanDeterminism("insert into tunique values (1,2,3,4)");
         assertDMLPlanDeterminism("insert into tpk values (1,2,3,4)");
+        assertDMLPlanDeterminism("delete from ttree");
+        assertDMLPlanDeterminism("delete from tunique");
+        assertDMLPlanDeterminism("delete from tpk");
         assertDMLPlanDeterminism("update ttree set z = 5 where a < 2");
         assertDMLPlanDeterminism("update tunique set z = 5 where a < 2");
         assertDMLPlanDeterminism("update tpk set z = 5 where a < 2");
-
-        // Deletes may have ORDER BY ... LIMIT so the determinism of the
-        // plan feeding into the delete node is explicitly modeled.
-        //
-        // For more tests covering determinism and DELETE, see
-        // TestSqlDeleteSuite.
-        assertDMLPlanDeterminismUnordered("delete from ttree");
-        assertDMLPlanDeterminismUnordered("delete from tunique");
-        assertDMLPlanDeterminismUnordered("delete from tpk");
-
     }
 
     public void testOrderByWithoutIndex() {
