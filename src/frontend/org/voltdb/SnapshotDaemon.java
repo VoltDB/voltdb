@@ -501,6 +501,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             }
         }
 
+        public void cancelLockedTask() {
+            cancelLockRequest();
+        }
+
         public ArrayList<Integer> getNodeListFor(SNAPSHOT_TYPE type) {
             String path = getPathFromType(type);
             assert(path != null);
@@ -544,6 +548,13 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             }
         }
 
+        public void lastSnapshotProcessed() {
+            assert(m_pendingSnapshotsQueue.isEmpty());
+            m_activeSnapshot = SNAPSHOT_TYPE.EMPTY;
+            ByteBuffer newQueue = buildProposalFromUpdatedQueue(ByteBuffer.wrap(new byte[0]));
+            proposeStateChange(newQueue);
+        }
+
         public void initiateNewSnapshot(SNAPSHOT_TYPE type, boolean satisfiesAllNodes, ByteBuffer activeSnapshotData) {
             m_pendingSnapshotsQueue.remove(type);
             if (!satisfiesAllNodes) {
@@ -583,15 +594,14 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         @Override
         public void susceptibleRun() throws Exception {
             SNAPSHOT_TYPE atHeadType = m_snapshotQueue.getPendingSnapshotType();
+            if (atHeadType == SNAPSHOT_TYPE.EMPTY) {
+                m_snapshotQueue.lastSnapshotProcessed();
+                return;
+            }
             NavigableMap<Integer,ByteBuffer> requestNodes =
                     m_snapshotQueue.getDetailsFromSnapshotNodeByType(atHeadType);
 
             int nodesCount = requestNodes.size();
-
-            if (requestNodes.isEmpty()) {
-                m_snapshotQueue.initiateNewSnapshot(atHeadType, true, ByteBuffer.wrap(new byte[0]));
-                return;
-            }
 
             ByteBuffer first = requestNodes.firstEntry().getValue();
             if (first == null || first.limit() == 0) {
