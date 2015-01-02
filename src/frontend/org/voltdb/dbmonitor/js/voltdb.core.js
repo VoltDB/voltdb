@@ -136,7 +136,7 @@
                     uri = 'http://' + this.server + ':' + this.port + '/api/1.0/';
                 }
                 var params = '';
-                if (procedure == '@Pause' || procedure == '@Resume' || procedure == '@Shutdown') {
+                if (procedure == '@Pause' || procedure == '@Resume' || procedure == '@Shutdown' || procedure == '@Promote') {
                     params = this.BuildParamSetForClusterState(procedure);
                 } else {
                     params = this.BuildParamSet(procedure, parameters, shortApiCallDetails);
@@ -510,7 +510,10 @@
                         }else if (processName == "SYSTEMINFORMATION_SAVESNAPSHOT") {
                             connection.Metadata[procedure['procedure'] + "_" + "status"] = data.status;
                             connection.Metadata[procedure['procedure'] + "_data"] = data.results[0];
-                        }else
+                        } else if (processName == "SYSTEMINFORMATION_PROMOTECLUSTER") {
+                            connection.Metadata[procedure['procedure'] + "_" + "status"] = data.status;
+                            connection.Metadata[procedure['procedure'] + "_statusstring"] = data.statusstring;
+                        } else
                             connection.Metadata[procedure['procedure'] + "_" + procedure['parameter'] + suffix] = data.results[0];
                     });
                 });
@@ -572,6 +575,7 @@
 
 jQuery.extend({
     postJSON: function (url, formData, callback, authorization) {
+        
         if (VoltDBCore.hostIP == "") {
 
             jQuery.ajax({
@@ -614,7 +618,8 @@ jQuery.extend({
 });
 
 jQuery.extend({
-    getJSON: function (url, formData, callback, authorization) {        
+    getJSON: function (url, formData, callback, authorization) {
+        
         if (VoltDBCore.hostIP == "") {
             jQuery.ajax({
                 type: 'GET',
