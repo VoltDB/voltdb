@@ -501,13 +501,12 @@
                 jQuery.each(connection.procedureCommands.procedures, function (id, procedure) {
                     connectionQueue.BeginExecute(procedure['procedure'], (procedure['value'] === undefined ? procedure['parameter'] : [procedure['parameter'], procedure['value']]), function (data) {
                         var suffix = (processName == "GRAPH_MEMORY" || processName == "GRAPH_TRANSACTION") || processName == "TABLE_INFORMATION" || processName == "CLUSTER_INFORMATION" ? "_" + processName : "";
-                        if (processName == "SYSTEMINFORMATION_STOPSERVER" ){
+                        if (processName == "SYSTEMINFORMATION_STOPSERVER"){
                             connection.Metadata[procedure['procedure'] + "_" + procedure['parameter'] + suffix + "_status"] = data.status;
                             connection.Metadata[procedure['procedure'] + "_" + procedure['parameter'] + suffix + "_statusString"] = data.statusstring;
-                        }
-                        else if (processName == "SYSTEMINFORMATION_PAUSECLUSTER" || processName == "SYSTEMINFORMATION_RESUMECLUSTER" || processName == "SYSTEMINFORMATION_SHUTDOWNCLUSTER") {
+                        } else if (processName == "SYSTEMINFORMATION_PAUSECLUSTER" || processName == "SYSTEMINFORMATION_RESUMECLUSTER" || processName == "SYSTEMINFORMATION_SHUTDOWNCLUSTER") {
                             connection.Metadata[procedure['procedure'] + "_" + "status"] = data.status;
-                        }else if (processName == "SYSTEMINFORMATION_SAVESNAPSHOT") {
+                        } else if (processName == "SYSTEMINFORMATION_SAVESNAPSHOT") {
                             connection.Metadata[procedure['procedure'] + "_" + "status"] = data.status;
                             connection.Metadata[procedure['procedure'] + "_data"] = data.results[0];
                         } else if (processName == "SYSTEMINFORMATION_PROMOTECLUSTER") {
