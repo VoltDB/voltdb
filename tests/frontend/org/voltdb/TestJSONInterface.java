@@ -84,6 +84,8 @@ import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
+import org.voltdb.compiler.deploymentfile.SystemSettingsType;
+import org.voltdb.compiler.deploymentfile.SystemSettingsType.Query;
 import org.voltdb.compiler.procedures.CrazyBlahProc;
 import org.voltdb.compiler.procedures.DelayProc;
 import org.voltdb.compiler.procedures.SelectStarHelloWorld;
@@ -177,15 +179,15 @@ public class TestJSONInterface extends TestCase {
         return response;
     }
 
-    public static String getUrlOverJSON(String url, String user, String password, String scheme, int expectedCode, String expectedCt) throws Exception {
+    private static String getUrlOverJSON(String url, String user, String password, String scheme, int expectedCode, String expectedCt) throws Exception {
         return httpUrlOverJSON("GET", url, user, password, scheme, expectedCode, expectedCt, null);
     }
 
-    public static String postUrlOverJSON(String url, String user, String password, String scheme, int expectedCode, String expectedCt, Map<String,String> params) throws Exception {
+    private static String postUrlOverJSON(String url, String user, String password, String scheme, int expectedCode, String expectedCt, Map<String,String> params) throws Exception {
         return httpUrlOverJSON("POST", url, user, password, scheme, expectedCode, expectedCt, params);
     }
 
-    public static String httpUrlOverJSON(String method, String url, String user, String password, String scheme, int expectedCode, String expectedCt, Map<String,String> params) throws Exception {
+    private static String httpUrlOverJSON(String method, String url, String user, String password, String scheme, int expectedCode, String expectedCt, Map<String,String> params) throws Exception {
         URL jsonAPIURL = new URL(url);
 
         HttpURLConnection conn = (HttpURLConnection) jsonAPIURL.openConnection();
@@ -202,6 +204,7 @@ public class TestJSONInterface extends TestCase {
             }
         }
         conn.connect();
+        byte andbyte[] = String.valueOf('&').getBytes();
         if (params != null && params.size() > 0) {
             OutputStream os = conn.getOutputStream();
             for (String key : params.keySet()) {
@@ -210,6 +213,7 @@ public class TestJSONInterface extends TestCase {
                     String b = "=" + params.get(key);
                     os.write(b.getBytes());
                 }
+                os.write(andbyte);
             }
         }
 
@@ -1078,11 +1082,55 @@ public class TestJSONInterface extends TestCase {
             String xdep = getUrlOverJSON("http://localhost:8095/deployment/download", null, null, null, 200, "text/xml");
             assertTrue(xdep.contains("<deployment>"));
             assertTrue(xdep.contains("</deployment>"));
+        } finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
+        }
+    }
+
+    public void testUpdateDeployment() throws Exception {
+        try {
+            String simpleSchema
+                    = "CREATE TABLE foo (\n"
+                    + "    bar BIGINT NOT NULL,\n"
+                    + "    PRIMARY KEY (bar)\n"
+                    + ");";
+
+            File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+            String schemaPath = schemaFile.getPath();
+            schemaPath = URLEncoder.encode(schemaPath, "UTF-8");
+
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addSchema(schemaPath);
+            builder.addPartitionInfo("foo", "bar");
+            builder.addProcedures(DelayProc.class);
+            builder.setHTTPDPort(8095);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            assertTrue(success);
+
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
+
+            //Get deployment
+            String jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            assertTrue(jdep.contains("cluster"));
             //POST deployment with no content
             String pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", null);
             assertTrue(pdep.contains("Failed"));
             Map<String,String> params = new HashMap<>();
             params.put("deployment", jdep);
+            pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            assertTrue(pdep.contains("Deployment Updated"));
+
+            //POST deployment in admin mode
+            params.put("admin", "true");
             pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
             assertTrue(pdep.contains("Deployment Updated"));
 
@@ -1107,6 +1155,43 @@ public class TestJSONInterface extends TestCase {
             deptype = mapper.readValue(jdep, DeploymentType.class);
             int nto = deptype.getHeartbeat().getTimeout();
             assertEquals(nto, 99);
+
+            //Test change Query timeout
+            SystemSettingsType ss = deptype.getSystemsettings();
+            if (ss == null) {
+                ss = new SystemSettingsType();
+                deptype.setSystemsettings(ss);
+            }
+            Query qv = ss.getQuery();
+            if (qv == null) {
+                qv = new Query();
+                ss.setQuery(qv);
+                qv.setTimeout(99);
+            }
+            ndeptype = mapper.writeValueAsString(deptype);
+            params.put("deployment", ndeptype);
+            pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            System.out.println("POST result is: " + pdep);
+            assertTrue(pdep.contains("Deployment Updated"));
+            jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            assertTrue(jdep.contains("cluster"));
+            deptype = mapper.readValue(jdep, DeploymentType.class);
+            nto = deptype.getSystemsettings().getQuery().getTimeout();
+            assertEquals(nto, 99);
+
+            qv.setTimeout(88);
+            ss.setQuery(qv);
+            deptype.setSystemsettings(ss);
+            ndeptype = mapper.writeValueAsString(deptype);
+            params.put("deployment", ndeptype);
+            pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
+            System.out.println("POST result is: " + pdep);
+            assertTrue(pdep.contains("Deployment Updated"));
+            jdep = getUrlOverJSON("http://localhost:8095/deployment", null, null, null, 200,  "application/json");
+            assertTrue(jdep.contains("cluster"));
+            deptype = mapper.readValue(jdep, DeploymentType.class);
+            nto = deptype.getSystemsettings().getQuery().getTimeout();
+            assertEquals(nto, 88);
 
         } finally {
             if (server != null) {
