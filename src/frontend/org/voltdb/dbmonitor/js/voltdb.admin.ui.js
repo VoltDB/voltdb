@@ -503,9 +503,9 @@ function loadAdminPage() {
             var popup = $(this)[0];
             $("#promoteConfirmOk").unbind("click");
             $("#promoteConfirmOk").on("click", function (e) {
-                $("#overlay").show();
-                voltDbRenderer.promoteCluster(function (status, statusstring) {
-                    $("#overlay").hide();
+                $("#adminActionOverlay").show();
+                
+                voltDbRenderer.promoteCluster(function(status, statusstring) {
                     if (status == 1) {
                         showUpdateMessage('Cluster promoted successfully.');
                         adminClusterObjects.enablePromote = false;
@@ -513,14 +513,15 @@ function loadAdminPage() {
                         adminClusterObjects.btnClusterPromote.removeClass().addClass("promote-disabled");
                     } else {
                         var msg = statusstring;
-                        
+
                         if (msg == null || msg == "") {
                             msg = "An error occurred while promoting the cluster.";
                         }
-
                         adminClusterObjects.errorPromoteMessage.html(msg);
                         adminClusterObjects.btnErrorClusterPromote.trigger("click");
                     }
+
+                    $("#adminActionOverlay").hide();
                 });
                 
                 //Close the popup 
