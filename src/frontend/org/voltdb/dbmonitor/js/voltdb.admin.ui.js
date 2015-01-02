@@ -17,6 +17,7 @@ function loadAdminPage() {
         txtSnapshotDirectory: $('#txtSnapshotDirectory'),
         btnClusterPromote: $('#promoteConfirmation'),
         enablePromote: false,
+        ignorePromoteUpdateCount: 0,
         btnErrorClusterPromote: $('#btnErrorPromotePopup'),
         errorPromoteMessage: $('#promoteErrorMessage'),
         updateMessageBar: $('#snapshotBar')
@@ -502,20 +503,25 @@ function loadAdminPage() {
             var popup = $(this)[0];
             $("#promoteConfirmOk").unbind("click");
             $("#promoteConfirmOk").on("click", function (e) {
-                voltDbRenderer.promoteCluster(function (status, statusstring) {
-
+                $("#adminActionOverlay").show();
+                
+                voltDbRenderer.promoteCluster(function(status, statusstring) {
                     if (status == 1) {
                         showUpdateMessage('Cluster promoted successfully.');
+                        adminClusterObjects.enablePromote = false;
+                        adminClusterObjects.ignorePromoteUpdateCount = 2;
+                        adminClusterObjects.btnClusterPromote.removeClass().addClass("promote-disabled");
                     } else {
                         var msg = statusstring;
-                        
+
                         if (msg == null || msg == "") {
                             msg = "An error occurred while promoting the cluster.";
                         }
-
                         adminClusterObjects.errorPromoteMessage.html(msg);
                         adminClusterObjects.btnErrorClusterPromote.trigger("click");
                     }
+
+                    $("#adminActionOverlay").hide();
                 });
                 
                 //Close the popup 
@@ -1122,6 +1128,13 @@ function loadAdminPage() {
         };
 
         var configurePromoteAction = function (adminConfigValues) {
+            
+            //Ignore at most 2 requests which might be old.
+            if (adminClusterObjects.ignorePromoteUpdateCount > 0) {
+                adminClusterObjects.ignorePromoteUpdateCount--;
+                return;
+            }
+
             var enable = (adminConfigValues.replicationRole != null && adminConfigValues.replicationRole.toLowerCase() == 'replica');
             
             if (enable != adminClusterObjects.enablePromote) {
