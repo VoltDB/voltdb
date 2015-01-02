@@ -27,7 +27,7 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.NoConnectionsException;
 
-public /*static*/ class TomcatVoltdbAppender extends AppenderSkeleton implements Appender {
+public class TomcatVoltdbAppender extends AppenderSkeleton implements Appender {
 	ClientConfig config = null;
 	Client client = null;
 	ArrayList<LoggingEvent> cache = new ArrayList<LoggingEvent>();
