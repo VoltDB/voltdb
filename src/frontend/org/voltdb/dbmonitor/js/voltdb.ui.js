@@ -1,8 +1,5 @@
 ﻿var ispopupRevoked = false;
 $(document).ready(function () {
-
-
-
     if ($.cookie("username") != undefined && $.cookie("username") != 'null') {
         $("#logOut").css('display', 'block');
     } else {
