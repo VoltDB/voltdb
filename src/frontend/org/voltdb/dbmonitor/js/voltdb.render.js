@@ -458,7 +458,13 @@ function alertNodeClicked(obj) {
             var alertCount = 0;
 
             jQuery.each(systemOverview, function (id, val) {
-                if (val["CLUSTERSTATE"] == "RUNNING")
+                $.each(VoltDbAdminConfig.servers, function(nestId, nestVal) {
+                    if (val['HOSTNAME'] == nestVal.serverName && val['CLUSTERSTATE'] == "MISSING") {
+                        return;
+                    }
+                    
+                });
+                if (val["CLUSTERSTATE"] == "RUNNING" || val["CLUSTERSTATE"] == "PAUSED")
                     activeCount++;
                 else if (val["CLUSTERSTATE"] == "JOINING")
                     joiningCount++;
@@ -1892,6 +1898,7 @@ function alertNodeClicked(obj) {
                                 if (VoltDbAdminConfig.stoppedServer != "" && VoltDbAdminConfig.stoppedServer.serverName == serverInfo['HOSTNAME']) {
                                     value.hostId = VoltDbAdminConfig.stoppedServer.hostId;
                                     value.serverState = VoltDbAdminConfig.stoppedServer.serverState;
+                                    console.log("Missing state restored");
 
                                 } else {
                                     value.hostId = hostId;
