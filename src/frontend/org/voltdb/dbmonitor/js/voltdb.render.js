@@ -1889,7 +1889,7 @@ function alertNodeClicked(obj) {
 
                             }
                             else if (value.serverName == serverInfo['HOSTNAME']) {
-                                if (VoltDbAdminConfig.stoppedServer.serverName == serverInfo['HOSTNAME']) {
+                                if (VoltDbAdminConfig.stoppedServer != "" && VoltDbAdminConfig.stoppedServer.serverName == serverInfo['HOSTNAME']) {
                                     value.hostId = VoltDbAdminConfig.stoppedServer.hostId;
                                     value.serverState = VoltDbAdminConfig.stoppedServer.serverState;
 
@@ -1904,6 +1904,9 @@ function alertNodeClicked(obj) {
                         count++;
 
                     });
+                    
+                    //always clean up stopped server whether or not its empty
+                    VoltDbAdminConfig.stoppedServer = "";
 
 
                 } else {
