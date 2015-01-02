@@ -268,7 +268,7 @@
                         <div class="adminClusterProperties">
                             <ul class="adminClusterList">
                                 <li><a href="#pauseConfirmationPop" class="resume" id="pauseConfirmation">Pause</a> <a href="#resumeConfirmationPop" class="pause" id="resumeConfirmation" style="display: none;">Resume</a> </li>
-                                <li><a href="#" class="promote-disabled">Promote</a></li>
+                                <li><a href="#promoteConfirmationPop" class="promote-disabled" id="promoteConfirmation">Promote</a></li>
                                 <li><a href="#savePop" id="saveConfirmation" class="saveme">Save</a></li>
                                 <li><a href="#restorePop" id="restoreConfirmation" class="restore">Restore</a></li>
                                 <li><a href="#shutDownConfirmationPop" class="shutdown" id="shutDownConfirmation">Shutdown</a></li>
@@ -894,6 +894,17 @@
         <div class="overlay-btns"><a id="startConfirmOk" class="btn closeBtn" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Ok">Cancel</a></div>
     </div>
     <!-- POPUP stopConfirmationPop -->
+    
+    <!-- POPUP promoteConfirmationPop -->
+    <div id="promoteConfirmationPop" style="display: none">
+        <div class="overlay-title icon-alert">Promote: Confirmation</div>
+        <div class="clear"></div>
+        <div class="overlay-content">
+            <p class="txt-bold">Do you want to promote the cluster?</p>
+        </div>
+        <div class="overlay-btns"><a id="promoteConfirmOk" class="btn closeBtn" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Ok">Cancel</a></div>
+    </div>
+    <!-- POPUP promoteConfirmationPop -->
 
     <!-- POPUP pauseConfirmationPop 1 -->
     <div id="pauseConfirmationPop" style="display: none">
@@ -1140,6 +1151,23 @@
         </div>
     </div>
     <!-- POPUP SaveSnapshotPopup -->
+    
+    <!-- Error Promote Popup-->
+    <div style="display: none"><a href="#errorPromotePopup" id="btnErrorPromotePopup">Cluster Promote Error</a></div>
+    <div id="errorPromotePopup" style="display: none">
+        <div id="errorPromote">
+            <div class="overlay-title ">
+                <img src="css/resources/images/Information.png" class="imgError" /><span id="promoteErrorHeader">Failed to promote cluster</span>
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError ">
+                <p id="promoteErrorMessage" class="snapshotErrorMsg"></p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn closeBtn" id="btnPromoteErrorOk" title="save">Ok</a></div>
+            </div>
+        </div>
+    </div>
+    <!-- Error Promote Popupp -->
 
     <!--Update error Popup-->
     <div style="display: none"><a href="#updateErrorPopup" id="updateErrorPopupLink">Update Error</a></div>

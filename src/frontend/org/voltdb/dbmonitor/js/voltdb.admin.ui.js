@@ -15,7 +15,12 @@ function loadAdminPage() {
         btnClusterShutdown: $('#shutDownConfirmation'),
         btnClusterSaveSnapshot: $('#saveConfirmation'),
         txtSnapshotDirectory: $('#txtSnapshotDirectory'),
-    };
+        btnClusterPromote: $('#promoteConfirmation'),
+        enablePromote: false,
+        btnErrorClusterPromote: $('#btnErrorPromotePopup'),
+        errorPromoteMessage: $('#promoteErrorMessage'),
+        updateMessageBar: $('#snapshotBar')
+};
 
     adminDOMObjects = {
         siteNumberHeader: $("#sitePerHost"),
@@ -132,29 +137,35 @@ function loadAdminPage() {
     };
 
     var adminValidationRules = {
-        numericRules : {
+        numericRules: {
             required: true,
             min: 0,
             max: INT_MAX_VALUE,
             digits: true,
         },
-        numericMessages : {
+        numericMessages: {
             required: "Please enter a valid positive number.",
             min: "Please enter a valid positive number.",
             max: "Please enter a positive number between 0 and " + INT_MAX_VALUE + ".",
             digits: "Please enter a positive number without any decimal."
         },
-        
+
         fileNameRules: {
             required: true,
             minlength: 2,
-            regex: /^[a-zA-Z0-9_.]+$/
-            
+            regex: /^[a-zA-Z0-9_.]+$/            
         },
         fileNameMessages: {
             required: "Please enter a valid file name.",
             minlength: "Please enter at least 2 characters.",
             regex: 'Only alphabets, numbers, _ and . are allowed.'
+        },
+
+        directoryPathRules: {
+            required: true
+        },
+        directoryPathMessages: {
+            required: "Please enter a valid directory path."
         }
     };
     
@@ -382,20 +393,29 @@ function loadAdminPage() {
         }
     });
 
+    var showUpdateMessage = function(msg) {
+        adminClusterObjects.updateMessageBar.html(msg);
+        adminClusterObjects.updateMessageBar.css('display', 'block');
+        adminClusterObjects.updateMessageBar.fadeOut(4000);
+    };
+
     $('#saveConfirmation').popup({
         open: function (event, ui, ele) {
             var textName = '<input id="txtSnapshotName" type="text" name="txtSnapshotName" value=' + 'SNAPSHOT_' + getDateTime() + '  />';
             var errorMsg = '<div class="errorLabelMsg"><label id="errorSnapshotFileName" for="txtSnapshotName" class="error" style="display: none;">This field is required.</label></div>';
             $('#tdSnapshotName').html(textName + errorMsg);
-            var textDirectory = '<input id="txtSnapshotDirectory" type="text"/>';
-            $('#tdSnapshotDirectory').html(textDirectory);
+            var textDirectory = '<input id="txtSnapshotDirectory" name="txtSnapshotDirectory" type="text"/>';
+            var errorDirectoryMsg = '<div class="errorLabelMsg"><label id="errorSnapshotDirectoryPath" for="txtSnapshotDirectory" class="error" style="display: none;">This field is required.</label></div>';
+            $('#tdSnapshotDirectory').html(textDirectory + errorDirectoryMsg);
 
             $("#formSaveSnapshot").validate({
                 rules: {
-                    txtSnapshotName: adminValidationRules.fileNameRules
+                    txtSnapshotName: adminValidationRules.fileNameRules,
+                    txtSnapshotDirectory: adminValidationRules.directoryPathRules,
                 },
                 messages: {
-                    txtSnapshotName: adminValidationRules.fileNameMessages
+                    txtSnapshotName: adminValidationRules.fileNameMessages,
+                    txtSnapshotDirectory: adminValidationRules.directoryPathMessages,
                 }
             });
 
@@ -414,32 +434,42 @@ function loadAdminPage() {
 
                 $("#formSaveSnapshot").valid();
                 var errorSnapshotFileName = $("#errorSnapshotFileName");
-                if (errorSnapshotFileName.is(":visible")) {
+                var errorDirectoryPath = $("#errorSnapshotDirectoryPath");
+                if (errorSnapshotFileName.is(":visible") || errorDirectoryPath.is(":visible")) {
                     e.preventDefault();
                     e.stopPropagation();
-                    
-                    errorSnapshotFileName.css("background-color", "yellow");
-                    setTimeout(function () {
-                        errorSnapshotFileName.animate({ backgroundColor: 'white' }, 'slow');
-                    }, 2000);
+
+                    if (errorSnapshotFileName.is(":visible")) {
+                        errorSnapshotFileName.css("background-color", "yellow");
+                        setTimeout(function() {
+                            errorSnapshotFileName.animate({ backgroundColor: 'white' }, 'slow');
+                        }, 2000);
+                    }
+
+                    if (errorDirectoryPath.is(":visible")) {
+                        errorDirectoryPath.css("background-color", "yellow");
+                        setTimeout(function () {
+                            errorDirectoryPath.animate({ backgroundColor: 'white' }, 'slow');
+                        }, 2000);
+                    }
                     return;
                 }
 
-                var snapShotDirectory = ($('#voltdbroot').text() != "" && $('#voltdbroot').text() != undefined && $('#snapshotpath').text() != "" && $('#snapshotpath').text() != undefined) ? ($('#voltdbroot').text() + '/' + $('#snapshotpath').text()) : '';
-                if (snapShotDirectory == "") {
-                    $($(this).siblings()[0]).trigger("click");
-                    $('#saveSnapshotStatus').html('Failed to save snapshot');
-                    $('#saveSnapshotMessage').html('Could not get Voltdb root directory and Snapshot path');
-                    $('#btnSaveSnapshotPopup').click();
-                } else {
-                    snapShotDirectory = $('#txtSnapshotDirectory').val() != "" ? snapShotDirectory + "/" + $('#txtSnapshotDirectory').val() : snapShotDirectory;
-                }
+                //var snapShotDirectory = ($('#voltdbroot').text() != "" && $('#voltdbroot').text() != undefined && $('#snapshotpath').text() != "" && $('#snapshotpath').text() != undefined) ? ($('#voltdbroot').text() + '/' + $('#snapshotpath').text()) : '';
+                //if (snapShotDirectory == "") {
+                //    $($(this).siblings()[0]).trigger("click");
+                //    $('#saveSnapshotStatus').html('Failed to save snapshot');
+                //    $('#saveSnapshotMessage').html('Could not get Voltdb root directory and Snapshot path');
+                //    $('#btnSaveSnapshotPopup').click();
+                //} else {
+                //    snapShotDirectory = $('#txtSnapshotDirectory').val() != "" ? snapShotDirectory + "/" + $('#txtSnapshotDirectory').val() : snapShotDirectory;
+                //}
+                var snapShotDirectory = $('#txtSnapshotDirectory').val();
                 var snapShotFileName = $('#txtSnapshotName').val();
                 voltDbRenderer.saveSnapshot(snapShotDirectory, snapShotFileName, function (success,snapshotStatus) {
                     if (success) {
                         if (snapshotStatus[getCurrentServer()].RESULT.toLowerCase() == "success") {
-                            $('#snapshotBar').css('display','block');
-                            $('#snapshotBar').fadeOut(4000);
+                            showUpdateMessage('Snapshot saved successfully.');
                         } else {
                             $('#saveSnapshotStatus').html('Failed to save snapshot');
                             $('#saveSnapshotMessage').html(snapshotStatus[getCurrentServer()].ERR_MSG);
@@ -452,6 +482,44 @@ function loadAdminPage() {
                 //Close the popup
                 $($(this).siblings()[0]).trigger("click");
 
+            });
+        }
+    });
+
+    adminClusterObjects.btnClusterPromote.on("click", function (e) {
+        if (!adminClusterObjects.enablePromote) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    });
+
+    adminClusterObjects.btnErrorClusterPromote.popup();
+
+    adminClusterObjects.btnClusterPromote.popup({
+        open: function(event, ui, ele) {
+        },
+        afterOpen: function (event) {
+            var popup = $(this)[0];
+            $("#promoteConfirmOk").unbind("click");
+            $("#promoteConfirmOk").on("click", function (e) {
+                voltDbRenderer.promoteCluster(function (status, statusstring) {
+
+                    if (status == 1) {
+                        showUpdateMessage('Cluster promoted successfully.');
+                    } else {
+                        var msg = statusstring;
+                        
+                        if (msg == null || msg == "") {
+                            msg = "An error occurred while promoting the cluster.";
+                        }
+
+                        adminClusterObjects.errorPromoteMessage.html(msg);
+                        adminClusterObjects.btnErrorClusterPromote.trigger("click");
+                    }
+                });
+                
+                //Close the popup 
+                popup.close();
             });
         }
     });
@@ -846,12 +914,20 @@ function loadAdminPage() {
         this.isAdmin = false;
         this.registeredElements = [];
         this.servers = [];
+        this.stoppedServer="";
         this.runningServerIds = "";
         
         this.server = function(hostIdvalue,serverNameValue,serverStateValue) {
             this.hostId = hostIdvalue;
             this.serverName = serverNameValue;
             this.serverState = serverStateValue;
+        };
+        
+        this.stoppedServer = function (hostIdvalue, serverNameValue, serverStateValue) {
+            this.hostId = hostIdvalue;
+            this.serverName = serverNameValue;
+            this.serverState = serverStateValue;
+            
         };
         
         this.displayAdminConfiguration = function (adminConfigValues, rawConfigValues) {
@@ -871,6 +947,7 @@ function loadAdminPage() {
             if (portAndClusterValues != undefined && VoltDbAdminConfig.isAdmin) {
                 configurePortAndOverviewValues(portAndClusterValues);
                 refreshClusterValues(portAndClusterValues);
+                configurePromoteAction(portAndClusterValues);
             }
         };
 
@@ -1043,7 +1120,19 @@ function loadAdminPage() {
             adminDOMObjects.commandLogPath.text(directoryConfigValues.commandLogPath);
             adminDOMObjects.commandLogSnapshotPath.text(directoryConfigValues.commandLogSnapshotPath);
         };
-        
+
+        var configurePromoteAction = function (adminConfigValues) {
+            var enable = (adminConfigValues.replicationRole != null && adminConfigValues.replicationRole.toLowerCase() == 'replica');
+            
+            if (enable != adminClusterObjects.enablePromote) {
+                adminClusterObjects.enablePromote = enable;
+                if (adminClusterObjects.enablePromote) {
+                    adminClusterObjects.btnClusterPromote.removeClass().addClass("promote");
+                } else {
+                    adminClusterObjects.btnClusterPromote.removeClass().addClass("promote-disabled");
+                }
+            }
+        };
     });
     window.VoltDbAdminConfig = VoltDbAdminConfig = new iVoltDbAdminConfig();
 
