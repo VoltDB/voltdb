@@ -829,7 +829,8 @@ ul.adminClusterList li a:hover{color:#000;}
 .adminContentLeft { float:left; width:49%; background:#FFFFFF; margin:0 2% 0 0 }
 .adminContentRight { float:left;width:49%;}
 .headerAdminContent {height:53px;position: relative; background:#fbfbfb; border-bottom:1px solid #aaa;}
-.adminDirectories { background:#FFFFFF; margin:20px 0 0 0; overflow:auto; width:auto;}
+.adminDirectories { background:#FFFFFF; margin:20px 0 0 0;}
+.adminDirect{overflow:auto; width:auto;}
 .headerAdminContent h1 {padding: 18px 0 0 20px; font-size:17px;}
 .adminPorts { margin:0 0 10px 0; background:#FFFFFF;}
 .adminTbl { margin:0; padding:0;}
