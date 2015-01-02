@@ -829,7 +829,7 @@ ul.adminClusterList li a:hover{color:#000;}
 .adminContentLeft { float:left; width:49%; background:#FFFFFF; margin:0 2% 0 0 }
 .adminContentRight { float:left;width:49%;}
 .headerAdminContent {height:53px;position: relative; background:#fbfbfb; border-bottom:1px solid #aaa;}
-.adminDirectories { background:#FFFFFF; margin:20px 0 0 0;}
+.adminDirectories { background:#FFFFFF; margin:20px 0 0 0; overflow:auto; width:auto;}
 .headerAdminContent h1 {padding: 18px 0 0 20px; font-size:17px;}
 .adminPorts { margin:0 0 10px 0; background:#FFFFFF;}
 .adminTbl { margin:0; padding:0;}
@@ -923,6 +923,7 @@ td.heartbeattd span.unit, td.queryTimeOut span.unit{position:relative;/* top:7px
     display: none;
 }
 .restoreInfo .overlay-content { }
+.overviewTbl {overflow:auto; width:auto}
 .overviewTbl table td{white-space:nowrap !important}
 .confirmationHeight { height:auto!important;}
 .snapshotErrorMsg { padding-bottom: 15px;}
@@ -1052,6 +1053,8 @@ top: 3px;}
 	.adminLeft { float:none; width:100%}
 	#serverConfigAdmin{ top:99px; width:421px;}
 	.adminRight{ padding-top:15px;}
+	.adminDirectories {overflow:auto; width:auto;}
+	
    
 }
 @media (min-width: 320px) and (max-width: 479px) {
@@ -1162,6 +1165,7 @@ top: 3px;}
     .resizeRestore {
         width: 90%;
     }
+	
 }
 
 	 
