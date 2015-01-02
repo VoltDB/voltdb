@@ -725,6 +725,31 @@ public class TestJDBCQueries {
             System.err.println("ERROR(CREATE UNIQUE INDEX): " + e.getMessage());
             fail();
         }
+
+        // Try a single-statement stored procedure create.  The trick here is the select within the statement,
+        // it should not be treated as a query, but instead as a create.
+        try
+        {
+            String sql = "CREATE PROCEDURE CountContestants AS SELECT COUNT(*) FROM contestants;";
+            java.sql.Statement query = conn.createStatement();
+            query.executeUpdate(sql);
+        }
+        catch (SQLException e) {
+            System.err.println("ERROR(executeUpdate(CREATE PROCEDURE)): " + e.getMessage());
+            fail();
+        }
+        // Only Selects work with executeQuery(), so the CREATE PROCEDURE should fail.
+        try
+        {
+            String sql = "CREATE PROCEDURE CountContestants2 AS SELECT COUNT(*) FROM contestants;";
+            java.sql.Statement query = conn.createStatement();
+            ResultSet rs = query.executeQuery(sql);
+            System.err.println("ERROR(executeQuery(CREATE PROCEDURE) succeeded, should have failed)");
+            fail();
+        }
+        catch (SQLException e) {
+        }
+
     }
 
     @Test
