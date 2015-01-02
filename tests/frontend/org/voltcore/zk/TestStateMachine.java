@@ -162,24 +162,24 @@ public class TestStateMachine extends ZKTestBase {
 
         public BooleanStateMachine(SynchronizedStatesManager ssm, String instanceName) {
             ssm.super(instanceName, log);
-            assertTrue("State machine local lock held after bool initialization", isLocalStateUnlocked());
+            assertTrue("State machine local lock held after bool initialization", debugIsLocalStateUnlocked());
         }
 
         @Override
         protected void membershipChanged(Set<String> addedHosts, Set<String> removedHosts) {
-            assertTrue("State machine local lock held after bool membership change", isLocalStateUnlocked());
+            assertTrue("State machine local lock held after bool membership change", debugIsLocalStateUnlocked());
         }
 
         @Override
         protected void setInitialState(ByteBuffer currentAgreedState) {
             state = toBoolean(currentAgreedState);
             initialized = true;
-            assertTrue("State machine local lock held after bool initial state notification", isLocalStateUnlocked());
+            assertTrue("State machine local lock held after bool initial state notification", debugIsLocalStateUnlocked());
         }
 
         @Override
         protected void lockRequestCompleted() {
-            assertTrue("State machine local lock held after bool distributed lock notification", isLocalStateUnlocked());
+            assertTrue("State machine local lock held after bool distributed lock notification", debugIsLocalStateUnlocked());
             if (justHoldTheLock) {
                 justHoldTheLock = false;
             }
@@ -187,23 +187,23 @@ public class TestStateMachine extends ZKTestBase {
                 if (makeProposal) {
                     proposed = toByteBuffer(!state);
                     proposeStateChange(proposed);
-                    assertTrue("State machine local lock held after bool delayed state change request", isLocalStateUnlocked());
+                    assertTrue("State machine local lock held after bool delayed state change request", debugIsLocalStateUnlocked());
                 }
                 else {
                     assertTrue(startTask);
                     proposed = ByteBuffer.wrap(taskString.getBytes());
                     initiateCoordinatedTask(coorelatedTask, proposed);
-                    assertTrue("State machine local lock held after bool delayed task request", isLocalStateUnlocked());
+                    assertTrue("State machine local lock held after bool delayed task request", debugIsLocalStateUnlocked());
                 }
             }
         }
 
         @Override
         protected void stateChangeProposed(ByteBuffer proposedState) {
-            assertTrue("State machine local lock held after bool state change notification", isLocalStateUnlocked());
+            assertTrue("State machine local lock held after bool state change notification", debugIsLocalStateUnlocked());
             if (!ignoreProposal) {
                 requestedStateChangeAcceptable(acceptProposalOrTask);
-                assertTrue("State machine local lock held after bool state change acceptance", isLocalStateUnlocked());
+                assertTrue("State machine local lock held after bool state change acceptance", debugIsLocalStateUnlocked());
             }
             if (!acceptProposalOrTask) {
                 acceptProposalOrTask = true;
@@ -213,12 +213,11 @@ public class TestStateMachine extends ZKTestBase {
 
         @Override
         protected void proposedStateResolved(boolean ourProposal, ByteBuffer proposedState, boolean success) {
-            assertTrue("State machine local lock held after bool state change resolution", isLocalStateUnlocked());
+            assertTrue("State machine local lock held after bool state change resolution", debugIsLocalStateUnlocked());
             assertTrue("Test state inconsistent with state machine", ourProposal == makeProposal);
             if (success) {
                 state = toBoolean(proposedState);
             }
-            System.out.println(m_stateMachineId + ": New state: " + Boolean.toString(state));
             if (ourProposal) {
                 makeProposal = false;
                 ourProposalOrTaskFinished = true;
@@ -233,24 +232,24 @@ public class TestStateMachine extends ZKTestBase {
             if (requestLock()) {
                 proposed = toByteBuffer(!state);
                 proposeStateChange(proposed);
-                assertTrue("State machine local lock held after bool state change request", isLocalStateUnlocked());
+                assertTrue("State machine local lock held after bool state change request", debugIsLocalStateUnlocked());
             }
         }
 
         @Override
         protected void taskRequested(ByteBuffer taskRequest) {
-            assertTrue("State machine local lock held after bool task notification", isLocalStateUnlocked());
+            assertTrue("State machine local lock held after bool task notification", debugIsLocalStateUnlocked());
             assertTrue(taskRequest.equals(ByteBuffer.wrap(taskString.getBytes())));
             if (!ignoreProposal) {
                 ByteBuffer completedResult = ByteBuffer.wrap(taskResultString.getBytes());
                 requestedTaskComplete(completedResult);
-                assertTrue("State machine local lock held after bool task completion", isLocalStateUnlocked());
+                assertTrue("State machine local lock held after bool task completion", debugIsLocalStateUnlocked());
             }
         }
 
         @Override
         protected void correlatedTaskCompleted(boolean ourTask, ByteBuffer taskRequest, Map<String, ByteBuffer> results) {
-            assertTrue("State machine local lock held after bool correlated task completion", isLocalStateUnlocked());
+            assertTrue("State machine local lock held after bool correlated task completion", debugIsLocalStateUnlocked());
             assertTrue(taskRequest.equals(ByteBuffer.wrap(taskString.getBytes())));
             assertTrue(ourTask == startTask);
             startTask = false;
@@ -267,7 +266,7 @@ public class TestStateMachine extends ZKTestBase {
 
         @Override
         protected void uncorrelatedTaskCompleted(boolean ourTask, ByteBuffer taskRequest, Set<ByteBuffer> results) {
-            assertTrue("State machine local lock held after bool uncorrelated task completion", isLocalStateUnlocked());
+            assertTrue("State machine local lock held after bool uncorrelated task completion", debugIsLocalStateUnlocked());
             assertTrue(taskRequest.equals(ByteBuffer.wrap(taskString.getBytes())));
             assertTrue(ourTask == startTask);
             coorelatedTask = true;
@@ -291,12 +290,28 @@ public class TestStateMachine extends ZKTestBase {
             if (requestLock()) {
                 proposed = ByteBuffer.wrap(taskString.getBytes());
                 initiateCoordinatedTask(coorelatedTask, proposed);
-                assertTrue("State machine local lock held after bool task request", isLocalStateUnlocked());
+                assertTrue("State machine local lock held after bool task request", debugIsLocalStateUnlocked());
             }
         }
 
         @Override
         protected void staleTaskRequestNotification(ByteBuffer proposedTask) {
+        }
+
+        @Override
+        protected String stateToString(ByteBuffer state)
+        {
+            byte[] b = new byte[state.remaining()];
+            state.get(b, 0, b.length);
+            return new String(b);
+        }
+
+        @Override
+        protected String taskToString(ByteBuffer task)
+        {
+            byte[] b = new byte[task.remaining()];
+            task.get(b, 0, b.length);
+            return new String(b);
         }
     };
 
@@ -328,24 +343,24 @@ public class TestStateMachine extends ZKTestBase {
 
         public ByteStateMachine(SynchronizedStatesManager ssm, String instanceName) {
             ssm.super(instanceName, log);
-            assertTrue("State machine local lock held after byte initialization", isLocalStateUnlocked());
+            assertTrue("State machine local lock held after byte initialization", debugIsLocalStateUnlocked());
         }
 
         @Override
         protected void membershipChanged(Set<String> addedHosts, Set<String> removedHosts) {
-            assertTrue("State machine local lock held after byte membership change", isLocalStateUnlocked());
+            assertTrue("State machine local lock held after byte membership change", debugIsLocalStateUnlocked());
         }
 
         @Override
         protected void setInitialState(ByteBuffer currentAgreedState) {
             state = toByte(currentAgreedState);
             initialized = true;
-            assertTrue("State machine local lock held after byte initial state notification", isLocalStateUnlocked());
+            assertTrue("State machine local lock held after byte initial state notification", debugIsLocalStateUnlocked());
         }
 
         @Override
         protected void lockRequestCompleted() {
-            assertTrue("State machine local lock held after byte distributed lock notification", isLocalStateUnlocked());
+            assertTrue("State machine local lock held after byte distributed lock notification", debugIsLocalStateUnlocked());
             if (justHoldTheLock) {
                 justHoldTheLock = false;
             }
@@ -353,23 +368,23 @@ public class TestStateMachine extends ZKTestBase {
                 if (makeProposal) {
                     proposed = toByteBuffer(getNextByteState(state));
                     proposeStateChange(proposed);
-                    assertTrue("State machine local lock held after byte delayed state change request", isLocalStateUnlocked());
+                    assertTrue("State machine local lock held after byte delayed state change request", debugIsLocalStateUnlocked());
                 }
                 else {
                     assertTrue(startTask);
                     proposed = ByteBuffer.wrap(taskString.getBytes());
                     initiateCoordinatedTask(coorelatedTask, proposed);
-                    assertTrue("State machine local lock held after byte delayed task request", isLocalStateUnlocked());
+                    assertTrue("State machine local lock held after byte delayed task request", debugIsLocalStateUnlocked());
                 }
             }
         }
 
         @Override
         protected void stateChangeProposed(ByteBuffer proposedState) {
-            assertTrue("State machine local lock held after byte state change notification", isLocalStateUnlocked());
+            assertTrue("State machine local lock held after byte state change notification", debugIsLocalStateUnlocked());
             if (!ignoreProposal) {
                 requestedStateChangeAcceptable(acceptProposalOrTask);
-                assertTrue("State machine local lock held after byte state change acceptance", isLocalStateUnlocked());
+                assertTrue("State machine local lock held after byte state change acceptance", debugIsLocalStateUnlocked());
             }
             if (!acceptProposalOrTask) {
                 acceptProposalOrTask = true;
@@ -379,10 +394,9 @@ public class TestStateMachine extends ZKTestBase {
 
         @Override
         protected void proposedStateResolved(boolean ourProposal, ByteBuffer proposedState, boolean success) {
-            assertTrue("State machine local lock held after byte state change resolution", isLocalStateUnlocked());
+            assertTrue("State machine local lock held after byte state change resolution", debugIsLocalStateUnlocked());
             if (success) {
                 state = toByte(proposedState);
-                System.out.println(m_stateMachineId + ": New state: " + state);
             }
             if (ourProposal) {
                 makeProposal = false;
@@ -397,24 +411,24 @@ public class TestStateMachine extends ZKTestBase {
             if (requestLock()) {
                 proposed = toByteBuffer(getNextByteState(state));
                 proposeStateChange(proposed);
-                assertTrue("State machine local lock held after byte state change request", isLocalStateUnlocked());
+                assertTrue("State machine local lock held after byte state change request", debugIsLocalStateUnlocked());
             }
         }
 
         @Override
         protected void taskRequested(ByteBuffer taskRequest) {
-            assertTrue("State machine local lock held after byte task notification", isLocalStateUnlocked());
+            assertTrue("State machine local lock held after byte task notification", debugIsLocalStateUnlocked());
             assertTrue(taskRequest.equals(ByteBuffer.wrap(taskString.getBytes())));
             if (!ignoreProposal) {
                 ByteBuffer completedResult = ByteBuffer.wrap(taskResultString.getBytes());
                 requestedTaskComplete(completedResult);
-                assertTrue("State machine local lock held after byte task completion", isLocalStateUnlocked());
+                assertTrue("State machine local lock held after byte task completion", debugIsLocalStateUnlocked());
             }
         }
 
         @Override
         protected void correlatedTaskCompleted(boolean ourTask, ByteBuffer taskRequest, Map<String, ByteBuffer> results) {
-            assertTrue("State machine local lock held after byte correlated task completion", isLocalStateUnlocked());
+            assertTrue("State machine local lock held after byte correlated task completion", debugIsLocalStateUnlocked());
             assertTrue(taskRequest.equals(ByteBuffer.wrap(taskString.getBytes())));
             assertTrue(ourTask == startTask);
             assertTrue(!ourTask || coorelatedTask);
@@ -432,7 +446,7 @@ public class TestStateMachine extends ZKTestBase {
 
         @Override
         protected void uncorrelatedTaskCompleted(boolean ourTask, ByteBuffer taskRequest, Set<ByteBuffer> results) {
-            assertTrue("State machine local lock held after byte uncorrelated task completion", isLocalStateUnlocked());
+            assertTrue("State machine local lock held after byte uncorrelated task completion", debugIsLocalStateUnlocked());
             assertTrue(taskRequest.equals(ByteBuffer.wrap(taskString.getBytes())));
             assertTrue(ourTask == startTask);
             assertFalse(ourTask || coorelatedTask);
@@ -457,12 +471,26 @@ public class TestStateMachine extends ZKTestBase {
             if (requestLock()) {
                 proposed = ByteBuffer.wrap(taskString.getBytes());
                 initiateCoordinatedTask(coorelatedTask, proposed);
-                assertTrue("State machine local lock held after byte task request", isLocalStateUnlocked());
+                assertTrue("State machine local lock held after byte task request", debugIsLocalStateUnlocked());
             }
         }
 
         @Override
         protected void staleTaskRequestNotification(ByteBuffer proposedTask) {
+        }
+
+        @Override
+        protected String stateToString(ByteBuffer state)
+        {
+            return Byte.toString(state.get());
+        }
+
+        @Override
+        protected String taskToString(ByteBuffer task)
+        {
+            byte[] b = new byte[task.remaining()];
+            task.get(b, 0, b.length);
+            return new String(b);
         }
     };
 
