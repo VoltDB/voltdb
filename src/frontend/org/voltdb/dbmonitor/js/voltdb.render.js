@@ -2071,6 +2071,12 @@ function alertNodeClicked(obj) {
                 snapshotStatus[hostName]["ERR_MSG"] = info[colIndex["ERR_MSG"]];
             });
         };
+        
+        this.promoteCluster = function (onClusterPromote) {
+            VoltDBService.PromoteCluster(function (connection, status, statusstring) {
+                onClusterPromote(status, statusstring);
+            });
+        };
 
         this.getAdminconfiguration = function (onInformationLoaded) {
             VoltDBService.GetSystemInformationDeployment(function (connection) {

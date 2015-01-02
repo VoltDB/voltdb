@@ -773,6 +773,45 @@
 
 
         };
+        
+        this.PromoteCluster = function (onConnectionAdded) {
+            try {
+                var processName = "SYSTEMINFORMATION_PROMOTECLUSTER";
+                var procedureNames = ['@Promote'];
+                var parameters = [undefined];
+                var values = [undefined];
+
+                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
+                if (_connection == null) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
+                        if (result == true) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                                status = connection.Metadata['@Promote_status'];
+                                if (!(status == "" || status == undefined)) {
+                                    onConnectionAdded(connection, status, connection.Metadata['@Promote_statusstring']);
+                                }
+                            });
+                        }
+
+                    });
+
+                } else {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
+                        status = connection.Metadata['@Promote_status'];
+                        if (!(status == "" || status == undefined)) {
+                            onConnectionAdded(connection, status, connection.Metadata['@Promote_statusstring']);
+                        }
+
+                    });
+
+                }
+
+            } catch (e) {
+                console.log(e.message);
+            }
+
+
+        };
 
         this.SaveSnapShot = function(snapshotDir,snapshotFileName, onConnectionAdded) {
             try {

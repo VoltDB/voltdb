@@ -16,7 +16,10 @@ function loadAdminPage() {
         btnClusterSaveSnapshot: $('#saveConfirmation'),
         txtSnapshotDirectory: $('#txtSnapshotDirectory'),
         btnClusterPromote: $('#promoteConfirmation'),
-        enablePromote: false
+        enablePromote: false,
+        btnErrorClusterPromote: $('#btnErrorPromotePopup'),
+        errorPromoteMessage: $('#promoteErrorMessage'),
+        updateMessageBar: $('#snapshotBar')
 };
 
     adminDOMObjects = {
@@ -390,6 +393,12 @@ function loadAdminPage() {
         }
     });
 
+    var showUpdateMessage = function(msg) {
+        adminClusterObjects.updateMessageBar.html(msg);
+        adminClusterObjects.updateMessageBar.css('display', 'block');
+        adminClusterObjects.updateMessageBar.fadeOut(4000);
+    };
+
     $('#saveConfirmation').popup({
         open: function (event, ui, ele) {
             var textName = '<input id="txtSnapshotName" type="text" name="txtSnapshotName" value=' + 'SNAPSHOT_' + getDateTime() + '  />';
@@ -460,8 +469,7 @@ function loadAdminPage() {
                 voltDbRenderer.saveSnapshot(snapShotDirectory, snapShotFileName, function (success,snapshotStatus) {
                     if (success) {
                         if (snapshotStatus[getCurrentServer()].RESULT.toLowerCase() == "success") {
-                            $('#snapshotBar').css('display','block');
-                            $('#snapshotBar').fadeOut(4000);
+                            showUpdateMessage('Snapshot saved successfully.');
                         } else {
                             $('#saveSnapshotStatus').html('Failed to save snapshot');
                             $('#saveSnapshotMessage').html(snapshotStatus[getCurrentServer()].ERR_MSG);
@@ -485,7 +493,36 @@ function loadAdminPage() {
         }
     });
 
-    adminClusterObjects.btnClusterPromote.popup();
+    adminClusterObjects.btnErrorClusterPromote.popup();
+
+    adminClusterObjects.btnClusterPromote.popup({
+        open: function(event, ui, ele) {
+        },
+        afterOpen: function (event) {
+            var popup = $(this)[0];
+            $("#promoteConfirmOk").unbind("click");
+            $("#promoteConfirmOk").on("click", function (e) {
+                voltDbRenderer.promoteCluster(function (status, statusstring) {
+
+                    if (status == 1) {
+                        showUpdateMessage('Cluster promoted successfully.');
+                    } else {
+                        var msg = statusstring;
+                        
+                        if (msg == null || msg == "") {
+                            msg = "An error occurred while promoting the cluster.";
+                        }
+
+                        adminClusterObjects.errorPromoteMessage.html(msg);
+                        adminClusterObjects.btnErrorClusterPromote.trigger("click");
+                    }
+                });
+                
+                //Close the popup 
+                popup.close();
+            });
+        }
+    });
 
     var getDateTime = function() {
         var currentDate = new Date();
@@ -1086,7 +1123,7 @@ function loadAdminPage() {
 
         var configurePromoteAction = function (adminConfigValues) {
             var enable = (adminConfigValues.replicationRole != null && adminConfigValues.replicationRole.toLowerCase() == 'replica');
-
+            
             if (enable != adminClusterObjects.enablePromote) {
                 adminClusterObjects.enablePromote = enable;
                 if (adminClusterObjects.enablePromote) {
