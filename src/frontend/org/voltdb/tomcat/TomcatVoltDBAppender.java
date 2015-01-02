@@ -41,7 +41,6 @@ public class TomcatVoltDBAppender extends AppenderSkeleton implements Appender {
             client.createConnection("localhost");
         } catch (java.io.IOException e) {
             e.printStackTrace();
-            System.exit(-1);
         }
     }
 
@@ -73,7 +72,6 @@ public class TomcatVoltDBAppender extends AppenderSkeleton implements Appender {
             client.callProcedure("VoltdbInsert", timestamp, level, message);
         } catch (Exception e) {
             e.printStackTrace();
-            System.exit(-1);
         }
     }
 
