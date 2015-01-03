@@ -346,7 +346,8 @@ public class PlanAssembler {
         //   DELETE ... ORDER BY <n> LIMIT <n> also has this issue
         // Update doesn't have this issue yet (but having ORDER BY and LIMIT there doesn't seem out
         // of the question).
-        // Subqueries in WHERE clauses of DML will also be relevant here.
+        // When subqueries in WHERE clauses of DML are allowed, we will need to make sure the
+        // subqueries are content-deterministic too.
 
         if (plan == null || plan.getReadOnly()) {
             return;
@@ -503,25 +504,12 @@ public class PlanAssembler {
             retval = getNextDeletePlan();
             // note that for replicated tables, multi-fragment plans
             // need to divide the result by the number of partitions
+        } else if (m_parsedUpdate != null) {
+            nextStmt = m_parsedUpdate;
+            retval = getNextUpdatePlan();
         } else {
-            //TODO: push CompiledPlan construction into getNextUpdatePlan
-            //
-            retval = new CompiledPlan();
-            if (m_parsedUpdate != null) {
-                nextStmt = m_parsedUpdate;
-                retval.rootPlanGraph = getNextUpdatePlan();
-                // note that for replicated tables, multi-fragment plans
-                // need to divide the result by the number of partitions
-            } else {
-                throw new RuntimeException(
-                        "setupForNewPlans not called or not successfull.");
-            }
-            assert (nextStmt.m_tableList.size() == 1);
-            retval.setReadOnly (false);
-            if (nextStmt.m_tableList.get(0).getIsreplicated()) {
-                retval.replicatedTableDML = true;
-            }
-            retval.statementGuaranteesDeterminism(false, true); // Until we support DML w/ subqueries/limits
+            throw new RuntimeException(
+                    "setupForNewPlans encountered unsupported statement type.");
         }
 
         if (retval == null || retval.rootPlanGraph == null) {
@@ -946,8 +934,11 @@ public class PlanAssembler {
             if (m_parsedDelete.orderByColumns().size() > 0
                     && !isSinglePartitionPlan
                     && !targetTable.getIsreplicated()) {
-                throw new PlanningErrorException("Only single-partition DELETE statements "
-                        + "may contain ORDER BY with LIMIT and/or OFFSET clauses.");
+                throw new PlanningErrorException(
+                        "DELETE statements affecting partitioned tables must "
+                        + "be able to execute on one partition "
+                        + "when ORDER BY and LIMIT or OFFSET clauses "
+                        + "are present.");
             }
 
             boolean needsOrderByNode = isOrderByNodeRequired(m_parsedDelete, subSelectRoot);
@@ -1010,7 +1001,7 @@ public class PlanAssembler {
         return plan;
     }
 
-    private AbstractPlanNode getNextUpdatePlan() {
+    private CompiledPlan getNextUpdatePlan() {
         assert (subAssembler != null);
 
         AbstractPlanNode subSelectRoot = subAssembler.nextPlan();
@@ -1024,6 +1015,7 @@ public class PlanAssembler {
         }
 
         UpdatePlanNode updateNode = new UpdatePlanNode();
+        assert (m_parsedUpdate.m_tableList.size() == 1);
         Table targetTable = m_parsedUpdate.m_tableList.get(0);
         updateNode.setTargetTableName(targetTable.getTypeName());
         // set this to false until proven otherwise
@@ -1081,14 +1073,28 @@ public class PlanAssembler {
         // connect the nodes to build the graph
         updateNode.addAndLinkChild(subSelectRoot);
 
+        AbstractPlanNode planRoot = null;
         if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.isInferredSingle()) {
-            return updateNode;
+            planRoot = updateNode;
+        }
+        else {
+            // Send the local result counts to the coordinator.
+            AbstractPlanNode recvNode = SubPlanAssembler.addSendReceivePair(updateNode);
+            // add a sum or a limit and send on top of the union
+            planRoot = addSumOrLimitAndSendToDMLNode(recvNode, targetTable.getIsreplicated());
         }
 
-        // Send the local result counts to the coordinator.
-        AbstractPlanNode recvNode = SubPlanAssembler.addSendReceivePair(updateNode);
-        // add a sum or a limit and send on top of the union
-        return addSumOrLimitAndSendToDMLNode(recvNode, targetTable.getIsreplicated());
+        CompiledPlan retval = new CompiledPlan();
+        retval.rootPlanGraph = planRoot;
+        retval.setReadOnly (false);
+
+        if (targetTable.getIsreplicated()) {
+            retval.replicatedTableDML = true;
+        }
+
+        retval.statementGuaranteesDeterminism(false, true); // Until we support DML w/ subqueries/limits
+
+        return retval;
     }
 
     static private AbstractExpression castExprIfNeeded(AbstractExpression expr, Column column) {

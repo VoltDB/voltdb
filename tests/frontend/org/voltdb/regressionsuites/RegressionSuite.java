@@ -322,6 +322,12 @@ public class RegressionSuite extends TestCase {
         }
     }
 
+    public void validateTableOfScalarLongs(Client client, String sql, long[] expected) throws Exception {
+        assertNotNull(expected);
+        VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfScalarLongs(vt, expected);
+    }
+
     public void validateTableOfLongs(VoltTable vt, long[][] expected) {
         assertNotNull(expected);
         assertEquals("Wrong number of rows in table.  ",

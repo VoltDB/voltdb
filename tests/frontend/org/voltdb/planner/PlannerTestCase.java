@@ -239,4 +239,25 @@ public class PlannerTestCase extends TestCase {
         assertEquals(explainStr1, explainStr2);
     }
 
+    /** Given a list of Class objects for plan node subclasses, asserts
+     * if the given plan doesn't contain instances of those classes.
+     */
+    static protected void assertClassesMatchNodeChain(
+            List<Class<? extends AbstractPlanNode>> expectedClasses,
+            AbstractPlanNode actualPlan) {
+        AbstractPlanNode pn = actualPlan;
+        for (Class<? extends AbstractPlanNode> c : expectedClasses) {
+            assertFalse("Actual plan shorter than expected",
+                    pn == null);
+            assertTrue("Expected plan to contain an instance of " + c.getSimpleName() +", "
+                    + "instead found " + pn.getClass().getSimpleName(),
+                    c.isInstance(pn));
+            if (pn.getChildCount() > 0)
+                pn = pn.getChild(0);
+            else
+                pn = null;
+        }
+
+        assertTrue("Actual plan longer than expected", pn == null);
+    }
 }

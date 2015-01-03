@@ -204,28 +204,6 @@ public class TestPlansDML extends PlannerTestCase {
         assertEquals(2, pns.size());
     }
 
-    /** Given a list of Class objects for plan node subclasses, asserts
-     * if the given plan doesn't contain instances of those classes.
-     */
-    private void assertPlanContainsNodes(
-            List<Class<? extends AbstractPlanNode>> expectedClasses,
-            AbstractPlanNode actualPlan) {
-        AbstractPlanNode pn = actualPlan;
-        for (Class<? extends AbstractPlanNode> c : expectedClasses) {
-            assertFalse("Actual plan shorter than expected",
-                    pn == null);
-            assertTrue("Expected plan to contain an instance of " + c.getSimpleName() +", "
-                    + "instead found " + pn.getClass().getSimpleName(),
-                    c.isInstance(pn));
-            if (pn.getChildCount() > 0)
-                pn = pn.getChild(0);
-            else
-                pn = null;
-        }
-
-        assertTrue("Actual plan longer than expected", pn == null);
-    }
-
     public void testDeleteOrderByPlan() {
         System.out.println("\n\n\nRUNNING testDeleteOrderByPlan\n\n");
 
@@ -233,7 +211,7 @@ public class TestPlansDML extends PlannerTestCase {
         pns = compileToFragments("DELETE FROM R5 ORDER BY A LIMIT ?");
         assertEquals(2, pns.size());
         AbstractPlanNode collectorRoot = pns.get(1);
-        assertPlanContainsNodes(Arrays.asList(
+        assertClassesMatchNodeChain(Arrays.asList(
                 SendPlanNode.class,
                 DeletePlanNode.class,
                 IndexScanPlanNode.class),
@@ -244,7 +222,7 @@ public class TestPlansDML extends PlannerTestCase {
         pns = compileToFragments("DELETE FROM R5 WHERE A = 1 ORDER BY A LIMIT ?");
         assertEquals(2, pns.size());
         collectorRoot = pns.get(1);
-        assertPlanContainsNodes(Arrays.asList(
+        assertClassesMatchNodeChain(Arrays.asList(
                 SendPlanNode.class,
                 DeletePlanNode.class,
                 IndexScanPlanNode.class),
@@ -255,7 +233,7 @@ public class TestPlansDML extends PlannerTestCase {
         pns = compileToFragments("DELETE FROM R5 WHERE A = 1 ORDER BY B, A, C, D LIMIT ?");
         assertEquals(2, pns.size());
         collectorRoot = pns.get(1);
-        assertPlanContainsNodes(Arrays.asList(
+        assertClassesMatchNodeChain(Arrays.asList(
                 SendPlanNode.class,
                 DeletePlanNode.class,
                 OrderByPlanNode.class,
@@ -267,7 +245,7 @@ public class TestPlansDML extends PlannerTestCase {
         pns = compileToFragments("DELETE FROM R5 WHERE B = 1 ORDER BY B, A, C, D LIMIT ?");
         assertEquals(2, pns.size());
         collectorRoot = pns.get(1);
-        assertPlanContainsNodes(Arrays.asList(
+        assertClassesMatchNodeChain(Arrays.asList(
                 SendPlanNode.class,
                 DeletePlanNode.class,
                 OrderByPlanNode.class,

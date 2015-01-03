@@ -1321,9 +1321,8 @@ public class StatementDML extends StatementDMQL {
 
         List<VoltXMLElement> newElements = voltGetLimitOffsetXMLFromSortAndSlice(session, m_sortAndSlice);
 
-        // Ideally this code could be shared with code that translate ORDER BY to XML for SELECT as well,
-        // but code in StatementDMQL uses the query's exprColumns field, which we don't have here.
-        // It's unclear to me how the exprList in SortAndSlice is different from this.
+        // This code isn't shared with how SELECT's ORDER BY clauses are serialized since there's
+        // some extra work that goes on there to handle references to SELECT clauses aliases, etc.
         HsqlArrayList exprList = m_sortAndSlice.exprList;
         if (exprList != null) {
             VoltXMLElement orderColumnsXml = new VoltXMLElement("ordercolumns");
