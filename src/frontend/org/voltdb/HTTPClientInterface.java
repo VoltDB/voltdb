@@ -38,6 +38,7 @@ import org.voltcore.logging.Level;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.utils.Base64;
 import org.voltdb.utils.Encoder;
 
@@ -110,6 +111,11 @@ public class HTTPClientInterface {
         AuthenticationResult authResult = null;
 
         Continuation continuation = ContinuationSupport.getContinuation(request);
+        Object o = request.getAttribute("SQLSUBMITTED");
+        if (o != null && o instanceof Boolean) {
+            continuation.suspend(response);
+            return;
+        }
         continuation.suspend(response);
         String jsonp = null;
         try {
@@ -179,6 +185,7 @@ public class HTTPClientInterface {
             if (!success) {
                 throw new Exception("Server is not accepting work at this time.");
             }
+            request.setAttribute("SQLSUBMITTED", Boolean.TRUE);
             if (authResult.m_adminMode) {
                 cb.waitForResponse();
             }
@@ -336,9 +343,10 @@ public class HTTPClientInterface {
             // admin connections aren't cached
             if (authResult.m_adminMode) {
                 try {
+                    authResult.m_client.drain();
                     authResult.m_client.close();
-                } catch (InterruptedException e) {
-                    m_log.warn("JSON interface was interrupted while closing an internal admin client connection.");
+                } catch (InterruptedException | NoConnectionsException e) {
+                    m_log.warn("JSON interface was interrupted while closing an internal admin client connection.", e);
                 }
             }
             // other connections are cached
