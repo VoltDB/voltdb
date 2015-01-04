@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -378,29 +378,6 @@ public class SystemStatsCollector {
         // create a new Datum which adds java stats
         Datum d = new Datum(rss);
         return d;
-    }
-
-    /**
-     * Get a CSV string of all the values in the history,
-     * filtering for uniqueness.
-     * @return A string containing CSV memory values.
-     */
-    public static synchronized String getCSV() {
-        // build a unique set
-        HashMap<Long, Datum> all =  new HashMap<Long, Datum>();
-        for (Datum d : historyS)
-            all.put(d.timestamp, d);
-        for (Datum d : historyM)
-            all.put(d.timestamp, d);
-        for (Datum d : historyL)
-            all.put(d.timestamp, d);
-
-        // print the csv out
-        StringBuilder sb = new StringBuilder();
-        for (Datum d : all.values())
-            sb.append(d.toLine()).append("\n");
-
-        return sb.toString();
     }
 
     /**

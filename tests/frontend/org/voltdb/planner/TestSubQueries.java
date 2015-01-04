@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -275,7 +275,9 @@ public class TestSubQueries extends PlannerTestCase {
         planNodes = compileToFragments(sql);
         // send node
         pn = planNodes.get(1).getChild(0);
-        checkPrimaryKeyIndexScan(pn, "P1");
+        // P1 has PRIMARY KEY INDEX on column A: GROUP BY C should not use its INDEX to speed up.
+        checkSeqScan(pn, "P1", "C", "A");
+        assertNotNull(AggregatePlanNode.getInlineAggregationNode(pn));
         assertNull(pn.getInlinePlanNode(PlanNodeType.LIMIT));
     }
 
@@ -1112,7 +1114,6 @@ public class TestSubQueries extends PlannerTestCase {
         checkSeqScan(pn, "T1");
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
         pn = pn.getChild(0);
-        // ProjectionNode for the top Aggregate, this may not be needed if without complex aggregates
         assertTrue(pn instanceof ProjectionPlanNode);
         pn = pn.getChild(0);
         checkPrimaryKeyIndexScan(pn, "P1");
@@ -1619,33 +1620,40 @@ public class TestSubQueries extends PlannerTestCase {
         checkPrimaryKeyIndexScan(pn, "P2");
         assertNotNull(pn.getInlinePlanNode(PlanNodeType.PROJECTION));
 
-        // TODO: Re-enable the original stronger version of the test
-        // that insists on matching the joinErrorMsg
-        // once multi-column distinct is correctly re-enabled.
-        // This will most likely happen as a side effect of fixing ENG-6436.
-        failToCompile(
-                //* stronger */ "SELECT * FROM (SELECT DISTINCT A, C FROM P1) T1, P2 where T1.A = P2.A", joinErrorMsg);
-                /*  weaker   */ "SELECT * FROM (SELECT DISTINCT A, C FROM P1) T1, P2 where T1.A = P2.A");
-
+        // Distinct with GROUP BY
         failToCompile(
                 "SELECT * FROM (SELECT DISTINCT A, C FROM P1 GROUP BY A, C) T1, P2 " +
                 "where T1.A = P2.A");
 
         failToCompile(
-                "SELECT * FROM (SELECT T0.A, R1.C FROM R1, " +
+                "SELECT * FROM (SELECT DISTINCT A, C FROM P1 GROUP BY A, C) T1, P2 " +
+                "where T1.A = P2.A");
+
+        // Distinct without GROUP BY
+        String sql1, sql2;
+        sql1 = "SELECT * FROM (SELECT DISTINCT A, C FROM P1) T1, P2 where T1.A = P2.A";
+        sql2 = "SELECT * FROM (SELECT A, C FROM P1 GROUP BY A, C) T1, P2 where T1.A = P2.A";
+        checkQueriesPlansAreTheSame(sql1, sql2);
+
+        sql1 =  "SELECT * FROM (SELECT T0.A, R1.C FROM R1, " +
                 "                (SELECT Distinct P1.A, C FROM P1,R2 where P1.A = R2.A) T0 where R1.A = T0.A ) T1, " +
                 "              P2 " +
-                "where T1.A = P2.A");
+                "where T1.A = P2.A";
+        sql2 =  "SELECT * FROM (SELECT T0.A, R1.C FROM R1, " +
+                "                (SELECT P1.A, C FROM P1,R2 where P1.A = R2.A group by P1.A, C) T0 where R1.A = T0.A ) T1, " +
+                "              P2 " +
+                "where T1.A = P2.A";
+        checkQueriesPlansAreTheSame(sql1, sql2);
 
-        failToCompile(
-                "SELECT * FROM (SELECT DISTINCT T0.A, R1.C FROM R1, " +
+        sql1 =  "SELECT * FROM (SELECT DISTINCT T0.A, R1.C FROM R1, " +
                 "                (SELECT P1.A, C FROM P1,R2 where P1.A = R2.A) T0 where R1.A = T0.A ) T1, " +
                 "              P2 " +
-                "where T1.A = P2.A");
-
-        failToCompile(
-                "SELECT * FROM (SELECT DISTINCT A, C FROM P1 GROUP BY A, C) T1, P2 " +
-                "where T1.A = P2.A");
+                "where T1.A = P2.A";
+        sql2 =  "SELECT * FROM (SELECT T0.A, R1.C FROM R1, " +
+                "                (SELECT P1.A, C FROM P1,R2 where P1.A = R2.A) T0 where R1.A = T0.A GROUP BY T0.A, R1.C) T1, " +
+                "              P2 " +
+                "where T1.A = P2.A";
+        checkQueriesPlansAreTheSame(sql1, sql2);
     }
 
     public void testEdgeCases() {

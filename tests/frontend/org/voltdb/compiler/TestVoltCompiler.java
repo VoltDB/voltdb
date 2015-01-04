@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -52,6 +53,7 @@ import org.voltdb.catalog.Group;
 import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
+import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltCompiler.Feedback;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
@@ -128,6 +130,14 @@ public class TestVoltCompiler extends TestCase {
         pb.addPartitionInfo("blah", "pkey");
         boolean success = pb.compile(Configuration.getPathToCatalogForTest("utf8xml.jar"));
         assertTrue(success);
+    }
+
+    private String feedbackToString(List<Feedback> fbs) {
+        StringBuilder sb = new StringBuilder();
+        for (Feedback fb : fbs) {
+            sb.append(fb.getStandardFeedbackLine() + "\n");
+        }
+        return sb.toString();
     }
 
     private boolean isFeedbackPresent(String expectedError,
@@ -387,7 +397,7 @@ public class TestVoltCompiler extends TestCase {
                 VoltCompilerUtils.readFileFromJarfile("/tmp/snapshot_settings_test.jar", "catalog.txt");
             final Catalog cat = new Catalog();
             cat.execute(catalogContents);
-            CatalogUtil.compileDeployment(cat, builder.getPathToDeployment(), true, false);
+            CatalogUtil.compileDeployment(cat, builder.getPathToDeployment(), false);
             SnapshotSchedule schedule =
                 cat.getClusters().get("cluster").getDatabases().
                     get("database").getSnapshotschedule().get("default");
@@ -450,7 +460,7 @@ public class TestVoltCompiler extends TestCase {
                 VoltCompilerUtils.readFileFromJarfile("/tmp/exportsettingstest.jar", "catalog.txt");
             final Catalog cat = new Catalog();
             cat.execute(catalogContents);
-            CatalogUtil.compileDeployment(cat, project.getPathToDeployment(), true, false);
+            CatalogUtil.compileDeployment(cat, project.getPathToDeployment(), false);
             Connector connector = cat.getClusters().get("cluster").getDatabases().
                 get("database").getConnectors().get("0");
             assertTrue(connector.getEnabled());
@@ -1913,9 +1923,6 @@ public class TestVoltCompiler extends TestCase {
     private static final String msgPR =
             "ASSUMEUNIQUE is not valid for an index that includes the partitioning column. " +
             "Please use UNIQUE instead";
-    private static final String msgR =
-            "ASSUMEUNIQUE is not valid for replicated tables. " +
-            "Please use UNIQUE instead";
 
     public void testColumnUniqueGiveException()
     {
@@ -1924,12 +1931,12 @@ public class TestVoltCompiler extends TestCase {
         // (1) ****** Replicate tables
         // A unique index on the non-primary key for replicated table gets no error.
         schema = "create table t0 (id bigint not null, name varchar(32) not null UNIQUE, age integer,  primary key (id));\n";
-        checkValidUniqueAndAssumeUnique(schema, null, msgR);
+        checkValidUniqueAndAssumeUnique(schema, null, null);
 
         // Similar to above, but use a different way to define unique column.
         schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  " +
                 "primary key (id), UNIQUE (name) );\n";
-        checkValidUniqueAndAssumeUnique(schema, null, msgR);
+        checkValidUniqueAndAssumeUnique(schema, null, null);
 
 
         // (2) ****** Partition Table: UNIQUE valid, ASSUMEUNIQUE not valid
@@ -1997,9 +2004,36 @@ public class TestVoltCompiler extends TestCase {
                 "PARTITION TABLE t0 ON COLUMN name;\n";
         // 1) unique index, 2) primary key
         checkValidUniqueAndAssumeUnique(schema, msgP, msgP);
+
+        // unique/assumeunique constraint added via ALTER TABLE to replicated table
+        schema = "create table t0 (id bigint not null, name varchar(32) not null);\n" +
+                "ALTER TABLE t0 ADD UNIQUE(name);";
+        checkValidUniqueAndAssumeUnique(schema, null, null);
+
+        // unique/assumeunique constraint added via ALTER TABLE to partitioned table
+        schema = "create table t0 (id bigint not null, name varchar(32) not null);\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "ALTER TABLE t0 ADD UNIQUE(name);";
+        checkValidUniqueAndAssumeUnique(schema, msgP, null);
+
+        // ENG-7242, kinda
+        // (tests the assumeuniqueness constraint is preserved, obliquely, see
+        // TestAdhocAlterTable for more thorough tests)
+        schema = "create table t0 (id bigint not null, name varchar(32) not null, val integer);\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "ALTER TABLE t0 ADD UNIQUE(name);\n" +
+                "ALTER TABLE t0 DROP COLUMN val;\n";
+        checkValidUniqueAndAssumeUnique(schema, msgP, null);
+
+        // ENG-7304, that we can pass functions to constrant definitions in alter table
+        schema = "create table t0 (id bigint not null, val2 integer not null, val integer);\n" +
+                "PARTITION TABLE t0 ON COLUMN id;\n" +
+                "ALTER TABLE t0 ADD UNIQUE(abs(val2));\n" +
+                "ALTER TABLE t0 DROP COLUMN val;\n";
+        checkValidUniqueAndAssumeUnique(schema, msgP, null);
     }
 
-    private void checkDDLErrorMessage(String ddl, String errorMsg) {
+    private boolean compileDDL(String ddl, VoltCompiler compiler) {
         final File schemaFile = VoltProjectBuilder.writeStringToTempFile(ddl);
         final String schemaPath = schemaFile.getPath();
 
@@ -2017,14 +2051,23 @@ public class TestVoltCompiler extends TestCase {
         final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
         final String projectPath = projectFile.getPath();
 
-        final VoltCompiler compiler = new VoltCompiler();
+        return compiler.compileWithProjectXML(projectPath, testout_jar);
+    }
 
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        boolean expectSuccess = errorMsg == null ? true : false;
-        assertEquals(expectSuccess, success);
-        if (!expectSuccess) {
-            assertTrue(isFeedbackPresent(errorMsg, compiler.m_errors));
+    private void checkCompilerErrorMessages(String expectedError, VoltCompiler compiler, boolean success) {
+        if (expectedError == null) {
+            assertTrue("Expected no compilation errors but got these:\n" + feedbackToString(compiler.m_errors), success);
+        } else {
+            assertFalse("Expected failure but got success", success);
+            assertTrue(isFeedbackPresent(expectedError, compiler.m_errors));
         }
+
+    }
+
+    private void checkDDLErrorMessage(String ddl, String errorMsg) {
+        final VoltCompiler compiler = new VoltCompiler();
+        final boolean success = compileDDL(ddl, compiler);
+        checkCompilerErrorMessages(errorMsg, compiler, success);
     }
 
     private void checkValidUniqueAndAssumeUnique(String ddl, String errorUnique, String errorAssumeUnique) {
@@ -2039,7 +2082,7 @@ public class TestVoltCompiler extends TestCase {
         // A unique index on the non-primary key for replicated table gets no error.
         schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
                 "CREATE UNIQUE INDEX user_index0 ON t0 (name) ;";
-        checkValidUniqueAndAssumeUnique(schema, null, msgR);
+        checkValidUniqueAndAssumeUnique(schema, null, null);
 
 
         // (2) ****** Partition Table: UNIQUE valid, ASSUMEUNIQUE not valid
@@ -2124,12 +2167,25 @@ public class TestVoltCompiler extends TestCase {
                 "create view my_view2 (num, total, sumwage) " +
                 "as select num, count(*), sum(sumwage) from my_view1 group by num; ";
         checkDDLErrorMessage(ddl, "A materialized view (MY_VIEW2) can not be defined on another view (MY_VIEW1)");
+
+        ddl = "create table t(id integer not null, num integer);\n" +
+                "create view my_view as select num, count(*) from t group by num limit 1;";
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with LIMIT or OFFSET clause is not supported.");
+
+        ddl = "create table t(id integer not null, num integer);\n" +
+                "create view my_view as select num, count(*) from t group by num limit 1 offset 10;";
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with LIMIT or OFFSET clause is not supported.");
+
+        ddl = "create table t(id integer not null, num integer);\n" +
+                "create view my_view as select num, count(*) from t group by num having count(*) > 3;";
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with HAVING clause is not supported.");
     }
 
     public void testDDLCompilerTableLimit()
     {
         String ddl;
 
+        // Test CREATE
         // test failed cases
         ddl = "create table t(id integer not null, num integer," +
                 "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 6xx);";
@@ -2145,7 +2201,7 @@ public class TestVoltCompiler extends TestCase {
 
         ddl = "create table t(id integer not null, num integer," +
                 "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 5, CONSTRAINT tblimit2 LIMIT PARTITION ROWS 7);";
-        checkDDLErrorMessage(ddl, "Too many table limit constraints for table T");
+        checkDDLErrorMessage(ddl, "Multiple LIMIT PARTITION ROWS constraints on table T are forbidden");
 
         ddl = "create table t(id integer not null, num integer," +
                 "CONSTRAINT tblimit1 LIMIT PARTITION Row 6);";
@@ -2164,6 +2220,203 @@ public class TestVoltCompiler extends TestCase {
         ddl = "create table t(id integer not null, num integer," +
                 "LIMIT PARTITION ROWS 6);";
         checkDDLErrorMessage(ddl, null);
+
+        // Test alter
+        // Test failed cases
+        ddl = "create table t(id integer not null, num integer);" +
+              "alter table t add constraint foo LIMIT PARTITION ROWS 6XX;";
+        checkDDLErrorMessage(ddl, "unexpected token: XX");
+
+        ddl = "create table t(id integer not null, num integer);" +
+              "alter table t add constraint foo LIMIT PARTITION ROWS 66666666666666666666666;";
+        checkDDLErrorMessage(ddl, "incompatible data type in operation");
+
+        ddl = "create table t(id integer not null, num integer);" +
+              "alter table t add constraint foo LIMIT PARTITION ROWS -10;";
+        checkDDLErrorMessage(ddl, "Invalid constraint limit number '-10'");
+
+        ddl = "create table t(id integer not null, num integer);" +
+              "alter table t add constraint foo LIMIT PARTITION ROW 6;";
+        checkDDLErrorMessage(ddl, "unexpected token: ROW required: ROWS");
+
+        ddl = "create table t(id integer not null, num integer);" +
+              "alter table t add constraint foo LIMIT ROWS 6;";
+        checkDDLErrorMessage(ddl, "unexpected token: ROWS required: PARTITION");
+
+        ddl = "create table t(id integer not null, num integer);" +
+              "alter table t2 add constraint foo LIMIT PARTITION ROWS 6;";
+        checkDDLErrorMessage(ddl, "object not found: T2");
+
+        // Test alter successes
+        ddl = "create table t(id integer not null, num integer);" +
+              "alter table t add constraint foo LIMIT PARTITION ROWS 6;";
+        checkDDLErrorMessage(ddl, null);
+
+        ddl = "create table t(id integer not null, num integer);" +
+              "alter table t add LIMIT PARTITION ROWS 6;";
+        checkDDLErrorMessage(ddl, null);
+
+        // Successive alter statements are okay
+        ddl = "create table t(id integer not null, num integer);" +
+              "alter table t add LIMIT PARTITION ROWS 6;" +
+              "alter table t add LIMIT PARTITION ROWS 7;";
+        checkDDLErrorMessage(ddl, null);
+
+        // Alter after constraint set in create is okay
+        ddl = "create table t(id integer not null, num integer," +
+                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 6);" +
+              "alter table t add LIMIT PARTITION ROWS 7;";
+        checkDDLErrorMessage(ddl, null);
+
+        // Test drop
+        // Test failed cases
+        ddl = "create table t(id integer not null, num integer);" +
+              "alter table t drop constraint tblimit2;";
+        checkDDLErrorMessage(ddl, "object not found: TBLIMIT2");
+
+        ddl = "create table t(id integer not null, num integer," +
+                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 6);" +
+              "alter table t drop constraint tblimit2;";
+        checkDDLErrorMessage(ddl, "object not found: TBLIMIT2");
+
+        ddl = "create table t(id integer not null, num integer);" +
+              "alter table t add LIMIT PARTITION ROWS 6;" +
+              "alter table t drop constraint tblimit2;";
+        checkDDLErrorMessage(ddl, "object not found: TBLIMIT2");
+
+        ddl = "create table t(id integer not null, num integer);" +
+              "alter table t drop LIMIT PARTITION ROWS;";
+        checkDDLErrorMessage(ddl, "object not found");
+
+        ddl = "create table t(id integer not null, num integer);" +
+              "alter table t drop LIMIT PARTITIONS ROWS;";
+        checkDDLErrorMessage(ddl, "unexpected token: PARTITIONS required: PARTITION");
+
+        ddl = "create table t(id integer not null, num integer);" +
+              "alter table t drop LIMIT PARTITION ROW;";
+        checkDDLErrorMessage(ddl, "unexpected token: ROW required: ROWS");
+
+        ddl = "create table t(id integer not null, num integer);" +
+              "alter table t drop PARTITION ROWS;";
+        checkDDLErrorMessage(ddl, "unexpected token: PARTITION");
+
+        // Test successes
+        // named drop
+        ddl = "create table t(id integer not null, num integer," +
+                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 6);" +
+              "alter table t drop constraint tblimit1;";
+        checkDDLErrorMessage(ddl, null);
+
+        // magic drop
+        ddl = "create table t(id integer not null, num integer);" +
+              "alter table t add LIMIT PARTITION ROWS 6;" +
+              "alter table t drop LIMIT PARTITION ROWS;";
+        checkDDLErrorMessage(ddl, null);
+
+        // magic drop of named constraint
+        ddl = "create table t(id integer not null, num integer," +
+                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 6);" +
+              "alter table t drop LIMIT PARTITION ROWS;";
+        checkDDLErrorMessage(ddl, null);
+    }
+
+    void compileLimitDeleteStmtAndCheckCatalog(String ddl, String expectedMessage, String tblName,
+            int expectedLimit, String expectedStmt) {
+        VoltCompiler compiler = new VoltCompiler();
+        boolean success = compileDDL(ddl, compiler);
+        checkCompilerErrorMessages(expectedMessage, compiler, success);
+
+        if (success) {
+            // We expected  success and got it.  Verify that the catalog looks how we expect
+            Catalog cat = compiler.getCatalog();
+
+            Table tbl = cat.getClusters().get("cluster").getDatabases().get("database").getTables().getIgnoreCase(tblName);
+
+            if (expectedLimit != -1) {
+                assertEquals(expectedLimit, tbl.getTuplelimit());
+            }
+            else {
+                // no limit is represented as a limit of max int.
+                assertEquals(Integer.MAX_VALUE, tbl.getTuplelimit());
+            }
+
+            Statement stmt = null;
+            try {
+                stmt = tbl.getTuplelimitdeletestmt().iterator().next();
+            }
+            catch (NoSuchElementException nse) {
+            }
+
+            if (expectedStmt == null) {
+                assertTrue("Did not expect to find a LIMIT DELETE statement, but found this one:\n"
+                        + (stmt != null ? stmt.getSqltext() : ""),
+                        stmt == null);
+            } else {
+                // Make sure we have the delete statement that we expected
+                assertTrue("Expected to find LIMIT DELETE statement, found none", stmt != null);
+
+                String sql = stmt.getSqltext();
+                if (sql.endsWith(";")) {
+                    // We seem to add a semicolon somewhere.  I guess that's okay.
+                    sql = sql.substring(0, sql.length() - 1);
+                }
+
+                assertEquals("Did not find the LIMIT DELETE statement that we expected",
+                        expectedStmt, sql);
+            }
+        }
+    }
+
+    public void testDDLCompilerAlterTableLimitWithDelete()
+    {
+        String ddl;
+
+        // See also TestVoltCompilerErrorMsgs for negative tests involving
+        // LIMIT PARTITION ROWS <n> EXECUTE (DELETE ...)
+
+        // This exercises adding a limit constraint with a DELETE statement
+        ddl = "create table t(id integer not null);\n" +
+                "alter table t add limit partition rows 10 execute (delete from t where id > 0);";
+        compileLimitDeleteStmtAndCheckCatalog(ddl, null, "t", 10, "delete from t where id > 0");
+
+        // This exercises making a change to the delete statement of an existing constraint
+        ddl = "create table t(id integer not null, "
+                + "constraint c1 limit partition rows 10 execute (delete from t where id > 0)"
+                + ");\n"
+                + "alter table t add limit partition rows 15 execute (delete from t where id between 0 and 100);";
+        compileLimitDeleteStmtAndCheckCatalog(ddl, null, "t", 15, "delete from t where id between 0 and 100");
+
+        // test dropping a limit contraint with a delete
+        ddl = "create table t(id integer not null, "
+                + "constraint c1 limit partition rows 10 execute (delete from t where id > 0)"
+                + ");\n"
+                + "alter table t drop limit partition rows;";
+        compileLimitDeleteStmtAndCheckCatalog(ddl, null, "t", -1, null);
+
+        // test dropping constraint by referencing the constraint name
+        ddl = "create table t(id integer not null, "
+                + "constraint c1 limit partition rows 10 execute (delete from t where id > 0)"
+                + ");\n"
+                + "alter table t drop constraint c1;";
+        compileLimitDeleteStmtAndCheckCatalog(ddl, null, "t", -1, null);
+
+        // test dropping constraint by referencing the constraint name
+        // Negative test---got the constraint name wrong
+        ddl = "create table t(id integer not null, "
+                + "constraint c1 limit partition rows 10 execute (delete from t where id > 0)"
+                + ");\n"
+                + "alter table t drop constraint c34;";
+        compileLimitDeleteStmtAndCheckCatalog(ddl, "object not found", "t", -1, null);
+
+        // Alter the table by removing the LIMIT DELETE statement, but not the row limit
+        ddl = "create table t(id integer not null, "
+                + "constraint c1 limit partition rows 10 execute (delete from t where id > 0)"
+                + ");\n"
+                + "alter table t add limit partition rows 10;";
+        compileLimitDeleteStmtAndCheckCatalog(ddl, null, "t", 10, null);
+
+        // See also regression testing that ensures EE picks up catalog changes
+        // in TestSQLFeaturesNewSuite
     }
 
     public void testPartitionOnBadType() {
@@ -2867,6 +3120,15 @@ public class TestVoltCompiler extends TestCase {
         expectedError =
                 "Dropped Procedure \"insert\" is not defined";
         assertTrue(isFeedbackPresent(expectedError, fbs));
+
+        // check if exists
+        db = goodDDLAgainstSimpleSchema(
+                "create procedure p1 as select * from books;\n" +
+                "drop procedure p1 if exists;\n" +
+                "drop procedure p1 if exists;\n"
+                );
+        proc = db.getProcedures().get("p1");
+        assertNull(proc);
     }
 
     private ArrayList<Feedback> checkInvalidProcedureDDL(String ddl) {
@@ -2969,21 +3231,26 @@ public class TestVoltCompiler extends TestCase {
 
     class TestRole {
         final String name;
-        boolean adhoc = false;
+        boolean sql = false;
+        boolean sqlread = false;
         boolean sysproc = false;
         boolean defaultproc = false;
         boolean defaultprocread = false;
+        boolean allproc = false;
 
         public TestRole(String name) {
             this.name = name;
         }
 
-        public TestRole(String name, boolean adhoc, boolean sysproc, boolean defaultproc, boolean defaultprocread) {
+        public TestRole(String name, boolean sql, boolean sqlread, boolean sysproc,
+                        boolean defaultproc, boolean defaultprocread, boolean allproc) {
             this.name = name;
-            this.adhoc = adhoc;
+            this.sql = sql;
+            this.sqlread = sqlread;
             this.sysproc = sysproc;
             this.defaultproc = defaultproc;
             this.defaultprocread = defaultprocread;
+            this.allproc = allproc;
         }
     }
 
@@ -3024,15 +3291,17 @@ public class TestVoltCompiler extends TestCase {
             }
 
             assertNotNull(groups);
-            assertEquals(roles.length, groups.size());
+            assertTrue(roles.length <= groups.size());
 
             for (TestRole role : roles) {
                 Group group = groups.get(role.name);
                 assertNotNull(String.format("Missing role \"%s\"", role.name), group);
-                assertEquals(String.format("Role \"%s\" adhoc flag mismatch:", role.name), role.adhoc, group.getAdhoc());
-                assertEquals(String.format("Role \"%s\" sysproc flag mismatch:", role.name), role.sysproc, group.getSysproc());
+                assertEquals(String.format("Role \"%s\" sql flag mismatch:", role.name), role.sql, group.getSql());
+                assertEquals(String.format("Role \"%s\" sqlread flag mismatch:", role.name), role.sqlread, group.getSqlread());
+                assertEquals(String.format("Role \"%s\" admin flag mismatch:", role.name), role.sysproc, group.getAdmin());
                 assertEquals(String.format("Role \"%s\" defaultproc flag mismatch:", role.name), role.defaultproc, group.getDefaultproc());
                 assertEquals(String.format("Role \"%s\" defaultprocread flag mismatch:", role.name), role.defaultprocread, group.getDefaultprocread());
+                assertEquals(String.format("Role \"%s\" allproc flag mismatch:", role.name), role.allproc, group.getAllproc());
             }
         }
         else {
@@ -3061,26 +3330,39 @@ public class TestVoltCompiler extends TestCase {
     }
 
     public void testRoleDDL() throws Exception {
-        goodRoleDDL("create role r1;", new TestRole("r1"));
-        goodRoleDDL("create role r1;create role r2;", new TestRole("r1"), new TestRole("r2"));
-        goodRoleDDL("create role r1 with adhoc;", new TestRole("r1", true, false, false, false));
-        goodRoleDDL("create role r1 with sysproc;", new TestRole("r1", false, true, false, false));
-        goodRoleDDL("create role r1 with defaultproc;", new TestRole("r1", false, false, true, false));
-        goodRoleDDL("create role r1 with adhoc,sysproc,defaultproc;", new TestRole("r1", true, true, true, false));
-        goodRoleDDL("create role r1 with adhoc,sysproc,sysproc;", new TestRole("r1", true, true, false, false));
-        goodRoleDDL("create role r1 with AdHoc,SysProc,DefaultProc;", new TestRole("r1", true, true, true, false));
+        goodRoleDDL("create role R1;", new TestRole("r1"));
+        goodRoleDDL("create role r1;create role r2;", new TestRole("r1"), new TestRole("R2"));
+        goodRoleDDL("create role r1 with adhoc;", new TestRole("r1", true, true, false, true, true, false));
+        goodRoleDDL("create role r1 with sql;", new TestRole("r1", true, true, false, true, true, false));
+        goodRoleDDL("create role r1 with sqlread;", new TestRole("r1", false, true, false, false, true, false));
+        goodRoleDDL("create role r1 with sysproc;", new TestRole("r1", true, true, true, true, true, true));
+        goodRoleDDL("create role r1 with defaultproc;", new TestRole("r1", false, false, false, true, true, false));
+        goodRoleDDL("create role r1 with adhoc,sysproc,defaultproc;", new TestRole("r1", true, true, true, true, true, true));
+        goodRoleDDL("create role r1 with adhoc,sysproc,sysproc;", new TestRole("r1", true, true, true, true, true, true));
+        goodRoleDDL("create role r1 with AdHoc,SysProc,DefaultProc;", new TestRole("r1", true, true, true, true, true, true));
         //Defaultprocread.
-        goodRoleDDL("create role r1 with defaultprocread;", new TestRole("r1", false, false, false, true));
-        goodRoleDDL("create role r1 with AdHoc,SysProc,DefaultProc,DefaultProcRead;", new TestRole("r1", true, true, true, true));
+        goodRoleDDL("create role r1 with defaultprocread;", new TestRole("r1", false, false, false, false, true, false));
+        goodRoleDDL("create role r1 with AdHoc,SysProc,DefaultProc,DefaultProcRead;", new TestRole("r1", true, true, true, true, true, true));
+        goodRoleDDL("create role r1 with AdHoc,Admin,DefaultProc,DefaultProcRead;", new TestRole("r1", true, true, true, true, true, true));
+        goodRoleDDL("create role r1 with allproc;", new TestRole("r1", false, false, false, false, false, true));
+
+        // Check default roles: ADMINISTRATOR, USER
+        goodRoleDDL("",
+                    new TestRole("ADMINISTRATOR", true, true, true, true, true, true),
+                    new TestRole("USER", true, true, false, true, true, true));
     }
 
     public void testBadRoleDDL() throws Exception {
         badRoleDDL("create role r1", ".*no semicolon.*");
         badRoleDDL("create role r1;create role r1;", ".*already exists.*");
         badRoleDDL("create role r1 with ;", ".*Invalid CREATE ROLE statement.*");
-        badRoleDDL("create role r1 with blah;", ".*Invalid permission \"blah\".*");
+        badRoleDDL("create role r1 with blah;", ".*Invalid permission \"BLAH\".*");
         badRoleDDL("create role r1 with adhoc sysproc;", ".*Invalid CREATE ROLE statement.*");
-        badRoleDDL("create role r1 with adhoc, blah;", ".*Invalid permission \"blah\".*");
+        badRoleDDL("create role r1 with adhoc, blah;", ".*Invalid permission \"BLAH\".*");
+
+        // cannot override default roles
+        badRoleDDL("create role ADMINISTRATOR;", ".*already exists.*");
+        badRoleDDL("create role USER;", ".*already exists.*");
     }
 
     private Database checkDDLAgainstSimpleSchema(String errorRegex, String... ddl) throws Exception {
@@ -3194,6 +3476,43 @@ public class TestVoltCompiler extends TestCase {
                 "create procedure p1 allow r1, rx as select * from books;");
     }
 
+    public void testDropRole() throws Exception
+    {
+        Database db = goodDDLAgainstSimpleSchema(
+                "create role r1;",
+                "drop role r1;");
+        CatalogMap<Group> groups = db.getGroups();
+        assertTrue(groups.get("r1") == null);
+
+        db = goodDDLAgainstSimpleSchema(
+                "create role r1;",
+                "drop role r1 if exists;");
+        groups = db.getGroups();
+        assertTrue(groups.get("r1") == null);
+
+        db = goodDDLAgainstSimpleSchema(
+                "create role r1;",
+                "drop role r1 if exists;",
+                "drop role r1 IF EXISTS;");
+        groups = db.getGroups();
+        assertTrue(groups.get("r1") == null);
+
+        badDDLAgainstSimpleSchema(".*does not exist.*",
+                "create role r1;",
+                "drop role r2;");
+
+        badDDLAgainstSimpleSchema(".*does not exist.*",
+                "create role r1;",
+                "drop role r1;",
+                "drop role r1;");
+
+        badDDLAgainstSimpleSchema(".*may not drop.*",
+                "drop role administrator;");
+
+        badDDLAgainstSimpleSchema(".*may not drop.*",
+                "drop role user;");
+    }
+
     private ConnectorTableInfo getConnectorTableInfoFor( Database db, String tableName) {
         Connector connector =  db.getConnectors().get("0");
         if( connector == null) return null;
@@ -3221,7 +3540,7 @@ public class TestVoltCompiler extends TestCase {
 
     public void testBadExportTable() throws Exception {
 
-        badDDLAgainstSimpleSchema(".+\\sexport, table non_existant was not present in the catalog.*",
+        badDDLAgainstSimpleSchema(".+\\sEXPORT statement: table non_existant was not present in the catalog.*",
                 "export table non_existant;"
                 );
 
@@ -3255,12 +3574,6 @@ public class TestVoltCompiler extends TestCase {
                 "create table view_source( id integer, f1 varchar(16), f2 varchar(12));",
                 "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;",
                 "export table my_view;"
-                );
-
-        badDDLAgainstSimpleSchema("Table \"E1\" is already exported.*",
-                "create table e1( id integer, f1 varchar(16), f2 varchar(12));",
-                "export table e1;",
-                "export table E1;"
                 );
     }
 

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -31,13 +31,6 @@ import org.voltdb.utils.MiscUtils;
 
 public class TestAdhocDropTable extends AdhocDDLTestBase {
 
-            //adHocQuery = "CREATE TABLE ICAST2 (C1 INT, C2 FLOAT);";
-            //adHocQuery = "CREATE INDEX IDX_PROJ_PNAME ON PROJ(PNAME);";
-            //adHocQuery = "DROP TABLE PROJ;";
-            //adHocQuery = "PARTITION TABLE PROJ ON COLUMN PNUM;";
-            //adHocQuery = "CREATE PROCEDURE AS SELECT 1 FROM PROJ;";
-            //adHocQuery = "CREATE PROCEDURE FROM CLASS bar.Foo;";
-
     public void testDropTableBasic() throws Exception {
 
         String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
@@ -59,7 +52,7 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
             "PRIMARY KEY(ID));");
         builder.addPartitionInfo("BLAH", "ID");
         builder.addPartitionInfo("DROPME", "ID");
-        builder.setUseAdhocSchema(true);
+        builder.setUseDDLSchema(true);
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
@@ -74,6 +67,13 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
             ClientResponse resp = m_client.callProcedure("@SystemCatalog", "TABLES");
             System.out.println(resp.getResults()[0]);
             assertTrue(findTableInSystemCatalogResults("DROPME"));
+
+            // eng7297, start with 6 rows in @Statistics table (one per table per site)
+            VoltTable stats = getStatWaitOnRowCount("TABLE", 6);
+            assertEquals(6, stats.getRowCount());
+            stats = getStatWaitOnRowCount("INDEX", 6);
+            assertEquals(6, stats.getRowCount());
+
             try {
                 m_client.callProcedure("@AdHoc", "drop table DROPME;");
             }
@@ -83,6 +83,12 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
             resp = m_client.callProcedure("@SystemCatalog", "TABLES");
             System.out.println(resp.getResults()[0]);
             assertFalse(findTableInSystemCatalogResults("DROPME"));
+            // eng7297, now only 4 rows in @Statistics table (one per table per site)
+            stats = getStatWaitOnRowCount("TABLE", 4);
+            assertEquals(4, stats.getRowCount());
+            stats = getStatWaitOnRowCount("INDEX", 4);
+            assertEquals(4, stats.getRowCount());
+
             // Check basic drop of replicated table that should work.
             resp = m_client.callProcedure("@SystemCatalog", "TABLES");
             System.out.println(resp.getResults()[0]);
@@ -96,6 +102,11 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
             resp = m_client.callProcedure("@SystemCatalog", "TABLES");
             System.out.println(resp.getResults()[0]);
             assertFalse(findTableInSystemCatalogResults("DROPME_R"));
+            // eng7297, now only 2 rows in @Statistics table (one per table per site)
+            stats = getStatWaitOnRowCount("TABLE", 2);
+            assertEquals(2, stats.getRowCount());
+            stats = getStatWaitOnRowCount("INDEX", 2);
+            assertEquals(2, stats.getRowCount());
 
             // Verify dropping a table that doesn't exist fails
             boolean threw = false;
@@ -117,6 +128,22 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
                 threw = true;
             }
             assertFalse("Dropping bad table with IF EXISTS should not have failed", threw);
+
+            // ENG-7297, Drop the last table and make sure that the statistics are correct
+            try {
+                m_client.callProcedure("@AdHoc", "drop table BLAH;");
+            }
+            catch (ProcCallException pce) {
+                fail("drop table should have succeeded");
+            }
+            resp = m_client.callProcedure("@SystemCatalog", "TABLES");
+            System.out.println(resp.getResults()[0]);
+            assertFalse(findTableInSystemCatalogResults("BLAH"));
+            // eng7297, now should be zero rows in the stats
+            stats = getStatWaitOnRowCount("TABLE", 0);
+            assertEquals(0, stats.getRowCount());
+            stats = getStatWaitOnRowCount("INDEX", 0);
+            assertEquals(0, stats.getRowCount());
         }
         finally {
             teardownSystem();
@@ -148,7 +175,7 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
         builder.addPartitionInfo("BLAH", "ID");
         builder.addPartitionInfo("DROPME", "ID");
         builder.addStmtProcedure("BLERG", "select * from BLAH where ID = ?");
-        builder.setUseAdhocSchema(true);
+        builder.setUseDDLSchema(true);
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);

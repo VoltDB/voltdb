@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -160,6 +160,13 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         inline int64_t pushTuplesProcessedForProgressMonitoring(int64_t tuplesProcessed);
         inline void pushFinalTuplesProcessedForProgressMonitoring(int64_t tuplesProcessed);
 
+        // If an insert will fail due to row limit constraint and user
+        // has defined a delete action to make space, this method
+        // executes the corresponding fragment.
+        //
+        // Returns ENGINE_ERRORCODE_SUCCESS on success
+        int executePurgeFragment(PersistentTable* table);
+
         // -------------------------------------------------
         // Dependency Transfer Functions
         // -------------------------------------------------
@@ -192,6 +199,11 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         const char* getParameterBuffer() const { return m_parameterBuffer; }
         /** Returns the size of buffer for passing parameters to EE. */
         int getParameterBufferCapacity() const { return m_parameterBufferCapacity; }
+
+        /**
+         * Sets the output and exception buffer to be empty, and then
+         * serializes the exception. */
+        void serializeException(const SerializableEEException& e);
 
         /**
          * Retrieves the size in bytes of the data that has been placed in the reused result buffer
@@ -350,6 +362,14 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         void rebuildTableCollections();
 
+        int64_t tempTableMemoryLimit() const {
+            return m_tempTableMemoryLimit;
+        }
+
+        int64_t tempTableLogLimit() const {
+            return (m_tempTableMemoryLimit * 3) / 4;
+        }
+
     private:
         /*
          * Tasks dispatched by executeTask
@@ -361,9 +381,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         // Initialization Functions
         // -------------------------------------------------
-        void initPlanNode(const int64_t fragId, AbstractPlanNode* node, TempTableLimits* limits);
         void processCatalogDeletes(int64_t timestamp);
-        void initMaterializedViews();
+        void initMaterializedViewsAndLimitDeletePlans();
         bool updateCatalogDatabaseReference();
 
         /**
@@ -392,7 +411,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         ExecutorVector *getExecutorVectorForFragmentId(const int64_t fragId);
 
         bool checkTempTableCleanup(ExecutorVector * execsForFrag);
-        void cleanupExecutors(ExecutorVector * execsForFrag, bool hasException = false);
+        void resetExecutionMetadata();
 
         // -------------------------------------------------
         // Data Members
@@ -585,7 +604,12 @@ inline int64_t VoltDBEngine::pushTuplesProcessedForProgressMonitoring(int64_t tu
 
 inline void VoltDBEngine::pushFinalTuplesProcessedForProgressMonitoring(int64_t tuplesProcessed)
 {
-    pushTuplesProcessedForProgressMonitoring(tuplesProcessed);
+    try {
+        pushTuplesProcessedForProgressMonitoring(tuplesProcessed);
+    } catch(const SerializableEEException &e) {
+        e.serialize(getExceptionOutputSerializer());
+    }
+
     m_lastAccessedExec = NULL;
 }
 

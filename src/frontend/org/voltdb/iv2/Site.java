@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -475,7 +475,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         CoreUtils.getHostIdFromHSId(m_siteId),
                         hostname,
                         m_context.cluster.getDeployment().get("deployment").
-                        getSystemsettings().get("systemsettings").getMaxtemptablesize(),
+                        getSystemsettings().get("systemsettings").getTemptablemaxsize(),
                         hashinatorConfig);
             }
             else {
@@ -488,12 +488,14 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             CoreUtils.getHostIdFromHSId(m_siteId),
                             hostname,
                             m_context.cluster.getDeployment().get("deployment").
-                            getSystemsettings().get("systemsettings").getMaxtemptablesize(),
+                            getSystemsettings().get("systemsettings").getTemptablemaxsize(),
                             m_backend,
                             VoltDB.instance().getConfig().m_ipcPort,
                             hashinatorConfig);
             }
             eeTemp.loadCatalog(m_startupConfig.m_timestamp, m_startupConfig.m_serializableCatalog.serialize());
+            eeTemp.setTimeoutLatency(m_context.cluster.getDeployment().get("deployment").
+                            getSystemsettings().get("systemsettings").getQuerytimeout());
         }
         // just print error info an bail if we run into an error here
         catch (final Exception ex) {
@@ -952,6 +954,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
                 m_tableStats.setStatsTable(stats);
             }
+            else {
+                // the EE returned no table stats, which means there are no tables.
+                // Need to ensure the cached stats are cleared to reflect that
+                m_tableStats.resetStatsTable();
+            }
 
             // update index stats
             final VoltTable[] s2 =
@@ -969,6 +976,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 stats.resetRowPosition();
 
                 m_indexStats.setStatsTable(stats);
+            }
+            else {
+                // the EE returned no index stats, which means there are no indexes.
+                // Need to ensure the cached stats are cleared to reflect that
+                m_indexStats.resetStatsTable();
             }
 
             // update the rolled up memory statistics
@@ -1111,6 +1123,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             boolean requiresSnapshotIsolationboolean, boolean isMPI)
     {
         m_context = context;
+        m_ee.setTimeoutLatency(m_context.cluster.getDeployment().get("deployment").
+                getSystemsettings().get("systemsettings").getQuerytimeout());
         m_loadedProcedures.loadProcedures(m_context, m_backend, csp);
 
         if (isMPI) {

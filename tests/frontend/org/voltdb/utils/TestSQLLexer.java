@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -99,6 +99,8 @@ public class TestSQLLexer {
         assertTrue(SQLLexer.isPermitted("create index PANTS (ID int, RENAME varchar(50));"));
         assertFalse(SQLLexer.isPermitted("create tabel PANTS (ID int, RENAME varchar(50));"));
         assertFalse(SQLLexer.isPermitted("craete table PANTS (ID int, RENAME varchar(50));"));
+        assertTrue(SQLLexer.isPermitted("create role pants with pockets;"));
+        assertTrue(SQLLexer.isPermitted("create role\n pants\n with cuffs;\n"));
 
         assertTrue(SQLLexer.isPermitted("drop table pants;"));
         assertTrue(SQLLexer.isPermitted("drop view pants;"));

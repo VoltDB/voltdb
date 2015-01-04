@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -83,39 +83,28 @@ public class VoltProjectBuilder {
     private StringBuffer transformer = new StringBuffer();
 
     public static final class ProcedureInfo {
-        private final String groups[];
+        private final String roles[];
         private final Class<?> cls;
         private final String name;
         private final String sql;
         private final String partitionInfo;
-        private final String joinOrder;
 
-        public ProcedureInfo(final String groups[], final Class<?> cls) {
-            this.groups = groups;
+        public ProcedureInfo(final String roles[], final Class<?> cls) {
+            this.roles = roles;
             this.cls = cls;
             this.name = cls.getSimpleName();
             this.sql = null;
-            this.joinOrder = null;
             this.partitionInfo = null;
             assert(this.name != null);
         }
 
         public ProcedureInfo(
-                final String groups[],
+                final String roles[],
                 final String name,
                 final String sql,
                 final String partitionInfo) {
-            this(groups, name, sql, partitionInfo, null);
-        }
-
-        public ProcedureInfo(
-                final String groups[],
-                final String name,
-                final String sql,
-                final String partitionInfo,
-                final String joinOrder) {
             assert(name != null);
-            this.groups = groups;
+            this.roles = roles;
             this.cls = null;
             this.name = name;
             if (sql.endsWith(";")) {
@@ -125,7 +114,6 @@ public class VoltProjectBuilder {
                 this.sql = sql + ";";
             }
             this.partitionInfo = partitionInfo;
-            this.joinOrder = joinOrder;
             assert(this.name != null);
         }
 
@@ -147,12 +135,12 @@ public class VoltProjectBuilder {
     public static final class UserInfo {
         public final String name;
         public String password;
-        private final String groups[];
+        private final String roles[];
 
-        public UserInfo (final String name, final String password, final String groups[]){
+        public UserInfo (final String name, final String password, final String roles[]){
             this.name = name;
             this.password = password;
-            this.groups = groups;
+            this.roles = roles;
         }
 
         @Override
@@ -170,19 +158,32 @@ public class VoltProjectBuilder {
         }
     }
 
-    public static final class GroupInfo {
+    public static final class RoleInfo {
         private final String name;
-        private final boolean adhoc;
-        private final boolean sysproc;
+        private final boolean sql;
+        private final boolean sqlread;
+        private final boolean admin;
         private final boolean defaultproc;
         private final boolean defaultprocread;
+        private final boolean allproc;
 
-        public GroupInfo(final String name, final boolean adhoc, final boolean sysproc, final boolean defaultproc, final boolean defaultprocread){
+        public RoleInfo(final String name, final boolean sql, final boolean sqlread, final boolean admin, final boolean defaultproc, final boolean defaultprocread, final boolean allproc){
             this.name = name;
-            this.adhoc = adhoc;
-            this.sysproc = sysproc;
+            this.sql = sql;
+            this.sqlread = sqlread;
+            this.admin = admin;
             this.defaultproc = defaultproc;
             this.defaultprocread = defaultprocread;
+            this.allproc = allproc;
+        }
+
+        public static RoleInfo[] fromTemplate(final RoleInfo other, final String... names) {
+            RoleInfo[] roles = new RoleInfo[names.length];
+            for (int i = 0; i < names.length; ++i) {
+                roles[i] = new RoleInfo(names[i], other.sql, other.sqlread, other.admin,
+                                other.defaultproc, other.defaultprocread, other.allproc);
+            }
+            return roles;
         }
 
         @Override
@@ -192,8 +193,8 @@ public class VoltProjectBuilder {
 
         @Override
         public boolean equals(final Object o) {
-            if (o instanceof GroupInfo) {
-                final GroupInfo oInfo = (GroupInfo)o;
+            if (o instanceof RoleInfo) {
+                final RoleInfo oInfo = (RoleInfo)o;
                 return name.equals(oInfo.name);
             }
             return false;
@@ -266,18 +267,24 @@ public class VoltProjectBuilder {
 
     private Integer m_deadHostTimeout = null;
 
-    private Integer m_elasticTargetThroughput = null;
-    private Integer m_elasticTargetPauseTime = null;
+    private Integer m_elasticThroughput = null;
+    private Integer m_elasticDuration = null;
+    private Integer m_queryTimeout = null;
 
-    private boolean m_useAdhocSchema = false;
+    private boolean m_useDDLSchema = false;
 
-    public VoltProjectBuilder setElasticTargetThroughput(int target) {
-        m_elasticTargetThroughput = target;
+    public VoltProjectBuilder setQueryTimeout(int target) {
+        m_queryTimeout = target;
         return this;
     }
 
-    public VoltProjectBuilder setElasticTargetPauseTime(int target) {
-        m_elasticTargetPauseTime = target;
+    public VoltProjectBuilder setElasticThroughput(int target) {
+        m_elasticThroughput = target;
+        return this;
+    }
+
+    public VoltProjectBuilder setElasticDuration(int target) {
+        m_elasticDuration = target;
         return this;
     }
 
@@ -285,8 +292,8 @@ public class VoltProjectBuilder {
         m_deadHostTimeout = deadHostTimeout;
     }
 
-    public void setUseAdhocSchema(boolean useIt) {
-        m_useAdhocSchema = useIt;
+    public void setUseDDLSchema(boolean useIt) {
+        m_useDDLSchema = useIt;
     }
 
     public void configureLogging(String internalSnapshotPath, String commandLogPath, Boolean commandLogSync,
@@ -337,22 +344,28 @@ public class VoltProjectBuilder {
         }
     }
 
-    public void addGroups(final GroupInfo groups[]) {
-        for (final GroupInfo info : groups) {
+    public void addRoles(final RoleInfo roles[]) {
+        for (final RoleInfo info : roles) {
             transformer.append("CREATE ROLE " + info.name);
-            if(info.adhoc || info.defaultproc || info.sysproc || info.defaultprocread) {
+            if(info.sql || info.sqlread || info.defaultproc || info.admin || info.defaultprocread || info.allproc) {
                 transformer.append(" WITH ");
-                if(info.adhoc) {
-                    transformer.append("adhoc,");
+                if(info.sql) {
+                    transformer.append("sql,");
+                }
+                if(info.sqlread) {
+                    transformer.append("sqlread,");
                 }
                 if(info.defaultproc) {
                     transformer.append("defaultproc,");
                 }
-                if(info.sysproc) {
-                    transformer.append("sysproc,");
+                if(info.admin) {
+                    transformer.append("admin,");
                 }
                 if(info.defaultprocread) {
                     transformer.append("defaultprocread,");
+                }
+                if(info.allproc) {
+                    transformer.append("allproc,");
                 }
                 transformer.replace(transformer.length() - 1, transformer.length(), ";");
             }
@@ -403,15 +416,11 @@ public class VoltProjectBuilder {
     }
 
     public void addStmtProcedure(String name, String sql) {
-        addStmtProcedure(name, sql, null, null);
+        addStmtProcedure(name, sql, null);
     }
 
     public void addStmtProcedure(String name, String sql, String partitionInfo) {
-        addStmtProcedure( name, sql, partitionInfo, null);
-    }
-
-    public void addStmtProcedure(String name, String sql, String partitionInfo, String joinOrder) {
-        addProcedures(new ProcedureInfo(new String[0], name, sql, partitionInfo, joinOrder));
+        addProcedures(new ProcedureInfo(new String[0], name, sql, partitionInfo));
     }
 
     public void addProcedures(final Class<?>... procedures) {
@@ -422,7 +431,7 @@ public class VoltProjectBuilder {
     }
 
     /*
-     * List of groups permitted to invoke the procedure
+     * List of roles permitted to invoke the procedure
      */
     public void addProcedures(final ProcedureInfo... procedures) {
         final ArrayList<ProcedureInfo> procArray = new ArrayList<ProcedureInfo>();
@@ -444,10 +453,10 @@ public class VoltProjectBuilder {
 
             // ALLOW clause in CREATE PROCEDURE stmt
             StringBuffer roleInfo = new StringBuffer();
-            if(procedure.groups.length != 0) {
+            if(procedure.roles.length != 0) {
                 roleInfo.append(" ALLOW ");
-                for(int i = 0; i < procedure.groups.length; i++) {
-                    roleInfo.append(procedure.groups[i] + ",");
+                for(int i = 0; i < procedure.roles.length; i++) {
+                    roleInfo.append(procedure.roles[i] + ",");
                 }
                 int length = roleInfo.length();
                 roleInfo.replace(length - 1, length, " ");
@@ -505,8 +514,12 @@ public class VoltProjectBuilder {
         m_jsonApiEnabled = enabled;
     }
 
-    public void setSecurityEnabled(final boolean enabled) {
+    public void setSecurityEnabled(final boolean enabled, boolean createAdminUser) {
         m_securityEnabled = enabled;
+        if (createAdminUser) {
+            addUsers(new UserInfo[]
+                    {new UserInfo("defaultadmin", "admin", new String[] {"ADMINISTRATOR"})});
+        }
     }
 
     public void setSecurityProvider(final String provider) {
@@ -815,7 +828,7 @@ public class VoltProjectBuilder {
         cluster.setHostcount(dinfo.hostCount);
         cluster.setSitesperhost(dinfo.sitesPerHost);
         cluster.setKfactor(dinfo.replication);
-        cluster.setSchema(m_useAdhocSchema ? SchemaType.ADHOC : SchemaType.CATALOG);
+        cluster.setSchema(m_useDDLSchema ? SchemaType.DDL : SchemaType.CATALOG);
 
         // <paths>
         PathsType paths = factory.createPathsType();
@@ -916,12 +929,18 @@ public class VoltProjectBuilder {
             snapshot.setPriority(m_snapshotPriority);
             systemSettingType.setSnapshot(snapshot);
         }
-        if (m_elasticTargetThroughput != null || m_elasticTargetPauseTime != null) {
+        if (m_elasticThroughput != null || m_elasticDuration != null) {
             SystemSettingsType.Elastic elastic = factory.createSystemSettingsTypeElastic();
-            if (m_elasticTargetThroughput != null) elastic.setThroughput(m_elasticTargetThroughput);
-            if (m_elasticTargetPauseTime != null) elastic.setDuration(m_elasticTargetPauseTime);
+            if (m_elasticThroughput != null) elastic.setThroughput(m_elasticThroughput);
+            if (m_elasticDuration != null) elastic.setDuration(m_elasticDuration);
             systemSettingType.setElastic(elastic);
         }
+        if (m_queryTimeout != null) {
+            SystemSettingsType.Query query = factory.createSystemSettingsTypeQuery();
+            query.setTimeout(m_queryTimeout);
+            systemSettingType.setQuery(query);
+        }
+
         deployment.setSystemsettings(systemSettingType);
 
         // <users>
@@ -936,15 +955,15 @@ public class VoltProjectBuilder {
                 user.setName(info.name);
                 user.setPassword(info.password);
 
-                // build up user/@groups.
-                if (info.groups.length > 0) {
-                    final StringBuilder groups = new StringBuilder();
-                    for (final String group : info.groups) {
-                        if (groups.length() > 0)
-                            groups.append(",");
-                        groups.append(group);
+                // build up user/roles.
+                if (info.roles.length > 0) {
+                    final StringBuilder roles = new StringBuilder();
+                    for (final String role : info.roles) {
+                        if (roles.length() > 0)
+                            roles.append(",");
+                        roles.append(role);
                     }
-                    user.setGroups(groups.toString());
+                    user.setRoles(roles.toString());
                 }
             }
         }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -35,9 +35,9 @@ public class SQLLexer
 
     private static final Pattern WHITELIST_1 = Pattern.compile(
             "^\\s*" +  // start of line, 0 or more whitespace
-            "(alter|create|drop|partition)" + // DDL we're ready to handle
+            "(alter|create|drop|export|partition)" + // DDL we're ready to handle
             "\\s+" + // one or more whitespace
-            "(table|assumeunique|unique|index|view|procedure)" +
+            "(table|assumeunique|unique|index|view|procedure|role)" +
             "\\s+" + // one or more whitespace
             ".*$", // all the rest
             Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL
@@ -48,7 +48,7 @@ public class SQLLexer
     // Don't accept these DDL tokens yet
     private static final Pattern BLACKLIST_1 = Pattern.compile(
             "^\\s*" +  // start of line, 0 or more whitespace
-            "(export|import)" + // DDL we're not ready to handle
+            "(import)" + // DDL we're not ready to handle
             "\\s+" + // one or more whitespace
             ".*$", // all the rest
             Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL
@@ -85,6 +85,31 @@ public class SQLLexer
             ddlToken = ddlMatcher.group(1).toLowerCase();
         }
         return ddlToken;
+    }
+
+    // Extracts the table name for DDL batch conflicting command checks.
+    private static final Pattern CREATE_DROP_TABLE_PREAMBLE = Pattern.compile(
+            "^\\s*" +  // start of line, 0 or more whitespace
+            "(create|drop)" + // DDL commands we're looking for
+            "\\s+" + // one or more whitespace
+            "table" +
+            "\\s+" + // one or more whitespace
+            "([a-z][a-z0-9_]*)" + // table name symbol
+            ".*$", // all the rest
+            Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL
+            );
+
+    /**
+     * Get the table name for a CREATE or DROP DDL statement.
+     * @return returns token, or null if the DDL isn't (CREATE|DROP) TABLE
+     */
+    public static String extractDDLTableName(String sql)
+    {
+        Matcher matcher = CREATE_DROP_TABLE_PREAMBLE.matcher(sql);
+        if (matcher.find()) {
+            return matcher.group(2).toLowerCase();
+        }
+        return null;
     }
 
     // Naive filtering for stuff we haven't implemented yet.

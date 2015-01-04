@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -41,22 +41,6 @@ public class TestSqlCommandParserInteractive extends TestCase {
 
     static ExecutorService executor = CoreUtils.getSingleThreadExecutor("TestSqlCommandParser");
 
-    Callable<List<String>> makeQueryTask(final InputStream in, final OutputStream out)
-    {
-        return new Callable<List<String>>() {
-                @Override
-                public List<String> call() {
-                    List<String> results = null;
-                    try {
-                        SQLConsoleReader reader = new SQLConsoleReader(in, out);
-                        SQLCommand.mockLineReaderForTest(reader);
-                        results = SQLCommand.getQuery(true);
-                    } catch (Exception ioe) {}
-                    return results;
-                }
-        };
-    }
-
     static class CommandStuff
     {
         PipedInputStream pis;
@@ -78,13 +62,7 @@ public class TestSqlCommandParserInteractive extends TestCase {
             return new Callable<List<String>>() {
                 @Override
                 public List<String> call() {
-                    List<String> results = null;
-                    try {
-                        SQLConsoleReader reader = new SQLConsoleReader(in, out);
-                        SQLCommand.mockLineReaderForTest(reader);
-                        results = SQLCommand.getQuery(true);
-                    } catch (Exception ioe) {}
-                    return results;
+                    return SQLCommand.getParserTestQueries(in, out);
                 }
             };
         }
@@ -276,14 +254,27 @@ public class TestSqlCommandParserInteractive extends TestCase {
 
     public void testAlterTable() throws Exception
     {
+        String[] alterStmts = new String[] {
+                "alter table foo add column newcol varchar(50)",
+                "alter table foo drop column",
+                "alter table foo alter column oldcol integer",
+                // test various cases with whitespace and quoted IDs
+                "alter table\"foo\"drop column",
+                "alter table \"drop \" drop column",
+                "alter table  \"foo\"\"foo\" alter column newcol integer",
+                "alter table \"alter\" alter column foo float",
+                "alter table \"create view\" drop column"
+        };
+
         CommandStuff cmd = new CommandStuff();
-        Future<List<String>> result = cmd.openQuery();
-        String alter = "alter table foo add column newcol varchar(50)";
-        cmd.submitText(alter + ";\n");
-        cmd.waitOnResult();
-        System.out.println("RESULT: " + result.get());
-        assertEquals(1, result.get().size());
-        assertEquals(alter, result.get().get(0));
+        for (int i = 0; i < alterStmts.length; ++i) {
+            Future<List<String>> result = cmd.openQuery();
+            cmd.submitText(alterStmts[i] + ";\n");
+            cmd.waitOnResult();
+            System.out.println("RESULT: " + result.get());
+            assertEquals(1, result.get().size());
+            assertEquals(alterStmts[i], result.get().get(0));
+        }
     }
 
     public void testDropTable() throws Exception
@@ -468,5 +459,17 @@ public class TestSqlCommandParserInteractive extends TestCase {
         System.out.println("RESULT: " + result.get());
         assertEquals(1, result.get().size());
         assertEquals(upsert, result.get().get(0));
+    }
+
+    public void testCreateRole() throws Exception
+    {
+        CommandStuff cmd = new CommandStuff();
+        Future<List<String>> result = cmd.openQuery();
+        String create = "create role goats with ADMINISTRATOR";
+        cmd.submitText(create + ";\n");
+        cmd.waitOnResult();
+        System.out.println("RESULT: " + result.get());
+        assertEquals(1, result.get().size());
+        assertEquals(create, result.get().get(0));
     }
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -50,15 +50,15 @@ public class CatalogBuilder {
     private StringBuffer transformer = new StringBuffer();
 
     public static final class ProcedureInfo {
-        private final String groups[];
+        private final String roles[];
         private final Class<?> cls;
         private final String name;
         private final String sql;
         private final String partitionInfo;
         private final String joinOrder;
 
-        public ProcedureInfo(final String groups[], final Class<?> cls) {
-            this.groups = groups;
+        public ProcedureInfo(final String roles[], final Class<?> cls) {
+            this.roles = roles;
             this.cls = cls;
             this.name = cls.getSimpleName();
             this.sql = null;
@@ -68,21 +68,21 @@ public class CatalogBuilder {
         }
 
         public ProcedureInfo(
-                final String groups[],
+                final String roles[],
                 final String name,
                 final String sql,
                 final String partitionInfo) {
-            this(groups, name, sql, partitionInfo, null);
+            this(roles, name, sql, partitionInfo, null);
         }
 
         public ProcedureInfo(
-                final String groups[],
+                final String roles[],
                 final String name,
                 final String sql,
                 final String partitionInfo,
                 final String joinOrder) {
             assert(name != null);
-            this.groups = groups;
+            this.roles = roles;
             this.cls = null;
             this.name = name;
             if(sql.endsWith(";")) {
@@ -105,36 +105,6 @@ public class CatalogBuilder {
         public boolean equals(final Object o) {
             if (o instanceof ProcedureInfo) {
                 final ProcedureInfo oInfo = (ProcedureInfo)o;
-                return name.equals(oInfo.name);
-            }
-            return false;
-        }
-    }
-
-    public static final class GroupInfo {
-        private final String name;
-        private final boolean adhoc;
-        private final boolean sysproc;
-        private final boolean defaultproc;
-        private final boolean defaultprocread;
-
-        public GroupInfo(final String name, final boolean adhoc, final boolean sysproc, final boolean defaultproc, final boolean defaultprocread){
-            this.name = name;
-            this.adhoc = adhoc;
-            this.sysproc = sysproc;
-            this.defaultproc = defaultproc;
-            this.defaultprocread = defaultprocread;
-        }
-
-        @Override
-        public int hashCode() {
-            return name.hashCode();
-        }
-
-        @Override
-        public boolean equals(final Object o) {
-            if (o instanceof GroupInfo) {
-                final GroupInfo oInfo = (GroupInfo)o;
                 return name.equals(oInfo.name);
             }
             return false;
@@ -171,31 +141,6 @@ public class CatalogBuilder {
 
     public void addAllDefaults() {
         // does nothing in the base class
-    }
-
-    public void addGroups(final GroupInfo groups[]) {
-        for (final GroupInfo info : groups) {
-            transformer.append("CREATE ROLE " + info.name);
-            if(info.adhoc || info.defaultproc || info.sysproc || info.defaultprocread) {
-                transformer.append(" WITH ");
-                if(info.adhoc) {
-                    transformer.append("adhoc,");
-                }
-                if(info.defaultproc) {
-                    transformer.append("defaultproc,");
-                }
-                if(info.sysproc) {
-                    transformer.append("sysproc,");
-                }
-                if(info.defaultprocread) {
-                    transformer.append("defaultprocread,");
-                }
-                transformer.replace(transformer.length() - 1, transformer.length(), ";");
-            }
-            else {
-                transformer.append(";");
-            }
-        }
     }
 
     public void addSchema(final URL schemaURL) {
@@ -258,7 +203,7 @@ public class CatalogBuilder {
     }
 
     /*
-     * List of groups permitted to invoke the procedure
+     * List of roles permitted to invoke the procedure
      */
     public void addProcedures(final ProcedureInfo... procedures) {
         final ArrayList<ProcedureInfo> procArray = new ArrayList<ProcedureInfo>();
@@ -280,10 +225,10 @@ public class CatalogBuilder {
 
             // ALLOW clause in CREATE PROCEDURE stmt
             StringBuffer roleInfo = new StringBuffer();
-            if(procedure.groups.length != 0) {
+            if(procedure.roles.length != 0) {
                 roleInfo.append(" ALLOW ");
-                for(int i = 0; i < procedure.groups.length; i++) {
-                    roleInfo.append(procedure.groups[i] + ",");
+                for(int i = 0; i < procedure.roles.length; i++) {
+                    roleInfo.append(procedure.roles[i] + ",");
                 }
                 int length = roleInfo.length();
                 roleInfo.replace(length - 1, length, " ");

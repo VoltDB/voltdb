@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -78,8 +78,9 @@ class Pool {
 public:
 
     Pool() :
-        m_allocationSize(TEMP_POOL_CHUNK_SIZE), m_maxChunkCount(0), m_currentChunkIndex(0)
+        m_allocationSize(TEMP_POOL_CHUNK_SIZE), m_maxChunkCount(1), m_currentChunkIndex(0)
     {
+        init();
     }
 
     Pool(uint64_t allocationSize, uint64_t maxChunkCount) :
@@ -91,6 +92,21 @@ public:
         m_maxChunkCount(static_cast<std::size_t>(maxChunkCount)),
         m_currentChunkIndex(0)
     {
+        init();
+    }
+
+    void init() {
+#ifdef USE_MMAP
+        char *storage =
+                static_cast<char*>(::mmap( 0, m_allocationSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 ));
+        if (storage == MAP_FAILED) {
+            std::cout << strerror( errno ) << std::endl;
+            throwFatalException("Failed mmap");
+        }
+#else
+        char *storage = new char[m_allocationSize];
+#endif
+        m_chunks.push_back(Chunk(m_allocationSize, storage));
     }
 
     ~Pool() {
@@ -120,19 +136,6 @@ public:
      * Allocate a continous block of memory of the specified size.
      */
     inline void* allocate(std::size_t size) {
-        if (m_chunks.empty()) {
-#ifdef USE_MMAP
-            char *storage =
-                    static_cast<char*>(::mmap( 0, m_allocationSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0 ));
-            if (storage == MAP_FAILED) {
-                std::cout << strerror( errno ) << std::endl;
-                throwFatalException("Failed mmap");
-            }
-#else
-            char *storage = new char[m_allocationSize];
-#endif
-            m_chunks.push_back(Chunk(m_allocationSize, storage));
-        }
         /*
          * See if there is space in the current chunk
          */

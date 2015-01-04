@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -170,36 +170,40 @@ public class LoadedProcedureSet {
 
             final String className = sysProc.getClassname();
             Class<?> procClass = null;
-            try {
-                procClass = catalogContext.classForProcedure(className);
-            }
-            catch (final ClassNotFoundException e) {
-                if (sysProc.commercial) {
-                    continue;
+
+            // this check is for sysprocs that don't have a procedure class
+            if (className != null) {
+                try {
+                    procClass = catalogContext.classForProcedure(className);
                 }
-                hostLog.l7dlog(
-                        Level.WARN,
-                        LogKeys.host_ExecutionSite_GenericException.name(),
-                        new Object[] { m_siteId, m_siteIndex },
-                        e);
-                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
-            }
+                catch (final ClassNotFoundException e) {
+                    if (sysProc.commercial) {
+                        continue;
+                    }
+                    hostLog.l7dlog(
+                            Level.WARN,
+                            LogKeys.host_ExecutionSite_GenericException.name(),
+                            new Object[] { m_siteId, m_siteIndex },
+                            e);
+                    VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+                }
 
-            try {
-                procedure = (VoltSystemProcedure) procClass.newInstance();
-            }
-            catch (final InstantiationException e) {
-                hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
-                        new Object[] { m_siteId, m_siteIndex }, e);
-            }
-            catch (final IllegalAccessException e) {
-                hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
-                        new Object[] { m_siteId, m_siteIndex }, e);
-            }
+                try {
+                    procedure = (VoltSystemProcedure) procClass.newInstance();
+                }
+                catch (final InstantiationException e) {
+                    hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
+                            new Object[] { m_siteId, m_siteIndex }, e);
+                }
+                catch (final IllegalAccessException e) {
+                    hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
+                            new Object[] { m_siteId, m_siteIndex }, e);
+                }
 
-            runner = m_runnerFactory.create(procedure, proc, csp);
-            procedure.initSysProc(m_site, this, proc, catalogContext.cluster);
-            builder.put(entry.getKey().intern(), runner);
+                runner = m_runnerFactory.create(procedure, proc, csp);
+                procedure.initSysProc(m_site, this, proc, catalogContext.cluster);
+                builder.put(entry.getKey().intern(), runner);
+            }
         }
     }
 

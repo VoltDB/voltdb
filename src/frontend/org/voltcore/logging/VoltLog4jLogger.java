@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -179,7 +179,7 @@ public class VoltLog4jLogger implements CoreVoltLogger {
      */
     public static void configure(String xmlConfig) {
         DOMConfigurator configurator = new DOMConfigurator();
-        StringReader sr = new StringReader(xmlConfig);
+        StringReader sr = new StringReader(xmlConfig.trim());
         configurator.doConfigure(sr, LogManager.getLoggerRepository());
     }
 

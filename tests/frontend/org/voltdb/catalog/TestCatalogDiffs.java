@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -33,7 +33,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
+import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
@@ -59,16 +59,16 @@ public class TestCatalogDiffs extends TestCase {
 
     protected String compileWithGroups(
             boolean securityEnabled, String securityProvider,
-            GroupInfo[] gi, UserInfo[] ui,
+            RoleInfo[] gi, UserInfo[] ui,
             String name, Class<?>... procList) {
         TPCCProjectBuilder builder = new TPCCProjectBuilder();
         builder.addDefaultSchema();
         builder.addDefaultPartitioning();
         builder.addProcedures(procList);
-        builder.setSecurityEnabled(securityEnabled);
+        builder.setSecurityEnabled(securityEnabled, true);
 
         if (gi != null && gi.length > 0)
-            builder.addGroups(gi);
+            builder.addRoles(gi);
         if (ui != null && ui.length > 0)
             builder.addUsers(ui);
 
@@ -141,6 +141,19 @@ public class TestCatalogDiffs extends TestCase {
         assertEquals(updatedOriginalSerialized, catUpdated.serialize());
     }
 
+    private void verifyDiffIfEmptyTable(
+            Catalog catOriginal,
+            Catalog catUpdated)
+    {
+        CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, catUpdated);
+        String originalSerialized = catOriginal.serialize();
+        catOriginal.execute(diff.commands());
+        String updatedOriginalSerialized = catOriginal.serialize();
+        assertTrue(diff.supported());
+        assertTrue(diff.tablesThatMustBeEmpty().length > 0);
+        assertEquals(updatedOriginalSerialized, catUpdated.serialize());
+    }
+
 
     public void testAddProcedure() throws IOException {
         String original = compile("base", BASEPROCS);
@@ -176,8 +189,8 @@ public class TestCatalogDiffs extends TestCase {
         String original = compile("base", BASEPROCS);
         Catalog catOriginal = catalogForJar(original);
 
-        GroupInfo gi[] = new GroupInfo[1];
-        gi[0] = new GroupInfo("group1", true, true, true, true);
+        RoleInfo gi[] = new RoleInfo[1];
+        gi[0] = new RoleInfo("group1", true, true, true, true, true, true);
         String updated = compileWithGroups(false, null, gi, null, "base", BASEPROCS);
         Catalog catUpdated = catalogForJar(updated);
 
@@ -188,8 +201,8 @@ public class TestCatalogDiffs extends TestCase {
         String original = compile("base", BASEPROCS);
         Catalog catOriginal = catalogForJar(original);
 
-        GroupInfo gi[] = new GroupInfo[1];
-        gi[0] = new GroupInfo("group1", true, true, true, true);
+        RoleInfo gi[] = new RoleInfo[1];
+        gi[0] = new RoleInfo("group1", true, true, true, true, true, false);
 
         UserInfo ui[] = new UserInfo[1];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
@@ -201,8 +214,8 @@ public class TestCatalogDiffs extends TestCase {
     }
 
     public void testModifyUser() throws IOException {
-        GroupInfo gi[] = new GroupInfo[1];
-        gi[0] = new GroupInfo("group1", true, true, true, false);
+        RoleInfo gi[] = new RoleInfo[1];
+        gi[0] = new RoleInfo("group1", true, true, true, true, false, false);
 
         UserInfo ui[] = new UserInfo[1];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
@@ -210,8 +223,8 @@ public class TestCatalogDiffs extends TestCase {
         String original = compileWithGroups(false, null, gi, ui, "base", BASEPROCS);
         Catalog catOriginal = catalogForJar(original);
 
-        GroupInfo gi2[] = new GroupInfo[1];
-        gi2[0] = new GroupInfo("group2", true, true, true, true);
+        RoleInfo gi2[] = new RoleInfo[1];
+        gi2[0] = new RoleInfo("group2", true, true, true, true, true, true);
         // change a user.
         ui[0] = new UserInfo("user1", "drowssap", new String[] {"group2"});
         String updated = compileWithGroups(false, null, gi2, ui, "base", BASEPROCS);
@@ -221,8 +234,8 @@ public class TestCatalogDiffs extends TestCase {
     }
 
     public void testDeleteUser() throws IOException {
-        GroupInfo gi[] = new GroupInfo[1];
-        gi[0] = new GroupInfo("group1", true, true, true, false);
+        RoleInfo gi[] = new RoleInfo[1];
+        gi[0] = new RoleInfo("group1", true, true, true, true, false, false);
 
         UserInfo ui[] = new UserInfo[1];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
@@ -238,8 +251,8 @@ public class TestCatalogDiffs extends TestCase {
     }
 
     public void testDeleteGroupAndUser() throws IOException {
-        GroupInfo gi[] = new GroupInfo[1];
-        gi[0] = new GroupInfo("group1", true, true, true, false);
+        RoleInfo gi[] = new RoleInfo[1];
+        gi[0] = new RoleInfo("group1", true, true, true, true, false, false);
 
         UserInfo ui[] = new UserInfo[1];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
@@ -255,9 +268,9 @@ public class TestCatalogDiffs extends TestCase {
     }
 
     public void testChangeUsersAssignedGroups() throws IOException {
-        GroupInfo gi[] = new GroupInfo[2];
-        gi[0] = new GroupInfo("group1", true, true, true, false);
-        gi[1] = new GroupInfo("group2", true, true, true, false);
+        RoleInfo gi[] = new RoleInfo[2];
+        gi[0] = new RoleInfo("group1", true, true, true, true, false, false);
+        gi[1] = new RoleInfo("group2", true, true, true, true, false, true);
 
         UserInfo ui[] = new UserInfo[2];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
@@ -276,9 +289,9 @@ public class TestCatalogDiffs extends TestCase {
     }
 
     public void testChangeSecurityEnabled() throws IOException {
-        GroupInfo gi[] = new GroupInfo[2];
-        gi[0] = new GroupInfo("group1", true, true, true, false);
-        gi[1] = new GroupInfo("group2", true, true, true, false);
+        RoleInfo gi[] = new RoleInfo[2];
+        gi[0] = new RoleInfo("group1", true, true, true, true, false, true);
+        gi[1] = new RoleInfo("group2", true, true, true, true, false, false);
 
         UserInfo ui[] = new UserInfo[2];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
@@ -295,9 +308,9 @@ public class TestCatalogDiffs extends TestCase {
     }
 
     public void testChangeSecurityProvider() throws IOException {
-        GroupInfo gi[] = new GroupInfo[2];
-        gi[0] = new GroupInfo("group1", true, true, true, false);
-        gi[1] = new GroupInfo("group2", true, true, true, false);
+        RoleInfo gi[] = new RoleInfo[2];
+        gi[0] = new RoleInfo("group1", true, true, true, true, false, false);
+        gi[1] = new RoleInfo("group2", true, true, true, true, false, false);
 
         UserInfo ui[] = new UserInfo[2];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
@@ -311,26 +324,6 @@ public class TestCatalogDiffs extends TestCase {
         Catalog catUpdated = catalogForJar(updated);
 
         verifyDiff (catOriginal, catUpdated);
-    }
-
-    public void testUnallowedChange() throws IOException {
-        String original = compile("base", BASEPROCS);
-        Catalog catOriginal = catalogForJar(original);
-
-        // compile an invalid change (add a unique index, in this case)
-        TPCCProjectBuilder builder = new TPCCProjectBuilder();
-        builder.addDefaultSchema();
-        builder.addDefaultPartitioning();
-        builder.addLiteralSchema("CREATE UNIQUE INDEX IDX_CUSTOMER_NAME2 ON CUSTOMER_NAME (C_W_ID,C_D_ID,C_LAST);");
-        builder.addProcedures(BASEPROCS);
-        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
-        String updated = testDir + File.separator + "tpcc-catalogcheck-invalid.jar";
-        builder.compile(updated);
-        Catalog catUpdated = catalogForJar(updated);
-
-        // and verify the allowed flag
-        CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, catUpdated);
-        assertFalse(diff.supported());
     }
 
     public void testAdminStartupChange() throws IOException {
@@ -529,21 +522,21 @@ public class TestCatalogDiffs extends TestCase {
         catUpdated = getCatalogForTable("A", "modtablecolumn2", t2);
         verifyDiff(catOriginal, catUpdated, true, null);
 
-        // fail integer contraction
+        // fail integer contraction if non-empty empty
         t1 = TableHelper.quickTable("(BIGINT)");
         t2 = TableHelper.quickTable("(INTEGER)");
         catOriginal = getCatalogForTable("A", "modtablecolumn1", t1);
         catUpdated = getCatalogForTable("A", "modtablecolumn2", t2);
-        verifyDiffRejected(catOriginal, catUpdated);
+        verifyDiffIfEmptyTable(catOriginal, catUpdated);
 
-        // fail string contraction
+        // fail string contraction if non-empty table
         t1 = TableHelper.quickTable("(VARCHAR35)");
         t2 = TableHelper.quickTable("(VARCHAR34)");
         catOriginal = getCatalogForTable("A", "modtablecolumn1", t1);
         catUpdated = getCatalogForTable("A", "modtablecolumn2", t2);
-        verifyDiffRejected(catOriginal, catUpdated);
+        verifyDiffIfEmptyTable(catOriginal, catUpdated);
 
-        // fail - change export schema
+        // fail - change export schema if non-empty
         t1 = TableHelper.quickTable("(VARCHAR35)");
         t2 = TableHelper.quickTable("(VARCHAR34)");
         catOriginal = getExportCatalogForTable("A", "modtablecolumn1", t1);
@@ -571,12 +564,12 @@ public class TestCatalogDiffs extends TestCase {
         report = verifyDiff(catOriginal, catUpdated);
         assert(report.contains("Table A has been modified."));
 
-        // size not satisfied
+        // size not satisfied if non-empty table
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT, v1 varchar(15 BYTES), v2 varchar(5 BYTES) );");
         builder.compile(testDir + File.separator + "testVarchar2.jar");
         catUpdated = catalogForJar(testDir + File.separator + "testVarchar2.jar");
-        verifyDiffRejected(catOriginal, catUpdated);
+        verifyDiffIfEmptyTable(catOriginal, catUpdated);
 
         // inline character to not in line bytes.
         builder = new VoltProjectBuilder();
@@ -618,7 +611,7 @@ public class TestCatalogDiffs extends TestCase {
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT, v1 varchar(5), v2 varchar(3) );");
         builder.compile(testDir + File.separator + "testVarchar6.jar");
         catUpdated = catalogForJar(testDir + File.separator + "testVarchar6.jar");
-        verifyDiffRejected(catOriginal, catUpdated);
+        verifyDiffIfEmptyTable(catOriginal, catUpdated);
     }
 
     public void testAddNonNullityRejected() throws IOException {
@@ -640,7 +633,7 @@ public class TestCatalogDiffs extends TestCase {
         builder.compile(testDir + File.separator + "testAddNonNullity2.jar");
         Catalog catUpdated = catalogForJar(testDir + File.separator + "testAddNonNullity2.jar");
 
-        verifyDiffRejected(catOriginal, catUpdated);
+        verifyDiffIfEmptyTable(catOriginal, catUpdated);
     }
 
     public void testDropNonNullity() throws IOException {
@@ -685,7 +678,7 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiff(catOriginal, catUpdated, false, null);
     }
 
-    public void testAddUniqueNonCoveringTableIndexRejected() throws IOException {
+    public void testAddUniqueNonCoveringTableIndexRejectedIfNotEmpty() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 
         // start with a table
@@ -701,10 +694,10 @@ public class TestCatalogDiffs extends TestCase {
         builder.compile(testDir + File.separator + "testAddUniqueNonCoveringTableIndexRejected2.jar");
         Catalog catUpdated = catalogForJar(testDir + File.separator + "testAddUniqueNonCoveringTableIndexRejected2.jar");
 
-        verifyDiffRejected(catOriginal, catUpdated);
+        verifyDiffIfEmptyTable(catOriginal, catUpdated);
     }
 
-    public void testShrinkUniqueNonCoveringTableIndexRejected() throws IOException {
+    public void testShrinkUniqueNonCoveringTableIndexRejectedIfNonEmpty() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 
         // start with a table
@@ -723,7 +716,7 @@ public class TestCatalogDiffs extends TestCase {
         builder.compile(testDir + File.separator + "testAddUniqueNonCoveringTableIndexRejected2.jar");
         Catalog catUpdated = catalogForJar(testDir + File.separator + "testAddUniqueNonCoveringTableIndexRejected2.jar");
 
-        verifyDiffRejected(catOriginal, catUpdated);
+        verifyDiffIfEmptyTable(catOriginal, catUpdated);
     }
 
     public void testExpandUniqueNonCoveringTableIndex() throws IOException {
@@ -827,7 +820,7 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiff(catOriginal, catUpdated);
     }
 
-    public void testAddTableConstraintRejected() throws IOException {
+    public void testAddTableConstraintRejectedIfNotEmpty() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 
         // start with a table without a PKEY
@@ -840,7 +833,7 @@ public class TestCatalogDiffs extends TestCase {
 
         // add a constraint (this function creates a primary key)
         Catalog catUpdated = getCatalogForTable("A", "testAddTableConstraintRejected2");
-        verifyDiffRejected(catOriginal, catUpdated);
+        verifyDiffIfEmptyTable(catOriginal, catUpdated);
     }
 
     public void testRemoveTableConstraint() throws IOException {
@@ -928,7 +921,7 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiffRejected(catOriginal, catUpdated);
     }
 
-    public void testModifyMaterializedViewStructureRejected() throws IOException {
+    public void testModifyMaterializedViewStructureRejectedIfEmpty() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 
         // with a view
@@ -952,7 +945,7 @@ public class TestCatalogDiffs extends TestCase {
         builder.compile(testDir + File.separator + "modmatview2.jar");
         Catalog catUpdated = catalogForJar(testDir + File.separator + "modmatview2.jar");
 
-        verifyDiffRejected(catOriginal, catUpdated);
+        verifyDiffIfEmptyTable(catOriginal, catUpdated);
     }
 
     public void testModifyMaterializedViewAddPredicateRejected() throws IOException {
@@ -1033,7 +1026,7 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiffRejected(catOriginal, catUpdated);
     }
 
-    public void testModifyMaterializedViewSourceRejected() throws IOException {
+    public void testModifyMaterializedViewSourceRejectedIfEmpty() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 
         // with a view
@@ -1046,7 +1039,7 @@ public class TestCatalogDiffs extends TestCase {
         builder.compile(testDir + File.separator + "resrcmatview1.jar");
         Catalog catOriginal = catalogForJar(testDir + File.separator + "resrcmatview1.jar");
 
-        // without a view
+        // without an added column (should work with empty table)
         builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL, C3 BIGINT NOT NULL);");
         builder.addLiteralSchema("\nCREATE VIEW MATVIEW(C1, NUM) AS " +
@@ -1056,7 +1049,7 @@ public class TestCatalogDiffs extends TestCase {
         builder.compile(testDir + File.separator + "resrcmatview2.jar");
         Catalog catUpdated = catalogForJar(testDir + File.separator + "resrcmatview2.jar");
 
-        verifyDiffRejected(catOriginal, catUpdated);
+        verifyDiffIfEmptyTable(catOriginal, catUpdated);
     }
 
     public void testRemoveTableAndMaterializedView() throws IOException {
@@ -1122,8 +1115,8 @@ public class TestCatalogDiffs extends TestCase {
         builder.compile(testDir + File.separator + "elastic1.jar");
         Catalog catOriginal = catalogForJar(testDir +  File.separator + "elastic1.jar");
 
-        builder.setElasticTargetPauseTime(100);
-        builder.setElasticTargetThroughput(50);
+        builder.setElasticDuration(100);
+        builder.setElasticThroughput(50);
         builder.compile(testDir + File.separator + "elastic2.jar");
         Catalog catUpdated = catalogForJar(testDir + File.separator + "elastic2.jar");
         verifyDiff(catOriginal, catUpdated, null, true);
@@ -1137,8 +1130,8 @@ public class TestCatalogDiffs extends TestCase {
         builder.compile(testDir + File.separator + "elastic1.jar");
         Catalog catOriginal = catalogForJar(testDir +  File.separator + "elastic1.jar");
 
-        builder.setElasticTargetPauseTime(100);
-        builder.setElasticTargetThroughput(50);
+        builder.setElasticDuration(100);
+        builder.setElasticThroughput(50);
         builder.addStmtProcedure("another_procedure", "select * from A;");
         builder.compile(testDir + File.separator + "elastic2.jar");
         Catalog catUpdated = catalogForJar(testDir + File.separator + "elastic2.jar");
@@ -1153,8 +1146,8 @@ public class TestCatalogDiffs extends TestCase {
         builder.compile(testDir + File.separator + "elastic1.jar");
         Catalog catOriginal = catalogForJar(testDir +  File.separator + "elastic1.jar");
 
-        builder.setElasticTargetPauseTime(100);
-        builder.setElasticTargetThroughput(50);
+        builder.setElasticDuration(100);
+        builder.setElasticThroughput(50);
         builder.addStmtProcedure("another_procedure", "select * from A;");
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL);");
         builder.compile(testDir + File.separator + "elastic2.jar");

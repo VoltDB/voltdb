@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -125,12 +125,6 @@ bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
 
     // for target table related info.
     m_partitionColumn = targetTable->partitionColumn();
-    m_partitionColumnIsString = false;
-    if (m_partitionColumn != -1) {
-        if (targetTable->schema()->columnType(m_partitionColumn) == VALUE_TYPE_VARCHAR) {
-            m_partitionColumnIsString = true;
-        }
-    }
 
     return true;
 }

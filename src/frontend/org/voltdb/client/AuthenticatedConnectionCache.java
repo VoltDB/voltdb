@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,6 +22,7 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
+import org.voltcore.logging.VoltLogger;
 
 import org.voltdb.common.Constants;
 
@@ -38,6 +39,8 @@ import org.voltdb.common.Constants;
  * This is probably not threadsafe yet.
  */
 public class AuthenticatedConnectionCache {
+
+    private static VoltLogger logger = new VoltLogger("HOST");
 
     final String m_hostname;
     final String m_adminHostName;
@@ -70,20 +73,7 @@ public class AuthenticatedConnectionCache {
 
         @Override
         public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
-            // Close the connection. The cause can be CONNECTION_CLOSED or TIMEOUT, we don't care which.
-
-            // debug printstacktrace, to be remove later.  In theory we shouldn't hit this code
-            // because the JSON/HTTP client is within the server.  Speculation that this
-            // can be called if the connection is closed by the server, which is odd because
-            // this client is running *within* the server!
-            new Exception("Client Disconnect").printStackTrace();
-            System.err.printf("ERROR: Connection to %s:%d was lost.\n", hostname, port);
-            try {
-                if (null != m_conn.client) {
-                    m_conn.client.close();
-                }
-            } catch (InterruptedException ex) {
-            }
+            logger.debug("Connection lost was reported for internal client.");
         }
     }
 
@@ -92,34 +82,6 @@ public class AuthenticatedConnectionCache {
     Map<String, Connection> m_connections = new TreeMap<String, Connection>();
     // The optional unauthenticated clients which should only work if auth is off
     ClientImpl m_unauthClient = null;
-
-    final static Long REJECT_TIMEOUT_S = 1L;
-    Long m_lastRejectTime = null;
-
-    // Check whether we're still blocking client connection attempts
-    // due to a server rejection.  Resets the timeout automagically if it
-    // has expired.
-    private boolean checkRejectHold()
-    {
-        boolean retval = false;
-        if (m_lastRejectTime != null)
-        {
-            if ((System.currentTimeMillis() - m_lastRejectTime) < (REJECT_TIMEOUT_S * 1000))
-            {
-                retval = true;
-            }
-            else
-            {
-                m_lastRejectTime = null;
-            }
-        }
-        return retval;
-    }
-
-    private void setRejectHold()
-    {
-        m_lastRejectTime = System.currentTimeMillis();
-    }
 
     public AuthenticatedConnectionCache(int targetSize) {
         this(targetSize, "localhost", "localhost");
@@ -144,11 +106,6 @@ public class AuthenticatedConnectionCache {
         // ADMIN MODE
         if (admin) {
             ClientImpl adminClient = null;
-            if (checkRejectHold())
-            {
-                throw new IOException("Admin connection was rejected due to too many recent rejected attempts. " +
-                                      "Wait " + REJECT_TIMEOUT_S + " seconds and try again.");
-            }
             try
             {
                 adminClient = (ClientImpl) ClientFactory.createClient();
@@ -164,7 +121,6 @@ public class AuthenticatedConnectionCache {
             }
             catch (IOException ioe)
             {
-                setRejectHold();
                 try {
                     adminClient.close();
                 } catch (InterruptedException ex) {
@@ -183,17 +139,11 @@ public class AuthenticatedConnectionCache {
             }
             if (m_unauthClient == null)
             {
-                if (checkRejectHold())
-                {
-                    throw new IOException("Unauthenticated connection was rejected due to too many recent rejected attempts. " +
-                                          "Wait " + REJECT_TIMEOUT_S + " seconds and try again.");
-                }
                 try {
                     m_unauthClient = (ClientImpl) ClientFactory.createClient();
                     m_unauthClient.createConnection(m_hostname, m_port);
                 }
                 catch (IOException e) {
-                    setRejectHold();
                     try {
                         m_unauthClient.close();
                     } catch (InterruptedException ex) {
@@ -223,12 +173,6 @@ public class AuthenticatedConnectionCache {
             conn.refCount++;
         }
         else {
-            if (checkRejectHold())
-            {
-                throw new IOException("Authenticated connection for user " + userName +
-                                      " was rejected due to too many recent rejected attempts. " +
-                                      "Wait " + REJECT_TIMEOUT_S + " seconds and try again.");
-            }
             conn = new Connection();
             conn.refCount = 1;
             conn.passHash = passHash;
@@ -254,7 +198,6 @@ public class AuthenticatedConnectionCache {
             }
             catch (IOException ioe)
             {
-                setRejectHold();
                 try {
                     conn.client.close();
                 } catch (InterruptedException ex) {

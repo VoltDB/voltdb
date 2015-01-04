@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -20,6 +20,8 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+
+package adhocddl;
 
 import java.util.Random;
 
@@ -113,7 +115,7 @@ public class DDLGenerator
      */
     public String DropTable(int tableNo, String prefix)
     {
-        return "DROP TABLE " + prefix + tableNo + ";";
+        return "DROP TABLE " + prefix + tableNo + " IF EXISTS;";
     }
 
     /**
@@ -139,6 +141,6 @@ public class DDLGenerator
     public String DropProcedure(int procNo, int tableNo, String prefix)
     {
         String tableName = prefix + tableNo;
-        return "Drop PROCEDURE P" + procNo + "on" + tableName + ";";
+        return "Drop PROCEDURE P" + procNo + "on" + tableName + " IF EXISTS;";
     }
 }

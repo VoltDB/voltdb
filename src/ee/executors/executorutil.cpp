@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -50,7 +50,6 @@
 
 #include "executors/aggregateexecutor.h"
 #include "executors/deleteexecutor.h"
-#include "executors/distinctexecutor.h"
 #include "executors/indexscanexecutor.h"
 #include "executors/indexcountexecutor.h"
 #include "executors/tablecountexecutor.h"
@@ -78,7 +77,6 @@ AbstractExecutor* getNewExecutor(VoltDBEngine *engine,
     switch (type) {
     case PLAN_NODE_TYPE_AGGREGATE: return new AggregateSerialExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_DELETE: return new DeleteExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_DISTINCT: return new DistinctExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_HASHAGGREGATE: return new AggregateHashExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_PARTIALAGGREGATE: return new AggregatePartialExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_INDEXSCAN: return new IndexScanExecutor(engine, abstract_node);

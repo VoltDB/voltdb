@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,6 +17,7 @@
 
 package org.voltdb.compiler;
 
+import org.voltdb.AuthSystem;
 import org.voltdb.client.ProcedureInvocationType;
 
 public class CatalogChangeWork extends AsyncCompilerWork {
@@ -42,13 +43,13 @@ public class CatalogChangeWork extends AsyncCompilerWork {
             long originalTxnId, long originalUniqueId,
             boolean onReplica, boolean useAdhocDDL,
             AsyncCompilerWorkCompletionHandler completionHandler,
-            String userName)
+            AuthSystem.AuthUser user)
     {
         super(replySiteId, false, clientHandle, connectionId, hostname,
               adminConnection, clientData, invocationName, type,
               originalTxnId, originalUniqueId,
               onReplica, useAdhocDDL,
-              completionHandler, userName);
+              completionHandler, user);
         if (operationBytes != null) {
             this.operationBytes = operationBytes.clone();
         }
@@ -80,7 +81,7 @@ public class CatalogChangeWork extends AsyncCompilerWork {
               adhocDDL.onReplica,
               adhocDDL.useAdhocDDL,
               adhocDDL.completionHandler,
-              adhocDDL.userName);
+              adhocDDL.user);
         // AsyncCompilerAgentHelper will fill in the current catalog bytes later.
         this.operationBytes = null;
         // Ditto for deployment string

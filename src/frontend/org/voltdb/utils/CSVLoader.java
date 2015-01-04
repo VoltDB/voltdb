@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -24,10 +24,8 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.TimeZone;
 import java.util.concurrent.LinkedBlockingQueue;
-
 
 import org.supercsv.io.CsvListReader;
 import org.supercsv.io.ICsvListReader;
@@ -279,6 +277,12 @@ public class CSVLoader implements BulkLoaderErrorHandler {
         @Option(desc = "port to use when connecting to database (default: 21212)")
         int port = Client.VOLTDB_SERVER_PORT;
 
+        @Option(shortOpt = "z", desc = "timezone for interpreting date and time strings")
+        String timezone = "";
+
+        @Option(shortOpt = "n", desc = "Custom null string, overrides all other Null pattern matching")
+        String customNullString = "";
+
         /**
          * Batch size for processing batched operations.
          */
@@ -316,6 +320,9 @@ public class CSVLoader implements BulkLoaderErrorHandler {
             if (batch < 0) {
                 exitWithMessageAndUsage("batch size number must be >= 0");
             }
+            if(!customNullString.isEmpty() && !blank.equals("error")){
+                blank = "empty";
+            }
             if (!blank.equalsIgnoreCase("error") &&
                 !blank.equalsIgnoreCase("null") &&
                 !blank.equalsIgnoreCase("empty")) {
@@ -323,6 +330,19 @@ public class CSVLoader implements BulkLoaderErrorHandler {
             }
             if ((procedure != null) && (procedure.trim().length() > 0)) {
                 useSuppliedProcedure = true;
+            }
+            if(!timezone.equals("")){
+                boolean isValidTimezone = false;
+                for (String tzId : TimeZone.getAvailableIDs()) {
+                    if(tzId.equals(timezone)) {
+                        TimeZone.setDefault(TimeZone.getTimeZone(timezone));
+                        isValidTimezone = true;
+                        break;
+                    }
+                }
+                if(!isValidTimezone){
+                    exitWithMessageAndUsage("specified timezone \"" + timezone + "\" is invalid");
+                }
             }
         }
 
@@ -355,8 +375,8 @@ public class CSVLoader implements BulkLoaderErrorHandler {
 
         final CSVConfig cfg = new CSVConfig();
         cfg.parse(CSVLoader.class.getName(), args);
-
         config = cfg;
+
         configuration();
         final Tokenizer tokenizer;
         ICsvListReader listReader = null;

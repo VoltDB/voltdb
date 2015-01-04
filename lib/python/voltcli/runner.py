@@ -1,6 +1,6 @@
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2014 VoltDB Inc.
+# Copyright (C) 2008-2015 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -426,15 +426,10 @@ class VerbRunner(object):
         """
         Initialize daemon keyword arguments.
         """
-        # Build the name, using the host option if available.
-        names = []
-        if name:
-            names.append(name)
-        if hasattr(self.opts, 'host'):
-            names.append(self.opts.host.replace(':', '_'))
-        if not names:
-            names.append('server')
-        daemon_name = ''.join(names)
+        daemon_name = utility.daemon_file_name(
+            base_name=name,
+            host=getattr(self.opts, 'host', None),
+            instance=getattr(self.opts, 'instance', None))
         # Default daemon output directory to the state directory, which is
         # frequently set to ~/.<command_name>.
         daemon_output = output

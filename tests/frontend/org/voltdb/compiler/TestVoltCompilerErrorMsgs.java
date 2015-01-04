@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -186,5 +186,24 @@ public class TestVoltCompilerErrorMsgs extends TestCase {
                 "create procedure insert_into_replicated_select as " +
                 "insert into blah select * from partitioned_blah;" +
                 "partition procedure insert_into_replicated_select on table partitioned_blah column sval;");
+    }
+
+    public void testErrorOnLimitPartitionRows() throws Exception {
+
+        ddlErrorTest("Table T1 has invalid DELETE statement for LIMIT PARTITION ROWS constraint: not a DELETE statement",
+                "create table t1 (i integer, "
+                + "constraint row_limit limit partition rows 5 "
+                + "execute (insert into t1 values(3)));");
+
+        ddlErrorTest("Table T1 has invalid DELETE statement for LIMIT PARTITION ROWS constraint: target of DELETE must be T1",
+                "create table t1 (i integer, "
+                + "constraint row_limit limit partition rows 5 "
+                + "execute (delete from partitioned_blah));");
+
+        ddlErrorTest("Table T1 has invalid DELETE statement for LIMIT PARTITION ROWS constraint: parse error: SQL Syntax error",
+                "create table t1 (i integer, "
+                + "constraint row_limit limit partition rows 5 "
+                + "execute (delete frm partitioned_blah));");
+
     }
 }

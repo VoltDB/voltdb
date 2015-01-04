@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -49,7 +49,7 @@ public class TestAdhocCreateStatementProc extends AdhocDDLTestBase {
                 ");\n"
                 );
         builder.addPartitionInfo("FOO", "ID");
-        builder.setUseAdhocSchema(true);
+        builder.setUseDDLSchema(true);
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue("Schema compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
@@ -107,6 +107,57 @@ public class TestAdhocCreateStatementProc extends AdhocDDLTestBase {
                 pce.printStackTrace();
                 fail("Should be able to call procedure FOOCOUNT");
             }
+
+            // now drop it
+            try {
+                m_client.callProcedure("@AdHoc", "drop procedure FOOCOUNT");
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Should be able to drop procedure FOOCOUNT");
+            }
+            assertFalse(findProcedureInSystemCatalog("FOOCOUNT"));
+
+            // Can't drop it twice
+            threw = false;
+            try {
+                m_client.callProcedure("@AdHoc", "drop procedure FOOCOUNT");
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                threw = true;
+            }
+            assertTrue("Can't vanilla drop procedure FOOCOUNT twice", threw);
+
+            // unless we use if exists
+            try {
+                m_client.callProcedure("@AdHoc", "drop procedure FOOCOUNT if exists");
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Should be able to drop procedure FOOCOUNT twice with if exists");
+            }
+
+            // Create it again so we can destroy it with drop with if exists, just to be sure
+            try {
+                m_client.callProcedure("@AdHoc",
+                        "create procedure FOOCOUNT as select * from FOO where ID=?;");
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Should be able to create statement procedure");
+            }
+            assertTrue(findProcedureInSystemCatalog("FOOCOUNT"));
+
+            // now drop it
+            try {
+                m_client.callProcedure("@AdHoc", "drop procedure FOOCOUNT if exists");
+            }
+            catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Should be able to drop procedure FOOCOUNT");
+            }
+            assertFalse(findProcedureInSystemCatalog("FOOCOUNT"));
         }
         finally {
             teardownSystem();

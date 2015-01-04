@@ -205,7 +205,7 @@ function checkConnection() {
             };
             plot = $.jqplot('chartUSMap1', data, chartParams);
 
-            con = VoltDB.AddConnection('localhost', 8080, false, null, null, false, (function(connection, success)
+            con = VoltDB.AddConnection(location.hostname, 8080, false, null, null, false, (function(connection, success)
             {}));
             SetRefreshInterval(1);
         }
@@ -217,12 +217,12 @@ function checkConnection() {
     <div class="navbar navbar-default navbar-fixed-top">
       <div class="container">
         <div class="navbar-header">
-          <a class="navbar-brand" href="http://voltdb.com"><img alt="" src="../../../tools/studio.web/img/logo.png" /></a>
+          <a class="navbar-brand" href="http://voltdb.com"><img alt="" src="img/logo.png" /></a>
           <span class="navbar-brand">Voter Demo</span>
         </div>
         <div class="navbar-collapse collapse">
           <ul class="nav navbar-nav navbar-right">
-            <li><a href="javascript:window.location='http://'+window.location.hostname+':8080'">Catalog Report</a></li>
+            <li><a href="javascript:window.location='http://'+window.location.hostname+':8080'">VoltDB Management Center</a></li>
           </ul>
         </div>
       </div>
@@ -233,9 +233,9 @@ function checkConnection() {
         <div class="col-md-8">
           <h4>Voter Sample: Real-Time Results</h4>
           <p>Watch the voting results live - the heat map indicates which
-          contestant is winning in a given state, while the table below the map
-          lists the total number of votes each contestant has received,
-          nationwide.  Use the pulldown menu to change the refresh rate..</p>
+          contestant is winning in a given state, while the table next to the
+          map lists the total number of votes each contestant has received,
+          nationwide.</p>
           <div class="jqPlot" id="chartUSMap1" style="width:550px;"></div>
         </div>
         <div class="col-md-4">

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -19,6 +19,7 @@ package org.voltdb.compiler;
 
 import java.io.Serializable;
 
+import org.voltdb.AuthSystem;
 import org.voltdb.client.ProcedureInvocationType;
 
 public class AsyncCompilerWork implements Serializable {
@@ -42,7 +43,7 @@ public class AsyncCompilerWork implements Serializable {
     public final long originalUniqueId;
     final boolean onReplica;
     final boolean useAdhocDDL;
-    final String userName;
+    public final AuthSystem.AuthUser user;
 
     final AsyncCompilerWorkCompletionHandler completionHandler;
 
@@ -53,7 +54,7 @@ public class AsyncCompilerWork implements Serializable {
             long originalTxnId, long originalUniqueId,
             boolean onReplica, boolean useAdhocDDL,
             AsyncCompilerWorkCompletionHandler completionHandler,
-            String userName)
+            AuthSystem.AuthUser user)
     {
         this.replySiteId = replySiteId;
         this.shouldShutdown = shouldShutdown;
@@ -69,7 +70,7 @@ public class AsyncCompilerWork implements Serializable {
         this.originalUniqueId = originalUniqueId;
         this.onReplica = onReplica;
         this.useAdhocDDL = useAdhocDDL;
-        this.userName = userName;
+        this.user = user;
         if (completionHandler == null) {
             throw new IllegalArgumentException("Completion handler can't be null");
         }

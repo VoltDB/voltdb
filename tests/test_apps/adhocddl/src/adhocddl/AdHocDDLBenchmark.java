@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-
+package adhocddl;
 
 import java.io.FileWriter;
 import java.io.IOException;
@@ -32,66 +32,61 @@ import org.voltdb.CLIConfig;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ClientStats;
-import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.ClientStatusListenerExt;
 
 public class AdHocDDLBenchmark {
 
     // handy, rather than typing this out several times
-    static final String HORIZONTAL_RULE =
+    private static final String HORIZONTAL_RULE =
             "----------" + "----------" + "----------" + "----------" +
             "----------" + "----------" + "----------" + "----------" + "\n";
 
     // validated command line configuration
-    final BenchmarkConfig config;
+    private final BenchmarkConfig config;
     // Reference to the database connection we will use
-    final Client client;
+    private final Client client;
     // DDL generator
-    DDLGenerator DDLGen;
+    private DDLGenerator DDLGen;
     // Flags to tell the worker threads to stop or go
-    boolean benchmarkComplete = false;
-    // Statistics manager objects from the client
-    final ClientStatsContext fullStatsContext;
+    private boolean benchmarkComplete = false;
 
     /**
      * Uses included {@link CLIConfig} class to
      * declaratively state command line options with defaults
      * and validation.
      */
-    static class BenchmarkConfig extends CLIConfig {
-        @Option(desc = "Number of warmup tests sent to server")
-        int numOfWarmup = 5;
+    private static class BenchmarkConfig extends CLIConfig {
+        @Option(desc = "Number of measured CREATE and DELETE statements per round")
+        int numCreateDeleteCalls = 5;
 
-        @Option(desc = "Number of tests sent to server")
-        int numOfTests = 5;
+        @Option(desc = "Number of rounds of tests averaged together")
+        int numRounds = 5;
 
-        @Option(desc = "Number of SPs per table in server")
-        int numOfSPs = 4;
+        @Option(desc = "Number of extra procedures per table in server")
+        int numProcedures = 2;
 
-        @Option(desc = "Table name prefix")
-        String prefix = "TABLE";
-
-        @Option(desc = "Table name for CREATE and DROP")
-        String table = "TEST";
+        @Option(desc = "Number of tables in benchmarked DDL")
+        int numTables = 40;
 
         @Option(desc = "Comma separated list of the form server[:port] to connect to.")
         String servers = "localhost";
 
         @Option(desc = "Filename to write raw summary statistics to.")
-        String statsfile = "";
+        String statsfile = "results.txt";
 
         @Option(desc = "Number of Columns in each tables")
-        int numOfCols = 5;
+        int numCols = 20;
 
         @Option(desc = "Percentage of indexed columns in the ramdonly generated table")
         double idxPercent = 0.1;
 
         @Override
         public void validate() {
-            if (numOfTests <= 0) exitWithMessageAndUsage("numOfTests must be > 0");
-            if (numOfCols <= 0) exitWithMessageAndUsage("numOfCols must be > 0");
+            if (numRounds <= 0) exitWithMessageAndUsage("numRounds must be > 0");
+            if (numCreateDeleteCalls <= 0) exitWithMessageAndUsage("numCreateDeleteCalls must be > 0");
+            if (numProcedures <= 0) exitWithMessageAndUsage("numProcedures must be > 0");
+            if (numCols <= 0) exitWithMessageAndUsage("numCols must be > 0");
+            if (numTables <= 0) exitWithMessageAndUsage("numTables must be > 0");
             if (idxPercent < 0 || idxPercent > 1) exitWithMessageAndUsage("idxPercent must be >= 0 and <= 1");
         }
     }
@@ -100,7 +95,7 @@ public class AdHocDDLBenchmark {
      * Provides a callback to be notified on node failure.
      * This example only logs the event.
      */
-    class StatusListener extends ClientStatusListenerExt {
+    private class StatusListener extends ClientStatusListenerExt {
         @Override
         public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
             // if the benchmark is still active
@@ -118,14 +113,12 @@ public class AdHocDDLBenchmark {
      * @throws IOException
      * @throws UnknownHostException
      */
-    public AdHocDDLBenchmark(BenchmarkConfig config) throws UnknownHostException, IOException {
+    private AdHocDDLBenchmark(BenchmarkConfig config) throws UnknownHostException, IOException {
         this.config = config;
 
         ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
 
         client = ClientFactory.createClient(clientConfig);
-
-        fullStatsContext = client.createStatsContext();
 
         System.out.print(HORIZONTAL_RULE);
         System.out.println(" Command Line Configuration");
@@ -140,7 +133,7 @@ public class AdHocDDLBenchmark {
      *
      * @param server hostname:port or just hostname (hostname can be ip).
      */
-    void connectToOneServerWithRetry(String server) {
+    private void connectToOneServerWithRetry(String server) {
         int sleep = 1000;
         while (true) {
             try {
@@ -164,7 +157,7 @@ public class AdHocDDLBenchmark {
      * syntax (where :port is optional).
      * @throws InterruptedException if anything bad happens with the threads.
      */
-    void connect(String servers) throws InterruptedException {
+    private void connect(String servers) throws InterruptedException {
         System.out.println("Connecting to VoltDB...");
 
         String[] serverArray = servers.split(",");
@@ -184,143 +177,81 @@ public class AdHocDDLBenchmark {
         connections.await();
     }
 
-    /**
-     * Test the exec time for AdHoc sqlstmt
-     * @param sqlstmt
-     * @return exec time
-     */
-    public long runTest(String sqlstmt) {
-        // synchronously call the "AdHoc" procedure
-        try
-        {
-            long start = System.currentTimeMillis();
-            ClientResponse response = client.callProcedure("@AdHoc", sqlstmt);
-            if(response.getStatus() != ClientResponse.SUCCESS)
-            {
-                System.out.println("AdHoc call failed");
-                return 0;
-            }
-            else
-            {
-                long end = System.currentTimeMillis();
-                System.out.println(end - start);
-                return end - start;
-            }
-
-        }
-        catch (Exception e)
-        {
-            e.printStackTrace();
-        }
-        return 0;
-    }
-
-    /**
-     * Run the config.numOfTests times CREATE and Drop
-     * @return avg exec time for CREATE and DROP in total
-     */
-    public float averageLatencyTest()
+    private double averageLatencyTest() throws Exception
     {
-        String createStmt = DDLGen.CreateTable(0, config.table);
-        String dropStmt = DDLGen.DropTable(0, config.table);
+        String createStmt = DDLGen.CreateTable(0, "TEST");
+        String dropStmt = DDLGen.DropTable(0, "TEST");
 
-        // Warmup
-        for(int i = 0; i < config.numOfWarmup; i++)
-        {
-            runTest(createStmt);
-            runTest(dropStmt);
-        }
+        System.out.printf("Running %d CREATEs and DROPs for test.\n", config.numCreateDeleteCalls);
+        System.out.flush();
 
         long sum = 0;
-        for(int i = 0; i < config.numOfTests; i++)
+        for(int i = 0; i < config.numCreateDeleteCalls; i++)
         {
-            sum += runTest(createStmt);
-            sum += runTest(dropStmt);
+            long start = System.currentTimeMillis();
+            client.callProcedure("@AdHoc", createStmt);
+            sum += System.currentTimeMillis() - start;
+            client.callProcedure("@AdHoc", dropStmt);
         }
 
-        System.out.println();
-        System.out.println("Average Latency: " + (sum / config.numOfTests));
-        return sum / config.numOfTests;
+        return sum / 1000.0 / config.numCreateDeleteCalls;
     }
 
-    /**
-     * Update catalog from the client side
-     * Exec AdHoc DDL in bunch
-     * @param startNo
-     * @param endNo
-     */
-    public void updateServer(int startNo, int endNo)
+    private long createSchema(boolean batch) throws Exception
     {
+        System.out.printf("Creating schema in %sbatch mode.\n", batch ? "" : "non-");
+        System.out.flush();
+
         StringBuffer sqlstmt = new StringBuffer();
-        for(int i = startNo; i < endNo; i++)
+        long start = System.currentTimeMillis();
+        for(int i = 0; i < config.numTables; i++)
         {
-            sqlstmt.append(DDLGen.CreateTable(i, config.prefix) + "\n\n");
-            for(int j = 0; j < config.numOfSPs; j++)
+            sqlstmt.append(DDLGen.CreateTable(i, "TABLE") + "\n\n");
+            if (!batch) {
+                System.out.printf("Creating table and %d procedures for table %d of %d.\n",
+                        config.numProcedures, i, config.numTables);
+                System.out.flush();
+                client.callProcedure("@AdHoc", sqlstmt.toString());
+                sqlstmt = new StringBuffer();
+            }
+
+            for(int j = 0; j < config.numProcedures; j++)
             {
-                sqlstmt.append(DDLGen.CreateProcedure(j, i, config.prefix) + "\n\n");
+                sqlstmt.append(DDLGen.CreateProcedure(j, i, "TABLE") + "\n\n");
+                if (!batch) {
+                    client.callProcedure("@AdHoc", sqlstmt.toString());
+                    sqlstmt = new StringBuffer();
+                }
             }
         }
-        runTest(sqlstmt.toString());
+
+        if (batch) {
+            System.out.printf("Calling a single batch insert @AdHoc for the whole schema.\n");
+            client.callProcedure("@AdHoc", sqlstmt.toString());
+        }
+
+        return System.currentTimeMillis() - start;
     }
 
-    /**
-     * Clear all the tables and procedures in catalog from client
-     * Exec AdHoc DDL in bunch
-     * @param startNo
-     * @param endNo
-     */
-    public void clearServer(int startNo, int endNo)
+    private void clearServer() throws Exception
     {
+        System.out.println("Clearing tables and procedures.");
+        System.out.flush();
+
         StringBuffer sqlstmt = new StringBuffer();
-        for(int i = startNo; i < endNo; i++)
+        for(int i = 0; i < config.numTables; i++)
         {
-            sqlstmt.append(DDLGen.DropTable(i, config.prefix) + "\n\n");
-            for(int j = 0; j < config.numOfSPs; j++)
+            sqlstmt.append(DDLGen.DropTable(i, "TABLE") + "\n\n");
+            for(int j = 0; j < config.numProcedures; j++)
             {
-                sqlstmt.append(DDLGen.DropProcedure(j, i, config.prefix) + "\n\n");
+                sqlstmt.append(DDLGen.DropProcedure(j, i, "TABLE") + "\n\n");
             }
         }
-        runTest(sqlstmt.toString());
+
+        client.callProcedure("@AdHoc", sqlstmt.toString());
     }
 
-    /**
-     * Run test in bunch to generate stats for charts
-     * @param col
-     * @param fw
-     * @param label
-     * @throws IOException
-     */
-    public void bunchTest(int col, FileWriter fw, String label) throws IOException
-    {
-        fullStatsContext.fetchAndResetBaseline();
-        DDLGen = new DDLGenerator(col, config.idxPercent);
-
-        float series1 = averageLatencyTest();
-        updateServer(0, 100);
-        float series2 = averageLatencyTest();
-        updateServer(100, 1000);
-        float series3 = averageLatencyTest();
-
-        ClientStats stats = fullStatsContext.fetchAndResetBaseline().getStats();
-
-        if(fw != null)
-        {
-            fw.append(String.format("%s,%d,-1,%.2f,0,0,%.2f,%.2f\n",
-                    label,
-                    stats.getStartTimestamp(),
-                    series3,
-                    series1,
-                    series2));
-        }
-    }
-
-    /**
-     * Core benchmark code.
-     * Connect. Initialize. Run the loop. Cleanup. Print Results.
-     *
-     * @throws Exception if anything unexpected happens.
-     */
-    public void runBenchmark() throws Exception {
+    private void runBenchmark() throws Exception {
         System.out.print(HORIZONTAL_RULE);
         System.out.println(" Setup & Initialization");
         System.out.println(HORIZONTAL_RULE);
@@ -329,22 +260,63 @@ public class AdHocDDLBenchmark {
         connect(config.servers);
 
         System.out.print(HORIZONTAL_RULE);
-        System.out.println(" Statistics ");
+        System.out.println(" Benchmark ");
         System.out.println(HORIZONTAL_RULE);
 
-        FileWriter fw = null;
-        if((config.statsfile != null) && (config.statsfile.length() != 0))
-        {
-            fw = new FileWriter(config.statsfile);
+        double sumBatched = 0, sumScripted = 0, sumIndividual = 0;
+
+        for (int i = 0; i < config.numRounds; i++) {
+
+            System.out.printf("Running round %d of %d.\n", i, config.numRounds);
+            System.out.print(HORIZONTAL_RULE);
+
+            DDLGen = new DDLGenerator(config.numCols, config.idxPercent);
+
+            clearServer();
+
+            long scriptTime = createSchema(false);
+
+            double perStmtLatencySec = averageLatencyTest();
+
+            clearServer();
+
+            long batchTime = createSchema(true);
+
+            clearServer();
+
+            System.out.print(HORIZONTAL_RULE);
+            System.out.printf("Batched %.3f seconds, Scripted %.3f seconds, Single create %.3f seconds\n",
+                    batchTime / 1000.0d, scriptTime / 1000d, perStmtLatencySec);
+            System.out.println(HORIZONTAL_RULE);
+
+            sumBatched += batchTime / 1000.0d;
+            sumScripted += scriptTime / 1000.0d;
+            sumIndividual += perStmtLatencySec;
         }
 
-        bunchTest(5, fw, "5 columns table");
-        clearServer(0, 1000);
-        bunchTest(50, fw, "50 columns table");
-        clearServer(0, 1000);
+        double avgBatched = sumBatched / config.numRounds;
+        double avgScripted = sumScripted / config.numRounds;
+        double avgIndividual = sumIndividual / config.numRounds;
+
+        System.out.println();
+        System.out.print(HORIZONTAL_RULE);
+        System.out.printf("FINAL AVERAGE STATS OVER %d RUNS:\n", config.numRounds);
+        System.out.printf("Batched %f seconds, Scripted %f seconds, Single create %f seconds\n",
+                avgBatched, avgScripted, avgIndividual);
+        System.out.println(HORIZONTAL_RULE);
 
         if((config.statsfile != null) && (config.statsfile.length() != 0))
         {
+            FileWriter fw = new FileWriter(config.statsfile);
+
+            // write config
+            // tables, columns, procs per table, index percentage, rounds, create delete calls
+            fw.append(String.format("%d,%d,%d,%.3f,%d,%d\n",
+                    config.numTables, config.numCols, config.numProcedures, config.idxPercent,
+                    config.numRounds, config.numCreateDeleteCalls));
+
+            // write results
+            fw.append(String.format("%.3f,%.3f,%.3f\n", avgBatched, avgScripted, avgIndividual));
             fw.close();
         }
 

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,6 +21,7 @@ import org.voltcore.logging.Level;
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.catalog.Procedure;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.common.Permission;
 import org.voltdb.utils.LogKeys;
 
 /**
@@ -44,9 +45,9 @@ public class InvocationDefaultProcPermissionPolicy extends InvocationPermissionP
         if (proc.getDefaultproc()) {
             boolean res = false;
             if (!proc.getReadonly()) {
-                res = user.hasDefaultProcPermission();
+                res = user.hasPermission(Permission.DEFAULTPROC);
             } else {
-                res = (user.hasDefaultProcReadPermission() || user.hasDefaultProcPermission());
+                res = user.hasPermission(Permission.DEFAULTPROCREAD);
             }
             if (!res) {
                 return PolicyResult.DENY;

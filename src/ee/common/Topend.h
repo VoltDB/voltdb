@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -65,6 +65,10 @@ class Topend {
     virtual void pushDRBuffer(int32_t partitionId, StreamBlock *block) = 0;
 
     virtual void fallbackToEEAllocatedBuffer(char *buffer, size_t length) = 0;
+
+    /** Calls the java method in org.voltdb.utils.Encoder */
+    virtual std::string decodeBase64AndDecompress(const std::string& buffer) = 0;
+
     virtual ~Topend()
     {
     }
@@ -92,6 +96,9 @@ public:
     void pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block);
 
     void fallbackToEEAllocatedBuffer(char *buffer, size_t length);
+
+    std::string decodeBase64AndDecompress(const std::string& buffer);
+
     std::queue<int32_t> partitionIds;
     std::queue<std::string> signatures;
     std::deque<boost::shared_ptr<StreamBlock> > blocks;

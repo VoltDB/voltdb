@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -150,6 +150,12 @@ public class SyncBenchmark {
         @Option(desc = "disable client affinity.")
         boolean noclientaffinity = false;
 
+        @Option(desc = "user id.")
+        String username = "";
+
+        @Option(desc = "password.")
+        String password = "";
+
         @Override
         public void validate() {
             if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
@@ -179,7 +185,7 @@ public class SyncBenchmark {
     public SyncBenchmark(KVConfig config) {
         this.config = config;
 
-        ClientConfig clientConfig = new ClientConfig("", "");
+        ClientConfig clientConfig = new ClientConfig(config.username, config.password);
         clientConfig.setReconnectOnConnectionLoss(true);
         clientConfig.setClientAffinity(!config.noclientaffinity);
         client = ClientFactory.createClient(clientConfig);

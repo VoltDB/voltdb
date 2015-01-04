@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -396,7 +396,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
             StatementPartitioning partitioning =
                 info.singlePartition ? StatementPartitioning.forceSP() :
                                        StatementPartitioning.forceMP();
-            StatementCompiler.compile(compiler, hsql, catalog, db,
+            StatementCompiler.compileFromSqlTextAndUpdateCatalog(compiler, hsql, catalog, db,
                     estimates, catalogStmt, stmt.getText(), stmt.getJoinOrder(),
                     detMode, partitioning);
 
@@ -680,7 +680,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
             info.singlePartition ? StatementPartitioning.forceSP() :
                                    StatementPartitioning.forceMP();
         // default to FASTER detmode because stmt procs can't feed read output into writes
-        StatementCompiler.compile(compiler, hsql, catalog, db,
+        StatementCompiler.compileFromSqlTextAndUpdateCatalog(compiler, hsql, catalog, db,
                 estimates, catalogStmt, procedureDescriptor.m_singleStmt,
                 procedureDescriptor.m_joinOrder, DeterminismMode.FASTER, partitioning);
 

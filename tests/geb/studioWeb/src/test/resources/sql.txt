@@ -149,3 +149,27 @@
 {"testName":"SysUpdate","sqlCmd":"exec PARTITIONED_TABLE.insert 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 a b c d e f;\nexec PARTITIONED_TABLE.update 1 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 b c d e f g 1","response":{"result":{"modified_tuples":["1"]},"status":"SUCCESS"}}
 {"testName":"SysSelect","sqlCmd":"exec PARTITIONED_TABLE.insert 1 2 3 4 5 6 7 8 9 10 '2010-07-31 16:08:11.000011' '2012-07-19 01:02:12.000012' 13 14 15 16 a b c d e f;\nexec PARTITIONED_TABLE.select 1","response":{"result":{"rowid":["1"],"rowid_group":["2"],"type_null_tinyint":["3"],"type_not_null_tinyint":["4"],"type_null_smallint":["5"],"type_not_null_smallint":["6"],"type_null_integer":["7"],"type_not_null_integer":["8"],"type_null_bigint":["9"],"type_not_null_bigint":["10"],"type_null_timestamp":["2010-07-31 16:08:11.000011"],"type_not_null_timestamp":["2012-07-19 01:02:12.000012"],"type_null_float":["13"],"type_not_null_float":["14"],"type_null_decimal":["15.000000000000"],"type_not_null_decimal":["16.000000000000"],"type_null_varchar25":["a"],"type_not_null_varchar25":["b"],"type_null_varchar128":["c"],"type_not_null_varchar128":["d"],"type_null_varchar1024":["e"],"type_not_null_varchar1024":["f"]},"status":"SUCCESS"}}
 {"testName":"SysInvalid","sqlCmd":"exec PARTITIONED_TABLE.badProc","response":{"result":"ERROR","status":"FAILURE"}}
+#
+#
+#/////////
+#//DDL (positive tests)
+#/////////
+#
+# Table "ddl_table" is created here and dropped and recreated for subsequent tests
+# It's finally dropped below
+{"testName":"DdlCreateTable","sqlCmd":"create table ddl_table (i integer)","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+{"testName":"DdlAlterTableDropColumn","sqlCmd":"drop table ddl_table;\ncreate table ddl_table (i integer, j tinyint);\nalter table ddl_table drop column j;","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+{"testName":"DdlAlterTableAlterColumn","sqlCmd":"drop table ddl_table;\ncreate table ddl_table (i integer, j tinyint);\nalter table ddl_table alter column j float default 3.4","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+#
+#
+#/////////
+#//DDL (negative tests)
+#/////////
+#
+# semicolons MUST appear between ALTER TABLE statements; studio will
+# not insert them, hence the following cause parse errors.
+{"testName":"DdlAlterTableDropDrop","sqlCmd":"drop table ddl_table;\ncreate table ddl_table (i integer, j tinyint, k bigint);\nalter table ddl_table drop column j alter table ddl_table drop column k","response":{"result":"ERROR","status":"FAILURE"}}
+{"testName":"DdlAlterTableAddAdd","sqlCmd":"drop table ddl_table;\ncreate table ddl_table (i integer);\nalter table ddl_table add column j bigint alter table ddl_table add column k tinyint","response":{"result":"ERROR","status":"FAILURE"}}
+#
+# Finally, drop ddl_table so test is repeatable.
+{"testName":"DdlDropTable","sqlCmd":"drop table ddl_table","response":{"result":{"status":["0"]},"status":"SUCCESS"}}

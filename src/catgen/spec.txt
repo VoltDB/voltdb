@@ -17,7 +17,7 @@ begin Cluster           "A set of connected hosts running one or more database a
   bool adminstartup     "Does the server start in admin mode?"
   CommandLog* logconfig "Command log configuration"
   int heartbeatTimeout  "How long to wait, in seconds, between messages before deciding a host is dead"
-  bool useadhocschema   "Manage the database schemas via catalog updates or adhoc DDL"
+  bool useddlschema   "Manage the database schemas via catalog updates or live DDL"
 end
 
 begin Deployment   "Run-time deployment settings"
@@ -27,11 +27,12 @@ begin Deployment   "Run-time deployment settings"
   Systemsettings* systemsettings  "Values from the systemsettings element"
 end
 
-begin Systemsettings  "Container for deployment systemsettings element"
-  int maxtemptablesize   "The maximum allocation size for temp tables in the EE"
-  int snapshotpriority "The priority of snapshot work"
-  int elasticPauseTime "Maximum pause time for rebalancing"
-  int elasticThroughput "Target throughput in megabytes for elasticity"
+begin Systemsettings    "Container for deployment systemsettings element"
+  int temptablemaxsize  "The maximum allocation size for temp tables in the EE"
+  int snapshotpriority  "The priority of snapshot work"
+  int elasticduration   "Maximum duration time for rebalancing"
+  int elasticthroughput "Target throughput in megabytes for elasticity"
+  int querytimeout      "The maximum latency for a query batch before timing out"
 end
 
 begin Database          "A set of schema, procedures and other metadata that together comprise an application"
@@ -75,10 +76,12 @@ end
 
 begin Group
   UserRef* users
-  bool sysproc          "Can invoke system procedures"
+  bool admin            "Can perform all database operations"
   bool defaultproc      "Can invoke default procedures"
-  bool adhoc            "Can invoke the adhoc system procedure
   bool defaultprocread  "Can invoke read-only default procedures"
+  bool sql              "Can invoke the adhoc system procedures"
+  bool sqlread          "Can invoke read-only adhoc system procedures"
+  bool allproc          "Can invoke any user defined procedures"
 end
 
 begin GroupRef
@@ -91,10 +94,6 @@ end
 
 begin User
   GroupRef* groups
-  bool sysproc          "Can invoke system procedures"
-  bool defaultproc      "Can invoke default procedures"
-  bool adhoc            "Can invoke the adhoc system procedure
-  bool defaultprocread  "Can invoke read-only default procedures"
   string shadowPassword "SHA-1 double hashed hex encoded version of the password"
 end
 
@@ -121,17 +120,18 @@ begin Procedure             "A stored procedure (transaction) in the system"
   ProcParameter* parameters "The set of parameters to this stored procedure"
 end
 
-begin Table                   "A table (relation) in the database"
-  Column* columns             "The set of columns in the table"
-  Index* indexes              "The set of indexes on the columns in the table"
-  Constraint* constraints     "The set of constraints on the table"
-  bool isreplicated           "Is the table replicated?"
-  Column? partitioncolumn     "On which column is the table partitioned"
-  int estimatedtuplecount     "A rough estimate of the number of tuples in the table; used for planning"
-  MaterializedViewInfo* views "Information about materialized views based on this table's content"
-  Table? materializer         "If this is a materialized view, this field stores the source table"
-  string signature            "Catalog version independent signature of the table consisting of name and schema"
-  int tuplelimit              "A maximum number of rows in a table"
+begin Table                        "A table (relation) in the database"
+  Column* columns                  "The set of columns in the table"
+  Index* indexes                   "The set of indexes on the columns in the table"
+  Constraint* constraints          "The set of constraints on the table"
+  bool isreplicated                "Is the table replicated?"
+  Column? partitioncolumn          "On which column is the table partitioned"
+  int estimatedtuplecount          "A rough estimate of the number of tuples in the table; used for planning"
+  MaterializedViewInfo* views      "Information about materialized views based on this table's content"
+  Table? materializer              "If this is a materialized view, this field stores the source table"
+  string signature                 "Catalog version independent signature of the table consisting of name and schema"
+  int tuplelimit                   "A maximum number of rows in a table"
+  Statement* tuplelimitDeleteStmt  "Delete statement to execute if tuple limit will be exceeded"
 end
 
 begin MaterializedViewInfo "Information used to build and update a materialized view"

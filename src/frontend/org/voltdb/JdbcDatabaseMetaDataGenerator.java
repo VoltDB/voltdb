@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,6 +22,7 @@ import java.io.StringWriter;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Column;
@@ -39,11 +40,15 @@ import org.voltdb.utils.InMemoryJarfile;
 
 public class JdbcDatabaseMetaDataGenerator
 {
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     public static final String JSON_PARTITION_PARAMETER = "partitionParameter";
     public static final String JSON_PARTITION_PARAMETER_TYPE = "partitionParameterType";
     public static final String JSON_SINGLE_PARTITION = "singlePartition";
     public static final String JSON_READ_ONLY = "readOnly";
+    public static final String JSON_PARTITION_COLUMN = "partitionColumn";
+    public static final String JSON_SOURCE_TABLE = "sourceTable";
+    public static final String JSON_ERROR = "error";
 
     static public final ColumnInfo[] TABLE_SCHEMA =
         new ColumnInfo[] {
@@ -248,12 +253,37 @@ public class JdbcDatabaseMetaDataGenerator
         VoltTable results = new VoltTable(TABLE_SCHEMA);
         for (Table table : m_database.getTables())
         {
-            // REMARKS and all following columns are always null for us.
+            String type = getTableType(table);
+            Column partColumn;
+            if (type.equals("VIEW")) {
+                partColumn = table.getMaterializer().getPartitioncolumn();
+            }
+            else {
+                partColumn = table.getPartitioncolumn();
+            }
+
+            String remark = null;
+            if (partColumn != null) {
+                JSONObject jsObj = new JSONObject();
+                try {
+                    jsObj.put(JSON_PARTITION_COLUMN, partColumn.getName());
+                    if (type.equals("VIEW")) {
+                        jsObj.put(JSON_SOURCE_TABLE, table.getMaterializer().getTypeName());
+                    }
+                    remark = jsObj.toString();
+                } catch (JSONException e) {
+                    hostLog.warn("You have encountered an unexpected error while generating results for the " +
+                            "@SystemCatalog procedure call. This error will not affect your database's " +
+                            "operation. Please contact VoltDB support with your log files and a " +
+                            "description of what you were doing when this error occured.", e);
+                    remark = "{\"" + JSON_ERROR + "\",\"" + e.getMessage() + "\"}";
+                }
+            }
             results.addRow(null,
                            null, // no schema name
                            table.getTypeName(),
-                           getTableType(table),
-                           null, // REMARKS
+                           type,
+                           remark, // REMARKS
                            null, // unused TYPE_CAT
                            null, // unused TYPE_SCHEM
                            null, // unused TYPE_NAME
@@ -528,12 +558,11 @@ public class JdbcDatabaseMetaDataGenerator
                 }
                 remark = jsObj.toString();
             } catch (JSONException e) {
-                e.printStackTrace();
-                StringWriter sw = new StringWriter();
-                PrintWriter pw = new PrintWriter(sw);
-                e.printStackTrace(pw);
-                pw.flush();
-                remark = sw.toString();
+                hostLog.warn("You have encountered an unexpected error while generating results for the " +
+                             "@SystemCatalog procedure call. This error will not affect your database's " +
+                             "operation. Please contact VoltDB support with your log files and a " +
+                             "description of what you were doing when this error occured.", e);
+                remark = "{\"" + JSON_ERROR + "\",\"" + e.getMessage() + "\"}";
             }
             results.addRow(
                            null,

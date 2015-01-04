@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -32,7 +32,6 @@ import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
-import org.voltdb.plannodes.DistinctPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
@@ -274,18 +273,9 @@ public class TestPlansJoin extends PlannerTestCase {
             assertNotSame(-1, tve.getColumnIndex());
         }
 
-        pn = compile("select  distinct(A) FROM R1 JOIN R2 USING(A)");
+        pn = compile("select distinct(A) FROM R1 JOIN R2 USING(A)");
         pn = pn.getChild(0);
-        assertTrue(pn instanceof ProjectionPlanNode);
-        ns = pn.getOutputSchema();
-        for (SchemaColumn sc : ns.getColumns()) {
-            AbstractExpression e = sc.getExpression();
-            assertTrue(e instanceof TupleValueExpression);
-            TupleValueExpression tve = (TupleValueExpression) e;
-            assertNotSame(-1, tve.getColumnIndex());
-        }
-        pn = pn.getChild(0);
-        assertTrue(pn instanceof DistinctPlanNode);
+        assertTrue(pn instanceof NestLoopPlanNode);
         ns = pn.getOutputSchema();
         for (SchemaColumn sc : ns.getColumns()) {
             AbstractExpression e = sc.getExpression();

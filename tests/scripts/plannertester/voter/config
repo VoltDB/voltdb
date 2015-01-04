@@ -1,5 +1,5 @@
 DDL:
-../../../examples/voter/ddl.sql
+./voter/ddl.sql
 
 SQL:
 SELECT COUNT(*) FROM contestants;
@@ -10,6 +10,8 @@ SELECT contestant_number FROM contestants WHERE contestant_number = ?;
 SELECT num_votes FROM v_votes_by_phone_number WHERE phone_number = ?;
 SELECT state FROM area_code_state WHERE area_code = ?;
 INSERT INTO votes (phone_number, state, contestant_number) VALUES (?, ?, ?);
+SELECT phone_number, COUNT(*) FROM votes GROUP BY phone_number;
+SELECT contestant_number, state, COUNT(*) FROM votes GROUP BY contestant_number, state;
 
 Partition Columns:
 votes.phone_number

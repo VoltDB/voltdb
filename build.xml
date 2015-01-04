@@ -74,7 +74,7 @@
 <property name='src.testproc.dir'            location='tests/testprocs' />
 <property name='src.hsqldb.test.dir'         location='tests/hsqldb' />
 <property name='src.ee.test.dir'             location='tests/ee' />
-<property name='src.studio.dir'              location='src/frontend/org/voltdb/studio' />
+<property name='src.dbmonitor.dir'           location='src/frontend/org/voltdb/dbmonitor' />
 <property name='build.testoutput.dir'        location='${build.dir}/testoutput' />
 <property name='build.testobjects.dir'       location='${build.dir}/testobjects' />
 <property name='lib.dir'                     location='lib' />
@@ -237,7 +237,7 @@ PRIMARY ENTRY POINTS
     description="Compile Java classes and C++ JNI library."
 />
 <target name="check"
-    depends="licensecheck, compile, voltdbipc"
+    depends="licensecheck, default, voltdbipc"
     description="Run Java and C++ JNI testcases." >
     <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
         <isset property="timeoutLength"/>
@@ -516,6 +516,12 @@ DISTRIBUTION
      populates the core components used by the client distribution. -->
 <target name="dist_internal" depends="dist_internal_core">
 
+	<!-- build the jars for the clients -->
+	<exec dir='examples/voter' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
+	<!--<exec dir='examples/voltkv' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
+	<exec dir='examples/windowing' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
+	<exec dir='examples/json' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>-->
+
     <!-- populate the stuff not handled by dist_internal_core -->
     <copy todir="${dist.dir}/">
         <fileset dir="." defaultexcludes="yes">
@@ -540,14 +546,6 @@ DISTRIBUTION
     <dist_tools_macro distlabel="" />
 
     <antcall target="copy_pro_bin"/>
-
-    <!-- copy studio.web -->
-    <mkdir dir="${dist.dir}/tools/studio.web" />
-    <copy todir="${dist.dir}/tools/studio.web">
-        <fileset dir="${src.gpl.dir}/org/voltdb/studio" defaultexcludes="yes">
-            <include name="**"/>
-        </fileset>
-    </copy>
 
     <!-- make shell scripts executable -->
     <chmod perm="ugo+rx">
@@ -578,12 +576,6 @@ DISTRIBUTION
         <arg value="${raw.dist.dir}/dist"/>
     </exec>
 
-    <!-- package up studio web trivially -->
-    <zip destfile="${raw.dist.dir}/voltdb-studio.web-${dist.version}.zip">
-        <fileset dir="${src.studio.dir}" defaultexcludes="yes">
-            <include name="**/*" />
-        </fileset>
-    </zip>
 </target>
 
 <target name="dist_client" depends="dist_internal_core"
@@ -717,9 +709,10 @@ CLEANING
 	description="Remove all compiled and generated files."
 	depends="cleantmp, clean_client, clean_project_gen, clean_deployment_gen,
 	         clean_debian_package, clean_rpm_package, clean_bindoc, clean_other_gen">
-  <exec dir='examples/voter' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
-  <exec dir='examples/voltcache' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
-  <exec dir='examples/voltkv' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
+  <exec dir='examples/voter' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
+  <exec dir='examples/json-sessions' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
+  <exec dir='examples/windowing' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
+  <exec dir='examples/voltkv' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='doc/tutorials/auction' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
   <exec dir='doc/tutorials/helloworld' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>  <exec dir='.' executable='/bin/sh'>
     <arg line="-c 'rm -rf obj/*'"/>
@@ -974,8 +967,8 @@ JAVA COMPILATION
         </fileset>
     </copy>
 
-    <copy todir='${build.prod.dir}/org/voltdb/studio'>
-        <fileset dir="${src.gpl.dir}/org/voltdb/studio">
+    <copy todir='${build.prod.dir}/org/voltdb/dbmonitor'>
+        <fileset dir="${src.gpl.dir}/org/voltdb/dbmonitor">
             <include name="**"/>
         </fileset>
     </copy>
@@ -1827,20 +1820,21 @@ TEST CASES
         <exec dir="${dist.examples.dir}/@{app}" executable="/usr/bin/env" failonerror='true'>
             <arg value="bash" />
             <arg value="run.sh" />
-            <arg value="srccompile" />
+            <arg value="jars" />
         </exec>
     </sequential>
 </macrodef>
 
 <target name="distcheck" depends='dist'
     description="Verify distribution sample applications compile and run.">
-
-    <echo>checking voltcache</echo>
-    <samplecheck app="voltcache" />
     <echo>checking voltkv</echo>
     <samplecheck app="voltkv" />
     <echo>checking voter</echo>
     <samplecheck app="voter" />
+    <echo>checking json-sessions</echo>
+    <samplecheck app="json-sessions" />
+    <echo>checking windowing</echo>
+    <samplecheck app="windowing" />
 </target>
 
 <target name='sqlcoverage' depends="ee,compile"
@@ -1971,7 +1965,7 @@ TEST CASES
 </target>
 
 <property name="ptdefaultconfigs"
-         value="json,voter,voltkv,voltcache,cust-report-2012-11-28,ENG-2549,joins,testplans-join,testjoins,aggs,join-order,inlist,indexes"
+         value="json,voter,voltkv,cust-report-2012-11-28,ENG-2549,joins,testplans-join,testjoins,aggs,join-order,inlist,indexes"
    description="default hard-coded set of plannertester configs to run or refresh" />
 
 <target name="plannertester" description="Run plannertester">

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -164,7 +164,7 @@ public class ClusterConfig
         }
         if (m_hostCount <= m_replicationFactor)
         {
-            m_errorMsg = String.format("%d servers required for K-safety=%d",
+            m_errorMsg = String.format("%d servers required for K-safety = %d",
                                        m_replicationFactor + 1, m_replicationFactor);
             return false;
         }

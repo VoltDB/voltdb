@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -227,6 +227,16 @@ public class PlannerTestCase extends TestCase {
             explain += apn.toExplainPlanString() + '\n';
         }
         return explain;
+    }
+
+    protected void checkQueriesPlansAreTheSame(String sql1, String sql2) {
+        String explainStr1, explainStr2;
+        List<AbstractPlanNode> pns = compileToFragments(sql1);
+        explainStr1 = buildExplainPlan(pns);
+        pns = compileToFragments(sql2);
+        explainStr2 = buildExplainPlan(pns);
+
+        assertEquals(explainStr1, explainStr2);
     }
 
 }

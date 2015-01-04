@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -63,9 +63,15 @@ public:
     InsertPlanNode() : AbstractOperationPlanNode(), m_multiPartition(false), m_fieldMap() { }
     PlanNodeType getPlanNodeType() const;
 
-    bool isMultiPartition() { return m_multiPartition; }
+    bool isMultiPartition() const { return m_multiPartition; }
 
-    bool isUpsert() { return m_isUpsert; }
+    bool isUpsert() const { return m_isUpsert; }
+
+    bool isMultiRowInsert() const {
+        // Materialize nodes correspond to INSERT INTO ... VALUES syntax.
+        // Otherwise this may be a multi-row insert via INSERT INTO ... SELECT.
+        return m_children[0]->getPlanNodeType() != PLAN_NODE_TYPE_MATERIALIZE;
+    }
 
     void initTupleWithDefaultValues(VoltDBEngine* engine,
                                     Pool* pool,

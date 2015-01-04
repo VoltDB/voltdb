@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -20,6 +20,7 @@ package org.voltdb.utils;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -27,6 +28,7 @@ import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.json_voltpatches.JSONException;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
@@ -40,7 +42,9 @@ import org.voltdb.catalog.Group;
 import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Procedure;
+import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
+import org.voltdb.common.Permission;
 import org.voltdb.compilereport.ProcedureAnnotation;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.expressions.AbstractExpression;
@@ -57,23 +61,34 @@ public abstract class CatalogSchemaTools {
     /**
      * Convert a Table catalog object into the proper SQL DDL, including all indexes,
      * constraints, and foreign key references.
+     * Also returns just the CREATE TABLE statement, since, like all good methods,
+     * it should have two purposes....
+     * It would be nice to have a separate method to just generate the CREATE TABLE,
+     * but we use that pass to also figure out what separate constraint and index
+     * SQL DDL needs to be generated, so instead, we opt to build the CREATE TABLE DDL
+     * separately as we go here, and then fill it in to the StringBuilder being used
+     * to construct the full canonical DDL at the appropriate time.
      * @param Table - object to be analyzed
      * @param String - the Query if this Table is a View
      * @param Boolean - true if this Table is an Export Table
-     * @return SQL Schema text representing the table.
+     * @return SQL Schema text representing the CREATE TABLE statement to generate the table
      */
-    public static void toSchema(StringBuilder sb, Table catalog_tbl, String viewQuery, boolean isExportTable) {
+    public static String toSchema(StringBuilder sb, Table catalog_tbl, String viewQuery, boolean isExportTable) {
         assert(!catalog_tbl.getColumns().isEmpty());
         boolean tableIsView = (viewQuery != null);
+
+        // We need the intermediate results of building the table schema string so that
+        // we can return the full CREATE TABLE statement, so accumulate it separately
+        StringBuilder table_sb = new StringBuilder();
 
         Set<Index> skip_indexes = new HashSet<Index>();
         Set<Constraint> skip_constraints = new HashSet<Constraint>();
 
         if (tableIsView) {
-            sb.append("CREATE VIEW " + catalog_tbl.getTypeName() + " (");
+            table_sb.append("CREATE VIEW " + catalog_tbl.getTypeName() + " (");
         }
         else {
-            sb.append("CREATE TABLE " + catalog_tbl.getTypeName() + " (");
+            table_sb.append("CREATE TABLE " + catalog_tbl.getTypeName() + " (");
         }
 
         // Columns
@@ -85,12 +100,12 @@ public abstract class CatalogSchemaTools {
             //assert(! ((catalog_col.getDefaultvalue() == null) && (catalog_col.getNullable() == false) ) );
 
             if (tableIsView) {
-                sb.append(add + spacer + catalog_col.getTypeName());
+                table_sb.append(add + spacer + catalog_col.getTypeName());
                 add = ",\n";
                 continue;
             }
 
-            sb.append(add + spacer + catalog_col.getTypeName() + " " + col_type.toSQLString() +
+            table_sb.append(add + spacer + catalog_col.getTypeName() + " " + col_type.toSQLString() +
                     ((col_type == VoltType.STRING || col_type == VoltType.VARBINARY) &&
                     catalog_col.getSize() > 0 ? "(" + catalog_col.getSize() +
                     (catalog_col.getInbytes() ? " BYTES" : "") + ")" : "") );
@@ -127,10 +142,10 @@ public abstract class CatalogSchemaTools {
                 }
             }
             if (defaultvalue == null) {
-                sb.append((!nullable ? " NOT NULL" : "") );
+                table_sb.append((!nullable ? " NOT NULL" : "") );
             }
             else {
-                sb.append(" DEFAULT " + (defaultvalue != null ? defaultvalue : "NULL") +
+                table_sb.append(" DEFAULT " + (defaultvalue != null ? defaultvalue : "NULL") +
                         (!nullable ? " NOT NULL" : "") );
             }
 
@@ -160,7 +175,7 @@ public abstract class CatalogSchemaTools {
                             }
 
                             assert(catalog_fkey_col != null);
-                            sb.append(" REFERENCES " + catalog_fkey_tbl.getTypeName() + " (" +
+                            table_sb.append(" REFERENCES " + catalog_fkey_tbl.getTypeName() + " (" +
                                     catalog_fkey_col.getTypeName() + ")" );
                             skip_constraints.add(catalog_const);
                             break;
@@ -185,20 +200,20 @@ public abstract class CatalogSchemaTools {
                 if (!tableIsView) {
                     // Get the ConstraintType.
 
-                    sb.append(add + spacer);
+                    table_sb.append(add + spacer);
                     if (!catalog_const.getTypeName().startsWith(HSQLInterface.AUTO_GEN_PREFIX)) {
-                        sb.append("CONSTRAINT " + catalog_const.getTypeName() + " ");
+                        table_sb.append("CONSTRAINT " + catalog_const.getTypeName() + " ");
                     }
                     if (const_type == ConstraintType.PRIMARY_KEY || const_type == ConstraintType.UNIQUE) {
                         if (const_type == ConstraintType.PRIMARY_KEY) {
-                            sb.append("PRIMARY KEY (");
+                            table_sb.append("PRIMARY KEY (");
                         }
                         else {
                             if (catalog_idx.getAssumeunique()) {
-                                sb.append("ASSUMEUNIQUE (");
+                                table_sb.append("ASSUMEUNIQUE (");
                             }
                             else {
-                                sb.append("UNIQUE (");
+                                table_sb.append("UNIQUE (");
                             }
                         }
                         String col_add = "";
@@ -215,21 +230,16 @@ public abstract class CatalogSchemaTools {
                             }
                             catch (JSONException e) {
                             }
-                            sb.append(col_add + exprStrings);
+                            table_sb.append(col_add + exprStrings);
                         }
                         else {
                             for (ColumnRef catalog_colref : CatalogUtil.getSortedCatalogItems(catalog_idx.getColumns(), "index")) {
-                                sb.append(col_add + catalog_colref.getColumn().getTypeName() );
+                                table_sb.append(col_add + catalog_colref.getColumn().getTypeName() );
                                 col_add = ", ";
                             } // FOR
                         }
-                        sb.append(")");
+                        table_sb.append(")");
                     }
-                    else
-                    if (const_type == ConstraintType.LIMIT) {
-                        sb.append("LIMIT PARTITION ROWS " + String.valueOf(catalog_tbl.getTuplelimit()) );
-                    }
-
                 }
                 if (catalog_idx.getTypeName().startsWith(HSQLInterface.AUTO_GEN_PREFIX) ||
                         catalog_idx.getTypeName().startsWith(HSQLInterface.AUTO_GEN_MATVIEW) ) {
@@ -254,7 +264,7 @@ public abstract class CatalogSchemaTools {
 
                     col_add = ", ";
                 }
-                sb.append(add + spacer + "CONSTRAINT " + catalog_const.getTypeName() + " " +
+                table_sb.append(add + spacer + "CONSTRAINT " + catalog_const.getTypeName() + " " +
                                          "FOREIGN KEY (" + our_columns + ") " +
                                          "REFERENCES " + catalog_fkey_tbl.getTypeName() + " (" + fkey_columns + ")" );
             }
@@ -262,16 +272,30 @@ public abstract class CatalogSchemaTools {
         }
 
         if (catalog_tbl.getTuplelimit() != Integer.MAX_VALUE) {
-            sb.append(add + spacer + "LIMIT PARTITION ROWS " + String.valueOf(catalog_tbl.getTuplelimit()) );
+            table_sb.append(add + spacer + "LIMIT PARTITION ROWS " + String.valueOf(catalog_tbl.getTuplelimit()) );
+            CatalogMap<Statement> deleteMap = catalog_tbl.getTuplelimitdeletestmt();
+            if (deleteMap.size() > 0) {
+                assert(deleteMap.size() == 1);
+                String deleteStmt = deleteMap.iterator().next().getSqltext();
+                if (deleteStmt.endsWith(";")) {
+                    // StatementCompiler appends the semicolon, we don't want it here.
+                    deleteStmt = deleteStmt.substring(0, deleteStmt.length() - 1);
+                }
+                table_sb.append(" EXECUTE (" + deleteStmt + ")");
+            }
         }
 
         if (viewQuery != null) {
-            sb.append("\n) AS \n");
-            sb.append(spacer + viewQuery + ";\n");
+            table_sb.append("\n) AS \n");
+            table_sb.append(spacer + viewQuery + ";\n");
         }
         else {
-            sb.append("\n);\n");
+            table_sb.append("\n);\n");
         }
+
+        // We've built the full CREATE TABLE statement for this table,
+        // Append the generated table schema to the canonical DDL StringBuilder
+        sb.append(table_sb.toString());
 
         // Partition Table
         if (catalog_tbl.getPartitioncolumn() != null && viewQuery == null) {
@@ -329,6 +353,9 @@ public abstract class CatalogSchemaTools {
         }
 
         sb.append("\n");
+        // Canonical DDL generation for this table is done, now just hand the CREATE TABLE
+        // statement to whoever might be interested (DDLCompiler, I'm looking in your direction)
+        return table_sb.toString();
     }
 
     /**
@@ -336,42 +363,21 @@ public abstract class CatalogSchemaTools {
      * @param Group
      */
     public static void toSchema(StringBuilder sb, Group grp) {
-        if (grp.getAdhoc() || grp.getDefaultproc() || grp.getSysproc() || grp.getDefaultprocread()) {
-            sb.append("CREATE ROLE " + grp.getTypeName() + " WITH ");
-            if (grp.getAdhoc()) {
-                if (grp.getDefaultproc() || grp.getSysproc() || grp.getDefaultprocread()) {
-                    sb.append("ADHOC, ");
-                }
-                else {
-                    sb.append("ADHOC;\n");
-                    return;
-                }
-            }
-            if (grp.getDefaultproc()) {
-                if (grp.getSysproc() || grp.getDefaultprocread()) {
-                    sb.append("DEFAULTPROC, ");
-                }
-                else {
-                    sb.append("DEFAULTPROC;\n");
-                    return;
-                }
-            }
-            if (grp.getSysproc()) {
-                if (grp.getDefaultprocread()) {
-                    sb.append("SYSPROC, ");
-                }
-                else {
-                    sb.append("SYSPROC;\n");
-                    return;
-                }
-            }
-            if (grp.getDefaultprocread()) {
-                sb.append("DEFAULTPROCREAD;\n");
-            }
+        // Don't output the default roles because user cannot change them.
+        if (grp.getTypeName().equalsIgnoreCase("ADMINISTRATOR") || grp.getTypeName().equalsIgnoreCase("USER")) {
+            return;
         }
-        else {
-            sb.append("CREATE ROLE " + grp.getTypeName() + ";\n");
+
+        final EnumSet<Permission> permissions = Permission.getPermissionSetForGroup(grp);
+        sb.append("CREATE ROLE ").append(grp.getTypeName());
+
+        String delimiter = " WITH ";
+        for (Permission permission : permissions) {
+            sb.append(delimiter).append(permission.name());
+            delimiter = ", ";
         }
+
+        sb.append(";\n");
     }
 
     /**
@@ -456,6 +462,15 @@ public abstract class CatalogSchemaTools {
     public static String toSchema(Catalog catalog, String[] importLines)
     {
         StringBuilder sb = new StringBuilder();
+
+        //sb.append("-- This file was generated by VoltDB version ");
+        //sb.append(VoltDB.instance().getVersionString());
+        //SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss z");
+        //String time = sdf.format(System.currentTimeMillis());
+        //sb.append(" on: " + time + ".\n");
+
+        //sb.append("-- This file represents the current database schema.\n");
+        //sb.append("-- Use this file as input to reproduce the current database structure in another database instance.\n");
 
         for (Cluster cluster : catalog.getClusters()) {
             for (Database db : cluster.getDatabases()) {

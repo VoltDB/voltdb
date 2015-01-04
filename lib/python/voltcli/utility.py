@@ -1,6 +1,6 @@
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2014 VoltDB Inc.
+# Copyright (C) 2008-2015 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -460,6 +460,24 @@ def pipe_cmd(*args):
         proc.stdout.close()
     except Exception, e:
         warning('Exception running command: %s' % ' '.join(args), e)
+
+#===============================================================================
+def daemon_file_name(base_name=None, host=None, instance=None):
+#===============================================================================
+    """
+    Build a daemon output file name using optional base name, host, and instance.
+    """
+    names = []
+    if not base_name is None:
+        names.append(base_name)
+    if not host is None:
+        names.append(host.replace(':', '_'))
+    if not names:
+        names.append('server')
+    if not instance is None:
+        names.append('_%d' % instance)
+    daemon_name = ''.join(names)
+    return daemon_name
 
 #===============================================================================
 class Daemonizer(daemon.Daemon):

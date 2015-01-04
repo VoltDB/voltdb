@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,6 +21,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
 import org.hsqldb_voltpatches.HSQLInterface;
+import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.PlanFragment;
@@ -55,9 +56,32 @@ public abstract class StatementCompiler {
 
     public static final int DEFAULT_MAX_JOIN_TABLES = 5;
 
-    static void compile(VoltCompiler compiler, HSQLInterface hsql,
+    /**
+     * This static method conveniently does a few things for its caller:
+     * - Formats the statement by replacing newlines with spaces
+     *     and appends a semicolon if needed
+     * - Updates the catalog Statement with metadata about the statement
+     * - Plans the statement and puts the serialized plan in the catalog Statement
+     * - Updates the catalog Statment with info about the statement's parameters
+     * Upon successful completion, catalog statement will have been updated with
+     * plan fragments needed to execute the statement.
+     *
+     * @param  compiler     The VoltCompiler instance
+     * @param  hsql         Pass through parameter to QueryPlanner
+     * @param  catalog      Pass through parameter to QueryPlanner
+     * @param  db           Pass through parameter to QueryPlanner
+     * @param  estimates    Pass through parameter to QueryPlanner
+     * @param  catalogStmt  Catalog statement to be updated with plan
+     * @param  xml          XML for statement, if it has been previously parsed
+     *                      (may be null)
+     * @param  stmt         Text of statement to be compiled
+     * @param  joinOrder    Pass through parameter to QueryPlanner
+     * @param  detMode      Pass through parameter to QueryPlanner
+     * @param  partitioning Partition info for statement
+    */
+    static void compileStatementAndUpdateCatalog(VoltCompiler compiler, HSQLInterface hsql,
             Catalog catalog, Database db, DatabaseEstimates estimates,
-            Statement catalogStmt, String stmt, String joinOrder,
+            Statement catalogStmt, VoltXMLElement xml, String stmt, String joinOrder,
             DeterminismMode detMode, StatementPartitioning partitioning)
     throws VoltCompiler.VoltCompilerException {
 
@@ -94,7 +118,13 @@ public abstract class StatementCompiler {
                 partitioning, hsql, estimates, false, DEFAULT_MAX_JOIN_TABLES,
                 costModel, null, joinOrder, detMode);
         try {
-            planner.parse();
+            if (xml != null) {
+                planner.parseFromXml(xml);
+            }
+            else {
+                planner.parse();
+            }
+
             plan = planner.plan();
             assert(plan != null);
         } catch (PlanningErrorException e) {
@@ -149,7 +179,10 @@ public abstract class StatementCompiler {
         planDescription.append("\nPLAN:\n");
         planDescription.append(plan.explainedPlan);
         String planString = planDescription.toString();
-        BuildDirectoryUtils.writeFile(null, name + ".txt", planString, false);
+        // only write to disk if compiler is in standalone mode
+        if (compiler.standaloneCompiler) {
+            BuildDirectoryUtils.writeFile(null, name + ".txt", planString, false);
+        }
         compiler.captureDiagnosticContext(planString);
 
         // Stuff the explain plan in an annotation for report generation.
@@ -202,6 +235,15 @@ public abstract class StatementCompiler {
         // Planner should have rejected with an exception any statement with an unrecognized type.
         int validType = catalogStmt.getQuerytype();
         assert(validType != QueryType.INVALID.getValue());
+    }
+
+    static void compileFromSqlTextAndUpdateCatalog(VoltCompiler compiler, HSQLInterface hsql,
+            Catalog catalog, Database db, DatabaseEstimates estimates,
+            Statement catalogStmt, String sqlText, String joinOrder,
+            DeterminismMode detMode, StatementPartitioning partitioning)
+    throws VoltCompiler.VoltCompilerException {
+        compileStatementAndUpdateCatalog(compiler, hsql, catalog, db, estimates, catalogStmt,
+                null, sqlText, joinOrder, detMode, partitioning);
     }
 
     /**

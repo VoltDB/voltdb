@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -157,10 +157,13 @@ public class VoltDB {
         public int m_httpPort = Integer.MAX_VALUE;
         public String m_httpPortInterface = "";
 
+        public String m_publicInterface = "";
+
         /** running the enterprise version? */
         public final boolean m_isEnterprise = org.voltdb.utils.MiscUtils.isPro();
 
-        public int m_deadHostTimeoutMS = 90 * 1000;
+        public int m_deadHostTimeoutMS =
+            org.voltcore.common.Constants.DEFAULT_HEARTBEAT_TIMEOUT_SECONDS * 1000;
 
         /** start up action */
         public StartAction m_startAction = null;
@@ -334,6 +337,10 @@ public class VoltDB {
                     } else {
                         m_zkInterface = "127.0.0.1:" + portStr.trim();
                     }
+                } else if (arg.equals("publicinterface")) {
+                    m_publicInterface = args[++i].trim();
+                } else if (arg.startsWith("publicinterface ")) {
+                    m_publicInterface = arg.substring("publicinterface ".length()).trim();
                 } else if (arg.equals("externalinterface")) {
                     m_externalInterface = args[++i].trim();
                 }
@@ -463,6 +470,10 @@ public class VoltDB {
                     System.out.flush();
                     System.exit(-1);
                 }
+            }
+
+            if (!m_publicInterface.isEmpty()) {
+                m_httpPortInterface = m_publicInterface;
             }
 
             // If no action is specified, issue an error.

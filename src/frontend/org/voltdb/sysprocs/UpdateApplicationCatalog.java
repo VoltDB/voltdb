@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -236,12 +236,13 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                         expectedCatalogVersion,
                         getVoltPrivateRealTransactionIdDontUseMe(),
                         getUniqueId(),
+                        catalogStuff.deploymentBytes,
                         catalogStuff.getDeploymentHash());
 
                 // update the local catalog.  Safe to do this thanks to the check to get into here.
                 context.updateCatalog(commands, p.getFirst(), p.getSecond(), requiresSnapshotIsolation);
 
-                log.info(String.format("Site %s completed catalog update with catalog hash %s, deployment hash %s%s.",
+                log.debug(String.format("Site %s completed catalog update with catalog hash %s, deployment hash %s%s.",
                         CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()),
                         Encoder.hexEncode(catalogStuff.getCatalogHash()).substring(0, 10),
                         Encoder.hexEncode(catalogStuff.getDeploymentHash()).substring(0, 10),

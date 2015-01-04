@@ -36,6 +36,10 @@ SELECT _variable[#arg @columntype] @aftermath AS B5LITTLEMATH FROM @fromtables A
 
 --- test DISTINCT
 SELECT DISTINCT _variable[#arg @comparabletype] B6 FROM @fromtables A
+SELECT DISTINCT _variable[#arg @comparabletype] B6 FROM @fromtables A ORDER BY 1 LIMIT 5
+SELECT DISTINCT _variable[#arg @comparabletype] B6_1, _variable B6_2  FROM @fromtables A
+SELECT DISTINCT _variable[#arg @comparabletype] B6_1, _variable B6_2  FROM @fromtables A ORDER BY 1, 2 LIMIT 5
+
 --- test ALL
 SELECT ALL _variable[#arg @comparabletype] B7 FROM @fromtables A
 
