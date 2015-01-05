@@ -862,7 +862,10 @@
                     VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function(result) {
                         if (result == true) {
                             VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function(connection, status) {
-                                onConnectionAdded(connection, status);
+                                status = connection.Metadata['@SnapshotScan_status'];
+                                if (!(status == "" || status == undefined)) {
+                                    onConnectionAdded(connection, status);
+                                }
                             });
                         }
 
@@ -870,7 +873,10 @@
 
                 } else {
                     VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function(connection, status) {
-                        onConnectionAdded(connection, status);
+                        status = connection.Metadata['@SnapshotScan_status'];
+                        if (!(status == "" || status == undefined)) {
+                            onConnectionAdded(connection, status);
+                        }
 
                     });
 
@@ -896,7 +902,7 @@
                             VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
                                 status = connection.Metadata['@SnapshotRestore_status'];
                                 if (!(status == "" || status == undefined)) {
-                                    onConnectionAdded(connection, status);
+                                    onConnectionAdded(connection, status, connection.Metadata['@SnapshotRestore_statusstring']);
                                 }
                             });
                         }
@@ -907,7 +913,7 @@
                     VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
                         status = connection.Metadata['@SnapshotRestore_status'];
                         if (!(status == "" || status == undefined)) {
-                            onConnectionAdded(connection, status);
+                            onConnectionAdded(connection, status, connection.Metadata['@SnapshotRestor_statusstring']);
                         }
 
                     });

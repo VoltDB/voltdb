@@ -552,8 +552,8 @@ function loadAdminPage() {
             var popup = $(this)[0];
             $('#btnSearchSnapshots').unbind('click');
             $('#btnSearchSnapshots').on('click', function () {
+                $('#tblSearchList').html('<tr style="border:none"><td colspan="3" align="center"><img src="css/resources/images/loader-small.gif"></td></tr>');
                 voltDbRenderer.GetSnapshotList($('#txtSearchSnapshots').val(), function (snapshotList) {
-                    $("#overlay").show();
                     var result = '';
                     var searchBox = '';
                     searchBox += '<tr>' +
@@ -561,6 +561,10 @@ function loadAdminPage() {
                             '</tr>';
                     var count = 0;
                     $.each(snapshotList, function (id, snapshot) {
+                        if (snapshot.RESULT == "FAILURE") {
+                            result += '<tr><td style="color:red"> Failure getting snapshots.' + snapshot.ERR_MSG + '</td></tr>';
+                            return false;
+                        }
                         var option = 'checked="checked"';
                         if (count != 0)
                             option = '';
@@ -584,7 +588,6 @@ function loadAdminPage() {
                     }
                     
                     $('#tblSearchList').html(searchBox + result);
-                    $("#overlay").hide();
                 });
             });
             
@@ -618,7 +621,7 @@ function loadAdminPage() {
                 }
                 var value = checkedValue.split('#');
                 $("#overlay").show();
-                voltDbRenderer.restoreSnapShot(value[0], value[1], function (status, snapshotResult) {
+                voltDbRenderer.restoreSnapShot(value[0], value[1], function (status, snapshotResult, statusString) {
                     if (status) {
                         if (snapshotResult[getCurrentServer()].RESULT.toLowerCase() == "success") {
                             $('#snapshotBar').html('Snapshot restored successfully.');
@@ -631,7 +634,7 @@ function loadAdminPage() {
                         }
                     } else {
                         $('#saveSnapshotStatus').html('Failed to restore snapshot');
-                        $('#saveSnapshotMessage').html('Unable to restore snapshot.');
+                        $('#saveSnapshotMessage').html(statusString);
                         $('#btnSaveSnapshotPopup').click();
                     }
                     $("#overlay").hide();
@@ -642,6 +645,31 @@ function loadAdminPage() {
             });
         }
     });
+
+    var restoreInterval = null;
+    var showHideRestoreBtn = function() {
+        if (!$('#restoredPopup').is(":visible")) {
+            if ($('#voltdbroot').text() + '/' + $('#snapshotpath').text() == '/') {
+                $('#restoreConfirmation').addClass('restoreConfirmationDisable');
+                $('#restoreConfirmation').removeClass('restore');
+            } else {
+                $('#restoreConfirmation').addClass('restore');
+                $('#restoreConfirmation').removeClass('restoreConfirmationDisable');
+                clearInterval(restoreInterval);
+
+            }
+        }
+    };
+
+    $('#restoreConfirmation').on("click", function(e) {
+        if ($('#restoreConfirmation').hasClass('restoreConfirmationDisable')) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    });
+
+    restoreInterval = setInterval(showHideRestoreBtn, 2000);
+    showHideRestoreBtn();
 
     $('#stopConfirmation').popup({
         open: function (event, ui, ele) {

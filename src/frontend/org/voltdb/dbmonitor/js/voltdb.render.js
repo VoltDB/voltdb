@@ -2081,13 +2081,13 @@ function alertNodeClicked(obj) {
         };
 
         this.restoreSnapShot = function (snapshotDir, snapshotFileName, onSaveSnapshot) {
-            VoltDBService.RestoreSnapShot(snapshotDir, snapshotFileName, function (connection, status) {
+            VoltDBService.RestoreSnapShot(snapshotDir, snapshotFileName, function (connection, status, statusString) {
                 var snapshotStatus = {};
                 if (status == 1) {
                     voltDbRenderer.getRestoreSnapshotStatus(connection, snapshotStatus);
-                    onSaveSnapshot(true, snapshotStatus);
+                    onSaveSnapshot(true, snapshotStatus, statusString);
                 } else {
-                    onSaveSnapshot(false);
+                    onSaveSnapshot(false, null ,statusString);
                 }
             });
         };
@@ -2103,19 +2103,26 @@ function alertNodeClicked(obj) {
         var getSnapshotDetails = function (connection, snapshotList, snapshotDirectory) {
             var colIndex = {};
             var counter = 0;
+            if (connection.Metadata['@SnapshotScan_data'][0].data.length != 0)
+                connection.Metadata['@SnapshotScan_data'] = connection.Metadata['@SnapshotScan_data'][0];
+            else
+                connection.Metadata['@SnapshotScan_data'] = connection.Metadata['@SnapshotScan_data'][1];
 
-            connection.Metadata['@SnapshotScan_' + snapshotDirectory].schema.forEach(function (columnInfo) {
-                if (columnInfo["name"] == "PATH" || columnInfo["name"] == "NONCE")
+            connection.Metadata['@SnapshotScan_data'].schema.forEach(function (columnInfo) {
+                if (columnInfo["name"] == "PATH" || columnInfo["name"] == "NONCE" || columnInfo["name"] == "RESULT" || columnInfo["name"] == "ERR_MSG")
                     colIndex[columnInfo["name"]] = counter;
                 counter++;
             });
             var count = 0;
-            connection.Metadata['@SnapshotScan_' + snapshotDirectory].data.forEach(function (info) {
+            
+            connection.Metadata['@SnapshotScan_data'].data.forEach(function (info) {
                 if (!snapshotList.hasOwnProperty(count)) {
                     snapshotList[count] = {};
                 }
                 snapshotList[count]["PATH"] = info[colIndex["PATH"]];
                 snapshotList[count]["NONCE"] = info[colIndex["NONCE"]];
+                snapshotList[count]["RESULT"] = info[colIndex["RESULT"]];
+                snapshotList[count]["ERR_MSG"] = info[colIndex["ERR_MSG"]];
                 count++;
             });
         };
@@ -2155,7 +2162,7 @@ function alertNodeClicked(obj) {
                     colIndex[columnInfo["name"]] = counter;
                 counter++;
             });
-
+            
             connection.Metadata['@SnapshotRestore_data'].data.forEach(function (info) {
                 var hostName = info[colIndex["HOSTNAME"]];
                 if (!snapshotStatus.hasOwnProperty(hostName)) {
