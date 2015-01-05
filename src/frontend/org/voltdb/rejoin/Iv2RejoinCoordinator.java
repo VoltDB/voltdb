@@ -242,7 +242,7 @@ public class Iv2RejoinCoordinator extends JoinCoordinator {
         }
 
         if (allDone) {
-            VoltZK.removeCatalogUpdateBlocker(m_messenger.getZK(), VoltZK.rejoinActiveBlocker);
+            VoltZK.removeCatalogUpdateBlocker(m_messenger.getZK(), VoltZK.rejoinActiveBlocker, REJOINLOG);
 
             // All sites have finished snapshot streaming, clear buffer pool
             m_snapshotBufPool.clear();

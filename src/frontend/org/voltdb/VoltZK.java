@@ -32,6 +32,7 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
@@ -258,12 +259,15 @@ public class VoltZK {
         }
     }
 
-    public static boolean removeCatalogUpdateBlocker(ZooKeeper zk, String node)
+    public static boolean removeCatalogUpdateBlocker(ZooKeeper zk, String node, VoltLogger log)
     {
         try {
             ZKUtil.deleteRecursively(zk, node);
         } catch (KeeperException e) {
             if (e.code() != KeeperException.Code.NONODE) {
+                if (log != null) {
+                    log.error("Failed to remove catalog udpate blocker: " + e.getMessage(), e);
+                }
                 return false;
             }
         } catch (InterruptedException e) {
