@@ -1063,9 +1063,6 @@ function alertNodeClicked(obj) {
                         }
                     }
                     
-
-
-
                 } else {
                     /********************************************************************************************
                     "currentServerHtml" is validated to verify if current server to be monitored is already set
