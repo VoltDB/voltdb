@@ -72,7 +72,7 @@ def parse(text):
                 if len(line):
                     comment = line.pop(0).strip("\"")
             else:
-                
+
                 comment = nextToken.strip("\"")
 
         fields = []

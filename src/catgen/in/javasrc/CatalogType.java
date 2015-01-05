@@ -201,7 +201,7 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         m_parentMap = parentMap;
         m_typename = name;
     }
-    
+
     abstract void initChildMaps();
 
     @SuppressWarnings("unchecked")

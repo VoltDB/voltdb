@@ -28,7 +28,7 @@
 #include <string>
 
 namespace catalog {
-    
+
 const char MAP_SEPARATOR = '#';
 
 class Catalog;
