@@ -34,7 +34,7 @@ import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.compiler.VoltCompiler;
-import org.voltdb.tomcat.VoltDBLog4JAppender;
+import org.voltdb.log4j.VoltDBLog4JAppender;
 import org.voltdb.utils.InMemoryJarfile;
 
 public class TestVoltDBLog4JAppender {
@@ -116,7 +116,7 @@ public class TestVoltDBLog4JAppender {
         try{
             InMemoryJarfile jarfile = new InMemoryJarfile();
             VoltCompiler comp = new VoltCompiler();
-            comp.addClassToJar(jarfile, org.voltdb.tomcat.VoltdbInsert.class);
+            comp.addClassToJar(jarfile, org.voltdb.log4j.VoltdbInsert.class);
             m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
             m_client.callProcedure("@AdHoc", "CREATE TABLE Logs ( timestamp BIGINT, level VARCHAR(10), message VARCHAR(255))");
             m_client.callProcedure("@AdHoc", "create procedure from class org.voltdb.tomcat.VoltdbInsert");
