@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.tomcat;
+package org.voltdb.log4j;
 
 import java.util.ArrayList;
 
