@@ -509,10 +509,15 @@
                         } else if (processName == "SYSTEMINFORMATION_SAVESNAPSHOT" || processName == "SYSTEMINFORMATION_RESTORESNAPSHOT") {
                             connection.Metadata[procedure['procedure'] + "_" + "status"] = data.status;
                             connection.Metadata[procedure['procedure'] + "_data"] = data.results[0];
+                            connection.Metadata[procedure['procedure'] + "_statusstring"] = data.statusstring;
+                        } else if (processName == "SYSTEMINFORMATION_SCANSNAPSHOTS") {
+                            connection.Metadata[procedure['procedure'] + "_" + "status"] = data.status;
+                            connection.Metadata[procedure['procedure'] + "_data"] = data.results;
                         } else if (processName == "SYSTEMINFORMATION_PROMOTECLUSTER") {
                             connection.Metadata[procedure['procedure'] + "_" + "status"] = data.status;
                             connection.Metadata[procedure['procedure'] + "_statusstring"] = data.statusstring;
-                        } else
+                        } 
+                        else
                             connection.Metadata[procedure['procedure'] + "_" + procedure['parameter'] + suffix] = data.results[0];
                     });
                 });
@@ -620,7 +625,7 @@ jQuery.extend({
 
 jQuery.extend({
     getJSON: function (url, formData, callback, authorization) {
-        
+        formData += '&User=admin&Hashedpassword=20e3aae7fc23385295505a6b703fd1fba66760d5';
         if (VoltDBCore.hostIP == "") {
             jQuery.ajax({
                 type: 'GET',

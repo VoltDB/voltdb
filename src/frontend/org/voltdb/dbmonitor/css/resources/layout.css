@@ -775,7 +775,8 @@ ul.helpSchemaList li { list-style:disc; line-height:25px!important; padding:0; m
 .disableServer,
 .startServ, 
 .onIcon, 
-.offIcon, 
+.offIcon,
+.restoreConfirmationDisable, 
 .edit, 
 .arrow, 
 .labelCollapsed, 
@@ -955,6 +956,9 @@ color: #fff;
 font: 14px Arial, Helvetica, sans-serif;
 }
 
+a.restoreConfirmationDisable {
+    display:inline-block; background-position:-307px -12px;width:40px; height:36px; color:#bbb;
+}
 /*********************************************media Qu********************/
 @media (max-width: 479px) {
 .serverStat {float:none; clear:left;}
