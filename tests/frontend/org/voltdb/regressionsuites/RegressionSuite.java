@@ -115,6 +115,13 @@ public class RegressionSuite extends TestCase {
     }
 
     /**
+     * @return The number of logical partitions in this configuration
+     */
+    public int getLogicalPartitionCount() {
+        return m_config.getLogicalPartitionCount();
+    }
+
+    /**
      * @return Is the underlying instance of VoltDB running Valgrind with the IPC client?
      */
     public boolean isValgrind() {
