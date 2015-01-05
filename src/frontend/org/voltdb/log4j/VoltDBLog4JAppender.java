@@ -28,15 +28,19 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.NoConnectionsException;
 
 public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
-    String cluster = "localhost";
+    String server = "localhost";
+    int port = 21212;
     String user = null;
     String password = null;
     ClientConfig config = null;
     Client client = null;
     ArrayList<LoggingEvent> cache = new ArrayList<LoggingEvent>();
 
-    public void setCluster(String cluster) { this.cluster = cluster; }
-    public String getCluster() { return this.cluster; }
+    public void setCluster(String cluster) { this.server = cluster; }
+    public String getCluster() { return this.server; }
+
+    public void setPort(int port) { this.port = port; }
+    public int getPort() { return this.port; }
 
     public void setUser(String user) { this.user = user; }
     public String getUser() { return this.user; }
@@ -55,7 +59,7 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
             }
             config.setReconnectOnConnectionLoss(true);
             client = ClientFactory.createClient(config);
-            client.createConnection(cluster);
+            client.createConnection(server, port);
         } catch (java.io.IOException e) {
             e.printStackTrace();
         }
