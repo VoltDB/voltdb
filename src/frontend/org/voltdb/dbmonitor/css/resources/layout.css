@@ -946,6 +946,7 @@ td.heartbeattd span.unit, td.queryTimeOut span.unit{position:relative;/* top:7px
 
 }
 .errorLabelMsg { width: 279px;margin-top: 5px; }
+.errorLabelMsgRestore { width: 196px;margin-top: 5px; }
 
 .resizeCon {width:452px}
 .resizeRestore{width:95%}

@@ -547,7 +547,7 @@ function loadAdminPage() {
         open: function (event, ui, ele) {
             $('#tblSearchList').html('');
             var textName = '<input id="txtSearchSnapshots" name="txtSearchSnapshots" type="text" value=' + $('#voltdbroot').text() + '/' + $('#snapshotpath').text() + '></td>';
-            var errorMsg = '<div class="errorLabelMsg"><label id="errorSearchSnapshotDirectory" for="txtSearchSnapshots" class="error" style="display: none;"></label></div>';
+            var errorMsg = '<div class="errorLabelMsgRestore"><label id="errorSearchSnapshotDirectory" for="txtSearchSnapshots" class="error" style="display: none;"></label></div>';
             $('#tdSearchSnapshots').html(textName + errorMsg);
             var btnName = '<a id="btnSearchSnapshots" class="save-search" title="Search" href="#">Search</a>';
             $('#tdSearchSnapshotsBtn').html(btnName);
