@@ -564,13 +564,15 @@ function loadAdminPage() {
                     txtSearchSnapshots: adminValidationRules.directoryPathMessages,
                 }
             });
+            
+            if ($('#voltdbroot').text() + '/' + $('#snapshotpath').text()!='/')
+                searchSnapshots();
         },
         afterOpen: function () {
             var popup = $(this)[0];
             
             $('#btnSearchSnapshots').unbind('click');
             $('#btnSearchSnapshots').on('click', function (e) {
-                
                 if (!$("#formSearchSnapshot").valid()) {
                     e.preventDefault();
                     e.stopPropagation();
@@ -583,59 +585,7 @@ function loadAdminPage() {
 
                     return;
                 }
-
-                $('#tblSearchList').html('<tr style="border:none"><td colspan="3" align="center"><img src="css/resources/images/loader-small.gif"></td></tr>');
-                voltDbRenderer.GetSnapshotList($('#txtSearchSnapshots').val(), function (snapshotList) {
-                    var result = '';
-                    var searchBox = '';
-                    searchBox += '<tr>' +
-                            '<th colspan="3" align="left">Snapshot Name</th>' +
-                            '</tr>';
-                    
-                    var count = 0;
-                    $.each(snapshotList, function (id, snapshot) {
-                        if (snapshot.RESULT == "FAILURE") {
-                            result += '<tr><td style="color:red"> Failure getting snapshots.' + snapshot.ERR_MSG + '</td></tr>';
-                            return false;
-                        }
-                        var option = 'checked="checked"';
-                        if (count != 0)
-                            option = '';
-                        result += '<tr>' +
-			            '<td colspan="2" align="left">' + snapshot.NONCE + '</td>' +
-			            '<td align="left">' +
-			            '<div class="restoreRadio">' +
-			            '<input type="radio" value="' + snapshot.PATH + '#' + snapshot.NONCE + '" name="vemmanual" ' + option + '>' +
-			            '</div>' +
-			            '</td>' +
-			            '</tr>';
-                        count++;
-                    });
-
-                    if (result == '') {
-                        result = '<td>No snapshots available.</td>';
-                        $('#btnRestore').addClass('restoreBtn');
-                        $('#btnRestore').removeClass('btn');
-                    } else {
-                        $('#btnRestore').addClass('btn');
-                        $('#btnRestore').removeClass('restoreBtn');
-                    }
-                    
-                    $('#tblSearchList').html(searchBox + result);
-                    $("#overlay").hide();
-                    
-                    adminClusterObjects.errorRestoreMsgContainer.html('<label id="errorRestoreSnapshot" for="vemmanual" class="error">Please select a snapshot to restore.</label>');
-                    $("#formRestoreSnapshot").validate({
-                        rules: {
-                            vemmanual: adminValidationRules.restoreSnapshotRules,
-                        },
-                        messages: {
-                            vemmanual: adminValidationRules.restoreSnapshotMessages,
-                        }
-                    });
-
-                    $("#errorRestoreSnapshot").hide();
-                });
+                searchSnapshots();
             });
             
             //restore cluster
@@ -703,10 +653,65 @@ function loadAdminPage() {
         }
     });
 
+    var searchSnapshots = function(e) {
+        $('#tblSearchList').html('<tr style="border:none"><td colspan="3" align="center"><img src="css/resources/images/loader-small.gif"></td></tr>');
+        voltDbRenderer.GetSnapshotList($('#txtSearchSnapshots').val(), function(snapshotList) {
+            var result = '';
+            var searchBox = '';
+            searchBox += '<tr>' +
+                '<th colspan="3" align="left">Snapshot Name</th>' +
+                '</tr>';
+
+            var count = 0;
+            $.each(snapshotList, function(id, snapshot) {
+                if (snapshot.RESULT == "FAILURE") {
+                    result += '<tr><td style="color:red"> Failure getting snapshots.' + snapshot.ERR_MSG + '</td></tr>';
+                    return false;
+                }
+                var option = 'checked="checked"';
+                if (count != 0)
+                    option = '';
+                result += '<tr>' +
+                    '<td colspan="2" align="left">' + snapshot.NONCE + '</td>' +
+                    '<td align="left">' +
+                    '<div class="restoreRadio">' +
+                    '<input type="radio" value="' + snapshot.PATH + '#' + snapshot.NONCE + '" name="vemmanual" ' + option + '>' +
+                    '</div>' +
+                    '</td>' +
+                    '</tr>';
+                count++;
+            });
+
+            if (result == '') {
+                result = '<td>No snapshots available.</td>';
+                $('#btnRestore').addClass('restoreBtn');
+                $('#btnRestore').removeClass('btn');
+            } else {
+                $('#btnRestore').addClass('btn');
+                $('#btnRestore').removeClass('restoreBtn');
+            }
+
+            $('#tblSearchList').html(searchBox + result);
+            $("#overlay").hide();
+
+            adminClusterObjects.errorRestoreMsgContainer.html('<label id="errorRestoreSnapshot" for="vemmanual" class="error">Please select a snapshot to restore.</label>');
+            $("#formRestoreSnapshot").validate({
+                rules: {
+                    vemmanual: adminValidationRules.restoreSnapshotRules,
+                },
+                messages: {
+                    vemmanual: adminValidationRules.restoreSnapshotMessages,
+                }
+            });
+
+            $("#errorRestoreSnapshot").hide();
+        });
+    };
+
     var restoreInterval = null;
     var showHideRestoreBtn = function() {
         if (!$('#restoredPopup').is(":visible")) {
-            if ($('#voltdbroot').text() + '/' + $('#snapshotpath').text() == '/') {
+            if (!VoltDbAdminConfig.firstResponseReceived) {
                 $('#restoreConfirmation').addClass('restoreConfirmationDisable');
                 $('#restoreConfirmation').removeClass('restore');
             } else {
@@ -1113,6 +1118,7 @@ function loadAdminPage() {
         this.servers = [];
         this.stoppedServer="";
         this.runningServerIds = "";
+        this.firstResponseReceived = false;
         
         this.server = function(hostIdvalue,serverNameValue,serverStateValue) {
             this.hostId = hostIdvalue;
@@ -1128,6 +1134,9 @@ function loadAdminPage() {
         };
         
         this.displayAdminConfiguration = function (adminConfigValues, rawConfigValues) {
+            if (!VoltDbAdminConfig.firstResponseReceived)
+                VoltDbAdminConfig.firstResponseReceived = true;
+            
             if (adminConfigValues != undefined && VoltDbAdminConfig.isAdmin) {
                 configureAdminValues(adminConfigValues);
                 configureDirectoryValues(adminConfigValues);
