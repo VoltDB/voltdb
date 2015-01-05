@@ -40,10 +40,12 @@ ExecutorContext::ExecutorContext(int64_t siteId,
                 bool exportEnabled,
                 std::string hostname,
                 CatalogId hostId,
-                DRTupleStream *drStream) :
+                DRTupleStream *drStream,
+                DRTupleStream *drReplicatedStream) :
     m_topEnd(topend), m_tempStringPool(tempStringPool),
     m_undoQuantum(undoQuantum),
-    m_drStream(drStream), m_engine(engine),
+    m_drStream(drStream), m_drReplicatedStream(drReplicatedStream),
+    m_engine(engine),
     m_txnId(0), m_spHandle(0),
     m_lastCommittedSpHandle(0),
     m_siteId(siteId), m_partitionId(partitionId),
@@ -78,4 +80,3 @@ ExecutorContext* ExecutorContext::getExecutorContext() {
     return static_cast<ExecutorContext*>(pthread_getspecific( static_key));
 }
 }
-

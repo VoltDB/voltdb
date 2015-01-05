@@ -117,7 +117,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final int hostId,
             final String hostname,
             final int tempTableMemory,
-            final HashinatorConfig hashinatorConfig)
+            final HashinatorConfig hashinatorConfig,
+            final boolean createDrReplicatedStream)
     {
         // base class loads the volt shared library.
         super(siteId, partitionId);
@@ -142,6 +143,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     hostId,
                     getStringBytes(hostname),
                     tempTableMemory * 1024 * 1024,
+                    createDrReplicatedStream,
                     EE_COMPACTION_THRESHOLD);
         checkErrorCode(errorCode);
 

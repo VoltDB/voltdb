@@ -489,7 +489,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         hostname,
                         m_context.cluster.getDeployment().get("deployment").
                         getSystemsettings().get("systemsettings").getTemptablemaxsize(),
-                        hashinatorConfig);
+                        hashinatorConfig,
+                        true);
             }
             else {
                 // set up the EE over IPC
@@ -504,7 +505,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             getSystemsettings().get("systemsettings").getTemptablemaxsize(),
                             m_backend,
                             VoltDB.instance().getConfig().m_ipcPort,
-                            hashinatorConfig);
+                            hashinatorConfig,
+                            true);
             }
             eeTemp.loadCatalog(m_startupConfig.m_timestamp, m_startupConfig.m_serializableCatalog.serialize());
             eeTemp.setTimeoutLatency(m_context.cluster.getDeployment().get("deployment").

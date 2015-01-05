@@ -264,6 +264,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
     jint hostId,
     jbyteArray hostname,
     jlong tempTableMemory,
+    jboolean createDrReplicatedStream,
     jint compactionThreshold)
 {
     VOLT_DEBUG("nativeInitialize() start");
@@ -289,6 +290,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
                                    hostId,
                                    hostString,
                                    tempTableMemory,
+                                   createDrReplicatedStream,
                                    static_cast<int32_t>(compactionThreshold));
         if (success) {
             VOLT_DEBUG("initialize succeeded");
