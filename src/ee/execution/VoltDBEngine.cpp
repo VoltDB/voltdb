@@ -376,7 +376,7 @@ VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
       m_templateSingleLongTable(NULL),
       m_topend(topend),
       m_executorContext(NULL),
-      m_tuplesModified(0)
+      m_tuplesModifiedStack()
 {
 #ifdef LINUX
     // We ran into an issue where memory wasn't being returned to the
@@ -635,8 +635,13 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
         m_dirtyFragmentBatch = false;
     }
 
+    // In version 5.0, fragments may trigger execution of other fragments.
+    // (I.e., DELETE triggered by an insert to enforce ROW LIMIT)
+    // This method only executes top-level fragments.
+    assert(m_tuplesModifiedStack.size() == 0);
+
     // set this to zero for dml operations
-    m_tuplesModified = 0;
+    m_tuplesModifiedStack.push(0);
 
     /*
      * Reserve space in the result output buffer for the number of
@@ -675,7 +680,11 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
     m_currExecutorVec = execsForFrag;
 
     int rc = execsForFrag->execute(this);
+
+    int64_t tuplesModified = m_tuplesModifiedStack.top();
+    m_tuplesModifiedStack.pop();
     resetExecutionMetadata();
+
     if (rc != 0) {
         return rc;
     }
@@ -683,7 +692,7 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
     // assume this is sendless dml
     if (m_numResultDependencies == 0) {
         // put the number of tuples modified into our simple table
-        uint64_t changedCount = htonll(m_tuplesModified);
+        uint64_t changedCount = htonll(tuplesModified);
         memcpy(m_templateSingleLongTable + m_templateSingleLongTableSize - 8, &changedCount, sizeof(changedCount));
         m_resultOutput.writeBytes(m_templateSingleLongTable, m_templateSingleLongTableSize);
         m_numResultDependencies++;
@@ -693,7 +702,7 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
     m_resultOutput.writeIntAt(numResultDependenciesCountOffset, m_numResultDependencies);
 
     // if a fragment modifies any tuples, the whole batch is dirty
-    if (m_tuplesModified > 0) {
+    if (tuplesModified > 0) {
         m_dirtyFragmentBatch = true;
     }
 
@@ -1868,7 +1877,16 @@ void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
 
 int VoltDBEngine::executePurgeFragment(PersistentTable* table) {
     ExecutorVector *pev = table->getPurgeExecutorVector();
-    return pev->execute(this);
+
+    // Push a new frame onto the stack for this executor vector
+    // to report its tuples modified.  We don't want to actually
+    // send this count back to the client---too confusing.  Just
+    // throw it away.
+    m_tuplesModifiedStack.push(0);
+    int rc = pev->execute(this);
+    m_tuplesModifiedStack.pop();
+
+    return rc;
 }
 
 static std::string dummy_last_accessed_plan_node_name("no plan node in progress");
@@ -1908,6 +1926,11 @@ void VoltDBEngine::reportProgressToTopend() {
 
         throw InterruptException(std::string(buff));
     }
+}
+
+void VoltDBEngine::addToTuplesModified(int64_t amount) {
+    assert(m_tuplesModifiedStack.size() > 0);
+    m_tuplesModifiedStack.top() += amount;
 }
 
 } // namespace voltdb
