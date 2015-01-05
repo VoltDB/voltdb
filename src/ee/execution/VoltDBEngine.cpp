@@ -375,7 +375,8 @@ VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
       m_logManager(logProxy),
       m_templateSingleLongTable(NULL),
       m_topend(topend),
-      m_executorContext(NULL)
+      m_executorContext(NULL),
+      m_tuplesModified(0)
 {
 #ifdef LINUX
     // We ran into an issue where memory wasn't being returned to the

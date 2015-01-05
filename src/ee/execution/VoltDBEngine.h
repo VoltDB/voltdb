@@ -238,8 +238,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         std::string debug(void) const;
 
-        /** Counts tuples modified by a plan fragment */
-        int64_t m_tuplesModified;
+        /** DML executors call this to indicate how many tuples
+         * have been modified */
+        void addToTuplesModified(int64_t amount);
 
         // -------------------------------------------------
         // Statistics functions
@@ -570,6 +571,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // This stateless member acts as a counted reference to keep the ThreadLocalPool alive
         // just while this VoltDBEngine is alive. That simplifies valgrind-compliant process shutdown.
         ThreadLocalPool m_tlPool;
+
+        /** Counts tuples modified by a plan fragment */
+        int64_t m_tuplesModified;
 };
 
 inline void VoltDBEngine::resetReusedResultOutputBuffer(const size_t headerSize)

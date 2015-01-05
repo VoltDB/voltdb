@@ -311,7 +311,7 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     }
 
     // add to the planfragments count of modified tuples
-    m_engine->m_tuplesModified += modifiedTuples;
+    m_engine->addToTuplesModified(modifiedTuples);
     VOLT_DEBUG("Finished inserting tuple");
     return true;
 }
