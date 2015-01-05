@@ -196,14 +196,14 @@
                 }
             };
 
-            var callbackWrapper = function (userCallback) {
+            var callbackWrapper = function (userCallback, isHighTimeout) {
                 var criticalErrorResponse = { "status": -1, "statusstring": "Query timeout.", "results": [] };
                 var UserCallback = userCallback;
                 var timeoutOccurred = 0;
                 var timeout = setTimeout(function () {
                     timeoutOccurred = 1;
                     UserCallback(criticalErrorResponse);
-                }, 20000);
+                }, !isHighTimeout ? 20000 : 6000000);
                 this.Callback = function (response, headerInfo) {
                     clearTimeout(timeout);
                     if (timeoutOccurred == 0) UserCallback(response, headerInfo);
@@ -211,8 +211,10 @@
                 return this;
             };
 
-            this.BeginExecute = function(procedure, parameters, callback, shortApiCallDetails) {
-                this.CallExecute(procedure, parameters, (new callbackWrapper(callback)).Callback, shortApiCallDetails);
+            this.BeginExecute = function (procedure, parameters, callback, shortApiCallDetails) {
+                var isHighTimeout = procedure == "@SnapshotRestore";
+                console.log("procedure: " + procedure);
+                this.CallExecute(procedure, parameters, (new callbackWrapper(callback, isHighTimeout)).Callback, shortApiCallDetails);
             };
 
             var iQueue = function (connection) {
@@ -242,6 +244,7 @@
                     if (stack.length > 0 && (success || continueOnFailure)) {
                         var item = stack[0];
                         var shortApiCallDetails = item[3];
+                        var isHighTimeout = item[0] == "@SnapshotRestore";
                         var callback =
                         (new callbackWrapper(
                             (function(queue, item) {
@@ -263,7 +266,7 @@
                                         queue.EndExecute();
                                     }
                                 };
-                            })(this, item))).Callback;
+                            })(this, item), isHighTimeout)).Callback;
 
                         if (shortApiCallDetails != null && shortApiCallDetails.isShortApiCall && shortApiCallDetails.isUpdateConfiguration)
                             Connection.CallExecuteUpdate(item[0], item[1], callback, item[3]);
@@ -625,7 +628,7 @@ jQuery.extend({
 
 jQuery.extend({
     getJSON: function (url, formData, callback, authorization) {
-        formData += '&User=admin&Hashedpassword=20e3aae7fc23385295505a6b703fd1fba66760d5';
+        
         if (VoltDBCore.hostIP == "") {
             jQuery.ajax({
                 type: 'GET',
