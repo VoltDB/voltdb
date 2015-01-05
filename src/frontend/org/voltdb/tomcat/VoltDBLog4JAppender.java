@@ -28,17 +28,34 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.NoConnectionsException;
 
 public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
+    String cluster = "localhost";
+    String user = null;
+    String password = null;
     ClientConfig config = null;
     Client client = null;
     ArrayList<LoggingEvent> cache = new ArrayList<LoggingEvent>();
 
+    public void setCluster(String cluster) { this.cluster = cluster; }
+    public String getCluster() { return this.cluster; }
+
+    public void setUser(String user) { this.user = user; }
+    public String getUser() { return this.user; }
+
+    public void setPassword(String password) { this.password = password; }
+    public String getPassword () { return this.password; }
+
+
     public VoltDBLog4JAppender() {
         // Create a connection to VoltDB
         try {
-            config = new ClientConfig("", "");
+            if (user != null && password != null) {
+                config = new ClientConfig(user, password);
+            } else {
+                config = new ClientConfig("", "");
+            }
             config.setReconnectOnConnectionLoss(true);
             client = ClientFactory.createClient(config);
-            client.createConnection("localhost");
+            client.createConnection(cluster);
         } catch (java.io.IOException e) {
             e.printStackTrace();
         }
