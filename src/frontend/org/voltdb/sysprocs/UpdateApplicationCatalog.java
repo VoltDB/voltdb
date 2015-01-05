@@ -365,8 +365,8 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
          */
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
         if (worksWithElastic == 0 &&
-            !zk.getChildren(VoltZK.elasticJoinActiveBlockers, false).isEmpty()) {
-            throw new VoltAbortException("Can't do a catalog update while an elastic join is active");
+            !zk.getChildren(VoltZK.catalogUpdateBlockers, false).isEmpty()) {
+            throw new VoltAbortException("Can't do a catalog update while an elastic join or rejoin is active");
         }
 
         // Pull the current catalog and deployment version and hash info.  Validate that we're either:
