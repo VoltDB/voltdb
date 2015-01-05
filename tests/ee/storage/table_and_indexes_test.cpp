@@ -53,7 +53,7 @@ static int64_t addPartitionId(int64_t value) {
 class TableAndIndexTest : public Test {
     public:
         TableAndIndexTest() {
-            engine = new ExecutorContext(0, 0, NULL, &topend, &pool, NULL, false, "", 0, &drStream);
+            engine = new ExecutorContext(0, 0, NULL, &topend, &pool, NULL, false, "", 0, &drStream, &drReplicatedStream);
             mem = 0;
             *reinterpret_cast<int64_t*>(signature) = 42;
             drStream.configure(44);
@@ -268,6 +268,7 @@ class TableAndIndexTest : public Test {
         TempTableLimits limits;
         ExecutorContext *engine;
         DRTupleStream drStream;
+        DRTupleStream drReplicatedStream;
         DummyTopend topend;
         Pool pool;
         BinaryLogSink sink;

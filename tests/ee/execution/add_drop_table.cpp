@@ -58,6 +58,7 @@ class AddDropTableTest : public Test {
                              m_partitionId,
                              m_hostId,
                              m_hostName,
+                             false,
                              DEFAULT_TEMP_TABLE_MEMORY);
         m_engine->updateHashinator( HASHINATOR_LEGACY,
                                    (char*)&partitionCount,

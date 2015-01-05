@@ -424,6 +424,7 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
         int hostId;
         int64_t logLevels;
         int64_t tempTableMemory;
+        int32_t createDrReplicatedStream;
         int32_t hostnameLength;
         char data[0];
     }__attribute__((packed));
@@ -437,6 +438,7 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
     cs->hostId = ntohl(cs->hostId);
     cs->logLevels = ntohll(cs->logLevels);
     cs->tempTableMemory = ntohll(cs->tempTableMemory);
+    bool createDrReplicatedStream = cs->createDrReplicatedStream != 0;
     cs->hostnameLength = ntohl(cs->hostnameLength);
 
     std::string hostname(cs->data, cs->hostnameLength);
@@ -455,6 +457,7 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
                                  cs->partitionId,
                                  cs->hostId,
                                  hostname,
+                                 createDrReplicatedStream,
                                  cs->tempTableMemory) == true) {
             return kErrorCode_Success;
         }

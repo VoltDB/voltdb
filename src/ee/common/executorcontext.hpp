@@ -50,7 +50,8 @@ class ExecutorContext {
                     bool exportEnabled,
                     std::string hostname,
                     CatalogId hostId,
-                    DRTupleStream *drTupleStream);
+                    DRTupleStream *drTupleStream,
+                    DRTupleStream *drReplicatedStream);
 
     // It is the thread-hopping VoltDBEngine's responsibility to re-establish the EC for each new thread it runs on.
     void bindToThread();
@@ -154,6 +155,10 @@ class ExecutorContext {
         return m_drStream;
     }
 
+    DRTupleStream* drReplicatedStream() {
+        return m_drReplicatedStream;
+    }
+
     static ExecutorContext* getExecutorContext();
 
     static Pool* getTempStringPool() {
@@ -172,6 +177,7 @@ class ExecutorContext {
     Pool *m_tempStringPool;
     UndoQuantum *m_undoQuantum;
     DRTupleStream *m_drStream;
+    DRTupleStream *m_drReplicatedStream;
     VoltDBEngine *m_engine;
     int64_t m_txnId;
     int64_t m_spHandle;
