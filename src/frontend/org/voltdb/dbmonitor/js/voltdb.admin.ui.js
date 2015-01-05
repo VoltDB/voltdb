@@ -666,7 +666,7 @@ function loadAdminPage() {
             
             $("#btnRestoreSnapshotOk").unbind("click");
             $("#btnRestoreSnapshotOk").on("click", function (e) {
-                alert('restore snapshot');
+                
                 var checkedValue = $('input:radio[name=vemmanual]:checked').val();
 
                 if (checkedValue == undefined) {
@@ -677,7 +677,7 @@ function loadAdminPage() {
                     return;
                 }
                 var value = checkedValue.split('#');
-                $("#overlay").show();
+                $("#adminActionOverlay").show();
                 voltDbRenderer.restoreSnapShot(value[0], value[1], function (status, snapshotResult, statusString) {
                     if (status) {
                         if (snapshotResult[getCurrentServer()].RESULT.toLowerCase() == "success") {
@@ -694,7 +694,7 @@ function loadAdminPage() {
                         $('#saveSnapshotMessage').html(statusString);
                         $('#btnSaveSnapshotPopup').click();
                     }
-                    $("#overlay").hide();
+                    $("#adminActionOverlay").hide();
                 });
                 
                 //Close the popup 
