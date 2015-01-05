@@ -2067,7 +2067,11 @@ public class VoltCompiler {
         org.voltdb.catalog.Table tableref = db.getTables().getIgnoreCase(tableName);
         if (tableref == null) {
             throw new VoltCompilerException("While configuring dr, table " + tableName + " was not present in the catalog");
+        } else if (tableref.getMaterializer() != null) {
+            throw new VoltCompilerException("While configuring dr, table " + tableName + " is a materialized view." +
+                                            " DR does not support materialized view.");
         }
+
         if (action.equalsIgnoreCase("DISABLE")) {
             tableref.setIsdred(false);
         } else {
