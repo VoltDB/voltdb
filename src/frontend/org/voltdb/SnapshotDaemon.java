@@ -1215,6 +1215,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             // TRAIL [TruncSnap:1] elected as leader
             truncationRequestExistenceCheck();
             userSnapshotRequestExistenceCheck(false);
+            m_snapshotQueue.setQueueChangeCallback(m_onQueueChange);
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Error while accepting snapshot daemon leadership", true, e);
         }
