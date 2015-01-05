@@ -324,6 +324,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 throws KeeperException, InterruptedException {
             String activePath = getPathFromType(m_activeSnapshot);
             m_zk.setData(getPathFromNodeId(activePath, nodeId), nodeData, -1);
+            ByteBuffer newQueue = buildProposalFromUpdatedQueue(ByteBuffer.wrap(nodeData));
+            proposeStateChange(newQueue);
         }
 
         public void coalesceNodesWith(
@@ -830,6 +832,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     {
         boolean success = true;
         VoltTable checkResult = SnapshotUtil.constructNodeResultsTable();
+        VoltTable hardlinkCheckResults = SnapshotUtil.constructHardlinkResultsTable();
         final String jsString = String.class.cast(params[0]);
 
         if (m_lastInitiationTs != null) {
@@ -860,6 +863,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
                 // Wait for responses from all hosts for a certain amount of time
                 Map<Integer, VoltTable> responses = Maps.newHashMap();
+                Map<Integer, VoltTable> hardlinkChecks = Maps.newHashMap();
                 final long timeoutMs = 10 * 1000; // 10s timeout
                 final long endTime = System.currentTimeMillis() + timeoutMs;
                 SnapshotCheckResponseMessage response;
@@ -868,7 +872,13 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     // ignore responses to previous requests
                     if (jsObj.getString("path").equals(response.getPath()) &&
                         jsObj.getString("nonce").equals(response.getNonce())) {
-                        responses.put(CoreUtils.getHostIdFromHSId(response.m_sourceHSId), response.getResponse());
+
+                        int hostid = CoreUtils.getHostIdFromHSId(response.m_sourceHSId);
+                        responses.put(hostid, response.getResponse());
+                        VoltTable hardlinkCheck = response.getHardLinkResults();
+                        if (hardlinkCheck != null) {
+                            hardlinkChecks.put(hostid, hardlinkCheck);
+                        }
                     }
 
                     if (responses.size() == liveHosts.size() || System.currentTimeMillis() > endTime) {
@@ -886,8 +896,33 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     // TRAIL [TruncSnap:12] all participating nodes have initiated successfully
                     // Call @SnapshotSave if check passed, return the failure otherwise
                     checkResult = VoltTableUtil.unionTables(responses.values());
+                    if (hardlinkChecks.size() > 0) {
+                        hardlinkCheckResults = VoltTableUtil.unionTables(hardlinkChecks.values());
+                    }
                     initiateSnapshot = SnapshotUtil.didSnapshotRequestSucceed(new VoltTable[]{checkResult});
 
+                    Map<String, ClientResponseImpl> badLinks =
+                            SnapshotUtil.checkHardLinkTestResponses(new VoltTable[]{ hardlinkCheckResults });
+                    if (badLinks.size() > 0) try {
+                        JSONObject hardLinks = jsObj.getJSONObject("hardLinks");
+                        String requestid = jsObj.getString("coalescedToRequestId");
+                        for (Map.Entry<String, ClientResponseImpl> e: badLinks.entrySet()) {
+                            hardLinks.remove(e.getKey());
+                            saveResponseToZK(e.getKey(), e.getValue());
+                        }
+                        m_snapshotQueue.updateActiveNodeData(
+                                RequestId.valueOf(requestid).getId(),
+                                jsObj.toString(4).getBytes(StandardCharsets.UTF_8)
+                                );
+                    } catch (InterruptedException|KeeperException ex) {
+                        SNAP_LOG.error("unable to save hardlink failure to zk", ex);
+                        initiateSnapshot = success = false;
+                        checkResult.addRow(
+                                CoreUtils.getHostIdFromHSId(m_mb.getHSId()),
+                                CoreUtils.getHostnameOrAddress(), null,
+                                "FAILURE", "ERROR SAVING HARDLINK FAILURE TO ZK"
+                                );
+                    }
                     if (initiateSnapshot) {
                         m_lastInitiationTs = Pair.of(System.currentTimeMillis(), blocking);
                         m_initiator.initiateSnapshotDaemonWork("@SnapshotSave", handle, params);
@@ -947,6 +982,22 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                         lastCallback, null);
             }
         }
+        lastCallback.get();
+    }
+
+    private void saveResponseToZK(String requestid, ClientResponseImpl response)
+            throws JSONException, KeeperException, InterruptedException {
+        ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize());
+        byte [] flattened = response.flattenToBuffer(buf).array();
+
+        StringCallback lastCallback = new StringCallback();
+
+        m_zk.create(VoltZK.user_snapshot_response + requestid,
+                flattened,
+                Ids.OPEN_ACL_UNSAFE,
+                CreateMode.PERSISTENT,
+                lastCallback, null);
+
         lastCallback.get();
     }
 
@@ -1459,7 +1510,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                         @Override
                         public void run() {
                             try {
-                                queueTruncationRequest();
+                                truncationSnapshotPrelude(joRequest);
                             } catch (Exception e) {
                                 VoltDB.crashLocalVoltDB("Error processing snapshot truncation request event", true, e);
                             }
@@ -1512,7 +1563,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                         @Override
                         public void run() {
                             try {
-                                queueTruncationRequest();
+                                truncationSnapshotPrelude(joRequest);
                             } catch (Exception e) {
                                 VoltDB.crashLocalVoltDB("Exception processing truncation request event", true, e);
                             }
@@ -2511,7 +2562,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
     @SuppressWarnings("unchecked")
     private final static Iterator<String> jsonFieldKeys(JSONObject jo) {
-        return (Iterator<String>)jo.keys();
+        return jo.keys();
     }
 
     private void makeTruncationRequestStub(JSONObject jo, int id) throws JSONException {

@@ -85,6 +85,8 @@ import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
 import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.Maps;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
@@ -1279,7 +1281,47 @@ public class SnapshotUtil {
             }
         }
         result.resetRowPosition();
+
         return err;
+    }
+
+    public static Map<String,ClientResponseImpl> checkHardLinkTestResponses(VoltTable [] results) {
+        Map<String, ClientResponseImpl> crs = Maps.newLinkedHashMap();
+        if (results == null || results.length == 0) {
+            return ImmutableMap.<String,ClientResponseImpl>of();
+        }
+        final VoltTable result = results[0];
+        result.resetRowPosition();
+        while (result.advanceRow()) {
+            String requestid = result.getString("REQUESTID");
+            String hardlinkTo = result.getString("HARDLINKTO");
+            if (!result.getString("RESULT").equals("SUCCESS")) {
+                VoltTable crt = constructNodeResultsTable();
+                crt.addRow(
+                        -1,result.getString("HOST_NAME"),
+                        "","FAILURE",
+                        "failed to hardlink target for request " + requestid
+                        );
+                ClientResponseImpl cr = new ClientResponseImpl(
+                        ClientResponseImpl.SUCCESS, new VoltTable[] { crt },
+                        "failed to tee or hardlink coalesced request"
+                        );
+                crs.put(requestid, cr);
+            } else if (hardlinkTo != null && !hardlinkTo.trim().isEmpty()) {
+                VoltTable crt = constructNodeResultsTable();
+                crt.addRow(
+                        -1,result.getString("HOST_NAME"),
+                        "","FAILURE",
+                        "no support for tee|copy targets " + requestid
+                        );
+                ClientResponseImpl cr = new ClientResponseImpl(
+                        ClientResponseImpl.SUCCESS, new VoltTable[] { crt },
+                        "failed to tee or hardlink coalesced request"
+                        );
+                crs.put(requestid, cr);
+            }
+        }
+        return ImmutableMap.copyOf(crs);
     }
 
     public static boolean didSnapshotRequestSucceed(VoltTable result[]) {
