@@ -654,6 +654,7 @@ function loadAdminPage() {
     });
 
     var searchSnapshots = function(e) {
+        $('#btnRestore').removeClass('btn').addClass('restoreBtn');
         $('#tblSearchList').html('<tr style="border:none"><td colspan="3" align="center"><img src="css/resources/images/loader-small.gif"></td></tr>');
         voltDbRenderer.GetSnapshotList($('#txtSearchSnapshots').val(), function(snapshotList) {
             var result = '';
@@ -663,9 +664,11 @@ function loadAdminPage() {
                 '</tr>';
 
             var count = 0;
+            var searchError = false;
             $.each(snapshotList, function(id, snapshot) {
                 if (snapshot.RESULT == "FAILURE") {
-                    result += '<tr><td style="color:red"> Failure getting snapshots.' + snapshot.ERR_MSG + '</td></tr>';
+                    result += '<tr><td style="color:red"> Error: Failure getting snapshots.' + snapshot.ERR_MSG + '</td></tr>';
+                    searchError = true;
                     return false;
                 }
                 var option = 'checked="checked"';
@@ -686,6 +689,8 @@ function loadAdminPage() {
                 result = '<td>No snapshots available.</td>';
                 $('#btnRestore').addClass('restoreBtn');
                 $('#btnRestore').removeClass('btn');
+            } else if (searchError) {
+                $('#btnRestore').removeClass('btn').addClass('restoreBtn');
             } else {
                 $('#btnRestore').addClass('btn');
                 $('#btnRestore').removeClass('restoreBtn');
