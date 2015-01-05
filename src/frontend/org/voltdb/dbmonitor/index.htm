@@ -565,6 +565,7 @@
                             <div class="headerAdminContent">
                                 <h1>Directories</h1>
                             </div>
+                            <div class="adminDirect">
                             <table width="100%" border="0" cellspacing="0" cellpadding="0" class="adminTbl2">
                                 <tr>
                                     <td width="76%">Root (Destination)</td>
@@ -587,6 +588,7 @@
                                     <td id="commandlogsnapshotpath"></td>
                                 </tr>
                             </table>
+                            </div>
                         </div>
                     </div>
                     <div class="clear"></div>
@@ -1117,6 +1119,23 @@
         </div>
     </div>
     <!-- POPUP SaveSnapshotPopup -->
+    
+    <!-- Error Promote Popup-->
+    <div style="display: none"><a href="#errorPromotePopup" id="btnErrorPromotePopup">Cluster Promote Error</a></div>
+    <div id="errorPromotePopup" style="display: none">
+        <div id="errorPromote">
+            <div class="overlay-title ">
+                <img src="css/resources/images/Information.png" class="imgError" /><span id="promoteErrorHeader">Failed to promote cluster</span>
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError ">
+                <p id="promoteErrorMessage" class="snapshotErrorMsg"></p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn closeBtn" id="btnPromoteErrorOk" title="save">Ok</a></div>
+            </div>
+        </div>
+    </div>
+    <!-- Error Promote Popupp -->
 
     <!--Update error Popup-->
     <div style="display: none"><a href="#updateErrorPopup" id="updateErrorPopupLink">Update Error</a></div>
@@ -1152,6 +1171,12 @@
 
     <!-- Loading -->
     <div id="overlay" style="display: none;">
+        <div class="loading"></div>
+    </div>
+    <!-- Loading -->
+    
+    <!-- Loading -->
+    <div id="adminActionOverlay" style="display: none;">
         <div class="loading"></div>
     </div>
     <!-- Loading -->

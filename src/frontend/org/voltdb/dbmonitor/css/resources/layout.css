@@ -38,7 +38,8 @@ a.icon-search,
 ul.servers-list li.active, 
 ul.servers-list li.joining,
 ul.clusterStat, li.activeServerName,
-ul.servers-list li.active, 
+ul.servers-list li.active,
+ul.servers-list li.pauseMonitoring, 
 ul.servers-list li.joining, a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-procedures, .pref-storedProc, .pref-tables, .pref-graph, .icon-server, #toggleMenu
 { background-image:url(images/voltdb-icon-sprite.png)!important; background-repeat:no-repeat;}
 
@@ -440,7 +441,8 @@ ul.servers-list li{border-bottom:1px solid #dbdbdb; padding:15px 10px 15px 30px;
 a.setVal{ background:#aa1f2f; color:#fff; padding:10px 8px 11px 8px; font-weight:normal; font-size:14px;}
 a.setVal:hover{background:#aa1f2f/*3f5364*/; color:#fff; }
 
-ul.servers-list li.active{ background-position:2px -298px;}
+ul.servers-list li.active{ background-position:4px -298px;}
+ul.servers-list li.pauseMonitoring {background-position:4px -1458px;}
 ul.servers-list li.joining{ background-position:2px -350px; color:#a3a3a3;}
 ul.servers-list li:hover{background-color:#f0f3f4;}
 ul.servers-list li.monitoring{background-color:#f0f3f4;}
@@ -705,7 +707,7 @@ h1.icon-queryResult{background-position:15px -1039px;}
 
 .resultHtml, .resultCsv, .resultMonospace{width:100%; overflow:auto;height:400px;}
 .queryResult pre{line-height:20px;}
-#overlay{ position: fixed;height: 100%;width: 100%;bottom: 0;background: rgba(0, 0, 0, 0.3);z-index: 9999;}
+#overlay, #adminActionOverlay{ position: fixed;height: 100%;width: 100%;bottom: 0;background: rgba(0, 0, 0, 0.3);z-index: 9999;}
 .loading{ background: #fff url(images/loader.GIF) no-repeat center center;height: 75px;width: 75px;margin: 20% auto;}
 .loading-small{ background: #fff url(images/loader-small.GIF) no-repeat center center;height: 20px;width: 20px;
                 position: absolute;top: 11px;left: 95px;}
@@ -830,6 +832,7 @@ ul.adminClusterList li a:hover{color:#000;}
 .adminContentRight { float:left;width:49%;}
 .headerAdminContent {height:53px;position: relative; background:#fbfbfb; border-bottom:1px solid #aaa;}
 .adminDirectories { background:#FFFFFF; margin:20px 0 0 0;}
+.adminDirect{overflow:auto; width:auto;}
 .headerAdminContent h1 {padding: 18px 0 0 20px; font-size:17px;}
 .adminPorts { margin:0 0 10px 0; background:#FFFFFF;}
 .adminTbl { margin:0; padding:0;}
@@ -926,6 +929,7 @@ td.heartbeattd span.unit, td.queryTimeOut span.unit{position:relative;/* top:7px
     display: none;
 }
 .restoreInfo .overlay-content { }
+.overviewTbl {overflow:auto; width:auto}
 .overviewTbl table td{white-space:nowrap !important}
 .confirmationHeight { height:auto!important;}
 .snapshotErrorMsg { padding-bottom: 15px;}
@@ -1061,6 +1065,8 @@ top: 3px;}
 	.adminLeft { float:none; width:100%}
 	#serverConfigAdmin{ top:99px; width:421px;}
 	.adminRight{ padding-top:15px;}
+	.adminDirectories {overflow:auto; width:auto;}
+	
    
 }
 @media (min-width: 320px) and (max-width: 479px) {
@@ -1171,6 +1177,7 @@ top: 3px;}
     .resizeRestore {
         width: 90%;
     }
+	
 }
 
 	 
