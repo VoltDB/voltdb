@@ -51,6 +51,9 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
         m_name = name;
         m_cls = cls;
         m_depth = depth;
+        if (depth <= 3) {
+            m_cachedPath = getPath();
+        }
     }
 
     public String getPath() {
@@ -58,13 +61,19 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
             return m_cachedPath;
         }
         // if parent is the catalog root, don't add an extra slash to the existing one
-        String path = m_parent == m_catalog ? m_name : (m_parent.getCatalogPath() + "/" + m_name);
+        return m_parent == m_catalog ? m_name : (m_parent.getCatalogPath() + "/" + m_name);
+    }
 
-        // cache the top 3 levels of maps' paths
-        if (m_depth <= 3) {
-            m_cachedPath = path;
+    public void getPath(StringBuilder sb) {
+        if (m_cachedPath != null) {
+            sb.append(m_cachedPath);
+            return;
         }
-        return path;
+        // if parent is the catalog root, don't add an extra slash to the existing one
+        if (m_parent != m_catalog) {
+            sb.append(m_parent.getCatalogPath()).append('/');
+        }
+        sb.append(m_name);
     }
 
     /**

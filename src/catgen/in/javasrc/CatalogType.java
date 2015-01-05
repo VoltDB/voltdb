@@ -135,7 +135,15 @@ public abstract class CatalogType implements Comparable<CatalogType> {
      * @return The full catalog path of this CatalogType instance
      */
     String getCatalogPath() {
-        return m_parentMap.getPath() + Catalog.MAP_SEPARATOR + m_typename;
+        StringBuilder sb = new StringBuilder();
+        getCatalogPath(sb);
+        return sb.toString();
+    }
+
+    void getCatalogPath(StringBuilder sb) {
+        m_parentMap.getPath(sb);
+        sb.append(Catalog.MAP_SEPARATOR);
+        sb.append(m_typename);
     }
 
     /**
@@ -237,11 +245,15 @@ public abstract class CatalogType implements Comparable<CatalogType> {
     }
 
     void writeCommandForField(StringBuilder sb, String field, boolean printFullPath) {
-        String path = getCatalogPath();
-        if (!printFullPath) path = "$PREV"; // use caching to shrink output + speed parsing
-
-        sb.append("set ").append(path).append(" ");
-        sb.append(field).append(" ");
+        sb.append("set ");
+        if (printFullPath) {
+            getCatalogPath(sb);
+            sb.append(' ');
+        }
+        else {
+            sb.append("$PREV "); // use caching to shrink output + speed parsing
+        }
+        sb.append(field).append(' ');
         Object value = getField(field);
         if (value == null) {
             sb.append("null");
@@ -253,7 +265,7 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         else if (value.getClass() == String.class)
             sb.append("\"").append(value).append("\"");
         else if (value instanceof CatalogType)
-            sb.append(((CatalogType)value).getCatalogPath());
+            ((CatalogType)value).getCatalogPath(sb);
         else
             throw new CatalogException("Unsupported field type '" + value + "'");
         sb.append("\n");

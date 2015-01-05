@@ -21,8 +21,12 @@
 
 package org.voltdb.catalog;
 
+import java.io.IOException;
+import java.io.StringReader;
+
 import com.google_voltpatches.common.cache.Cache;
 import com.google_voltpatches.common.cache.CacheBuilder;
+import com.google_voltpatches.common.io.LineReader;
 
 /**
  * The root class in the Catalog hierarchy, which is essentially a tree of
@@ -35,7 +39,7 @@ public class Catalog extends CatalogType {
 
     //private final HashMap<String, CatalogType> m_pathCache = new HashMap<String, CatalogType>();
     //private final PatriciaTrie<CatalogType> m_pathCache = new PatriciaTrie<>();
-    Cache<String, CatalogType> m_pathCache = CacheBuilder.newBuilder().maximumSize(100).build();
+    Cache<String, CatalogType> m_pathCache = CacheBuilder.newBuilder().maximumSize(8).build();
 
     private CatalogType m_prevUsedPath = null;
 
@@ -78,48 +82,57 @@ public class Catalog extends CatalogType {
      */
     public void execute(final String commands) {
 
-        int ctr = 0;
-        for (String line : commands.split("\n")) {
-            try {
-                if (line.length() > 0) executeOne(line);
-            }
-            catch (Exception ex) {
-                String msg = "Invalid catalog command on line " + ctr + "\n" +
-                    "Contents: '" + line + "'\n";
-                ex.printStackTrace();
-                throw new RuntimeException(msg, ex);
+        LineReader lines = new LineReader(new StringReader(commands));
 
+        int ctr = 0;
+        String line = null;
+        try {
+            while ((line = lines.readLine()) != null) {
+                try {
+                    if (line.length() > 0) executeOne(line);
+                }
+                catch (Exception ex) {
+                    String msg = "Invalid catalog command on line " + ctr + "\n" +
+                        "Contents: '" + line + "'\n";
+                    ex.printStackTrace();
+                    throw new RuntimeException(msg, ex);
+
+                }
+                ctr++;
             }
-            ctr++;
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
         }
     }
 
     void executeOne(String stmt) {
-        stmt = stmt.trim();
-
         // command comes before the first space (add or set)
-        int pos = stmt.indexOf(' ');
-        assert pos != -1;
-        String cmd = stmt.substring(0, pos);
-        stmt = stmt.substring(pos + 1);
+
+        int pos = 0;
+        while (Character.isWhitespace(stmt.charAt(pos))) {
+            ++pos;
+        }
+        char cmd = stmt.charAt(pos++);
+        while (stmt.charAt(pos++) != ' ');
 
         // ref to a catalog node between first two spaces
-        pos = stmt.indexOf(' ');
-        assert pos != -1;
-        String ref = stmt.substring(0, pos);
-        stmt = stmt.substring(pos + 1);
+        int refStart = pos;
+        while (stmt.charAt(pos++) != ' ');
+        String ref = stmt.substring(refStart, pos - 1);
 
         // spaces 2 & 3 separate the two arguments
-        pos = stmt.indexOf(' ');
-        assert pos != -1;
-        String arg1 = stmt.substring(0, pos);
-        String arg2 = stmt.substring(pos + 1);
+        int argStart = pos;
+        while (stmt.charAt(pos++) != ' ');
+        String arg1 = stmt.substring(argStart, pos - 1);
+        String arg2 = stmt.substring(pos);
 
         // resolve the ref to a node in the catalog
         CatalogType resolved = null;
-        if (ref.equals("$PREV")) {
-            if (m_prevUsedPath == null)
+        if (ref.startsWith("$")) { // $PREV
+            if (m_prevUsedPath == null) {
                 throw new CatalogException("$PREV reference was not preceded by a cached reference.");
+            }
             resolved = m_prevUsedPath;
         }
         else {
@@ -131,15 +144,15 @@ public class Catalog extends CatalogType {
         }
 
         // run either command
-        if (cmd.equals("add")) {
+        if (cmd == 'a') { // add
             resolved.getCollection(arg1).add(arg2);
         }
-        else if (cmd.equals("delete")) {
+        else if (cmd == 'd') { // delete
             resolved.getCollection(arg1).delete(arg2);
             String toDelete = ref + "/" + arg1 + MAP_SEPARATOR + arg2;
             m_pathCache.invalidate(toDelete);
         }
-        else if (cmd.equals("set")) {
+        else if (cmd == 's') { // set
             resolved.set(arg1, arg2);
         }
     }
