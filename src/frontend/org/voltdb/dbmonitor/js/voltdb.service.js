@@ -913,7 +913,7 @@
                     VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
                         status = connection.Metadata['@SnapshotRestore_status'];
                         if (!(status == "" || status == undefined)) {
-                            onConnectionAdded(connection, status, connection.Metadata['@SnapshotRestor_statusstring']);
+                            onConnectionAdded(connection, status, connection.Metadata['@SnapshotRestore_statusstring']);
                         }
 
                     });
