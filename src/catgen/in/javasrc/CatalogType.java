@@ -298,6 +298,7 @@ public abstract class CatalogType implements Comparable<CatalogType> {
 
         assert(parentMap.m_parent.getCatalog() == catalog);
         copy.setBaseValues(parentMap, m_typename);
+        copy.initChildMaps();
         copy.m_relativeIndex = m_relativeIndex;
 
         copyFields(copy);
