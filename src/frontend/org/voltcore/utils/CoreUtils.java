@@ -73,17 +73,10 @@ import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 public class CoreUtils {
-    private static final VoltLogger hostLog = new VoltLogger("HOST");
-
     public static final int SMALL_STACK_SIZE = 1024 * 256;
     public static final int MEDIUM_STACK_SIZE = 1024 * 512;
 
-    public static volatile Runnable m_threadLocalDeallocator = new Runnable() {
-        @Override
-        public void run() {
-
-        }
-    };
+    public static volatile Runnable m_threadLocalDeallocator = initEmptyRunnable();
 
     public static final ExecutorService SAMETHREADEXECUTOR = new ExecutorService() {
 
@@ -410,10 +403,15 @@ public class CoreUtils {
         public Object get(long timeout, TimeUnit unit) { return null; }
     };
 
-    public static final Runnable EMPTY_RUNNABLE = new Runnable() {
-        @Override
-        public void run() {}
-    };
+    public static final Runnable EMPTY_RUNNABLE = initEmptyRunnable();
+
+    private static Runnable initEmptyRunnable() {
+        Runnable runnable = new Runnable() {
+            @Override
+            public void run() { }
+        };
+        return runnable;
+    }
 
     /**
      * Get a single thread executor that caches it's thread meaning that the thread will terminate
@@ -643,7 +641,7 @@ public class CoreUtils {
                         try {
                             r.run();
                         } catch (Throwable t) {
-                            hostLog.error("Exception thrown in thread " + threadName, t);
+                            new VoltLogger("HOST").error("Exception thrown in thread " + threadName, t);
                         } finally {
                             m_threadLocalDeallocator.run();
                         }

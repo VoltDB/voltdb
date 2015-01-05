@@ -32,14 +32,13 @@ package org.voltdb.utils;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 
 import junit.framework.TestCase;
 
-import org.voltdb.ServerThread;
-import org.voltdb.VoltDB;
-import org.voltdb.VoltDB.Configuration;
+import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
@@ -47,28 +46,41 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.regressionsuites.LocalCluster;
 
 public class TestSqlCmdErrorHandling extends TestCase {
+    /// Sample syntax for testing invalid sql statements.
+    private static final String m_lastError = "ThisIsObviouslyNotAnAdHocSQLCommand;\n";
 
-    private final String m_lastError = "ThisIsObviouslyNotAnAdHocSQLCommand;\n";
-
-    private ServerThread m_server;
+    /// The configuration of the local VoltDB server
+    private LocalCluster m_cluster;
+    /// direct connection to VoltDB server
     private Client m_client;
+    /// Control test verbosity to assist debugging
+    private boolean m_verboseForDebug = false;
+
+    /// Connection options derived from the launched server for local test use.
+    private String m_addressString;
+    /// Connection options derived from the launched server for sqlcmd command line.
+    private String m_sqlcmdServerOption = "localhost";
+    private String m_sqlcmdPortOption = "21212";
 
     @Override
-    public void setUp() throws Exception
+    protected void setUp() throws Exception
     {
+        super.setUp();
+        // Define a schema to exercise various type conversions and their failures.
         String[] mytype = new String[] { "integer", "varbinary", "decimal", "float" };
         String simpleSchema =
                 "create table intkv (" +
-                "  key integer, " +
-                "  myinteger integer default 0, " +
-                "  myvarbinary varbinary default 'ff', " +
-                "  mydecimal decimal default 10.10, " +
-                "  myfloat float default 9.9, " +
-                "  PRIMARY KEY(key) );" +
-                "\n" +
-                "";
+                        "  key integer, " +
+                        "  myinteger integer default 0, " +
+                        "  myvarbinary varbinary default 'ff', " +
+                        "  mydecimal decimal default 10.10, " +
+                        "  myfloat float default 9.9, " +
+                        "  PRIMARY KEY(key) );" +
+                        "\n" +
+                        "";
 
         // Define procs that to complain when sqlcmd passes them garbage parameters.
         for (String type : mytype) {
@@ -77,27 +89,22 @@ public class TestSqlCmdErrorHandling extends TestCase {
                     "\n";
         }
 
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(simpleSchema);
-        builder.setUseDDLSchema(false);
-        String catalogPath = Configuration.getPathToCatalogForTest("sqlcmderror.jar");
-        assertTrue(builder.compile(catalogPath, 1, 1, 0));
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = catalogPath;
-        config.m_pathToDeployment = builder.getPathToDeployment();
-        m_server = new ServerThread(config);
-        m_server.start();
-        m_server.waitForInitialization();
+        startServer(simpleSchema);
 
         m_client = ClientFactory.createClient();
-        m_client.createConnection("localhost");
 
-        assertEquals("sqlcmd dry run failed -- maybe some sqlcmd component (the voltdb jar file?) needs to be rebuilt.",
-                0, callSQLcmd(true, ";\n"));
+        m_addressString = m_cluster.getListenerAddresses().get(0);
 
-        assertEquals("sqlcmd --stop-on-error=false dry run failed.",
-                0, callSQLcmd(false, ";\n"));
+        // Parse the running server's address string for sqlcmd command line parameters.
+        String[] split =  m_addressString.split(":");
+        m_sqlcmdServerOption = split[0];
+        if (split.length > 1) {
+            m_sqlcmdPortOption = split[1];
+        }
+        else {
+            m_sqlcmdPortOption = "21212";
+        }
+        m_client.createConnection(m_addressString);
 
         // Execute the constrained write to end all constrained writes.
         // This poisons all future executions of the badWriteCommand() query.
@@ -107,6 +114,14 @@ public class TestSqlCmdErrorHandling extends TestCase {
         assertEquals(1, results.length);
         VoltTable result = results[0];
         assertEquals(1, result.asScalarLong());
+
+        // Confirm that the sqlcmd executable is minimally functional.
+        assertEquals("sqlcmd dry run failed -- maybe some sqlcmd component (the voltdb jar file?) needs to be rebuilt.",
+                0, callSQLcmd(true, /**/"\n"));//";\n"));
+
+        // Confirm that the --stop-on-error command line override is minimally functional (accepted, at least).
+        assertEquals("sqlcmd --stop-on-error=false dry run failed.",
+                0, callSQLcmd(false, /**/"\n"));//";\n"));
 
         // Assert that the procs don't complain when fed good parameters.
         // Keep these dry run key values out of range of the test cases.
@@ -123,40 +138,59 @@ public class TestSqlCmdErrorHandling extends TestCase {
         }
     }
 
-    @Override
-    public void tearDown() throws InterruptedException
+    /**
+     * @param simpleSchema
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    private void startServer(String simpleSchema) throws IOException, InterruptedException
     {
-        m_client.close();
-        m_server.shutdown();
-        m_server.join();
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(simpleSchema);
+        builder.setUseDDLSchema(false);
+        m_cluster = new LocalCluster("TestSqlCmdErrorHandling" + ".jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        assertTrue(m_cluster.compile(builder));
+        // m_cluster.setHasLocalServer(false);
+        m_cluster.startUp();
+        Thread.sleep(1000);
     }
 
-    public String writeCommand(int id)
+    @Override
+    protected void tearDown() throws Exception
+    {
+        m_client.close();
+        m_cluster.shutDown();
+        super.tearDown();
+    }
+
+    private String writeCommand(int id)
     {
         return "insert into intkv (key, myinteger) values(" + id + ", " + id + ");\n";
     }
 
-    public String badWriteCommand()
+    private static String badWriteCommand()
     {
         return "insert into intkv (key, myinteger) values(0, 0);\n";
     }
 
-    public String badExecCommand(String type, int id, String badValue)
+    private String badExecCommand(String type, int id, String badValue)
     {
         return "exec myfussy_" + type + "_proc " + id + " '" + badValue + "'\n";
     }
 
-    private static String execWithNullCommand(String type, int id) {
+    private static String execWithNullCommand(String type, int id)
+    {
         return "exec myfussy_" + type + "_proc " + id + " null\n";
     }
 
-    public String badFileCommand()
+    private String badFileCommand()
     {
         return "file 'ButThereIsNoSuchFileAsThis'\n";
     }
 
-    private String createFileWithContent(String inputText) throws IOException {
-        File created = File.createTempFile("sqlcmdInput", "txt");
+    private String createFileWithContent(String inputText) throws IOException
+    {
+        File created = File.createTempFile("sqlcmdInput", ".txt");
         created.deleteOnExit();
         FileOutputStream fostr = new FileOutputStream(created);
         byte[] bytes = inputText.getBytes("UTF-8");
@@ -165,7 +199,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
         return created.getCanonicalPath();
     }
 
-    public boolean checkIfWritten(int id) throws NoConnectionsException, IOException, ProcCallException
+    private boolean checkIfWritten(int id) throws NoConnectionsException, IOException, ProcCallException
     {
         ClientResponse response = m_client.callProcedure("@AdHoc",
                 "select count(*) from intkv where key = " + id);
@@ -176,9 +210,10 @@ public class TestSqlCmdErrorHandling extends TestCase {
         return 1 == result.asScalarLong();
     }
 
-    private int callSQLcmd(boolean stopOnError, String inputText) throws Exception {
+    private int callSQLcmd(boolean stopOnError, String inputText) throws Exception
+    {
         final String commandPath = "bin/sqlcmd";
-        final long timeout = 60000; // 60,000 millis -- give up after 1 minute of trying.
+        final long timeout = 20000;
 
         File f = new File("ddl.sql");
         f.deleteOnExit();
@@ -186,12 +221,22 @@ public class TestSqlCmdErrorHandling extends TestCase {
         fos.write(inputText.getBytes());
         fos.close();
 
-        File out = new File("out.log");
+        File out = File.createTempFile("testsqlcmdout", ".log");
+        out.deleteOnExit();
 
-        File error = new File("error.log");
+        File error = File.createTempFile("testsqlcmderr", ".log");
+        error.deleteOnExit();
 
         ProcessBuilder pb =
-                new ProcessBuilder(commandPath, "--stop-on-error=" + (stopOnError ? "true" : "false"));
+                new ProcessBuilder(commandPath,
+//                // Enable elapsed time reports to stderr.
+//                "--debugdelay=,,",
+//                // Use up all allotted time on the first error
+//                // selectively exercises timeout diagnostics."
+//                "--debugdelay=,,20000",
+                        "--stop-on-error=" + (stopOnError ? "true" : "false"),
+                        "--servers=" + m_sqlcmdServerOption,
+                        "--port=" + m_sqlcmdPortOption);
         pb.redirectInput(f);
         pb.redirectOutput(out);
         pb.redirectError(error);
@@ -211,10 +256,25 @@ public class TestSqlCmdErrorHandling extends TestCase {
                     elapsedtime = System.currentTimeMillis() - starttime;
                     System.err.println("External process (" + commandPath + ") exited after being polled " +
                             pollcount + " times over " + elapsedtime + "ms");
+                    //*/enable for debug*/ if (pollcount % 10 == 0) {
+                    //*/enable for debug*/     dumpProcessTree();
+                    //*/enable for debug*/ }
                 }
-                //*/enable for debug*/ System.err.println(commandPath + " returned " + exitValue);
-                //*/enable for debug*/ System.err.println(" in " + (System.currentTimeMillis() - starttime)+ "ms");
-                //*/enable for debug*/ System.err.println(" on input:\n" + inputText);
+                if (m_verboseForDebug && exitValue != 0) {
+                    System.err.println("Standard input for failed " + commandPath + ":");
+                    streamFileToErr(f);
+                    System.err.println("*****");
+                    System.err.println("Standard output from failed " + commandPath + ":");
+                    streamFileToErr(out);
+                    System.err.println("*****");
+                    System.err.println("Error output from failed " + commandPath + ":");
+                    streamFileToErr(error);
+                    System.err.println("*****");
+                    System.err.flush();
+                }
+                f.delete();
+                out.delete();
+                error.delete();
                 return exitValue;
             }
             catch (Exception e) {
@@ -224,30 +284,89 @@ public class TestSqlCmdErrorHandling extends TestCase {
             }
         } while (elapsedtime < timeout);
 
+        process.destroy();
+
+        System.err.println("Standard input for timed out " + commandPath + ":");
+        streamFileToErr(f);
+        f.delete();
+        System.err.println("*****");
         System.err.println("Standard output from timed out " + commandPath + ":");
-        FileInputStream cmdOut = new FileInputStream(out);
-        byte[] transfer = new byte[1000];
-        while (cmdOut.read(transfer) != -1) {
-            System.err.write(transfer);
-        }
-        cmdOut.close();
-        System.err.println("Error outpout from timed out " + commandPath + ":");
-        FileInputStream cmdErr = new FileInputStream(error);
-        while (cmdErr.read(transfer) != -1) {
-            System.err.write(transfer);
-        }
-        cmdErr.close();
+        streamFileToErr(out);
+        out.delete();
+        System.err.println("*****");
+        System.err.println("Error output from timed out " + commandPath + ":");
+        streamFileToErr(error);
+        error.delete();
+        System.err.println("*****");
+        dumpProcessTree();
+        System.err.println("*****");
         fail("External process (" + commandPath + ") timed out after " + elapsedtime + "ms on input:\n" + inputText);
         return 0;
     }
 
+    /**
+     * @param f
+     * @throws FileNotFoundException
+     * @throws IOException
+     */
+    private static void streamFileToErr(File f) throws IOException {
+        try {
+            byte[] transfer = new byte[1000];
+            int asRead = -1;
+            FileInputStream cmdIn = new FileInputStream(f);
+            while ((asRead = cmdIn.read(transfer)) != -1) {
+                System.err.write(transfer, 0, asRead);
+            }
+            cmdIn.close();
+        }
+        catch (FileNotFoundException fnfe) {
+            System.err.println("ERROR: TestSqlCmdErrorHandling could not find file " + f.getPath());
+        } finally {
+            System.err.flush();
+        }
+    }
+
+    /**
+     * Invoke a ps command and send the putput to stderr to help diagnose sqlcmd timing/hang issues.
+     * @throws IOException
+     * @throws InterruptedException
+     * @throws FileNotFoundException
+     */
+    private static void dumpProcessTree() throws IOException, InterruptedException, FileNotFoundException {
+        File psout = new File("psout.log");
+        File pserror = new File("pserr.log");
+        ProcessBuilder pspb = new ProcessBuilder("ps", "auxfww");
+        pspb.redirectOutput(psout);
+        pspb.redirectError(pserror);
+        Process psprocess = pspb.start();
+
+        long psstarttime = System.currentTimeMillis();
+        Thread.sleep(1000);
+        try {
+            psprocess.exitValue();
+        }
+        catch (Exception e) {
+            long pselapsed = System.currentTimeMillis() - psstarttime;
+            System.err.println("External process (ps) has not yet exited after " + pselapsed + "ms");
+        }
+
+        FileInputStream psOuts = new FileInputStream(psout);
+        byte[] pstransfer = new byte[1000];
+        while (psOuts.read(pstransfer) != -1) {
+            System.err.write(pstransfer);
+        }
+        psOuts.close();
+    }
+
     public void test10Error() throws Exception
     {
+        System.out.println("Starting test10Error");
         assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(false, m_lastError));
     }
 
     public void test20ErrorThenWrite() throws Exception
     {
+        System.out.println("Starting test20ErrorThenWrite");
         int id = 20;
         assertFalse("pre-condition violated", checkIfWritten(id));
         String inputText = m_lastError + writeCommand(id);
@@ -257,6 +376,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
 
     public void test30ErrorThenWriteThenError() throws Exception
     {
+        System.out.println("Starting test30ErrorThenWriteThenError");
         int id = 30;
         assertFalse("pre-condition violated", checkIfWritten(id));
         String inputText = m_lastError + writeCommand(id) + m_lastError;
@@ -266,12 +386,14 @@ public class TestSqlCmdErrorHandling extends TestCase {
 
     public void test40BadWrite() throws Exception
     {
+        System.out.println("Starting test40BadWrite");
         String inputText = badWriteCommand();
         assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(false, inputText));
     }
 
     public void test50BadWriteThenWrite() throws Exception
     {
+        System.out.println("Starting test50BadWriteThenWrite");
         int id = 50;
         assertFalse("pre-condition violated", checkIfWritten(id));
         String inputText = badWriteCommand() + writeCommand(id);
@@ -281,6 +403,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
 
     public void test60BadFileThenWrite() throws Exception
     {
+        System.out.println("Starting test60BadFileThenWrite");
         int id = 60;
         assertFalse("pre-condition violated", checkIfWritten(id));
         String inputText = badFileCommand() + writeCommand(id);
@@ -290,6 +413,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
 
     public void test70BadNestedFileWithWriteThenWrite() throws Exception
     {
+        System.out.println("Starting test70BadNestedFileWithWriteThenWrite");
         int id = 80;
         assertFalse("pre-condition violated", checkIfWritten(id));
         assertFalse("pre-condition violated", checkIfWritten( -id));
@@ -303,11 +427,13 @@ public class TestSqlCmdErrorHandling extends TestCase {
 
     public void test11Error() throws Exception
     {
+        System.out.println("Starting test11Error");
         assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(true, m_lastError));
     }
 
     public void test21ErrorThenStopBeforeWrite() throws Exception
     {
+        System.out.println("Starting test21ErrorThenStopBeforeWrite");
         int id = 21;
         assertFalse("pre-condition violated", checkIfWritten(id));
         String inputText = m_lastError + writeCommand(id);
@@ -317,6 +443,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
 
     public void test31ErrorThenStopBeforeWriteOrError() throws Exception
     {
+        System.out.println("Starting test31ErrorThenStopBeforeWriteOrError");
         int id = 31;
         assertFalse("pre-condition violated", checkIfWritten(id));
         String inputText = m_lastError + writeCommand(id) + m_lastError;
@@ -326,12 +453,14 @@ public class TestSqlCmdErrorHandling extends TestCase {
 
     public void test41BadWrite() throws Exception
     {
+        System.out.println("Starting test41BadWrite");
         String inputText = badWriteCommand();
         assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(true, inputText));
     }
 
     public void test51BadWriteThenStopBeforeWrite() throws Exception
     {
+        System.out.println("Starting test51BadWriteThenStopBeforeWrite");
         int id = 51;
         assertFalse("pre-condition violated", checkIfWritten(id));
         String inputText = badWriteCommand() + writeCommand(id);
@@ -341,6 +470,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
 
     public void test61BadFileStoppedBeforeWrite() throws Exception
     {
+        System.out.println("Starting test61BadFileStoppedBeforeWrite");
         int id = 61;
         assertFalse("pre-condition violated", checkIfWritten(id));
         String inputText = badFileCommand() + writeCommand(id);
@@ -350,6 +480,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
 
     public void test71BadNestedFileStoppedBeforeWrites() throws Exception
     {
+        System.out.println("Starting test71BadNestedFileStoppedBeforeWrites");
         int id = 81;
         assertFalse("pre-condition violated", checkIfWritten(id));
         assertFalse("pre-condition violated", checkIfWritten( -id));
@@ -371,6 +502,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
     // we will at least know it is time to "release note" the change.
     public void test101BadExecsThenStopBeforeWrite() throws Exception
     {
+        System.out.println("Starting test101BadExecsThenStopBeforeWrite");
         int id = 101;
         subtestBadExec("integer", id++, "garbage");
         subtestBadExec("integer", id++, "1 and still garbage");
@@ -392,6 +524,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
 
     public void test125ExecWithNulls() throws Exception
     {
+        System.out.println("Starting test125ExecWithNulls");
         int id = 125;
         String[] types = new String[] {"integer", "varbinary", "decimal", "float"};
         for (String type : types) {

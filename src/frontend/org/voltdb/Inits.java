@@ -43,7 +43,9 @@ import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
+import org.voltdb.VoltDB.Configuration;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.compiler.deploymentfile.AdminModeType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.export.ExportManager;
 import org.voltdb.iv2.MpInitiator;
@@ -67,7 +69,7 @@ public class Inits {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     final RealVoltDB m_rvdb;
-    final VoltDB.Configuration m_config;
+    final Configuration m_config;
     final boolean m_isRejoin;
     DeploymentType m_deployment = null;
 
@@ -110,17 +112,13 @@ public class Inits {
         }
     }
 
-    Inits(RealVoltDB rvdb, int threadCount) {
+    Inits(RealVoltDB rvdb) {
         m_rvdb = rvdb;
-        m_config = rvdb.m_config;
+        m_config = rvdb.getConfig();
         // determine if this is a rejoining node
         // (used for license check and later the actual rejoin)
-        if (m_config.m_startAction.doesRejoin()) {
-            m_isRejoin = true;
-        } else {
-            m_isRejoin = false;
-        }
-        m_threadCount = threadCount;
+        m_isRejoin = m_config.m_startAction.doesRejoin();
+        m_threadCount = 1;
         m_deployment = rvdb.m_catalogContext.getDeployment();
 
         // find all the InitWork subclasses using reflection and load them up
@@ -413,8 +411,7 @@ public class Inits {
 
                 if (!MiscUtils.validateLicense(m_rvdb.getLicenseApi(),
                                                m_deployment.getCluster().getHostcount(),
-                                               m_rvdb.getReplicationRole()))
-                {
+                                               m_rvdb.getReplicationRole())) {
                     // validateLicense logs. Exit call is here for testability.
                     VoltDB.crashGlobalVoltDB("VoltDB license constraints are not met.", false, null);
                 }
@@ -520,26 +517,27 @@ public class Inits {
 
         @Override
         public void run() {
-            int adminPort = VoltDB.DEFAULT_ADMIN_PORT;
-
             // See if we should bring the server up in admin mode
-            if (m_deployment.getAdminMode() != null) {
-                // rejoining nodes figure out admin mode from other nodes
-                if (m_isRejoin == false) {
-                    if (m_deployment.getAdminMode().isAdminstartup()) {
-                        m_rvdb.setStartMode(OperationMode.PAUSED);
-                    }
+            AdminModeType adminMode = m_deployment.getAdminMode();
+            if (adminMode == null) {
+                // allow command line override
+                if (m_config.m_adminPort <= 0) {
+                    // other places might use config to figure out the port
+                    m_config.m_adminPort = VoltDB.DEFAULT_ADMIN_PORT;
                 }
+                return;
+            }
 
-                // set the adminPort from the deployment file
-                adminPort = m_deployment.getAdminMode().getPort();
+            // rejoining nodes figure out admin mode from other nodes
+            if ( ! m_isRejoin && adminMode.isAdminstartup()) {
+                m_rvdb.setStartMode(OperationMode.PAUSED);
             }
 
             // allow command line override
-            if (m_config.m_adminPort > 0)
-                adminPort = m_config.m_adminPort;
-            // other places might use config to figure out the port
-            m_config.m_adminPort = adminPort;
+            if (m_config.m_adminPort <= 0) {
+                // set the adminPort from the deployment file
+                m_config.m_adminPort = adminMode.getPort();
+            }
         }
     }
 
@@ -586,8 +584,7 @@ public class Inits {
 
                 ZooKeeper zk = m_rvdb.getHostMessenger().getZK();
                 // rejoining nodes figure out the replication role from other nodes
-                if (!m_isRejoin)
-                {
+                if (!m_isRejoin) {
                     try {
                         zk.create(
                                 VoltZK.replicationconfig,
