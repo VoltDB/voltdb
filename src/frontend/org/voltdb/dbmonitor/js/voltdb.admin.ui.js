@@ -547,7 +547,7 @@ function loadAdminPage() {
         open: function (event, ui, ele) {
             $('#tblSearchList').html('');
             var textName = '<input id="txtSearchSnapshots" name="txtSearchSnapshots" type="text" value=' + $('#voltdbroot').text() + '/' + $('#snapshotpath').text() + '></td>';
-            var errorMsg = '<div class="errorLabelMsg"><label id="errorSearchSnapshotDirectory" for="txtSearchSnapshots" class="error" style="display: none;"></label></div>';
+            var errorMsg = '<div class="errorLabelMsgRestore"><label id="errorSearchSnapshotDirectory" for="txtSearchSnapshots" class="error" style="display: none;"></label></div>';
             $('#tdSearchSnapshots').html(textName + errorMsg);
             var btnName = '<a id="btnSearchSnapshots" class="save-search" title="Search" href="#">Search</a>';
             $('#tdSearchSnapshotsBtn').html(btnName);
@@ -616,7 +616,7 @@ function loadAdminPage() {
             
             $("#btnRestoreSnapshotOk").unbind("click");
             $("#btnRestoreSnapshotOk").on("click", function (e) {
-                alert('restore snapshot');
+                
                 var checkedValue = $('input:radio[name=vemmanual]:checked').val();
 
                 if (checkedValue == undefined) {
@@ -627,7 +627,7 @@ function loadAdminPage() {
                     return;
                 }
                 var value = checkedValue.split('#');
-                $("#overlay").show();
+                $("#adminActionOverlay").show();
                 voltDbRenderer.restoreSnapShot(value[0], value[1], function (status, snapshotResult, statusString) {
                     if (status) {
                         if (snapshotResult[getCurrentServer()].RESULT.toLowerCase() == "success") {
@@ -644,7 +644,7 @@ function loadAdminPage() {
                         $('#saveSnapshotMessage').html(statusString);
                         $('#btnSaveSnapshotPopup').click();
                     }
-                    $("#overlay").hide();
+                    $("#adminActionOverlay").hide();
                 });
                 
                 //Close the popup 
@@ -654,6 +654,7 @@ function loadAdminPage() {
     });
 
     var searchSnapshots = function(e) {
+        $('#btnRestore').removeClass('btn').addClass('restoreBtn');
         $('#tblSearchList').html('<tr style="border:none"><td colspan="3" align="center"><img src="css/resources/images/loader-small.gif"></td></tr>');
         voltDbRenderer.GetSnapshotList($('#txtSearchSnapshots').val(), function(snapshotList) {
             var result = '';
@@ -663,9 +664,11 @@ function loadAdminPage() {
                 '</tr>';
 
             var count = 0;
+            var searchError = false;
             $.each(snapshotList, function(id, snapshot) {
                 if (snapshot.RESULT == "FAILURE") {
-                    result += '<tr><td style="color:red"> Failure getting snapshots.' + snapshot.ERR_MSG + '</td></tr>';
+                    result += '<tr><td style="color:red"> Error: Failure getting snapshots.' + snapshot.ERR_MSG + '</td></tr>';
+                    searchError = true;
                     return false;
                 }
                 var option = 'checked="checked"';
@@ -686,6 +689,8 @@ function loadAdminPage() {
                 result = '<td>No snapshots available.</td>';
                 $('#btnRestore').addClass('restoreBtn');
                 $('#btnRestore').removeClass('btn');
+            } else if (searchError) {
+                $('#btnRestore').removeClass('btn').addClass('restoreBtn');
             } else {
                 $('#btnRestore').addClass('btn');
                 $('#btnRestore').removeClass('restoreBtn');
