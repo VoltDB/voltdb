@@ -38,7 +38,8 @@ a.icon-search,
 ul.servers-list li.active, 
 ul.servers-list li.joining,
 ul.clusterStat, li.activeServerName,
-ul.servers-list li.active, 
+ul.servers-list li.active,
+ul.servers-list li.pauseMonitoring, 
 ul.servers-list li.joining, a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-procedures, .pref-storedProc, .pref-tables, .pref-graph, .icon-server, #toggleMenu
 { background-image:url(images/voltdb-icon-sprite.png)!important; background-repeat:no-repeat;}
 
@@ -440,7 +441,8 @@ ul.servers-list li{border-bottom:1px solid #dbdbdb; padding:15px 10px 15px 30px;
 a.setVal{ background:#aa1f2f; color:#fff; padding:10px 8px 11px 8px; font-weight:normal; font-size:14px;}
 a.setVal:hover{background:#aa1f2f/*3f5364*/; color:#fff; }
 
-ul.servers-list li.active{ background-position:2px -298px;}
+ul.servers-list li.active{ background-position:4px -298px;}
+ul.servers-list li.pauseMonitoring {background-position:4px -1458px;}
 ul.servers-list li.joining{ background-position:2px -350px; color:#a3a3a3;}
 ul.servers-list li:hover{background-color:#f0f3f4;}
 ul.servers-list li.monitoring{background-color:#f0f3f4;}
