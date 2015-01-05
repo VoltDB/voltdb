@@ -20,8 +20,9 @@ function loadAdminPage() {
         ignorePromoteUpdateCount: 0,
         btnErrorClusterPromote: $('#btnErrorPromotePopup'),
         errorPromoteMessage: $('#promoteErrorMessage'),
-        updateMessageBar: $('#snapshotBar')
-};
+        updateMessageBar: $('#snapshotBar'),
+        errorRestoreMsgContainer: $('#errorRestoreMsgContainer')
+    };
 
     adminDOMObjects = {
         siteNumberHeader: $("#sitePerHost"),
@@ -167,7 +168,14 @@ function loadAdminPage() {
         },
         directoryPathMessages: {
             required: "Please enter a valid directory path."
-        }
+        },
+        
+        restoreSnapshotRules: {
+            required: true
+        },
+        restoreSnapshotMessages: {
+            required: "Please select a snapshot to restore."
+        },
     };
     
     //Admin Page download link
@@ -538,8 +546,8 @@ function loadAdminPage() {
     $('#restoreConfirmation').popup({
         open: function (event, ui, ele) {
             $('#tblSearchList').html('');
-            var textName = '<input id="txtSearchSnapshots" type="text" value=' + $('#voltdbroot').text() + '/' + $('#snapshotpath').text() + '></td>';
-            var errorMsg = '<div class="errorLabelMsg"><label id="errorSearchSnapshotDirectory" for="txtSearchSnapshots" class="error" style="display: none;">This field is required.</label></div>';
+            var textName = '<input id="txtSearchSnapshots" name="txtSearchSnapshots" type="text" value=' + $('#voltdbroot').text() + '/' + $('#snapshotpath').text() + '></td>';
+            var errorMsg = '<div class="errorLabelMsg"><label id="errorSearchSnapshotDirectory" for="txtSearchSnapshots" class="error" style="display: none;"></label></div>';
             $('#tdSearchSnapshots').html(textName + errorMsg);
             var btnName = '<a id="btnSearchSnapshots" class="save-search" title="Search" href="#">Search</a>';
             $('#tdSearchSnapshotsBtn').html(btnName);
@@ -547,11 +555,35 @@ function loadAdminPage() {
             $('#btnRestore').removeClass('btn');
             $('.restoreConfirmation').hide();
             $('.restoreInfo').show();
+            
+            $("#formSearchSnapshot").validate({
+                rules: {
+                    txtSearchSnapshots: adminValidationRules.directoryPathRules,
+                },
+                messages: {
+                    txtSearchSnapshots: adminValidationRules.directoryPathMessages,
+                }
+            });
         },
         afterOpen: function () {
             var popup = $(this)[0];
+            
             $('#btnSearchSnapshots').unbind('click');
-            $('#btnSearchSnapshots').on('click', function () {
+            $('#btnSearchSnapshots').on('click', function (e) {
+                
+                if (!$("#formSearchSnapshot").valid()) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    var errorSearchSnapshotDirectory = $("#errorSearchSnapshotDirectory");
+                    errorSearchSnapshotDirectory.css("background-color", "yellow");
+                    setTimeout(function () {
+                        errorSearchSnapshotDirectory.animate({ backgroundColor: 'white' }, 'slow');
+                    }, 2000);
+
+                    return;
+                }
+
                 voltDbRenderer.GetSnapshotList($('#txtSearchSnapshots').val(), function (snapshotList) {
                     $("#overlay").show();
                     var result = '';
@@ -559,6 +591,7 @@ function loadAdminPage() {
                     searchBox += '<tr>' +
                             '<th colspan="3" align="left">Snapshot Name</th>' +
                             '</tr>';
+                    
                     var count = 0;
                     $.each(snapshotList, function (id, snapshot) {
                         var option = 'checked="checked"';
@@ -568,12 +601,13 @@ function loadAdminPage() {
 			            '<td colspan="2" align="left">' + snapshot.NONCE + '</td>' +
 			            '<td align="left">' +
 			            '<div class="restoreRadio">' +
-			            '<input type="radio" value="' + snapshot.PATH + '#' + snapshot.NONCE + '" name="vemmanual" '+ option +'>' +
+			            '<input type="radio" value="' + snapshot.PATH + '#' + snapshot.NONCE + '" name="vemmanual" ' + option + '>' +
 			            '</div>' +
 			            '</td>' +
 			            '</tr>';
                         count++;
                     });
+
                     if (result == '') {
                         result = '<td>No snapshots available.</td>';
                         $('#btnRestore').addClass('restoreBtn');
@@ -585,6 +619,18 @@ function loadAdminPage() {
                     
                     $('#tblSearchList').html(searchBox + result);
                     $("#overlay").hide();
+                    
+                    adminClusterObjects.errorRestoreMsgContainer.html('<label id="errorRestoreSnapshot" for="vemmanual" class="error">Please select a snapshot to restore.</label>');
+                    $("#formRestoreSnapshot").validate({
+                        rules: {
+                            vemmanual: adminValidationRules.restoreSnapshotRules,
+                        },
+                        messages: {
+                            vemmanual: adminValidationRules.restoreSnapshotMessages,
+                        }
+                    });
+
+                    $("#errorRestoreSnapshot").hide();
                 });
             });
             
@@ -594,6 +640,16 @@ function loadAdminPage() {
                 if ($('#btnRestore').hasClass('restoreBtn')) {
                     return;
                 }
+                
+                if (!$("#formRestoreSnapshot").valid()) {
+                    var errorRestoreSnapshot = $("#errorRestoreSnapshot");
+                    errorRestoreSnapshot.css("background-color", "yellow");
+                    setTimeout(function () {
+                        errorRestoreSnapshot.animate({ backgroundColor: 'white' }, 'slow');
+                    }, 2000);
+                    return;
+                }
+
                 $('.restoreInfo').hide();
                 $('.restoreConfirmation').show();
             });

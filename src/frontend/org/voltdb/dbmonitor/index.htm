@@ -1027,8 +1027,9 @@
         <div class="restoreInfo">
             <div class="overlay-content">
                 <div class="restoreCont">
+                    <form id="formSearchSnapshot" method="get" action="">
                     <div class="directoryRestore">
-                       <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblRestore">
+                        <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblRestore">
                             <tr>
                                 <th align="left">Directory</th>
                                 <td align="left" id="tdSearchSnapshots">
@@ -1039,6 +1040,8 @@
                         </table>
 
                     </div>
+                    </form>
+                    <form id="formRestoreSnapshot" method="get" action="">
                     <div class="restoreSnapshot">
                         <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblRestore" id="tblSearchList">
                             
@@ -1046,9 +1049,9 @@
                         </table>
 
                     </div>
-                    
+                    <div id="errorRestoreMsgContainer" class="errorLabelMsg"></div>
+                    </form>
                 </div>
-
             </div>
             <div class="overlay-btns"><a id="btnRestore" class="btn restoreBtn" title="Ok">Restore</a> <a class="btn btn-gray closeBtn" title="Cancel">Cancel</a></div>
         </div>
