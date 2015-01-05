@@ -91,16 +91,16 @@ public class CatalogDiffEngine {
         // store the complete set of old and new indexes so some extra checking can be done with
         // constraints and new/updated unique indexes
         CatalogMap<Cluster> clusters = prev.getClusters();
-        Cluster cluster = clusters.get("cluster");
+        Cluster cluster = clusters.getExact("CLUSTER");
         CatalogMap<Database> databases = cluster.getDatabases();
-        Database db = databases.get("database");
+        Database db = databases.getExact("DATABASE");
 
         CatalogMap<Table> tables = db.getTables(); //prev.getClusters().get("cluster").getDatabases().get("database").getTables();
         assert(tables != null);
         for (Table t : tables) {
             m_originalIndexesByTable.put(t.getTypeName(), t.getIndexes());
         }
-        tables = next.getClusters().get("cluster").getDatabases().get("database").getTables();
+        tables = next.getClusters().getExact("CLUSTER").getDatabases().getExact("DATABASE").getTables();
         assert(tables != null);
         for (Table t : tables) {
             m_newIndexesByTable.put(t.getTypeName(), t.getIndexes());
@@ -346,7 +346,7 @@ public class CatalogDiffEngine {
 
                 if (parent.getUnique() && (changeType == ChangeType.DELETION)) {
                     CatalogMap<Index> newIndexes= m_newIndexesByTable.get(parent.getParent().getTypeName());
-                    Index newIndex = newIndexes.get(parent.getTypeName());
+                    Index newIndex = newIndexes.getExact(parent.getTypeName());
 
                     if (!checkNewUniqueIndex(newIndex)) {
                         return "May not dynamically remove columns from unique index: " +
@@ -1115,7 +1115,7 @@ public class CatalogDiffEngine {
         // in previous, not in new
         for (CatalogType prevType : prevMap) {
             String name = prevType.getTypeName();
-            CatalogType newType = newMap.get(name);
+            CatalogType newType = newMap.getExact(name);
             if (newType == null) {
                 writeDeletion(prevType, newMap.m_parent, mapName, name);
                 continue;
@@ -1126,7 +1126,7 @@ public class CatalogDiffEngine {
 
         // in new, not in previous
         for (CatalogType newType : newMap) {
-            CatalogType prevType = prevMap.get(newType.getTypeName());
+            CatalogType prevType = prevMap.getExact(newType.getTypeName());
             if (prevType != null) continue;
             writeAddition(newType);
         }

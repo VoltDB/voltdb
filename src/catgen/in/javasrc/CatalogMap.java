@@ -61,7 +61,7 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
             return m_cachedPath;
         }
         // if parent is the catalog root, don't add an extra slash to the existing one
-        return m_parent == m_catalog ? m_name : (m_parent.getCatalogPath() + "/" + m_name);
+        return m_parent == m_catalog ? ("/" + m_name) : (m_parent.getCatalogPath() + "/" + m_name);
     }
 
     public void getPath(StringBuilder sb) {

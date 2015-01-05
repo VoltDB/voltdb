@@ -225,22 +225,12 @@ public abstract class CatalogType implements Comparable<CatalogType> {
     abstract void set(String field, String value);
 
     void writeCreationCommand(StringBuilder sb) {
-        String path = getCatalogPath();
-
-        // skip root node command
-        if (path.equals("/"))
-            return;
-
-        int lastSlash = path.lastIndexOf("/");
-        String key = path.substring(lastSlash + 1);
-        String newPath = path.substring(0, lastSlash);
-        if (newPath.length() == 0)
-            newPath = "/";
-        String[] parts = key.split("\\" + Catalog.MAP_SEPARATOR);
-        parts[1] = parts[1].trim();
-
-        sb.append("add ").append(newPath).append(" ");
-        sb.append(parts[0]).append(" ").append(parts[1]);
+        sb.append("add ");
+        m_parentMap.m_parent.getCatalogPath(sb);
+        sb.append(' ');
+        sb.append(m_parentMap.m_name);
+        sb.append(' ');
+        sb.append(m_typename);
         sb.append("\n");
     }
 

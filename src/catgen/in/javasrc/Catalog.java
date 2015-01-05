@@ -50,7 +50,7 @@ public class Catalog extends CatalogType {
      */
     public Catalog() {
         setBaseValues(null, "catalog");
-        m_clusters = new CatalogMap<Cluster>(this, this, "/clusters", Cluster.class, 1);
+        m_clusters = new CatalogMap<Cluster>(this, this, "clusters", Cluster.class, 1);
         m_relativeIndex = 1;
     }
 
@@ -67,6 +67,11 @@ public class Catalog extends CatalogType {
     @Override
     public String getCatalogPath() {
         return "/";
+    }
+
+    @Override
+    public void getCatalogPath(StringBuilder sb) {
+        sb.append('/');
     }
 
     @Override
@@ -288,5 +293,10 @@ public class Catalog extends CatalogType {
         if ((m_clusters != null) && !m_clusters.equals(other.m_clusters)) return false;
 
         return true;
+    }
+
+    @Override
+    void writeCreationCommand(StringBuilder sb) {
+        return;
     }
 }
