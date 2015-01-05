@@ -142,7 +142,7 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
 
             T x = m_cls.newInstance();
             x.setBaseValues(this, name);
-            x.m_parentMap = this;
+            x.initChildMaps();
 
             m_items.put(mapKey, x);
 

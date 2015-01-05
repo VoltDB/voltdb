@@ -182,7 +182,7 @@ void Catalog::executeOne(const string &stmt) {
         // remove from collection and hash path to the deletion tracker
         // throw if nothing was removed.
         if(item->removeChild(coll, child)) {
-            m_deletions.push_back(ref + "/" + coll + "[" + child);
+            m_deletions.push_back(ref + "/" + coll + MAP_SEPARATOR + child);
         }
         else {
             // Silently ignore failures -- these are indicative of commands for types
@@ -240,7 +240,7 @@ CatalogType *Catalog::itemForPath(const CatalogType *parent, const string &path)
 }
 
 CatalogType *Catalog::itemForPathPart(const CatalogType *parent, const string &pathPart) const {
-    vector<string> parts = MiscUtil::splitToTwoString(pathPart, '[');
+    vector<string> parts = MiscUtil::splitToTwoString(pathPart, MAP_SEPARATOR);
     if (parts.size() <= 1) {
         return NULL;
     }

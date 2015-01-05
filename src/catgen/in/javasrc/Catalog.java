@@ -31,6 +31,8 @@ import com.google_voltpatches.common.cache.CacheBuilder;
  */
 public class Catalog extends CatalogType {
 
+    public static final char MAP_SEPARATOR = '#';
+
     //private final HashMap<String, CatalogType> m_pathCache = new HashMap<String, CatalogType>();
     //private final PatriciaTrie<CatalogType> m_pathCache = new PatriciaTrie<>();
     Cache<String, CatalogType> m_pathCache = CacheBuilder.newBuilder().maximumSize(100).build();
@@ -46,6 +48,11 @@ public class Catalog extends CatalogType {
         setBaseValues(null, "catalog");
         m_clusters = new CatalogMap<Cluster>(this, this, "/clusters", Cluster.class, 1);
         m_relativeIndex = 1;
+    }
+    
+    @Override
+    void initChildMaps() {
+        // never called on the root catalog object
     }
 
     @Override
@@ -129,7 +136,7 @@ public class Catalog extends CatalogType {
         }
         else if (cmd.equals("delete")) {
             resolved.getCollection(arg1).delete(arg2);
-            String toDelete = ref + "/" + arg1 + "[" + arg2;
+            String toDelete = ref + "/" + arg1 + MAP_SEPARATOR + arg2;
             m_pathCache.invalidate(toDelete);
         }
         else if (cmd.equals("set")) {
@@ -178,7 +185,7 @@ public class Catalog extends CatalogType {
 
         if ((path.length() == 1) && hasStartSlash) return parent;
 
-        int index = path.lastIndexOf('[');
+        int index = path.lastIndexOf(MAP_SEPARATOR);
 
         String collection = path.substring(hasStartSlash ? 1 : 0, index);
         String name = path.substring(index + 1, path.length());

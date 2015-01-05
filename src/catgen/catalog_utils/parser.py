@@ -55,19 +55,25 @@ def parse(text):
     text = text.split('\n')
 
     while len(text):
-        line = text.pop(0).split(None, 2)
+        line = text.pop(0).split(None, 3)
         if len(line) == 0:
             continue
         beginStmt = line.pop(0)
         if not beginStmt.startswith("begin"):
             raise Exception("Didn't find expected \"begin\" token.")
-        hasEE = beginStmt.endswith("EE")
         name = line.pop(0)
-        if not hasEE:
-            javaOnlyClasses.append(name)
         comment = None
+        hasEE = True # unless changed below
         if len(line):
-            comment = line.pop(0).strip("\"")
+            nextToken = line.pop(0)
+            if (nextToken.lower() == "javaonly"):
+                javaOnlyClasses.append(name)
+                hasEE = False
+                if len(line):
+                    comment = line.pop(0).strip("\"")
+            else:
+                
+                comment = nextToken.strip("\"")
 
         fields = []
         fieldline = text.pop(0).split(None, 2)

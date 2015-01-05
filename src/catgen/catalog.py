@@ -109,9 +109,9 @@ def genjava( classes, javaOnlyClasses, prepath, postpath, package ):
                 write( interp( '    $ftype m_$fname;', locals() ) )
         write( '' )
 
-        # setBaseValues
-        write( '    void setBaseValues(CatalogMap<? extends CatalogType> parentMap, String name) {' )
-        write( '        super.setBaseValues(parentMap, name);')
+        # initChildMaps
+        write( '    @Override' )
+        write( '    void initChildMaps() {' )
         for field in cls.fields:
             ftype = javatypify( field.type )
             fname = field.name

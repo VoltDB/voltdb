@@ -159,7 +159,6 @@ CTX.INPUT[''] = """
 
 CTX.INPUT['catalog'] = """
  catalog.cpp
- cataloginteger.cpp
  catalogtype.cpp
  cluster.cpp
  column.cpp

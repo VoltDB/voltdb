@@ -135,7 +135,7 @@ public abstract class CatalogType implements Comparable<CatalogType> {
      * @return The full catalog path of this CatalogType instance
      */
     String getCatalogPath() {
-        return m_parentMap.getPath() + "[" + m_typename;
+        return m_parentMap.getPath() + Catalog.MAP_SEPARATOR + m_typename;
     }
 
     /**
@@ -192,8 +192,7 @@ public abstract class CatalogType implements Comparable<CatalogType> {
     public abstract Object getField(String field);
 
     /**
-     * This should only ever be called from CatalogMap.add(); it's my lazy hack
-     * to avoid using reflection to instantiate records.
+     * This is my lazy hack to avoid using reflection to instantiate records.
      */
     void setBaseValues(CatalogMap<? extends CatalogType> parentMap, String name) {
         if (name == null) {
@@ -202,6 +201,8 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         m_parentMap = parentMap;
         m_typename = name;
     }
+    
+    abstract void initChildMaps();
 
     @SuppressWarnings("unchecked")
     CatalogMap<? extends CatalogType> getCollection(String collectionName) {
@@ -227,7 +228,7 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         String newPath = path.substring(0, lastSlash);
         if (newPath.length() == 0)
             newPath = "/";
-        String[] parts = key.split("\\[");
+        String[] parts = key.split("\\" + Catalog.MAP_SEPARATOR);
         parts[1] = parts[1].trim();
 
         sb.append("add ").append(newPath).append(" ");

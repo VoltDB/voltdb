@@ -1,8 +1,4 @@
-beginEE CatalogInteger  "Wrapper for an integer so it can be in a list."
-  int value             "Integer Value"
-end
-
-beginEE Cluster                    "A set of connected hosts running one or more database application contexts"
+begin Cluster                      "A set of connected hosts running one or more database application contexts"
   Database* databases              "The set of databases the cluster is running"
   Deployment* deployment           "Storage for settings passed in on deployment"
   int localepoch                   "The number of seconds since the epoch that we're calling our local epoch"
@@ -20,22 +16,22 @@ beginEE Cluster                    "A set of connected hosts running one or more
   bool useddlschema                "Manage the database schemas via catalog updates or live DDL"
 end
 
-begin Deployment                  "Run-time deployment settings"
+begin Deployment javaonly         "Run-time deployment settings"
   int hostcount                   "The number of hosts in the cluster"
   int kfactor                     "The required k-safety factor"
   int sitesperhost                "The number of execution sites per host"
   Systemsettings* systemsettings  "Values from the systemsettings element"
 end
 
-begin Systemsettings    "Container for deployment systemsettings element"
-  int temptablemaxsize  "The maximum allocation size for temp tables in the EE"
-  int snapshotpriority  "The priority of snapshot work"
-  int elasticduration   "Maximum duration time for rebalancing"
-  int elasticthroughput "Target throughput in megabytes for elasticity"
-  int querytimeout      "The maximum latency for a query batch before timing out"
+begin Systemsettings javaonly "Container for deployment systemsettings element"
+  int temptablemaxsize        "The maximum allocation size for temp tables in the EE"
+  int snapshotpriority        "The priority of snapshot work"
+  int elasticduration         "Maximum duration time for rebalancing"
+  int elasticthroughput       "Target throughput in megabytes for elasticity"
+  int querytimeout            "The maximum latency for a query batch before timing out"
 end
 
-beginEE Database                     "A set of schema, procedures and other metadata that together comprise an application"
+begin Database                       "A set of schema, procedures and other metadata that together comprise an application"
   string     schema                  "Full SQL DDL for the database's schema"
   User*      users                   "The set of users"
   Group*     groups                  "The set of groups"
@@ -47,7 +43,7 @@ beginEE Database                     "A set of schema, procedures and other meta
   string securityprovider            "The security provider used to authenticate users"
 end
 
-begin CommandLog              "Configuration for a command log"
+begin CommandLog javaonly     "Configuration for a command log"
   bool enabled                "Is command logging enabled"
   bool synchronous            "Should commands be executed only once durable"
   int fsyncInterval           "How often commands should be written to disk"
@@ -57,24 +53,24 @@ begin CommandLog              "Configuration for a command log"
   string internalSnapshotPath "Directory to store internal snapshots for the command log"
 end
 
-beginEE ConnectorTableInfo  "Per-export connector table configuration"
+begin ConnectorTableInfo    "Per-export connector table configuration"
   Table? table              "Reference to the table being appended"
   bool appendOnly           "DEPRECATED: True if this table is an append-only table for export."
 end
 
-beginEE ConnectorProperty  "Connector configuration property"
+begin ConnectorProperty    "Connector configuration property"
   string name              "Configuration property name"
   string value             "Configuration property value"
 end
 
-beginEE Connector               "Export connector"
+begin Connector                 "Export connector"
   string loaderclass            "The class name of the connector"
   bool enabled                  "Is the connector enabled"
   ConnectorTableInfo* tableInfo "Per table configuration"
   ConnectorProperty* config     "Connector configuration properties"
 end
 
-begin Group
+begin Group javaonly
   UserRef* users
   bool admin            "Can perform all database operations"
   bool defaultproc      "Can invoke default procedures"
@@ -84,23 +80,23 @@ begin Group
   bool allproc          "Can invoke any user defined procedures"
 end
 
-begin GroupRef
+begin GroupRef javaonly
   Group? group
 end
 
-begin UserRef
+begin UserRef javaonly
   User? user
 end
 
-begin User
+begin User javaonly
   GroupRef* groups
   string shadowPassword "SHA-1 double hashed hex encoded version of the password"
 end
 
-begin Program "The name of a program with access (effectively a username for an app server)"
+begin Program javaonly "The name of a program with access (effectively a username for an app server)"
 end
 
-begin Procedure             "A stored procedure (transaction) in the system"
+begin Procedure javaonly    "A stored procedure (transaction) in the system"
   string classname          "The full class name for the Java class for this procedure"
   UserRef* authUsers        "Users authorized to invoke this procedure"
   GroupRef* authGroups      "Groups authorized to invoke this procedure"
@@ -120,7 +116,7 @@ begin Procedure             "A stored procedure (transaction) in the system"
   ProcParameter* parameters "The set of parameters to this stored procedure"
 end
 
-beginEE Table                      "A table (relation) in the database"
+begin Table                        "A table (relation) in the database"
   Column* columns                  "The set of columns in the table"
   Index* indexes                   "The set of indexes on the columns in the table"
   Constraint* constraints          "The set of constraints on the table"
@@ -134,7 +130,7 @@ beginEE Table                      "A table (relation) in the database"
   Statement* tuplelimitDeleteStmt  "Delete statement to execute if tuple limit will be exceeded"
 end
 
-beginEE MaterializedViewInfo        "Information used to build and update a materialized view"
+begin MaterializedViewInfo          "Information used to build and update a materialized view"
   Table? dest                       "The table which will be updated when the source table is updated"
   ColumnRef* groupbycols            "The columns involved in the group by of the aggregation"
   string predicate                  "A filtering predicate"
@@ -143,16 +139,16 @@ beginEE MaterializedViewInfo        "Information used to build and update a mate
   string indexForMinMax             "The name of index on srcTable which can be used to maintain min()/max()"
 end
 
-begin AuthProgram "The name of a program with access to a specific procedure. This is effectively a weak reference to a 'program'"
+begin AuthProgram javaonly "The name of a program with access to a specific procedure. This is effectively a weak reference to a 'program'"
 end
 
-begin ProcParameter "Metadata for a parameter to a stored procedure"
-  int type          "The data type for the parameter (int/float/date/etc)"
-  bool isarray      "Is the parameter an array of value"
-  int index         "The index of the parameter within the list of parameters for the stored procedure"
+begin ProcParameter javaonly "Metadata for a parameter to a stored procedure"
+  int type                   "The data type for the parameter (int/float/date/etc)"
+  bool isarray               "Is the parameter an array of value"
+  int index                  "The index of the parameter within the list of parameters for the stored procedure"
 end
 
-beginEE Statement           "A parameterized SQL statement embedded in a stored procedure"
+begin Statement           "A parameterized SQL statement embedded in a stored procedure"
   string sqltext            "The text of the sql statement"
   int querytype             ""
   bool readonly             "Can the statement modify any data?"
@@ -170,7 +166,7 @@ beginEE Statement           "A parameterized SQL statement embedded in a stored 
   string explainplan        "A human-readable plan description"
 end
 
-begin StmtParameter            "A parameter for a parameterized SQL statement"
+begin StmtParameter javaonly   "A parameter for a parameterized SQL statement"
   int sqltype                  "The SQL type of the parameter (int/float/date/etc)"
   int javatype                 "The Java class of the parameter (int/float/date/etc)"
   bool isarray                 "Is the parameter an array of value"
@@ -178,7 +174,7 @@ begin StmtParameter            "A parameter for a parameterized SQL statement"
   ProcParameter? procparameter "Reference back to original input parameter"
 end
 
-beginEE PlanFragment             "Instructions to the executor to execute part of an execution plan"
+begin PlanFragment               "Instructions to the executor to execute part of an execution plan"
   bool hasdependencies           "Dependencies must be received before this plan fragment can execute"
   bool multipartition            "Should this plan fragment be sent to all partitions"
   string plannodetree            "A serialized representation of the plan-graph/plan-pipeline"
@@ -186,7 +182,7 @@ beginEE PlanFragment             "Instructions to the executor to execute part o
   string planhash                "SHA-1 Hash of the plan assumed to be unique"
 end
 
-beginEE Index            "A index structure on a database table's columns"
+begin Index              "A index structure on a database table's columns"
   bool unique            "May the index contain duplicate keys?"
   bool assumeUnique      "User allow unique index on partition table without including partition key?"
   bool countable         "Index counter feature"
@@ -195,12 +191,12 @@ beginEE Index            "A index structure on a database table's columns"
   string expressionsjson "A serialized representation of the optional expression trees"
 end
 
-beginEE ColumnRef  "A reference to a table column"
+begin ColumnRef    "A reference to a table column"
   int index        "The index within the set"
   Column? column   "The table column being referenced"
 end
 
-beginEE Constraint          "A constraint on a database table"
+begin Constraint            "A constraint on a database table"
   int type                  "The type of constraint"
   string oncommit           "(currently unused)"
   Index? index              "The index used by this constraint (if needed)"
@@ -208,11 +204,11 @@ beginEE Constraint          "A constraint on a database table"
   ColumnRef* foreignkeycols "The columns in the foreign table referenced by the constraint (if needed)"
 end
 
-beginEE ConstraintRef EE   "A reference to a table constraint"
+begin ConstraintRef      "A reference to a table constraint"
   Constraint? constraint "The constraint that is referenced"
 end
 
-beginEE Column                  "A table column"
+begin Column                    "A table column"
   int index                     "The column's order in the table"
   int type                      "The type of the column (int/double/date/etc)"
   int size                      "(currently unused)"
@@ -227,7 +223,7 @@ beginEE Column                  "A table column"
   bool inbytes                  "If a varchar column and size was specified in bytes"
 end
 
-begin SnapshotSchedule          "A schedule for the database to follow when creating automated snapshots"
+begin SnapshotSchedule javaonly "A schedule for the database to follow when creating automated snapshots"
   bool enabled                  "Is this auto snapshot schedule enabled?"
   string frequencyUnit          "Unit of time frequency is specified in"
   int frequencyValue            "Frequency in some unit"
