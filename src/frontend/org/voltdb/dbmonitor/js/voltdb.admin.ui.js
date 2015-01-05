@@ -649,7 +649,7 @@ function loadAdminPage() {
     var restoreInterval = null;
     var showHideRestoreBtn = function() {
         if (!$('#restoredPopup').is(":visible")) {
-            if ($('#voltdbroot').text() + '/' + $('#snapshotpath').text() == '/') {
+            if (!VoltDbAdminConfig.firstResponseReceived) {
                 $('#restoreConfirmation').addClass('restoreConfirmationDisable');
                 $('#restoreConfirmation').removeClass('restore');
             } else {
@@ -1056,6 +1056,7 @@ function loadAdminPage() {
         this.servers = [];
         this.stoppedServer="";
         this.runningServerIds = "";
+        this.firstResponseReceived = false;
         
         this.server = function(hostIdvalue,serverNameValue,serverStateValue) {
             this.hostId = hostIdvalue;
@@ -1071,6 +1072,9 @@ function loadAdminPage() {
         };
         
         this.displayAdminConfiguration = function (adminConfigValues, rawConfigValues) {
+            if (!VoltDbAdminConfig.firstResponseReceived)
+                VoltDbAdminConfig.firstResponseReceived = true;
+            
             if (adminConfigValues != undefined && VoltDbAdminConfig.isAdmin) {
                 configureAdminValues(adminConfigValues);
                 configureDirectoryValues(adminConfigValues);
