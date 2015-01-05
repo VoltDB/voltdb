@@ -315,11 +315,17 @@ public class RegressionSuite extends TestCase {
 
     public void validateTableOfScalarLongs(VoltTable vt, long[] expected) {
         assertNotNull(expected);
-        assertEquals(expected.length, vt.getRowCount());
+        assertEquals("Different number of rows! ", expected.length, vt.getRowCount());
         int len = expected.length;
         for (int i=0; i < len; i++) {
             validateRowOfLongs(vt, new long[] {expected[i]});
         }
+    }
+
+    public void validateTableOfScalarLongs(Client client, String sql, long[] expected) throws Exception {
+        assertNotNull(expected);
+        VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        validateTableOfScalarLongs(vt, expected);
     }
 
     public void validateTableOfLongs(VoltTable vt, long[][] expected) {
@@ -361,7 +367,7 @@ public class RegressionSuite extends TestCase {
             }
             // Long.MIN_VALUE is like a NULL
             if (expected[i] != Long.MIN_VALUE) {
-                assertEquals(expected[i], actual);
+                assertEquals("At index " + i + ", ", expected[i], actual);
             } else {
                 if (isHSQL()) {
                     // Hsql return 0 for NULL
