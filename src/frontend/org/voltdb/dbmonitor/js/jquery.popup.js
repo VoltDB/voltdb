@@ -128,7 +128,7 @@
 						.o.afterOpen.call(this);
 
 				},
-				hide : function($popup, $back) {
+				hide: function ($popup, $back) {
 					if( $popup !== undefined ){
 
 						// Fade the popup out
@@ -347,16 +347,6 @@
 			
 				
 			
-				//restore cluster
-			$('.restoreBtn').click(function(){
-				$('.restoreInfo').hide();
-				$('.restoreConfirmation').show();
-			});
-			
-			$('.confirmNoRestore').click(function(){
-				$('.restoreConfirmation').hide();
-				$('.restoreInfo').show();
-			});
 			
 			
 			//admin

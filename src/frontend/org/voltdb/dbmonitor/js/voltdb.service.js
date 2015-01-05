@@ -812,6 +812,74 @@
 
         };
 
+        this.GetSnapshotList = function(snapshotDirectory, onConnectionAdded) {
+            try {
+                var processName = "SYSTEMINFORMATION_SCANSNAPSHOTS";
+                var procedureNames = ['@SnapshotScan'];
+                var parameters = [snapshotDirectory];
+                var values = [undefined];
+                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
+                if (_connection == null) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function(result) {
+                        if (result == true) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function(connection, status) {
+                                onConnectionAdded(connection, status);
+                            });
+                        }
+
+                    });
+
+                } else {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function(connection, status) {
+                        onConnectionAdded(connection, status);
+
+                    });
+
+                }
+
+            } catch(e) {
+                console.log(e.message);
+            }
+
+        };
+        
+        this.RestoreSnapShot = function (snapshotDir, snapshotFileName, onConnectionAdded) {
+            try {
+                var processName = "SYSTEMINFORMATION_RESTORESNAPSHOT";
+                var procedureNames = ['@SnapshotRestore'];
+                var parameters = ["'" + snapshotDir + "'", snapshotFileName, 0];
+                var values = [undefined];
+
+                _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
+                if (_connection == null) {
+                    VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
+                        if (result == true) {
+                            VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
+                                status = connection.Metadata['@SnapshotRestore_status'];
+                                if (!(status == "" || status == undefined)) {
+                                    onConnectionAdded(connection, status);
+                                }
+                            });
+                        }
+
+                    });
+
+                } else {
+                    VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
+                        status = connection.Metadata['@SnapshotRestore_status'];
+                        if (!(status == "" || status == undefined)) {
+                            onConnectionAdded(connection, status);
+                        }
+
+                    });
+
+                }
+
+            } catch (e) {
+                console.log(e.message);
+            }
+
+        };
         //end admin configuration
 
     });

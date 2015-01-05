@@ -1025,70 +1025,36 @@
         <div class="restoreInfo">
             <div class="overlay-content">
                 <div class="restoreCont">
-                    <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblRestore">
-                        <tr>
-                            <th align="left">Directory</th>
-                            <td align="left">
-                                <input type="text" value="D:/VoltDB/Snapshots/"></td>
-                            <td align="left"><a id="searchStoredProc2" class="save-search" title="Search" href="javascript:void(0)">Search</a></td>
-                        </tr>
-                        <tr>
-                            <th colspan="3" align="left">Snapshot Name</th>
-                        </tr>
-                        <tr>
-                            <td colspan="2" align="left">VEMMANUAL_2014.11.13.21.19.24</td>
-                            <td align="left">
-                                <div class="restoreRadio">
-                                    <input type="radio" value="1" name="vemmanual">
-                                </div>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td colspan="2" align="left">VEMMANUAL_2014.11.13.21.19.24</td>
-                            <td align="left">
-                                <div class="restoreRadio">
-                                    <input type="radio" value="2" name="vemmanual">
-                                </div>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td colspan="2" align="left">VEMMANUAL_2014.11.13.21.19.24</td>
-                            <td align="left">
-                                <div class="restoreRadio">
-                                    <input type="radio" value="3" name="vemmanual">
-                                </div>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td colspan="2" align="left">VEMMANUAL_2014.11.13.21.19.24</td>
-                            <td align="left">
-                                <div class="restoreRadio">
-                                    <input type="radio" value="4" name="vemmanual">
-                                </div>
-                            </td>
+                    <div class="directoryRestore">
+                       <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblRestore">
+                            <tr>
+                                <th align="left">Directory</th>
+                                <td align="left" id="tdSearchSnapshots">
+                                    <!--<input id="txtSearchSnapshots" type="text">--></td>
+                                <td align="left" id="tdSearchSnapshotsBtn"><!--<a id="btnSearchSnapshots" class="save-search" title="Search" href="#">Search</a>--></td>
+                            </tr>  
 
-                        </tr>
-                        <tr>
-                            <td colspan="2" align="left">VEMMANUAL_2014.11.13.21.19.24</td>
-                            <td align="left">
-                                <div class="restoreRadio">
-                                    <input type="radio" value="5" name="vemmanual">
-                                </div>
-                            </td>
+                        </table>
 
-                        </tr>
+                    </div>
+                    <div class="restoreSnapshot">
+                        <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblRestore" id="tblSearchList">
+                            
+                            
+                        </table>
 
-                    </table>
+                    </div>
+                    
                 </div>
 
             </div>
-            <div class="overlay-btns"><a class="btn restoreBtn" title="Ok">Restore</a> <a class="btn btn-gray closeBtn" title="Cancel">Cancel</a></div>
+            <div class="overlay-btns"><a id="btnRestore" class="btn restoreBtn" title="Ok">Restore</a> <a class="btn btn-gray closeBtn" title="Cancel">Cancel</a></div>
         </div>
-        <div class="restoreConfirmation" style="display: none;">
+        <div id="restoreConfirm" class="restoreConfirmation" style="display: none;">
             <div class="overlay-content ">
                 <div class="confirmationInfo">Are you sure you want to Restore?</div>
             </div>
-            <div class="overlay-btns"><a class="btn closeBtn" title="Yes">Yes</a> <a class="btn btn-gray confirmNoRestore" title="No">No</a> </div>
+            <div id="divConfirm" class="overlay-btns"><a id="btnRestoreSnapshotOk" class="btn closeBtn" title="Yes">Yes</a> <a class="btn btn-gray confirmNoRestore" title="No">No</a> </div>
         </div>
     </div>
     <!-- POPUP restorePop -->

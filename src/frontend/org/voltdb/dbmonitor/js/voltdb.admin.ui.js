@@ -492,8 +492,114 @@ function loadAdminPage() {
         return (currentDate.getFullYear() + '.' + (currentDate.getMonth() + 1) + '.' + currentDate.getDate() + '.' + currentDate.getHours() + '.' + currentDate.getMinutes() + '.' + currentDate.getSeconds()).toString();
     };
 
-    $('#restoreConfirmation').popup();
-    
+    $('#restoreConfirmation').popup({
+        open: function (event, ui, ele) {
+            $('#tblSearchList').html('');
+            var textName = '<input id="txtSearchSnapshots" type="text" value=' + $('#voltdbroot').text() + '/' + $('#snapshotpath').text() + '></td>';
+            var errorMsg = '<div class="errorLabelMsg"><label id="errorSearchSnapshotDirectory" for="txtSearchSnapshots" class="error" style="display: none;">This field is required.</label></div>';
+            $('#tdSearchSnapshots').html(textName + errorMsg);
+            var btnName = '<a id="btnSearchSnapshots" class="save-search" title="Search" href="#">Search</a>';
+            $('#tdSearchSnapshotsBtn').html(btnName);
+            $('#btnRestore').addClass('restoreBtn');
+            $('#btnRestore').removeClass('btn');
+            $('.restoreConfirmation').hide();
+            $('.restoreInfo').show();
+        },
+        afterOpen: function () {
+            var popup = $(this)[0];
+            $('#btnSearchSnapshots').unbind('click');
+            $('#btnSearchSnapshots').on('click', function () {
+                voltDbRenderer.GetSnapshotList($('#txtSearchSnapshots').val(), function (snapshotList) {
+                    $("#overlay").show();
+                    var result = '';
+                    var searchBox = '';
+                    searchBox += '<tr>' +
+                            '<th colspan="3" align="left">Snapshot Name</th>' +
+                            '</tr>';
+                    var count = 0;
+                    $.each(snapshotList, function (id, snapshot) {
+                        var option = 'checked="checked"';
+                        if (count != 0)
+                            option = '';
+                        result += '<tr>' +
+			            '<td colspan="2" align="left">' + snapshot.NONCE + '</td>' +
+			            '<td align="left">' +
+			            '<div class="restoreRadio">' +
+			            '<input type="radio" value="' + snapshot.PATH + '#' + snapshot.NONCE + '" name="vemmanual" '+ option +'>' +
+			            '</div>' +
+			            '</td>' +
+			            '</tr>';
+                        count++;
+                    });
+                    if (result == '') {
+                        result = '<td>No snapshots available.</td>';
+                        $('#btnRestore').addClass('restoreBtn');
+                        $('#btnRestore').removeClass('btn');
+                    } else {
+                        $('#btnRestore').addClass('btn');
+                        $('#btnRestore').removeClass('restoreBtn');
+                    }
+                    
+                    $('#tblSearchList').html(searchBox + result);
+                    $("#overlay").hide();
+                });
+            });
+            
+            //restore cluster
+            $("#btnRestore").unbind("click");
+            $("#btnRestore").on("click", function (e) {
+                if ($('#btnRestore').hasClass('restoreBtn')) {
+                    return;
+                }
+                $('.restoreInfo').hide();
+                $('.restoreConfirmation').show();
+            });
+            
+            $(".confirmNoRestore").unbind("click");
+            $(".confirmNoRestore").on("click", function (e) {
+                $('.restoreConfirmation').hide();
+                $('.restoreInfo').show();
+            });
+            
+            $("#btnRestoreSnapshotOk").unbind("click");
+            $("#btnRestoreSnapshotOk").on("click", function (e) {
+                alert('restore snapshot');
+                var checkedValue = $('input:radio[name=vemmanual]:checked').val();
+
+                if (checkedValue == undefined) {
+                    $($(this).siblings()[0]).trigger("click");
+                    $('#saveSnapshotStatus').html('Failed to restore snapshot');
+                    $('#saveSnapshotMessage').html('Please select the snapshot file.');
+                    $('#btnSaveSnapshotPopup').click();
+                    return;
+                }
+                var value = checkedValue.split('#');
+                $("#overlay").show();
+                voltDbRenderer.restoreSnapShot(value[0], value[1], function (status, snapshotResult) {
+                    if (status) {
+                        if (snapshotResult[getCurrentServer()].RESULT.toLowerCase() == "success") {
+                            $('#snapshotBar').html('Snapshot restored successfully.');
+                            $('#snapshotBar').css('display', 'block');
+                            $('#snapshotBar').fadeOut(4000);
+                        } else {
+                            $('#saveSnapshotStatus').html('Failed to restore snapshot');
+                            $('#saveSnapshotMessage').html(snapshotResult[getCurrentServer()].ERR_MSG);
+                            $('#btnSaveSnapshotPopup').click();
+                        }
+                    } else {
+                        $('#saveSnapshotStatus').html('Failed to restore snapshot');
+                        $('#saveSnapshotMessage').html('Unable to restore snapshot.');
+                        $('#btnSaveSnapshotPopup').click();
+                    }
+                    $("#overlay").hide();
+                });
+                
+                //Close the popup 
+                popup.close();
+            });
+        }
+    });
+
     $('#stopConfirmation').popup({
         open: function (event, ui, ele) {
         },

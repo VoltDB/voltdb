@@ -860,6 +860,9 @@ ul.adminClusterList li a:hover{color:#000;}
 #btnServerConfigAdmin:hover{cursor:pointer;}
 #serverConfigAdmin{ position:absolute;right:20px; top:49px; z-index:99; width:500px;}
 .txt-bold{font-weight:bold;}
+.directoryRestore { margin: 0;padding: 0;}
+.restoreSnapshot { position: relative;top: -1px;}
+
 
 
 .btn-gray { background-color:#999; cursor:pointer; padding:8px 10px; text-align:center; color:#fff; font:14px Arial, Helvetica, sans-serif; text-shadow:none; text-decoration:none; border-radius:0; border:none;} 
@@ -941,6 +944,12 @@ td.heartbeattd span.unit, td.queryTimeOut span.unit{position:relative;/* top:7px
 
 .resizeCon {width:452px}
 .resizeRestore{width:95%}
+a.restoreBtn { cursor: default; background-color: #999;
+padding: 8px 10px;
+text-align: center;
+color: #fff;
+font: 14px Arial, Helvetica, sans-serif;
+}
 
 /*********************************************media Qu********************/
 @media (max-width: 479px) {

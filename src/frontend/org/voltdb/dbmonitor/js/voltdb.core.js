@@ -507,7 +507,7 @@
                         }
                         else if (processName == "SYSTEMINFORMATION_PAUSECLUSTER" || processName == "SYSTEMINFORMATION_RESUMECLUSTER" || processName == "SYSTEMINFORMATION_SHUTDOWNCLUSTER") {
                             connection.Metadata[procedure['procedure'] + "_" + "status"] = data.status;
-                        }else if (processName == "SYSTEMINFORMATION_SAVESNAPSHOT") {
+                        } else if (processName == "SYSTEMINFORMATION_SAVESNAPSHOT" || processName == "SYSTEMINFORMATION_RESTORESNAPSHOT") {
                             connection.Metadata[procedure['procedure'] + "_" + "status"] = data.status;
                             connection.Metadata[procedure['procedure'] + "_data"] = data.results[0];
                         }else
@@ -558,7 +558,9 @@
                 lConnection.procedureCommands["procedures"][i]["procedure"] = procedureNames[i];
                 if (procedureNames[i] == '@SnapshotSave')
                     lConnection.procedureCommands["procedures"][i]["parameter"] = [parameters[i], parameters[i + 1], parameters[i + 2]];
-                else
+                else if (procedureNames[i] == '@SnapshotRestore') {
+                    lConnection.procedureCommands["procedures"][i]["parameter"] = [parameters[i], parameters[i + 1]];
+                } else
                     lConnection.procedureCommands["procedures"][i]["parameter"] = parameters[i];
                 lConnection.procedureCommands["procedures"][i]["value"] = values[i];
             }
@@ -614,7 +616,8 @@ jQuery.extend({
 });
 
 jQuery.extend({
-    getJSON: function (url, formData, callback, authorization) {        
+    getJSON: function (url, formData, callback, authorization) {
+        
         if (VoltDBCore.hostIP == "") {
             jQuery.ajax({
                 type: 'GET',
