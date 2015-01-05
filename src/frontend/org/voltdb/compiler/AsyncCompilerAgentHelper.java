@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -223,6 +223,7 @@ public class AsyncCompilerAgentHelper
             String oldDDL = new String(jarfile.get(VoltCompiler.AUTOGEN_DDL_FILE_NAME),
                     Constants.UTF8ENCODING);
             StringBuilder sb = new StringBuilder();
+            compilerLog.trace("OLD DDL: " + oldDDL);
             sb.append(oldDDL);
             sb.append("\n");
             compilerLog.info("Applying the following DDL to cluster:");

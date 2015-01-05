@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -59,59 +59,6 @@ import org.voltdb.types.JoinType;
 
 public class ParsedSelectStmt extends AbstractParsedStmt {
 
-    public static class ParsedColInfo implements Cloneable{
-        public String alias = null;
-        public String columnName = null;
-        public String tableName = null;
-        public String tableAlias = null;
-        public AbstractExpression expression = null;
-        public int index = 0;
-
-        // orderby stuff
-        public boolean orderBy = false;
-        public boolean ascending = true;
-
-        // groupby
-        public boolean groupBy = false;
-
-        @Override
-        public boolean equals (Object obj) {
-            if (obj == null) return false;
-            if (obj instanceof ParsedColInfo == false) return false;
-            ParsedColInfo col = (ParsedColInfo) obj;
-            if ( columnName != null && columnName.equals(col.columnName) &&
-                    tableName != null && tableName.equals(col.tableName) &&
-                    tableAlias != null && tableAlias.equals(col.tableAlias) &&
-                    expression != null && expression.equals(col.expression) )
-                return true;
-            return false;
-        }
-
-        // Based on implementation on equals().
-        @Override
-        public int hashCode() {
-            int result = new HashCodeBuilder(17, 31).
-                    append(columnName).append(tableName).append(tableAlias).
-                    toHashCode();
-            if (expression != null) {
-                result += expression.hashCode();
-            }
-            return result;
-        }
-
-        @Override
-        public ParsedColInfo clone() {
-            ParsedColInfo col = null;
-            try {
-                col = (ParsedColInfo) super.clone();
-            } catch (CloneNotSupportedException e) {
-                e.printStackTrace();
-            }
-            col.expression = (AbstractExpression) expression.clone();
-            return col;
-        }
-    }
-
     public ArrayList<ParsedColInfo> m_displayColumns = new ArrayList<ParsedColInfo>();
     public ArrayList<ParsedColInfo> m_orderColumns = new ArrayList<ParsedColInfo>();
     public AbstractExpression m_having = null;
@@ -141,6 +88,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private boolean m_hasPartitionColumnInGroupby = false;
     private boolean m_hasAggregateDistinct = false;
     private boolean m_hasPartitionColumnInDistinctGroupby = false;
+    private boolean m_isComplexOrderBy = false;
 
     // Limit plan node information.
     private LimitPlanNode m_limitNodeTop = null;
@@ -283,7 +231,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             parseHavingExpression(havingElement, true);
         }
 
-        if (orderbyElement != null) {
+        if (orderbyElement != null && ! hasAOneRowResult()) {
             parseOrderColumns(orderbyElement, true);
         }
 
@@ -445,6 +393,20 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             index++;
         }
 
+        // Replace TVE for group by columns
+        m_groupByExpressions = new HashMap<String, AbstractExpression>();
+        for (ParsedColInfo groupbyCol: m_groupByColumns) {
+            assert(aggTableIndexMap.get(groupbyCol.expression) != null);
+
+            AbstractExpression expr = groupbyCol.expression.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
+            m_groupByExpressions.put(groupbyCol.alias,expr);
+        }
+
+        if (m_having != null) {
+            m_having = m_having.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
+            ExpressionUtil.finalizeValueTypes(m_having);
+        }
+
         // Replace TVE for display columns
         m_projectSchema = new NodeSchema();
         for (ParsedColInfo col : m_displayColumns) {
@@ -456,43 +418,54 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             m_projectSchema.addColumn(schema_col);
         }
 
-        // Replace TVE for order by columns
-        for (ParsedColInfo orderCol : m_orderColumns) {
-            AbstractExpression expr = orderCol.expression.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
+        // DISTINCT group by expressions are already TVEs when set
 
-            if (hasComplexAgg()) {
-                orderCol.expression = expr;
-            } else {
-                // This if case checking is to rule out cases like: select PKEY + A_INT from O1 order by PKEY + A_INT,
-                // This case later needs a projection node on top of sort node to make it work.
+        placeTVEsForOrderby(aggTableIndexMap, indexToColumnMap);
+    }
 
-                // Assuming the restrictions: Order by columns are (1) columns from table
-                // (2) tag from display columns (3) actual expressions from display columns
-                // Currently, we do not allow order by complex expressions that are not in display columns
+    /**
+     * Replace TVE for order by columns.
+     * Restrictions: Order by clause must operate on display column list, except for columns that are
+     * (1) GROUP BY columns list without DISTINCT,
+     * (2) in tables or joined tables without GROUP BY or DISTINCT clause.
+     *
+     * Display columns means exact columns/expressions in the select list or tag alias.
+     * Order by clause can be columns or expressions on the columns.
+     */
+    private void placeTVEsForOrderby(Map <AbstractExpression, Integer> aggTableIndexMap,
+            Map <Integer, ParsedColInfo> indexToColumnMap) {
+        // Detect the edge order by case
+        detectComplexOrderby();
 
-                // If there is a complexGroupby at his point, it means that Display columns contain all the order by columns.
-                // In that way, this plan does not require another projection node on top of sort node.
-                if (orderCol.expression.hasAnySubexpressionOfClass(AggregateExpression.class) ||
-                        hasComplexGroupby()) {
-                    orderCol.expression = expr;
+        if (isComplexOrderBy()) {
+            // Case that ORDER BY is below Projection node
+            boolean replaceAll = hasComplexAgg() || hasComplexGroupby();
+            for (ParsedColInfo orderCol : m_orderColumns) {
+                if (replaceAll || orderCol.expression.hasAnySubexpressionOfClass(AggregateExpression.class)) {
+                    orderCol.expression = orderCol.expression.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
                 }
             }
-        }
+        } else if (hasAggregateOrGroupby()) {
+            // Case that ORDER BY is above Projection node
 
-        // Replace TVE for group by columns
-        m_groupByExpressions = new HashMap<String, AbstractExpression>();
-        for (ParsedColInfo groupbyCol: m_groupByColumns) {
-            assert(aggTableIndexMap.get(groupbyCol.expression) != null);
-            assert(m_groupByExpressions.get(groupbyCol.alias) == null);
-            AbstractExpression expr = groupbyCol.expression.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
-            m_groupByExpressions.put(groupbyCol.alias,expr);
-        }
+            Map <AbstractExpression, Integer> displayIndexMap = new HashMap <AbstractExpression,Integer>();
+            Map <Integer, ParsedColInfo> displayIndexToColumnMap = new HashMap <Integer, ParsedColInfo>();
 
-        if (m_having != null) {
-            m_having = m_having.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
-            ExpressionUtil.finalizeValueTypes(m_having);
-        }
+            int orderByIndex = 0;
+            for (ParsedColInfo col : m_displayColumns) {
+                displayIndexMap.put(col.expression, orderByIndex);
+                assert(col.alias != null);
+                displayIndexToColumnMap.put(orderByIndex, col);
+                orderByIndex++;
+            }
 
+            // place the TVEs from Display columns in the ORDER BY expression
+            for (ParsedColInfo orderCol : m_orderColumns) {
+                AbstractExpression expr = orderCol.expression.replaceWithTVE(displayIndexMap, displayIndexToColumnMap);
+                orderCol.expression = expr;
+            }
+        }
+        // other cases like (2) from the function comments.
     }
 
     /**
@@ -757,20 +730,20 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             groupbyCol.tableAlias = "VOLT_TEMP_TABLE";
             groupbyCol.columnName = "";
             m_hasComplexGroupby = true;
+        }
 
-            ParsedColInfo orig_col = null;
-            for (int i = 0; i < m_displayColumns.size(); ++i) {
-                ParsedColInfo col = m_displayColumns.get(i);
-                if (col.expression.equals(groupbyCol.expression)) {
-                    groupbyCol.alias = col.alias;
-                    orig_col = col;
-                    break;
-                }
-            }
-            if (orig_col != null) {
-                orig_col.groupBy = true;
+        // find the matching columns in display list
+        for (int i = 0; i < m_displayColumns.size(); ++i) {
+            ParsedColInfo col = m_displayColumns.get(i);
+            if (col.expression.equals(groupbyCol.expression)) {
+                groupbyCol.alias = col.alias;
+                groupbyCol.groupByInDisplay = true;
+
+                col.groupBy = true;
+                break;
             }
         }
+
         m_groupByColumns.add(groupbyCol);
     }
 
@@ -780,79 +753,42 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
     }
 
-    private void parseOrderColumn(VoltXMLElement orderByNode, boolean isDistributed) {
-        // make sure everything is kosher
-        assert(orderByNode.name.equalsIgnoreCase("orderby"));
+    private void parseOrderColumn(VoltXMLElement orderByNode, final boolean isDistributed) {
 
-        // get desc/asc
-        String desc = orderByNode.attributes.get("desc");
-        boolean descending = (desc != null) && (desc.equalsIgnoreCase("true"));
-
-        // get the columnref or other expression inside the orderby node
-        VoltXMLElement child = orderByNode.children.get(0);
-        assert(child != null);
-
-        // create the orderby column
-        ParsedColInfo order_col = new ParsedColInfo();
-        order_col.orderBy = true;
-        order_col.ascending = !descending;
+        // Aggregation list needs to be cleared before parsing the order by expression
         m_aggregationList.clear();
-        AbstractExpression order_exp = parseExpressionTree(child);
-        assert(order_exp != null);
-        if (isDistributed) {
-            order_exp = order_exp.replaceAVG();
-            updateAvgExpressions();
-        }
-        order_col.expression = order_exp;
-        ExpressionUtil.finalizeValueTypes(order_col.expression);
 
-        // Cases:
-        // child could be columnref, in which case it's just a normal column.
-        // Just make a ParsedColInfo object for it and the planner will do the right thing later
-        if (child.name.equals("columnref")) {
-            assert(order_exp instanceof TupleValueExpression);
-            TupleValueExpression tve = (TupleValueExpression) order_exp;
-            order_col.columnName = tve.getColumnName();
-            order_col.tableName = tve.getTableName();
-            order_col.tableAlias = tve.getTableAlias();
-            if (order_col.tableAlias == null) {
-                order_col.tableAlias = order_col.tableName;
+        ParsedColInfo.ExpressionAdjuster adjuster = new ParsedColInfo.ExpressionAdjuster() {
+            @Override
+            public AbstractExpression adjust(AbstractExpression expr) {
+                if (isDistributed) {
+                    expr = expr.replaceAVG();
+                    updateAvgExpressions();
+                }
+
+                ExpressionUtil.finalizeValueTypes(expr);
+                return expr;
             }
+        };
 
-            order_col.alias = tve.getColumnAlias();
-        } else {
-            String alias = child.attributes.get("alias");
-            order_col.alias = alias;
-            order_col.tableName = "VOLT_TEMP_TABLE";
-            order_col.tableAlias = "VOLT_TEMP_TABLE";
-            order_col.columnName = "";
-            // Replace its expression to TVE after we build the ExpressionIndexMap
+        ParsedColInfo order_col = ParsedColInfo.fromOrderByXml(this, orderByNode, adjuster);
 
-            if ((child.name.equals("operation") == false) &&
-                    (child.name.equals("aggregation") == false) &&
-                    (child.name.equals("function") == false)) {
-               throw new RuntimeException("ORDER BY parsed with strange child node type: " + child.name);
-           }
-        }
-
+        AbstractExpression order_exp = order_col.expression;
+        assert(order_exp != null);
         // Mark the order by column if it is in displayColumns
         // The ORDER BY column MAY be identical to a simple display column, in which case,
         // tagging the actual display column as being also an order by column
         // helps later when trying to determine ORDER BY coverage (for determinism).
-        ParsedColInfo orig_col = null;
         for (ParsedColInfo col : m_displayColumns) {
             if (col.alias.equals(order_col.alias) || col.expression.equals(order_exp)) {
-                orig_col = col;
+                col.orderBy = true;
+                col.ascending = order_col.ascending;
+
+                order_col.alias = col.alias;
+                order_col.columnName = col.columnName;
+                order_col.tableName = col.tableName;
                 break;
             }
-        }
-        if (orig_col != null) {
-            orig_col.orderBy = true;
-            orig_col.ascending = order_col.ascending;
-
-            order_col.alias = orig_col.alias;
-            order_col.columnName = orig_col.columnName;
-            order_col.tableName = orig_col.tableName;
         }
         assert( ! (order_exp instanceof ConstantValueExpression));
         assert( ! (order_exp instanceof ParameterValueExpression));
@@ -929,6 +865,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         for (ParsedColInfo col: m_displayColumns) {
             TupleValueExpression tve = new TupleValueExpression(
                     col.tableName, col.tableAlias, col.columnName, col.alias, col.index);
+
             ParsedColInfo pcol = new ParsedColInfo();
             pcol.tableName = col.tableName;
             pcol.tableAlias = col.tableAlias;
@@ -1297,6 +1234,66 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     /**
+     * For aggregation queries, ORDER BY can only apply on display columns list.
+     * However, this is an edge case :
+     * ORDER BY on GROUP BY columns or expression that are not selected.
+     *
+     * GROUP BY keys are not in select list will make it complex aggregated.
+     * For this case, the PROJECTION node should apply after the ORDER BY node.
+     *
+     * However, any expression involved with ConstantValueExpression make us hard
+     * to detect and compare, so we are just pessimistic about them and fall back
+     * to use the old plan node tree.
+     *
+     * @return true when this query is the edge case query, false otherwise.
+     */
+    public boolean isComplexOrderBy() {
+        return m_isComplexOrderBy;
+    }
+
+    private void detectComplexOrderby() {
+        m_isComplexOrderBy = false;
+
+        if (! hasOrderByColumns() || ! isGrouped()) {
+            return;
+        }
+
+        // HAVING clause does not matter
+        Set <AbstractExpression> missingGroupBySet = new HashSet <AbstractExpression>();
+        for (ParsedColInfo col: m_groupByColumns) {
+            if (col.groupByInDisplay) {
+                continue;
+            }
+            if (col.expression.hasAnySubexpressionOfClass(ParameterValueExpression.class)) {
+                // group by expression has ParameterValueExpression
+                assert(hasComplexGroupby());
+
+                // hsql has already guarded invalid ORDER BY expression.
+                // let's be pessimistic about these cases to place Projection above ORDER BY.
+                m_isComplexOrderBy = true;
+                return;
+            }
+
+            missingGroupBySet.add(col.expression);
+        }
+
+        // place the TVEs from Display columns in the ORDER BY expression
+        for (ParsedColInfo orderCol : m_orderColumns) {
+            AbstractExpression expr = orderCol.expression;
+            // be pessimistic at this point
+            if (expr.hasAnySubexpressionOfClass(ParameterValueExpression.class)) {
+                m_isComplexOrderBy = true;
+                return;
+            }
+
+            if (expr.hasSubExpressionFrom(missingGroupBySet)) {
+                m_isComplexOrderBy = true;
+                return;
+            }
+        }
+    }
+
+    /**
      * DISTINCT without GROUP BY is completely rewrote with a GROUP BY query.
      * DISTINCT with GROUP BY is not tricky, it needs another GROUP BY on the original GROUP BY.
      * @return true if query has a DISTINCT with GROUP BY
@@ -1445,6 +1442,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return false;
     }
 
+
+    /**
+     * Order by Columns or expressions has to operate on the display columns or expressions.
+     * @return
+     */
     private boolean orderByColumnsCoverUniqueKeys()
     {
         // In theory, if EVERY table in the query has a uniqueness constraint
@@ -1477,6 +1479,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         if (m_tableAliasMap.size() > baseTableAliases.size()) {
             // FIXME: This would be one of the tricky cases where the goal would be to prove that the
             // row with no ORDER BY component came from the right side of a 1-to-1 or many-to-1 join.
+            // like Unique Index nested loop join, etc.
             return false;
         }
         boolean allScansAreDeterministic = true;
@@ -1531,7 +1534,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 }
 
                 // If the sort covers the index, then it's a unique sort.
-                //TODO: The statement's equivalence sets would be handy here to recognize cases like
+                // TODO: The statement's equivalence sets would be handy here to recognize cases like
                 //    WHERE B.unique_id = A.b_id
                 //    ORDER BY A.unique_id, A.b_id
                 if (orderedAliasExprs.containsAll(indexExpressions)) {
@@ -1549,7 +1552,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     private boolean orderByColumnsDetermineAllDisplayColumns(ArrayList<AbstractExpression> nonOrdered)
     {
-        ArrayList<ParsedColInfo> candidateColumns = new ArrayList<ParsedSelectStmt.ParsedColInfo>();
+        ArrayList<ParsedColInfo> candidateColumns = new ArrayList<ParsedColInfo>();
         for (ParsedColInfo displayCol : m_displayColumns) {
             if (displayCol.orderBy) {
                 continue;

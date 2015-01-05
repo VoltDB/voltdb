@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -106,9 +106,12 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.ConstraintType;
-import org.xml.sax.SAXException;
 
 import com.google_voltpatches.common.base.Charsets;
+import java.io.StringWriter;
+import javax.xml.bind.Marshaller;
+import javax.xml.namespace.QName;
+import org.xml.sax.SAXException;
 
 /**
  *
@@ -119,6 +122,25 @@ public abstract class CatalogUtil {
 
     public static final String CATALOG_FILENAME = "catalog.txt";
     public static final String CATALOG_BUILDINFO_FILENAME = "buildinfo.txt";
+
+    private static JAXBContext m_jc;
+    private static Schema m_schema;
+    static {
+        try {
+            // This schema shot the sheriff.
+            m_jc = JAXBContext.newInstance("org.voltdb.compiler.deploymentfile");
+            SchemaFactory sf = SchemaFactory.newInstance(javax.xml.XMLConstants.W3C_XML_SCHEMA_NS_URI);
+            m_schema = sf.newSchema(VoltDB.class.getResource("compiler/DeploymentFileSchema.xsd"));
+        } catch (JAXBException ex) {
+            m_jc = null;
+            m_schema = null;
+            hostLog.error("Failed to create JAXB Context for deployment.", ex);
+        } catch (SAXException e) {
+            m_jc = null;
+            m_schema = null;
+            hostLog.error("Error schema validating deployment.xml file. " + e.getMessage());
+        }
+    }
 
     /**
      * Load a catalog from the jar bytes.
@@ -606,12 +628,11 @@ public abstract class CatalogUtil {
     @SuppressWarnings("unchecked")
     public static DeploymentType getDeployment(InputStream deployIS) {
         try {
-            JAXBContext jc = JAXBContext.newInstance("org.voltdb.compiler.deploymentfile");
-            // This schema shot the sheriff.
-            SchemaFactory sf = SchemaFactory.newInstance(javax.xml.XMLConstants.W3C_XML_SCHEMA_NS_URI);
-            Schema schema = sf.newSchema(VoltDB.class.getResource("compiler/DeploymentFileSchema.xsd"));
-            Unmarshaller unmarshaller = jc.createUnmarshaller();
-            unmarshaller.setSchema(schema);
+            if (m_jc == null || m_schema == null) {
+                throw new RuntimeException("Error schema validation.");
+            }
+            Unmarshaller unmarshaller = m_jc.createUnmarshaller();
+            unmarshaller.setSchema(m_schema);
             JAXBElement<DeploymentType> result =
                 (JAXBElement<DeploymentType>) unmarshaller.unmarshal(deployIS);
             DeploymentType deployment = result.getValue();
@@ -627,9 +648,36 @@ public abstract class CatalogUtil {
             } else {
                 throw new RuntimeException(e);
             }
-        } catch (SAXException e) {
-            hostLog.error("Error schema validating deployment.xml file. " + e.getMessage());
-            return null;
+        }
+    }
+
+    /**
+     * Given the deployment object generate the XML
+     * @param deployment
+     * @return XML of deployment object.
+     * @throws IOException
+     */
+    public static String getDeployment(DeploymentType deployment) throws IOException {
+        try {
+            if (m_jc == null || m_schema == null) {
+                throw new RuntimeException("Error schema validation.");
+            }
+            Marshaller marshaller = m_jc.createMarshaller();
+            marshaller.setSchema(m_schema);
+            StringWriter sw = new StringWriter();
+            marshaller.marshal(new JAXBElement(new QName("","deployment"), DeploymentType.class, deployment), sw);
+            return sw.toString();
+        } catch (JAXBException e) {
+            // Convert some linked exceptions to more friendly errors.
+            if (e.getLinkedException() instanceof java.io.FileNotFoundException) {
+                hostLog.error(e.getLinkedException().getMessage());
+                return null;
+            } else if (e.getLinkedException() instanceof org.xml.sax.SAXParseException) {
+                hostLog.error("Error schema validating deployment.xml file. " + e.getLinkedException().getMessage());
+                return null;
+            } else {
+                throw new RuntimeException(e);
+            }
         }
     }
 

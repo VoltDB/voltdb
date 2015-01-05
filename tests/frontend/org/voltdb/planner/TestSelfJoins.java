@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -275,7 +275,6 @@ public class TestSelfJoins  extends PlannerTestCase {
 
         apn = compile("select B.C, B.A FROM R2 A, R2 B WHERE A.A = B.A AND B.A > 1 GROUP BY B.A, B.C ORDER BY B.A, B.C");
         //* for debug */ System.out.println(apn.toExplainPlanString());
-        // Some day, the wasteful projection node will not be here to skip.
         pn = apn.getChild(0);
         assertNotNull(AggregatePlanNode.getInlineAggregationNode(pn));
         assertTrue(pn instanceof NestLoopIndexPlanNode);
@@ -301,8 +300,11 @@ public class TestSelfJoins  extends PlannerTestCase {
         // in the GROUP BY and ORDER BY.
         apn = compile("select B.C, B.A FROM R2 A, R2 B WHERE A.A = B.A AND B.C > 1 GROUP BY B.A, A.C ORDER BY B.A, A.C");
         //* for debug */ System.out.println(apn.toExplainPlanString());
-        // Some day, the wasteful projection node will not be here to skip.
-        pn = apn.getChild(0).getChild(0);
+
+        // Complex ORDER BY case: GROUP BY columns that are not in the display column list
+        pn = apn.getChild(0);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        pn = pn.getChild(0);
         assertTrue(pn instanceof OrderByPlanNode);
         pn = pn.getChild(0);
         assertNotNull(AggregatePlanNode.getInlineAggregationNode(pn));

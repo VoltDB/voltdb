@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,7 +18,11 @@
 package org.voltdb.compiler;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -113,6 +117,9 @@ public class AsyncCompilerAgent {
             // This is not currently robust to comment, multi-line statments,
             // multiple statements on a line, etc.
             Boolean hasDDL = null;
+            // conflictTables tracks dropped tables before removing the ones that don't have CREATEs.
+            SortedSet<String> conflictTables = new TreeSet<String>();
+            Set<String> createdTables = new HashSet<String>();
             for (String stmt : w.sqlStatements) {
                 String ddlToken = SQLLexer.extractDDLToken(stmt);
                 if (hasDDL == null) {
@@ -127,13 +134,29 @@ public class AsyncCompilerAgent {
                     w.completionHandler.onCompletion(errResult);
                     return;
                 }
-                // if it's DDL, check to see if it's allowed
-                if (hasDDL && !SQLLexer.isPermitted(stmt)) {
-                    AsyncCompilerResult errResult =
-                        AsyncCompilerResult.makeErrorResult(w,
-                                "AdHoc DDL contains an unsupported DDL statement: " + stmt);
-                    w.completionHandler.onCompletion(errResult);
-                    return;
+                // do a couple of additional checks if it's DDL
+                if (hasDDL) {
+                    // check that the DDL is allowed
+                    if (!SQLLexer.isPermitted(stmt)) {
+                        AsyncCompilerResult errResult =
+                            AsyncCompilerResult.makeErrorResult(w,
+                                    "AdHoc DDL contains an unsupported DDL statement: " + stmt);
+                        w.completionHandler.onCompletion(errResult);
+                        return;
+                    }
+                    // make sure not to mix drop and create in the same batch for the same table
+                    if (ddlToken.equals("drop")) {
+                        String tableName = SQLLexer.extractDDLTableName(stmt);
+                        if (tableName != null) {
+                            conflictTables.add(tableName);
+                        }
+                    }
+                    else if (ddlToken.equals("create")) {
+                        String tableName = SQLLexer.extractDDLTableName(stmt);
+                        if (tableName != null) {
+                            createdTables.add(tableName);
+                        }
+                    }
                 }
             }
             if (!hasDDL) {
@@ -142,6 +165,25 @@ public class AsyncCompilerAgent {
             }
             else {
                 // We have adhoc DDL.  Is it okay to run it?
+
+                // check for conflicting DDL create/drop table statements.
+                // unhappy if the intersection is empty
+                conflictTables.retainAll(createdTables);
+                if (!conflictTables.isEmpty()) {
+                    StringBuilder sb = new StringBuilder();
+                    sb.append("AdHoc DDL contains both DROP and CREATE statements for the following table(s):");
+                    for (String tableName : conflictTables) {
+                        sb.append(" ");
+                        sb.append(tableName);
+                    }
+                    sb.append("\nYou cannot DROP and ADD a table with the same name in a single batch "
+                            + "(via @AdHoc). Issue the DROP and ADD statements as separate commands.");
+                    AsyncCompilerResult errResult =
+                            AsyncCompilerResult.makeErrorResult(w, sb.toString());
+                        w.completionHandler.onCompletion(errResult);
+                        return;
+                }
+
                 // Is it forbidden by the replication role and configured schema change method?
                 // master and UAC method chosen:
                 if (!w.onReplica && !w.useAdhocDDL) {
