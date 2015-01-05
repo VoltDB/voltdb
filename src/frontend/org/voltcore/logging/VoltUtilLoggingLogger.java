@@ -17,7 +17,6 @@
 
 package org.voltcore.logging;
 
-import java.io.StringWriter;
 import java.util.logging.Logger;
 
 /**
@@ -92,19 +91,9 @@ public class VoltUtilLoggingLogger implements VoltLogger.CoreVoltLogger {
     }
 
     @Override
-    public void addSimpleWriterAppender(StringWriter writer) {
-        m_logger.log(java.util.logging.Level.INFO, "This logger doesn't support appenders. You need Log4j.");
-    }
-
-    @Override
     public long getLogLevels(VoltLogger[] loggers) {
         System.err.printf("This logger doesn't support getting log levels. You need Log4j.\n");
         return 0;
-    }
-
-    @Override
-    public void setLevel(Level level) {
-        m_logger.setLevel(getPriorityForLevel(level));
     }
 
 }

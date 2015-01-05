@@ -21,12 +21,12 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.licensetool.LicenseApi;
 
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
 public interface VoltDBInterface
@@ -193,7 +193,7 @@ public interface VoltDBInterface
      *            The initial delay before the first execution of the work
      * @param delay
      *            The delay between each subsequent execution of the work. If
-     *            this is negative, the work will only be executed once after
+     *            this is zero or negative, the work will only be executed once after
      *            the initial delay.
      * @param unit
      *            Time unit

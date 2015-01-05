@@ -2312,7 +2312,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
         }, 200, 200, TimeUnit.MILLISECONDS);
         /*
-         * Every five seconds check if the topology of the cluster has changed,
+         * Schedule with period TOPOLOGY_CHANGE_CHECK_MS (by default every 5 seconds)
+         * check if the topology of the cluster has changed,
          * and if it has push an update to the clients. This should be an inexpensive operation
          * that operates on cached data and it ensures that clients eventually converge on the current
          * topology

@@ -76,7 +76,10 @@ public class SQLCommand
     private static boolean m_returningToPromptAfterError = false;
     private static int m_exitCode = 0;
 
+    // Enables a "developer" mode with extra diagnostics probably not of interest to VoltDB customers.
     private static boolean m_debug = false;
+    // Enables a "developer option" that delays at various processing steps,
+    // like a performance fault injection.
     private static String[] m_debugDelay;
     private static long m_debugStartTime;
 
@@ -556,31 +559,19 @@ public class SQLCommand
         // so much statement queueing.
         StringBuilder query = new StringBuilder();
         while (true) {
-            if (m_debug) {
-                reportElapsedTime("pre-read");
-            }
+            if (m_debug) { reportElapsedTime("pre-read"); }
             String line = lineInputReader.readLine();
             if (line == null) {
-                if (m_debug) {
-                    reportElapsedTime("finished reading");
-                }
+                if (m_debug) { reportElapsedTime("finished reading"); }
                 //* enable to debug */     System.err.println("Read null batch line.");
                 List<String> parsedQueries = parseQuery(query.toString());
-                if (m_debug) {
-                    reportElapsedTime("post-parse");
-                }
+                if (m_debug) { reportElapsedTime("post-parse"); }
                 for (String parsedQuery : parsedQueries) {
-                    if (m_debug) {
-                        reportElapsedTime("pre-execute");
-                    }
+                    if (m_debug) { reportElapsedTime("pre-execute"); }
                     executeQuery(parsedQuery);
-                    if (m_debug) {
-                        reportElapsedTime("post-execute");
-                    }
+                    if (m_debug) { reportElapsedTime("post-execute"); }
                 }
-                if (m_debug) {
-                    reportElapsedTime("finished execute");
-                }
+                if (m_debug) { reportElapsedTime("finished execute"); }
                 return;
             }
             //* enable to debug */ else System.err.println("Read non-null batch line: (" + line + ")");
@@ -996,7 +987,7 @@ public class SQLCommand
         System.err.println(exc.getMessage());
         if (m_debug) {
             exc.printStackTrace(System.err);
-            // third debug delay is on each detected error.
+            // The third debug delay occurs on each detected error.
             reportElapsedTime("caught error");
             try {
                 long delay3 = Long.parseLong(m_debugDelay[2]);
@@ -1142,23 +1133,21 @@ public class SQLCommand
 
     private static Client getClient(ClientConfig config, String[] servers, int port) throws Exception
     {
-        if (m_debug) {
-            reportElapsedTime("pre-client create");
-        }
+        if (m_debug) { reportElapsedTime("pre-client create"); }
         final Client client = ClientFactory.createClient(config);
         if (m_debug) {
-            reportElapsedTime("post-client create, pre-connect to " + servers.length + " servers");
+            reportElapsedTime("post-client create, pre-connect to " +
+                    servers.length + " servers");
         }
         int ii = 0;
         for (String server : servers) {
             if (m_debug) {
-                reportElapsedTime("pre-client connect to server (" + server + ":" + port + ") #" + (++ii) + " of " + servers.length);
+                reportElapsedTime("pre-client connect to server (" + server + ":" + port + ") #" +
+                        (++ii) + " of " + servers.length);
             }
             client.createConnection(server.trim(), port);
         }
-        if (m_debug) {
-            reportElapsedTime("post-client init");
-        }
+        if (m_debug) { reportElapsedTime("post-client init"); }
         return client;
     }
 
@@ -1489,10 +1478,7 @@ public class SQLCommand
         ClientConfig config = new ClientConfig(user, password);
         config.setProcedureCallTimeout(0);  // Set procedure all to infinite timeout, see ENG-2670
 
-        if (m_debug) {
-            reportElapsedTime("pre-client init");
-        }
-
+        if (m_debug) { reportElapsedTime("pre-client init"); }
         try {
             // if specified enable kerberos
             if (!kerberos.isEmpty()) {
@@ -1511,9 +1497,7 @@ public class SQLCommand
             // Load user stored procs
             loadStoredProcedures(Procedures, Classlist);
 
-            if (m_debug) {
-                reportElapsedTime("post-metadata load");
-            }
+            if (m_debug) { reportElapsedTime("post-metadata load"); }
 
             in = new FileInputStream(FileDescriptor.in);
             out = System.out;
@@ -1548,9 +1532,7 @@ public class SQLCommand
                 }
             });
 
-            if (m_debug) {
-                reportElapsedTime("post-reader init");
-            }
+            if (m_debug) { reportElapsedTime("post-reader init"); }
 
             // Removed code to prevent Ctrl-C from exiting. The original code is visible
             // in Git history hash 837df236c059b5b4362ffca7e7a5426fba1b7f20.

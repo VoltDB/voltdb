@@ -57,7 +57,7 @@ public class LocalCluster implements VoltServerConfig {
     // NOTE: This mechanism can't be used when m_hasLocalServer is enabled
     public static final String clusterHostIdProperty = "__VOLTDB_CLUSTER_HOSTID__";
 
-    private /*TODO: consider? static*/ VoltLogger log = new VoltLogger("HOST");
+    private VoltLogger log = new VoltLogger("HOST");
 
     // the timestamp salt for the TransactionIdManager
     // will vary between -3 and 3 uniformly

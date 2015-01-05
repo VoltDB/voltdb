@@ -73,14 +73,6 @@ import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 public class CoreUtils {
-    ////private static VoltLogger hostLog = null;
-
-    static {
-        System.err.println("CoreUtils x000");
-        /////*hostLog = */new VoltLogger("HOST");
-        System.err.println("CoreUtils x001");
-    }
-
     public static final int SMALL_STACK_SIZE = 1024 * 256;
     public static final int MEDIUM_STACK_SIZE = 1024 * 512;
 
@@ -442,13 +434,11 @@ public class CoreUtils {
      * Create an unbounded single threaded executor
      */
     public static ExecutorService getSingleThreadExecutor(String name) {
-System.err.println("pmartel debugging CoreUtils gSTE 0");
         ExecutorService ste =
                 new ThreadPoolExecutor(1, 1,
                         0L, TimeUnit.MILLISECONDS,
                         new LinkedBlockingQueue<Runnable>(),
                         CoreUtils.getThreadFactory(null, name, SMALL_STACK_SIZE, false, null));
-System.err.println("pmartel debugging CoreUtils gSTE 1");
         return ste;
     }
 
@@ -595,10 +585,7 @@ System.err.println("pmartel debugging CoreUtils gSTE 1");
     }
 
     public static ThreadFactory getThreadFactory(String name) {
-System.err.println("pmartel debugging CoreUtils x1");
-        ThreadFactory threadFactory = getThreadFactory(name, SMALL_STACK_SIZE);
-System.err.println("pmartel debugging CoreUtils x2");
-        return threadFactory;
+        return getThreadFactory(name, SMALL_STACK_SIZE);
     }
 
     public static ThreadFactory getThreadFactory(String groupName, String name) {

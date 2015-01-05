@@ -161,7 +161,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     private final VoltLogger hostLog = new VoltLogger("HOST");
     private final VoltLogger consoleLog = new VoltLogger("CONSOLE");
 
-    public Configuration m_config = new Configuration();
+    private Configuration m_config = new Configuration();
     int m_configuredNumberOfPartitions;
     int m_configuredReplicationFactor;
     // CatalogContext is immutable, just make sure that accessors see a consistent version
@@ -342,7 +342,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 hostLog.fatal("You are running on an unsupported (probably 32 bit) JVM. Exiting.");
                 System.exit(-1);
             }
-            consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
+            consoleLog.l7dlog(Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
 
             // If there's no deployment provide a default and put it under voltdbroot.
             if (config.m_pathToDeployment == null) {
@@ -614,7 +614,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             }
 
             // do the many init tasks in the Inits class
-            Inits inits = new Inits(this, 1);
+            Inits inits = new Inits(this);
             inits.doInitializationWork();
 
             // Need the catalog so that we know how many tables so we can guess at the necessary heap size
@@ -807,6 +807,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 VoltDB.crashLocalVoltDB("Error initializing snapshot completion monitor", true, e);
             }
 
+
             /*
              * Make sure the build string successfully validated
              * before continuing to do operations
@@ -844,6 +845,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
             // print out a bunch of useful system info
             logDebuggingInfo(m_config.m_adminPort, m_config.m_httpPort, m_httpPortExtraLogMessage, m_jsonEnabled);
+
 
             // warn the user on the console if k=0 or if no command logging
             if (m_configuredReplicationFactor == 0) {
@@ -934,7 +936,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 }
             }
             if (dailyAppender != null) {
-////                scheduleDailyLogging(dailyAppender);
+                scheduleDailyLogging(dailyAppender);
             }
         }
     }
@@ -971,20 +973,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                     return;
                 }
                 scheduleWork(new DailyLogTask(),
-                        nextCheck + 30 * 1000 - System.currentTimeMillis(), -1, TimeUnit.MILLISECONDS);
+                        Math.max(nextCheck - System.currentTimeMillis(), 0l) + 30 * 1000, -1, TimeUnit.MILLISECONDS);
             }
         };
+
+        hostLog.info("Log delay: " + MiscUtils.formatUptime(getClusterUptime()));
 
         long nextCheck;
         try {
             nextCheck = nextCheckField.getLong(dailyRollingFileAppender);
-            hostLog.info("Log delay: " + MiscUtils.formatUptime(getClusterUptime()));
         } catch (IllegalAccessException e) {
             hostLog.error("Failed to set daily system info logging: " + e.getMessage());
             return;
         }
         scheduleWork(new DailyLogTask(),
-                nextCheck + 30 * 1000 - System.currentTimeMillis(), -1, TimeUnit.MILLISECONDS);
+                Math.max(nextCheck - System.currentTimeMillis(), 0l) + 30 * 1000, -1, TimeUnit.MILLISECONDS);
     }
 
     class StartActionWatcher implements Watcher {
@@ -2467,7 +2470,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             // Shouldn't be here, but to be safe
             m_mode = OperationMode.RUNNING;
         }
-        consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null);
+        consoleLog.l7dlog(Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null);
 
         // Create a zk node to indicate initialization is completed
         m_messenger.getZK().create(VoltZK.init_completed, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, new ZKUtil.StringCallback(), null);
