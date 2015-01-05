@@ -55,7 +55,11 @@ public class HTTPClientInterface {
     public static final String PARAM_PASSWORD = "Password";
     public static final String PARAM_HASHEDPASSWORD = "Hashedpassword";
     public static final String PARAM_ADMIN = "admin";
+    int m_timeout = 0;
 
+    public void setTimeout(int seconds) {
+        m_timeout = seconds * 1000;
+    }
 
     class JSONProcCallback implements ProcedureCallback {
 
@@ -111,9 +115,38 @@ public class HTTPClientInterface {
         AuthenticationResult authResult = null;
 
         Continuation continuation = ContinuationSupport.getContinuation(request);
+        if (m_timeout > 0) {
+            continuation.setTimeout(m_timeout);
+        }
+        //If this is expired just send timeout.
+        if (continuation.isExpired()) {
+            try {
+                String msg = "Request Timeout";
+                String jsonp = (String )request.getAttribute("jsonp");
+                if (jsonp != null) {
+                    msg = String.format("%s( %s )", jsonp, msg);
+                }
+                response.setStatus(HttpServletResponse.SC_OK);
+                request.setHandled(true);
+                response.getWriter().print(msg);
+            } catch (IllegalStateException | IOException e){
+               // Thrown when we shut down the server via the JSON/HTTP (web studio) API
+               // Essentially we're closing everything down from underneath the HTTP request.
+                m_log.warn("JSON request timeout: ", e);
+            }
+            return;
+        }
+
+        //Check if this is resumed request.
         Object o = request.getAttribute("SQLSUBMITTED");
         if (o != null && o instanceof Boolean) {
-            continuation.suspend(response);
+            try {
+                continuation.suspend(response);
+            } catch (IllegalStateException e){
+                // Thrown when we shut down the server via the JSON/HTTP (web studio) API
+                // Essentially we're closing everything down from underneath the HTTP request.
+                 m_log.warn("JSON request completion exception in process: ", e);
+            }
             return;
         }
         continuation.suspend(response);
@@ -184,6 +217,9 @@ public class HTTPClientInterface {
             }
             if (!success) {
                 throw new Exception("Server is not accepting work at this time.");
+            }
+            if (jsonp != null) {
+                request.setAttribute("jsonp", jsonp);
             }
             request.setAttribute("SQLSUBMITTED", Boolean.TRUE);
             if (authResult.m_adminMode) {

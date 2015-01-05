@@ -455,12 +455,12 @@ public class Inits {
         }
 
         //Setup http server with given port and interface
-        private void setupHttpServer(String httpInterface, int httpPort, boolean findAny, boolean mustListen) {
+        private void setupHttpServer(String httpInterface, int httpPort, boolean findAny, boolean mustListen, int poolSize, int toInSeconds) {
 
             boolean success = false;
             for (; true; httpPort++) {
                 try {
-                    m_rvdb.m_adminListener = new HTTPAdminListener(m_rvdb.m_jsonEnabled, httpInterface, httpPort, mustListen);
+                    m_rvdb.m_adminListener = new HTTPAdminListener(m_rvdb.m_jsonEnabled, httpInterface, httpPort, mustListen, poolSize, toInSeconds);
                     success = true;
                     break;
                 } catch (Exception e1) {
@@ -499,17 +499,17 @@ public class Inits {
             }
             // if set by cli use that.
             if (m_config.m_httpPort != Integer.MAX_VALUE) {
-                setupHttpServer(m_config.m_httpPortInterface, m_config.m_httpPort, false, true);
+                setupHttpServer(m_config.m_httpPortInterface, m_config.m_httpPort, false, true, m_deployment.getHttpd().getPoolsize(), m_deployment.getHttpd().getTimeout());
                 // if not set by the user, just find a free port
             } else if (httpPort == 0) {
                 // if not set by the user, start at 8080
                 httpPort = 8080;
-                setupHttpServer("", httpPort, true, false);
+                setupHttpServer("", httpPort, true, false, m_deployment.getHttpd().getPoolsize(), m_deployment.getHttpd().getTimeout());
             } else if (httpPort != -1) {
                 if (!m_deployment.getHttpd().isEnabled()) {
                     return;
                 }
-                setupHttpServer("", httpPort, false, true);
+                setupHttpServer("", httpPort, false, true, m_deployment.getHttpd().getPoolsize(), m_deployment.getHttpd().getTimeout());
             }
         }
     }
