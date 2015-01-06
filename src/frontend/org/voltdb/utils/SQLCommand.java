@@ -1329,6 +1329,15 @@ public class SQLCommand
     private static InputStream in = null;
     private static OutputStream out = null;
 
+
+    private static String extractArgInput(String arg) {
+        String[] splitStrings = arg.split("=");
+        if (splitStrings.length < 2) {
+            printUsage("Missing input value for " + splitStrings[0]);
+        }
+        return splitStrings[1];
+    }
+
     // Application entry point
     public static void main(String args[])
     {
@@ -1346,15 +1355,15 @@ public class SQLCommand
         for (int i = 0; i < args.length; i++) {
             String arg = args[i];
             if (arg.startsWith("--servers=")) {
-                serverList = arg.split("=")[1];
+                serverList = extractArgInput(arg);
             } else if (arg.startsWith("--port=")) {
-                port = Integer.valueOf(arg.split("=")[1]);
+                port = Integer.valueOf(extractArgInput(arg));
             } else if (arg.startsWith("--user=")) {
-                user = arg.split("=")[1];
+                user = extractArgInput(arg);
             } else if (arg.startsWith("--password=")) {
-                password = arg.split("=")[1];
+                password = extractArgInput(arg);
             } else if (arg.startsWith("--kerberos=")) {
-                kerberos = arg.split("=")[1];
+                kerberos = extractArgInput(arg);
             } else if (arg.startsWith("--kerberos")) {
                 kerberos = "VoltDBClient";
             } else if (arg.startsWith("--query=")) {
@@ -1369,7 +1378,7 @@ public class SQLCommand
                 }
             }
             else if (arg.startsWith("--output-format=")) {
-                String formatName = arg.split("=")[1].toLowerCase();
+                String formatName = extractArgInput(arg).toLowerCase();
                 if (formatName.equals("fixed")) {
                     m_outputFormatter = new SQLCommandOutputFormatterDefault();
                 }
@@ -1390,7 +1399,7 @@ public class SQLCommand
                 m_debug = true;
             }
             else if (arg.startsWith("--stop-on-error=")) {
-                String optionName = arg.split("=")[1].toLowerCase();
+                String optionName = extractArgInput(arg).toLowerCase();
                 if (optionName.equals("true")) {
                     m_stopOnError = true;
                 }
@@ -1401,6 +1410,14 @@ public class SQLCommand
                     printUsage("Invalid value for --stop-on-error");
                 }
             }
+            else if (arg.startsWith("--ddl-file=")) {
+                String ddlFilePath = extractArgInput(arg);
+                try {
+                    ddlFile = new Scanner(new File(ddlFilePath)).useDelimiter("\\Z").next();
+                } catch (FileNotFoundException e) {
+                    printUsage("DDL file not found at path:" + ddlFilePath);
+                }
+            }
             else if (arg.equals("--help")) {
                 printHelp(System.out); // Print readme to the screen
                 System.out.println("\n\n");
@@ -1408,14 +1425,6 @@ public class SQLCommand
             }
             else if ((arg.equals("--usage")) || (arg.equals("-?"))) {
                 printUsage(0);
-            }
-            else if (arg.startsWith("--ddl-file=")) {
-                String ddlFilePath = arg.split("=")[1];
-                try {
-                    ddlFile = new Scanner(new File(ddlFilePath)).useDelimiter("\\Z").next();
-                } catch (FileNotFoundException e) {
-                    e.printStackTrace();
-                }
             }
             else {
                 printUsage("Invalid Parameter: " + arg);
@@ -1447,73 +1456,74 @@ public class SQLCommand
         }
 
         try {
-            if (ddlFile.equals("")) {
-                // Load system procedures
-                loadSystemProcedures();
-
-                // Load user stored procs
-                loadStoredProcedures(Procedures, Classlist);
-
-                in = new FileInputStream(FileDescriptor.in);
-                out = System.out;
-                lineInputReader = new SQLConsoleReader(in, out);
-
-                lineInputReader.setBellEnabled(false);
-
-                // Provide a custom completer.
-                Completer completer = new SQLCompleter(m_commandPrefixes);
-                lineInputReader.addCompleter(completer);
-
-                // Maintain persistent history in ~/.sqlcmd_history.
-                historyFile = new FileHistory(new File(System.getProperty("user.home"), ".sqlcmd_history"));
-                lineInputReader.setHistory(historyFile);
-
-                // Make Ctrl-D (EOF) exit if on an empty line, otherwise delete the next character.
-                KeyMap keyMap = lineInputReader.getKeys();
-                keyMap.bind(new Character(KeyMap.CTRL_D).toString(), new ActionListener() {
-                    @Override
-                    public void actionPerformed(ActionEvent e)
-                    {
-                        CursorBuffer cursorBuffer = lineInputReader.getCursorBuffer();
-                        if (cursorBuffer.length() == 0) {
-                            System.exit(m_exitCode);
-                        }
-                        else {
-                            try {
-                                lineInputReader.delete();
-                            }
-                            catch (IOException e1) {}
-                        }
-                    }
-                });
-
-                // Removed code to prevent Ctrl-C from exiting. The original code is visible
-                // in Git history hash 837df236c059b5b4362ffca7e7a5426fba1b7f20.
-
-                m_interactive = true;
-                if (queries != null && !queries.isEmpty()) {
-                    // If queries are provided via command line options run them in
-                    // non-interactive mode.
-                    //TODO: Someday we should honor batching.
-                    m_interactive = false;
-                    for (String query : queries) {
-                        executeQuery(query);
-                    }
-                }
-                if (System.in.available() > 0) {
-                    // If Standard input comes loaded with data, run in non-interactive mode
-                    m_interactive = false;
-                    executeNoninteractive();
-                }
-                if (m_interactive) {
-                    // Print out welcome message
-                    System.out.printf("SQL Command :: %s%s:%d\n", (user == "" ? "" : user + "@"), serverList, port);
-                    interactWithTheUser();
-                }
-            } else {
+            if (! ddlFile.equals("")) {
                 // fast DDL Loader mode
                 // System.out.println("fast DDL Loader mode with DDL input:\n" + ddlFile);
                 VoltDB.callProcedure("@AdHoc", ddlFile);
+                System.exit(m_exitCode);
+            }
+
+            // Load system procedures
+            loadSystemProcedures();
+
+            // Load user stored procs
+            loadStoredProcedures(Procedures, Classlist);
+
+            in = new FileInputStream(FileDescriptor.in);
+            out = System.out;
+            lineInputReader = new SQLConsoleReader(in, out);
+
+            lineInputReader.setBellEnabled(false);
+
+            // Provide a custom completer.
+            Completer completer = new SQLCompleter(m_commandPrefixes);
+            lineInputReader.addCompleter(completer);
+
+            // Maintain persistent history in ~/.sqlcmd_history.
+            historyFile = new FileHistory(new File(System.getProperty("user.home"), ".sqlcmd_history"));
+            lineInputReader.setHistory(historyFile);
+
+            // Make Ctrl-D (EOF) exit if on an empty line, otherwise delete the next character.
+            KeyMap keyMap = lineInputReader.getKeys();
+            keyMap.bind(new Character(KeyMap.CTRL_D).toString(), new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e)
+                {
+                    CursorBuffer cursorBuffer = lineInputReader.getCursorBuffer();
+                    if (cursorBuffer.length() == 0) {
+                        System.exit(m_exitCode);
+                    }
+                    else {
+                        try {
+                            lineInputReader.delete();
+                        }
+                        catch (IOException e1) {}
+                    }
+                }
+            });
+
+            // Removed code to prevent Ctrl-C from exiting. The original code is visible
+            // in Git history hash 837df236c059b5b4362ffca7e7a5426fba1b7f20.
+
+            m_interactive = true;
+            if (queries != null && !queries.isEmpty()) {
+                // If queries are provided via command line options run them in
+                // non-interactive mode.
+                //TODO: Someday we should honor batching.
+                m_interactive = false;
+                for (String query : queries) {
+                    executeQuery(query);
+                }
+            }
+            if (System.in.available() > 0) {
+                // If Standard input comes loaded with data, run in non-interactive mode
+                m_interactive = false;
+                executeNoninteractive();
+            }
+            if (m_interactive) {
+                // Print out welcome message
+                System.out.printf("SQL Command :: %s%s:%d\n", (user == "" ? "" : user + "@"), serverList, port);
+                interactWithTheUser();
             }
         }
         catch (Exception x) {
