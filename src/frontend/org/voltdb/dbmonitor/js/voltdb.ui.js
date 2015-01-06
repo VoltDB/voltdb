@@ -474,7 +474,7 @@ var loadPage = function (serverName, portid) {
                         {
                             voltDbRenderer.stopServer(hostId, function (success,statusString) {
                                 if (success) {
-                                    //voltDbRenderer.GetSystemInformation(loadClusterHealth, loadAdminTabPortAndOverviewDetails, loadAdminServerList);
+                                    adminClusterObjects.ignoreServerListUpdateCount = 2;
                                     updateServers(hostId, hostName, "MISSING");
                                     $("#stopServer_" + hostName).addClass('disableServer');
                                     $("#stopServer_" + hostName + " span").addClass('shutdownServer');
