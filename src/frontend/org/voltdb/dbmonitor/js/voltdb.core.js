@@ -627,8 +627,7 @@ jQuery.extend({
 });
 
 jQuery.extend({
-    getJSON: function (url, formData, callback, authorization) {
-        
+    getJSON: function (url, formData, callback, authorization) {        
         if (VoltDBCore.hostIP == "") {
             jQuery.ajax({
                 type: 'GET',

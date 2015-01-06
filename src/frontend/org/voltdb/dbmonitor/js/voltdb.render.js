@@ -112,6 +112,12 @@ function alertNodeClicked(obj) {
 
         this.hint = "";
 
+        var activeCount = 0;
+        var activeCountCopied = 0;
+        var joiningCount = 0;
+        var missingCount = 0;
+        var alertCount = 0;
+
         this.ChangeServerConfiguration = function (serverName, portId, userName, pw, isHashPw, isAdmin) {
             VoltDBService.ChangeServerConfiguration(serverName, portId, userName, pw, isHashPw, isAdmin);
         };
@@ -321,7 +327,7 @@ function alertNodeClicked(obj) {
             VoltDBService.GetClusterInformation(function (connection) {
                 if (VoltDbAdminConfig.isAdmin) {
                     getClusterDetails(connection, clusterDetails, "CLUSTER_INFORMATION");
-                    getClusterState(clusterDetails,clusterState);
+                    getClusterState(clusterDetails, clusterState);
                     onInformationLoaded(clusterState);
                 }
             });
@@ -452,29 +458,41 @@ function alertNodeClicked(obj) {
                 return;
             }
 
-            var activeCount = 0;
-            var joiningCount = 0;
-            var missingCount = 0;
-            var alertCount = 0;
+            if (adminClusterObjects.ignoreServerListUpdateCount > 0) {
+                if (totalServerCount == 0) {
+                    totalServerCount = activeCount + joiningCount;
+                }
 
-            jQuery.each(systemOverview, function (id, val) {
-                $.each(VoltDbAdminConfig.servers, function(nestId, nestVal) {
-                    if (val['HOSTNAME'] == nestVal.serverName && val['CLUSTERSTATE'] == "MISSING") {
-                        return;
-                    }
-                    
-                });
-                if (val["CLUSTERSTATE"] == "RUNNING" || val["CLUSTERSTATE"] == "PAUSED")
-                    activeCount++;
-                else if (val["CLUSTERSTATE"] == "JOINING")
-                    joiningCount++;
-            });
+                if (activeCount == activeCountCopied) {
+                    activeCount--;
+                }
 
-            if (totalServerCount == 0) {
-                totalServerCount = activeCount + joiningCount;
+                missingCount = totalServerCount - (activeCount + joiningCount);
+                adminClusterObjects.ignoreServerListUpdateCount--;
+
             }
+            else {
+                activeCount = 0;
+                joiningCount = 0;
+                missingCount = 0;
+                alertCount = 0;
 
-            missingCount = totalServerCount - (activeCount + joiningCount);
+                jQuery.each(systemOverview, function (id, val) {
+                    if (val["CLUSTERSTATE"] == "RUNNING" || val["CLUSTERSTATE"] == "PAUSED")
+                        activeCount++;
+
+                    else if (val["CLUSTERSTATE"] == "JOINING")
+                        joiningCount++;
+                });
+
+                if (totalServerCount == 0) {
+                    totalServerCount = activeCount + joiningCount;
+                }
+
+                missingCount = totalServerCount - (activeCount + joiningCount);
+                activeCountCopied = activeCount;
+
+            }
 
             if (missingCount < 0)
                 missingCount = 0;
@@ -1037,14 +1055,6 @@ function alertNodeClicked(obj) {
                             htmlMarkup = "<li class=\"active monitoring\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
                         }
                     }
-                    else if (hostName != null && currentServer == hostName && val["CLUSTERSTATE"] == "PAUSED") {
-                        if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
-                            htmlMarkup = "<li class=\"pauseMonitoring\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span><span class=\"hostIdHidden\" style=\"display:none\">" + systemMemory[hostName]["HOST_ID"] + "</span></li>";
-                        } else {
-                            htmlMarkup = "<li class=\"pauseMonitoring\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
-                        }
-
-                    }
                     else if (hostName != null && currentServer != hostName && val["CLUSTERSTATE"] == "RUNNING") {
                         if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
                             htmlMarkup = "<li class=\"active\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span><span class=\"hostIdHidden\" style=\"display:none\">" + systemMemory[hostName]["HOST_ID"] + "</span></li>";
@@ -1053,7 +1063,22 @@ function alertNodeClicked(obj) {
                         }
 
                     }
-                    
+                    else if (hostName != null && currentServer == hostName && val["CLUSTERSTATE"] == "PAUSED") {
+                        if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
+                            htmlMarkup = "<li class=\"pauseActiveMonitoring\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span><span class=\"hostIdHidden\" style=\"display:none\">" + systemMemory[hostName]["HOST_ID"] + "</span></li>";
+                        } else {
+                            htmlMarkup = "<li class=\"pauseActiveMonitoring\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
+                        }
+
+                    }
+                    else if (hostName != null && currentServer != hostName && val["CLUSTERSTATE"] == "PAUSED") {
+                        if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
+                            htmlMarkup = "<li class=\"pauseMonitoring\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span><span class=\"hostIdHidden\" style=\"display:none\">" + systemMemory[hostName]["HOST_ID"] + "</span></li>";
+                        } else {
+                            htmlMarkup = "<li class=\"pauseMonitoring\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
+                        }
+
+                    }
                     else if (hostName != null && val["CLUSTERSTATE"] == "JOINING") {
                         if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
                             htmlMarkup = htmlMarkup + "<li class=\"joining\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span><span class=\"hostIdHidden\" style=\"display:none\">" + systemMemory[hostName]["HOST_ID"] + "</span></li>";
@@ -1062,7 +1087,7 @@ function alertNodeClicked(obj) {
                             htmlMarkup = htmlMarkup + "<li class=\"joining\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
                         }
                     }
-                    
+
                 } else {
                     /********************************************************************************************
                     "currentServerHtml" is validated to verify if current server to be monitored is already set
@@ -1075,7 +1100,6 @@ function alertNodeClicked(obj) {
                             htmlMarkup = htmlMarkup + "<li class=\"active monitoring\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\"class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
                         }
                     }
-
                     if (hostName != null && currentServerHtml != hostName && val["CLUSTERSTATE"] == "RUNNING") {
                         if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
                             htmlMarkup = htmlMarkup + "<li class=\"active\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
@@ -1085,7 +1109,15 @@ function alertNodeClicked(obj) {
                         }
 
                     }
-                    
+                    if (hostName != null && currentServerHtml == hostName && val["CLUSTERSTATE"] == "PAUSED") {
+                        if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
+                            htmlMarkup = htmlMarkup + "<li class=\"pauseActiveMonitoring\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span><span class=\"hostIdHidden\" style=\"display:none\">" + systemMemory[hostName]["HOST_ID"] + "</span></li>";
+                        } else {
+                            htmlMarkup = htmlMarkup + "<li class=\"pauseActiveMonitoring\"><a data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
+                        }
+
+                    }
+
                     if (hostName != null && currentServerHtml != hostName && val["CLUSTERSTATE"] == "PAUSED") {
                         if (systemMemory[hostName]["MEMORYUSAGE"] >= memoryThreshold) {
                             htmlMarkup = htmlMarkup + "<li class=\"pauseMonitoring\"><a class=\"alertIcon\" data-ip=\"" + systemMemory[hostName]["HOST_ID"] + "\" href=\"javascript:void(0);\">" + hostName + "</a> <span class=\"memory-status alert\">" + systemMemory[hostName]["MEMORYUSAGE"] + "%</span></li>";
@@ -1785,10 +1817,10 @@ function alertNodeClicked(obj) {
             });
         };
 
-        var getClusterDetails = function(connection, clusterDetails, processName) {
+        var getClusterDetails = function (connection, clusterDetails, processName) {
             var suffix = "";
             suffix = "_" + processName;
-            
+
             connection.Metadata['@SystemInformation_OVERVIEW' + suffix].data.forEach(function (info) {
                 var singleData = info;
                 var id = singleData[0];
@@ -1804,7 +1836,7 @@ function alertNodeClicked(obj) {
             });
         };
 
-        var getClusterState = function(clusterDetails,clusterState) {
+        var getClusterState = function (clusterDetails, clusterState) {
             var currentServer = getCurrentServer();
             $.each(clusterDetails, function (key, val) {
                 if (val["HOSTNAME"] == currentServer) {
@@ -1901,7 +1933,47 @@ function alertNodeClicked(obj) {
             var currentServerRowClass;
             var currentServerColumnClass;
 
-            this.setServerDetails = function (hostId, serverInfo,clusterState) {
+            //this.setServerDetails = function (hostId, serverInfo, clusterState) {
+            //    var count = 0;
+            //    if ((VoltDbAdminConfig.servers != "" || VoltDbAdminConfig.servers != null || VoltDbAdminConfig.servers != undefined)
+            //        && VoltDbAdminConfig.servers.length > 0) {
+            //        $.each(VoltDbAdminConfig.servers, function (id, value) {
+            //            {
+            //                if (value.serverName != serverInfo['HOSTNAME'] && count == VoltDbAdminConfig.servers.length - 1) {
+            //                    serverDetails = new VoltDbAdminConfig.server(hostId, serverInfo['HOSTNAME'], serverInfo['CLUSTERSTATE']);
+            //                    VoltDbAdminConfig.servers.push(serverDetails);
+
+            //                } else if (value.serverName == serverInfo['HOSTNAME']) {
+            //                    if (VoltDbAdminConfig.stoppedServer != "" && VoltDbAdminConfig.stoppedServer.serverName == serverInfo['HOSTNAME']) {
+            //                        value.hostId = VoltDbAdminConfig.stoppedServer.hostId;
+            //                        value.serverState = VoltDbAdminConfig.stoppedServer.serverState;
+            //                        console.log("Missing state restored");
+
+            //                    } else {
+            //                        value.hostId = hostId;
+            //                        value.serverState = clusterState;
+            //                    }
+
+            //                    return false;
+            //                }
+            //            }
+            //            count++;
+
+            //        });
+
+            //        //always clean up stopped server whether or not its empty
+            //        VoltDbAdminConfig.stoppedServer = "";
+
+
+            //    } else {
+            //        serverDetails = new VoltDbAdminConfig.server(hostId, serverInfo['HOSTNAME'], serverInfo['CLUSTERSTATE']);
+            //        VoltDbAdminConfig.servers.push(serverDetails);
+
+            //    }
+            //};
+
+
+            this.setServerDetails = function (hostId, serverInfo, clusterState) {
                 var count = 0;
                 if ((VoltDbAdminConfig.servers != "" || VoltDbAdminConfig.servers != null || VoltDbAdminConfig.servers != undefined)
                     && VoltDbAdminConfig.servers.length > 0) {
@@ -1913,25 +1985,14 @@ function alertNodeClicked(obj) {
 
                             }
                             else if (value.serverName == serverInfo['HOSTNAME']) {
-                                if (VoltDbAdminConfig.stoppedServer != "" && VoltDbAdminConfig.stoppedServer.serverName == serverInfo['HOSTNAME']) {
-                                    value.hostId = VoltDbAdminConfig.stoppedServer.hostId;
-                                    value.serverState = VoltDbAdminConfig.stoppedServer.serverState;
-                                    console.log("Missing state restored");
-
-                                } else {
-                                    value.hostId = hostId;
-                                    value.serverState = clusterState;
-                                }
-                                
+                                value.hostId = hostId;
+                                value.serverState = serverInfo['CLUSTERSTATE'];
                                 return false;
                             }
+                            count++;
                         }
-                        count++;
 
                     });
-                    
-                    //always clean up stopped server whether or not its empty
-                    VoltDbAdminConfig.stoppedServer = "";
 
 
                 } else {
@@ -1944,7 +2005,7 @@ function alertNodeClicked(obj) {
             this.updateServers = function (hostId, hostName, serverState) {
                 if ((VoltDbAdminConfig.servers != "" || VoltDbAdminConfig.servers != null || VoltDbAdminConfig.servers != undefined)
                     && VoltDbAdminConfig.servers.length > 0) {
-                    
+
                     $.each(VoltDbAdminConfig.servers, function (id, value) {
                         if (value.serverName == hostName) {
                             value.hostId = hostId;
@@ -1952,10 +2013,10 @@ function alertNodeClicked(obj) {
                             console.log("updated ", value.serverName, " to ", serverState, " state");
 
                             //stopped server details
-                            VoltDbAdminConfig.stoppedServer.hostId = hostId;
-                            VoltDbAdminConfig.stoppedServer.serverName = hostName;
-                            VoltDbAdminConfig.stoppedServer.serverState = serverState;
-                            
+                            //VoltDbAdminConfig.stoppedServer.hostId = hostId;
+                            //VoltDbAdminConfig.stoppedServer.serverName = hostName;
+                            //VoltDbAdminConfig.stoppedServer.serverState = serverState;
+
                             return false;
                         }
                     });
@@ -1977,16 +2038,21 @@ function alertNodeClicked(obj) {
                             runningServerCounter++;
                         }
 
-                    } 
+                    }
 
                 });
 
             };
+            if (adminClusterObjects.ignoreServerListUpdateCount > 0) {
+                adminClusterObjects.ignoreServerListUpdateCount--;
 
-            if (systemOverview != null || systemOverview != undefined) {
-                $.each(systemOverview, function (id, val) {
-                    setServerDetails(id, val, val['CLUSTERSTATE']);
-                });
+            } else {
+                if (systemOverview != null || systemOverview != undefined) {
+                    $.each(systemOverview, function (id, val) {
+                        setServerDetails(id, val, val['CLUSTERSTATE']);
+                    });
+                }
+                
             }
 
             if (VoltDbAdminConfig.servers != null || VoltDbAdminConfig.servers != undefined) {
@@ -2000,9 +2066,7 @@ function alertNodeClicked(obj) {
                             "<td align=\"right\"><a href=\"javascript:void(0);\" data-HostId=\"" + val.hostId + "\" data-HostName=\"" + val.serverName + "\" class=\"" + className + "\" id=\"stopServer_" + val.serverName + "\">" +
                             "<span class=\"" + currentServerColumnClass + "\">Stop</span></a></td></tr>");
 
-                    }
-
-                    else if ((val.serverName != null || val.serverName != "") && val.serverState == 'PAUSED') {
+                    } else if ((val.serverName != null || val.serverName != "") && val.serverState == 'PAUSED') {
                         className = voltDbRenderer.currentHost == val.serverName ? "disableServer" : "shutdown";
                         currentServerRowClass = voltDbRenderer.currentHost == val.serverName ? "activeHost" : "";
                         currentServerColumnClass = "shutdownServerPause";
@@ -2010,18 +2074,16 @@ function alertNodeClicked(obj) {
                         htmlServerListHtml = htmlServerListHtml.concat("<tr class=\"" + currentServerRowClass + "\"><td class=\"configLabel\" width=\"85%\"><a href=\"#\" >" + val.serverName + "</a></td>" +
                             "<td align=\"right\" class=\"pauseCursorDefault\"><a href=\"javascript:void(0);\" data-HostId=\"" + val.hostId + "\" data-HostName=\"" + val.serverName + "\"class=\"resume\" id=\"stopServer_" + val.serverName + "\">" +
                             "<span class=\"" + currentServerColumnClass + "\">Paused</span></a></td></tr>");
-                        
+
 
                     } else if ((val.serverName != null || val.serverName != "") && val.serverState == 'JOINING') {
                         htmlServerListHtml = htmlServerListHtml.concat("<tr><td class=\"configLabel\" width=\"85%\"><a href=\"#\">" + val.serverName + "</a></td>" +
                             "<td align=\"right\"><a href=\"javascript:void(0);\" class=\"shutdownDisabled\">" +
                             "<span>Stop</span></a></td></tr>");
-                    }
-                    
-                    else if ((val.serverName != null || val.serverName != "") && val.serverState == 'MISSING') {
+                    } else if ((val.serverName != null || val.serverName != "") && val.serverState == 'MISSING') {
                         htmlServerListHtml = htmlServerListHtml.concat("<tr><td class=\"configLabel\" width=\"85%\"><a href=\"#\">" + val.serverName + "</a></td>" +
-                                "<td align=\"right\"><a href=\"javascript:void(0);\" data-HostId=\"" + val.hostId + "\" data-HostName=\"" + val.serverName + "\" class=\"disableServer\"  id=\"stopServer_" + val.serverName + "\ onclick=\"VoltDbUI.openPopup(this);\">" +
-                                "<span class=\"shutdownServer stopDisable\">Stop</span></a></td></tr>");
+                            "<td align=\"right\"><a href=\"javascript:void(0);\" data-HostId=\"" + val.hostId + "\" data-HostName=\"" + val.serverName + "\" class=\"disableServer\"  id=\"stopServer_" + val.serverName + "\ onclick=\"VoltDbUI.openPopup(this);\">" +
+                            "<span class=\"shutdownServer stopDisable\">Stop</span></a></td></tr>");
                     }
 
                 });
@@ -2029,8 +2091,9 @@ function alertNodeClicked(obj) {
                 updateAdminServerList();
                 return htmlServerListHtml;
 
-            }           
+            }
             return "";
+
         };
 
         this.stopServer = function (nodeId, onServerStopped) {
@@ -2043,8 +2106,8 @@ function alertNodeClicked(obj) {
             });
         };
 
-        this.pauseCluster = function(onServerPaused) {
-            VoltDBService.PauseClusterState(function(connection, status) {
+        this.pauseCluster = function (onServerPaused) {
+            VoltDBService.PauseClusterState(function (connection, status) {
                 if (status == 1) {
                     onServerPaused(true);
                 }
@@ -2059,20 +2122,20 @@ function alertNodeClicked(obj) {
             });
         };
 
-        this.shutdownCluster = function(onServerShutdown) {
-            VoltDBService.ShutdownClusterState(function(connection, status) {
+        this.shutdownCluster = function (onServerShutdown) {
+            VoltDBService.ShutdownClusterState(function (connection, status) {
                 if (status == 1) {
                     onServerShutdown(true);
                 }
             });
         };
 
-        this.saveSnapshot = function(snapshotDir, snapshotFileName, onSaveSnapshot) {
-            VoltDBService.SaveSnapShot(snapshotDir, snapshotFileName, function(connection, status) {
+        this.saveSnapshot = function (snapshotDir, snapshotFileName, onSaveSnapshot) {
+            VoltDBService.SaveSnapShot(snapshotDir, snapshotFileName, function (connection, status) {
                 var snapshotStatus = {};
                 if (status == 1) {
-                    voltDbRenderer.getSaveSnapshotStatus(connection,snapshotStatus);
-                    onSaveSnapshot(true,snapshotStatus);
+                    voltDbRenderer.getSaveSnapshotStatus(connection, snapshotStatus);
+                    onSaveSnapshot(true, snapshotStatus);
                 }
             });
         };
@@ -2124,17 +2187,17 @@ function alertNodeClicked(obj) {
             });
         };
 
-        this.getSaveSnapshotStatus = function(connection, snapshotStatus) {
+        this.getSaveSnapshotStatus = function (connection, snapshotStatus) {
             var colIndex = {};
             var counter = 0;
 
-            connection.Metadata['@SnapshotSave_data'].schema.forEach(function(columnInfo) {
+            connection.Metadata['@SnapshotSave_data'].schema.forEach(function (columnInfo) {
                 if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "RESULT" || columnInfo["name"] == "ERR_MSG")
                     colIndex[columnInfo["name"]] = counter;
                 counter++;
             });
 
-            connection.Metadata['@SnapshotSave_data'].data.forEach(function(info) {
+            connection.Metadata['@SnapshotSave_data'].data.forEach(function (info) {
                 var hostName = info[colIndex["HOSTNAME"]];
                 if (!snapshotStatus.hasOwnProperty(hostName)) {
                     snapshotStatus[hostName] = {};
@@ -2143,7 +2206,7 @@ function alertNodeClicked(obj) {
                 snapshotStatus[hostName]["ERR_MSG"] = info[colIndex["ERR_MSG"]];
             });
         };
-        
+
         this.promoteCluster = function (onClusterPromote) {
             VoltDBService.PromoteCluster(function (connection, status, statusstring) {
                 onClusterPromote(status, statusstring);

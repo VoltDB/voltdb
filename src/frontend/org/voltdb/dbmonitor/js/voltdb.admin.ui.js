@@ -18,6 +18,7 @@ function loadAdminPage() {
         btnClusterPromote: $('#promoteConfirmation'),
         enablePromote: false,
         ignorePromoteUpdateCount: 0,
+        ignoreServerListUpdateCount: 0,
         btnErrorClusterPromote: $('#btnErrorPromotePopup'),
         errorPromoteMessage: $('#promoteErrorMessage'),
         updateMessageBar: $('#snapshotBar'),
@@ -123,6 +124,7 @@ function loadAdminPage() {
         spanHeartbeatTimeOut: $("#hrtTimeOutSpan"),
         loadingHeartbeatTimeout: $("#loadingHeartbeatTimeout"),
         errorHeartbeatTimeout: $("#errorHeartbeatTimeout"),
+        editStateHeartbeatTimeout: editStates.ShowEdit,
 
         //Query Timeout
         rowQueryTimeout: $("#queryTimoutRow"),
@@ -164,10 +166,12 @@ function loadAdminPage() {
         },
 
         directoryPathRules: {
-            required: true
+            required: true,
+            minlength: 2,
         },
         directoryPathMessages: {
-            required: "Please enter a valid directory path."
+            required: "Please enter a valid directory path.",
+            minlength: "Please enter at least 2 characters.",
         },
         
         restoreSnapshotRules: {
@@ -343,6 +347,7 @@ function loadAdminPage() {
         } else {
             adminEditObjects.chkSecurity.iCheck('uncheck');
         }
+        
         adminEditObjects.spanSecurity.text(getOnOffText(adminEditObjects.chkSecurityValue));
 
         if (showEdit) {
@@ -655,7 +660,7 @@ function loadAdminPage() {
 
     var searchSnapshots = function(e) {
         $('#btnRestore').removeClass('btn').addClass('restoreBtn');
-        $('#tblSearchList').html('<tr style="border:none"><td colspan="3" align="center"><img src="css/resources/images/loader-small.gif"></td></tr>');
+        $('#tblSearchList').html('<tr style="border:none"><td colspan="3" align="center"><img src="css/resources/images/loader-small.GIF"></td></tr>');
         voltDbRenderer.GetSnapshotList($('#txtSearchSnapshots').val(), function(snapshotList) {
             var result = '';
             var searchBox = '';
@@ -667,7 +672,7 @@ function loadAdminPage() {
             var searchError = false;
             $.each(snapshotList, function(id, snapshot) {
                 if (snapshot.RESULT == "FAILURE") {
-                    result += '<tr><td style="color:red"> Error: Failure getting snapshots.' + snapshot.ERR_MSG + '</td></tr>';
+                    result += '<tr><td style="color:#c70000"> Error: Failure getting snapshots.' + snapshot.ERR_MSG + '</td></tr>';
                     searchError = true;
                     return false;
                 }
@@ -893,6 +898,7 @@ function loadAdminPage() {
     //Heartbeat time out
     var toggleHeartbeatTimeoutEdit = function (state) {
 
+        adminEditObjects.editStateHeartbeatTimeout = state;
         adminEditObjects.tBoxHeartbeatTimeout.val(adminEditObjects.tBoxHeartbeatTimeoutValue);
 
         if (state == editStates.ShowLoading) {
@@ -940,9 +946,8 @@ function loadAdminPage() {
     });
 
     adminEditObjects.btnEditHeartbeatTimeoutOk.on("click", function(e) {
-        $("#formHeartbeatTimeout").valid();
 
-        if (adminEditObjects.errorHeartbeatTimeout.is(":visible")) {
+        if (!$("#formHeartbeatTimeout").valid()) {
             e.preventDefault();
             e.stopPropagation();
             adminEditObjects.tBoxHeartbeatTimeout.focus();
@@ -1047,7 +1052,7 @@ function loadAdminPage() {
     adminEditObjects.btnEditQueryTimeoutCancel.on("click", function () {
         toggleQueryTimeoutEdit(true);
     });
-
+  
     adminEditObjects.btnEditQueryTimeoutOk.popup({
         open: function (event, ui, ele) {
         },
@@ -1075,7 +1080,7 @@ function loadAdminPage() {
                 toggleQueryTimeoutEdit(true);
             });
         }
-    });
+    });   
 
     $("#updateErrorPopupLink").popup();
 
@@ -1201,7 +1206,9 @@ function loadAdminPage() {
 
             if (adminConfigValues.heartBeatTimeout != "" && adminConfigValues.heartBeatTimeout != undefined) {
                 adminDOMObjects.heartBeatTimeoutLabel.text("ms");
-                adminEditObjects.LinkHeartbeatEdit.show();
+                
+                if (adminEditObjects.editStateHeartbeatTimeout == editStates.ShowEdit)
+                    adminEditObjects.LinkHeartbeatEdit.show();
             } else {
                 adminDOMObjects.heartBeatTimeoutLabel.text("");
                 adminEditObjects.LinkHeartbeatEdit.hide();
