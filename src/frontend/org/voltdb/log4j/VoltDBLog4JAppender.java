@@ -17,8 +17,6 @@
 
 package org.voltdb.log4j;
 
-import java.util.ArrayList;
-
 import org.apache.log4j.Appender;
 import org.apache.log4j.AppenderSkeleton;
 import org.apache.log4j.spi.LoggingEvent;
@@ -34,7 +32,6 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
     String password = null;
     ClientConfig config = null;
     Client client = null;
-    ArrayList<LoggingEvent> cache = new ArrayList<LoggingEvent>();
 
     public void setCluster(String cluster) { this.server = cluster; }
     public String getCluster() { return this.server; }
