@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.utils;
+package org.hsqldb_voltpatches;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -92,11 +92,21 @@ public class SQLLexer
             "^\\s*" +  // start of line, 0 or more whitespace
             "(create|drop|alter)" + // DDL commands we're looking for
             "\\s+" + // one or more whitespace
-            "(unique\\s+)?" + // unique for index parsing
+            "((assume)?unique\\s+)?" + // assume | unique for index parsing
             "(table|view|index)" +
             "\\s+" + // one or more whitespace
-            "([a-z][a-z0-9_]*)" + // table name symbol
+            "([a-z][a-z0-9_]*)" + // table/view/index name symbol
+            "(\\s+on\\s+([a-z][a-z0-9_]*))?" + // on table/view second name
             ".*$", // all the rest
+            Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL
+            );
+
+    // does ddl the statement end with cascade
+    private static final Pattern DDL_CASCADE_CHECK = Pattern.compile(
+            "^.*" + // start of line, then anything
+            "cascade" + // must contain cascade
+            "\\s*;?\\s*" + // then optional whitespace, a sigle optional semi, then ws
+            "$", // end of line
             Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL
             );
 
@@ -151,9 +161,11 @@ public class SQLLexer
         public final HSQLDDLVerb verb;
         public final HSQLDDLNoun noun;
         public final String name;
+        public final String secondName;
+        public boolean cascade;
 
-        HSQLDDLInfo(HSQLDDLVerb verb, HSQLDDLNoun noun, String name) {
-            this.verb = verb; this.noun = noun; this.name = name;
+        HSQLDDLInfo(HSQLDDLVerb verb, HSQLDDLNoun noun, String name, String secondName, boolean cascade) {
+            this.verb = verb; this.noun = noun; this.name = name; this.secondName = secondName; this.cascade = cascade;
         }
     }
 
@@ -169,18 +181,30 @@ public class SQLLexer
                 return null;
             }
 
-            String nounString = matcher.group(3);
+            String nounString = matcher.group(4);
             HSQLDDLNoun noun = HSQLDDLNoun.get(nounString);
             if (noun == null) {
                 return null;
             }
 
-            String name = matcher.group(4);
+            String name = matcher.group(5);
             if (name == null) {
                 return null;
             }
 
-            return new HSQLDDLInfo(verb, noun, name.toLowerCase());
+            String secondName = matcher.group(7);
+            if (secondName != null) {
+                secondName = secondName.toLowerCase();
+            }
+
+            // cascade is interesting on alters and drops
+            boolean cascade = false;
+            if (verb != HSQLDDLVerb.CREATE) {
+                matcher = DDL_CASCADE_CHECK.matcher(ddl);
+                cascade = matcher.matches();
+            }
+
+            return new HSQLDDLInfo(verb, noun, name.toLowerCase(), secondName, cascade);
         }
         return null;
     }

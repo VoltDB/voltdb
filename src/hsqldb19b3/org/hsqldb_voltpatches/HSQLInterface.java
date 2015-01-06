@@ -17,10 +17,14 @@
 
 package org.hsqldb_voltpatches;
 
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeMap;
 
+import org.hsqldb_voltpatches.SQLLexer.HSQLDDLNoun;
+import org.hsqldb_voltpatches.SQLLexer.HSQLDDLVerb;
 import org.hsqldb_voltpatches.VoltXMLElement.VoltXMLDiff;
 import org.hsqldb_voltpatches.index.Index;
 import org.hsqldb_voltpatches.lib.HashMappedList;
@@ -154,21 +158,35 @@ public class HSQLInterface {
      * @throws HSQLParseException Throws exception if SQL parse error is
      * encountered.
      */
-    public VoltXMLDiff runDDLCommandAndDiff(String expectedTableAffected,
-                                            String expectedIndexAffected,
+    public VoltXMLDiff runDDLCommandAndDiff(SQLLexer.HSQLDDLInfo stmtInfo,
                                             String ddl)
                                             throws HSQLParseException
     {
-        runDDLCommand(ddl);
+        Set<String> existingTableNames = null;
+        if (stmtInfo.cascade) {
+            existingTableNames = getTableNames();
+        }
 
-        // we either have an index name or a table name, but not both
-        if (expectedIndexAffected != null) {
-            assert(expectedTableAffected == null);
-            expectedTableAffected = tableNameForIndexName(expectedIndexAffected);
+        // we either have an index name or a table/view name, but not both
+        String expectedTableAffected = null;
+        if (stmtInfo.noun == HSQLDDLNoun.INDEX) {
+            if (stmtInfo.verb == HSQLDDLVerb.CREATE) {
+                expectedTableAffected = stmtInfo.secondName;
+            }
+            else {
+                expectedTableAffected = tableNameForIndexName(stmtInfo.name);
+                if ((expectedTableAffected == null) && (stmtInfo.verb == HSQLDDLVerb.DROP)) {
+                    // if exists
+                    return null;
+                }
+            }
+            assert(expectedTableAffected != null);
         }
         else {
-            assert(expectedIndexAffected == null);
+            expectedTableAffected = stmtInfo.name;
         }
+
+        runDDLCommand(ddl);
 
         // get old and new XML representations for the affected table
         VoltXMLElement tableXMLNew = getXMLForTable(expectedTableAffected);
@@ -185,6 +203,21 @@ public class HSQLInterface {
         }
 
         VoltXMLDiff diff = VoltXMLElement.computeDiff(tableXMLOld, tableXMLNew);
+
+        if (stmtInfo.cascade) {
+            Set<String> finalTableNames = getTableNames();
+            for (String tableName : existingTableNames) {
+                if (!finalTableNames.contains(tableName)) {
+                    tableName = tableName.toLowerCase();
+                    tableXMLOld = lastSchema.get(tableName).children.get(0);
+                    lastSchema.remove(tableName);
+                    if (tableName.equals(expectedTableAffected)) {
+                        continue;
+                    }
+                    diff.m_removedElements.add(tableXMLOld);
+                }
+            }
+        }
 
         // this is a hack to allow the diff-apply-er to accept a diff that has no order
         diff.m_elementOrder.clear();
@@ -409,6 +442,27 @@ public class HSQLInterface {
         }
     }
 
+    private Set<String> getTableNames() {
+        Set<String> names = new HashSet<>();
+
+        String schemaName = null;
+        try {
+            schemaName = sessionProxy.getSchemaName(null);
+        } catch (HsqlException e) {
+            e.printStackTrace();
+        }
+        SchemaManager schemaManager = sessionProxy.getDatabase().schemaManager;
+
+        // load all the tables
+        HashMappedList hsqlTables = schemaManager.getTables(schemaName);
+        for (int i = 0; i < hsqlTables.size(); i++) {
+            Table table = (Table) hsqlTables.get(i);
+            names.add(table.getName().name);
+        }
+
+        return names;
+    }
+
     /**
      * Find the table that owns a particular index by name (or null if no match).
      * Case insensitive with whatever performance cost that implies.
@@ -463,6 +517,36 @@ public class HSQLInterface {
 
         return xml;
     }
+
+    /*public void viewsForTable() {
+        VoltXMLElement xml = emptySchema.duplicate();
+        String schemaName = null;
+        try {
+            schemaName = sessionProxy.getSchemaName(null);
+        } catch (HsqlException e) {
+            e.printStackTrace();
+        }
+        SchemaManager schemaManager = sessionProxy.getDatabase().schemaManager;
+
+        // search all the tables XXX probably could do this non-linearly,
+        //  but i don't know about case-insensitivity yet
+        HashMappedList hsqlTables = schemaManager.getTables(schemaName);
+        for (int i = 0; i < hsqlTables.size(); i++) {
+            Table table = (Table) hsqlTables.get(i);
+            if (!table.isView) {
+                continue;
+            }
+            String candidateTableName = table.getName().name;
+
+            // found the table of interest
+            if (candidateTableName.equalsIgnoreCase(tableName)) {
+                VoltXMLElement vxmle = table.voltGetTableXML(sessionProxy);
+                assert(vxmle != null);
+                xml.children.add(vxmle);
+                return xml;
+            }
+        }
+    }*/
 
     /**
      * Get an serialized XML representation of the a particular table.

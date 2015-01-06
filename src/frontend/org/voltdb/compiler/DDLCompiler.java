@@ -42,6 +42,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.FunctionSQL;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
+import org.hsqldb_voltpatches.SQLLexer;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.hsqldb_voltpatches.VoltXMLElement.VoltXMLDiff;
 import org.json_voltpatches.JSONException;
@@ -81,8 +82,6 @@ import org.voltdb.utils.CatalogSchemaTools;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
-import org.voltdb.utils.SQLLexer;
-import org.voltdb.utils.SQLLexer.HSQLDDLNoun;
 import org.voltdb.utils.VoltTypeUtil;
 
 
@@ -512,20 +511,14 @@ public class DDLCompiler {
 
                     // figure out what table this DDL might affect to minimize diff processing
                     SQLLexer.HSQLDDLInfo ddlStmtInfo = SQLLexer.preprocessHSQLDDL(stmt.statement);
-                    String expectedTableAffected = null;
-                    String expectedIndexAffected = null;
-                    // if it's ddl for an index, table name needs to be looked up
-                    if (ddlStmtInfo.noun == HSQLDDLNoun.INDEX) {
-                        expectedIndexAffected = ddlStmtInfo.name;
-                    }
-                    else {
-                        expectedTableAffected = ddlStmtInfo.name;
-                    }
 
                     // Get the diff that results from applying this statement and apply it
                     // to our local tree (with Volt-specific additions)
-                    VoltXMLDiff thisStmtDiff = m_hsql.runDDLCommandAndDiff(expectedTableAffected, expectedIndexAffected, stmt.statement);
-                    applyDiff(thisStmtDiff);
+                    VoltXMLDiff thisStmtDiff = m_hsql.runDDLCommandAndDiff(ddlStmtInfo, stmt.statement);
+                    // null diff means no change (usually drop if exists for non-existent thing)
+                    if (thisStmtDiff != null) {
+                        applyDiff(thisStmtDiff);
+                    }
                 } catch (HSQLParseException e) {
                     String msg = "DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
                     throw m_compiler.new VoltCompilerException(msg, stmt.lineNo);
