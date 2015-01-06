@@ -416,8 +416,10 @@ public class HTTPClientInterface {
                 try {
                     authResult.m_client.drain();
                     authResult.m_client.close();
-                } catch (InterruptedException | NoConnectionsException e) {
-                    m_log.warn("JSON interface was interrupted while closing an internal admin client connection.", e);
+                } catch (InterruptedException e) {
+                    m_log.warn("JSON interface was interrupted while closing an internal admin client connection.");
+                } catch (NoConnectionsException ex) {
+                    m_log.warn("JSON interface has closed an internal admin client connection.");
                 }
             }
             // other connections are cached
