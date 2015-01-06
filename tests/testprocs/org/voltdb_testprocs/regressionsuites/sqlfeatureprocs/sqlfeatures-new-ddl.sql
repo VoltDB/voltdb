@@ -50,6 +50,15 @@ CONSTRAINT tblimit3_exec_complex LIMIT PARTITION ROWS 3
 CREATE INDEX CAPPED3_COMPLEX_INDEX
        ON CAPPED3_LIMIT_EXEC_COMPLEX (may_be_purged);
 
+CREATE TABLE events_capped (
+  when_occurred TIMESTAMP NOT NULL,
+  info BIGINT,
+  CONSTRAINT limit_5_delete_oldest
+    LIMIT PARTITION ROWS 5
+    EXECUTE (DELETE FROM events_capped ORDER BY when_occurred, info ASC LIMIT 1)
+);
+CREATE INDEX events_capped_when ON events_capped (when_occurred);
+
 CREATE TABLE RTABLE (
     ID INTEGER DEFAULT 0 NOT NULL,
     AGE INTEGER NOT NULL,

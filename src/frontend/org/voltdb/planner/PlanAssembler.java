@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -337,6 +337,44 @@ public class PlanAssembler {
         subAssembler = new WriterSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
     }
 
+    private static void failIfNonDeterministicDml(AbstractParsedStmt parsedStmt, CompiledPlan plan) {
+        // If we have content non-determinism on DML, then fail planning.
+        // This can happen if:
+        //   INSERT INTO ... SELECT ... where the select statement has a limit on unordered data.
+        //   UPSERT INTO ... SELECT has the same issue, but no limit is required because
+        //                      order may determine which rows are updated and which are inserted
+        //   DELETE ... ORDER BY <n> LIMIT <n> also has this issue
+        // Update doesn't have this issue yet (but having ORDER BY and LIMIT there doesn't seem out
+        // of the question).
+        // When subqueries in WHERE clauses of DML are allowed, we will need to make sure the
+        // subqueries are content-deterministic too.
+
+        if (plan == null || plan.getReadOnly()) {
+            return;
+        }
+
+        if (parsedStmt instanceof ParsedInsertStmt  && !plan.isOrderDeterministic()) {
+            if (parsedStmt.m_isUpsert) {
+                throw new PlanningErrorException(
+                        "UPSERT statement manipulates data in a non-deterministic way.  "
+                        + "Adding an ORDER BY clause to UPSERT INTO ... SELECT may address this issue.");
+            }
+            else if (plan.hasLimitOrOffset()) {
+                throw new PlanningErrorException(
+                        "INSERT statement manipulates data in a content non-deterministic way.  "
+                        + "Adding an ORDER BY clause to INSERT INTO ... SELECT may address this issue.");
+            }
+        }
+
+        if (parsedStmt instanceof ParsedDeleteStmt
+                && !((ParsedDeleteStmt)parsedStmt).sideEffectsAreDeterministic()) {
+                throw new PlanningErrorException(
+                        "DELETE statement manipulates data in a non-deterministic way.  This may happen "
+                                + "when the DELETE has an ORDER BY clause with a LIMIT, but the order is not "
+                                + "well-defined.");
+        }
+    }
+
     /**
      * Generate the best cost plan for the current SQL statement context.
      *
@@ -399,21 +437,7 @@ public class PlanAssembler {
             retval.rootPlanGraph = connectChildrenBestPlans(retval.rootPlanGraph);
         }
 
-        // If we have content non-determinism on DML, then fail planning.
-        // This can happen in case of an INSERT INTO ... SELECT ... where the select statement has a limit on unordered data.
-        // This may also be a concern in the future if we allow subqueries in UPDATE and DELETE statements
-        //   (e.g., WHERE c IN (SELECT ...))
-        if (retval != null && !retval.getReadOnly() && !retval.isOrderDeterministic()) {
-            String errorMsg = "DML statement manipulates data in content non-deterministic way ";
-            if (parsedStmt.m_isUpsert) {
-                throw new PlanningErrorException(errorMsg +
-                        "(this may happen on UPSERT INTO ... SELECT, for example).");
-            }
-            if (retval.hasLimitOrOffset()) {
-                throw new PlanningErrorException(errorMsg +
-                        "(this may happen on INSERT INTO ... SELECT, for example).");
-            }
-        }
+        failIfNonDeterministicDml(parsedStmt, retval);
 
         return retval;
     }
@@ -475,30 +499,17 @@ public class PlanAssembler {
         } else if (m_parsedInsert != null) {
             nextStmt = m_parsedInsert;
             retval = getNextInsertPlan();
+        } else if (m_parsedDelete != null) {
+            nextStmt = m_parsedDelete;
+            retval = getNextDeletePlan();
+            // note that for replicated tables, multi-fragment plans
+            // need to divide the result by the number of partitions
+        } else if (m_parsedUpdate != null) {
+            nextStmt = m_parsedUpdate;
+            retval = getNextUpdatePlan();
         } else {
-            //TODO: push CompiledPlan construction into getNextUpdatePlan/getNextDeletePlan
-            //
-            retval = new CompiledPlan();
-            if (m_parsedUpdate != null) {
-                nextStmt = m_parsedUpdate;
-                retval.rootPlanGraph = getNextUpdatePlan();
-                // note that for replicated tables, multi-fragment plans
-                // need to divide the result by the number of partitions
-            } else if (m_parsedDelete != null) {
-                nextStmt = m_parsedDelete;
-                retval.rootPlanGraph = getNextDeletePlan();
-                // note that for replicated tables, multi-fragment plans
-                // need to divide the result by the number of partitions
-            } else {
-                throw new RuntimeException(
-                        "setupForNewPlans not called or not successfull.");
-            }
-            assert (nextStmt.m_tableList.size() == 1);
-            retval.setReadOnly (false);
-            if (nextStmt.m_tableList.get(0).getIsreplicated()) {
-                retval.replicatedTableDML = true;
-            }
-            retval.statementGuaranteesDeterminism(false, true); // Until we support DML w/ subqueries/limits
+            throw new RuntimeException(
+                    "setupForNewPlans encountered unsupported statement type.");
         }
 
         if (retval == null || retval.rootPlanGraph == null) {
@@ -777,7 +788,7 @@ public class PlanAssembler {
         }
 
         if (m_parsedSelect.hasOrderByColumns()) {
-            root = handleOrderBy(root);
+            root = handleOrderBy(m_parsedSelect, root);
             if (m_parsedSelect.isComplexOrderBy() && root instanceof OrderByPlanNode) {
                 AbstractPlanNode child = root.getChild(0);
                 AbstractPlanNode grandChild = child.getChild(0);
@@ -866,8 +877,26 @@ public class PlanAssembler {
         return false;
     }
 
+    /** Returns true if this DELETE can be executed in the EE as a truncate operation */
+    static private boolean deleteIsTruncate(ParsedDeleteStmt stmt, AbstractPlanNode plan) {
+        if (!(plan instanceof SeqScanPlanNode)) {
+            return false;
+        }
 
-    private AbstractPlanNode getNextDeletePlan() {
+        // Assume all index scans have filters in this context, so only consider seq scans.
+        SeqScanPlanNode seqScanNode = (SeqScanPlanNode)plan;
+        if (seqScanNode.getPredicate() != null) {
+            return false;
+        }
+
+        if (stmt.hasLimitOrOffset()) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private CompiledPlan getNextDeletePlan() {
         assert (subAssembler != null);
 
         // figure out which table we're deleting from
@@ -886,57 +915,93 @@ public class PlanAssembler {
             return getNextDeletePlan();
         }
 
+        boolean isSinglePartitionPlan = m_partitioning.wasSpecifiedAsSingle() || m_partitioning.isInferredSingle();
+
         // generate the delete node with the right target table
         DeletePlanNode deleteNode = new DeletePlanNode();
         deleteNode.setTargetTableName(targetTable.getTypeName());
 
-        ProjectionPlanNode projectionNode = new ProjectionPlanNode();
-        AbstractExpression addressExpr = new TupleAddressExpression();
-        NodeSchema proj_schema = new NodeSchema();
-        // This planner-created column is magic.
-        proj_schema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
-                                               "VOLT_TEMP_TABLE",
-                                               "tuple_address",
-                                               "tuple_address",
-                                               addressExpr));
-        projectionNode.setOutputSchema(proj_schema);
 
         assert(subSelectRoot instanceof AbstractScanPlanNode);
 
         // If the scan matches all rows, we can throw away the scan
         // nodes and use a truncate delete node.
-        // Assume all index scans have filters in this context, so only consider seq scans.
-        if ( (subSelectRoot instanceof SeqScanPlanNode) &&
-                (((SeqScanPlanNode) subSelectRoot).getPredicate() == null)) {
+        if (deleteIsTruncate(m_parsedDelete, subSelectRoot)) {
             deleteNode.setTruncate(true);
-
-            if (m_partitioning.wasSpecifiedAsSingle()) {
-                return deleteNode;
-            }
         } else {
-            // connect the nodes to build the graph
-            deleteNode.addAndLinkChild(subSelectRoot);
-            // OPTIMIZATION: Projection Inline
-            // If the root node we got back from createSelectTree() is an
-            // AbstractScanNode, then
-            // we put the Projection node we just created inside of it
-            // When we inline this projection into the scan, we're going
-            // to overwrite any original projection that we might have inlined
-            // in order to simply cull the columns from the persistent table.
+
+            // User may have specified an ORDER BY ... LIMIT clause
+            if (m_parsedDelete.orderByColumns().size() > 0
+                    && !isSinglePartitionPlan
+                    && !targetTable.getIsreplicated()) {
+                throw new PlanningErrorException(
+                        "DELETE statements affecting partitioned tables must "
+                        + "be able to execute on one partition "
+                        + "when ORDER BY and LIMIT or OFFSET clauses "
+                        + "are present.");
+            }
+
+            boolean needsOrderByNode = isOrderByNodeRequired(m_parsedDelete, subSelectRoot);
+
+            ProjectionPlanNode projectionNode = new ProjectionPlanNode();
+            AbstractExpression addressExpr = new TupleAddressExpression();
+            NodeSchema proj_schema = new NodeSchema();
+            // This planner-created column is magic.
+            proj_schema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
+                                                   "VOLT_TEMP_TABLE",
+                                                   "tuple_address",
+                                                   "tuple_address",
+                                                   addressExpr));
+            if (needsOrderByNode) {
+                // Projection will need to pass the sort keys to the order by node
+                for (ParsedColInfo col : m_parsedDelete.orderByColumns()) {
+                    proj_schema.addColumn(col.asSchemaColumn());
+                }
+            }
+            projectionNode.setOutputSchema(proj_schema);
             subSelectRoot.addInlinePlanNode(projectionNode);
+
+            AbstractPlanNode root = subSelectRoot;
+            if (needsOrderByNode) {
+                OrderByPlanNode ob = buildOrderByPlanNode(m_parsedDelete.orderByColumns());
+                ob.addAndLinkChild(root);
+                root = ob;
+            }
+
+            if (m_parsedDelete.hasLimitOrOffset()) {
+                assert(m_parsedDelete.orderByColumns().size() > 0);
+                root.addInlinePlanNode(m_parsedDelete.limitPlanNode());
+            }
+
+            deleteNode.addAndLinkChild(root);
         }
 
-        if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.isInferredSingle()) {
-            return deleteNode;
+        CompiledPlan plan = new CompiledPlan();
+        if (isSinglePartitionPlan) {
+            plan.rootPlanGraph = deleteNode;
+        }
+        else {
+            // Send the local result counts to the coordinator.
+            AbstractPlanNode recvNode = SubPlanAssembler.addSendReceivePair(deleteNode);
+            // add a sum or a limit and send on top of the union
+            plan.rootPlanGraph = addSumOrLimitAndSendToDMLNode(recvNode, targetTable.getIsreplicated());
         }
 
-        // Send the local result counts to the coordinator.
-        AbstractPlanNode recvNode = SubPlanAssembler.addSendReceivePair(deleteNode);
-        // add a sum or a limit and send on top of the union
-        return addSumOrLimitAndSendToDMLNode(recvNode, targetTable.getIsreplicated());
+        // check non-determinism status
+        plan.setReadOnly(false);
+
+        // treat this as deterministic for reporting purposes:
+        // delete statements produce just one row that is the
+        // number of rows affected
+        boolean orderIsDeterministic = true;
+
+        boolean hasLimitOrOffset = m_parsedDelete.hasLimitOrOffset();
+        plan.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic);
+
+        return plan;
     }
 
-    private AbstractPlanNode getNextUpdatePlan() {
+    private CompiledPlan getNextUpdatePlan() {
         assert (subAssembler != null);
 
         AbstractPlanNode subSelectRoot = subAssembler.nextPlan();
@@ -950,6 +1015,7 @@ public class PlanAssembler {
         }
 
         UpdatePlanNode updateNode = new UpdatePlanNode();
+        assert (m_parsedUpdate.m_tableList.size() == 1);
         Table targetTable = m_parsedUpdate.m_tableList.get(0);
         updateNode.setTargetTableName(targetTable.getTypeName());
         // set this to false until proven otherwise
@@ -1007,14 +1073,28 @@ public class PlanAssembler {
         // connect the nodes to build the graph
         updateNode.addAndLinkChild(subSelectRoot);
 
+        AbstractPlanNode planRoot = null;
         if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.isInferredSingle()) {
-            return updateNode;
+            planRoot = updateNode;
+        }
+        else {
+            // Send the local result counts to the coordinator.
+            AbstractPlanNode recvNode = SubPlanAssembler.addSendReceivePair(updateNode);
+            // add a sum or a limit and send on top of the union
+            planRoot = addSumOrLimitAndSendToDMLNode(recvNode, targetTable.getIsreplicated());
         }
 
-        // Send the local result counts to the coordinator.
-        AbstractPlanNode recvNode = SubPlanAssembler.addSendReceivePair(updateNode);
-        // add a sum or a limit and send on top of the union
-        return addSumOrLimitAndSendToDMLNode(recvNode, targetTable.getIsreplicated());
+        CompiledPlan retval = new CompiledPlan();
+        retval.rootPlanGraph = planRoot;
+        retval.setReadOnly (false);
+
+        if (targetTable.getIsreplicated()) {
+            retval.replicatedTableDML = true;
+        }
+
+        retval.statementGuaranteesDeterminism(false, true); // Until we support DML w/ subqueries/limits
+
+        return retval;
     }
 
     static private AbstractExpression castExprIfNeeded(AbstractExpression expr, Column column) {
@@ -1273,13 +1353,32 @@ public class PlanAssembler {
         }
     }
 
+    /** Given a list of ORDER BY columns, construct and return an OrderByPlanNode. */
+    private static OrderByPlanNode buildOrderByPlanNode(List<ParsedColInfo> cols) {
+        OrderByPlanNode n = new OrderByPlanNode();
+
+        for (ParsedColInfo col : cols) {
+            n.addSort(col.expression,
+                    col.ascending ? SortDirectionType.ASC
+                                  : SortDirectionType.DESC);
+        }
+
+        return n;
+    }
+
     /**
-     * Create an order by node as required by the statement and make it a parent of root.
-     * @param root
-     * @return new orderByNode (the new root) or the original root if no orderByNode was required.
+     * Determine if an OrderByPlanNode is needed.  This may return false if the
+     * statement has no ORDER BY clause, or if the subtree is already producing
+     * rows in the correct order.
+     * @param parsedStmt    The statement whose plan may need an OrderByPlanNode
+     * @param root          The subtree which may need its output tuples ordered
+     * @return true if the plan needs an OrderByPlanNode, false otherwise
      */
-    private AbstractPlanNode handleOrderBy(AbstractPlanNode root) {
-        assert (m_parsedSelect != null);
+    private static boolean isOrderByNodeRequired(AbstractParsedStmt parsedStmt, AbstractPlanNode root) {
+        // Only sort when the statement has an ORDER BY.
+        if ( ! parsedStmt.hasOrderByColumns()) {
+            return false;
+        }
 
         SortDirectionType sortDirection = SortDirectionType.INVALID;
         // Skip the explicit ORDER BY plan step if an IndexScan is already providing the equivalent ordering.
@@ -1306,15 +1405,26 @@ public class PlanAssembler {
         }
 
         if (sortDirection != SortDirectionType.INVALID) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Create an order by node as required by the statement and make it a parent of root.
+     * @param parsedStmt  Parsed statement, for context
+     * @param root        The root of the plan needing ordering
+     * @return new orderByNode (the new root) or the original root if no orderByNode was required.
+     */
+    private static AbstractPlanNode handleOrderBy(AbstractParsedStmt parsedStmt, AbstractPlanNode root) {
+        assert (parsedStmt instanceof ParsedSelectStmt || parsedStmt instanceof ParsedDeleteStmt);
+
+        if (! isOrderByNodeRequired(parsedStmt, root)) {
             return root;
         }
 
-        OrderByPlanNode orderByNode = new OrderByPlanNode();
-        for (ParsedColInfo col : m_parsedSelect.m_orderColumns) {
-            orderByNode.addSort(col.expression,
-                                col.ascending ? SortDirectionType.ASC
-                                              : SortDirectionType.DESC);
-        }
+        OrderByPlanNode orderByNode = buildOrderByPlanNode(parsedStmt.orderByColumns());
         orderByNode.addAndLinkChild(root);
         return orderByNode;
     }
@@ -1376,7 +1486,7 @@ public class PlanAssembler {
             // If the distributed limit must be performed on ordered input,
             // ensure the order of the data on each partition.
             if (m_parsedSelect.hasOrderByColumns()) {
-                distributedPlan = handleOrderBy(distributedPlan);
+                distributedPlan = handleOrderBy(m_parsedSelect, distributedPlan);
             }
 
             if (isInlineLimitPlanNodePossible(distributedPlan)) {

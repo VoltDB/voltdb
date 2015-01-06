@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -492,9 +492,35 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         vt = client.callProcedure("CAPPED3_LIMIT_EXEC_COMPLEX.insert", 37, 8, 0, "important", 17000).getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {1});
 
-        // my fancy assertTablesAreEqual doesn't work for the below query.  Why?
         vt = client.callProcedure("@AdHoc", "select dept from capped3_limit_exec_complex order by dept asc").getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {5, 6, 8});
+    }
+
+    // DELETE .. LIMIT <n> is intended to support the row limit trigger
+    // so let's test it here.
+    public void testLimitPartitionRowsDeleteWithLimit() throws Exception {
+        if (isHSQL())
+            return;
+
+        Client client = getClient();
+
+        // The table EVENTS is capped at 5 rows.  Inserts that
+        // would cause the constraint to fail trigger a delete of
+        // the oldest row.
+
+        VoltTable vt;
+        for (int i = 0; i < 50; ++i) {
+            vt = client.callProcedure("@AdHoc",
+                    "INSERT INTO events_capped VALUES (NOW, " + i + ")")
+                    .getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {1});
+        }
+
+        // Should have the most recent 5 rows.
+        vt = client.callProcedure("@AdHoc",
+                "select info from events_capped order by when_occurred asc")
+                .getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {45, 46, 47, 48, 49});
     }
 
     /**
