@@ -164,10 +164,12 @@ function loadAdminPage() {
         },
 
         directoryPathRules: {
-            required: true
+            required: true,
+            minlength: 2,
         },
         directoryPathMessages: {
-            required: "Please enter a valid directory path."
+            required: "Please enter a valid directory path.",
+            minlength: "Please enter at least 2 characters.",
         },
         
         restoreSnapshotRules: {
