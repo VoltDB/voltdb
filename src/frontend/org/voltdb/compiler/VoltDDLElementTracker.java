@@ -21,9 +21,12 @@ import static org.voltdb.compiler.ProcedureCompiler.deriveShortProcedureName;
 
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
+import java.util.SortedMap;
+import java.util.SortedSet;
+import java.util.TreeMap;
 import java.util.TreeSet;
 
 import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
@@ -40,7 +43,8 @@ public class VoltDDLElementTracker {
     final Map<String, String> m_partitionMap = new HashMap<String, String>();
     final Map<String, ProcedureDescriptor> m_procedureMap =
             new HashMap<String, ProcedureDescriptor>();
-    final Set<String> m_exports = new HashSet<String>();
+    // map from export group name to a sorted set of table names in that group
+    final SortedMap<String, SortedSet<String>> m_exportsByGroup = new TreeMap<>();
     // additional non-procedure classes for the jar
     final Set<String> m_extraClassses = new TreeSet<String>();
     final Set<String> m_importLines = new TreeSet<String>();
@@ -185,25 +189,42 @@ public class VoltDDLElementTracker {
     /**
      * Track an exported table
      * @param tableName a table name
+     * @param groupName
+     * @throws VoltCompilerException when the given table is already exported
      */
-    void addExportedTable(String tableName)
+    void addExportedTable(String tableName, String groupName)
+        throws VoltCompilerException
     {
         assert tableName != null && ! tableName.trim().isEmpty();
+        assert groupName != null && ! groupName.trim().isEmpty();
 
-        m_exports.add(tableName);
+        // store uppercase in the catalog as typename
+        groupName = groupName.toUpperCase();
+
+        // insert the table's name into the export group
+        SortedSet<String> tableGroup = m_exportsByGroup.get(groupName);
+        if (tableGroup == null) {
+            tableGroup = new TreeSet<>();
+            m_exportsByGroup.put(groupName, tableGroup);
+        }
+        tableGroup.add(tableName);
     }
 
     void removeExportedTable(String tableName)
     {
-        m_exports.remove(tableName);
+        for (Entry<String, SortedSet<String>> groupTables : m_exportsByGroup.entrySet()) {
+            if (groupTables.getValue().contains(tableName)) {
+                groupTables.getValue().remove(tableName);
+            }
+        }
     }
 
     /**
      * Get a collection with tracked table exports
      * @return a collection with tracked table exports
      */
-    Collection<String> getExportedTables() {
-        return m_exports;
+    SortedMap<String, SortedSet<String>> getExportedTables() {
+        return m_exportsByGroup;
     }
 
 }

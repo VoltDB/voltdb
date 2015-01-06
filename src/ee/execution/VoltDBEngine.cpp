@@ -368,7 +368,6 @@ VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
       m_staticParams(MAX_PARAM_COUNT),
       m_pfCount(0),
       m_currentInputDepId(-1),
-      m_isELEnabled(false),
       m_stringPool(16777216, 2),
       m_numResultDependencies(0),
       m_logManager(logProxy),
@@ -458,7 +457,6 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                                             getTopend(),
                                             &m_stringPool,
                                             this,
-                                            m_isELEnabled,
                                             hostname,
                                             hostId,
                                             &m_drStream);
@@ -787,13 +785,6 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const string &catalogPay
     catalog::Cluster* catalogCluster = m_catalog->clusters().get("cluster");
     int64_t epoch = catalogCluster->localepoch() * (int64_t)1000;
     m_executorContext->setEpoch(epoch);
-
-    // Tables care about EL state.
-    if (m_database->connectors().size() > 0 && m_database->connectors().get("0")->enabled()) {
-        VOLT_DEBUG("EL enabled.");
-        m_executorContext->m_exportEnabled = true;
-        m_isELEnabled = true;
-    }
 
     // load up all the tables, adding all tables
     if (processCatalogAdditions(timestamp) == false) {

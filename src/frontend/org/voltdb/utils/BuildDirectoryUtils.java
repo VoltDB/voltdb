@@ -97,6 +97,8 @@ public abstract class BuildDirectoryUtils {
     public static String getBuildDirectoryPath() {
         String envPath = System.getenv("TEST_DIR");
         if (envPath != null) {
+            File path = new File(envPath);
+            path.mkdirs();
             return envPath;
         } else {
             return ".";

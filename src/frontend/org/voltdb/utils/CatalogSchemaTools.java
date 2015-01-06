@@ -44,6 +44,7 @@ import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
+import org.voltdb.common.Constants;
 import org.voltdb.common.Permission;
 import org.voltdb.compilereport.ProcedureAnnotation;
 import org.voltdb.compilereport.TableAnnotation;
@@ -73,7 +74,7 @@ public abstract class CatalogSchemaTools {
      * @param Boolean - true if this Table is an Export Table
      * @return SQL Schema text representing the CREATE TABLE statement to generate the table
      */
-    public static String toSchema(StringBuilder sb, Table catalog_tbl, String viewQuery, boolean isExportTable) {
+    public static String toSchema(StringBuilder sb, Table catalog_tbl, String viewQuery, String isExportTableWithGroup) {
         assert(!catalog_tbl.getColumns().isEmpty());
         boolean tableIsView = (viewQuery != null);
 
@@ -348,8 +349,12 @@ public abstract class CatalogSchemaTools {
             sb.append(");\n");
         }
 
-        if (isExportTable) {
-            sb.append("EXPORT TABLE " + catalog_tbl.getTypeName() + ";\n");
+        if (isExportTableWithGroup != null) {
+            sb.append("EXPORT TABLE " + catalog_tbl.getTypeName());
+            if (!isExportTableWithGroup.equalsIgnoreCase(Constants.DEFAULT_EXPORT_CONNECTOR_NAME)) {
+                sb.append(" GROUP " + isExportTableWithGroup);
+            }
+            sb.append(";\n");
         }
 
         sb.append("\n");
@@ -489,12 +494,12 @@ public abstract class CatalogSchemaTools {
                         viewList.add(table);
                         continue;
                     }
-                    toSchema(sb, table, null, CatalogUtil.isTableExportOnly(db, table));
+                    toSchema(sb, table, null, CatalogUtil.getExportGroupIfExportTableOrNullOtherwise(db, table));
                 }
                 // A View cannot preceed a table that it depends on in the DDL
                 for (Table table : viewList) {
                     String viewQuery = ((TableAnnotation)table.getAnnotation()).ddl;
-                    toSchema(sb, table, viewQuery, CatalogUtil.isTableExportOnly(db, table));
+                    toSchema(sb, table, viewQuery, CatalogUtil.getExportGroupIfExportTableOrNullOtherwise(db, table));
                 }
                 sb.append("\n");
 

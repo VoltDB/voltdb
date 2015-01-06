@@ -4,11 +4,16 @@
     <httpd enabled="true">
         <jsonapi enabled="true" />
     </httpd>
-    <export enabled="false" target="file">
-        <configuration>
+    <export>
+        <configuration enabled="true" target="file">
             <property name="type">csv</property>
             <property name="nonce">MyExport</property>
             <property name="period">5</property>
+        </configuration>
+        <configuration group="fOo" enabled="true" target="file">
+            <property name="type">csv</property>
+            <property name="nonce">NingSucks</property>
+            <property name="period">3</property>
         </configuration>
     </export>
 </deployment>

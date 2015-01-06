@@ -43,6 +43,7 @@ import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
 import org.voltdb.catalog.User;
+import org.voltdb.common.Constants;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
@@ -89,7 +90,7 @@ public class TestCatalogUtil extends TestCase {
         // Simple check to make sure things look ok...
         for (Table catalog_tbl : catalog_db.getTables()) {
             StringBuilder sb = new StringBuilder();
-            CatalogSchemaTools.toSchema(sb, catalog_tbl, null, false);
+            CatalogSchemaTools.toSchema(sb, catalog_tbl, null, null);
             String sql = sb.toString();
             assertTrue(sql.startsWith("CREATE TABLE " + catalog_tbl.getTypeName()));
 
@@ -625,8 +626,8 @@ public class TestCatalogUtil extends TestCase {
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
-                + "    <export enabled='true' target='custom' exportconnectorclass=\"com.foo.export.ExportClient\" >"
-                + "        <configuration>"
+                + "    <export>"
+                + "        <configuration enabled='true' target='custom' exportconnectorclass=\"com.foo.export.ExportClient\" >"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -637,8 +638,8 @@ public class TestCatalogUtil extends TestCase {
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
-                + "    <export enabled='true' target='custom' exportconnectorclass=\"org.voltdb.exportclient.NoOpTestExportClient\" >"
-                + "        <configuration>"
+                + "    <export>"
+                + "        <configuration enabled='true' target='custom' exportconnectorclass=\"org.voltdb.exportclient.NoOpTestExportClient\" >"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -649,8 +650,8 @@ public class TestCatalogUtil extends TestCase {
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
-                + "    <export enabled='true' target='file'>"
-                + "        <configuration>"
+                + "    <export>"
+                + "        <configuration enabled='true' target='file'>"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -661,8 +662,8 @@ public class TestCatalogUtil extends TestCase {
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
-                + "    <export enabled='true' target='kafka'>"
-                + "        <configuration>"
+                + "    <export>"
+                + "        <configuration enabled='true' target='kafka'>"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -673,8 +674,8 @@ public class TestCatalogUtil extends TestCase {
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
-                + "    <export enabled='true' target='rabbitmq'>"
-                + "        <configuration>"
+                + "    <export>"
+                + "        <configuration enabled='true' target='rabbitmq'>"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -699,10 +700,10 @@ public class TestCatalogUtil extends TestCase {
         assertTrue("Deployment file failed to parse: " + msg, msg == null);
 
         Database db = cat.getClusters().get("cluster").getDatabases().get("database");
-        org.voltdb.catalog.Connector catconn = db.getConnectors().get("0");
+        org.voltdb.catalog.Connector catconn = db.getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
         assertNotNull(catconn);
 
-        assertFalse(bad_deployment.getExport().isEnabled());
+        assertFalse(bad_deployment.getExport().getConfiguration().get(0).isEnabled());
 
         //This is a good deployment with custom class that can be found
         final File tmpGood = VoltProjectBuilder.writeStringToTempFile(withGoodCustomExport);
@@ -713,12 +714,12 @@ public class TestCatalogUtil extends TestCase {
         assertTrue("Deployment file failed to parse: " + msg, msg == null);
 
         db = cat2.getClusters().get("cluster").getDatabases().get("database");
-        catconn = db.getConnectors().get("0");
+        catconn = db.getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
         assertNotNull(catconn);
 
-        assertTrue(good_deployment.getExport().isEnabled());
-        assertEquals(good_deployment.getExport().getTarget(), ServerExportEnum.CUSTOM);
-        assertEquals(good_deployment.getExport().getExportconnectorclass(),
+        assertTrue(good_deployment.getExport().getConfiguration().get(0).isEnabled());
+        assertEquals(good_deployment.getExport().getConfiguration().get(0).getTarget(), ServerExportEnum.CUSTOM);
+        assertEquals(good_deployment.getExport().getConfiguration().get(0).getExportconnectorclass(),
                 "org.voltdb.exportclient.NoOpTestExportClient");
         ConnectorProperty prop = catconn.getConfig().get(ExportDataProcessor.EXPORT_TO_TYPE);
         assertEquals(prop.getValue(), "org.voltdb.exportclient.NoOpTestExportClient");
@@ -732,11 +733,11 @@ public class TestCatalogUtil extends TestCase {
         assertTrue("Deployment file failed to parse: " + msg, msg == null);
 
         db = cat3.getClusters().get("cluster").getDatabases().get("database");
-        catconn = db.getConnectors().get("0");
+        catconn = db.getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
         assertNotNull(catconn);
 
-        assertTrue(builtin_deployment.getExport().isEnabled());
-        assertEquals(builtin_deployment.getExport().getTarget(), ServerExportEnum.FILE);
+        assertTrue(builtin_deployment.getExport().getConfiguration().get(0).isEnabled());
+        assertEquals(builtin_deployment.getExport().getConfiguration().get(0).getTarget(), ServerExportEnum.FILE);
         prop = catconn.getConfig().get(ExportDataProcessor.EXPORT_TO_TYPE);
         assertEquals(prop.getValue(), "org.voltdb.exportclient.ExportToFileClient");
 
@@ -749,11 +750,11 @@ public class TestCatalogUtil extends TestCase {
         assertTrue("Deployment file failed to parse: " + msg, msg == null);
 
         db = cat4.getClusters().get("cluster").getDatabases().get("database");
-        catconn = db.getConnectors().get("0");
+        catconn = db.getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
         assertNotNull(catconn);
 
-        assertTrue(builtin_kafkadeployment.getExport().isEnabled());
-        assertEquals(builtin_kafkadeployment.getExport().getTarget(), ServerExportEnum.KAFKA);
+        assertTrue(builtin_kafkadeployment.getExport().getConfiguration().get(0).isEnabled());
+        assertEquals(builtin_kafkadeployment.getExport().getConfiguration().get(0).getTarget(), ServerExportEnum.KAFKA);
         prop = catconn.getConfig().get(ExportDataProcessor.EXPORT_TO_TYPE);
         assertEquals(prop.getValue(), "org.voltdb.exportclient.KafkaExportClient");
 
@@ -764,12 +765,185 @@ public class TestCatalogUtil extends TestCase {
         msg = CatalogUtil.compileDeployment(cat5, builtin_rabbitmqdeployment, false);
         assertTrue("Deployment file failed to parse: " + msg, msg == null);
         db = cat5.getClusters().get("cluster").getDatabases().get("database");
-        catconn = db.getConnectors().get("0");
+        catconn = db.getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
         assertNotNull(catconn);
-        assertTrue(builtin_rabbitmqdeployment.getExport().isEnabled());
-        assertEquals(ServerExportEnum.RABBITMQ, builtin_rabbitmqdeployment.getExport().getTarget());
+        assertTrue(builtin_rabbitmqdeployment.getExport().getConfiguration().get(0).isEnabled());
+        assertEquals(ServerExportEnum.RABBITMQ, builtin_rabbitmqdeployment.getExport().getConfiguration().get(0).getTarget());
         prop = catconn.getConfig().get(ExportDataProcessor.EXPORT_TO_TYPE);
         assertEquals("org.voltdb.exportclient.RabbitMQExportClient", prop.getValue());
+    }
+
+    public void testMultiExportClientSettings() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // not supported in community
+
+        final String withBadCustomExport =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <export>"
+                + "        <configuration group='foo' enabled='true' target='custom' exportconnectorclass=\"com.foo.export.ExportClient\" >"
+                + "            <property name=\"foo\">false</property>"
+                + "            <property name=\"type\">CSV</property>"
+                + "            <property name=\"with-schema\">false</property>"
+                + "        </configuration>"
+                + "        <configuration group='bar' enabled='true' target='file'>"
+                + "            <property name=\"foo\">false</property>"
+                + "            <property name=\"type\">CSV</property>"
+                + "            <property name=\"with-schema\">false</property>"
+                + "        </configuration>"
+                + "    </export>"
+                + "</deployment>";
+        final String withBadRepeatGroup =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <export>"
+                + "        <configuration group='foo' enabled='true' target='file'>"
+                + "            <property name=\"foo\">false</property>"
+                + "            <property name=\"type\">CSV</property>"
+                + "            <property name=\"with-schema\">false</property>"
+                + "        </configuration>"
+                + "        <configuration group='foo' enabled='true' target='kafka'>"
+                + "            <property name=\"foo\">false</property>"
+                + "            <property name=\"type\">CSV</property>"
+                + "            <property name=\"with-schema\">false</property>"
+                + "        </configuration>"
+                + "    </export>"
+                + "</deployment>";
+        final String withUnusedConnector =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <export>"
+                + "        <configuration group='foo' enabled='true' target='file'>"
+                + "            <property name=\"foo\">false</property>"
+                + "            <property name=\"type\">CSV</property>"
+                + "            <property name=\"with-schema\">false</property>"
+                + "        </configuration>"
+                + "        <configuration group='bar' enabled='true' target='file'>"
+                + "            <property name=\"foo\">false</property>"
+                + "            <property name=\"type\">CSV</property>"
+                + "            <property name=\"with-schema\">false</property>"
+                + "        </configuration>"
+                + "        <configuration group='unused' enabled='true' target='file'>"
+                + "            <property name=\"foo\">false</property>"
+                + "            <property name=\"type\">CSV</property>"
+                + "            <property name=\"with-schema\">false</property>"
+                + "        </configuration>"
+                + "    </export>"
+                + "</deployment>";
+        final String withGoodExport =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <export>"
+                + "        <configuration group='foo' enabled='true' target='file'>"
+                + "            <property name=\"foo\">false</property>"
+                + "            <property name=\"type\">CSV</property>"
+                + "            <property name=\"with-schema\">false</property>"
+                + "        </configuration>"
+                + "        <configuration group='bar' enabled='true' target='file'>"
+                + "            <property name=\"foo\">false</property>"
+                + "            <property name=\"type\">CSV</property>"
+                + "            <property name=\"with-schema\">false</property>"
+                + "        </configuration>"
+                + "    </export>"
+                + "</deployment>";
+        final String ddl =
+                "CREATE TABLE export_data ( id BIGINT default 0 , value BIGINT DEFAULT 0 );\n"
+                + "EXPORT TABLE export_data GROUP foo;\n"
+                + "CREATE TABLE export_more_data ( id BIGINT default 0 , value BIGINT DEFAULT 0 );\n"
+                + "EXPORT TABLE export_more_data GROUP bar;";
+
+        final File tmpDdl = VoltProjectBuilder.writeStringToTempFile(ddl);
+
+        //Custom deployment with bad class export will be disabled.
+        final File tmpBad = VoltProjectBuilder.writeStringToTempFile(withBadCustomExport);
+        DeploymentType bad_deployment = CatalogUtil.getDeployment(new FileInputStream(tmpBad));
+
+        VoltCompiler compiler = new VoltCompiler();
+        String x[] = {tmpDdl.getAbsolutePath()};
+        Catalog cat = compiler.compileCatalogFromDDL(x);
+
+        String msg = CatalogUtil.compileDeployment(cat, bad_deployment, false);
+        assertTrue("Deployment file failed to parse: " + msg, msg == null);
+
+        Database db = cat.getClusters().get("cluster").getDatabases().get("database");
+        org.voltdb.catalog.Connector catconn = db.getConnectors().get("foo");
+        assertNotNull(catconn);
+
+        assertFalse(bad_deployment.getExport().getConfiguration().get(0).isEnabled());
+
+        //This is a bad deployment with the same export group defined multiple times
+        final File tmpBadGrp = VoltProjectBuilder.writeStringToTempFile(withBadRepeatGroup);
+        DeploymentType bad_grp_deployment = CatalogUtil.getDeployment(new FileInputStream(tmpBadGrp));
+
+        Catalog cat2 = compiler.compileCatalogFromDDL(x);
+        if ((msg = CatalogUtil.compileDeployment(cat2, bad_grp_deployment, false)) == null) {
+            fail("Should not accept a deployment file containing multiple connectors for the same group.");
+        } else {
+            assertTrue(msg.contains("Multiple connectors can not be assigned to single export group:"));
+        }
+
+        // This is to test that unused connectors are ignored
+        final File tmpUnused = VoltProjectBuilder.writeStringToTempFile(withUnusedConnector);
+        DeploymentType unused_deployment = CatalogUtil.getDeployment(new FileInputStream(tmpUnused));
+
+        Catalog cat3 = compiler.compileCatalogFromDDL(x);
+        msg = CatalogUtil.compileDeployment(cat3, unused_deployment, false);
+        assertTrue("Deployment file failed to parse: " + msg, msg == null);
+
+        db = cat3.getClusters().get("cluster").getDatabases().get("database");
+        catconn = db.getConnectors().get("unused");
+        assertNull(catconn);
+
+        //This is a good deployment with custom class that can be found
+        final File tmpGood = VoltProjectBuilder.writeStringToTempFile(withGoodExport);
+        DeploymentType good_deployment = CatalogUtil.getDeployment(new FileInputStream(tmpGood));
+
+        Catalog cat4 = compiler.compileCatalogFromDDL(x);
+        msg = CatalogUtil.compileDeployment(cat4, good_deployment, false);
+        assertTrue("Deployment file failed to parse: " + msg, msg == null);
+
+        db = cat4.getClusters().get("cluster").getDatabases().get("database");
+        catconn = db.getConnectors().get("foo");
+        assertNotNull(catconn);
+        catconn = db.getConnectors().get("bar");
+        assertNotNull(catconn);
+
+        assertTrue(good_deployment.getExport().getConfiguration().get(0).isEnabled());
+        assertEquals(good_deployment.getExport().getConfiguration().get(0).getTarget(), ServerExportEnum.FILE);
+
+        assertTrue(good_deployment.getExport().getConfiguration().get(1).isEnabled());
+        assertEquals(good_deployment.getExport().getConfiguration().get(1).getTarget(), ServerExportEnum.FILE);
+    }
+
+    public void testDeprecatedExportSyntax() throws Exception {
+        final String withGoodCustomExport =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <export enabled='true' target='custom' exportconnectorclass=\"org.voltdb.exportclient.NoOpTestExportClient\" >"
+                + "        <configuration>"
+                + "            <property name=\"foo\">false</property>"
+                + "            <property name=\"type\">CSV</property>"
+                + "            <property name=\"with-schema\">false</property>"
+                + "        </configuration>"
+                + "    </export>"
+                + "</deployment>";
+        final String ddl =
+                "CREATE TABLE export_data ( id BIGINT default 0 , value BIGINT DEFAULT 0 );\n"
+                + "EXPORT TABLE export_data;";
+
+        final File tmpDdl = VoltProjectBuilder.writeStringToTempFile(ddl);
+
+        final File tmpGood = VoltProjectBuilder.writeStringToTempFile(withGoodCustomExport);
+        DeploymentType good_deployment = CatalogUtil.getDeployment(new FileInputStream(tmpGood));
+
+        assertTrue(good_deployment.getExport().getConfiguration().get(0).isEnabled());
+        assertEquals(good_deployment.getExport().getConfiguration().get(0).getExportconnectorclass(),
+                "org.voltdb.exportclient.NoOpTestExportClient");
+        assertEquals(good_deployment.getExport().getConfiguration().get(0).getTarget(), ServerExportEnum.CUSTOM);
     }
 
     /**

@@ -999,7 +999,7 @@ public class VoltProjectBuilder {
 
                 configProperties.add(prop);
             }
-            export.setConfiguration(exportConfig);
+            export.getConfiguration().add(exportConfig);
         }
 
         // Have some yummy boilerplate!
