@@ -780,7 +780,8 @@ ul.helpSchemaList li { list-style:disc; line-height:25px!important; padding:0; m
 .edit, 
 .arrow, 
 .labelCollapsed, 
-.labelExpanded { background-image:url(images/admin-icons.png);}
+.labelExpanded,
+a.restoreConfirmationDisable { background-image:url(images/admin-icons.png);}
 label.error { color: #c70000; width: auto; display: block; line-height: 0px; font-size: 11px; padding: 10px 5px 0 7px; margin: 0 0 6px 0; height: 10px;}
 
 .adminWrapper{ margin:0; padding:15px 20px;background:#FFFFFF; border-bottom:1px solid #CCCCCC;}
@@ -795,14 +796,15 @@ ul.adminClusterList li a.pause { display:inline-block; background-position:-20px
 ul.adminClusterList li a.resume { display:inline-block; background-position:-20px -151px; width:40px; height:36px;}
 ul.adminClusterList li a.promote { display:inline-block; background-position:-70px -12px;width:40px; height:36px;}
 ul.adminClusterList li a.promote-disabled, ul.adminClusterList li a.promote-disabled:hover{ display:inline-block; background-position:-70px -56px;width:40px; height:36px; color:#bbb;}
-ul.adminClusterList li a.restore { display:inline-block;background-position:-120px -12px; width:40px; height:36px;}
+ul.adminClusterList li a.restore, ul.adminClusterList li a.restoreConfirmationDisable { display:inline-block;background-position:-120px -12px; width:40px; height:36px;}
 ul.adminClusterList li a.saveme { display:inline-block;background-position:-120px -57px; width:40px; height:36px;}
 .save { display:inline-block;background-position:-313px -57px; width:40px; height:26px;}
 
+ul.adminClusterList li a.restoreConfirmationDisable {display: inline-block;  width:40px; height:36px; background-position:-310px -12px; color:#bbb;}
 
 ul.adminClusterList li a.stop { display:inline-block;background-position:-580px -12px; width:40px; height:36px;}
 ul.adminClusterList li a.shutdown{ display:inline-block;background-position:-739px -56px; width:40px; height:36px;}
-ul.adminClusterList li a:hover{color:#000;}
+/*ul.adminClusterList li a:hover{color:#000;}*/
 .adminTxt01 { margin:0 0 0 6px;}
 .adminTxt02 { margin:0 0 0 2px;}
 .adminTxt03 { margin:0 0 0 3px;}
@@ -957,9 +959,7 @@ color: #fff;
 font: 14px Arial, Helvetica, sans-serif;
 }
 
-a.restoreConfirmationDisable {
-    display:inline-block; background-position:-307px -12px;width:40px; height:36px; color:#bbb;
-}
+
 /*********************************************media Qu********************/
 @media (max-width: 479px) {
 .serverStat {float:none; clear:left;}
