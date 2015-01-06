@@ -53,7 +53,7 @@ public class AuthenticatedConnectionCache {
      */
     class Connection {
         int refCount;
-        ClientImpl client;
+        Client client;
         String user;
         byte[] hashedPassword;
         int passHash;
@@ -81,7 +81,7 @@ public class AuthenticatedConnectionCache {
     // The set of active connections.
     Map<String, Connection> m_connections = new TreeMap<String, Connection>();
     // The optional unauthenticated clients which should only work if auth is off
-    ClientImpl m_unauthClient = null;
+    Client m_unauthClient = null;
 
     public AuthenticatedConnectionCache(int targetSize) {
         this(targetSize, "localhost", "localhost");
@@ -191,10 +191,10 @@ public class AuthenticatedConnectionCache {
             ClientConfig config = new ClientConfig(userName, password, true, new StatusListener(conn));
 
             conn.user = userName;
-            conn.client = (ClientImpl) ClientFactory.createClient(config);
+            conn.client = ClientFactory.createClient(config);
             try
             {
-                conn.client.createConnectionWithHashedCredentials(m_hostname, m_port, userName, hashedPassword);
+                conn.client.createConnection(m_hostname, m_port);
             }
             catch (IOException ioe)
             {
@@ -241,6 +241,8 @@ public class AuthenticatedConnectionCache {
                 m_unauthClient.close();
             } catch (InterruptedException ex) {
                 throw new RuntimeException("Unable to close unauthenticated client.", ex);
+            } catch (NoConnectionsException ex) {
+                throw new RuntimeException("Unable to close unauthenticated client.", ex);
             }
         }
         for (Entry<String, Connection> e : m_connections.entrySet())
@@ -250,6 +252,8 @@ public class AuthenticatedConnectionCache {
                 e.getValue().client.close();
             } catch (InterruptedException ex) {
                 throw new RuntimeException("Unable to close client from pool.", ex);
+            } catch (NoConnectionsException ex) {
+                throw new RuntimeException("Unable to close unauthenticated client.", ex);
             }
         }
     }
