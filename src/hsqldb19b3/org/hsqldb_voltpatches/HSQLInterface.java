@@ -17,9 +17,16 @@
 
 package org.hsqldb_voltpatches;
 
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import java.util.TimeZone;
+import java.util.TreeMap;
 
+import org.hsqldb_voltpatches.SQLLexer.HSQLDDLNoun;
+import org.hsqldb_voltpatches.SQLLexer.HSQLDDLVerb;
 import org.hsqldb_voltpatches.VoltXMLElement.VoltXMLDiff;
+import org.hsqldb_voltpatches.index.Index;
 import org.hsqldb_voltpatches.lib.HashMappedList;
 import org.hsqldb_voltpatches.persist.HsqlProperties;
 import org.hsqldb_voltpatches.result.Result;
@@ -89,12 +96,14 @@ public class HSQLInterface {
     }
 
     Session sessionProxy;
-    // Initialize to an empty schema
-    VoltXMLElement lastSchema = new VoltXMLElement(XML_SCHEMA_NAME);
+    // Keep track of the previous XML for each table in the schema
+    Map<String, VoltXMLElement> lastSchema = new TreeMap<>();
+    // empty schema for cloning and for null diffs
+    final VoltXMLElement emptySchema = new VoltXMLElement(XML_SCHEMA_NAME);
     static int instanceId = 0;
 
     private HSQLInterface(Session sessionProxy) {
-        lastSchema.attributes.put("name", XML_SCHEMA_NAME);
+        emptySchema.attributes.put("name", XML_SCHEMA_NAME);
         this.sessionProxy = sessionProxy;
     }
 
@@ -136,18 +145,85 @@ public class HSQLInterface {
 
     /**
      * Modify the current schema with a SQL DDL command and get the
-     * diff which represents the changes
+     * diff which represents the changes.
      *
+     * Note that you have to be consistent WRT case for the expected names.
+     *
+     * @param expectedTableAffected The name of the table affected by this DDL
+     * or null if unknown
+     * @param expectedIndexAffected The name of the index affected by this DDL
+     * or null if table is known instead
      * @param ddl The SQL DDL statement to be run.
-     * @return the "diff" of the before and after trees
+     * @return the "diff" of the before and after trees for the affected table
      * @throws HSQLParseException Throws exception if SQL parse error is
      * encountered.
      */
-    public VoltXMLDiff runDDLCommandAndDiff(String ddl) throws HSQLParseException {
+    public VoltXMLDiff runDDLCommandAndDiff(SQLLexer.HSQLDDLInfo stmtInfo,
+                                            String ddl)
+                                            throws HSQLParseException
+    {
+        Set<String> existingTableNames = null;
+        if (stmtInfo.cascade) {
+            existingTableNames = getTableNames();
+        }
+
+        // we either have an index name or a table/view name, but not both
+        String expectedTableAffected = null;
+        if (stmtInfo.noun == HSQLDDLNoun.INDEX) {
+            if (stmtInfo.verb == HSQLDDLVerb.CREATE) {
+                expectedTableAffected = stmtInfo.secondName;
+            }
+            else {
+                expectedTableAffected = tableNameForIndexName(stmtInfo.name);
+                if ((expectedTableAffected == null) && (stmtInfo.verb == HSQLDDLVerb.DROP)) {
+                    // if exists
+                    return null;
+                }
+            }
+            assert(expectedTableAffected != null);
+        }
+        else {
+            expectedTableAffected = stmtInfo.name;
+        }
+
         runDDLCommand(ddl);
-        VoltXMLElement thisSchema = getXMLFromCatalog();
-        VoltXMLDiff diff = VoltXMLElement.computeDiff(lastSchema, thisSchema);
-        lastSchema = thisSchema.duplicate();
+
+        // get old and new XML representations for the affected table
+        VoltXMLElement tableXMLNew = getXMLForTable(expectedTableAffected);
+        VoltXMLElement tableXMLOld = lastSchema.get(expectedTableAffected);
+
+        // valid reasons for tableXMLNew to be null are DROP TABLE IF EXISTS and not much else
+        if (tableXMLNew == null) {
+            tableXMLNew = emptySchema;
+        }
+
+        // the old table can be null for CREATE TABLE
+        if (tableXMLOld == null) {
+            tableXMLOld = emptySchema;
+        }
+
+        VoltXMLDiff diff = VoltXMLElement.computeDiff(tableXMLOld, tableXMLNew);
+
+        if (stmtInfo.cascade) {
+            Set<String> finalTableNames = getTableNames();
+            for (String tableName : existingTableNames) {
+                if (!finalTableNames.contains(tableName)) {
+                    tableName = tableName.toLowerCase();
+                    tableXMLOld = lastSchema.get(tableName).children.get(0);
+                    lastSchema.remove(tableName);
+                    if (tableName.equals(expectedTableAffected)) {
+                        continue;
+                    }
+                    diff.m_removedElements.add(tableXMLOld);
+                }
+            }
+        }
+
+        // this is a hack to allow the diff-apply-er to accept a diff that has no order
+        diff.m_elementOrder.clear();
+
+        // remember the current schema
+        lastSchema.put(expectedTableAffected, tableXMLNew.duplicate());
         return diff;
     }
 
@@ -366,6 +442,54 @@ public class HSQLInterface {
         }
     }
 
+    private Set<String> getTableNames() {
+        Set<String> names = new HashSet<>();
+
+        String schemaName = null;
+        try {
+            schemaName = sessionProxy.getSchemaName(null);
+        } catch (HsqlException e) {
+            e.printStackTrace();
+        }
+        SchemaManager schemaManager = sessionProxy.getDatabase().schemaManager;
+
+        // load all the tables
+        HashMappedList hsqlTables = schemaManager.getTables(schemaName);
+        for (int i = 0; i < hsqlTables.size(); i++) {
+            Table table = (Table) hsqlTables.get(i);
+            names.add(table.getName().name);
+        }
+
+        return names;
+    }
+
+    /**
+     * Find the table that owns a particular index by name (or null if no match).
+     * Case insensitive with whatever performance cost that implies.
+     */
+    String tableNameForIndexName(String indexName) {
+        String schemaName = null;
+        try {
+            schemaName = sessionProxy.getSchemaName(null);
+        } catch (HsqlException e) {
+            e.printStackTrace();
+        }
+        // the schema manager has a map of indexes by name
+        // if this shows up on profiles, you can try to use that, but beware
+        // the case insensitivity going on here
+        SchemaManager schemaManager = sessionProxy.getDatabase().schemaManager;
+        HashMappedList hsqlTables = schemaManager.getTables(schemaName);
+        for (int i = 0; i < hsqlTables.size(); i++) {
+            Table table = (Table) hsqlTables.get(i);
+            for (Index index : table.getIndexList()) {
+                if (index.getName().name.equalsIgnoreCase(indexName)) {
+                    return table.getName().name.toLowerCase();
+                }
+            }
+        }
+        return null;
+    }
+
     /**
      * Get an serialized XML representation of the current schema/catalog.
      *
@@ -373,8 +497,7 @@ public class HSQLInterface {
      * @throws HSQLParseException
      */
     public VoltXMLElement getXMLFromCatalog() throws HSQLParseException {
-        VoltXMLElement xml = new VoltXMLElement(XML_SCHEMA_NAME);
-        xml.attributes.put("name", XML_SCHEMA_NAME);
+        VoltXMLElement xml = emptySchema.duplicate();
         String schemaName = null;
         try {
             schemaName = sessionProxy.getSchemaName(null);
@@ -388,10 +511,71 @@ public class HSQLInterface {
         for (int i = 0; i < hsqlTables.size(); i++) {
             Table table = (Table) hsqlTables.get(i);
             VoltXMLElement vxmle = table.voltGetTableXML(sessionProxy);
-            xml.children.add(vxmle);
             assert(vxmle != null);
+            xml.children.add(vxmle);
         }
 
         return xml;
+    }
+
+    /*public void viewsForTable() {
+        VoltXMLElement xml = emptySchema.duplicate();
+        String schemaName = null;
+        try {
+            schemaName = sessionProxy.getSchemaName(null);
+        } catch (HsqlException e) {
+            e.printStackTrace();
+        }
+        SchemaManager schemaManager = sessionProxy.getDatabase().schemaManager;
+
+        // search all the tables XXX probably could do this non-linearly,
+        //  but i don't know about case-insensitivity yet
+        HashMappedList hsqlTables = schemaManager.getTables(schemaName);
+        for (int i = 0; i < hsqlTables.size(); i++) {
+            Table table = (Table) hsqlTables.get(i);
+            if (!table.isView) {
+                continue;
+            }
+            String candidateTableName = table.getName().name;
+
+            // found the table of interest
+            if (candidateTableName.equalsIgnoreCase(tableName)) {
+                VoltXMLElement vxmle = table.voltGetTableXML(sessionProxy);
+                assert(vxmle != null);
+                xml.children.add(vxmle);
+                return xml;
+            }
+        }
+    }*/
+
+    /**
+     * Get an serialized XML representation of the a particular table.
+     */
+    public VoltXMLElement getXMLForTable(String tableName) throws HSQLParseException {
+        VoltXMLElement xml = emptySchema.duplicate();
+        String schemaName = null;
+        try {
+            schemaName = sessionProxy.getSchemaName(null);
+        } catch (HsqlException e) {
+            e.printStackTrace();
+        }
+        SchemaManager schemaManager = sessionProxy.getDatabase().schemaManager;
+
+        // search all the tables XXX probably could do this non-linearly,
+        //  but i don't know about case-insensitivity yet
+        HashMappedList hsqlTables = schemaManager.getTables(schemaName);
+        for (int i = 0; i < hsqlTables.size(); i++) {
+            Table table = (Table) hsqlTables.get(i);
+            String candidateTableName = table.getName().name;
+
+            // found the table of interest
+            if (candidateTableName.equalsIgnoreCase(tableName)) {
+                VoltXMLElement vxmle = table.voltGetTableXML(sessionProxy);
+                assert(vxmle != null);
+                xml.children.add(vxmle);
+                return xml;
+            }
+        }
+        return null;
     }
 }
