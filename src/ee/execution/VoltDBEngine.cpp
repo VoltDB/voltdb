@@ -685,7 +685,7 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
     m_tuplesModifiedStack.pop();
     resetExecutionMetadata();
 
-    if (rc != 0) {
+    if (rc != ENGINE_ERRORCODE_SUCCESS) {
         return rc;
     }
 
