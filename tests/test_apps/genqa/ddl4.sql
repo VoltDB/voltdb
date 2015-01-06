@@ -1,3 +1,5 @@
+IMPORT CLASS genqa2.procedures.SampleRecord;
+
 -- Export Table for Partitioned Data Table deletions
 CREATE TABLE export_partitioned_table2
 (
