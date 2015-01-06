@@ -53,7 +53,7 @@ public class AuthenticatedConnectionCache {
      */
     class Connection {
         int refCount;
-        Client client;
+        ClientImpl client;
         String user;
         byte[] hashedPassword;
         int passHash;
@@ -81,7 +81,7 @@ public class AuthenticatedConnectionCache {
     // The set of active connections.
     Map<String, Connection> m_connections = new TreeMap<String, Connection>();
     // The optional unauthenticated clients which should only work if auth is off
-    Client m_unauthClient = null;
+    ClientImpl m_unauthClient = null;
 
     public AuthenticatedConnectionCache(int targetSize) {
         this(targetSize, "localhost", "localhost");
@@ -191,10 +191,10 @@ public class AuthenticatedConnectionCache {
             ClientConfig config = new ClientConfig(userName, password, true, new StatusListener(conn));
 
             conn.user = userName;
-            conn.client = ClientFactory.createClient(config);
+            conn.client = (ClientImpl) ClientFactory.createClient(config);
             try
             {
-                conn.client.createConnection(m_hostname, m_port);
+                conn.client.createConnectionWithHashedCredentials(m_hostname, m_port, userName, hashedPassword);
             }
             catch (IOException ioe)
             {
@@ -237,11 +237,8 @@ public class AuthenticatedConnectionCache {
         if (m_unauthClient != null)
         {
             try {
-                m_unauthClient.drain();
                 m_unauthClient.close();
             } catch (InterruptedException ex) {
-                throw new RuntimeException("Unable to close unauthenticated client.", ex);
-            } catch (NoConnectionsException ex) {
                 throw new RuntimeException("Unable to close unauthenticated client.", ex);
             }
             //Clear unauth client. unauth server mostly rolls over on JSON api after catalog update.
@@ -250,12 +247,9 @@ public class AuthenticatedConnectionCache {
         for (Entry<String, Connection> e : m_connections.entrySet())
         {
             try {
-                e.getValue().client.drain();
                 e.getValue().client.close();
             } catch (InterruptedException ex) {
                 throw new RuntimeException("Unable to close client from pool.", ex);
-            } catch (NoConnectionsException ex) {
-                throw new RuntimeException("Unable to close unauthenticated client.", ex);
             }
         }
     }
