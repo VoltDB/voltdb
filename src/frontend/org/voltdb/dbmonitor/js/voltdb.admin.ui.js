@@ -123,6 +123,7 @@ function loadAdminPage() {
         spanHeartbeatTimeOut: $("#hrtTimeOutSpan"),
         loadingHeartbeatTimeout: $("#loadingHeartbeatTimeout"),
         errorHeartbeatTimeout: $("#errorHeartbeatTimeout"),
+        editStateHeartbeatTimeout: editStates.ShowEdit,
 
         //Query Timeout
         rowQueryTimeout: $("#queryTimoutRow"),
@@ -895,6 +896,7 @@ function loadAdminPage() {
     //Heartbeat time out
     var toggleHeartbeatTimeoutEdit = function (state) {
 
+        adminEditObjects.editStateHeartbeatTimeout = state;
         adminEditObjects.tBoxHeartbeatTimeout.val(adminEditObjects.tBoxHeartbeatTimeoutValue);
 
         if (state == editStates.ShowLoading) {
@@ -1203,7 +1205,9 @@ function loadAdminPage() {
 
             if (adminConfigValues.heartBeatTimeout != "" && adminConfigValues.heartBeatTimeout != undefined) {
                 adminDOMObjects.heartBeatTimeoutLabel.text("ms");
-                adminEditObjects.LinkHeartbeatEdit.show();
+                
+                if (adminEditObjects.editStateHeartbeatTimeout == editStates.ShowEdit)
+                    adminEditObjects.LinkHeartbeatEdit.show();
             } else {
                 adminDOMObjects.heartBeatTimeoutLabel.text("");
                 adminEditObjects.LinkHeartbeatEdit.hide();
