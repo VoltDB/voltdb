@@ -22,7 +22,6 @@ import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.servlet.http.HttpServletResponse;
@@ -136,8 +135,7 @@ public class HTTPClientInterface {
             return;
         }
         //Check if this is resumed request.
-        Object o = request.getAttribute("SQLSUBMITTED");
-        if (o != null && o instanceof Boolean) {
+        if (Boolean.TRUE.equals(request.getAttribute("SQLSUBMITTED"))) {
             try {
                 continuation.suspend(response);
             } catch (IllegalStateException e){
