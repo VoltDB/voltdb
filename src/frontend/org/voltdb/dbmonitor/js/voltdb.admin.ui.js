@@ -944,9 +944,8 @@ function loadAdminPage() {
     });
 
     adminEditObjects.btnEditHeartbeatTimeoutOk.on("click", function(e) {
-        $("#formHeartbeatTimeout").valid();
 
-        if (adminEditObjects.errorHeartbeatTimeout.is(":visible")) {
+        if (!$("#formHeartbeatTimeout").valid()) {
             e.preventDefault();
             e.stopPropagation();
             adminEditObjects.tBoxHeartbeatTimeout.focus();
