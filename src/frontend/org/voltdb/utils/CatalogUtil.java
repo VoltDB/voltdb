@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -44,6 +44,7 @@ import javax.xml.bind.Unmarshaller;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
@@ -291,8 +292,9 @@ public abstract class CatalogUtil {
         boolean hasField = false;
         for (T item : items) {
             // check the first time through for the field
-            if (hasField == false)
-                hasField = item.getFields().contains(sortFieldName);
+            if (hasField == false) {
+                hasField = ArrayUtils.contains(item.getFields(), sortFieldName);
+            }
             assert(hasField == true);
 
             map.put(item.getField(sortFieldName), item);
