@@ -26,6 +26,7 @@ package org.voltdb.planner;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.DeletePlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
@@ -35,6 +36,7 @@ import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.UpdatePlanNode;
+import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
 
 import java.util.Arrays;
@@ -252,6 +254,28 @@ public class TestPlansDML extends PlannerTestCase {
                 SeqScanPlanNode.class),
                 collectorRoot
                 );
+    }
+
+    /**
+     * ENG-7384 Redundant predicate in DELETE/UPDATE statement plans.
+     */
+    public void testDMLPredicate() {
+        {
+            pns = compileToFragments("UPDATE P1 SET C = 1 WHERE A = 0");
+            assertEquals(1, pns.size());
+            checkPredicate(pns.get(0).getChild(0), ExpressionType.COMPARE_EQUAL);
+        }
+        {
+            pns = compileToFragments("DELETE FROM P1 WHERE A > 0");
+            assertTrue(pns.size() == 2);
+            checkPredicate(pns.get(1).getChild(0).getChild(0), ExpressionType.COMPARE_GREATERTHAN);
+        }
+    }
+
+    private void checkPredicate(AbstractPlanNode pn, ExpressionType type) {
+        assertTrue(pn instanceof SeqScanPlanNode);
+        AbstractExpression e = ((SeqScanPlanNode) pn).getPredicate();
+        assertEquals(type, e.getExpressionType());
     }
 
     private void checkTruncateFlag() {
