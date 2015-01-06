@@ -93,8 +93,8 @@ public class TestVoltDBLog4JAppender {
             startServer();
             startClient();
         } catch (Exception e) {
-            // Something went wrong
-
+            System.out.println("Error starting up VoltDB instance");
+            e.printStackTrace();
         }
     }
 
@@ -104,6 +104,7 @@ public class TestVoltDBLog4JAppender {
             stopClient();
             stopServer();
         } catch (Exception e) {
+            System.out.println("Failed to stop VoltDB instance");
             e.printStackTrace();
         }
     }
@@ -124,7 +125,8 @@ public class TestVoltDBLog4JAppender {
             rootLogger.setLevel(Level.INFO);
             rootLogger.addAppender(voltAppender);
         } catch (Exception e) {
-            //Nothing here
+            System.out.println("Error creating appender");
+            e.printStackTrace();
         }
     }
 
@@ -138,11 +140,8 @@ public class TestVoltDBLog4JAppender {
             VoltTable tables = m_client.callProcedure("@AdHoc", "SELECT message FROM Logs").getResults()[0];
             Assert.assertTrue("We have the correct number of insertions", tables.getRowCount() == 2);
         } catch (Exception e) {
-            // Something went wrong
-            // Nothing here
-        } finally {
-            // We're done, turn off the server
-            //tearDown();
+            System.out.println("Failed to insert log messages into VoltDB");
+            e.printStackTrace();
         }
     }
 
