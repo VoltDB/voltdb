@@ -53,6 +53,7 @@ import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.HttpdType.Jsonapi;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType.Snapshot;
+import org.voltdb.compiler.deploymentfile.PathEntry;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PathsType.Voltdbroot;
 import org.voltdb.compiler.deploymentfile.PropertyType;
@@ -837,7 +838,7 @@ public class VoltProjectBuilder {
         voltdbroot.setPath(voltRoot);
 
         if (m_snapshotPath != null) {
-            PathsType.Snapshots snapshotPathElement = factory.createPathsTypeSnapshots();
+            PathEntry snapshotPathElement = factory.createPathEntry();
             snapshotPathElement.setPath(m_snapshotPath);
             paths.setSnapshots(snapshotPathElement);
         }
@@ -849,13 +850,13 @@ public class VoltProjectBuilder {
         }
 
         if (m_commandLogPath != null) {
-            PathsType.Commandlog commandLogPathElement = factory.createPathsTypeCommandlog();
+            PathEntry commandLogPathElement = factory.createPathEntry();
             commandLogPathElement.setPath(m_commandLogPath);
             paths.setCommandlog(commandLogPathElement);
         }
 
         if (m_internalSnapshotPath != null) {
-            PathsType.Commandlogsnapshot commandLogSnapshotPathElement = factory.createPathsTypeCommandlogsnapshot();
+            PathEntry commandLogSnapshotPathElement = factory.createPathEntry();
             commandLogSnapshotPathElement.setPath(m_internalSnapshotPath);
             paths.setCommandlogsnapshot(commandLogSnapshotPathElement);
         }
