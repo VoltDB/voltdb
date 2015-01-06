@@ -885,7 +885,7 @@ public class VoltCompiler {
 
     private Database initCatalogDatabase() {
         // create the database in the catalog
-        m_catalog.execute("add /clusters[cluster] databases database");
+        m_catalog.execute("add /clusters#cluster databases database");
         addDefaultRoles();
         return getCatalogDatabase();
     }
@@ -901,12 +901,12 @@ public class VoltCompiler {
     private void addDefaultRoles()
     {
         // admin
-        m_catalog.execute("add /clusters[cluster]/databases[database] groups administrator");
+        m_catalog.execute("add /clusters#cluster/databases#database groups administrator");
         Permission.setPermissionsInGroup(getCatalogDatabase().getGroups().get("administrator"),
                                          Permission.getPermissionsFromAliases(Arrays.asList("ADMIN")));
 
         // user
-        m_catalog.execute("add /clusters[cluster]/databases[database] groups user");
+        m_catalog.execute("add /clusters#cluster/databases#database groups user");
         Permission.setPermissionsInGroup(getCatalogDatabase().getGroups().get("user"),
                                          Permission.getPermissionsFromAliases(Arrays.asList("SQL", "ALLPROC")));
     }
