@@ -38,6 +38,7 @@ import org.voltcore.logging.Level;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.utils.Base64;
 import org.voltdb.utils.Encoder;
 
@@ -336,9 +337,12 @@ public class HTTPClientInterface {
             // admin connections aren't cached
             if (authResult.m_adminMode) {
                 try {
+                    authResult.m_client.drain();
                     authResult.m_client.close();
                 } catch (InterruptedException e) {
                     m_log.warn("JSON interface was interrupted while closing an internal admin client connection.");
+                } catch (NoConnectionsException ex) {
+                    m_log.warn("JSON interface has closed an internal admin client connection.");
                 }
             }
             // other connections are cached
