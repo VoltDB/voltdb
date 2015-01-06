@@ -33,12 +33,11 @@ import org.junit.Test;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
-import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.log4j.VoltDBLog4JAppender;
-import org.voltdb.utils.InMemoryJarfile;
 
 public class TestVoltDBLog4JAppender {
 
+    Logger rootLogger;
     private MessagePrinter printer;
     private ServerThread m_localServer;
     private Client m_client;
@@ -93,10 +92,9 @@ public class TestVoltDBLog4JAppender {
         try {
             startServer();
             startClient();
-            addProcedure();
         } catch (Exception e) {
             // Something went wrong
-            tearDown();
+
         }
     }
 
@@ -110,22 +108,6 @@ public class TestVoltDBLog4JAppender {
         }
     }
 
-    // Add our custom procedure to VoltDB
-    private void addProcedure() {
-        ClientResponse resp = null;
-        try{
-            InMemoryJarfile jarfile = new InMemoryJarfile();
-            VoltCompiler comp = new VoltCompiler();
-            comp.addClassToJar(jarfile, org.voltdb.log4j.VoltdbInsert.class);
-            m_client.callProcedure("@UpdateClasses", jarfile.getFullJarBytes(), null);
-            m_client.callProcedure("@AdHoc", "CREATE TABLE Logs ( timestamp BIGINT, level VARCHAR(10), message VARCHAR(255))");
-            m_client.callProcedure("@AdHoc", "create procedure from class org.voltdb.tomcat.VoltdbInsert");
-        } catch (Exception e) {
-            tearDown();
-        }
-
-    }
-
     // Set up the VoltDB instance, writer class and its logger
     @Before
     public void setup() {
@@ -136,13 +118,13 @@ public class TestVoltDBLog4JAppender {
         try {
             printer = new MessagePrinter();
 
-            Logger rootLogger = Logger.getRootLogger();
+            rootLogger = Logger.getRootLogger();
             Appender voltAppender = new VoltDBLog4JAppender();
             rootLogger.removeAllAppenders();
             rootLogger.setLevel(Level.INFO);
             rootLogger.addAppender(voltAppender);
         } catch (Exception e) {
-            tearDown();
+            //Nothing here
         }
     }
 
@@ -153,14 +135,14 @@ public class TestVoltDBLog4JAppender {
             printer.printMessages();
 
             // Make sure that we have a bunch of messages in VoltDB
-            VoltTable tables = m_client.callProcedure("@AdHoc", "SELECT messages FROM Logs").getResults()[0];
+            VoltTable tables = m_client.callProcedure("@AdHoc", "SELECT message FROM Logs").getResults()[0];
             Assert.assertTrue("We have the correct number of insertions", tables.getRowCount() == 2);
         } catch (Exception e) {
             // Something went wrong
-            tearDown();
+            // Nothing here
         } finally {
             // We're done, turn off the server
-            tearDown();
+            //tearDown();
         }
     }
 
