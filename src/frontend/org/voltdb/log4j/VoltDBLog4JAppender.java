@@ -24,7 +24,6 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
 import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
 
@@ -86,9 +85,11 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
     public void close() {
         // Close the VoltDB connection
         try {
+            bulkLoader.drain();
+            bulkLoader.close();
             client.drain();
             client.close();
-        } catch (InterruptedException | NoConnectionsException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
@@ -109,6 +110,7 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
         try{
             Object rowHandle = null;
             bulkLoader.insertRow(rowHandle, timestamp, level, message);
+            client.drain();
         } catch (Exception e) {
             e.printStackTrace();
         }
