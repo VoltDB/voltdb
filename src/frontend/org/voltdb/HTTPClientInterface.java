@@ -57,6 +57,7 @@ public class HTTPClientInterface {
     public static final String PARAM_HASHEDPASSWORD = "Hashedpassword";
     public static final String PARAM_ADMIN = "admin";
     int m_timeout = 0;
+    final String m_timeoutResponse;
 
 
     public void setTimeout(int seconds) {
@@ -107,12 +108,19 @@ public class HTTPClientInterface {
             m_latch.countDown();
         }
 
-        public void waitForResponse() throws InterruptedException {
-            m_latch.await();
+        public boolean waitForResponse(long timeout, TimeUnit unit) throws InterruptedException {
+            if (timeout <= 0) {
+                m_latch.await();
+                return true;
+            }
+            return m_latch.await(timeout, unit);
         }
     }
 
     public HTTPClientInterface() {
+        final ClientResponseImpl r = new ClientResponseImpl(ClientResponse.CONNECTION_TIMEOUT,
+                new VoltTable[0], "Request Timeout");
+        m_timeoutResponse = r.toJSONString();
     }
 
     public void process(Request request, HttpServletResponse response) {
@@ -136,8 +144,7 @@ public class HTTPClientInterface {
             return;
         }
         //Check if this is resumed request.
-        Object o = request.getAttribute("SQLSUBMITTED");
-        if (o != null && o instanceof Boolean) {
+        if (Boolean.TRUE.equals(request.getAttribute("SQLSUBMITTED"))) {
             try {
                 continuation.suspend(response);
             } catch (IllegalStateException e){
@@ -222,9 +229,25 @@ public class HTTPClientInterface {
             request.setAttribute("SQLSUBMITTED", Boolean.TRUE);
             //In admin mode thread is blocked.
             if (authResult.m_adminMode) {
-                cb.waitForResponse();
                 //Result must be filled in now.
-                result = (String )request.getAttribute("result");
+                result = null;
+                try {
+                    if (!cb.waitForResponse(m_timeout, TimeUnit.MILLISECONDS)) {
+                        m_log.info("JSON failed to get response from client in time: " + m_timeout);
+                        result = m_timeoutResponse;
+                        if (jsonp != null) {
+                            result = String.format("%s( %s )", jsonp, result);
+                        }
+                    } else {
+                        result = (String )request.getAttribute("result");
+                    }
+                } catch (InterruptedException ex) {
+                    m_log.info("JSON failed to get response from client in time: " + m_timeout, ex);
+                    result = m_timeoutResponse;
+                    if (jsonp != null) {
+                        result = String.format("%s( %s )", jsonp, result);
+                    }
+                }
                 response.setStatus(HttpServletResponse.SC_OK);
                 request.setHandled(true);
                 if (result != null) {
