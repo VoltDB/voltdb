@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -34,12 +34,49 @@ import org.voltdb.compiler.VoltProjectBuilder;
 public class TestMaxSuite extends RegressionSuite {
 
     static final Class<?>[] PROCEDURES = {};
+    private static int SQL_TEXT_MAX_LENGTH = 100000;
+    private static String LONG_STRING_TEMPLATE = "This is a long string to test. It will make the client easier "
+            + "to generate very long long string.";
+    private static int APPEND_TIMES = SQL_TEXT_MAX_LENGTH / LONG_STRING_TEMPLATE.length();
+
     private static int PARAMETERS_MAX_JOIN = 100;
     private static int PARAMETERS_MAX_COLUMN = 1024;
     private static int PARAMETERS_MAX_IN = 6000;
 
     public TestMaxSuite(String name) {
         super(name);
+    }
+
+    public void testMaxSQLLength() throws Exception {
+        Client client = this.getClient();
+        StringBuilder stringBuilder = new StringBuilder();
+        for (int i = 0; i < APPEND_TIMES; i++) {
+            stringBuilder.append(LONG_STRING_TEMPLATE);
+        }
+
+        client.callProcedure("max_sql_proc");
+
+        client.callProcedure("max_parameter_proc", stringBuilder.toString());
+    }
+
+    public void testAdHocMaxSQLText() throws Exception {
+        Client client = this.getClient();
+        StringBuilder stringBuilder = new StringBuilder(
+                "select * from max_in_table where column0 in(");
+        for (int i = 0; i < SQL_TEXT_MAX_LENGTH; i++) {
+            stringBuilder.append(i);
+            if (i != SQL_TEXT_MAX_LENGTH - 1) {
+                stringBuilder.append(",");
+            }
+        }
+        stringBuilder.append(") order by column0;");
+
+        try {
+            client.callProcedure("@AdHoc", stringBuilder.toString());
+            fail();
+        } catch(Exception ex) {
+            assertTrue(ex.getMessage().contains("AdHoc SQL text exceeds the length limitation 32767"));
+        }
     }
 
     public void testMaxIn() throws Exception {
@@ -148,8 +185,25 @@ public class TestMaxSuite extends RegressionSuite {
         final VoltProjectBuilder project = new VoltProjectBuilder();
 
         try {
+            StringBuilder sb;
+
+            /** for max parameter or SQL text */
+            sb = new StringBuilder(
+                    "CREATE TABLE max_sql_table(column0 VARCHAR(1048576) NOT NULL,"
+                    + "PRIMARY KEY(column0)); ");
+            sb.append("CREATE PROCEDURE max_sql_proc AS "
+                    + "SELECT column0 as c1 from max_sql_table where column0 = ' ");
+            for (int i = 0; i < APPEND_TIMES; i++) {
+                sb.append(LONG_STRING_TEMPLATE);
+            }
+            sb.append("';");
+
+            sb.append("CREATE PROCEDURE max_parameter_proc AS "
+                    + "SELECT column0 as c2 from max_sql_table where column0 = ?;");
+            project.addLiteralSchema(sb.toString());
+
             /** for max column */
-            StringBuilder sb = new StringBuilder(
+            sb = new StringBuilder(
                     "CREATE TABLE max_column_table(");
             for (int i = 0; i < PARAMETERS_MAX_COLUMN; i++) {
                 sb.append("column");

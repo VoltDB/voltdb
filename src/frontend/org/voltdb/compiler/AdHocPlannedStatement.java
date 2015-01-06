@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -127,6 +127,10 @@ public class AdHocPlannedStatement {
 
         // sql bytes
         short sqlLength = buf.getShort();
+        if (sqlLength < 0) {
+            throw new RuntimeException("AdHoc SQL text exceeds the length limitation " + Short.MAX_VALUE);
+        }
+
         byte[] sql = new byte[sqlLength];
         buf.get(sql);
 
