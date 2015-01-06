@@ -444,9 +444,9 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     /**
      * Returns the purge executor vector for this table
      */
-    ExecutorVector* getPurgeExecutorVector() {
+    boost::shared_ptr<ExecutorVector> getPurgeExecutorVector() {
         assert(hasPurgeFragment());
-        return m_purgeExecutorVector.get();
+        return m_purgeExecutorVector;
     }
 
   private:
