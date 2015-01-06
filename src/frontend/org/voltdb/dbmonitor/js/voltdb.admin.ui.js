@@ -18,6 +18,7 @@ function loadAdminPage() {
         btnClusterPromote: $('#promoteConfirmation'),
         enablePromote: false,
         ignorePromoteUpdateCount: 0,
+        ignoreServerListUpdateCount: 0,
         btnErrorClusterPromote: $('#btnErrorPromotePopup'),
         errorPromoteMessage: $('#promoteErrorMessage'),
         updateMessageBar: $('#snapshotBar'),
@@ -346,6 +347,7 @@ function loadAdminPage() {
         } else {
             adminEditObjects.chkSecurity.iCheck('uncheck');
         }
+        
         adminEditObjects.spanSecurity.text(getOnOffText(adminEditObjects.chkSecurityValue));
 
         if (showEdit) {
@@ -1050,7 +1052,7 @@ function loadAdminPage() {
     adminEditObjects.btnEditQueryTimeoutCancel.on("click", function () {
         toggleQueryTimeoutEdit(true);
     });
-
+  
     adminEditObjects.btnEditQueryTimeoutOk.popup({
         open: function (event, ui, ele) {
         },
@@ -1078,7 +1080,7 @@ function loadAdminPage() {
                 toggleQueryTimeoutEdit(true);
             });
         }
-    });
+    });   
 
     $("#updateErrorPopupLink").popup();
 

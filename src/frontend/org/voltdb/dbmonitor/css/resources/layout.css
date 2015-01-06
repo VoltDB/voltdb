@@ -42,6 +42,7 @@ ul.servers-list li.active,
 ul.servers-list li.pauseMonitoring, 
 ul.servers-list li.joining, a.showServers, a.hideServers, .popup_close, .icon-document, .icon-tables, .icon-procedures, .pref-storedProc, .pref-tables, .pref-graph, .icon-server, #toggleMenu
 { background-image:url(images/voltdb-icon-sprite.png)!important; background-repeat:no-repeat;}
+ul.servers-list li.pauseActiveMonitoring{ background-image:url(images/voltdb-icon-sprite.png)!important; background-repeat:no-repeat;background-color: #f0f3f4}
 
 .user {background-position:left -209px; width:25px; height:25px;}
 /*.help {background-position:left -1354px; width:25px; height:25px;}*/
@@ -443,6 +444,7 @@ a.setVal:hover{background:#aa1f2f/*3f5364*/; color:#fff; }
 
 ul.servers-list li.active{ background-position:4px -298px;}
 ul.servers-list li.pauseMonitoring {background-position:4px -1458px;}
+ul.servers-list li.pauseActiveMonitoring {background-position:4px -1458px;}
 ul.servers-list li.joining{ background-position:2px -350px; color:#a3a3a3;}
 ul.servers-list li:hover{background-color:#f0f3f4;}
 ul.servers-list li.monitoring{background-color:#f0f3f4;}
