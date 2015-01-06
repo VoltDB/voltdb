@@ -1154,7 +1154,7 @@ public class TestJSONInterface extends TestCase {
             assertTrue(jdep.contains("cluster"));
             deptype = mapper.readValue(jdep, DeploymentType.class);
             int nto = deptype.getHeartbeat().getTimeout();
-            assertEquals(99, nto);
+            assertEquals(nto, 99);
 
             //Test change Query timeout
             SystemSettingsType ss = deptype.getSystemsettings();
@@ -1165,12 +1165,9 @@ public class TestJSONInterface extends TestCase {
             Query qv = ss.getQuery();
             if (qv == null) {
                 qv = new Query();
-                qv.setTimeout(99);
-            } else {
+                ss.setQuery(qv);
                 qv.setTimeout(99);
             }
-            ss.setQuery(qv);
-            deptype.setSystemsettings(ss);
             ndeptype = mapper.writeValueAsString(deptype);
             params.put("deployment", ndeptype);
             pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
@@ -1180,7 +1177,7 @@ public class TestJSONInterface extends TestCase {
             assertTrue(jdep.contains("cluster"));
             deptype = mapper.readValue(jdep, DeploymentType.class);
             nto = deptype.getSystemsettings().getQuery().getTimeout();
-            assertEquals(99, nto);
+            assertEquals(nto, 99);
 
             qv.setTimeout(88);
             ss.setQuery(qv);
@@ -1194,7 +1191,7 @@ public class TestJSONInterface extends TestCase {
             assertTrue(jdep.contains("cluster"));
             deptype = mapper.readValue(jdep, DeploymentType.class);
             nto = deptype.getSystemsettings().getQuery().getTimeout();
-            assertEquals(88, nto);
+            assertEquals(nto, 88);
 
         } finally {
             if (server != null) {
