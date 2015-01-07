@@ -65,7 +65,7 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
             if (user != null && password != null) {
                 config = new ClientConfig(user, password);
             } else {
-                config = new ClientConfig("", "");
+                config = new ClientConfig();
             }
             config.setReconnectOnConnectionLoss(true);
             client = ClientFactory.createClient(config);

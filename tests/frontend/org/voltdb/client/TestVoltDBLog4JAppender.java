@@ -125,7 +125,7 @@ public class TestVoltDBLog4JAppender {
             rootLogger.setLevel(Level.INFO);
             rootLogger.addAppender(voltAppender);
         } catch (Exception e) {
-            System.out.println("Error creating appender");
+            System.err.println("Error creating appender");
             e.printStackTrace();
         }
     }
