@@ -111,7 +111,7 @@ public class SchemaChangeUtility
             now = System.currentTimeMillis();
         }
 
-        log.error("Error no progress timeout reached, terminating");
+        log.error(String.format("Error no progress timeout (%d seconds) reached, terminating", timeout));
         System.exit(-1);
         return null;
     }
