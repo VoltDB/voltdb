@@ -125,6 +125,7 @@ function loadAdminPage() {
 
         //snapshot
         editStateSnapshot: editStates.ShowEdit,
+        loadingSnapshot: $("#loadingSnapshot"),
         
         //Heartbeat Timeout
         rowHeartbeatTimeout: $("#heartbeatTimeoutRow"),
@@ -992,7 +993,7 @@ function loadAdminPage() {
                     adminConfigurations.snapshot.frequency = adminEditObjects.tBoxAutoSnapshotFreq.val() + frequencyUnit;
                     adminConfigurations.snapshot.prefix = adminEditObjects.tBoxFilePrefix.val();
                     adminConfigurations.snapshot.retain = adminEditObjects.tBoxAutoSnapshotRetained.val();
-
+                    adminConfigurations.snapshot.enabled = adminEditObjects.chkAutoSnapsot.is(':checked');
                     //Call the loading image only after setting the new value to be saved.
                     toggleAutoSnapshotEdit(editStates.ShowLoading);
                     voltDbRenderer.updateAdminConfiguration(adminConfigurations, function(result) {
