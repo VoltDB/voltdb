@@ -21,6 +21,7 @@ import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
@@ -39,18 +40,22 @@ import org.eclipse.jetty.server.handler.AbstractHandler;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
+import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.AuthenticationResult;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.HTTPClientInterface;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
 import org.voltdb.compilereport.ReportMaker;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.io.Resources;
-import java.net.InetAddress;
-import org.json_voltpatches.JSONArray;
-import org.json_voltpatches.JSONObject;
 
 public class HTTPAdminListener {
+
+    private static final VoltLogger m_log = new VoltLogger("HOST");
 
     Server m_server = new Server();
     HTTPClientInterface httpClientInterface = new HTTPClientInterface();
@@ -89,10 +94,22 @@ public class HTTPAdminListener {
             return m_hostHeader;
         }
 
+        public AuthenticationResult authenticate(Request request) {
+            return httpClientInterface.authenticate(request);
+        }
 
         @Override
         public void handle(String string, Request rqst, HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
             response.setHeader("Host", getHostHeader());
+        }
+
+        //Build a client response based json response
+        protected String buildClientResponse(String jsonp, byte code, String msg) {
+            ClientResponseImpl rimpl = new ClientResponseImpl(code, new VoltTable[0], msg);
+            if (jsonp != null) {
+                return String.format("%s( %s )", jsonp, rimpl.toJSONString());
+            }
+            return rimpl.toJSONString();
         }
 
     }
@@ -103,7 +120,6 @@ public class HTTPAdminListener {
         public void handle(String target, Request baseRequest,
                            HttpServletRequest request, HttpServletResponse response)
                             throws IOException, ServletException {
-            VoltLogger logger = new VoltLogger("HOST");
             super.handle(target, baseRequest, request, response);
             try{
 
@@ -237,7 +253,6 @@ public class HTTPAdminListener {
         public void handle(String target, Request baseRequest,
                            HttpServletRequest request, HttpServletResponse response)
                             throws IOException, ServletException {
-            VoltLogger logger = new VoltLogger("HOST");
             super.handle(target, baseRequest, request, response);
             try {
                 // http://www.ietf.org/rfc/rfc4627.txt dictates this mime type
@@ -257,7 +272,7 @@ public class HTTPAdminListener {
                 }
 
             } catch(Exception ex){
-                logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage());
+                logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage(), ex);
             }
         }
     }
@@ -344,6 +359,8 @@ public class HTTPAdminListener {
 
             ///api/1.0/
             ContextHandler apiRequestHandler = new ContextHandler("/api/1.0");
+            // the default is 200k which well short of out 2M row size limit
+            apiRequestHandler.setMaxFormContentSize(2* 1024 * 1024);
             apiRequestHandler.setHandler(new APIRequestHandler());
 
             ///catalog
@@ -364,14 +381,16 @@ public class HTTPAdminListener {
 
             m_server.setHandler(handlers);
 
+            int poolsize = Integer.getInteger("HTTP_POOL_SIZE", 50);
+            int timeout = Integer.getInteger("HTTP_REQUEST_TIMEOUT_SECONDS", 15);
             /*
              * Don't force us to look at a huge pile of threads
              */
-            final QueuedThreadPool qtp = new QueuedThreadPool();
-            qtp.setMaxIdleTimeMs(15000);
+            final QueuedThreadPool qtp = new QueuedThreadPool(poolsize);
+            qtp.setMaxIdleTimeMs(timeout * 1000);
             qtp.setMinThreads(1);
             m_server.setThreadPool(qtp);
-
+            httpClientInterface.setTimeout(timeout);
             m_jsonEnabled = jsonEnabled;
         } catch (Exception e) {
             // double try to make sure the port doesn't get eaten
@@ -407,6 +426,7 @@ public class HTTPAdminListener {
 
     public void notifyOfCatalogUpdate()
     {
+        //Notify to clean any cached clients so new security can be enforced.
         httpClientInterface.notifyOfCatalogUpdate();
     }
 }

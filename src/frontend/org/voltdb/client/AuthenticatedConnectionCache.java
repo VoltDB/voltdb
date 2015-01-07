@@ -18,12 +18,16 @@
 package org.voltdb.client;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
 
-import org.voltdb.common.Constants;
+import org.voltcore.logging.VoltLogger;
+
+import com.google_voltpatches.common.base.Predicate;
+import com.google_voltpatches.common.collect.FluentIterable;
 
 /**
  * Maintain a set of the last N recently used credentials and
@@ -38,6 +42,9 @@ import org.voltdb.common.Constants;
  * This is probably not threadsafe yet.
  */
 public class AuthenticatedConnectionCache {
+
+    private static VoltLogger logger = new VoltLogger("HOST");
+    private final static String ADMIN_SUFFIX = ":++__ADMIN__++";
 
     final String m_hostname;
     final String m_adminHostName;
@@ -70,20 +77,7 @@ public class AuthenticatedConnectionCache {
 
         @Override
         public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
-            // Close the connection. The cause can be CONNECTION_CLOSED or TIMEOUT, we don't care which.
-
-            // debug printstacktrace, to be remove later.  In theory we shouldn't hit this code
-            // because the JSON/HTTP client is within the server.  Speculation that this
-            // can be called if the connection is closed by the server, which is odd because
-            // this client is running *within* the server!
-            new Exception("Client Disconnect").printStackTrace();
-            System.err.printf("ERROR: Connection to %s:%d was lost.\n", hostname, port);
-            try {
-                if (null != m_conn.client) {
-                    m_conn.client.close();
-                }
-            } catch (InterruptedException ex) {
-            }
+            logger.debug("Connection lost was reported for internal client.");
         }
     }
 
@@ -92,14 +86,8 @@ public class AuthenticatedConnectionCache {
     Map<String, Connection> m_connections = new TreeMap<String, Connection>();
     // The optional unauthenticated clients which should only work if auth is off
     ClientImpl m_unauthClient = null;
-
-    public AuthenticatedConnectionCache(int targetSize) {
-        this(targetSize, "localhost", "localhost");
-    }
-
-    public AuthenticatedConnectionCache(int targetSize, String serverHostname, String adminHostName) {
-        this(targetSize, serverHostname, Constants.DEFAULT_PORT, adminHostName, 0);
-    }
+    // The optional unauthenticated adming client which should work if auth if off
+    ClientImpl m_adminUnauthClient = null;
 
     public AuthenticatedConnectionCache(int targetSize, String serverHostname, int serverPort, String adminHostName, int adminPort) {
         assert(serverHostname != null);
@@ -113,37 +101,15 @@ public class AuthenticatedConnectionCache {
     }
 
     public synchronized Client getClient(String userName, String password, byte[] hashedPassword, boolean admin) throws IOException {
-        // ADMIN MODE
-        if (admin) {
-            ClientImpl adminClient = null;
-            try
-            {
-                adminClient = (ClientImpl) ClientFactory.createClient();
-                if ((userName == null) || (userName.equals(""))) {
-                    if ((hashedPassword != null) && (hashedPassword.length > 0)) {
-                        throw new IOException("Username was null but password was not.");
-                    }
-                    adminClient.createConnection(m_adminHostName, m_adminPort);
-                }
-                else {
-                    adminClient.createConnectionWithHashedCredentials(m_adminHostName, m_adminPort, userName, hashedPassword);
-                }
+        String userNameWithAdminSuffix = null;
+        if (userName != null && !userName.trim().isEmpty()) {
+            if (userName.endsWith(ADMIN_SUFFIX)) {
+                throw new IOException("User name cannot end with " + ADMIN_SUFFIX);
             }
-            catch (IOException ioe)
-            {
-                try {
-                    adminClient.close();
-                } catch (InterruptedException ex) {
-                    throw new IOException("Unable to close rejected admin client connection", ex);
-                }
-                throw ioe;
-            }
-
-            return adminClient;
+            userNameWithAdminSuffix = userName + ADMIN_SUFFIX;
         }
-
         // UN-AUTHENTICATED
-        if ((userName == null) || userName.equals("")) {
+        if ((userName == null) || userName.trim().isEmpty()) {
             if ((hashedPassword != null) && (hashedPassword.length > 0)) {
                 throw new IOException("Username was null but password was not.");
             }
@@ -164,9 +130,28 @@ public class AuthenticatedConnectionCache {
 
                 }
             }
+            if (m_adminUnauthClient == null)
+            {
+                try {
+                    m_adminUnauthClient = (ClientImpl) ClientFactory.createClient();
+                    m_adminUnauthClient.createConnection(m_hostname, m_adminPort);
+                }
+                catch (IOException e) {
+                    try {
+                        m_adminUnauthClient.close();
+                    } catch (InterruptedException ex) {
+                        throw new IOException("Unable to close rejected unauthenticated admin client connection", ex);
+                    }
+                    m_adminUnauthClient = null;
+                    throw e;
+
+                }
+            }
 
             assert(m_unauthClient != null);
-            return m_unauthClient;
+            assert(m_adminUnauthClient != null);
+
+            return admin ? m_adminUnauthClient : m_unauthClient;
         }
 
         // AUTHENTICATED
@@ -175,7 +160,7 @@ public class AuthenticatedConnectionCache {
             passHash = Arrays.hashCode(hashedPassword);
         }
 
-        Connection conn = m_connections.get(userName);
+        Connection conn = m_connections.get(admin ? userNameWithAdminSuffix : userName);
         if (conn != null) {
             if (conn.passHash != passHash) {
                 throw new IOException("Incorrect authorization credentials.");
@@ -204,23 +189,37 @@ public class AuthenticatedConnectionCache {
             conn.client = (ClientImpl) ClientFactory.createClient(config);
             try
             {
-                conn.client.createConnectionWithHashedCredentials(m_hostname, m_port, userName, hashedPassword);
+                conn.client.createConnectionWithHashedCredentials(
+                        m_hostname,
+                        (admin ? m_adminPort : m_port),
+                        userName, hashedPassword
+                        );
             }
             catch (IOException ioe)
             {
                 try {
                     conn.client.close();
                 } catch (InterruptedException ex) {
-                    throw new IOException("Unable to close rejected authenticated client connection.", ex);
+                    throw new IOException(
+                            "Unable to close rejected authenticated "
+                          + (admin ? "admin " : "") + "client connection.", ex
+                          );
                 }
                 conn = null;
                 throw ioe;
             }
-            m_connections.put(userName, conn);
+            m_connections.put(admin ? userNameWithAdminSuffix : userName, conn);
             attemptToShrinkPoolIfNeeded();
         }
         return conn.client;
     }
+
+    private Predicate<InetSocketAddress> onAdminPort = new Predicate<InetSocketAddress>() {
+        @Override
+        public boolean apply(InetSocketAddress input) {
+            return input.getPort() == m_adminPort;
+        }
+    };
 
     /**
      * Dec-ref a client.
@@ -233,8 +232,12 @@ public class AuthenticatedConnectionCache {
         if (ci.getUsername().length() == 0) {
             return;
         }
+        StringBuilder userNameBuilder = new StringBuilder(ci.getUsername());
+        if (FluentIterable.from(ci.getConnectedHostList()).allMatch(onAdminPort)) {
+            userNameBuilder.append(ADMIN_SUFFIX);
+        }
 
-        Connection conn = m_connections.get(ci.getUsername());
+        Connection conn = m_connections.get(userNameBuilder.toString());
         if (conn == null) {
             throw new RuntimeException("Released client not in pool.");
         }
@@ -247,14 +250,25 @@ public class AuthenticatedConnectionCache {
         if (m_unauthClient != null)
         {
             try {
+                m_unauthClient.drain();
                 m_unauthClient.close();
             } catch (InterruptedException ex) {
                 throw new RuntimeException("Unable to close unauthenticated client.", ex);
             }
         }
+        if (m_adminUnauthClient != null)
+        {
+            try {
+                m_adminUnauthClient.drain();
+                m_adminUnauthClient.close();
+            } catch (InterruptedException ex) {
+                throw new RuntimeException("Unable to close unauthenticated admin client.", ex);
+            }
+        }
         for (Entry<String, Connection> e : m_connections.entrySet())
         {
             try {
+                e.getValue().client.drain();
                 e.getValue().client.close();
             } catch (InterruptedException ex) {
                 throw new RuntimeException("Unable to close client from pool.", ex);
@@ -272,6 +286,7 @@ public class AuthenticatedConnectionCache {
                 if (e.getValue().refCount <= 0) {
                     m_connections.remove(e.getKey());
                     try {
+                        e.getValue().client.drain();
                         e.getValue().client.close();
                     } catch (InterruptedException ex) {
                         throw new RuntimeException("Unable to close client from pool.", ex);
@@ -284,4 +299,15 @@ public class AuthenticatedConnectionCache {
         }
     }
 
+    //Used for testing today.
+    public int getSize() {
+        if (m_connections == null) return 0;
+        return m_connections.size();
+    }
+    public Client getUnauthenticatedAdminClient() {
+        return this.m_adminUnauthClient;
+    }
+    public Client getUnauthenticatedClient() {
+        return this.m_unauthClient;
+    }
 }
