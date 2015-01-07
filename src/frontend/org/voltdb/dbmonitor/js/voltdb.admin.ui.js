@@ -836,7 +836,6 @@ function loadAdminPage() {
         } else {
             adminEditObjects.chkAutoSnapsot.iCheck('uncheck');
         }
-
         adminEditObjects.tBoxAutoSnapshotFreq.val(adminEditObjects.tBoxAutoSnapshotFreqValue);
         adminEditObjects.tBoxAutoSnapshotRetained.val(adminEditObjects.tBoxAutoSnapshotRetainedValue);
         adminEditObjects.tBoxFilePrefix.val(adminEditObjects.tBoxFilePrefixValue);
@@ -844,7 +843,9 @@ function loadAdminPage() {
         adminEditObjects.txtAutoSnapshot.text(getOnOffText(adminEditObjects.chkAutoSnapshotValue));
 
         if (state == editStates.ShowLoading) {
+            adminEditObjects.chkAutoSnapsot.parent().removeClass("customCheckbox");
             adminEditObjects.iconAutoSnapshotOption.hide();
+            adminDOMObjects.autoSnapshotLabel.hide();
             adminEditObjects.LinkAutoSnapshotEdit.hide();
             adminEditObjects.btnEditAutoSnapshotOk.hide();
             adminEditObjects.btnEditAutoSnapshotCancel.hide();
@@ -860,12 +861,14 @@ function loadAdminPage() {
             adminEditObjects.tBoxFilePrefix.hide();
             adminDOMObjects.retainedLabel.hide();
 
+            adminEditObjects.loadingSnapshot.show();
             adminEditObjects.loadingSnapshotFrequency.show();
             adminEditObjects.loadingSnapshotPrefix.show();
             adminEditObjects.loadingSnapshotRetained.show();
         }
         else if (state == editStates.ShowOkCancel) {
             adminEditObjects.iconAutoSnapshotOption.hide();
+            adminDOMObjects.autoSnapshotLabel.show();
             adminEditObjects.LinkAutoSnapshotEdit.hide();
             adminEditObjects.btnEditAutoSnapshotOk.show();
             adminEditObjects.btnEditAutoSnapshotCancel.show();
@@ -883,12 +886,14 @@ function loadAdminPage() {
             adminEditObjects.loadingSnapshotFrequency.hide();
             adminEditObjects.loadingSnapshotPrefix.hide();
             adminEditObjects.loadingSnapshotRetained.hide();
+            adminEditObjects.loadingSnapshot.hide();
         } else {
             adminEditObjects.chkAutoSnapsot.parent().removeClass("customCheckbox");
             adminEditObjects.btnEditAutoSnapshotOk.hide();
             adminEditObjects.btnEditAutoSnapshotCancel.hide();
             adminEditObjects.LinkAutoSnapshotEdit.show();
             adminEditObjects.iconAutoSnapshotOption.show();
+            adminDOMObjects.autoSnapshotLabel.show();
 
             adminEditObjects.tBoxAutoSnapshotFreq.hide();
             adminEditObjects.ddlAutoSnapshotFreqUnit.hide();
@@ -902,6 +907,7 @@ function loadAdminPage() {
             adminEditObjects.loadingSnapshotFrequency.hide();
             adminEditObjects.loadingSnapshotPrefix.hide();
             adminEditObjects.loadingSnapshotRetained.hide();
+            adminEditObjects.loadingSnapshot.hide();
         }
     };
 
