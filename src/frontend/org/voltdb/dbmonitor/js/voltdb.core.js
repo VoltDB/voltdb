@@ -213,7 +213,6 @@
 
             this.BeginExecute = function (procedure, parameters, callback, shortApiCallDetails) {
                 var isHighTimeout = procedure == "@SnapshotRestore";
-                console.log("procedure: " + procedure);
                 this.CallExecute(procedure, parameters, (new callbackWrapper(callback, isHighTimeout)).Callback, shortApiCallDetails);
             };
 

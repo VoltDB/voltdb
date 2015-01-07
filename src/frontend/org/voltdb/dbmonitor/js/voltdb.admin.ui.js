@@ -82,6 +82,7 @@ function loadAdminPage() {
 
     adminEditObjects = {
         //Edit Security objects
+        loadingSecurity: $("#loadingSecurity"),
         btnEditSecurityOk: $("#btnEditSecurityOk"),
         btnEditSecurityCancel: $("#btnEditSecurityCancel"),
         LinkSecurityEdit: $("#securityEdit"),
@@ -89,6 +90,8 @@ function loadAdminPage() {
         chkSecurityValue: $("#chkSecurity").is(":checked"),
         iconSecurityOption: $("#securityOptionIcon"),
         spanSecurity: $("#spanSecurity"),
+        securityLabel: $("#securityRow").find("td:first-child").text(),
+        spanSecurityEdited:"",
 
         //Edit Auto Snapshot objects
         btnEditAutoSnapshotOk: $("#btnEditAutoSnapshotOk"),
@@ -143,12 +146,17 @@ function loadAdminPage() {
         tBoxQueryTimeout: $("#txtQueryTimeout"),
         tBoxQueryTimeoutValue: $("#queryTimeOutSpan").text(),
         spanqueryTimeOut: $("#queryTimeOutSpan"),
+        loadingQueryTimeout: $("#loadingQueryTimeout"),
+        errorQueryTimeout: $("#errorQueryTimeout"),
+        editStateQueryTimeout: editStates.ShowEdit,
         
         //Update Error
         updateErrorFieldMsg: $("#updateErrorFieldMsg"),
         updateSnapshotErrorFieldMsg: $("#updateSnapshotErrorFieldMsg"),
         heartbeatTimeoutLabel: $("#heartbeatTimeoutRow").find("td:first-child").text(),
+        queryTimeoutUpdateErrorFieldMsg: $("#queryTimeoutUpdateErrorFieldMsg"),
         snapshotLabel: $("#row-2").find("td:first-child").text(),
+        queryTimeoutFieldLabel: $("#queryTimoutRow").find("td:first-child").text()
     };
 
     var adminValidationRules = {
@@ -204,6 +212,7 @@ function loadAdminPage() {
     });
 
     adminEditObjects.chkSecurity.on('ifChanged', function () {
+        adminEditObjects.spanSecurityEdited= getOnOffText(adminEditObjects.chkSecurity.is(":checked"));
         adminEditObjects.spanSecurity.text(getOnOffText(adminEditObjects.chkSecurity.is(":checked")));
     });
 
@@ -352,7 +361,7 @@ function loadAdminPage() {
         }
     });
 
-    var toggleSecurityEdit = function (showEdit) {
+    var toggleSecurityEdit = function (state) {
         if (adminEditObjects.chkSecurityValue) {
             adminEditObjects.chkSecurity.iCheck('check');
         } else {
@@ -361,36 +370,86 @@ function loadAdminPage() {
         
         adminEditObjects.spanSecurity.text(getOnOffText(adminEditObjects.chkSecurityValue));
 
-        if (showEdit) {
+
+        if (state == editStates.ShowLoading) {        
             adminEditObjects.chkSecurity.parent().removeClass("customCheckbox");
             adminEditObjects.btnEditSecurityOk.hide();
             adminEditObjects.btnEditSecurityCancel.hide();
-            adminEditObjects.LinkSecurityEdit.show();
-            adminEditObjects.iconSecurityOption.show();
-        } else {
+            adminEditObjects.LinkSecurityEdit.hide();
+            adminEditObjects.iconSecurityOption.hide();
+            adminEditObjects.spanSecurity.hide();
+            adminEditObjects.loadingSecurity.show();
+
+        }
+        else if (state == editStates.ShowOkCancel) {
+            adminEditObjects.loadingSecurity.hide();
             adminEditObjects.iconSecurityOption.hide();
             adminEditObjects.LinkSecurityEdit.hide();
+            adminEditObjects.spanSecurity.show();
             adminEditObjects.btnEditSecurityOk.show();
             adminEditObjects.btnEditSecurityCancel.show();
             adminEditObjects.chkSecurity.parent().addClass("customCheckbox");
         }
+        else {
+            adminEditObjects.loadingSecurity.hide();
+            adminEditObjects.spanSecurity.show();
+            adminEditObjects.iconSecurityOption.show();
+            adminEditObjects.LinkSecurityEdit.show();
+            adminEditObjects.btnEditSecurityOk.hide();
+            adminEditObjects.btnEditSecurityCancel.hide();
+            adminEditObjects.chkSecurity.parent().removeClass("customCheckbox");
+        }
     };
 
-    adminEditObjects.LinkSecurityEdit.on("click", function () {
-        toggleSecurityEdit(false);
+    adminEditObjects.LinkSecurityEdit.on("click", function() {
+        toggleSecurityEdit(editStates.ShowOkCancel);
     });
 
     adminEditObjects.btnEditSecurityCancel.on("click", function () {
-        toggleSecurityEdit(true);
+        toggleSecurityEdit(editStates.ShowEdit);
     });
-
+    
     adminEditObjects.btnEditSecurityOk.popup({
         open: function (event, ui, ele) {
         },
         afterOpen: function () {
-
             $("#btnSecurityOk").unbind("click");
             $("#btnSecurityOk").on("click", function () {
+                var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();                
+                if (!adminConfigurations.hasOwnProperty("security")) {
+                    adminConfigurations.security = {};
+                }
+                
+                //Set the new value to be saved.
+                adminConfigurations.security.enabled = adminEditObjects.chkSecurity.is(':checked');
+
+                //Call the loading image only after setting the new value to be saved.
+                toggleSecurityEdit(editStates.ShowLoading);
+                
+                voltDbRenderer.updateAdminConfiguration(adminConfigurations, function (result) {
+                    if (result.status == "1") {
+                        adminEditObjects.chkSecurityValue = adminConfigurations.securityEnabled;
+                       
+                        //Reload Admin configurations for displaying the updated value
+                        voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues, rawConfigValues) {
+                            VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues, rawConfigValues);
+                            toggleSecurityEdit(editStates.ShowEdit);
+                        });
+
+                    } else {
+
+                        toggleSecurityEdit(editStates.ShowEdit);
+                        var msg = '"' + adminEditObjects.securityLabel + '". ';
+                        if (result.status == "-1" && result.statusstring == "Query timeout.") {
+                            msg += "The DB Monitor service is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
+                        } else {
+                            msg += "Please try again later.";
+                        }
+
+                        adminEditObjects.updateErrorFieldMsg.text(msg);
+                        $("#updateErrorPopupLink").trigger("click");
+                    }
+                });
 
                 if (adminEditObjects.chkSecurity.is(':checked')) {
                     adminEditObjects.iconSecurityOption.removeClass().addClass("onIcon");
@@ -402,19 +461,7 @@ function loadAdminPage() {
 
                 //Close the popup
                 $($(this).siblings()[0]).trigger("click");
-            });
-
-            $("#btnPopupSecurityCancel").on("click", function () {
-                toggleSecurityEdit(true);
-            });
-
-            $(".popup_back").on("click", function () {
-                toggleSecurityEdit(true);
-            });
-
-            $(".popup_close").on("click", function () {
-                toggleSecurityEdit(true);
-            });
+            });            
         }
     });
 
@@ -1142,36 +1189,72 @@ function loadAdminPage() {
             });
         }
     });
+    
+    $("#formQueryTimeout").validate({
+        rules: {
+            txtQueryTimeout: adminValidationRules.numericRules
+        },
+        messages: {
+            txtQueryTimeout: adminValidationRules.numericMessages
+        }
+    });
 
     //Query time out
-    var toggleQueryTimeoutEdit = function (showEdit) {
+    var toggleQueryTimeoutEdit = function (state) {
 
         adminEditObjects.tBoxQueryTimeout.val(adminEditObjects.tBoxQueryTimeoutValue);
 
-        if (showEdit) {
+        if (state == editStates.ShowLoading) {
+            adminDOMObjects.queryTimeoutLabel.hide();
+            adminEditObjects.LinkQueryTimeoutEdit.hide();
             adminEditObjects.btnEditQueryTimeoutOk.hide();
             adminEditObjects.btnEditQueryTimeoutCancel.hide();
-            adminEditObjects.LinkQueryTimeoutEdit.show();
-
             adminEditObjects.tBoxQueryTimeout.hide();
-            adminEditObjects.spanqueryTimeOut.show();
-        } else {
+            
+            adminEditObjects.loadingQueryTimeout.show();
+        }
+        else if (state == editStates.ShowOkCancel) {
+            adminEditObjects.loadingQueryTimeout.hide();
             adminEditObjects.LinkQueryTimeoutEdit.hide();
             adminEditObjects.btnEditQueryTimeoutOk.show();
             adminEditObjects.btnEditQueryTimeoutCancel.show();
 
             adminEditObjects.spanqueryTimeOut.hide();
             adminEditObjects.tBoxQueryTimeout.show();
+            adminDOMObjects.queryTimeoutLabel.show();
+        } else {
+            adminEditObjects.loadingQueryTimeout.hide();
+            adminEditObjects.btnEditQueryTimeoutOk.hide();
+            adminEditObjects.btnEditQueryTimeoutCancel.hide();
+            adminEditObjects.LinkQueryTimeoutEdit.show();
+
+            adminEditObjects.tBoxQueryTimeout.hide();
+            adminEditObjects.spanqueryTimeOut.show();
+            adminDOMObjects.queryTimeoutLabel.show();
         }
     };
 
     adminEditObjects.LinkQueryTimeoutEdit.on("click", function () {
-        toggleQueryTimeoutEdit(false);
+        toggleQueryTimeoutEdit(editStates.ShowOkCancel);
         $("td.queryTimeOut span").toggleClass("unit");
     });
 
     adminEditObjects.btnEditQueryTimeoutCancel.on("click", function () {
-        toggleQueryTimeoutEdit(true);
+        toggleQueryTimeoutEdit(editStates.ShowEdit);
+    });
+    
+    adminEditObjects.btnEditQueryTimeoutOk.on("click", function (e) {
+
+        if (!$("#formQueryTimeout").valid()) {
+            e.preventDefault();
+            e.stopPropagation();
+            adminEditObjects.tBoxQueryTimeout.focus();
+
+            adminEditObjects.errorQueryTimeout.css("background-color", "yellow");
+            setTimeout(function () {
+                adminEditObjects.errorQueryTimeout.animate({ backgroundColor: 'white' }, 'slow');
+            }, 2000);
+        }
     });
   
     adminEditObjects.btnEditQueryTimeoutOk.popup({
@@ -1179,31 +1262,65 @@ function loadAdminPage() {
         },
         afterOpen: function () {
 
+            var popup = $(this)[0];
             $("#btnPopupQueryTimeoutOk").unbind("click");
             $("#btnPopupQueryTimeoutOk").on("click", function () {
 
-                adminEditObjects.tBoxQueryTimeoutValue = adminEditObjects.tBoxQueryTimeout.val();
-                adminEditObjects.spanqueryTimeOut.html(adminEditObjects.tBoxQueryTimeoutValue);
+                var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();
+                if (adminConfigurations.systemsettings.query == null) {
+                    adminConfigurations.systemsettings.query = {};
+                }
+                //Set the new value to be saved.
+                adminConfigurations.systemsettings.query.timeout = adminEditObjects.tBoxQueryTimeout.val();
+                
+                //Call the loading image only after setting the new value to be saved.
+                toggleQueryTimeoutEdit(editStates.ShowLoading);
+                voltDbRenderer.updateAdminConfiguration(adminConfigurations, function (result) {
+                    if (result.status == "1") {
+                        adminEditObjects.tBoxQueryTimeoutValue = adminEditObjects.tBoxQueryTimeout.val();
+                        adminEditObjects.spanqueryTimeOut.html(adminEditObjects.tBoxQueryTimeoutValue);
+
+                        //Reload Admin configurations for displaying the updated value
+                        voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues, rawConfigValues) {
+                            VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues, rawConfigValues);
+                            toggleQueryTimeoutEdit(editStates.ShowEdit);
+                        });
+
+                    } else {
+
+                        toggleQueryTimeoutEdit(editStates.ShowEdit);
+                        var msg = '"' + adminEditObjects.queryTimeoutFieldLabel + '". ';
+                        if (result.status == "-1" && result.statusstring == "Query timeout.") {
+                            msg += "The DB Monitor service is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
+                        } else {
+                            msg += "Please try again later.";
+                        }
+
+                        adminEditObjects.queryTimeoutUpdateErrorFieldMsg.text(msg);
+                        $("#queryTimeoutUpdateErrorPopupLink").trigger("click");
+                    }
+                });
 
                 //Close the popup
-                $($(this).siblings()[0]).trigger("click");
+                popup.close();
             });
 
             $("#btnPopupQueryTimeoutCancel").on("click", function () {
-                toggleQueryTimeoutEdit(true);
+                toggleQueryTimeoutEdit(editStates.ShowEdit);
             });
 
             $(".popup_back").on("click", function () {
-                toggleQueryTimeoutEdit(true);
+                toggleQueryTimeoutEdit(editStates.ShowEdit);
             });
 
             $(".popup_close").on("click", function () {
-                toggleQueryTimeoutEdit(true);
+                toggleQueryTimeoutEdit(editStates.ShowEdit);
             });
         }
     });   
 
     $("#updateErrorPopupLink").popup();
+
     $("#updateErrorSnapshotPopupLink").popup({
         open: function (event, ui, ele) {
         },
@@ -1215,6 +1332,9 @@ function loadAdminPage() {
             });
         }
     });
+
+    $("#queryTimeoutUpdateErrorPopupLink").popup();
+
     // Filters servers list
     $('#popServerSearchAdmin').keyup(function () {
         var that = this;
@@ -1317,7 +1437,7 @@ function loadAdminPage() {
             adminDOMObjects.partitionDetection.removeClass().addClass(getOnOffClass(adminConfigValues.partitionDetection));
             adminDOMObjects.partitionDetectionLabel.text(getOnOffText(adminConfigValues.partitionDetection));
             adminDOMObjects.security.removeClass().addClass(getOnOffClass(adminConfigValues.securityEnabled));
-            adminDOMObjects.securityLabel.text(getOnOffText(adminConfigValues.securityEnabled));
+            adminDOMObjects.securityLabel.text(adminEditObjects.spanSecurityEdited==""?getOnOffText(adminConfigValues.securityEnabled):adminEditObjects.spanSecurityEdited);
             adminDOMObjects.httpAccess.removeClass().addClass(getOnOffClass(adminConfigValues.httpEnabled));
             adminDOMObjects.httpAccessLabel.text(getOnOffText(adminConfigValues.httpEnabled));
             adminDOMObjects.jsonAPI.removeClass().addClass(getOnOffClass(adminConfigValues.jsonEnabled));
