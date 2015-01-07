@@ -1229,7 +1229,6 @@ public abstract class CatalogUtil {
     }
 
     public static File getCommandLogSnapshot(PathsType.Commandlogsnapshot paths, File voltDbRoot) {
-        System.out.println("Called to get COMMAND LOG SNAPSHOT");
         if (!VoltDB.instance().getConfig().m_isEnterprise) {
             // dumb defaults if you ask for logging in community version
             File commandlogSnapshotPath = new VoltFile(voltDbRoot, "command_log_snapshot");
