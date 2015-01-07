@@ -91,7 +91,7 @@ function loadAdminPage() {
         iconSecurityOption: $("#securityOptionIcon"),
         spanSecurity: $("#spanSecurity"),
         securityLabel: $("#securityRow").find("td:first-child").text(),
-        spanSecurityEdited:"",
+        spanSecurityEdited: "",
 
         //Edit Auto Snapshot objects
         btnEditAutoSnapshotOk: $("#btnEditAutoSnapshotOk"),
@@ -101,6 +101,7 @@ function loadAdminPage() {
         chkAutoSnapshotValue: $("#chkAutoSnapshot").is(":checked"),
         iconAutoSnapshotOption: $("#autoSnapshotIcon"),
         txtAutoSnapshot: $("#txtAutoSnapshot"),
+        spanAutoSpanEdited: "",
         //File Prefix objects
         tBoxFilePrefix: $("#txtPrefix"),
         tBoxFilePrefixValue: $("#txtPrefix").text(),
@@ -218,6 +219,7 @@ function loadAdminPage() {
     });
 
     adminEditObjects.chkAutoSnapsot.on('ifChanged', function () {
+        adminEditObjects.spanAutoSpanEdited = getOnOffText(adminEditObjects.chkAutoSnapsot.is(":checked"));
         adminEditObjects.txtAutoSnapshot.text(getOnOffText(adminEditObjects.chkAutoSnapsot.is(":checked")));
     });
 
@@ -1476,7 +1478,7 @@ function loadAdminPage() {
             adminDOMObjects.jsonAPI.removeClass().addClass(getOnOffClass(adminConfigValues.jsonEnabled));
             adminDOMObjects.jsonAPILabel.text(getOnOffText(adminConfigValues.jsonEnabled));
             adminDOMObjects.autoSnapshot.removeClass().addClass(getOnOffClass(adminConfigValues.snapshotEnabled));
-            adminDOMObjects.autoSnapshotLabel.text(getOnOffText(adminConfigValues.snapshotEnabled));
+            adminDOMObjects.autoSnapshotLabel.text(adminEditObjects.spanAutoSpanEdited == "" ? getOnOffText(adminConfigValues.snapshotEnabled) : adminConfigValues.spanAutoSpanEdited);
             adminDOMObjects.filePrefix.text(adminConfigValues.filePrefix != "" ? adminConfigValues.filePrefix : "");
             adminDOMObjects.frequency.text(adminConfigValues.frequency != "" ? adminConfigValues.frequency : "");
             adminDOMObjects.frequencyLabel.text(adminConfigValues.frequency != "" ? "Hrs" : "");
