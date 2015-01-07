@@ -110,7 +110,6 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
         try{
             Object rowHandle = null;
             bulkLoader.insertRow(rowHandle, timestamp, level, message);
-            client.drain();
         } catch (Exception e) {
             e.printStackTrace();
         }
