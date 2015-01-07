@@ -584,7 +584,7 @@
 
 jQuery.extend({
     postJSON: function (url, formData, callback, authorization) {
-        
+
         if (VoltDBCore.hostIP == "") {
 
             jQuery.ajax({
@@ -628,7 +628,6 @@ jQuery.extend({
 
 jQuery.extend({
     getJSON: function (url, formData, callback, authorization) {
-        formData += '&User=admin&Hashedpassword=20e3aae7fc23385295505a6b703fd1fba66760d5';
 
         if (VoltDBCore.hostIP == "") {
             jQuery.ajax({
