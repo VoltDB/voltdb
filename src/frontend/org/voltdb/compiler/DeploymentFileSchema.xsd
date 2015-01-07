@@ -259,10 +259,6 @@
         </xs:complexType>
       </xs:element>
     </xs:sequence>
-    <!-- Thread pool size default 10 -->
-    <xs:attribute name="poolsize" type="xs:int" default="50"/>
-    <!-- Request timeout default 10 seconds. -->
-    <xs:attribute name="timeout" type="xs:int" default="10"/>
     <xs:attribute name="port" type="xs:int" default="8080"/>
     <xs:attribute name="enabled" type="xs:boolean" default="true"/>
   </xs:complexType>

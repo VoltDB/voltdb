@@ -552,7 +552,7 @@ public class HTTPAdminListener {
         m_htmlTemplates.put(name, contents);
     }
 
-    public HTTPAdminListener(boolean jsonEnabled, String intf, int port, boolean mustListen, int poolSize, int toInSeconds) throws Exception {
+    public HTTPAdminListener(boolean jsonEnabled, String intf, int port, boolean mustListen) throws Exception {
         m_mustListen = mustListen;
         // PRE-LOAD ALL HTML TEMPLATES (one for now)
         try {
@@ -618,14 +618,16 @@ public class HTTPAdminListener {
 
             m_server.setHandler(handlers);
 
+            int poolsize = Integer.getInteger("HTTP_POOL_SIZE", 50);
+            int timeout = Integer.getInteger("HTTP_REQUEST_TIMEOUT_SECONDS", 15);
             /*
              * Don't force us to look at a huge pile of threads
              */
-            final QueuedThreadPool qtp = new QueuedThreadPool(poolSize);
-            qtp.setMaxIdleTimeMs(toInSeconds * 1000);
+            final QueuedThreadPool qtp = new QueuedThreadPool(poolsize);
+            qtp.setMaxIdleTimeMs(timeout * 1000);
             qtp.setMinThreads(1);
             m_server.setThreadPool(qtp);
-            httpClientInterface.setTimeout(toInSeconds);
+            httpClientInterface.setTimeout(timeout);
             m_jsonEnabled = jsonEnabled;
         } catch (Exception e) {
             // double try to make sure the port doesn't get eaten
