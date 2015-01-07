@@ -450,6 +450,10 @@ public class HTTPAdminListener {
                 if (newDeployment.getSecurity() != null) {
                     DeploymentType currentDeployment = this.getDeployment();
                     List<User> users = currentDeployment.getUsers().getUser();
+                    if (newDeployment.getSecurity().isEnabled() && (users == null || users.isEmpty())) {
+                        response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, "Enabling security without any users is not allowed."));
+                        return;
+                    }
                     for (UsersType.User user : newDeployment.getUsers().getUser()) {
                         if (user.getPassword() == null || user.getPassword().trim().length() == 0) {
                             for (User u : users) {
