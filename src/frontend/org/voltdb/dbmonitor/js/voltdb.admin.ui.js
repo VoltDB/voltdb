@@ -521,15 +521,6 @@ function loadAdminPage() {
                     return;
                 }
 
-                //var snapShotDirectory = ($('#voltdbroot').text() != "" && $('#voltdbroot').text() != undefined && $('#snapshotpath').text() != "" && $('#snapshotpath').text() != undefined) ? ($('#voltdbroot').text() + '/' + $('#snapshotpath').text()) : '';
-                //if (snapShotDirectory == "") {
-                //    $($(this).siblings()[0]).trigger("click");
-                //    $('#saveSnapshotStatus').html('Failed to save snapshot');
-                //    $('#saveSnapshotMessage').html('Could not get Voltdb root directory and Snapshot path');
-                //    $('#btnSaveSnapshotPopup').click();
-                //} else {
-                //    snapShotDirectory = $('#txtSnapshotDirectory').val() != "" ? snapShotDirectory + "/" + $('#txtSnapshotDirectory').val() : snapShotDirectory;
-                //}
                 var snapShotDirectory = $('#txtSnapshotDirectory').val();
                 var snapShotFileName = $('#txtSnapshotName').val();
                 voltDbRenderer.saveSnapshot(snapShotDirectory, snapShotFileName, function (success,snapshotStatus) {
