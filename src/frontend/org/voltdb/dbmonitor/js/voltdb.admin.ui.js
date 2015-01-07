@@ -105,6 +105,8 @@ function loadAdminPage() {
         tBoxFilePrefix: $("#txtPrefix"),
         tBoxFilePrefixValue: $("#txtPrefix").text(),
         spanAutoSnapshotFilePrefix: $("#prefixSpan"),
+        errorAutoSnapshotFilePrefix: $("#errorSnapshotFilePrefix"),
+        loadingSnapshotPrefix: $("#loadingSnapshotPrefix"),
         //Frequency objects
         tBoxAutoSnapshotFreq: $("#txtFrequency"),
         tBoxAutoSnapshotFreqValue: $("#frequencySpan").text(),
@@ -112,11 +114,18 @@ function loadAdminPage() {
         ddlAutoSnapshotFreqUnit: $("#ddlfrequencyUnit"),
         ddlAutoSnapshotFreqUnitValue: $("#spanFrequencyUnit").text(),
         spanAutoSnapshotFreqUnit: $("#spanFrequencyUnit"),
+        errorAutoSnapshotFreq: $("#errorSnapshotFrequency"),
+        loadingSnapshotFrequency: $("#loadingSnapshotFrequency"),
         //Retained objects
         tBoxAutoSnapshotRetained: $("#txtRetained"),
         tBoxAutoSnapshotRetainedValue: $("#retainedSpan").text(),
         spanAutoSnapshotRetained: $("#retainedSpan"),
+        errorAutoSnapshotRetained: $("#errorSnapshotRetained"),
+        loadingSnapshotRetained: $("#loadingSnapshotRetained"),
 
+        //snapshot
+        editStateSnapshot: editStates.ShowEdit,
+        
         //Heartbeat Timeout
         rowHeartbeatTimeout: $("#heartbeatTimeoutRow"),
         btnEditHeartbeatTimeoutOk: $("#btnEditHeartbeatTimeoutOk"),
@@ -143,8 +152,10 @@ function loadAdminPage() {
         
         //Update Error
         updateErrorFieldMsg: $("#updateErrorFieldMsg"),
+        updateSnapshotErrorFieldMsg: $("#updateSnapshotErrorFieldMsg"),
         heartbeatTimeoutLabel: $("#heartbeatTimeoutRow").find("td:first-child").text(),
         queryTimeoutUpdateErrorFieldMsg: $("#queryTimeoutUpdateErrorFieldMsg"),
+        snapshotLabel: $("#row-2").find("td:first-child").text(),
         queryTimeoutFieldLabel: $("#queryTimoutRow").find("td:first-child").text()
     };
 
@@ -187,7 +198,7 @@ function loadAdminPage() {
         },
         restoreSnapshotMessages: {
             required: "Please select a snapshot to restore."
-        },
+        }
     };
     
     //Admin Page download link
@@ -479,15 +490,6 @@ function loadAdminPage() {
                     txtSnapshotDirectory: adminValidationRules.directoryPathMessages,
                 }
             });
-
-            $.validator.addMethod(
-                "regex",
-                function(value, element, regexp) {
-                    var re = new RegExp(regexp);
-                    return this.optional(element) || re.test(value);
-                },
-                "Please enter only valid characters."
-            );
         },
         afterOpen: function (event) {
             $("#btnSaveSnapshots").unbind("click");
@@ -825,7 +827,8 @@ function loadAdminPage() {
     });
 
 
-    var toggleAutoSnapshotEdit = function (showEdit) {
+    var toggleAutoSnapshotEdit = function (state) {
+        adminEditObjects.editStateSnapshot = state;
 
         if (adminEditObjects.chkAutoSnapshotValue) {
             adminEditObjects.chkAutoSnapsot.iCheck('check');
@@ -839,22 +842,28 @@ function loadAdminPage() {
         adminEditObjects.ddlAutoSnapshotFreqUnit.val(adminEditObjects.ddlAutoSnapshotFreqUnitValue);
         adminEditObjects.txtAutoSnapshot.text(getOnOffText(adminEditObjects.chkAutoSnapshotValue));
 
-        if (showEdit) {
-            adminEditObjects.chkAutoSnapsot.parent().removeClass("customCheckbox");
+        if (state == editStates.ShowLoading) {
+            adminEditObjects.iconAutoSnapshotOption.hide();
+            adminEditObjects.LinkAutoSnapshotEdit.hide();
             adminEditObjects.btnEditAutoSnapshotOk.hide();
             adminEditObjects.btnEditAutoSnapshotCancel.hide();
-            adminEditObjects.LinkAutoSnapshotEdit.show();
-            adminEditObjects.iconAutoSnapshotOption.show();
-
+            
+            adminEditObjects.spanAutoSnapshotFreqUnit.hide();
+            adminEditObjects.spanAutoSnapshotFreq.hide();
+            adminEditObjects.spanAutoSnapshotRetained.hide();
+            adminEditObjects.spanAutoSnapshotFilePrefix.hide();
+            
             adminEditObjects.tBoxAutoSnapshotFreq.hide();
             adminEditObjects.ddlAutoSnapshotFreqUnit.hide();
             adminEditObjects.tBoxAutoSnapshotRetained.hide();
             adminEditObjects.tBoxFilePrefix.hide();
-            adminEditObjects.spanAutoSnapshotFreq.show();
-            adminEditObjects.spanAutoSnapshotFreqUnit.show();
-            adminEditObjects.spanAutoSnapshotRetained.show();
-            adminEditObjects.spanAutoSnapshotFilePrefix.show();
-        } else {
+            adminDOMObjects.retainedLabel.hide();
+
+            adminEditObjects.loadingSnapshotFrequency.show();
+            adminEditObjects.loadingSnapshotPrefix.show();
+            adminEditObjects.loadingSnapshotRetained.show();
+        }
+        else if (state == editStates.ShowOkCancel) {
             adminEditObjects.iconAutoSnapshotOption.hide();
             adminEditObjects.LinkAutoSnapshotEdit.hide();
             adminEditObjects.btnEditAutoSnapshotOk.show();
@@ -869,11 +878,95 @@ function loadAdminPage() {
             adminEditObjects.ddlAutoSnapshotFreqUnit.show();
             adminEditObjects.tBoxAutoSnapshotRetained.show();
             adminEditObjects.tBoxFilePrefix.show();
+            adminDOMObjects.retainedLabel.show();
+            adminEditObjects.loadingSnapshotFrequency.hide();
+            adminEditObjects.loadingSnapshotPrefix.hide();
+            adminEditObjects.loadingSnapshotRetained.hide();
+        } else {
+            adminEditObjects.chkAutoSnapsot.parent().removeClass("customCheckbox");
+            adminEditObjects.btnEditAutoSnapshotOk.hide();
+            adminEditObjects.btnEditAutoSnapshotCancel.hide();
+            adminEditObjects.LinkAutoSnapshotEdit.show();
+            adminEditObjects.iconAutoSnapshotOption.show();
+
+            adminEditObjects.tBoxAutoSnapshotFreq.hide();
+            adminEditObjects.ddlAutoSnapshotFreqUnit.hide();
+            adminEditObjects.tBoxAutoSnapshotRetained.hide();
+            adminEditObjects.tBoxFilePrefix.hide();
+            adminEditObjects.spanAutoSnapshotFreq.show();
+            adminEditObjects.spanAutoSnapshotFreqUnit.show();
+            adminEditObjects.spanAutoSnapshotRetained.show();
+            adminEditObjects.spanAutoSnapshotFilePrefix.show();
+            adminDOMObjects.retainedLabel.show();
+            adminEditObjects.loadingSnapshotFrequency.hide();
+            adminEditObjects.loadingSnapshotPrefix.hide();
+            adminEditObjects.loadingSnapshotRetained.hide();
         }
     };
 
     adminEditObjects.btnEditAutoSnapshotCancel.on("click", function () {
-        toggleAutoSnapshotEdit(true);
+        toggleAutoSnapshotEdit(editStates.ShowEdit);
+    });
+
+    adminEditObjects.btnEditAutoSnapshotOk.on("click", function(e) {
+        if (!$("#frmSnapshotFrequency").valid()) {
+            e.preventDefault();
+            e.stopPropagation();
+            adminEditObjects.tBoxAutoSnapshotFreq.focus();
+
+            adminEditObjects.errorAutoSnapshotFreq.css("background-color", "yellow");
+            setTimeout(function() {
+                adminEditObjects.errorAutoSnapshotFreq.animate({ backgroundColor: 'white' }, 'slow');
+            }, 2000);
+        }
+        if (!$("#frmSnapshotFilePrefix").valid()) {
+            e.preventDefault();
+            e.stopPropagation();
+            adminEditObjects.tBoxFilePrefix.focus();
+
+            adminEditObjects.errorAutoSnapshotFilePrefix.css("background-color", "yellow");
+            setTimeout(function () {
+                adminEditObjects.errorAutoSnapshotFilePrefix.animate({ backgroundColor: 'white' }, 'slow');
+            }, 2000);
+        }
+        if (!$("#frmSnapshotRetained").valid()) {
+            e.preventDefault();
+            e.stopPropagation();
+            adminEditObjects.tBoxAutoSnapshotRetained.focus();
+
+            adminEditObjects.errorAutoSnapshotRetained.css("background-color", "yellow");
+            setTimeout(function () {
+                adminEditObjects.errorAutoSnapshotRetained.animate({ backgroundColor: 'white' }, 'slow');
+            }, 2000);
+        }
+        
+    });
+
+    $("#frmSnapshotFrequency").validate({
+        rules: {
+            txtFrequency: adminValidationRules.numericRules
+        },
+        messages: {
+            txtFrequency: adminValidationRules.numericMessages
+        }
+    });
+    
+    $("#frmSnapshotFilePrefix").validate({
+        rules: {
+            txtPrefix: adminValidationRules.fileNameRules
+        },
+        messages: {
+            txtPrefix: adminValidationRules.fileNameMessages
+        }
+    }); 
+
+    $("#frmSnapshotRetained").validate({
+        rules: {
+            txtRetained: adminValidationRules.numericRules
+        },
+        messages: {
+            txtRetained: adminValidationRules.numericMessages
+        }
     });
 
     adminEditObjects.btnEditAutoSnapshotOk.popup({
@@ -883,46 +976,74 @@ function loadAdminPage() {
 
             $("#btnSaveSnapshot").unbind("click");
             $("#btnSaveSnapshot").on("click", function () {
-                var regex = new RegExp("^[a-zA-Z0-9_]+$");
-                if (!regex.test(adminEditObjects.tBoxFilePrefix.val())) {
-                    alert("Invalid input characters.");
-                    $($(this).siblings()[0]).trigger("click");
-                    return false;
-                }
+                var popup = $(this)[0];
+                var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();
+                    if (!adminConfigurations.hasOwnProperty("snapshot")) {
+                        adminConfigurations.snapshot = {};
+                    }
+                    //Set the new value to be saved.
+                    var frequencyUnit = "s";
+                    if (adminEditObjects.ddlAutoSnapshotFreqUnit.val().toLowerCase() == "min")
+                        frequencyUnit = "m";
+                    else if (adminEditObjects.ddlAutoSnapshotFreqUnit.val().toLowerCase() == "sec")
+                        frequencyUnit = "s";
+                    else if (adminEditObjects.ddlAutoSnapshotFreqUnit.val().toLowerCase() == "hrs")
+                        frequencyUnit = "h";
+                    adminConfigurations.snapshot.frequency = adminEditObjects.tBoxAutoSnapshotFreq.val() + frequencyUnit;
+                    adminConfigurations.snapshot.prefix = adminEditObjects.tBoxFilePrefix.val();
+                    adminConfigurations.snapshot.retain = adminEditObjects.tBoxAutoSnapshotRetained.val();
 
-                if (adminEditObjects.chkAutoSnapsot.is(':checked')) {
-                    adminEditObjects.iconAutoSnapshotOption.removeClass().addClass("onIcon");
-                    adminEditObjects.chkAutoSnapshotValue = true;
-                } else {
-                    adminEditObjects.iconAutoSnapshotOption.removeClass().addClass("offIcon");
-                    adminEditObjects.chkAutoSnapshotValue = false;
-                }
+                    //Call the loading image only after setting the new value to be saved.
+                    toggleAutoSnapshotEdit(editStates.ShowLoading);
+                    voltDbRenderer.updateAdminConfiguration(adminConfigurations, function(result) {
+                        if (result.status == "1") {
+                            adminEditObjects.tBoxAutoSnapshotFreqValue = adminEditObjects.tBoxAutoSnapshotFreq.val();
+                            adminEditObjects.ddlAutoSnapshotFreqUnitValue = adminEditObjects.ddlAutoSnapshotFreqUnit.val();
+                            adminEditObjects.tBoxAutoSnapshotRetainedValue = adminEditObjects.tBoxAutoSnapshotRetained.val();
+                            adminEditObjects.tBoxFilePrefixValue = adminEditObjects.tBoxFilePrefix.val();
 
-                adminEditObjects.tBoxAutoSnapshotFreqValue = adminEditObjects.tBoxAutoSnapshotFreq.val();
-                adminEditObjects.ddlAutoSnapshotFreqUnitValue = adminEditObjects.ddlAutoSnapshotFreqUnit.val();
-                adminEditObjects.tBoxAutoSnapshotRetainedValue = adminEditObjects.tBoxAutoSnapshotRetained.val();
-                adminEditObjects.tBoxFilePrefixValue = adminEditObjects.tBoxFilePrefix.val();
+                            adminEditObjects.spanAutoSnapshotFreq.html(adminEditObjects.tBoxAutoSnapshotFreqValue);
+                            adminEditObjects.spanAutoSnapshotFreqUnit.html(adminEditObjects.ddlAutoSnapshotFreqUnitValue);
+                            adminEditObjects.spanAutoSnapshotRetained.html(adminEditObjects.tBoxAutoSnapshotRetainedValue);
+                            adminEditObjects.spanAutoSnapshotFilePrefix.html(adminEditObjects.tBoxFilePrefixValue);
 
-                adminEditObjects.spanAutoSnapshotFreq.html(adminEditObjects.tBoxAutoSnapshotFreqValue);
-                adminEditObjects.spanAutoSnapshotFreqUnit.html(adminEditObjects.ddlAutoSnapshotFreqUnitValue);
-                adminEditObjects.spanAutoSnapshotRetained.html(adminEditObjects.tBoxAutoSnapshotRetainedValue);
-                adminEditObjects.spanAutoSnapshotFilePrefix.html(adminEditObjects.tBoxFilePrefixValue);
+                            //Reload Admin configurations for displaying the updated value
+                            voltDbRenderer.GetAdminDeploymentInformation(false, function(adminConfigValues, rawConfigValues) {
+                                VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues, rawConfigValues);
+                                toggleAutoSnapshotEdit(editStates.ShowEdit);
+                            });
+                        } else {
+                            toggleAutoSnapshotEdit(editStates.ShowEdit);
+                            var msg = '"' + adminEditObjects.snapshotLabel + '". ';
+                            if (result.status == "-1" && result.statusstring == "Query timeout.") {
+                                msg += "The DB Monitor service is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
+                            } else {
+                                msg += "Please try again later.";
+                            }
 
+                            adminEditObjects.updateSnapshotErrorFieldMsg.text(msg);
+                            $("#updateErrorSnapshotPopupLink").trigger("click");
+                        }
+
+
+                        //Close the popup 
+                    popup.close();
+                });
                 //Close the popup
                 $($(this).siblings()[0]).trigger("click");
             });
 
-            $("#btnPopupAutoSnapshotCancel").on("click", function () {
-                toggleAutoSnapshotEdit(true);
-            });
+            //$("#btnPopupAutoSnapshotCancel").on("click", function () {
+            //    toggleAutoSnapshotEdit(editStates.ShowEdit);
+            //});
 
-            $(".popup_back").on("click", function () {
-                toggleAutoSnapshotEdit(true);
-            });
+            //$(".popup_back").on("click", function () {
+            //    toggleAutoSnapshotEdit(editStates.ShowEdit);
+            //});
 
-            $(".popup_close").on("click", function () {
-                toggleAutoSnapshotEdit(true);
-            });
+            //$(".popup_close").on("click", function () {
+            //    toggleAutoSnapshotEdit(editStates.ShowEdit);
+            //});
         }
     });
 
@@ -930,7 +1051,7 @@ function loadAdminPage() {
         var parent = $(this).parent().parent();
         parent.siblings('.child-' + parent.attr("id")).show();
         parent.find(".labelCollapsed").addClass("labelExpanded");
-        toggleAutoSnapshotEdit(false);
+        toggleAutoSnapshotEdit(editStates.ShowOkCancel);
     });
 
     $("#formHeartbeatTimeout").validate({
@@ -1022,7 +1143,6 @@ function loadAdminPage() {
                 }
                 //Set the new value to be saved.
                 adminConfigurations.heartbeat.timeout = adminEditObjects.tBoxHeartbeatTimeout.val();
-                
                 //Call the loading image only after setting the new value to be saved.
                 toggleHeartbeatTimeoutEdit(editStates.ShowLoading);
                 voltDbRenderer.updateAdminConfiguration(adminConfigurations, function (result) {
@@ -1213,16 +1333,29 @@ function loadAdminPage() {
             });
         }
     });
+    
     $("#queryTimeoutUpdateErrorPopupLink").popup({
-        open: function (event, ui, ele) {
+        open: function(event, ui, ele) {
         },
-        afterOpen: function () {
+        afterOpen: function() {
 
             var popup = $(this)[0];
             $("#btnQueryTimeoutUpdateErrorOk").unbind("click");
-            $("#btnQueryTimeoutUpdateErrorOk").on("click", function () {
+            $("#btnQueryTimeoutUpdateErrorOk").on("click", function() {
 
                 //Close the popup
+                popup.close();
+            });
+        }
+    });
+
+    $("#updateErrorSnapshotPopupLink").popup({
+        open: function(event, ui, ele) {
+        },
+        afterOpen: function() {
+            var popup = $(this)[0];
+            $("#btnUpdateSnapshotErrorOk").unbind("click");
+            $("#btnUpdateSnapshotErrorOk").on("click", function() {
                 popup.close();
             });
         }
@@ -1261,6 +1394,15 @@ function loadAdminPage() {
         checkboxClass: 'icheckbox_square-aero',
         increaseArea: '20%' // optional
     });
+
+    $.validator.addMethod(
+        "regex",
+        function(value, element, regexp) {
+            var re = new RegExp(regexp);
+            return this.optional(element) || re.test(value);
+        },
+        "Please enter only valid characters."
+    );
 }
 
 (function (window) {
