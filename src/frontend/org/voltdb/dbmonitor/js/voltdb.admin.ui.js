@@ -1320,12 +1320,40 @@ function loadAdminPage() {
         }
     });   
 
-    $("#updateErrorPopupLink").popup();
-
-    $("#updateErrorSnapshotPopupLink").popup({
+    $("#updateErrorPopupLink").popup({
         open: function (event, ui, ele) {
         },
         afterOpen: function () {
+
+            var popup = $(this)[0];
+            $("#btnUpdateErrorOk").unbind("click");
+            $("#btnUpdateErrorOk").on("click", function () {
+
+                //Close the popup
+                popup.close();
+            });
+        }
+    });
+    
+    $("#queryTimeoutUpdateErrorPopupLink").popup({
+        open: function(event, ui, ele) {
+        },
+        afterOpen: function() {
+
+            var popup = $(this)[0];
+            $("#btnQueryTimeoutUpdateErrorOk").unbind("click");
+            $("#btnQueryTimeoutUpdateErrorOk").on("click", function() {
+
+                //Close the popup
+                popup.close();
+            });
+        }
+    });
+
+    $("#updateErrorSnapshotPopupLink").popup({
+        open: function(event, ui, ele) {
+        },
+        afterOpen: function() {
             var popup = $(this)[0];
             $("#btnUpdateSnapshotErrorOk").unbind("click");
             $("#btnUpdateSnapshotErrorOk").on("click", function() {
@@ -1333,8 +1361,6 @@ function loadAdminPage() {
             });
         }
     });
-
-    $("#queryTimeoutUpdateErrorPopupLink").popup();
 
     // Filters servers list
     $('#popServerSearchAdmin').keyup(function () {
