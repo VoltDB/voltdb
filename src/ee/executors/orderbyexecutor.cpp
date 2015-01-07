@@ -88,6 +88,15 @@ OrderByExecutor::p_init(AbstractPlanNode* abstract_node,
         dynamic_cast<LimitPlanNode*>(node->
                                      getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
 
+#if defined(VOLT_LOG_LEVEL)
+#if VOLT_LOG_LEVEL<=VOLT_LEVEL_TRACE
+    const std::vector<AbstractExpression*>& sortExprs = node->getSortExpressions();
+    for (int i = 0; i < sortExprs.size(); ++i) {
+        VOLT_TRACE("Sort key[%d]:\n%s", i, sortExprs[i]->debug(true).c_str());
+    }
+#endif
+#endif
+
     return true;
 }
 

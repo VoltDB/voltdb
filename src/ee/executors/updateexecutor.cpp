@@ -230,7 +230,7 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
     // delete/insert
 
     // add to the planfragments count of modified tuples
-    m_engine->m_tuplesModified += m_inputTable->tempTableTupleCount();
+    m_engine->addToTuplesModified(m_inputTable->tempTableTupleCount());
 
     return true;
 }

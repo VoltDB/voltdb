@@ -31,6 +31,9 @@
 
 package org.hsqldb_voltpatches;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
@@ -943,17 +946,17 @@ public abstract class StatementDMQL extends Statement {
         }
     }
 
-    private static VoltXMLElement voltGetXMLSpecification(QuerySpecification select, ExpressionColumn parameters[], Session session)
-    throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
-    {
-        // select
-        VoltXMLElement query = new VoltXMLElement("select");
-        if (select.isDistinctSelect)
-            query.attributes.put("distinct", "true");
+    /** return a list of VoltXMLElements that need to be added to the statement XML for LIMIT and OFFSET */
+    protected static List<VoltXMLElement> voltGetLimitOffsetXMLFromSortAndSlice(Session session, SortAndSlice sortAndSlice)
+            throws HSQLParseException {
+        List<VoltXMLElement> result = new ArrayList<>();
 
-        // limit
-        if ((select.sortAndSlice != null) && (select.sortAndSlice.limitCondition != null)) {
-            Expression limitCondition = select.sortAndSlice.limitCondition;
+        if (sortAndSlice == null || sortAndSlice == SortAndSlice.noSort) {
+            return result;
+        }
+
+        if (sortAndSlice.limitCondition != null) {
+            Expression limitCondition = sortAndSlice.limitCondition;
             if (limitCondition.nodes.length != 2) {
                 throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
                     "Parser did not create limit and offset expression for LIMIT.");
@@ -972,7 +975,7 @@ public abstract class StatementDMQL extends Statement {
                 } else {
                     offset.attributes.put("offset_paramid", limitCondition.nodes[0].getUniqueId(session));
                 }
-                query.children.add(offset);
+                result.add(offset);
 
                 // read limit. it may be a parameter token.
                 VoltXMLElement limit = new VoltXMLElement("limit");
@@ -985,12 +988,28 @@ public abstract class StatementDMQL extends Statement {
                 } else {
                     limit.attributes.put("limit_paramid", limitCondition.nodes[1].getUniqueId(session));
                 }
-                query.children.add(limit);
+                result.add(limit);
 
             } catch (HsqlException ex) {
                 // XXX really?
                 ex.printStackTrace();
             }
+        }
+
+        return result;
+    }
+
+    private static VoltXMLElement voltGetXMLSpecification(QuerySpecification select, ExpressionColumn parameters[], Session session)
+    throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
+    {
+        // select
+        VoltXMLElement query = new VoltXMLElement("select");
+        if (select.isDistinctSelect)
+            query.attributes.put("distinct", "true");
+
+        List<VoltXMLElement> limitOffsetXml = voltGetLimitOffsetXMLFromSortAndSlice(session, select.sortAndSlice);
+        for (VoltXMLElement elem : limitOffsetXml) {
+            query.children.add(elem);
         }
 
         // Just gather a mish-mash of every possible relevant expression
