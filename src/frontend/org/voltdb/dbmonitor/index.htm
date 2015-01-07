@@ -270,7 +270,7 @@
                                 <li><a href="#pauseConfirmationPop" class="resume" id="pauseConfirmation">Pause</a> <a href="#resumeConfirmationPop" class="pause" id="resumeConfirmation" style="display: none;">Resume</a> </li>
                                 <li><a href="#promoteConfirmationPop" class="promote-disabled" id="promoteConfirmation">Promote</a></li>
                                 <li><a href="#savePop" id="saveConfirmation" class="saveme">Save</a></li>
-                                <li><a href="#restorePop" id="restoreConfirmation" class="restore">Restore</a></li>
+                                <li><a href="#restorePop" id="restoreConfirmation" class="restoreConfirmationDisable">Restore</a></li>
                                 <li><a href="#shutDownConfirmationPop" class="shutdown" id="shutDownConfirmation">Shutdown</a></li>
                             </ul>
                            
@@ -371,41 +371,58 @@
                                 </tr>
                                 <tr class="hasSubLabel parent" id="row-2">
                                     <td class="configLabel"><a href="javascript:void(0)" class="labelCollapsed">Auto Snapshots</a></td>
-                                    <td align="right" id="autoSnapshotOption">
+                                    <td align="right" id="autoSnapshotOption" class="snapshottd">
                                         <div id="autoSnapshotIcon" class="onIcon"></div>
-                                        <input style="display: none;" type="checkbox" id="chkAutoSnapshot" checked="checked" class="snapshot" /></td>
+                                        <input style="display: none;" type="checkbox" id="chkAutoSnapshot" checked="checked" class="snapshot" />
+                                        <div id="loadingSnapshot" class="loading-small" style="display: none"></div>
+                                    </td>
                                     <td>
                                         <div id="txtAutoSnapshot" class="SnapshotsOn"></div>
                                     </td>
                                     <td><a id="btnEditAutoSnapshotOk" href="#autoSnapshotPop" class="editOk" title="Save" style="">Ok</a> <a id="btnEditAutoSnapshotCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a href="javascript:void(0)" id="autoSnapshotEdit" class="edit" title="Edit">&nbsp;</a></td>
                                 </tr>
-                                <tr class="child-row-2 subLabelRow">
+                                <tr class="child-row-2 subLabelRow" id="snapshotPrefixRow">
                                     <td class="configLabel">File Prefix </td>
-                                    <td align="right"><span id="prefixSpan"></span>
-                                        <input id="txtPrefix" class="exitableTxtBx exitableFilePrefix" type="text" style="display: none">
+                                    <td align="right" class="tdSnapshotPrefix">
+                                        <form id="frmSnapshotFilePrefix" method="get" action="">
+                                            <div id="loadingSnapshotPrefix" class="loading-small" style="display: none;"></div>
+                                            <span id="prefixSpan"></span>
+                                            <input id="txtPrefix" name="txtPrefix" class="exitableTxtBx exitableFilePrefix" type="text" style="display: none" />
+                                            <label id="errorSnapshotFilePrefix" for="txtPrefix" class="error" style="display: none;"></label>
+                                        </form>
                                     </td>
                                     <td>&nbsp;</td>
                                     <td>&nbsp;</td>
                                 </tr>
-                                <tr class="child-row-2 subLabelRow">
+                                <tr class="child-row-2 subLabelRow" id="snapshotFrequencyRow">
                                     <td class="configLabel">Frequency </td>
-                                    <td align="right"><span id="frequencySpan"></span>
-                                        <input id="txtFrequency" class="exitableTxtBx" type="text" style="display: none">
-                                        <span id="spanFrequencyUnit"></span>
-                                        <select id="ddlfrequencyUnit" style="display: none;">
-                                            <option>Hrs</option>
-                                            <option>Min</option>
-                                            <option>Sec</option>
-                                        </select>
+                                    <td align="right" class="tdSnapshotFrequency">
+                                        <form id="frmSnapshotFrequency" method="get" action="">
+                                            <div id="loadingSnapshotFrequency" class="loading-small" style="display: none;"></div>
+                                            <span id="frequencySpan"></span>
+                                            <input id="txtFrequency" name="txtFrequency" class="exitableTxtBx" type="text" style="display: none" />
+                                            <span id="spanFrequencyUnit"></span>
+                                            <select id="ddlfrequencyUnit" style="display: none;">
+                                                <option>Hrs</option>
+                                                <option>Min</option>
+                                                <option>Sec</option>
+                                            </select>
+                                            <label id="errorSnapshotFrequency" for="txtFrequency" class="error" style="display: none;"></label>
+                                        </form>
                                     </td>
                                     <td>&nbsp;</td>
                                     <td>&nbsp;</td>
                                 </tr>
-                                <tr class="child-row-2 subLabelRow">
+                                <tr class="child-row-2 subLabelRow" id="snapshotRetainedRow">
                                     <td class="configLabel">Retained </td>
-                                    <td align="right"><span id="retainedSpan"></span>
-                                        <input id="txtRetained" class="exitableTxtBx" type="text" style="display: none">
-                                        <span id="retainedSpanUnit"></span>
+                                    <td align="right" class="tdSnapshotRetained">
+                                        <form id="frmSnapshotRetained" method="get" action="">
+                                            <div id="loadingSnapshotRetained" class="loading-small" style="display: none;"></div>
+                                            <span id="retainedSpan"></span>
+                                            <input id="txtRetained" name="txtRetained" class="exitableTxtBx" type="text" style="display: none" />
+                                            <span id="retainedSpanUnit"></span>
+                                            <label id="errorSnapshotRetained" for="txtRetained" class="error" style="display: none;"></label>
+                                        </form>
                                     </td>
                                     <td>&nbsp;</td>
                                     <td>&nbsp;</td>
@@ -506,9 +523,15 @@
                                 </tr>
                                 <tr class="child-row-5 subLabelRow" id="queryTimoutRow">
                                     <td class="configLabel">Query time out</td>
-                                    <td align="right" class="queryTimeOut"><span id="queryTimeOutSpan"></span>
-                                        <input id="txtQueryTimeout" class="exitableTxtBx" type="text" style="display: none" />
-                                        <span id="queryTimeOutUnitSpan"></span></td>
+                                    <td align="right" class="queryTimeOut">
+                                        <form id="formQueryTimeout" method="get" action="">
+                                            <div id="loadingQueryTimeout" class="loading-small" style="display: none;"></div>
+                                            <span id="queryTimeOutSpan"></span>
+                                            <input id="txtQueryTimeout" name="txtQueryTimeout" class="exitableTxtBx" type="text" style="display: none" />
+                                            <span id="queryTimeOutUnitSpan"></span>
+                                            <label id="errorQueryTimeout" for="txtQueryTimeout" class="error" style="display: none;"></label>
+                                        </form>
+                                    </td>
                                     <td>&nbsp;</td>
                                     <td><a id="btnEditQueryTimeoutOk" href="#QueryTimeOutPopup" class="editOk" title="Ok" style="">Ok</a> <a id="btnEditQueryTimeoutCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a id="btnEditQueryTimeout" href="javascript:void(0)" class="edit" title="Edit">&nbsp;</a></td>
                                 </tr>
@@ -1058,7 +1081,7 @@
                     </div>
 
                 </div>
-                <div class="overlay-btns"><a id="btnRestore" class="btn restoreBtn" title="Ok">Restore</a> <a class="btn btn-gray closeBtn" title="Cancel">Cancel</a></div>
+                <div class="overlay-btns"><a id="btnRestore" class="btn restoreBtn" title="Restore">Restore</a> <a class="btn btn-gray closeBtn" title="Cancel">Cancel</a></div>
             </div>
             <div id="restoreConfirm" class="restoreConfirmation" style="display: none;">
                 <div class="overlay-content ">
@@ -1159,11 +1182,52 @@
                     Could not update the value of <span id="updateErrorFieldMsg"></span>
                 </p>
                 <br />
-                <div class="overlay-btns" style="padding: 0"><a class="btn closeBtn" id="btnUpdateErrorOk" title="Ok">Ok</a></div>
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnUpdateErrorOk">Ok</a></div>
             </div>
         </div>
     </div>
     <!--Update error Popup-->
+    
+
+    <!--Update error Auto Snapshot Popup-->
+    <div style="display: none"><a href="#updateSnapshotErrorPopup" id="updateErrorSnapshotPopupLink">Update Error</a></div>
+    <div id="updateSnapshotErrorPopup" style="display: none">
+        <div id="updateInnerSnapshotErrorPopup">
+            <div class="overlay-title ">
+                <img src="css/resources/images/error.png" class="imgError" />Error
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorMsg">
+                <p>
+                    Could not update the value of <span id="updateSnapshotErrorFieldMsg"></span>
+                </p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnUpdateSnapshotErrorOk">Ok</a></div>
+
+            </div>
+        </div>
+    </div>
+    <!--Update error Popup-->
+    
+    <!--Update Query Time out error Popup-->
+    <div style="display: none"><a href="#queryTimeoutUpdateErrorPopup" id="queryTimeoutUpdateErrorPopupLink">Update Error</a></div>
+    <div id="queryTimeoutUpdateErrorPopup" style="display: none">
+        <div id="queryTimeoutUpdateInnerErrorPopup">
+            <div class="overlay-title ">
+                <img src="css/resources/images/error.png" class="imgError" />Error
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorMsg">
+                <p>
+                    Could not update the value of <span id="queryTimeoutUpdateErrorFieldMsg"></span>
+                </p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnQueryTimeoutUpdateErrorOk">Ok</a></div>
+            </div>
+        </div>
+    </div>
+    <!--Update error Popup-->
+
     <!-- POPUP StopServerErrorPopup-->
     <div id="divStopServerError" style="display: none; ">
         <div class="overlay-title icon-alert">Stop Error</div>
