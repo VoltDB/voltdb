@@ -91,7 +91,7 @@ function loadAdminPage() {
         iconSecurityOption: $("#securityOptionIcon"),
         spanSecurity: $("#spanSecurity"),
         securityLabel: $("#securityRow").find("td:first-child").text(),
-        spanSecurityEdited:"",
+        spanSecurityEdited: "",
 
         //Edit Auto Snapshot objects
         btnEditAutoSnapshotOk: $("#btnEditAutoSnapshotOk"),
@@ -101,6 +101,7 @@ function loadAdminPage() {
         chkAutoSnapshotValue: $("#chkAutoSnapshot").is(":checked"),
         iconAutoSnapshotOption: $("#autoSnapshotIcon"),
         txtAutoSnapshot: $("#txtAutoSnapshot"),
+        spanAutoSpanEdited: "",
         //File Prefix objects
         tBoxFilePrefix: $("#txtPrefix"),
         tBoxFilePrefixValue: $("#txtPrefix").text(),
@@ -125,6 +126,7 @@ function loadAdminPage() {
 
         //snapshot
         editStateSnapshot: editStates.ShowEdit,
+        loadingSnapshot: $("#loadingSnapshot"),
         
         //Heartbeat Timeout
         rowHeartbeatTimeout: $("#heartbeatTimeoutRow"),
@@ -217,6 +219,7 @@ function loadAdminPage() {
     });
 
     adminEditObjects.chkAutoSnapsot.on('ifChanged', function () {
+        adminEditObjects.spanAutoSpanEdited = getOnOffText(adminEditObjects.chkAutoSnapsot.is(":checked"));
         adminEditObjects.txtAutoSnapshot.text(getOnOffText(adminEditObjects.chkAutoSnapsot.is(":checked")));
     });
 
@@ -712,7 +715,7 @@ function loadAdminPage() {
             var searchError = false;
             $.each(snapshotList, function(id, snapshot) {
                 if (snapshot.RESULT == "FAILURE") {
-                    result += '<tr><td style="color:#c70000"> Error: Failure getting snapshots.' + snapshot.ERR_MSG + '</td></tr>';
+                    result += '<tr><td style="color:#c70000" colspan="3"> Error: Failure getting snapshots.' + snapshot.ERR_MSG + '</td></tr>';
                     searchError = true;
                     return false;
                 }
@@ -826,7 +829,6 @@ function loadAdminPage() {
         } else {
             adminEditObjects.chkAutoSnapsot.iCheck('uncheck');
         }
-
         adminEditObjects.tBoxAutoSnapshotFreq.val(adminEditObjects.tBoxAutoSnapshotFreqValue);
         adminEditObjects.tBoxAutoSnapshotRetained.val(adminEditObjects.tBoxAutoSnapshotRetainedValue);
         adminEditObjects.tBoxFilePrefix.val(adminEditObjects.tBoxFilePrefixValue);
@@ -834,7 +836,9 @@ function loadAdminPage() {
         adminEditObjects.txtAutoSnapshot.text(getOnOffText(adminEditObjects.chkAutoSnapshotValue));
 
         if (state == editStates.ShowLoading) {
+            adminEditObjects.chkAutoSnapsot.parent().removeClass("customCheckbox");
             adminEditObjects.iconAutoSnapshotOption.hide();
+            adminDOMObjects.autoSnapshotLabel.hide();
             adminEditObjects.LinkAutoSnapshotEdit.hide();
             adminEditObjects.btnEditAutoSnapshotOk.hide();
             adminEditObjects.btnEditAutoSnapshotCancel.hide();
@@ -850,12 +854,14 @@ function loadAdminPage() {
             adminEditObjects.tBoxFilePrefix.hide();
             adminDOMObjects.retainedLabel.hide();
 
+            adminEditObjects.loadingSnapshot.show();
             adminEditObjects.loadingSnapshotFrequency.show();
             adminEditObjects.loadingSnapshotPrefix.show();
             adminEditObjects.loadingSnapshotRetained.show();
         }
         else if (state == editStates.ShowOkCancel) {
             adminEditObjects.iconAutoSnapshotOption.hide();
+            adminDOMObjects.autoSnapshotLabel.show();
             adminEditObjects.LinkAutoSnapshotEdit.hide();
             adminEditObjects.btnEditAutoSnapshotOk.show();
             adminEditObjects.btnEditAutoSnapshotCancel.show();
@@ -873,12 +879,14 @@ function loadAdminPage() {
             adminEditObjects.loadingSnapshotFrequency.hide();
             adminEditObjects.loadingSnapshotPrefix.hide();
             adminEditObjects.loadingSnapshotRetained.hide();
+            adminEditObjects.loadingSnapshot.hide();
         } else {
             adminEditObjects.chkAutoSnapsot.parent().removeClass("customCheckbox");
             adminEditObjects.btnEditAutoSnapshotOk.hide();
             adminEditObjects.btnEditAutoSnapshotCancel.hide();
             adminEditObjects.LinkAutoSnapshotEdit.show();
             adminEditObjects.iconAutoSnapshotOption.show();
+            adminDOMObjects.autoSnapshotLabel.show();
 
             adminEditObjects.tBoxAutoSnapshotFreq.hide();
             adminEditObjects.ddlAutoSnapshotFreqUnit.hide();
@@ -892,6 +900,7 @@ function loadAdminPage() {
             adminEditObjects.loadingSnapshotFrequency.hide();
             adminEditObjects.loadingSnapshotPrefix.hide();
             adminEditObjects.loadingSnapshotRetained.hide();
+            adminEditObjects.loadingSnapshot.hide();
         }
     };
 
@@ -983,7 +992,7 @@ function loadAdminPage() {
                     adminConfigurations.snapshot.frequency = adminEditObjects.tBoxAutoSnapshotFreq.val() + frequencyUnit;
                     adminConfigurations.snapshot.prefix = adminEditObjects.tBoxFilePrefix.val();
                     adminConfigurations.snapshot.retain = adminEditObjects.tBoxAutoSnapshotRetained.val();
-
+                    adminConfigurations.snapshot.enabled = adminEditObjects.chkAutoSnapsot.is(':checked');
                     //Call the loading image only after setting the new value to be saved.
                     toggleAutoSnapshotEdit(editStates.ShowLoading);
                     voltDbRenderer.updateAdminConfiguration(adminConfigurations, function(result) {
@@ -1460,7 +1469,7 @@ function loadAdminPage() {
             adminDOMObjects.jsonAPI.removeClass().addClass(getOnOffClass(adminConfigValues.jsonEnabled));
             adminDOMObjects.jsonAPILabel.text(getOnOffText(adminConfigValues.jsonEnabled));
             adminDOMObjects.autoSnapshot.removeClass().addClass(getOnOffClass(adminConfigValues.snapshotEnabled));
-            adminDOMObjects.autoSnapshotLabel.text(getOnOffText(adminConfigValues.snapshotEnabled));
+            adminDOMObjects.autoSnapshotLabel.text(adminEditObjects.spanAutoSpanEdited == "" ? getOnOffText(adminConfigValues.snapshotEnabled) : adminConfigValues.spanAutoSpanEdited);
             adminDOMObjects.filePrefix.text(adminConfigValues.filePrefix != "" ? adminConfigValues.filePrefix : "");
             adminDOMObjects.frequency.text(adminConfigValues.frequency != "" ? adminConfigValues.frequency : "");
             adminDOMObjects.frequencyLabel.text(adminConfigValues.frequency != "" ? "Hrs" : "");
