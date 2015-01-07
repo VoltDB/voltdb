@@ -504,9 +504,15 @@
                                 </tr>
                                 <tr class="child-row-5 subLabelRow" id="queryTimoutRow">
                                     <td class="configLabel">Query time out</td>
-                                    <td align="right" class="queryTimeOut"><span id="queryTimeOutSpan"></span>
-                                        <input id="txtQueryTimeout" class="exitableTxtBx" type="text" style="display: none" />
-                                        <span id="queryTimeOutUnitSpan"></span></td>
+                                    <td align="right" class="queryTimeOut">
+                                        <form id="formQueryTimeout" method="get" action="">
+                                            <div id="loadingQueryTimeout" class="loading-small" style="display: none;"></div>
+                                            <span id="queryTimeOutSpan"></span>
+                                            <input id="txtQueryTimeout" name="txtQueryTimeout" class="exitableTxtBx" type="text" style="display: none" />
+                                            <span id="queryTimeOutUnitSpan"></span>
+                                            <label id="errorQueryTimeout" for="txtQueryTimeout" class="error" style="display: none;"></label>
+                                        </form>
+                                    </td>
                                     <td>&nbsp;</td>
                                     <td><a id="btnEditQueryTimeoutOk" href="#QueryTimeOutPopup" class="editOk" title="Ok" style="">Ok</a> <a id="btnEditQueryTimeoutCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a id="btnEditQueryTimeout" href="javascript:void(0)" class="edit" title="Edit">&nbsp;</a></td>
                                 </tr>
@@ -1158,6 +1164,26 @@
         </div>
     </div>
     <!--Update error Popup-->
+    
+    <!--Update Query Time out error Popup-->
+    <div style="display: none"><a href="#queryTimeoutUpdateErrorPopup" id="queryTimeoutUpdateErrorPopupLink">Update Error</a></div>
+    <div id="queryTimeoutUpdateErrorPopup" style="display: none">
+        <div id="queryTimeoutUpdateInnerErrorPopup">
+            <div class="overlay-title ">
+                <img src="css/resources/images/error.png" class="imgError" />Error
+            </div>
+            <div class="clear"></div>
+            <div class="overlay-contentError errorMsg">
+                <p>
+                    Could not update the value of <span id="queryTimeoutUpdateErrorFieldMsg"></span>
+                </p>
+                <br />
+                <div class="overlay-btns" style="padding: 0"><a class="btn closeBtn" id="btnQueryTimeoutUpdateErrorOk">Ok</a></div>
+            </div>
+        </div>
+    </div>
+    <!--Update error Popup-->
+
     <!-- POPUP StopServerErrorPopup-->
     <div id="divStopServerError" style="display: none; ">
         <div class="overlay-title icon-alert">Stop Error</div>

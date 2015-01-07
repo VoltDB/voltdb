@@ -134,10 +134,15 @@ function loadAdminPage() {
         tBoxQueryTimeout: $("#txtQueryTimeout"),
         tBoxQueryTimeoutValue: $("#queryTimeOutSpan").text(),
         spanqueryTimeOut: $("#queryTimeOutSpan"),
+        loadingQueryTimeout: $("#loadingQueryTimeout"),
+        errorQueryTimeout: $("#errorQueryTimeout"),
+        editStateQueryTimeout: editStates.ShowEdit,
         
         //Update Error
         updateErrorFieldMsg: $("#updateErrorFieldMsg"),
-        heartbeatTimeoutLabel: $("#heartbeatTimeoutRow").find("td:first-child").text()
+        heartbeatTimeoutLabel: $("#heartbeatTimeoutRow").find("td:first-child").text(),
+        queryTimeoutUpdateErrorFieldMsg: $("#queryTimeoutUpdateErrorFieldMsg"),
+        queryTimeoutFieldLabel: $("#queryTimoutRow").find("td:first-child").text()
     };
 
     var adminValidationRules = {
@@ -1021,36 +1026,72 @@ function loadAdminPage() {
             });
         }
     });
+    
+    $("#formQueryTimeout").validate({
+        rules: {
+            txtQueryTimeout: adminValidationRules.numericRules
+        },
+        messages: {
+            txtQueryTimeout: adminValidationRules.numericMessages
+        }
+    });
 
     //Query time out
-    var toggleQueryTimeoutEdit = function (showEdit) {
+    var toggleQueryTimeoutEdit = function (state) {
 
         adminEditObjects.tBoxQueryTimeout.val(adminEditObjects.tBoxQueryTimeoutValue);
 
-        if (showEdit) {
+        if (state == editStates.ShowLoading) {
+            adminDOMObjects.queryTimeoutLabel.hide();
+            adminEditObjects.LinkQueryTimeoutEdit.hide();
             adminEditObjects.btnEditQueryTimeoutOk.hide();
             adminEditObjects.btnEditQueryTimeoutCancel.hide();
-            adminEditObjects.LinkQueryTimeoutEdit.show();
-
             adminEditObjects.tBoxQueryTimeout.hide();
-            adminEditObjects.spanqueryTimeOut.show();
-        } else {
+            
+            adminEditObjects.loadingQueryTimeout.show();
+        }
+        else if (state == editStates.ShowOkCancel) {
+            adminEditObjects.loadingQueryTimeout.hide();
             adminEditObjects.LinkQueryTimeoutEdit.hide();
             adminEditObjects.btnEditQueryTimeoutOk.show();
             adminEditObjects.btnEditQueryTimeoutCancel.show();
 
             adminEditObjects.spanqueryTimeOut.hide();
             adminEditObjects.tBoxQueryTimeout.show();
+            adminDOMObjects.queryTimeoutLabel.show();
+        } else {
+            adminEditObjects.loadingQueryTimeout.hide();
+            adminEditObjects.btnEditQueryTimeoutOk.hide();
+            adminEditObjects.btnEditQueryTimeoutCancel.hide();
+            adminEditObjects.LinkQueryTimeoutEdit.show();
+
+            adminEditObjects.tBoxQueryTimeout.hide();
+            adminEditObjects.spanqueryTimeOut.show();
+            adminDOMObjects.queryTimeoutLabel.show();
         }
     };
 
     adminEditObjects.LinkQueryTimeoutEdit.on("click", function () {
-        toggleQueryTimeoutEdit(false);
+        toggleQueryTimeoutEdit(editStates.ShowOkCancel);
         $("td.queryTimeOut span").toggleClass("unit");
     });
 
     adminEditObjects.btnEditQueryTimeoutCancel.on("click", function () {
-        toggleQueryTimeoutEdit(true);
+        toggleQueryTimeoutEdit(editStates.ShowEdit);
+    });
+    
+    adminEditObjects.btnEditQueryTimeoutOk.on("click", function (e) {
+
+        if (!$("#formQueryTimeout").valid()) {
+            e.preventDefault();
+            e.stopPropagation();
+            adminEditObjects.tBoxQueryTimeout.focus();
+
+            adminEditObjects.errorQueryTimeout.css("background-color", "yellow");
+            setTimeout(function () {
+                adminEditObjects.errorQueryTimeout.animate({ backgroundColor: 'white' }, 'slow');
+            }, 2000);
+        }
     });
   
     adminEditObjects.btnEditQueryTimeoutOk.popup({
@@ -1058,31 +1099,65 @@ function loadAdminPage() {
         },
         afterOpen: function () {
 
+            var popup = $(this)[0];
             $("#btnPopupQueryTimeoutOk").unbind("click");
             $("#btnPopupQueryTimeoutOk").on("click", function () {
 
-                adminEditObjects.tBoxQueryTimeoutValue = adminEditObjects.tBoxQueryTimeout.val();
-                adminEditObjects.spanqueryTimeOut.html(adminEditObjects.tBoxQueryTimeoutValue);
+                var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();
+                if (adminConfigurations.systemsettings.query == null) {
+                    adminConfigurations.systemsettings.query = {};
+                }
+                //Set the new value to be saved.
+                adminConfigurations.systemsettings.query.timeout = adminEditObjects.tBoxQueryTimeout.val();
+                
+                //Call the loading image only after setting the new value to be saved.
+                toggleQueryTimeoutEdit(editStates.ShowLoading);
+                voltDbRenderer.updateAdminConfiguration(adminConfigurations, function (result) {
+                    if (result.status == "1") {
+                        adminEditObjects.tBoxQueryTimeoutValue = adminEditObjects.tBoxQueryTimeout.val();
+                        adminEditObjects.spanqueryTimeOut.html(adminEditObjects.tBoxQueryTimeoutValue);
+
+                        //Reload Admin configurations for displaying the updated value
+                        voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues, rawConfigValues) {
+                            VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues, rawConfigValues);
+                            toggleQueryTimeoutEdit(editStates.ShowEdit);
+                        });
+
+                    } else {
+
+                        toggleQueryTimeoutEdit(editStates.ShowEdit);
+                        var msg = '"' + adminEditObjects.queryTimeoutFieldLabel + '". ';
+                        if (result.status == "-1" && result.statusstring == "Query timeout.") {
+                            msg += "The DB Monitor service is either down, very slow to respond or the server refused connection. Please try to edit when the server is back online.";
+                        } else {
+                            msg += "Please try again later.";
+                        }
+
+                        adminEditObjects.queryTimeoutUpdateErrorFieldMsg.text(msg);
+                        $("#queryTimeoutUpdateErrorPopupLink").trigger("click");
+                    }
+                });
 
                 //Close the popup
-                $($(this).siblings()[0]).trigger("click");
+                popup.close();
             });
 
             $("#btnPopupQueryTimeoutCancel").on("click", function () {
-                toggleQueryTimeoutEdit(true);
+                toggleQueryTimeoutEdit(editStates.ShowEdit);
             });
 
             $(".popup_back").on("click", function () {
-                toggleQueryTimeoutEdit(true);
+                toggleQueryTimeoutEdit(editStates.ShowEdit);
             });
 
             $(".popup_close").on("click", function () {
-                toggleQueryTimeoutEdit(true);
+                toggleQueryTimeoutEdit(editStates.ShowEdit);
             });
         }
     });   
 
     $("#updateErrorPopupLink").popup();
+    $("#queryTimeoutUpdateErrorPopupLink").popup();
 
     // Filters servers list
     $('#popServerSearchAdmin').keyup(function () {
