@@ -22,6 +22,7 @@ import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.servlet.http.HttpServletResponse;
@@ -55,7 +56,13 @@ public class HTTPClientInterface {
     public static final String PARAM_PASSWORD = "Password";
     public static final String PARAM_HASHEDPASSWORD = "Hashedpassword";
     public static final String PARAM_ADMIN = "admin";
+    int m_timeout = 0;
+    final String m_timeoutResponse;
 
+
+    public void setTimeout(int seconds) {
+        m_timeout = seconds * 1000;
+    }
 
     class JSONProcCallback implements ProcedureCallback {
 
@@ -63,14 +70,16 @@ public class HTTPClientInterface {
         final Continuation m_continuation;
         final String m_jsonp;
         final CountDownLatch m_latch = new CountDownLatch(1);
+        final boolean m_adminMode;
 
-        public JSONProcCallback(Request request, Continuation continuation, String jsonp) {
+        public JSONProcCallback(Request request, Continuation continuation, String jsonp, boolean adminMode) {
             assert(request != null);
             assert(continuation != null);
 
             m_request = request;
             m_continuation = continuation;
             m_jsonp = jsonp;
+            m_adminMode = adminMode;
         }
 
         @Override
@@ -84,13 +93,13 @@ public class HTTPClientInterface {
                 msg = String.format("%s( %s )", m_jsonp, msg);
             }
 
-            // send the response back through jetty
-            HttpServletResponse response = (HttpServletResponse) m_continuation.getServletResponse();
-            response.setStatus(HttpServletResponse.SC_OK);
-            m_request.setHandled(true);
-            response.getWriter().print(msg);
+            m_request.setAttribute("result", msg);
             try{
-                m_continuation.complete();
+                if (!m_adminMode) {
+                    if (!m_continuation.isInitial()) {
+                        m_continuation.resume();
+                    }
+                }
              } catch (IllegalStateException e){
                 // Thrown when we shut down the server via the JSON/HTTP (web studio) API
                 // Essentially we're closing everything down from underneath the HTTP request.
@@ -99,19 +108,52 @@ public class HTTPClientInterface {
             m_latch.countDown();
         }
 
-        public void waitForResponse() throws InterruptedException {
-            m_latch.await();
+        public boolean waitForResponse(long timeout, TimeUnit unit) throws InterruptedException {
+            if (timeout <= 0) {
+                m_latch.await();
+                return true;
+            }
+            return m_latch.await(timeout, unit);
         }
     }
 
     public HTTPClientInterface() {
+        final ClientResponseImpl r = new ClientResponseImpl(ClientResponse.CONNECTION_TIMEOUT,
+                new VoltTable[0], "Request Timeout");
+        m_timeoutResponse = r.toJSONString();
     }
 
     public void process(Request request, HttpServletResponse response) {
         AuthenticationResult authResult = null;
 
         Continuation continuation = ContinuationSupport.getContinuation(request);
-        continuation.suspend(response);
+        if (m_timeout > 0) {
+            continuation.setTimeout(m_timeout);
+        }
+        String result = (String )request.getAttribute("result");
+        if (result != null) {
+            try {
+                response.setStatus(HttpServletResponse.SC_OK);
+                request.setHandled(true);
+                response.getWriter().print(result);
+            } catch (IllegalStateException | IOException e){
+               // Thrown when we shut down the server via the JSON/HTTP (web studio) API
+               // Essentially we're closing everything down from underneath the HTTP request.
+                m_log.warn("JSON failed to send response: ", e);
+            }
+            return;
+        }
+        //Check if this is resumed request.
+        if (Boolean.TRUE.equals(request.getAttribute("SQLSUBMITTED"))) {
+            try {
+                continuation.suspend(response);
+            } catch (IllegalStateException e){
+                // Thrown when we shut down the server via the JSON/HTTP (web studio) API
+                // Essentially we're closing everything down from underneath the HTTP request.
+                 m_log.warn("JSON request completion exception in process: ", e);
+            }
+            return;
+        }
         String jsonp = null;
         try {
             jsonp = request.getParameter("jsonp");
@@ -132,7 +174,6 @@ public class HTTPClientInterface {
             // null procs are bad news
             if (procName == null) {
                 response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                continuation.complete();
                 return;
             }
 
@@ -148,12 +189,14 @@ public class HTTPClientInterface {
                 request.setHandled(true);
                 try {
                     response.getWriter().print(msg);
-                    continuation.complete();
                 } catch (IOException e1) {} // Ignore this as browser must have closed.
                 return;
             }
 
-            JSONProcCallback cb = new JSONProcCallback(request, continuation, jsonp);
+            if (!authResult.m_adminMode) {
+                continuation.suspend(response);
+            }
+            JSONProcCallback cb = new JSONProcCallback(request, continuation, jsonp, authResult.m_adminMode);
             boolean success;
             if (params != null) {
                 ParameterSet paramSet = null;
@@ -180,8 +223,42 @@ public class HTTPClientInterface {
             if (!success) {
                 throw new Exception("Server is not accepting work at this time.");
             }
+            if (jsonp != null) {
+                request.setAttribute("jsonp", jsonp);
+            }
+            request.setAttribute("SQLSUBMITTED", Boolean.TRUE);
+            //In admin mode thread is blocked.
             if (authResult.m_adminMode) {
-                cb.waitForResponse();
+                //Result must be filled in now.
+                result = null;
+                try {
+                    if (!cb.waitForResponse(m_timeout, TimeUnit.MILLISECONDS)) {
+                        m_log.info("JSON failed to get response from client in time: " + m_timeout);
+                        result = m_timeoutResponse;
+                        if (jsonp != null) {
+                            result = String.format("%s( %s )", jsonp, result);
+                        }
+                    } else {
+                        result = (String )request.getAttribute("result");
+                    }
+                } catch (InterruptedException ex) {
+                    m_log.info("JSON failed to get response from client in time: " + m_timeout, ex);
+                    result = m_timeoutResponse;
+                    if (jsonp != null) {
+                        result = String.format("%s( %s )", jsonp, result);
+                    }
+                }
+                response.setStatus(HttpServletResponse.SC_OK);
+                request.setHandled(true);
+                if (result != null) {
+                    try {
+                        response.getWriter().print(result);
+                    } catch (IllegalStateException | IOException e){
+                       // Thrown when we shut down the server via the JSON/HTTP (web studio) API
+                       // Essentially we're closing everything down from underneath the HTTP request.
+                        m_log.warn("JSON failed to send response: ", e);
+                    }
+                }
             }
         } catch (Exception e) {
             String msg = e.getMessage();
@@ -339,10 +416,8 @@ public class HTTPClientInterface {
                 try {
                     authResult.m_client.drain();
                     authResult.m_client.close();
-                } catch (InterruptedException e) {
-                    m_log.warn("JSON interface was interrupted while closing an internal admin client connection.");
-                } catch (NoConnectionsException ex) {
-                    m_log.warn("JSON interface has closed an internal admin client connection.");
+                } catch (InterruptedException | NoConnectionsException e) {
+                    m_log.warn("JSON interface was interrupted while closing an internal admin client connection.", e);
                 }
             }
             // other connections are cached
