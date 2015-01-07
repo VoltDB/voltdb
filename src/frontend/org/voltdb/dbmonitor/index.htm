@@ -340,12 +340,14 @@
                                     <td id="partitionDetectionLabel"></td>
                                     <td>&nbsp;</td>
                                 </tr>
-                                <tr class="security">
+                                <tr class="security" id="securityRow">
                                     <td class="configLabel">Security</td>
-                                    <td align="right">
+                                    <td align="right" class="securitytd">                                        
                                         <div id="securityOptionIcon" class="offIcon"></div>
-                                        <input type="checkbox" id="chkSecurity" class="chkSecurity" /></td>
-                                    <td><span id="spanSecurity"></span></td>
+                                        <input type="checkbox" id="chkSecurity" class="chkSecurity" />
+                                        <div id="loadingSecurity" class="loading-small" style="display: none"></div>
+                                    </td>
+                                    <td><span id="spanSecurity" style="display: inline"></span></td>
                                     <td>
                                         <a id="btnEditSecurityOk" href="#securityPop" class="editOk" title="Save" style="">Ok</a>
                                         <a id="btnEditSecurityCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a>
@@ -1047,14 +1049,18 @@
                             </table>
 
                         </div>
-                        </form>                        <form id="formRestoreSnapshot" method="get" action="">                        <div class="restoreSnapshot">
+                        </form>
+                        <form id="formRestoreSnapshot" method="get" action="">
+                        <div class="restoreSnapshot">
                             <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblRestore" id="tblSearchList">
                             
                             
                             </table>
 
                         </div>
-                        <div id="errorRestoreMsgContainer" class="errorLabelMsg"></div>                        </form>
+                        <div id="errorRestoreMsgContainer" class="errorLabelMsg"></div>
+                        </form>
+
                     </div>
 
                 </div>

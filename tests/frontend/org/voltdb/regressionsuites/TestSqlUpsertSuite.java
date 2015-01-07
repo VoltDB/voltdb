@@ -174,54 +174,24 @@ public class TestSqlUpsertSuite extends RegressionSuite {
         String[] tables = {"UR1", "UP1", "UR2", "UP2", "UR3", "UP3"};
         for (String tb : tables) {
             String upsertProc = tb + ".upsert";
-            String errorMsg = "Procedure "+ upsertProc + " was not found";
-            try {
-                client.callProcedure(upsertProc, 1, 1, 2).getResults();
-                fail();
-            } catch(Exception ex) {
-                assertEquals(errorMsg, ex.getMessage());
-            }
+            String errorMsg = "Procedure " + upsertProc + " was not found";
+            verifyProcFails(client, errorMsg, upsertProc, 1, 1, 2);
 
             errorMsg = "Unsupported UPSERT table without primary key: UPSERT";
-            try {
-                client.callProcedure("@AdHoc", "Upsert into "+ tb + " values(1, 1, 2)").getResults();
-                fail();
-            } catch(Exception ex) {
-                assertTrue(ex.getMessage().contains(errorMsg));
-            }
+            verifyStmtFails(client, "Upsert into " + tb + " values(1, 1, 2)", errorMsg);
         }
 
-        String errorMsg = "DML statement manipulates data in content non-deterministic way "
-                + "(this may happen on UPSERT INTO ... SELECT, for example).";
-        // validate the non-content deterministic result
-        try {
-            client.callProcedure("@AdHoc", String.format(
-                    "Upsert into P1 (dept, id) SELECT id, dept FROM P2"));
-            fail();
-        } catch (Exception ex) {
-            assertTrue(ex.getMessage().contains(errorMsg));
-        }
+        String errorMsg = "UPSERT statement manipulates data in a non-deterministic way";
+        verifyStmtFails(client, "Upsert into P1 (dept, id) SELECT id, dept FROM P2", errorMsg);
+        verifyStmtFails(client, "Upsert into P1 (dept, id) SELECT id, dept FROM P2 order by 2",
+                errorMsg);
 
-        try {
-            client.callProcedure("@AdHoc", String.format(
-                    "Upsert into P1 (dept, id) SELECT id, dept FROM P2 order by 2"));
-            fail();
-        } catch (Exception ex) {
-            assertTrue(ex.getMessage().contains(errorMsg));
-        }
-
+        // also validate the partition to partition UPSERT
         errorMsg = "Partitioning could not be determined for UPSERT INTO ... SELECT statement.  "
                 + "Please ensure that statement does not attempt to copy row data "
                 + "from one partition to another, which is unsupported.";
-
-        // also validate the partition to partition UPSERT
-        try {
-            client.callProcedure("@AdHoc", String.format(
-                    "Upsert into P1 (dept, id) SELECT dept, id  FROM P2 order by 1, 2 "));
-            fail();
-        } catch (Exception ex) {
-            assertTrue(ex.getMessage().contains(errorMsg));
-        }
+        verifyStmtFails(client, "Upsert into P1 (dept, id) SELECT dept, id  FROM P2 order by 1, 2 ",
+                errorMsg);
     }
 
     //
