@@ -1204,7 +1204,6 @@ public abstract class CatalogUtil {
         if (!VoltDB.instance().getConfig().m_isEnterprise) {
             // dumb defaults if you ask for logging in community version
             File commandlogPath =  new VoltFile(voltDbRoot, "command_log");
-            validateDirectory("command log", commandlogPath);
             return commandlogPath;
         }
         File commandlogPath;
@@ -1232,7 +1231,6 @@ public abstract class CatalogUtil {
         if (!VoltDB.instance().getConfig().m_isEnterprise) {
             // dumb defaults if you ask for logging in community version
             File commandlogSnapshotPath = new VoltFile(voltDbRoot, "command_log_snapshot");
-            validateDirectory("command log snapshot", commandlogSnapshotPath);
             return commandlogSnapshotPath;
         }
 
