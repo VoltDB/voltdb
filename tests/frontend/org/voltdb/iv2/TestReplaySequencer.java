@@ -111,6 +111,7 @@ public class TestReplaySequencer {
         TransactionInfoBaseMessage frag2 = makeFragment(1L);
 
         result = dut.offer(1L, sntl);
+        dut.dump(1); // sanity check the toString methods
         result = dut.offer(1L, frag);
         Assert.assertEquals(true, result);
         Assert.assertEquals(frag, dut.poll());
@@ -135,6 +136,7 @@ public class TestReplaySequencer {
         result = dut.offer(1L, frag);
         Assert.assertEquals(true, result);
         Assert.assertEquals(null, dut.poll());
+        dut.dump(1); // sanity check the toString methods
 
         result = dut.offer(1L, sntl);
         Assert.assertEquals(true, result);
