@@ -724,7 +724,7 @@ function loadAdminPage() {
             var searchError = false;
             $.each(snapshotList, function(id, snapshot) {
                 if (snapshot.RESULT == "FAILURE") {
-                    result += '<tr><td style="color:#c70000"> Error: Failure getting snapshots.' + snapshot.ERR_MSG + '</td></tr>';
+                    result += '<tr><td style="color:#c70000" colspan="3"> Error: Failure getting snapshots.' + snapshot.ERR_MSG + '</td></tr>';
                     searchError = true;
                     return false;
                 }
