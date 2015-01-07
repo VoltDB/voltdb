@@ -704,7 +704,7 @@ function loadAdminPage() {
     var searchSnapshots = function(e) {
         $('#btnRestore').removeClass('btn').addClass('restoreBtn');
         $('#tblSearchList').html('<tr style="border:none"><td colspan="3" align="center"><img src="css/resources/images/loader-small.gif"></td></tr>');
-        voltDbRenderer.GetSnapshotList($('#txtSearchSnapshots').val(), function(snapshotList) {
+        voltDbRenderer.GetSnapshotList($('#txtSearchSnapshots').val(), function (snapshotList) {
             var result = '';
             var searchBox = '';
             searchBox += '<tr>' +
@@ -716,6 +716,10 @@ function loadAdminPage() {
             $.each(snapshotList, function(id, snapshot) {
                 if (snapshot.RESULT == "FAILURE") {
                     result += '<tr><td style="color:#c70000" colspan="3"> Error: Failure getting snapshots.' + snapshot.ERR_MSG + '</td></tr>';
+                    searchError = true;
+                    return false;
+                } else if (snapshot.NONCE == undefined) {
+                    result += '<tr><td colspan="3">No snapshot is available.' + snapshot.ERR_MSG + '</td></tr>';
                     searchError = true;
                     return false;
                 }
