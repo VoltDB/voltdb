@@ -91,8 +91,8 @@ function loadAdminPage() {
         iconSecurityOption: $("#securityOptionIcon"),
         spanSecurity: $("#spanSecurity"),
         securityLabel: $("#securityRow").find("td:first-child").text(),
-        spanSecurityEdited:"",
-
+        editStateSecurity: editStates.ShowEdit,
+        securityStateOriginal: {"SecurityStatus":false},
         //Edit Auto Snapshot objects
         btnEditAutoSnapshotOk: $("#btnEditAutoSnapshotOk"),
         btnEditAutoSnapshotCancel: $("#btnEditAutoSnapshotCancel"),
@@ -195,8 +195,8 @@ function loadAdminPage() {
         }, 100);
     });
 
-    adminEditObjects.chkSecurity.on('ifChanged', function () {
-        adminEditObjects.spanSecurityEdited= getOnOffText(adminEditObjects.chkSecurity.is(":checked"));
+    adminEditObjects.chkSecurity.on('ifChanged', function () {        
+        adminEditObjects.chkSecurityValue = adminEditObjects.chkSecurity.is(":checked");
         adminEditObjects.spanSecurity.text(getOnOffText(adminEditObjects.chkSecurity.is(":checked")));
     });
 
@@ -353,7 +353,7 @@ function loadAdminPage() {
         }
         
         adminEditObjects.spanSecurity.text(getOnOffText(adminEditObjects.chkSecurityValue));
-
+        adminEditObjects.editStateSecurity = state;
 
         if (state == editStates.ShowLoading) {        
             adminEditObjects.chkSecurity.parent().removeClass("customCheckbox");
@@ -390,6 +390,7 @@ function loadAdminPage() {
     });
 
     adminEditObjects.btnEditSecurityCancel.on("click", function () {
+        adminEditObjects.chkSecurityValue = adminEditObjects.securityStateOriginal.SecurityStatus;
         toggleSecurityEdit(editStates.ShowEdit);
     });
     
@@ -412,7 +413,7 @@ function loadAdminPage() {
                 
                 voltDbRenderer.updateAdminConfiguration(adminConfigurations, function (result) {
                     if (result.status == "1") {
-                        adminEditObjects.chkSecurityValue = adminConfigurations.securityEnabled;
+                        adminEditObjects.chkSecurityValue = adminConfigurations.security.enabled;
                        
                         //Reload Admin configurations for displaying the updated value
                         voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues, rawConfigValues) {
@@ -445,7 +446,18 @@ function loadAdminPage() {
 
                 //Close the popup
                 $($(this).siblings()[0]).trigger("click");
-            });            
+            });
+            
+           
+            $(".popup_back").on("click", function () {
+               adminEditObjects.chkSecurityValue = adminEditObjects.securityStateOriginal.SecurityStatus;                
+               toggleSecurityEdit(editStates.ShowEdit);
+            });
+
+            $(".popup_close").on("click", function () {
+                adminEditObjects.chkSecurityValue = adminEditObjects.securityStateOriginal.SecurityStatus;
+                toggleSecurityEdit(editStates.ShowEdit);
+            });
         }
     });
 
@@ -1219,8 +1231,7 @@ function loadAdminPage() {
             adminDOMObjects.kSafety.text(adminConfigValues.kSafety);
             adminDOMObjects.partitionDetection.removeClass().addClass(getOnOffClass(adminConfigValues.partitionDetection));
             adminDOMObjects.partitionDetectionLabel.text(getOnOffText(adminConfigValues.partitionDetection));
-            adminDOMObjects.security.removeClass().addClass(getOnOffClass(adminConfigValues.securityEnabled));
-            adminDOMObjects.securityLabel.text(adminEditObjects.spanSecurityEdited==""?getOnOffText(adminConfigValues.securityEnabled):adminEditObjects.spanSecurityEdited);
+            configureSecurity(adminConfigValues);
             adminDOMObjects.httpAccess.removeClass().addClass(getOnOffClass(adminConfigValues.httpEnabled));
             adminDOMObjects.httpAccessLabel.text(getOnOffText(adminConfigValues.httpEnabled));
             adminDOMObjects.jsonAPI.removeClass().addClass(getOnOffClass(adminConfigValues.jsonEnabled));
@@ -1321,7 +1332,18 @@ function loadAdminPage() {
                 adminEditObjects.spanAutoSnapshotFreqUnit.text('');
                 adminEditObjects.ddlAutoSnapshotFreqUnitValue = '';
             }
-        }; 
+        };
+
+        var configureSecurity = function (adminConfigValues) {            
+            if (adminEditObjects.editStateSecurity == editStates.ShowEdit) {
+                adminDOMObjects.securityLabel.text(getOnOffText(adminConfigValues.securityEnabled));
+            }
+            
+            adminEditObjects.securityStateOriginal.SecurityStatus = adminConfigValues.securityEnabled;
+            adminDOMObjects.security.removeClass().addClass(getOnOffClass(adminConfigValues.securityEnabled));
+            adminEditObjects.chkSecurityValue = adminConfigValues.securityEnabled;
+            
+        };
 
         //var configureAdminValuesFromSystemInfo = function (adminConfigValues) {
         var configureQueryTimeout = function (adminConfigValues) {
