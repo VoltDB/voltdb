@@ -519,7 +519,7 @@
                                         </form>
                                     </td>
                                     <td>&nbsp;</td>
-                                    <td><a id="btnEditHeartbeatTimeoutOk" href="#HrtTimeOutPopup" class="editOk" title="Ok" style="">Ok</a> <a id="btnEditHeartbeatTimeoutCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a id="btnEditHrtTimeOut" href="javascript:void(0)" class="edit" title="Edit">&nbsp;</a></td>
+                                    <td><a id="btnEditHeartbeatTimeoutOk" href="#HrtTimeOutPopup" class="editOk" title="Save" style="">Ok</a> <a id="btnEditHeartbeatTimeoutCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a id="btnEditHrtTimeOut" href="javascript:void(0)" class="edit" title="Edit">&nbsp;</a></td>
                                 </tr>
                                 <tr class="child-row-5 subLabelRow" id="queryTimoutRow">
                                     <td class="configLabel">Query time out</td>
@@ -533,7 +533,7 @@
                                         </form>
                                     </td>
                                     <td>&nbsp;</td>
-                                    <td><a id="btnEditQueryTimeoutOk" href="#QueryTimeOutPopup" class="editOk" title="Ok" style="">Ok</a> <a id="btnEditQueryTimeoutCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a id="btnEditQueryTimeout" href="javascript:void(0)" class="edit" title="Edit">&nbsp;</a></td>
+                                    <td><a id="btnEditQueryTimeoutOk" href="#QueryTimeOutPopup" class="editOk" title="Save" style="">Ok</a> <a id="btnEditQueryTimeoutCancel" href="javascript:void(0)" class="editCancel" title="Cancel" style="">Cancel</a> <a id="btnEditQueryTimeout" href="javascript:void(0)" class="edit" title="Edit">&nbsp;</a></td>
                                 </tr>
                                 <tr class="child-row-5 subLabelRow">
                                     <td class="configLabel">Max temp table memory</td>
@@ -728,7 +728,7 @@
                 <input type="submit" name="account_details" id="account_details" value="Save" class="input-submit left" hidden="hidden" style="display: none;" />
             </form>
         </div>
-        <div class="overlay-btns"><a href="#" class="btn" id="savePreference" title="save">Save</a></div>
+        <div class="overlay-btns"><a href="#" class="btn" id="savePreference">Save</a></div>
     </div>
     <!-- POPUP Saved Preferences -->
 
@@ -753,7 +753,7 @@
         <div class="overlay-contentError errorMsg">
             <p id="errorMessage"></p>
             <br />
-            <div class="overlay-btns" style="padding: 0"><a href="#" class="btn" id="btnOk" title="save">Ok</a></div>
+            <div class="overlay-btns" style="padding: 0"><a href="#" class="btn" id="btnOk">Ok</a></div>
         </div>
     </div>
     <!--Error popup-->
@@ -769,10 +769,10 @@
             <br />
             <ul class="btnList" id="Ul1">
                 <li>
-                    <div class="overlay-btns" style="padding: 0"><a href="javascript:void(0)" class="btn" id="A1" onclick="logout();" title="Ok">Ok</a></div>
+                    <div class="overlay-btns" style="padding: 0"><a href="javascript:void(0)" class="btn" id="A1" onclick="logout();">Ok</a></div>
                 </li>
                 <li>
-                    <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnCancel" title="Cancel">Cancel</a></div>
+                    <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnCancel">Cancel</a></div>
                 </li>
             </ul>
         </div>
@@ -790,7 +790,7 @@
             <div class="overlay-contentError errorMsg">
                 <p>Lost connection to DB Monitor service. Please click ok when the server is back online. </p>
                 <br />
-                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnConOk" title="save">Ok</a></div>
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnConOk">Ok</a></div>
             </div>
         </div>
     </div>
@@ -807,7 +807,7 @@
             <div class="overlay-contentError errorMsg">
                 <p>DB Monitor service has been shutdown. Please click ok when the server is back online. </p>
                 <br />
-                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnServerShutdownOk" title="save">Ok</a></div>
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnServerShutdownOk">Ok</a></div>
             </div>
         </div>
     </div>
@@ -827,7 +827,7 @@
         Please click ok when the server is back online.
                 </p>
                 <br />
-                <div class="overlay-btns" style="padding: 0"><a class="btn" id="serverUnavailableBtn" title="Ok">Ok</a></div>
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="serverUnavailableBtn">Ok</a></div>
             </div>
         </div>
     </div>
@@ -897,7 +897,7 @@
             <p>Any data not saved to a snapshot or command log will be lost.</p>
             <p>Continue with the shutdown?</p>
         </div>
-        <div class="overlay-btns"><a id="btnShutdownConfirmationOk" class="btn closeBtn" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Ok">Cancel</a></div>
+        <div class="overlay-btns"><a id="btnShutdownConfirmationOk" class="btn closeBtn">Ok</a> <a class="btn btn-gray closeBtn">Cancel</a></div>
     </div>
     <!-- POPUP shutDownConfirmationPop -->
     <!-- POPUP stopConfirmationPop -->
@@ -907,7 +907,7 @@
         <div class="overlay-content">
             <p class="txt-bold">Are you sure you want to stop the Server?</p>
         </div>
-        <div class="overlay-btns"><a id="StopConfirmOK" class="btn closeBtn" title="Ok">Ok</a> <a id="StopConfirmCancel" class="btn btn-gray closeBtn" title="Ok">Cancel</a></div>
+        <div class="overlay-btns"><a id="StopConfirmOK" class="btn closeBtn">Ok</a> <a id="StopConfirmCancel" class="btn btn-gray closeBtn">Cancel</a></div>
     </div>
     <!-- POPUP stopConfirmationPop -->
 
@@ -918,7 +918,7 @@
         <div class="overlay-content">
             <p class="txt-bold">Are you sure you want to start the Server?</p>
         </div>
-        <div class="overlay-btns"><a id="startConfirmOk" class="btn closeBtn" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Ok">Cancel</a></div>
+        <div class="overlay-btns"><a id="startConfirmOk" class="btn closeBtn">Ok</a> <a class="btn btn-gray closeBtn">Cancel</a></div>
     </div>
     <!-- POPUP stopConfirmationPop -->
     
@@ -929,7 +929,7 @@
         <div class="overlay-content">
             <p class="txt-bold">Do you want to promote the cluster?</p>
         </div>
-        <div class="overlay-btns"><a id="promoteConfirmOk" class="btn closeBtn" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Ok">Cancel</a></div>
+        <div class="overlay-btns"><a id="promoteConfirmOk" class="btn closeBtn">Ok</a> <a class="btn btn-gray closeBtn">Cancel</a></div>
     </div>
     <!-- POPUP promoteConfirmationPop -->
 
@@ -940,7 +940,7 @@
         <div class="overlay-content">
             <p class="txt-bold">Do you want to pause the cluster and enter admin mode?</p>
         </div>
-        <div class="overlay-btns"><a id="btnPauseConfirmationOk" class="btn closeBtn" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Ok">Cancel</a></div>
+        <div class="overlay-btns"><a id="btnPauseConfirmationOk" class="btn closeBtn">Ok</a> <a class="btn btn-gray closeBtn">Cancel</a></div>
     </div>
     <!-- POPUP pauseConfirmationPop -->
 
@@ -952,7 +952,7 @@
             <p class="txt-bold">Are you sure you want to stop this node?</p>
             <p>Continue with the shutdown?</p>
         </div>
-        <div class="overlay-btns"><a class="btn closeBtn" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Ok">Cancel</a></div>
+        <div class="overlay-btns"><a class="btn closeBtn">Ok</a> <a class="btn btn-gray closeBtn">Cancel</a></div>
     </div>
     <!-- POPUP shutdownPopupPop -->
     <!-- POPUP shutdownPopupPop -->
@@ -963,7 +963,7 @@
             <p class="txt-bold">Are you sure you want to enable this node?</p>
             <p>Continue with the enable?</p>
         </div>
-        <div class="overlay-btns"><a class="btn closeBtn" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Ok">Cancel</a></div>
+        <div class="overlay-btns"><a class="btn closeBtn">Ok</a> <a class="btn btn-gray closeBtn">Cancel</a></div>
     </div>
     <!-- POPUP shutdownPopupPop -->
 
@@ -976,7 +976,7 @@
             <p>Any data not saved to a snapshot or command log will be lost.</p>
             <p>Continue with the shutdown?</p>
         </div>
-        <div class="overlay-btns"><a class="btn closeBtn" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Ok">Cancel</a></div>
+        <div class="overlay-btns"><a class="btn closeBtn">Ok</a> <a class="btn btn-gray closeBtn">Cancel</a></div>
     </div>
     <!-- POPUP shutdownPopupPop -->
 
@@ -987,7 +987,7 @@
         <div class="overlay-content">
             <p class="txt-bold">Do you want to resume the cluster and exit admin mode?</p>
         </div>
-        <div class="overlay-btns"><a id="btnResumeConfirmationOk" class="btn closeBtn" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Ok">Cancel</a></div>
+        <div class="overlay-btns"><a id="btnResumeConfirmationOk" class="btn closeBtn">Ok</a> <a class="btn btn-gray closeBtn">Cancel</a></div>
     </div>
     <!-- POPUP resumeConfirmationPop -->
 
@@ -998,7 +998,7 @@
         <div class="overlay-content confirmationHeight">
             <p class="txt-bold">Do you want to save the value?</p>
         </div>
-        <div class="overlay-btns"><a id="btnSaveSnapshot" class="btn" title="Ok">Ok</a> <a id="btnPopupAutoSnapshotCancel" class="btn btn-gray closeBtn" title="Ok">Cancel</a></div>
+        <div class="overlay-btns"><a id="btnSaveSnapshot" class="btn">Ok</a> <a id="btnPopupAutoSnapshotCancel" class="btn btn-gray closeBtn">Cancel</a></div>
     </div>
     <!-- POPUP autoSnapshotyPop -->
 
@@ -1009,7 +1009,7 @@
         <div class="overlay-content confirmationHeight">
             <p class="txt-bold">Do you want to change Security?</p>
         </div>
-        <div class="overlay-btns"><a class="btn closeBtn" id="btnSecurityOk" title="Ok">Ok</a> <a id="btnPopupSecurityCancel" class="btn btn-gray closeBtn" title="Cancel">Cancel</a></div>
+        <div class="overlay-btns"><a class="btn closeBtn" id="btnSecurityOk">Ok</a> <a id="btnPopupSecurityCancel" class="btn btn-gray closeBtn">Cancel</a></div>
     </div>
     <!-- POPUP securityPop -->
 
@@ -1034,13 +1034,13 @@
                     </table>
                 </form>
             </div>
-            <div class="overlay-btns"><a id="btnSaveSnapshots" class="btn saveBtn" title="Save">Save</a> <a class="btn btn-gray closeBtn" title="Cancel">Cancel</a> </div>
+            <div class="overlay-btns"><a id="btnSaveSnapshots" class="btn saveBtn">Save</a> <a class="btn btn-gray closeBtn">Cancel</a> </div>
         </div>
         <div class="saveConfirmation" style="display: none;">
             <div class="overlay-content ">
                 <div class="confirmationInfo">Are you sure you want to save?</div>
             </div>
-            <div class="overlay-btns"><a class="btn closeBtn" title="Yes">Yes</a> <a class="btn btn-gray confirmNoSave" title="No">No</a> </div>
+            <div class="overlay-btns"><a class="btn closeBtn">Yes</a> <a class="btn btn-gray confirmNoSave">No</a> </div>
         </div>
     </div>
     <!-- POPUP savePop -->
@@ -1081,13 +1081,13 @@
                     </div>
 
                 </div>
-                <div class="overlay-btns"><a id="btnRestore" class="btn restoreBtn" title="Restore">Restore</a> <a class="btn btn-gray closeBtn" title="Cancel">Cancel</a></div>
+                <div class="overlay-btns"><a id="btnRestore" class="btn restoreBtn">Restore</a> <a class="btn btn-gray closeBtn">Cancel</a></div>
             </div>
             <div id="restoreConfirm" class="restoreConfirmation" style="display: none;">
                 <div class="overlay-content ">
                     <div class="confirmationInfo">Are you sure you want to Restore?</div>
                 </div>
-                <div id="divConfirm" class="overlay-btns"><a id="btnRestoreSnapshotOk" class="btn closeBtn" title="Yes">Yes</a> <a class="btn btn-gray confirmNoRestore" title="No">No</a> </div>
+                <div id="divConfirm" class="overlay-btns"><a id="btnRestoreSnapshotOk" class="btn closeBtn">Yes</a> <a class="btn btn-gray confirmNoRestore">No</a> </div>
             </div>
         </div>
     </div>
@@ -1099,7 +1099,7 @@
         <div class="overlay-content confirmationHeight">
             <p class="txt-bold">Do you want to save the value?</p>
         </div>
-        <div class="overlay-btns"><a class="btn closeBtn" id="btnPopupHeartbeatTimeoutOk" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" id="btnPopupHeartbeatTimeoutCancel" title="Cancel">Cancel</a> </div>
+        <div class="overlay-btns"><a class="btn closeBtn" id="btnPopupHeartbeatTimeoutOk">Ok</a> <a class="btn btn-gray closeBtn" id="btnPopupHeartbeatTimeoutCancel">Cancel</a> </div>
     </div>
     <!-- POPUP restorePop -->
 
@@ -1110,7 +1110,7 @@
         <div class="overlay-content confirmationHeight">
             <p class="txt-bold">Do you want to save the value?</p>
         </div>
-        <div class="overlay-btns"><a class="btn closeBtn" id="btnPopupQueryTimeoutOk" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" id="btnPopupQueryTimeoutCancel" title="Cancel">Cancel</a> </div>
+        <div class="overlay-btns"><a class="btn closeBtn" id="btnPopupQueryTimeoutOk">Ok</a> <a class="btn btn-gray closeBtn" id="btnPopupQueryTimeoutCancel">Cancel</a> </div>
     </div>
     <!-- POPUP Query time out Popup -->
     <!-- POPUP saveConfirmationPopup -->
@@ -1120,7 +1120,7 @@
         <div class="overlay-content">
             <p class="txt-bold">Do you want to save the value?</p>
         </div>
-        <div class="overlay-btns"><a class="btn closeBtn" id="btnDone" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Cancel">Cancel</a></div>
+        <div class="overlay-btns"><a class="btn closeBtn" id="btnDone">Ok</a> <a class="btn btn-gray closeBtn">Cancel</a></div>
     </div>
     <!-- POPUP saveConfirmationPopup -->
 
@@ -1131,7 +1131,7 @@
         <div class="overlay-content">
             <p class="txt-bold">Do you want to save the value?</p>
         </div>
-        <div class="overlay-btns"><a class="btn closeBtn" id="A4" title="Ok">Ok</a> <a class="btn btn-gray closeBtn" title="Cancel">Cancel</a></div>
+        <div class="overlay-btns"><a class="btn closeBtn" id="A4">Ok</a> <a class="btn btn-gray closeBtn">Cancel</a></div>
     </div>
     <!-- POPUP RestoreConfirmationPopup -->
 
@@ -1146,7 +1146,7 @@
             <div class="overlay-contentError ">
                 <p id="saveSnapshotMessage" class="snapshotErrorMsg"></p>
                 <br />
-                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnSaveSnapshotStatus" title="save">Ok</a></div>
+                <div class="overlay-btns" style="padding: 0"><a class="btn" id="btnSaveSnapshotStatus">Ok</a></div>
             </div>
         </div>
     </div>
@@ -1163,7 +1163,7 @@
             <div class="overlay-contentError ">
                 <p id="promoteErrorMessage" class="snapshotErrorMsg"></p>
                 <br />
-                <div class="overlay-btns" style="padding: 0"><a class="btn closeBtn" id="btnPromoteErrorOk" title="save">Ok</a></div>
+                <div class="overlay-btns" style="padding: 0"><a class="btn closeBtn" id="btnPromoteErrorOk">Ok</a></div>
             </div>
         </div>
     </div>
@@ -1235,7 +1235,7 @@
         <div class="overlay-content resizeCon">
             <p id="errorLabel" class="txt-bold resizeRestore">Server could not be stopped at the moment</p>
         </div>
-        <div class="overlay-btns"><a class="btn closeBtn" id="A2" title="Ok">Ok</a></div>
+        <div class="overlay-btns"><a class="btn closeBtn" id="A2">Ok</a></div>
     </div>
 
     <!-- POPUP StopServerErrorPopup-->
