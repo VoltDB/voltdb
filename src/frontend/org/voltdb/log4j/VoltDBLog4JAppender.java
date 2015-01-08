@@ -20,6 +20,7 @@ package org.voltdb.log4j;
 import org.apache.log4j.Appender;
 import org.apache.log4j.AppenderSkeleton;
 import org.apache.log4j.spi.LoggingEvent;
+import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -77,14 +78,30 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
             client.createConnection(server, port);
 
             // Make sure we have a table set up.
-            String sqlStmt = "CREATE TABLE " + table + " ( timestamp BIGINT, level VARCHAR(10), message VARCHAR(255))";
-            client.callProcedure("@AdHoc", sqlStmt);
+            setupTable(client);
 
             // Grab a bulk loader
             bulkLoader = client.getNewBulkLoader("log4j", 1, new VoltDBLog4JAppenderCallback());
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    private void setupTable(Client client) throws Exception {
+        // See if we have a table
+        VoltTable allTables = client.callProcedure("@SystemCatalog", "TABLES").getResults()[0];
+        for (int i = 0; i < allTables.getRowCount(); i++) {
+            allTables.advanceRow();
+            String name = allTables.getString("TABLE_NAME");
+            if (name.toLowerCase().equals(table)){
+                // We have the table, don't need to add it
+                System.out.println("Using existing table '" + table + "' in VoltDB");
+                return;
+            }
+        }
+       // No table, so we need to add one
+       String sqlStmt = "CREATE TABLE " + table + " ( timestamp BIGINT, level VARCHAR(10), message VARCHAR(255))";
+       client.callProcedure("@AdHoc", sqlStmt);
     }
 
     @Override
