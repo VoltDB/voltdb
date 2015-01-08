@@ -41,7 +41,6 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Scanner;
 import java.util.TimeZone;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
@@ -580,6 +579,45 @@ public class SQLCommand
             // Collect the lines ...
             query.append(line);
             query.append("\n");
+        }
+    }
+
+    private static final Pattern VoltCMD = Pattern.compile("^\\s*(exec|execute|load|remove)\\s",
+            Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+
+    public static void executeFastLoadingDDL(String ddlFilePath) throws Exception {
+        BufferedReader br = null;
+        try {
+            br = new BufferedReader(new FileReader(ddlFilePath));
+        } catch (FileNotFoundException e) {
+            printUsage("DDL file not found at path:" + ddlFilePath);
+        }
+
+        String query = "";
+        StringBuilder batchedDDL = new StringBuilder();
+        while ((query = br.readLine()) != null) {
+            // process the line.
+            query = SingleLineComments.matcher(query).replaceAll("");
+            if (query.equals("")) {
+                continue;
+            }
+            if (VoltCMD.matcher(query).find()) {
+                if (batchedDDL.length() > 0) {
+                    VoltDB.callProcedure("@AdHoc", batchedDDL.toString());
+                    batchedDDL.setLength(0);
+                }
+
+                // process the special command
+                executeQuery(query);
+            } else {
+                batchedDDL.append(query).append("\n");
+            }
+        }
+        br.close();
+
+        // execute the last batch
+        if (batchedDDL.length()> 0) {
+            VoltDB.callProcedure("@AdHoc", batchedDDL.toString());
         }
     }
 
@@ -1349,7 +1387,7 @@ public class SQLCommand
         String password = "";
         String kerberos = "";
         List<String> queries = null;
-        String ddlFile = "";
+        String ddlFilePath = "";
 
         // Parse out parameters
         for (int i = 0; i < args.length; i++) {
@@ -1411,12 +1449,7 @@ public class SQLCommand
                 }
             }
             else if (arg.startsWith("--ddl-file=")) {
-                String ddlFilePath = extractArgInput(arg);
-                try {
-                    ddlFile = new Scanner(new File(ddlFilePath)).useDelimiter("\\Z").next();
-                } catch (FileNotFoundException e) {
-                    printUsage("DDL file not found at path:" + ddlFilePath);
-                }
+                ddlFilePath = extractArgInput(arg);
             }
             else if (arg.equals("--help")) {
                 printHelp(System.out); // Print readme to the screen
@@ -1456,18 +1489,17 @@ public class SQLCommand
         }
 
         try {
-            if (! ddlFile.equals("")) {
-                // fast DDL Loader mode
-                // System.out.println("fast DDL Loader mode with DDL input:\n" + ddlFile);
-                VoltDB.callProcedure("@AdHoc", ddlFile);
-                System.exit(m_exitCode);
-            }
-
             // Load system procedures
             loadSystemProcedures();
 
             // Load user stored procs
             loadStoredProcedures(Procedures, Classlist);
+
+            if (! ddlFilePath.equals("")) {
+                // fast DDL Loader mode
+                executeFastLoadingDDL(ddlFilePath);
+                System.exit(m_exitCode);
+            }
 
             in = new FileInputStream(FileDescriptor.in);
             out = System.out;
