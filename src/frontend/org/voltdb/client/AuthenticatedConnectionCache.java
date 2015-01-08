@@ -25,7 +25,6 @@ import java.util.Map.Entry;
 import java.util.TreeMap;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.common.Constants;
 
 import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.collect.FluentIterable;
@@ -89,14 +88,6 @@ public class AuthenticatedConnectionCache {
     ClientImpl m_unauthClient = null;
     // The optional unauthenticated adming client which should work if auth if off
     ClientImpl m_adminUnauthClient = null;
-
-    public AuthenticatedConnectionCache(int targetSize) {
-        this(targetSize, "localhost", "localhost");
-    }
-
-    public AuthenticatedConnectionCache(int targetSize, String serverHostname, String adminHostName) {
-        this(targetSize, serverHostname, Constants.DEFAULT_PORT, adminHostName, Constants.DEFAULT_PORT-1);
-    }
 
     public AuthenticatedConnectionCache(int targetSize, String serverHostname, int serverPort, String adminHostName, int adminPort) {
         assert(serverHostname != null);
