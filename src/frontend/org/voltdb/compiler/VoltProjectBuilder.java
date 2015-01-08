@@ -276,6 +276,7 @@ public class VoltProjectBuilder {
     private boolean m_useDDLSchema = false;
 
     private String m_drMasterHost;
+    private Integer m_drProducerClusterId = null;
 
     public VoltProjectBuilder setQueryTimeout(int target) {
         m_queryTimeout = target;
@@ -596,6 +597,11 @@ public class VoltProjectBuilder {
 
     public void setDRMasterHost(String drMasterHost) {
         m_drMasterHost = drMasterHost;
+    }
+
+    public void enableDrProducer(int clusterId)
+    {
+        m_drProducerClusterId = new Integer(clusterId);
     }
 
     /**
@@ -1016,13 +1022,19 @@ public class VoltProjectBuilder {
             export.setConfiguration(exportConfig);
         }
 
-        if (m_drMasterHost != null && !m_drMasterHost.isEmpty()) {
+        if (m_drProducerClusterId != null || (m_drMasterHost != null && !m_drMasterHost.isEmpty())) {
             DrType dr = factory.createDrType();
             deployment.setDr(dr);
-            ConnectionType conn = factory.createConnectionType();
-            dr.setConnection(conn);
-            conn.setEnabled(true);
-            conn.setSource(m_drMasterHost);
+            if (m_drProducerClusterId != null) {
+                dr.setId(m_drProducerClusterId);
+                dr.setListen(true);
+            }
+            if (m_drMasterHost != null && !m_drMasterHost.isEmpty()) {
+                ConnectionType conn = factory.createConnectionType();
+                dr.setConnection(conn);
+                conn.setEnabled(true);
+                conn.setSource(m_drMasterHost);
+            }
         }
 
         // Have some yummy boilerplate!

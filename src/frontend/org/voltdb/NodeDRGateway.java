@@ -24,7 +24,7 @@ public interface NodeDRGateway {
     /**
      * Start listening on the ports
      */
-    public abstract void bindPorts();
+    public abstract void bindPorts(boolean drProducerEnabled);
 
     /**
      * @return true if bindPorts has been called.
@@ -60,5 +60,4 @@ public interface NodeDRGateway {
     public abstract void shutdown() throws InterruptedException;
 
     public abstract void updateCatalog(boolean calledFromUAP, CatalogContext catalog);
-
 }

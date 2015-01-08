@@ -588,6 +588,11 @@ public class CatalogDiffEngine {
             return null;
         if (suspect instanceof Cluster && field.equals("drProducerEnabled"))
             return null;
+
+        // Avoid over-generalization when describing limitations that are dependent on particular
+        // cases of BEFORE and AFTER values by listing the offending values.
+        String restrictionQualifier = "";
+        
         if (suspect instanceof Cluster && field.equals("drClusterId") || 
                 suspect instanceof Cluster && field.equals("drProducerPort")) {
             // Don't allow changes to ClusterId or ProducerPort while not transitioning to or from Disabled
@@ -620,11 +625,6 @@ public class CatalogDiffEngine {
                 if (!isDRed) return null;
             }
         }
-
-
-        // Avoid over-generalization when describing limitations that are dependent on particular
-        // cases of BEFORE and AFTER values by listing the offending values.
-        String restrictionQualifier = "";
 
         // whitelist certain column changes
         if (suspect instanceof Column) {

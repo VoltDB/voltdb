@@ -326,7 +326,7 @@
   <xs:complexType name="drType">
     <xs:sequence>
         <!-- Currently, only one DR data source is allowed -->
-        <xs:element name="connection" type="connectionType" minOccurs="1" maxOccurs="1"/>
+        <xs:element name="connection" type="connectionType" minOccurs="0" maxOccurs="1"/>
     </xs:sequence>
     <xs:attribute name="name" type="xs:string" default=""/>
     <xs:attribute name="id" type="clusterIdType" default="1"/>

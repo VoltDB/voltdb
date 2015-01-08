@@ -87,6 +87,7 @@ import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
 import org.voltdb.compiler.deploymentfile.CommandLogType.Frequency;
+import org.voltdb.compiler.deploymentfile.ConnectionType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DrType;
 import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
@@ -1254,22 +1255,25 @@ public abstract class CatalogUtil {
     private static void setDrInfo(Catalog catalog, DrType dr) {
         if (dr != null) {
             Cluster cluster = catalog.getClusters().get("cluster");
-            String drSource = dr.getConnection().getSource();
+            ConnectionType drConnection = dr.getConnection();
             cluster.setDrproducerenabled(dr.isListen());
             cluster.setDrclusterid(dr.getId());
             cluster.setDrproducerport(dr.getPort());
-            if (dr.getConnection().isEnabled()) {
-                if (dr.isListen()) {
-                    hostLog.error("DR Active-Active or Daisy-Chain clusters are unsupported." +
-                            " Disabling DR Consumer service until DR Listen is disabled.");
+            if (drConnection != null) {
+                String drSource = drConnection.getSource();
+                if (drConnection.isEnabled()) {
+                    if (dr.isListen()) {
+                        hostLog.error("DR Active-Active or Daisy-Chain clusters are unsupported." +
+                                " Disabling DR Consumer service until DR Listen is disabled.");
+                    }
+                    else {
+                        cluster.setDrmasterhost(drSource);
+                        hostLog.info("Configured connection for DR replica role to host " + drSource);
+                    }
+                } else {
+                    hostLog.info("DR data source " + drSource + " disabled for DR replica role. " +
+                            "Starting cluster as replica will be disabled.");
                 }
-                else {
-                    cluster.setDrmasterhost(drSource);
-                    hostLog.info("Configured connection for DR replica role to host " + drSource);
-                }
-            } else {
-                hostLog.info("DR data source " + drSource + " disabled for DR replica role. " +
-                        "Starting cluster as replica will be disabled.");
             }
         }
     }

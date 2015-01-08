@@ -790,6 +790,9 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const string &catalogPay
         m_isELEnabled = true;
     }
 
+    // Set DR flag based on current catalog state
+    m_drStream.m_enabled = catalogCluster->drProducerEnabled();
+
     // load up all the tables, adding all tables
     if (processCatalogAdditions(timestamp) == false) {
         return false;
