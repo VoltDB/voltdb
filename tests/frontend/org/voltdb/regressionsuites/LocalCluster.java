@@ -1349,4 +1349,9 @@ public class LocalCluster implements VoltServerConfig {
             }
         }
     }
+
+    @Override
+    public int getLogicalPartitionCount() {
+        return (m_siteCount * m_hostCount) / (m_kfactor + 1);
+    }
 }

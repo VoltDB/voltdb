@@ -153,7 +153,7 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
                    m_node->getOutputTable()->name().c_str());
         return false;
     }
-    m_engine->m_tuplesModified += modified_tuples;
+    m_engine->addToTuplesModified(modified_tuples);
 
     return true;
 }
