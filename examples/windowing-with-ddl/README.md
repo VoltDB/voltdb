@@ -55,19 +55,19 @@ How does the EXECUTE action of a LIMIT PARTITION ROWS constraint work?
 
 Rows are deleted automatically by a trigger defined in the LIMIT PARTITION ROWS constraint in the table definition:
 
- CREATE TABLE timedata
- (
-   uuid VARCHAR(36) NOT NULL,
-   val BIGINT NOT NULL,
-   update_ts TIMESTAMP NOT NULL,
-   CONSTRAINT update_ts_uuid_unique UNIQUE (update_ts, uuid),
-   CONSTRAINT row_limit LIMIT PARTITION ROWS 165000
-     EXECUTE (DELETE FROM timedata
-              WHERE update_ts
-                    < TO_TIMESTAMP(SECOND, SINCE_EPOCH(SECOND, NOW) - 30)
-              ORDER BY update_ts, uuid LIMIT 1500)
- );
- PARTITION TABLE timedata ON COLUMN uuid;
+    CREATE TABLE timedata
+    (
+      uuid VARCHAR(36) NOT NULL,
+      val BIGINT NOT NULL,
+      update_ts TIMESTAMP NOT NULL,
+      CONSTRAINT update_ts_uuid_unique UNIQUE (update_ts, uuid),
+      CONSTRAINT row_limit LIMIT PARTITION ROWS 165000
+        EXECUTE (DELETE FROM timedata
+                 WHERE update_ts
+                       < TO_TIMESTAMP(SECOND, SINCE_EPOCH(SECOND, NOW) - 30)
+                 ORDER BY update_ts, uuid LIMIT 1500)
+    );
+    PARTITION TABLE timedata ON COLUMN uuid;
 
 The constraint caps each partition of the table to 165000 rows, and also says to execute a DELETE statement if an insert would cause the table to exceed the cap.  In this case, the DELETE statement says to get rid of the oldest rows that are older than 30 seconds, but not more than 1,500 rows at one go.  Being able to define a DELETE statement that helps to enforce a LIMIT PARTITON ROWS constraint is a new feature in version 5.0.
 
@@ -75,21 +75,27 @@ If the insertion rate is 20k rows per second, then 600k rows are produced in 30 
 
 It's important to note that the DELETE statement triggered by a LIMIT PARTITION ROWS CONSTRAINT is executed within the context of a single partition.  Any individual invocation of the statement deletes the oldest rows on *one* partition only.  But since rows are being inserted at a high rate, and we expect the hashing function to distribute the rows evenly across all partitions, the net effect of the DELETE statement is to age out old rows in the table as a whole.
 
-The DELETE statement makes use of an ORDER BY and LIMIT clause, which is also newly supported in version 5.0. In order to support VoltDB features like replication and command log replay, any data manipulation must be executed deterministically, such that the effect is identical across multiple executions of the statement.  Therefore, it's a requirement of DELETE with ORDER BY and LIMIT that the ORDER BY clause defines a unique ordering.  In this case we've defined a UNIQUE constraint on `update_ts` and `uuid`.  The UNIQUE constraint is implemented as a tree index under the hood and achieves two things: it ensures that the DELETE is deterministic, and also provides an efficient way to evaluate the WHERE and ORDER BY of the DELETE without resorting to doing a sequential scan and sorting all of the rows.
+The DELETE statement makes use of an ORDER BY and LIMIT clause, which is also newly supported in version 5.0. In order to support VoltDB features like replication and command log replay, any data manipulation must be executed deterministically, such that the effect is identical across multiple executions of the statement.  Therefore, it's a requirement of DELETE with ORDER BY and LIMIT that the ORDER BY clause defines a unique ordering.  
+
+To address this requirement in this example, we've defined a UNIQUE constraint on `update_ts` and `uuid`.  The UNIQUE constraint is implemented as a tree index under the hood and achieves two things: it ensures that the DELETE is deterministic, and also provides an efficient way to evaluate the WHERE and ORDER BY of the DELETE without resorting to doing a sequential scan and sorting all of the rows.
 
 The reason that we want to limit the number of rows deleted at once is that large deletes place a strain on resources: they take longer to execute, and they require extra memory to store all of the necessary *undo* information in case the transaction needs to be rolled back.
 
 This way of purging old historical data from a table is easy for the user, since it doesn't require any application code to be written.  In addition, it can be done very fast because the DELETE is invoked directly from the execution engine as soon as it detects that more space is needed.
 
-This solution might be less suited to applications where the rate of new data coming in varies greatly.  What are the implications of very fast or very slow data?
+### What are the Implications of Insertion Rate? ###
 
-When the insertion rate is slow, there will be data much older than 30 seconds in the table.  Older data is not purged from the table until the new data arrives to push it out.  This may not be desirable.
+Since the deletion of old rows is tied to the insertion of new ones, the rate at which new rows are inserted has implications that are worth discussing.
 
-When the insertion rate is very fast, two things may happen, depending on deletion criteria.  If only old rows are deleted, then inserts may begin to fail with a constraint violation if space cannot be made for new rows---new data arrives, but none of the existing tuples are yet old enough to be aged out.  If we make the delete less selective, such that it just deletes some fixed number of the oldest rows (without requiring them to be older than a certain age), then we may age out rows that are younger than the time window that we care about.
+When the insertion rate is slow, there may be stale data in the table.  Older data is not purged from the table until the new data arrives to push it out.  This may not be desirable, but isn't the end of the world either; just be sure to select only the newer rows when reading the table.
 
-If the insertion rate is too fast for a given partition row limit, then the database administrator has a couple options.  He or she can increase the per-partition row limit for the table (and accept the increased memory cost that this implies).  In version 5.0, this can be done on a running data base by executing the `ALTER TABLE ... ADD CONSTRAINT` command.  Alternatively, the adminstrator could expand the cluster by adding new nodes, as more partitions means fewer rows per partition.
+When the insertion rate becomes faster than is appropriate for the current row limit, two things may happen, depending on deletion criteria.  If only old rows are deleted, then inserts may begin to fail with a constraint violation if space cannot be made for new rows---new data arrives, but none of the existing tuples are yet old enough to be aged out.  If we make the delete less selective, such that it just deletes some fixed number of the oldest rows (without requiring them to be older than a certain age), then we may age out rows that are younger than the time window that we care about.
 
-The other way to delete older data is via the "nibble" pattern, wherein a procedure is created that deletes small amounts of rows.  This procedure can then be run periodically to purge unneeded rows.  An advantage of this approach is that new data does not need to be inserted to purge older data.  A discussion of this pattern appears in the README for the "windowing" example.
+The database administrator has a couple options when this happens.  He or she can increase the per-partition row limit for the table (and accept the increased memory cost that this implies).  In version 5.0, this can be done on a running database by executing the `ALTER TABLE ... ADD CONSTRAINT` command.  Alternatively, the adminstrator could expand the cluster by adding new nodes, as more partitions means fewer rows per partition.  Elastically expanding a cluster can also be done online, without shutting down the database.
+
+To see how insertion rate affects the performance of this example app, try playing with the `--ratelimit` setting in the client.
+
+Another way to delete older data is via the "nibble" pattern, wherein a procedure is created that deletes small amounts of rows.  This procedure can then be run periodically to purge unneeded rows.  One advantage of this approach is that new tuples do not need to be inserted to purge older ones.  A discussion of this pattern appears in the README for the "windowing" example.
 
 
 What do the Queries Do?
