@@ -62,6 +62,7 @@ public abstract class AbstractParsedStmt {
     protected HashMap<Long, ParameterValueExpression> m_paramsById = new HashMap<Long, ParameterValueExpression>();
 
     public ArrayList<Table> m_tableList = new ArrayList<Table>();
+    public ArrayList<StmtSubqueryScan> m_fromSubqueryList = new ArrayList<StmtSubqueryScan>();
     private Table m_DDLIndexedTable = null;
 
     public ArrayList<AbstractExpression> m_noTableSelectionList = new ArrayList<AbstractExpression>();
@@ -640,6 +641,8 @@ public abstract class AbstractParsedStmt {
             m_tableList.add(table);
             leafNode = new TableLeafNode(nodeId, joinExpr, whereExpr, (StmtTargetTableScan)tableScan);
         } else {
+            assert(tableScan instanceof StmtSubqueryScan);
+            m_fromSubqueryList.add((StmtSubqueryScan) tableScan);
             leafNode = new SubqueryLeafNode(nodeId, joinExpr, whereExpr, (StmtSubqueryScan)tableScan);
         }
 
