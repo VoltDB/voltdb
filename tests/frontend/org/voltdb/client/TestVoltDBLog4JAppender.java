@@ -137,7 +137,7 @@ public class TestVoltDBLog4JAppender {
             printer.printMessages();
 
             // Make sure that we have a bunch of messages in VoltDB
-            VoltTable tables = m_client.callProcedure("@AdHoc", "SELECT message FROM Logs").getResults()[0];
+            VoltTable tables = m_client.callProcedure("@AdHoc", "SELECT message FROM log4j").getResults()[0];
             Assert.assertTrue("We have the correct number of insertions", tables.getRowCount() == 2);
         } catch (Exception e) {
             System.err.println("Failed to insert log messages into VoltDB");

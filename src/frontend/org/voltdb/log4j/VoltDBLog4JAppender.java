@@ -32,6 +32,8 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
     int port = 21212;
     String user = null;
     String password = null;
+    String table = "log4j";
+
     ClientConfig config = null;
     Client client = null;
     VoltBulkLoader bulkLoader = null;
@@ -58,6 +60,9 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
     public void setPassword(String password) { this.password = password; }
     public String getPassword () { return this.password; }
 
+    public void setTable(String table) { this.table = table; }
+    public String getTable() { return this.table; }
+
 
     public VoltDBLog4JAppender() {
         try {
@@ -72,7 +77,8 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
             client.createConnection(server, port);
 
             // Make sure we have a table set up.
-            client.callProcedure("@AdHoc", "CREATE TABLE Logs ( timestamp BIGINT, level VARCHAR(10), message VARCHAR(255))");
+            String sqlStmt = "CREATE TABLE " + table + " ( timestamp BIGINT, level VARCHAR(10), message VARCHAR(255))";
+            client.callProcedure("@AdHoc", sqlStmt);
 
             // Grab a bulk loader
             bulkLoader = client.getNewBulkLoader("Logs", 1, new VoltDBLog4JAppenderCallback());
