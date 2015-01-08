@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -69,6 +69,10 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import static junit.framework.Assert.assertEquals;
 
 import junit.framework.TestCase;
 import org.codehaus.jackson.map.ObjectMapper;
@@ -76,11 +80,16 @@ import org.codehaus.jackson.map.ObjectMapper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientConfig;
+import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
+import org.voltdb.compiler.VoltProjectBuilder.RoleInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
@@ -97,6 +106,7 @@ import org.voltdb.utils.MiscUtils;
 public class TestJSONInterface extends TestCase {
 
     ServerThread server;
+    Client client;
 
     static class Response {
 
@@ -347,6 +357,125 @@ public class TestJSONInterface extends TestCase {
 
         return response;
     }
+
+    public void testAJAXAndClientTogether() throws Exception {
+        try {
+            String simpleSchema
+                    = "CREATE TABLE foo (\n"
+                    + "    bar BIGINT NOT NULL,\n"
+                    + "    PRIMARY KEY (bar)\n"
+                    + ");";
+
+            VoltProjectBuilder builder = new VoltProjectBuilder();
+            builder.addLiteralSchema(simpleSchema);
+            builder.setHTTPDPort(8095);
+            boolean success = builder.compile(Configuration.getPathToCatalogForTest("json.jar"));
+            assertTrue(success);
+
+            VoltDB.Configuration config = new VoltDB.Configuration();
+            config.m_pathToCatalog = config.setPathToCatalogForTest("json.jar");
+            config.m_pathToDeployment = builder.getPathToDeployment();
+            server = new ServerThread(config);
+            server.start();
+            server.waitForInitialization();
+
+            client = ClientFactory.createClient(new ClientConfig());
+            client.createConnection("localhost");
+
+            final AtomicLong fcnt = new AtomicLong(0);
+            final AtomicLong scnt = new AtomicLong(0);
+            final AtomicLong cfcnt = new AtomicLong(0);
+            final AtomicLong cscnt = new AtomicLong(0);
+            final int jsonRunnerCount = 50;
+            final int clientRunnerCount = 50;
+            final ParameterSet pset = ParameterSet.fromArrayNoCopy("select count(*) from foo");
+            String responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
+            Response r = responseFromJSON(responseJSON);
+            assertEquals(ClientResponse.SUCCESS, r.status);
+            //Do replicated table read.
+            class JSONRunner implements Runnable {
+
+                @Override
+                public void run() {
+                    try {
+                        String rresponseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
+                        System.out.println("Response: " + rresponseJSON);
+                        Response rr = responseFromJSON(rresponseJSON);
+                        assertEquals(ClientResponse.SUCCESS, rr.status);
+                        scnt.incrementAndGet();
+                    } catch (Exception ex) {
+                        fcnt.incrementAndGet();
+                        ex.printStackTrace();
+                    }
+                }
+
+            }
+
+            //Do replicated table read.
+            class ClientRunner implements Runnable {
+
+                class Callback implements ProcedureCallback {
+
+                    @Override
+                    public void clientCallback(ClientResponse clientResponse) throws Exception {
+                        if (clientResponse.getStatus() == ClientResponse.SUCCESS) {
+                            cscnt.incrementAndGet();
+                        } else {
+                            System.out.println("Client failed: " + clientResponse.getStatusString());
+                            cfcnt.incrementAndGet();
+                        }
+                    }
+
+                }
+                @Override
+                public void run() {
+                    try {
+                        if (!client.callProcedure(new Callback(), "@AdHoc", "SELECT count(*) from foo")) {
+                            cfcnt.decrementAndGet();
+                        }
+                    } catch (Exception ex) {
+                        fcnt.incrementAndGet();
+                        ex.printStackTrace();
+                    }
+                }
+
+            }
+
+            //Start runners
+            ExecutorService es = CoreUtils.getBoundedSingleThreadExecutor("runners", jsonRunnerCount);
+            for (int i = 0; i < jsonRunnerCount; i++) {
+                es.submit(new JSONRunner());
+            }
+            ExecutorService ces = CoreUtils.getBoundedSingleThreadExecutor("crunners", clientRunnerCount);
+            for (int i = 0; i < clientRunnerCount; i++) {
+                ces.submit(new ClientRunner());
+            }
+
+            es.shutdown();
+            es.awaitTermination(1, TimeUnit.DAYS);
+            assertEquals(jsonRunnerCount, scnt.get());
+            ces.shutdown();
+            ces.awaitTermination(1, TimeUnit.DAYS);
+            client.drain();
+            assertEquals(clientRunnerCount, cscnt.get());
+            responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
+            r = responseFromJSON(responseJSON);
+            assertEquals(ClientResponse.SUCCESS, r.status);
+            //Make sure we are still good.
+            ClientResponse resp = client.callProcedure("@AdHoc", "SELECT count(*) from foo");
+            assertEquals(ClientResponse.SUCCESS, resp.getStatus());
+        } finally {
+            if (server != null) {
+                server.shutdown();
+                server.join();
+            }
+            server = null;
+            if (client != null) {
+                client.close();
+            }
+        }
+    }
+
 
     public void testAdminMode() throws Exception {
         try {
@@ -1154,7 +1283,7 @@ public class TestJSONInterface extends TestCase {
             assertTrue(jdep.contains("cluster"));
             deptype = mapper.readValue(jdep, DeploymentType.class);
             int nto = deptype.getHeartbeat().getTimeout();
-            assertEquals(nto, 99);
+            assertEquals(99, nto);
 
             //Test change Query timeout
             SystemSettingsType ss = deptype.getSystemsettings();
@@ -1165,9 +1294,12 @@ public class TestJSONInterface extends TestCase {
             Query qv = ss.getQuery();
             if (qv == null) {
                 qv = new Query();
-                ss.setQuery(qv);
+                qv.setTimeout(99);
+            } else {
                 qv.setTimeout(99);
             }
+            ss.setQuery(qv);
+            deptype.setSystemsettings(ss);
             ndeptype = mapper.writeValueAsString(deptype);
             params.put("deployment", ndeptype);
             pdep = postUrlOverJSON("http://localhost:8095/deployment/", null, null, null, 200, "application/json", params);
@@ -1177,7 +1309,7 @@ public class TestJSONInterface extends TestCase {
             assertTrue(jdep.contains("cluster"));
             deptype = mapper.readValue(jdep, DeploymentType.class);
             nto = deptype.getSystemsettings().getQuery().getTimeout();
-            assertEquals(nto, 99);
+            assertEquals(99, nto);
 
             qv.setTimeout(88);
             ss.setQuery(qv);
@@ -1191,7 +1323,7 @@ public class TestJSONInterface extends TestCase {
             assertTrue(jdep.contains("cluster"));
             deptype = mapper.readValue(jdep, DeploymentType.class);
             nto = deptype.getSystemsettings().getQuery().getTimeout();
-            assertEquals(nto, 88);
+            assertEquals(88, nto);
 
         } finally {
             if (server != null) {
@@ -1418,5 +1550,4 @@ public class TestJSONInterface extends TestCase {
             server = null;
         }
     }
-
 }

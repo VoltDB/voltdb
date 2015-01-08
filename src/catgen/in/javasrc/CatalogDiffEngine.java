@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -90,6 +90,7 @@ public class CatalogDiffEngine {
 
         // store the complete set of old and new indexes so some extra checking can be done with
         // constraints and new/updated unique indexes
+
         CatalogMap<Table> tables = prev.getClusters().get("cluster").getDatabases().get("database").getTables();
         assert(tables != null);
         for (Table t : tables) {
@@ -411,7 +412,7 @@ public class CatalogDiffEngine {
 
         // Also allow add/drop of anything (that hasn't triggered an early return already)
         // if it is found anywhere in these sub-trees.
-        for (CatalogType parent = suspect.m_parent; parent != null; parent = parent.m_parent) {
+        for (CatalogType parent = suspect.getParent(); parent != null; parent = parent.getParent()) {
             if (parent instanceof Procedure ||
                 parent instanceof Connector ||
                 parent instanceof ConstraintRef ||
@@ -704,7 +705,7 @@ public class CatalogDiffEngine {
         // This would provide flexibility in the future for the grand-fathered elements
         // to bypass as many or as few checks as desired.
 
-        for (CatalogType parent = suspect.m_parent; parent != null; parent = parent.m_parent) {
+        for (CatalogType parent = suspect.getParent(); parent != null; parent = parent.getParent()) {
             if (parent instanceof Procedure || parent instanceof ColumnRef) {
                 if (m_triggeredVerbosity) {
                     System.out.println("DEBUG VERBOSE diffRecursively field change to " +
@@ -920,7 +921,7 @@ public class CatalogDiffEngine {
 
         // write the commands to make it so
         // they will be ignored if the change is unsupported
-        m_sb.append("delete ").append(prevType.getParent().getPath()).append(" ");
+        m_sb.append("delete ").append(prevType.getParent().getCatalogPath()).append(" ");
         m_sb.append(mapName).append(" ").append(name).append("\n");
 
         // add it to the set of deletions to later compute descriptive text
@@ -1032,8 +1033,8 @@ public class CatalogDiffEngine {
                 // if comparing CatalogTypes (both must be same)
                 if (prevValue instanceof CatalogType) {
                     assert(newValue instanceof CatalogType);
-                    String prevPath = ((CatalogType) prevValue).getPath();
-                    String newPath = ((CatalogType) newValue).getPath();
+                    String prevPath = ((CatalogType) prevValue).getCatalogPath();
+                    String newPath = ((CatalogType) newValue).getCatalogPath();
                     if (prevPath.compareTo(newPath) != 0) {
                         if (m_triggeredVerbosity) {
                             int padWidth = StringUtils.indexOfDifference(prevPath, newPath);
@@ -1065,15 +1066,15 @@ public class CatalogDiffEngine {
         }
 
         // recurse
-        for (String field : prevType.m_childCollections.keySet()) {
+        for (String field : prevType.getChildCollections()) {
             boolean verbosityTriggeredHere = false;
             if (field.equals(m_triggerForVerbosity)) {
                 System.out.println("DEBUG VERBOSE diffRecursively verbosity ON");
                 m_triggeredVerbosity = true;
                 verbosityTriggeredHere = true;
             }
-            CatalogMap<? extends CatalogType> prevMap = prevType.m_childCollections.get(field);
-            CatalogMap<? extends CatalogType> newMap = newType.m_childCollections.get(field);
+            CatalogMap<? extends CatalogType> prevMap = prevType.getCollection(field);
+            CatalogMap<? extends CatalogType> newMap = newType.getCollection(field);
             getCommandsToDiff(field, prevMap, newMap);
             if (verbosityTriggeredHere) {
                 System.out.println("DEBUG VERBOSE diffRecursively verbosity OFF");
@@ -1253,7 +1254,7 @@ public class CatalogDiffEngine {
                 // note, this has to be pretty raw to avoid some smarts that wont work
                 // in this context. this may return an unresolved link which points nowhere,
                 // but that's good enough to know it's a view
-                if (table.m_fields.get("materializer") != null) {
+                if (table.getField("materializer") != null) {
                     return "View " + type.getTypeName();
                 }
 
