@@ -197,7 +197,7 @@ public class ReplaySequencer
         public String toString()
         {
             return String.format("(SENTINEL TXNID: %d (%s), %d BLOCKED MESSAGES, %s)\n%s",
-                                 m_sentinalTxnId, TxnEgo.txnIdToString(m_sentinalTxnId),
+                                 m_sentinalTxnId, m_sentinalTxnId != null ? TxnEgo.txnIdToString(m_sentinalTxnId) : "",
                                  m_blockedMessages.size(),
                                  m_servedFragment ? "SERVED FRAGMENT" : "",
                                  m_firstFragment);

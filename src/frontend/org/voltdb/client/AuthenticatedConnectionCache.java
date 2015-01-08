@@ -237,6 +237,7 @@ public class AuthenticatedConnectionCache {
         if (m_unauthClient != null)
         {
             try {
+                m_unauthClient.drain();
                 m_unauthClient.close();
             } catch (InterruptedException ex) {
                 throw new RuntimeException("Unable to close unauthenticated client.", ex);
@@ -245,6 +246,7 @@ public class AuthenticatedConnectionCache {
         for (Entry<String, Connection> e : m_connections.entrySet())
         {
             try {
+                e.getValue().client.drain();
                 e.getValue().client.close();
             } catch (InterruptedException ex) {
                 throw new RuntimeException("Unable to close client from pool.", ex);
@@ -262,6 +264,7 @@ public class AuthenticatedConnectionCache {
                 if (e.getValue().refCount <= 0) {
                     m_connections.remove(e.getKey());
                     try {
+                        e.getValue().client.drain();
                         e.getValue().client.close();
                     } catch (InterruptedException ex) {
                         throw new RuntimeException("Unable to close client from pool.", ex);
