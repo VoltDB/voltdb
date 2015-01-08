@@ -344,7 +344,7 @@ public class PlanAssembler {
         ParsedResultAccumulator exprSubqueryResult = null;
         if ( ! subqueryExprs.isEmpty() ) {
             if (parsedStmt instanceof ParsedSelectStmt == false) {
-                m_recentErrorMsg = "IN/EXISTS subquery clauses are only supported in SELECT statements";
+                m_recentErrorMsg = "Subquery expressions are only supported in SELECT statements";
                 return null;
             }
 
@@ -424,7 +424,7 @@ public class PlanAssembler {
 
         if ( ! subqueryExprs.isEmpty() ) {
              if (! m_partitioning.isInferredSingle()) {
-                m_recentErrorMsg = "IN/EXISTS subquery clauses are only supported in single partition procedures";
+                m_recentErrorMsg = "Subquery expressions are only supported in single partition procedures";
                 return null;
              }
         }
@@ -495,7 +495,7 @@ public class PlanAssembler {
             // multiple times during the parent statement execution.
             if (bestPlan.rootPlanGraph.hasAnyNodeOfType(PlanNodeType.SEND)) {
                 // fail the whole plan
-                m_recentErrorMsg = "IN/EXISTS subquery clauses are only supported in single partition procedures";
+                m_recentErrorMsg = "Subquery expressions are only supported in single partition procedures";
                 return false;
             }
 //            // For IN Expressions only
