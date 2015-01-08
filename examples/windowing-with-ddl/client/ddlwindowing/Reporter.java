@@ -22,7 +22,7 @@
  */
 
 
-package windowing;
+package ddlwindowing;
 
 import java.io.IOException;
 import java.util.Map;
@@ -33,7 +33,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 
-import windowing.WindowingApp.PartitionInfo;
+import ddlwindowing.WindowingApp.PartitionInfo;
 
 /**
  * Periodically print a report of insert rates, latencies and failures,

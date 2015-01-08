@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package windowing;
+package ddlwindowing;
 
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicLong;

@@ -41,7 +41,7 @@ run.sh Client Options
 Near the bottom of the run.sh bash script is the section run when you type `run.sh client`. In that section is the actual shell command to run the client code, reproduced below:
 
     java -classpath client:$CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
-        windowing.WindowingApp \
+        ddlwindowing.WindowingApp \
         --displayinterval=5 \              # how often to print the report
         --duration=120 \                   # how long to run for
         --servers=localhost:21212 \        # servers to connect to

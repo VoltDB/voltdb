@@ -36,7 +36,7 @@ CREATE INDEX val_index ON timedata (val);
 
 -- Pre-aggregate the sum and counts of the rows by second.
 -- This allows for fast computation of averages by ranges of seconds.
--- See the windowing.Average procedure SQL below for more.
+-- See the ddlwindowing.Average procedure SQL below for more.
 CREATE VIEW agg_by_second
 (
   second_ts,
@@ -56,13 +56,13 @@ AS SELECT TRUNCATE(SECOND, update_ts), COUNT(*), SUM(val)
 -- 40k rows. In this case, it needs to scan 1 row per second times the number of
 -- partitions, or 40 rows. That's a tremendous advantage of pre-aggregating the
 -- table sums and counts by second.
-CREATE PROCEDURE windowing.Average AS
+CREATE PROCEDURE ddlwindowing.Average AS
     SELECT SUM(sum_values) / SUM(count_values)
     FROM agg_by_second
     WHERE second_ts >= TO_TIMESTAMP(SECOND, SINCE_EPOCH(SECOND, NOW) - ?);
 
 -- Find the maximum value across all rows and partitions.
-CREATE PROCEDURE windowing.MaxValue AS
+CREATE PROCEDURE ddlwindowing.MaxValue AS
     SELECT MAX(val)
     FROM timedata;
 
@@ -74,7 +74,7 @@ CREATE PROCEDURE windowing.MaxValue AS
 -- It's just here to provide a place for the parameter
 -- used to partition the procedure, so it can be called
 -- in the "run everywhere" pattern.
-CREATE PROCEDURE windowing.AgeOfOldest AS
+CREATE PROCEDURE ddlwindowing.AgeOfOldest AS
   SELECT SINCE_EPOCH(MILLISECOND, NOW)
          - SINCE_EPOCH(MILLISECOND, update_ts) AS age_ms
   FROM timedata
@@ -86,7 +86,7 @@ PARTITION PROCEDURE AgeOfOldest ON TABLE timedata COLUMN uuid;
 
 -- A procedure that finds the age of the youngest tuple
 -- in a partition, similar to the procedure above.
-CREATE PROCEDURE windowing.AgeOfYoungest AS
+CREATE PROCEDURE ddlwindowing.AgeOfYoungest AS
   SELECT SINCE_EPOCH(MILLISECOND, NOW)
          - SINCE_EPOCH(MILLISECOND, update_ts) AS age_ms
   FROM timedata

@@ -36,7 +36,7 @@ APPCLASSPATH=$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_LIB"/*.jar; \
     \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
 } 2> /dev/null | paste -sd ':' - )
-CLIENTCLASSPATH=windowing-client.jar:$CLASSPATH:$({ \
+CLIENTCLASSPATH=ddlwindowing-client.jar:$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdbclient-*.jar; \
     \ls -1 "$VOLTDB_LIB"/commons-cli-1.2.jar; \
 } 2> /dev/null | paste -sd ':' - )
@@ -46,24 +46,24 @@ HOST="localhost"
 
 # remove binaries, logs, runtime artifacts, etc... but keep the jars
 function clean() {
-    rm -rf client/windowing/*.class debugoutput \
+    rm -rf client/ddlwindowing/*.class debugoutput \
            voltdbroot log catalog-report.html statement-plans
 }
 
 # remove everything from "clean" as well as the jarfiles
 function cleanall() {
     clean
-    rm -rf windowing-client.jar
+    rm -rf ddlwindowing-client.jar
 }
 
 # compile the source code for the client into a jarfile
 function jars() {
     # compile java source
-    javac -target 1.7 -source 1.7 -classpath $CLIENTCLASSPATH client/windowing/*.java
+    javac -target 1.7 -source 1.7 -classpath $CLIENTCLASSPATH client/ddlwindowing/*.java
     # build procedure and client jars
-    jar cf windowing-client.jar -C client windowing
+    jar cf ddlwindowing-client.jar -C client ddlwindowing
     # remove compiled .class files
-    rm -rf client/windowing/*.class
+    rm -rf client/ddlwindowing/*.class
 }
 
 # compile the procedure and client jarfiles if they don't exist
@@ -93,11 +93,11 @@ function init() {
 # Use this target for argument help
 function client-help() {
     jars-ifneeded
-    java -classpath $CLIENTCLASSPATH windowing.WindowingApp --help
+    java -classpath $CLIENTCLASSPATH ddlwindowing.WindowingApp --help
 }
 
 ## USAGE FOR CLIENT TARGET ##
-# usage: windowing.WindowingApp
+# usage: ddlwindowing.WindowingApp
 #     --displayinterval <arg>   Interval for performance feedback, in
 #                               seconds.
 #     --duration <arg>          Duration, in seconds.
@@ -112,7 +112,7 @@ function client() {
     jars-ifneeded
     # Note that in the command below, maxrows and historyseconds can't both be non-zero.
     java -classpath $CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
-        windowing.WindowingApp \
+        ddlwindowing.WindowingApp \
         --displayinterval=5 \
         --duration=120 \
         --servers=localhost:21212 \

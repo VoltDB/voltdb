@@ -22,7 +22,7 @@
  */
 
 
-package windowing;
+package ddlwindowing;
 
 import java.io.IOException;
 import java.util.Date;
