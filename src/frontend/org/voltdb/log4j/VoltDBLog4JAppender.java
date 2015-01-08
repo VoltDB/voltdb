@@ -83,6 +83,7 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
             // Grab a bulk loader
             bulkLoader = client.getNewBulkLoader("log4j", 1, new VoltDBLog4JAppenderCallback());
         } catch (Exception e) {
+            System.err.println("Unable to create VoltDB client");
             e.printStackTrace();
         }
     }
@@ -113,6 +114,7 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
             client.drain();
             client.close();
         } catch (Exception e) {
+            System.err.println("Unable to close connection to VoltDB");
             e.printStackTrace();
         }
     }
