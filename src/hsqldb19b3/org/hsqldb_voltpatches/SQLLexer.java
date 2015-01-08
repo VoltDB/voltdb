@@ -101,11 +101,12 @@ public class SQLLexer
             Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL
             );
 
-    // does ddl the statement end with cascade
-    private static final Pattern DDL_CASCADE_CHECK = Pattern.compile(
-            "^.*" + // start of line, then anything
-            "cascade" + // must contain cascade
-            "\\s*;?\\s*" + // then optional whitespace, a sigle optional semi, then ws
+    // does ddl the statement end with cascade or have if exists in the right place
+    private static final Pattern DDL_IFEXISTS_OR_CASCADE_CHECK = Pattern.compile(
+            "^.*?" + // start of line, then anything (greedy)
+            "(\\s+if\\s+exists)?" + // may contain if exists preceded by whitespace
+            "(\\s+cascade)?" + // may contain cascade preceded by whitespace
+            "\\s*;?\\s*" + // then optional whitespace, a single optional semi, then ws
             "$", // end of line
             Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL
             );
@@ -163,9 +164,10 @@ public class SQLLexer
         public final String name;
         public final String secondName;
         public boolean cascade;
+        public boolean ifexists;
 
-        HSQLDDLInfo(HSQLDDLVerb verb, HSQLDDLNoun noun, String name, String secondName, boolean cascade) {
-            this.verb = verb; this.noun = noun; this.name = name; this.secondName = secondName; this.cascade = cascade;
+        HSQLDDLInfo(HSQLDDLVerb verb, HSQLDDLNoun noun, String name, String secondName, boolean cascade, boolean ifexists) {
+            this.verb = verb; this.noun = noun; this.name = name; this.secondName = secondName; this.cascade = cascade; this.ifexists = ifexists;
         }
     }
 
@@ -197,14 +199,22 @@ public class SQLLexer
                 secondName = secondName.toLowerCase();
             }
 
-            // cascade is interesting on alters and drops
+            // cascade/if exists are interesting on alters and drops
             boolean cascade = false;
+            boolean ifexists = false;
             if (verb != HSQLDDLVerb.CREATE) {
-                matcher = DDL_CASCADE_CHECK.matcher(ddl);
-                cascade = matcher.matches();
+                matcher = DDL_IFEXISTS_OR_CASCADE_CHECK.matcher(ddl);
+                if (matcher.matches()) {
+                    for (int i = 0; i < 3; i++) {
+                        System.out.println(matcher.group(i));
+                    }
+                    System.out.println();
+                    ifexists = matcher.group(1) != null;
+                    cascade = matcher.group(2) != null;
+                }
             }
 
-            return new HSQLDDLInfo(verb, noun, name.toLowerCase(), secondName, cascade);
+            return new HSQLDDLInfo(verb, noun, name.toLowerCase(), secondName, cascade, ifexists);
         }
         return null;
     }
