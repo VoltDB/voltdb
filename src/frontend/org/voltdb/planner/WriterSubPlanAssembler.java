@@ -66,13 +66,13 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
     AbstractPlanNode nextPlan() {
         if (!m_generatedPlans) {
             // Analyze join conditions
-            m_parsedStmt.m_joinTree.analyzeJoinExpressions(m_parsedStmt.m_noTableSelectionList);
+            assert (m_parsedStmt.m_joinTree != null);
+            JoinNode tableNode = (JoinNode) m_parsedStmt.m_joinTree.clone();
+            tableNode.analyzeJoinExpressions(m_parsedStmt.m_noTableSelectionList);
             // these just shouldn't happen right?
             assert(m_parsedStmt.m_noTableSelectionList.size() == 0);
 
             m_generatedPlans = true;
-            assert (m_parsedStmt.m_joinTree != null);
-            JoinNode tableNode = m_parsedStmt.m_joinTree;
             // This is either UPDATE or DELETE statement. Consolidate all expressions
             // into the WHERE list.
             tableNode.m_whereInnerList.addAll(tableNode.m_joinInnerList);
