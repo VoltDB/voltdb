@@ -299,4 +299,15 @@ public class AuthenticatedConnectionCache {
         }
     }
 
+    //Used for testing today.
+    public int getSize() {
+        if (m_connections == null) return 0;
+        return m_connections.size();
+    }
+    public Client getUnauthenticatedAdminClient() {
+        return this.m_adminUnauthClient;
+    }
+    public Client getUnauthenticatedClient() {
+        return this.m_unauthClient;
+    }
 }
