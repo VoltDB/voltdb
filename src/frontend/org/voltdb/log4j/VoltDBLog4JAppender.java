@@ -62,7 +62,7 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
     public VoltDBLog4JAppender() {
         try {
             // Create a connection to VoltDB
-            if (user != null && password != null) {
+            if ((user != null && !user.trim().isEmpty()) && (password != null && !password.trim().isEmpty())) {
                 config = new ClientConfig(user, password);
             } else {
                 config = new ClientConfig();
