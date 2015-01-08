@@ -574,6 +574,19 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         }
     }
 
+    public void testLimitRowsWithTruncate() throws IOException, ProcCallException {
+        if (isHSQL())
+            return;
+
+        Client client = getClient();
+
+        for (int i = 0; i < 13; ++i) {
+            VoltTable vt = client.callProcedure("CAPPED_TRUNCATE.insert", i)
+                    .getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {1});
+        }
+    }
+
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
