@@ -1580,6 +1580,12 @@ function loadAdminPage() {
         var configureSecurity = function (adminConfigValues) {            
             if (adminEditObjects.editStateSecurity == editStates.ShowEdit) {
                 adminDOMObjects.securityLabel.text(getOnOffText(adminConfigValues.securityEnabled));
+
+                if (adminConfigValues.users != null && adminConfigValues.users.length > 0)
+                    adminEditObjects.LinkSecurityEdit.removeClass().addClass('edit');
+                else
+                    adminEditObjects.LinkSecurityEdit.removeClass().addClass('editDisabled');
+                
             }
             
             adminEditObjects.securityStateOriginal.SecurityStatus = adminConfigValues.securityEnabled;

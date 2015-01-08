@@ -779,7 +779,8 @@ ul.helpSchemaList li { list-style:disc; line-height:25px!important; padding:0; m
 .onIcon, 
 .offIcon,
 .restoreConfirmationDisable, 
-.edit, 
+.edit,
+.editDisabled,
 .arrow, 
 .labelCollapsed, 
 .labelExpanded,
@@ -848,6 +849,7 @@ ul.adminClusterList li a.shutdown{ display:inline-block;background-position:-739
 .onIcon			 { background-position: -266px -58px; width: 31px; height: 17px; position:relative; top:4px;}
 .offIcon 		 { background-position:-266px -106px; width: 31px; height: 17px; position:relative; top:5px;}
 .edit 			 { background-position: -226px -64px; width: 31px; height: 17px; display:inline-block; position:relative; top:-3px;}
+.editDisabled   {background-position: -465px -62px; width: 31px; height: 17px; display:inline-block; position:relative; top:-3px;}
 .arrow 			 { background-position: -316px -102px;width: 10px; height: 17px}
 .adminTbl1 tr td.configLabel{ padding-left:35px; font-weight:bold; white-space:nowrap;}
 .tblshutdown tr td.configLabel a { font-weight:bold;}
@@ -858,7 +860,7 @@ ul.adminClusterList li a.shutdown{ display:inline-block;background-position:-739
 .propertiesTbl tr td { padding:0 0 0 60px}
 .propertiesTbl tr.propertyLast td {border-bottom: none;}
 
-.adminTbl1 td .edit {top:9px;}
+.adminTbl1 td .edit, .adminTbl1 td .editDisabled {top:9px;}
 .hasSubLabel{} 
 .labelCollapsed{ background-position:-422px -11px; padding-left:22px;}
 .labelExpanded{ background-position:-422px -55px; padding-left:22px;}

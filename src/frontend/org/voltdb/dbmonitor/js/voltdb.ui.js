@@ -492,7 +492,7 @@ var loadPage = function (serverName, portid) {
                             
                         }
                         catch (error) {
-                            //console.log("failure stopping server");
+                            
                         }
                         
                         //Close the popup                                            
