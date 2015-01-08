@@ -44,7 +44,7 @@ import ddlwindowing.WindowingApp.PartitionInfo;
  * of tuples in the 'timedata' table at each partition.</p>
  *
  * <p>Every time that it's called, it updates a global data structure. This
- * structure is primarily used by the ContinuousDeleter class.</p>
+ * structure is primarily used by Reporter to log per-partition statistics.</p>
  *
  * <p>This code is pretty adaptable to other applications without much
  * modification.</p>
@@ -108,6 +108,9 @@ public class PartitionDataTracker implements Runnable {
             pinfo.partitionKey = partitionKeys.getString("PARTITION_KEY");
 
             try {
+                // Find the age of the oldest and youngest tuples in this partition to
+                // demonstrate that we're both accepting new tuples and aging out
+                // old tuples at the appropriate time.
                 ClientResponse cr = app.client.callProcedure("AgeOfOldest", pinfo.partitionKey);
                 pinfo.oldestTupleAge = cr.getResults()[0].asScalarLong();
                 cr = app.client.callProcedure("AgeOfYoungest", pinfo.partitionKey);

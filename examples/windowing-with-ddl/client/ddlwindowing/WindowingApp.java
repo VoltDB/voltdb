@@ -52,6 +52,10 @@ import org.voltdb.client.ClientStatusListenerExt;
  * threadpool. All inter-task communication is done via the main instance of
  * this class.</p>
  *
+ * <p>Note there is no need to explicitly invoke a procedure to delete old data
+ * anywhere in application code.  Deletion of old data is taken care of by the
+ * DELETE statement embedded in the LIMIT PARTITION ROWS constraint of the
+ * table definition.</p>
  */
 public class WindowingApp {
 

@@ -38,9 +38,9 @@ import ddlwindowing.WindowingApp.PartitionInfo;
 /**
  * Periodically print a report of insert rates, latencies and failures,
  * as well as average values of the 'val' column in the 'timedata' table
- * over several moving windows. The delay between report printing is
- * specified by the user in the configuration.
- *
+ * over several moving windows. Also print per-partition statistics collected
+ * by PartitionDataTracker.  The delay between report printing is specified
+ * by the user in the configuration.
  */
 public class Reporter implements Runnable {
 
@@ -71,6 +71,9 @@ public class Reporter implements Runnable {
                 if (! result.wasNull()) {
                     averagesForWindows.put(seconds, average);
                 } else {
+                    // If there are no rows in the selected time window (for example
+                    // if we stop the client and then start it up again), then the
+                    // average will be NULL.
                     averagesForWindows.put(seconds, null);
                 }
             } catch (IOException | ProcCallException e) {

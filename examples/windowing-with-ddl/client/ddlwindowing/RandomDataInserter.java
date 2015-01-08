@@ -39,9 +39,6 @@ import org.voltdb.client.NullCallback;
  * <p>Given a time duration, insert random tuples into the 'timedata'
  * table as fast as possible.</p>
  *
- * <p>If the user selects 'inline' deletes, this class will call procedures
- * that delete data as they insert it.</p>
- *
  * <p>The rate of insertion is probably rate-limited by a user specified
  * rate limiting parameter passed to the insert client.</p>
  *
@@ -57,7 +54,7 @@ public class RandomDataInserter {
     final ClientStatsContext periodicStatsContext;
 
     // Seed PRNG with a constant for what predictability we can have in the async world...
-    static final Random rand = new Random(31337);
+    static final Random rand = new Random(42);
 
     RandomDataInserter(WindowingApp app, Client client) {
         this.app = app;
