@@ -582,6 +582,11 @@ function alertNodeClicked(obj) {
                 adminConfigValues['partitionDetection'] = data.partitionDetection != null ? data.partitionDetection.enabled : false;
                 adminConfigValues['securityEnabled'] = data.security != null ? data.security.enabled : false;
 
+                if (data.users != null && data.users.user!=null)
+                    adminConfigValues['users'] = data.users.user.length > 0 ? data.users.user : null;
+                else 
+                    adminConfigValues['users'] = null;
+                
                 //HTTP Access
                 if (data.httpd != null) {
                     adminConfigValues['httpEnabled'] = data.httpd.enabled;
@@ -1932,47 +1937,7 @@ function alertNodeClicked(obj) {
             var className;
             var currentServerRowClass;
             var currentServerColumnClass;
-
-            //this.setServerDetails = function (hostId, serverInfo, clusterState) {
-            //    var count = 0;
-            //    if ((VoltDbAdminConfig.servers != "" || VoltDbAdminConfig.servers != null || VoltDbAdminConfig.servers != undefined)
-            //        && VoltDbAdminConfig.servers.length > 0) {
-            //        $.each(VoltDbAdminConfig.servers, function (id, value) {
-            //            {
-            //                if (value.serverName != serverInfo['HOSTNAME'] && count == VoltDbAdminConfig.servers.length - 1) {
-            //                    serverDetails = new VoltDbAdminConfig.server(hostId, serverInfo['HOSTNAME'], serverInfo['CLUSTERSTATE']);
-            //                    VoltDbAdminConfig.servers.push(serverDetails);
-
-            //                } else if (value.serverName == serverInfo['HOSTNAME']) {
-            //                    if (VoltDbAdminConfig.stoppedServer != "" && VoltDbAdminConfig.stoppedServer.serverName == serverInfo['HOSTNAME']) {
-            //                        value.hostId = VoltDbAdminConfig.stoppedServer.hostId;
-            //                        value.serverState = VoltDbAdminConfig.stoppedServer.serverState;
-            //                        console.log("Missing state restored");
-
-            //                    } else {
-            //                        value.hostId = hostId;
-            //                        value.serverState = clusterState;
-            //                    }
-
-            //                    return false;
-            //                }
-            //            }
-            //            count++;
-
-            //        });
-
-            //        //always clean up stopped server whether or not its empty
-            //        VoltDbAdminConfig.stoppedServer = "";
-
-
-            //    } else {
-            //        serverDetails = new VoltDbAdminConfig.server(hostId, serverInfo['HOSTNAME'], serverInfo['CLUSTERSTATE']);
-            //        VoltDbAdminConfig.servers.push(serverDetails);
-
-            //    }
-            //};
-
-
+            
             this.setServerDetails = function (hostId, serverInfo, clusterState) {
                 var count = 0;
                 if ((VoltDbAdminConfig.servers != "" || VoltDbAdminConfig.servers != null || VoltDbAdminConfig.servers != undefined)
@@ -1994,7 +1959,6 @@ function alertNodeClicked(obj) {
 
                     });
 
-
                 } else {
                     serverDetails = new VoltDbAdminConfig.server(hostId, serverInfo['HOSTNAME'], serverInfo['CLUSTERSTATE']);
                     VoltDbAdminConfig.servers.push(serverDetails);
@@ -2009,14 +1973,7 @@ function alertNodeClicked(obj) {
                     $.each(VoltDbAdminConfig.servers, function (id, value) {
                         if (value.serverName == hostName) {
                             value.hostId = hostId;
-                            value.serverState = serverState;
-                            console.log("updated ", value.serverName, " to ", serverState, " state");
-
-                            //stopped server details
-                            //VoltDbAdminConfig.stoppedServer.hostId = hostId;
-                            //VoltDbAdminConfig.stoppedServer.serverName = hostName;
-                            //VoltDbAdminConfig.stoppedServer.serverState = serverState;
-
+                            value.serverState = serverState;                            
                             return false;
                         }
                     });
