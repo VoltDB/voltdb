@@ -64,6 +64,9 @@ public class TestSplitSQLStatements {
         checkSplitter("abc --;def\n;ghi", "abc --;def", "ghi");
         checkSplitter("abc /*\";def\n;*/ghi", "abc /*\";def\n;*/ghi");
         checkSplitter("a\r\nb;c\r\nd;", "a\r\nb", "c\r\nd");
+        checkSplitter("--one\n--two\nreal", "--one", "--two", "real");
+        checkSplitter("  --one\n  --two\nreal", "--one", "--two", "real");
+        checkSplitter("  abc;  --def\n\n  /*ghi\njkl;*/", "abc", "--def", "/*ghi\njkl;*/");
     }
 
 }
