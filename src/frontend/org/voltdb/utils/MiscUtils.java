@@ -652,11 +652,7 @@ public class MiscUtils {
         while (iCur < buf.length) {
             // Eat up whitespace outside of a statement
             if (!inStatement) {
-                if (buf[iCur] == ' ' ||
-                    buf[iCur] == '\r' ||
-                    buf[iCur] == '\n' ||
-                    buf[iCur] == '\t')
-                {
+                if (Character.isWhitespace(buf[iCur])) {
                     iCur++;
                     iStart = iCur;
                 }

@@ -30,8 +30,7 @@ public class SQLLexer
     private static final Pattern SINGLE_LINE_COMMENT_MATCH = Pattern.compile(
             "^\\s*" + // start of line, 0 or more whitespace
             "--" + // start of comment
-            ".*$", + // everything to end of line
-            Pattern.CASE_INSENSITIVE);
+            ".*$"); // everything to end of line
 
     // Simplest possible SQL DDL token lexer
     private static final Pattern DDL_MATCH = Pattern.compile(
