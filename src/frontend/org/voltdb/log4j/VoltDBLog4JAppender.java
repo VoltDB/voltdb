@@ -34,6 +34,7 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
     String user = null;
     String password = null;
     String table = "log4j";
+    long current_index = 0;
 
     ClientConfig config = null;
     Client client = null;
@@ -44,7 +45,7 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
         @Override
         public void failureCallback(Object rowHandle, Object[] fieldList,
                 ClientResponse response) {
-            System.err.println("Log insertion into VoltDB failed");
+            System.err.println("Log insertion into VoltDB failed:");
         }
 
     }
@@ -97,12 +98,20 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
             if (name.toLowerCase().equals(table)){
                 // We have the table, don't need to add it
                 System.out.println("Using existing table '" + table + "' in VoltDB");
+                current_index = findCurrentLogIndex();
                 return;
             }
         }
        // No table, so we need to add one
-       String sqlStmt = "CREATE TABLE " + table + " ( timestamp BIGINT, level VARCHAR(10), message VARCHAR(255))";
+       String sqlStmt = "CREATE TABLE " + table + " ( id INT UNIQUE NOT NULL, timestamp BIGINT, level VARCHAR(10), message VARCHAR(255))";
        client.callProcedure("@AdHoc", sqlStmt);
+    }
+
+    private long findCurrentLogIndex() throws Exception{
+        String sqlStmt = "SELECT MAX(id) from " + table + ";";
+        VoltTable result = client.callProcedure("@AdHoc", sqlStmt).getResults()[0];
+        result.advanceRow();
+        return result.getLong(0);
     }
 
     @Override
@@ -134,7 +143,8 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
         // Insert the log message into VoltDB
         try{
             Object rowHandle = null;
-            bulkLoader.insertRow(rowHandle, timestamp, level, message);
+            bulkLoader.insertRow(rowHandle, current_index, timestamp, level, message);
+            current_index++;
         } catch (InterruptedException e) {
             System.err.println("Failed to insert into VoltDB using bulk loader");
             e.printStackTrace();
