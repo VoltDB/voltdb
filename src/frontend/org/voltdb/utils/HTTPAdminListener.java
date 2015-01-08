@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -618,14 +618,16 @@ public class HTTPAdminListener {
 
             m_server.setHandler(handlers);
 
+            int poolsize = Integer.getInteger("HTTP_POOL_SIZE", 50);
+            int timeout = Integer.getInteger("HTTP_REQUEST_TIMEOUT_SECONDS", 15);
             /*
              * Don't force us to look at a huge pile of threads
              */
-            final QueuedThreadPool qtp = new QueuedThreadPool();
-            qtp.setMaxIdleTimeMs(15000);
+            final QueuedThreadPool qtp = new QueuedThreadPool(poolsize);
+            qtp.setMaxIdleTimeMs(timeout * 1000);
             qtp.setMinThreads(1);
             m_server.setThreadPool(qtp);
-
+            httpClientInterface.setTimeout(timeout);
             m_jsonEnabled = jsonEnabled;
         } catch (Exception e) {
             // double try to make sure the port doesn't get eaten

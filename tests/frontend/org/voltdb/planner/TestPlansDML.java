@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -26,12 +26,20 @@ package org.voltdb.planner;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.DeletePlanNode;
+import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.InsertPlanNode;
+import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
+import org.voltdb.plannodes.SendPlanNode;
+import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.UpdatePlanNode;
+import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
+
+import java.util.Arrays;
 
 public class TestPlansDML extends PlannerTestCase {
 
@@ -196,6 +204,78 @@ public class TestPlansDML extends PlannerTestCase {
         // Cannot evaluate expression except in EE.
         pns = compileToFragments("INSERT INTO P1 (a, c) values(cast(? + 1 as integer), 100)");
         assertEquals(2, pns.size());
+    }
+
+    public void testDeleteOrderByPlan() {
+        System.out.println("\n\n\nRUNNING testDeleteOrderByPlan\n\n");
+
+        // No ORDER BY node, since we can use index instead
+        pns = compileToFragments("DELETE FROM R5 ORDER BY A LIMIT ?");
+        assertEquals(2, pns.size());
+        AbstractPlanNode collectorRoot = pns.get(1);
+        assertClassesMatchNodeChain(Arrays.asList(
+                SendPlanNode.class,
+                DeletePlanNode.class,
+                IndexScanPlanNode.class),
+                collectorRoot
+                );
+
+        // No ORDER BY node, since index scan is used to evaluate predicate
+        pns = compileToFragments("DELETE FROM R5 WHERE A = 1 ORDER BY A LIMIT ?");
+        assertEquals(2, pns.size());
+        collectorRoot = pns.get(1);
+        assertClassesMatchNodeChain(Arrays.asList(
+                SendPlanNode.class,
+                DeletePlanNode.class,
+                IndexScanPlanNode.class),
+                collectorRoot
+                );
+
+        // Index used to evaluate predicate not suitable for ORDER BY
+        pns = compileToFragments("DELETE FROM R5 WHERE A = 1 ORDER BY B, A, C, D LIMIT ?");
+        assertEquals(2, pns.size());
+        collectorRoot = pns.get(1);
+        assertClassesMatchNodeChain(Arrays.asList(
+                SendPlanNode.class,
+                DeletePlanNode.class,
+                OrderByPlanNode.class,
+                IndexScanPlanNode.class),
+                collectorRoot
+                );
+
+        // Index can't be used either for predicate evaluation or ORDER BY
+        pns = compileToFragments("DELETE FROM R5 WHERE B = 1 ORDER BY B, A, C, D LIMIT ?");
+        assertEquals(2, pns.size());
+        collectorRoot = pns.get(1);
+        assertClassesMatchNodeChain(Arrays.asList(
+                SendPlanNode.class,
+                DeletePlanNode.class,
+                OrderByPlanNode.class,
+                SeqScanPlanNode.class),
+                collectorRoot
+                );
+    }
+
+    /**
+     * ENG-7384 Redundant predicate in DELETE/UPDATE statement plans.
+     */
+    public void testDMLPredicate() {
+        {
+            pns = compileToFragments("UPDATE P1 SET C = 1 WHERE A = 0");
+            assertEquals(1, pns.size());
+            checkPredicate(pns.get(0).getChild(0), ExpressionType.COMPARE_EQUAL);
+        }
+        {
+            pns = compileToFragments("DELETE FROM P1 WHERE A > 0");
+            assertTrue(pns.size() == 2);
+            checkPredicate(pns.get(1).getChild(0).getChild(0), ExpressionType.COMPARE_GREATERTHAN);
+        }
+    }
+
+    private void checkPredicate(AbstractPlanNode pn, ExpressionType type) {
+        assertTrue(pn instanceof SeqScanPlanNode);
+        AbstractExpression e = ((SeqScanPlanNode) pn).getPredicate();
+        assertEquals(type, e.getExpressionType());
     }
 
     private void checkTruncateFlag() {

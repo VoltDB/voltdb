@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -66,13 +66,13 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
     AbstractPlanNode nextPlan() {
         if (!m_generatedPlans) {
             // Analyze join conditions
-            m_parsedStmt.m_joinTree.analyzeJoinExpressions(m_parsedStmt.m_noTableSelectionList);
+            assert (m_parsedStmt.m_joinTree != null);
+            JoinNode tableNode = (JoinNode) m_parsedStmt.m_joinTree.clone();
+            tableNode.analyzeJoinExpressions(m_parsedStmt.m_noTableSelectionList);
             // these just shouldn't happen right?
             assert(m_parsedStmt.m_noTableSelectionList.size() == 0);
 
             m_generatedPlans = true;
-            assert (m_parsedStmt.m_joinTree != null);
-            JoinNode tableNode = m_parsedStmt.m_joinTree;
             // This is either UPDATE or DELETE statement. Consolidate all expressions
             // into the WHERE list.
             tableNode.m_whereInnerList.addAll(tableNode.m_joinInnerList);
