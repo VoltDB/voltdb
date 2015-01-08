@@ -46,6 +46,7 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
         public void failureCallback(Object rowHandle, Object[] fieldList,
                 ClientResponse response) {
             System.err.println("Log insertion into VoltDB failed:");
+            System.err.println(response.getStatusString());
         }
 
     }
