@@ -270,6 +270,7 @@ function loadAdminPage() {
         open: function (event, ui, ele) {
         },
         afterOpen: function () {
+            var popup = $(this)[0];
             $("#btnShutdownConfirmationOk").unbind("click");
             $("#btnShutdownConfirmationOk").on("click", function () {
                 var shutdownTimeout = setTimeout(function() {
@@ -286,8 +287,12 @@ function loadAdminPage() {
                     $("#overlay").hide();
                 });
                 //Close the popup
-                $($(this).siblings()[0]).trigger("click");
+                popup.close();
+            });
 
+            $("#btnShutdownConfirmationCancel").unbind("click");
+            $("#btnShutdownConfirmationCancel").on("click", function() {
+                popup.close();
             });
         }
     });
@@ -304,7 +309,7 @@ function loadAdminPage() {
         open: function (event, ui, ele) {
         },
         afterOpen: function () {
-
+            var popup = $(this)[0];
             $("#btnPauseConfirmationOk").unbind("click");
             $("#btnPauseConfirmationOk").on("click", function () {
                 $("#overlay").show();
@@ -328,8 +333,12 @@ function loadAdminPage() {
                 });
                 
                 //Close the popup
-                $($(this).siblings()[0]).trigger("click");                
+                popup.close();
+            });
 
+            $("#btnPauseConfirmationCancel").unbind("click");
+            $("#btnPauseConfirmationCancel").on("click", function() {
+                popup.close();
             });
         }
     });
@@ -338,7 +347,7 @@ function loadAdminPage() {
         open: function (event, ui, ele) {
         },
         afterOpen: function () {
-
+            var popup = $(this)[0];
             $("#btnResumeConfirmationOk").unbind("click");
             $("#btnResumeConfirmationOk").on("click", function () {
                 $("#overlay").show();
@@ -360,7 +369,12 @@ function loadAdminPage() {
                     }
                 });
                 //Close the popup
-                $($(this).siblings()[0]).trigger("click");
+                popup.close();
+            });
+
+            $("#btnResumeConfirmationCancel").unbind("click");
+            $("#btnResumeConfirmationCancel").on("click", function() {
+                popup.close();
             });
         }
     });
@@ -418,6 +432,7 @@ function loadAdminPage() {
         open: function (event, ui, ele) {
         },
         afterOpen: function () {
+            var popup = $(this)[0];
             $("#btnSecurityOk").unbind("click");
             $("#btnSecurityOk").on("click", function () {
                 var adminConfigurations = VoltDbAdminConfig.getLatestRawAdminConfigurations();                
@@ -465,10 +480,15 @@ function loadAdminPage() {
                 }
 
                 //Close the popup
-                $($(this).siblings()[0]).trigger("click");
+                popup.close();
             });
-            
-           
+
+            $("#btnPopupSecurityCancel").unbind("click");
+            $("#btnPopupSecurityCancel").on("click", function() {
+                toggleSecurityEdit(editStates.ShowEdit);
+                popup.close();
+            });
+
             $(".popup_back").on("click", function () {
                adminEditObjects.chkSecurityValue = adminEditObjects.securityStateOriginal.SecurityStatus;                
                toggleSecurityEdit(editStates.ShowEdit);
@@ -508,9 +528,9 @@ function loadAdminPage() {
             });
         },
         afterOpen: function (event) {
+            var popup = $(this)[0];
             $("#btnSaveSnapshots").unbind("click");
             $("#btnSaveSnapshots").on("click", function (e) {
-
                 $("#formSaveSnapshot").valid();
                 var errorSnapshotFileName = $("#errorSnapshotFileName");
                 var errorDirectoryPath = $("#errorSnapshotDirectoryPath");
@@ -550,8 +570,13 @@ function loadAdminPage() {
                     }
                 });
                 //Close the popup
-                $($(this).siblings()[0]).trigger("click");
+                popup.close();
 
+            });
+
+            $("#btnSaveSnapshotCancel").unbind("click");
+            $("#btnSaveSnapshotCancel").on("click", function() {
+                popup.close();
             });
         }
     });
@@ -563,7 +588,17 @@ function loadAdminPage() {
         }
     });
 
-    adminClusterObjects.btnErrorClusterPromote.popup();
+    adminClusterObjects.btnErrorClusterPromote.popup({
+        open: function(event, ui, ele) {
+        },
+        afterOpen: function () {
+            var popup = $(this)[0];
+            $("#btnPromoteErrorOk").unbind("click");
+            $("#btnPromoteErrorOk").on("click", function() {
+                popup.close();
+            });
+        }
+    });
 
     adminClusterObjects.btnClusterPromote.popup({
         open: function(event, ui, ele) {
@@ -594,6 +629,11 @@ function loadAdminPage() {
                 });
                 
                 //Close the popup 
+                popup.close();
+            });
+
+            $("#promoteConfirmCancel").unbind("click");
+            $("#promoteConfirmCancel").on("click", function() {
                 popup.close();
             });
         }
@@ -667,6 +707,11 @@ function loadAdminPage() {
 
                 $('.restoreInfo').hide();
                 $('.restoreConfirmation').show();
+            });
+
+            $("#btnRestoreCancel").unbind("click");
+            $("#btnRestoreCancel").on("click", function() {
+                popup.close();
             });
             
             $(".confirmNoRestore").unbind("click");
@@ -824,7 +869,7 @@ function loadAdminPage() {
         open: function (event, ui, ele) {
         },
         afterOpen: function () {
-
+            var popup = $(this)[0];
             $("#startConfirmOk").unbind("click");
             $("#startConfirmOk").on("click", function () {
 
@@ -832,7 +877,12 @@ function loadAdminPage() {
                 $("#stopConfirmation").show();
 
                 //Close the popup
-                $($(this).siblings()[0]).trigger("click");
+                popup.close();
+            });
+
+            $("#startConfirmCancel").unbind("click");
+            $("#startConfirmCancel").on("click", function() {
+                popup.close();
             });
         }
     });
@@ -1047,6 +1097,7 @@ function loadAdminPage() {
 
             $("#btnPopupAutoSnapshotCancel").on("click", function () {
                 toggleAutoSnapshotEdit(editStates.ShowEdit);
+                popup.close();
             });
 
             $(".popup_back").on("click", function () {
@@ -1190,6 +1241,7 @@ function loadAdminPage() {
 
             $("#btnPopupHeartbeatTimeoutCancel").on("click", function () {
                 toggleHeartbeatTimeoutEdit(editStates.ShowEdit);
+                popup.close();
             });
 
             $(".popup_back").on("click", function () {
@@ -1273,7 +1325,6 @@ function loadAdminPage() {
         open: function (event, ui, ele) {
         },
         afterOpen: function () {
-
             var popup = $(this)[0];
             $("#btnPopupQueryTimeoutOk").unbind("click");
             $("#btnPopupQueryTimeoutOk").on("click", function () {
@@ -1319,6 +1370,7 @@ function loadAdminPage() {
 
             $("#btnPopupQueryTimeoutCancel").on("click", function () {
                 toggleQueryTimeoutEdit(editStates.ShowEdit);
+                popup.close();
             });
 
             $(".popup_back").on("click", function () {
