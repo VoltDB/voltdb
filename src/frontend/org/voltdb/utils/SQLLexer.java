@@ -25,6 +25,14 @@ import org.voltcore.logging.VoltLogger;
 public class SQLLexer
 {
     private static final VoltLogger COMPILER_LOG = new VoltLogger("COMPILER");
+
+    // Match single-line comments
+    private static final Pattern SINGLE_LINE_COMMENT_MATCH = Pattern.compile(
+            "^\\s*" + // start of line, 0 or more whitespace
+            "--" + // start of comment
+            ".*$", + // everything to end of line
+            Pattern.CASE_INSENSITIVE);
+
     // Simplest possible SQL DDL token lexer
     private static final Pattern DDL_MATCH = Pattern.compile(
             "^\\s*" +  // start of line, 0 or more whitespace
@@ -73,6 +81,12 @@ public class SQLLexer
 
     private static final Pattern[] BLACKLISTS = { BLACKLIST_1, BLACKLIST_2 };
 
+    public static boolean isComment(String sql)
+    {
+        Matcher commentMatcher = SINGLE_LINE_COMMENT_MATCH.matcher(sql);
+        return commentMatcher.matches();
+    }
+
     /**
      * Get the DDL token, if any, at the start of this statement.
      * @return returns token, or null if it wasn't DDL
@@ -116,13 +130,19 @@ public class SQLLexer
     // Hopefully this gets whittled away and eventually disappears.
     public static boolean isPermitted(String sql)
     {
+        boolean hadWLMatch = false;
         for (Pattern wl : WHITELISTS) {
             Matcher wlMatcher = wl.matcher(sql);
-            if (!wlMatcher.matches()) {
-                COMPILER_LOG.info("Statement: " + sql + " , failed whitelist: " + wlMatcher.toString());
-                return false;
+            if (wlMatcher.matches()) {
+                hadWLMatch = true;
             }
         }
+
+        if (!hadWLMatch) {
+            COMPILER_LOG.info("Statement: " + sql + " , failed to match any whitelist");
+            return false;
+        }
+
         for (Pattern bl : BLACKLISTS) {
             Matcher blMatcher = bl.matcher(sql);
             if (blMatcher.matches()) {
@@ -130,6 +150,7 @@ public class SQLLexer
                 return false;
             }
         }
-        return true;
+
+        return hadWLMatch;
     }
 }
