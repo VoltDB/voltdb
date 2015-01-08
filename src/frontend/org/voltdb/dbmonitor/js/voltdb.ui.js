@@ -268,7 +268,7 @@ var loadPage = function (serverName, portid) {
         var templateUrl = window.location.protocol + '//' + window.location.host + '/catalog';
         var templateJavascript = "js/template.js";
 
-        $.get(templateUrl, function (result) {
+        $.post(templateUrl, function (result) {
             result = result.replace('<!--##SIZES##>', '');
             var body = $(result).filter("#wrapper").html();
             $("#schema").html(body);
