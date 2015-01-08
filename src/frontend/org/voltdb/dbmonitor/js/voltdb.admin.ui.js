@@ -92,7 +92,7 @@ function loadAdminPage() {
         spanSecurity: $("#spanSecurity"),
         securityLabel: $("#securityRow").find("td:first-child").text(),
         editStateSecurity: editStates.ShowEdit,
-        securityStateOriginal: { "SecurityStatus": false, "linkSecurityEdit": true },
+        securityStateOriginal: { "SecurityStatus": false, "linkSecurityEdit": false },
 
         //Edit Auto Snapshot objects
         btnEditAutoSnapshotOk: $("#btnEditAutoSnapshotOk"),
