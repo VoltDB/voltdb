@@ -81,7 +81,7 @@ public class VoltDBLog4JAppender extends AppenderSkeleton implements Appender {
             client.callProcedure("@AdHoc", sqlStmt);
 
             // Grab a bulk loader
-            bulkLoader = client.getNewBulkLoader("Logs", 1, new VoltDBLog4JAppenderCallback());
+            bulkLoader = client.getNewBulkLoader("log4j", 1, new VoltDBLog4JAppenderCallback());
         } catch (Exception e) {
             e.printStackTrace();
         }
