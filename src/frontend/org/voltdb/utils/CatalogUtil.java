@@ -1262,14 +1262,8 @@ public abstract class CatalogUtil {
             if (drConnection != null) {
                 String drSource = drConnection.getSource();
                 if (drConnection.isEnabled()) {
-                    if (dr.isListen()) {
-                        hostLog.error("DR Active-Active or Daisy-Chain clusters are unsupported." +
-                                " Disabling DR Consumer service until DR Listen is disabled.");
-                    }
-                    else {
-                        cluster.setDrmasterhost(drSource);
-                        hostLog.info("Configured connection for DR replica role to host " + drSource);
-                    }
+                    cluster.setDrmasterhost(drSource);
+                    hostLog.info("Configured connection for DR replica role to host " + drSource);
                 } else {
                     hostLog.info("DR data source " + drSource + " disabled for DR replica role. " +
                             "Starting cluster as replica will be disabled.");

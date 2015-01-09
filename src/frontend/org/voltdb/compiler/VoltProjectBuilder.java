@@ -276,6 +276,7 @@ public class VoltProjectBuilder {
     private boolean m_useDDLSchema = false;
 
     private String m_drMasterHost;
+    private Boolean m_drProducerEnabled = null;
     private Integer m_drProducerClusterId = null;
 
     public VoltProjectBuilder setQueryTimeout(int target) {
@@ -599,8 +600,15 @@ public class VoltProjectBuilder {
         m_drMasterHost = drMasterHost;
     }
 
-    public void enableDrProducer(int clusterId)
+    public void setDrProducerEnabled(int clusterId)
     {
+        m_drProducerEnabled = true;
+        m_drProducerClusterId = new Integer(clusterId);
+    }
+
+    public void setDrProducerDisabled(int clusterId)
+    {
+        m_drProducerEnabled = false;
         m_drProducerClusterId = new Integer(clusterId);
     }
 
@@ -1026,8 +1034,8 @@ public class VoltProjectBuilder {
             DrType dr = factory.createDrType();
             deployment.setDr(dr);
             if (m_drProducerClusterId != null) {
+                dr.setListen(m_drProducerEnabled);
                 dr.setId(m_drProducerClusterId);
-                dr.setListen(true);
             }
             if (m_drMasterHost != null && !m_drMasterHost.isEmpty()) {
                 ConnectionType conn = factory.createConnectionType();

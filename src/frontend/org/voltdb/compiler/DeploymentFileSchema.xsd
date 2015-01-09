@@ -329,7 +329,7 @@
         <xs:element name="connection" type="connectionType" minOccurs="0" maxOccurs="1"/>
     </xs:sequence>
     <xs:attribute name="name" type="xs:string" default=""/>
-    <xs:attribute name="id" type="clusterIdType" default="1"/>
+    <xs:attribute name="id" type="clusterIdType" use="required"/>
     <xs:attribute name="listen" type="xs:boolean" default="false" />
     <xs:attribute name="port" type="xs:int" default="5555"/>
   </xs:complexType>
@@ -352,7 +352,7 @@
   <xs:simpleType name="clusterIdType">
     <xs:restriction base="xs:int">
       <xs:minInclusive value="1"/>
-      <xs:maxInclusive value="2147483647"/>
+      <xs:maxInclusive value="127"/>
     </xs:restriction>
   </xs:simpleType>
   
