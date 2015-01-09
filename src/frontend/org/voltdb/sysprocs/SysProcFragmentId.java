@@ -85,7 +85,8 @@ public class SysProcFragmentId
                 fragId == PF_balancePartitions ||
                 fragId == PF_balancePartitionsData ||
                 fragId == PF_balancePartitionsClearIndex ||
-                fragId == PF_distribute);
+                fragId == PF_distribute ||
+                fragId == PF_applyBinaryLog);
     }
 
     // @LoadMultipartitionTable
@@ -178,4 +179,7 @@ public class SysProcFragmentId
 
     public static final long PF_matchesHashinator = 250;
     public static final long PF_matchesHashinatorResults = 251;
+
+    public static final long PF_applyBinaryLog = 260;
+    public static final long PF_applyBinaryLogAggregate = 261;
 }
