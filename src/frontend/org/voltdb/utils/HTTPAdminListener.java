@@ -21,8 +21,10 @@ import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.net.URL;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -30,33 +32,27 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.eclipse.jetty.server.AsyncContinuation;
-import org.eclipse.jetty.server.Handler;
-import org.eclipse.jetty.server.Request;
-import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.server.handler.AbstractHandler;
-import org.eclipse.jetty.server.handler.ContextHandler;
-import org.eclipse.jetty.server.handler.ContextHandlerCollection;
-import org.eclipse.jetty.util.thread.QueuedThreadPool;
-import org.voltcore.logging.VoltLogger;
-import org.voltdb.HTTPClientInterface;
-import org.voltdb.VoltDB;
-import org.voltdb.compilereport.ReportMaker;
-
-import com.google_voltpatches.common.base.Charsets;
-import com.google_voltpatches.common.io.Resources;
-import java.net.InetAddress;
-import java.util.List;
 import org.codehaus.jackson.JsonGenerator;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.map.JsonMappingException;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.schema.JsonSchema;
+import org.eclipse.jetty.server.AsyncContinuation;
+import org.eclipse.jetty.server.Handler;
+import org.eclipse.jetty.server.Request;
+import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.server.bio.SocketConnector;
+import org.eclipse.jetty.server.handler.AbstractHandler;
+import org.eclipse.jetty.server.handler.ContextHandler;
+import org.eclipse.jetty.server.handler.ContextHandlerCollection;
+import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
-import org.eclipse.jetty.server.bio.SocketConnector;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.AuthenticationResult;
 import org.voltdb.ClientResponseImpl;
+import org.voltdb.HTTPClientInterface;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
@@ -64,6 +60,10 @@ import org.voltdb.common.Permission;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
+import org.voltdb.compilereport.ReportMaker;
+
+import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.io.Resources;
 
 public class HTTPAdminListener {
 
@@ -587,6 +587,8 @@ public class HTTPAdminListener {
 
             ///api/1.0/
             ContextHandler apiRequestHandler = new ContextHandler("/api/1.0");
+            // the default is 200k which well short of out 2M row size limit
+            apiRequestHandler.setMaxFormContentSize(2* 1024 * 1024);
             apiRequestHandler.setHandler(new APIRequestHandler());
 
             ///catalog
