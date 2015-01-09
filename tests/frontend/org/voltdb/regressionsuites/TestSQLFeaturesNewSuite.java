@@ -574,17 +574,29 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         }
     }
 
-    public void testLimitRowsWithTruncate() throws IOException, ProcCallException {
+    public void testLimitRowsWithTruncatingTrigger() throws IOException, ProcCallException {
         if (isHSQL())
             return;
 
         Client client = getClient();
 
+        // The table capped_truncate is capped at 5 rows.
+        // The LIMIT ROWS trigger for this table just does a
+        //   DELETE FROM capped_truncate
+        // This is a tricky case since this truncates the table.
+
+        // Insert enough rows to cause the trigger to fire a few times.
         for (int i = 0; i < 13; ++i) {
             VoltTable vt = client.callProcedure("CAPPED_TRUNCATE.insert", i)
                     .getResults()[0];
             validateTableOfScalarLongs(vt, new long[] {1});
         }
+
+        // Verify that we only have the last 13 % 5 rows.
+        VoltTable vt = client.callProcedure("@AdHoc",
+                "SELECT i FROM capped_truncate ORDER BY i")
+                .getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {10, 11, 12});
     }
 
     /**
