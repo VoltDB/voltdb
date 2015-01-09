@@ -599,6 +599,38 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         validateTableOfScalarLongs(vt, new long[] {10, 11, 12});
     }
 
+    /* Test to make sure that row limit triggers still execute even when data
+     * is being inserted via INSERT INTO ... SELECT */
+    public void testLimitRowsWithInsertIntoSelect() throws Exception {
+        if (isHSQL())
+            return;
+
+        Client client = getClient();
+
+        // Populate a source table
+        for (int i = 0; i < 11; ++i) {
+            VoltTable vt = client.callProcedure("NOCAPPED.insert", i, i*10, i*10 + 1)
+                    .getResults()[0];
+            validateTableOfScalarLongs(vt, new long[] {1});
+        }
+
+        // Insert into select into a capped table with a trigger
+        // NOTE: if target table has a cap, then the SELECT output must be
+        // strictly ordered!  Otherwise the effect is not deterministic.
+        VoltTable vt = client.callProcedure("@AdHoc",
+                "INSERT INTO capped3_limit_rows_exec "
+                + "SELECT 1, wage, dept FROM nocapped")
+                .getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {11});
+
+        validateTableOfLongs(client,
+                "SELECT purge_me, wage, dept from CAPPED3_LIMIT_ROWS_EXEC ORDER BY wage",
+                new long[][] {
+                {1, 90, 91},
+                {1, 100, 101}
+        });
+    }
+
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
