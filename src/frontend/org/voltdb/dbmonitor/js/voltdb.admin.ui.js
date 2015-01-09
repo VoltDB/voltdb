@@ -291,7 +291,7 @@ function loadAdminPage() {
             });
 
             $("#btnShutdownConfirmationCancel").unbind("click");
-            $("#btnShutdownConfirmationCancel").on("click", function() {
+            $("#btnShutdownConfirmationCancel").on("click", function () {
                 popup.close();
             });
         }
@@ -337,7 +337,7 @@ function loadAdminPage() {
             });
 
             $("#btnPauseConfirmationCancel").unbind("click");
-            $("#btnPauseConfirmationCancel").on("click", function() {
+            $("#btnPauseConfirmationCancel").on("click", function () {
                 popup.close();
             });
         }
@@ -373,7 +373,7 @@ function loadAdminPage() {
             });
 
             $("#btnResumeConfirmationCancel").unbind("click");
-            $("#btnResumeConfirmationCancel").on("click", function() {
+            $("#btnResumeConfirmationCancel").on("click", function () {
                 popup.close();
             });
         }
@@ -451,6 +451,10 @@ function loadAdminPage() {
                     if (result.status == "1") {
                         adminEditObjects.chkSecurityValue = adminConfigurations.security.enabled;
 
+                        //reload the page if security is enabled, user is asked to login upon reload action if user session no longer exist
+                        if (adminConfigurations.security.enabled)
+                            location.reload(true);
+
                         //Reload Admin configurations for displaying the updated value
                         voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues, rawConfigValues) {
                             VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues, rawConfigValues);
@@ -485,7 +489,7 @@ function loadAdminPage() {
             });
 
             $("#btnPopupSecurityCancel").unbind("click");
-            $("#btnPopupSecurityCancel").on("click", function() {
+            $("#btnPopupSecurityCancel").on("click", function () {
                 toggleSecurityEdit(editStates.ShowEdit);
                 popup.close();
             });
@@ -576,7 +580,7 @@ function loadAdminPage() {
             });
 
             $("#btnSaveSnapshotCancel").unbind("click");
-            $("#btnSaveSnapshotCancel").on("click", function() {
+            $("#btnSaveSnapshotCancel").on("click", function () {
                 popup.close();
             });
         }
@@ -590,12 +594,12 @@ function loadAdminPage() {
     });
 
     adminClusterObjects.btnErrorClusterPromote.popup({
-        open: function(event, ui, ele) {
+        open: function (event, ui, ele) {
         },
         afterOpen: function () {
             var popup = $(this)[0];
             $("#btnPromoteErrorOk").unbind("click");
-            $("#btnPromoteErrorOk").on("click", function() {
+            $("#btnPromoteErrorOk").on("click", function () {
                 popup.close();
             });
         }
@@ -634,7 +638,7 @@ function loadAdminPage() {
             });
 
             $("#promoteConfirmCancel").unbind("click");
-            $("#promoteConfirmCancel").on("click", function() {
+            $("#promoteConfirmCancel").on("click", function () {
                 popup.close();
             });
         }
@@ -711,10 +715,10 @@ function loadAdminPage() {
             });
 
             $("#btnRestoreCancel").unbind("click");
-            $("#btnRestoreCancel").on("click", function() {
+            $("#btnRestoreCancel").on("click", function () {
                 popup.close();
             });
-            
+
             $(".confirmNoRestore").unbind("click");
             $(".confirmNoRestore").on("click", function (e) {
                 $('.restoreConfirmation').hide();
@@ -882,7 +886,7 @@ function loadAdminPage() {
             });
 
             $("#startConfirmCancel").unbind("click");
-            $("#startConfirmCancel").on("click", function() {
+            $("#startConfirmCancel").on("click", function () {
                 popup.close();
             });
         }
@@ -1550,7 +1554,7 @@ function loadAdminPage() {
             adminDOMObjects.commandLogSegmentSizeLabel.text(adminConfigValues.logSegmentSize != null ? "MB" : "");
             adminDOMObjects.exports.removeClass().addClass(getOnOffClass(adminConfigValues.export));
             adminDOMObjects.exportLabel.text(getOnOffText(adminConfigValues.export));
-            adminDOMObjects.target.text(adminConfigValues.targets);            
+            adminDOMObjects.target.text(adminConfigValues.targets);
             adminDOMObjects.heartBeatTimeout.text(adminConfigValues.heartBeatTimeout != null ? adminConfigValues.heartBeatTimeout : "");
 
 
