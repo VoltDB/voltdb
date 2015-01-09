@@ -37,8 +37,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.SortedMap;
-import java.util.SortedSet;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.regex.Matcher;
@@ -105,6 +103,7 @@ import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
 
 import com.google_voltpatches.common.collect.ImmutableList;
+import java.util.Set;
 
 /**
  * Compiles a project XML file and some metadata into a Jarfile
@@ -1149,8 +1148,8 @@ public class VoltCompiler {
         addDatabaseEstimatesInfo(m_estimates, db);
 
         // Process DDL exported tables
-        SortedMap<String, SortedSet<String>> exportTables = voltDdlTracker.getExportedTables();
-        for (Entry<String, SortedSet<String>> e : exportTables.entrySet()) {
+        Map<String, Set<String>> exportTables = voltDdlTracker.getExportedTables();
+        for (Entry<String, Set<String>> e : exportTables.entrySet()) {
             String groupName = e.getKey();
             for (String tableName : e.getValue()) {
                 addExportTableToConnector(groupName, tableName, db);

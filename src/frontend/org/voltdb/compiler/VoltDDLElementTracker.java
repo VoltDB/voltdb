@@ -24,7 +24,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.SortedMap;
 import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -44,7 +43,7 @@ public class VoltDDLElementTracker {
     final Map<String, ProcedureDescriptor> m_procedureMap =
             new HashMap<String, ProcedureDescriptor>();
     // map from export group name to a sorted set of table names in that group
-    final SortedMap<String, SortedSet<String>> m_exportsByGroup = new TreeMap<>();
+    final Map<String, Set<String>> m_exportsByGroup = new TreeMap<String, Set<String>>();
     // additional non-procedure classes for the jar
     final Set<String> m_extraClassses = new TreeSet<String>();
     final Set<String> m_importLines = new TreeSet<String>();
@@ -202,9 +201,9 @@ public class VoltDDLElementTracker {
         groupName = groupName.toUpperCase();
 
         // insert the table's name into the export group
-        SortedSet<String> tableGroup = m_exportsByGroup.get(groupName);
+        Set<String> tableGroup = m_exportsByGroup.get(groupName);
         if (tableGroup == null) {
-            tableGroup = new TreeSet<>();
+            tableGroup = new TreeSet<String>();
             m_exportsByGroup.put(groupName, tableGroup);
         }
         tableGroup.add(tableName);
@@ -212,7 +211,7 @@ public class VoltDDLElementTracker {
 
     void removeExportedTable(String tableName)
     {
-        for (Entry<String, SortedSet<String>> groupTables : m_exportsByGroup.entrySet()) {
+        for (Entry<String, Set<String>> groupTables : m_exportsByGroup.entrySet()) {
             if (groupTables.getValue().contains(tableName)) {
                 groupTables.getValue().remove(tableName);
             }
@@ -223,7 +222,7 @@ public class VoltDDLElementTracker {
      * Get a collection with tracked table exports
      * @return a collection with tracked table exports
      */
-    SortedMap<String, SortedSet<String>> getExportedTables() {
+    Map<String, Set<String>> getExportedTables() {
         return m_exportsByGroup;
     }
 
