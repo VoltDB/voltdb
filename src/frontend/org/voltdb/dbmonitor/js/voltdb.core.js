@@ -212,7 +212,7 @@
             };
 
             this.BeginExecute = function (procedure, parameters, callback, shortApiCallDetails) {
-                var isHighTimeout = procedure == "@SnapshotRestore";
+                var isHighTimeout = (procedure == "@SnapshotRestore" || procedure == "@AdHoc");
                 this.CallExecute(procedure, parameters, (new callbackWrapper(callback, isHighTimeout)).Callback, shortApiCallDetails);
             };
 
@@ -243,7 +243,7 @@
                     if (stack.length > 0 && (success || continueOnFailure)) {
                         var item = stack[0];
                         var shortApiCallDetails = item[3];
-                        var isHighTimeout = item[0] == "@SnapshotRestore";
+                        var isHighTimeout = (item[0] == "@SnapshotRestore" || item[0] == "@AdHoc");
                         var callback =
                         (new callbackWrapper(
                             (function(queue, item) {
@@ -626,8 +626,7 @@ jQuery.extend({
 });
 
 jQuery.extend({
-    getJSON: function (url, formData, callback, authorization) {
-
+    getJSON: function (url, formData, callback, authorization) {
         if (VoltDBCore.hostIP == "") {
             jQuery.ajax({
                 type: 'GET',

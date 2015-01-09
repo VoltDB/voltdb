@@ -582,11 +582,11 @@ function alertNodeClicked(obj) {
                 adminConfigValues['partitionDetection'] = data.partitionDetection != null ? data.partitionDetection.enabled : false;
                 adminConfigValues['securityEnabled'] = data.security != null ? data.security.enabled : false;
 
-                if (data.users != null && data.users.user!=null)
+                if (data.users != null && data.users.user != null)
                     adminConfigValues['users'] = data.users.user.length > 0 ? data.users.user : null;
-                else 
+                else
                     adminConfigValues['users'] = null;
-                
+
                 //HTTP Access
                 if (data.httpd != null) {
                     adminConfigValues['httpEnabled'] = data.httpd.enabled;
@@ -1754,6 +1754,9 @@ function alertNodeClicked(obj) {
                 hostNameList = systemOverview;
             }
 
+            if (connection.Metadata['@Statistics_MEMORY' + suffix] == null) {
+                return;
+            }
             connection.Metadata['@Statistics_MEMORY' + suffix].schema.forEach(function (columnInfo) {
 
                 if (columnInfo["name"] == "HOSTNAME")
@@ -1774,6 +1777,7 @@ function alertNodeClicked(obj) {
                     javaMaxHeapIndex = counter;
                 counter++;
             });
+
 
             connection.Metadata['@Statistics_MEMORY' + suffix].data.forEach(function (memoryInfo) {
                 jQuery.each(hostNameList, function (id, val) {
@@ -1806,11 +1810,16 @@ function alertNodeClicked(obj) {
             var colIndex = {};
             var counter = 0;
 
+            if (connection.Metadata['@Statistics_CPU'] == null) {
+                return;
+            }
+
             connection.Metadata['@Statistics_CPU'].schema.forEach(function (columnInfo) {
                 if (columnInfo["name"] == "HOSTNAME" || columnInfo["name"] == "PERCENT_USED" || columnInfo["name"] == "TIMESTAMP")
                     colIndex[columnInfo["name"]] = counter;
                 counter++;
             });
+
 
             connection.Metadata['@Statistics_CPU'].data.forEach(function (info) {
                 var hostName = info[colIndex["HOSTNAME"]];
@@ -1826,6 +1835,9 @@ function alertNodeClicked(obj) {
             var suffix = "";
             suffix = "_" + processName;
 
+            if (connection.Metadata['@SystemInformation_OVERVIEW' + suffix] == null) {
+                return;
+            }              
             connection.Metadata['@SystemInformation_OVERVIEW' + suffix].data.forEach(function (info) {
                 var singleData = info;
                 var id = singleData[0];
@@ -1860,11 +1872,16 @@ function alertNodeClicked(obj) {
             var procStats = {};
 
             //connection.Metadata['@Statistics_PROCEDUREPROFILE_GRAPH_TRANSACTION'] = GetTestProcedureData(connection);
-            connection.Metadata['@Statistics_PROCEDUREPROFILE_GRAPH_TRANSACTION'].schema.forEach(function (columnInfo) {
-                colIndex[columnInfo["name"]] = counter;
-                counter++;
-            });
-
+            if (connection.Metadata['@Statistics_PROCEDUREPROFILE_GRAPH_TRANSACTION'] == null) {
+                return;
+            }
+            if (connection.Metadata['@Statistics_PROCEDUREPROFILE_GRAPH_TRANSACTION'].schema != null) {
+                connection.Metadata['@Statistics_PROCEDUREPROFILE_GRAPH_TRANSACTION'].schema.forEach(function (columnInfo) {
+                    colIndex[columnInfo["name"]] = counter;
+                    counter++;
+                });
+            }
+           
             var dataCount = 0;
             connection.Metadata['@Statistics_PROCEDUREPROFILE_GRAPH_TRANSACTION'].data.forEach(function (table) {
                 var srcData = table;
@@ -1937,7 +1954,7 @@ function alertNodeClicked(obj) {
             var className;
             var currentServerRowClass;
             var currentServerColumnClass;
-            
+
             this.setServerDetails = function (hostId, serverInfo, clusterState) {
                 var count = 0;
                 if ((VoltDbAdminConfig.servers != "" || VoltDbAdminConfig.servers != null || VoltDbAdminConfig.servers != undefined)
@@ -1973,7 +1990,7 @@ function alertNodeClicked(obj) {
                     $.each(VoltDbAdminConfig.servers, function (id, value) {
                         if (value.serverName == hostName) {
                             value.hostId = hostId;
-                            value.serverState = serverState;                            
+                            value.serverState = serverState;
                             return false;
                         }
                     });
@@ -2009,7 +2026,7 @@ function alertNodeClicked(obj) {
                         setServerDetails(id, val, val['CLUSTERSTATE']);
                     });
                 }
-                
+
             }
 
             if (VoltDbAdminConfig.servers != null || VoltDbAdminConfig.servers != undefined) {
@@ -2104,7 +2121,7 @@ function alertNodeClicked(obj) {
                     voltDbRenderer.getRestoreSnapshotStatus(connection, snapshotStatus);
                     onSaveSnapshot(true, snapshotStatus, statusString);
                 } else {
-                    onSaveSnapshot(false, null ,statusString);
+                    onSaveSnapshot(false, null, statusString);
                 }
             });
         };
@@ -2131,7 +2148,7 @@ function alertNodeClicked(obj) {
                 counter++;
             });
             var count = 0;
-            
+
             connection.Metadata['@SnapshotScan_data'].data.forEach(function (info) {
                 if (!snapshotList.hasOwnProperty(count)) {
                     snapshotList[count] = {};
@@ -2179,7 +2196,7 @@ function alertNodeClicked(obj) {
                     colIndex[columnInfo["name"]] = counter;
                 counter++;
             });
-            
+
             connection.Metadata['@SnapshotRestore_data'].data.forEach(function (info) {
                 var hostName = info[colIndex["HOSTNAME"]];
                 if (!snapshotStatus.hasOwnProperty(hostName)) {
