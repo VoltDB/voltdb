@@ -1067,7 +1067,7 @@ public abstract class AbstractParsedStmt {
         return null;
     }
 
-    /** 
+    /**
      * Return true if a SQL statement contains a subquery of any kind
      * @return TRUE is this statement contains a subquery
      */

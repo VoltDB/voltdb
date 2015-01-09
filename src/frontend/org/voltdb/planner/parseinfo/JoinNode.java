@@ -494,7 +494,7 @@ public abstract class JoinNode implements Cloneable {
         return null;
     }
 
-    /** 
+    /**
      * Return true if a tree contains a subquery of any kind
      * @return TRUE is this statement contains a subquery
      */
