@@ -1073,7 +1073,6 @@ public abstract class AbstractParsedStmt {
      */
     public boolean hasSubquery() {
         // This method should be called only after the statement is parsed and join tree is built
-        assert(m_joinTree != null);
-        return m_joinTree.hasSubquery();
+        return !getSubqueries().isEmpty();
     }
 }
