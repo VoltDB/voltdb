@@ -493,4 +493,24 @@ public abstract class JoinNode implements Cloneable {
     public StmtTableScan getTableScan() {
         return null;
     }
+
+    /** 
+     * Return true if a tree contains a subquery of any kind
+     * @return TRUE is this statement contains a subquery
+     */
+    public boolean hasSubquery() {
+        if (this instanceof SubqueryLeafNode) {
+            return true;
+        }
+        JoinNode leftChild = getLeftNode();
+        if (leftChild != null && leftChild.hasSubquery()) {
+            return true;
+        }
+        JoinNode rightChild = getRightNode();
+        if (rightChild != null && rightChild.hasSubquery()) {
+            return true;
+        }
+        return false;
+    }
+
 }

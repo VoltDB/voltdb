@@ -62,7 +62,6 @@ public abstract class AbstractParsedStmt {
     protected HashMap<Long, ParameterValueExpression> m_paramsById = new HashMap<Long, ParameterValueExpression>();
 
     public ArrayList<Table> m_tableList = new ArrayList<Table>();
-    public ArrayList<StmtSubqueryScan> m_fromSubqueryList = new ArrayList<StmtSubqueryScan>();
     private Table m_DDLIndexedTable = null;
 
     public ArrayList<AbstractExpression> m_noTableSelectionList = new ArrayList<AbstractExpression>();
@@ -642,7 +641,6 @@ public abstract class AbstractParsedStmt {
             leafNode = new TableLeafNode(nodeId, joinExpr, whereExpr, (StmtTargetTableScan)tableScan);
         } else {
             assert(tableScan instanceof StmtSubqueryScan);
-            m_fromSubqueryList.add((StmtSubqueryScan) tableScan);
             leafNode = new SubqueryLeafNode(nodeId, joinExpr, whereExpr, (StmtSubqueryScan)tableScan);
         }
 
@@ -1069,4 +1067,13 @@ public abstract class AbstractParsedStmt {
         return null;
     }
 
+    /** 
+     * Return true if a SQL statement contains a subquery of any kind
+     * @return TRUE is this statement contains a subquery
+     */
+    public boolean hasSubquery() {
+        // This method should be called only after the statement is parsed and join tree is built
+        assert(m_joinTree != null);
+        return m_joinTree.hasSubquery();
+    }
 }

@@ -2333,7 +2333,7 @@ public class DDLCompiler {
         int displayColCount = stmt.m_displayColumns.size();
         String msg = "Materialized view \"" + viewName + "\" ";
 
-        if (!stmt.m_fromSubqueryList.isEmpty()) {
+        if (stmt.hasSubquery()) {
             msg += "with subquery sources is not supported.";
             throw m_compiler.new VoltCompilerException(msg);
         }
