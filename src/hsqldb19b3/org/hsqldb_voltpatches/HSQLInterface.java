@@ -23,8 +23,6 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeMap;
 
-import org.hsqldb_voltpatches.SQLLexer.HSQLDDLNoun;
-import org.hsqldb_voltpatches.SQLLexer.HSQLDDLVerb;
 import org.hsqldb_voltpatches.VoltXMLElement.VoltXMLDiff;
 import org.hsqldb_voltpatches.index.Index;
 import org.hsqldb_voltpatches.lib.HashMappedList;
@@ -158,35 +156,48 @@ public class HSQLInterface {
      * @throws HSQLParseException Throws exception if SQL parse error is
      * encountered.
      */
-    public VoltXMLDiff runDDLCommandAndDiff(SQLLexer.HSQLDDLInfo stmtInfo,
+    public VoltXMLDiff runDDLCommandAndDiff(HSQLDDLInfo stmtInfo,
                                             String ddl)
                                             throws HSQLParseException
     {
-        // If cascade, we're going to need to look for any views that might have
-        // gotten deleted. So get a list of all tables and views that existed before
-        // we run the ddl, then we'll do a comparison later.
-        Set<String> existingTableNames = stmtInfo.cascade ? getTableNames() : null;
-
-        // we either have an index name or a table/view name, but not both
+        // name of the table we're going to have to diff (if any)
         String expectedTableAffected = null;
-        if (stmtInfo.noun == HSQLDDLNoun.INDEX) {
-            if (stmtInfo.verb == HSQLDDLVerb.CREATE) {
-                expectedTableAffected = stmtInfo.secondName;
-            }
-            else {
-                expectedTableAffected = tableNameForIndexName(stmtInfo.name);
-            }
-        }
-        else {
-            expectedTableAffected = stmtInfo.name;
-        }
 
         // If we fail to pre-process a statement, then we want to fail, but we're
         // still going to run the statement through HSQL to get its error message.
         // This variable helps us make sure we don't fail to preprocess and then
         // succeed at runnign the statement through HSQL.
-        // Note that we're assuming ifexists can't happen with "create"
-        boolean expectFailure = (expectedTableAffected == null) && !stmtInfo.ifexists;
+        boolean expectFailure = false;
+
+        // If cascade, we're going to need to look for any views that might have
+        // gotten deleted. So get a list of all tables and views that existed before
+        // we run the ddl, then we'll do a comparison later.
+        Set<String> existingTableNames = null;
+
+        if (stmtInfo != null) {
+            if (stmtInfo.cascade) {
+                existingTableNames = getTableNames();
+            }
+
+            // we either have an index name or a table/view name, but not both
+            if (stmtInfo.noun == HSQLDDLInfo.Noun.INDEX) {
+                if (stmtInfo.verb == HSQLDDLInfo.Verb.CREATE) {
+                    expectedTableAffected = stmtInfo.secondName;
+                }
+                else {
+                    expectedTableAffected = tableNameForIndexName(stmtInfo.name);
+                }
+            }
+            else {
+                expectedTableAffected = stmtInfo.name;
+            }
+
+            // Note that we're assuming ifexists can't happen with "create"
+            expectFailure = (expectedTableAffected == null) && !stmtInfo.ifexists;
+        }
+        else {
+            expectFailure = true;
+        }
 
         runDDLCommand(ddl);
 
@@ -195,6 +206,8 @@ public class HSQLInterface {
         if (expectFailure) {
             throw new HSQLParseException("Unable to plan statement due to VoltDB DDL pre-processing error");
         }
+        // sanity checks for non-failure
+        assert(stmtInfo != null);
 
         // get old and new XML representations for the affected table
         VoltXMLElement tableXMLNew = null, tableXMLOld = null;

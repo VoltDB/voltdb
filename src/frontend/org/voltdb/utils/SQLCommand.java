@@ -51,7 +51,6 @@ import jline.console.KeyMap;
 import jline.console.completer.Completer;
 import jline.console.history.FileHistory;
 
-import org.hsqldb_voltpatches.SQLLexer;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;

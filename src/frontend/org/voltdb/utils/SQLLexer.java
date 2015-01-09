@@ -15,11 +15,14 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.hsqldb_voltpatches;
+package org.voltdb.utils;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.hsqldb_voltpatches.HSQLDDLInfo;
+import org.hsqldb_voltpatches.HSQLDDLInfo.Noun;
+import org.hsqldb_voltpatches.HSQLDDLInfo.Verb;
 import org.voltcore.logging.VoltLogger;
 
 public class SQLLexer
@@ -112,79 +115,19 @@ public class SQLLexer
             );
 
     /**
-     * CREATE, ALTER or DROP
-     */
-    public static enum HSQLDDLVerb {
-        CREATE, ALTER, DROP;
-
-        public static HSQLDDLVerb get(String name) {
-            if (name.equalsIgnoreCase("CREATE")) {
-                return CREATE;
-            }
-            else if (name.equalsIgnoreCase("ALTER")) {
-                return ALTER;
-            }
-            else if (name.equalsIgnoreCase("DROP")) {
-                return DROP;
-            }
-            else {
-                return null;
-            }
-        }
-    }
-
-    /**
-     * TABLE, INDEX or VIEW
-     */
-    public static enum HSQLDDLNoun {
-        TABLE, INDEX, VIEW;
-
-        public static HSQLDDLNoun get(String name) {
-            if (name.equalsIgnoreCase("TABLE")) {
-                return TABLE;
-            }
-            else if (name.equalsIgnoreCase("INDEX")) {
-                return INDEX;
-            }
-            else if (name.equalsIgnoreCase("VIEW")) {
-                return VIEW;
-            }
-            else {
-                return null;
-            }
-        }
-    }
-
-    /**
-     *  Information about DDL passed to HSQL that allows it to be better understood by VoltDB
-     */
-    public static class HSQLDDLInfo {
-        public final HSQLDDLVerb verb;
-        public final HSQLDDLNoun noun;
-        public final String name;
-        public final String secondName;
-        public boolean cascade;
-        public boolean ifexists;
-
-        HSQLDDLInfo(HSQLDDLVerb verb, HSQLDDLNoun noun, String name, String secondName, boolean cascade, boolean ifexists) {
-            this.verb = verb; this.noun = noun; this.name = name; this.secondName = secondName; this.cascade = cascade; this.ifexists = ifexists;
-        }
-    }
-
-    /**
      * Glean some basic info about DDL statements sent to HSQLDB
      */
     public static HSQLDDLInfo preprocessHSQLDDL(String ddl) {
         Matcher matcher = HSQL_DDL_PREPROCESSOR.matcher(ddl);
         if (matcher.find()) {
             String verbString = matcher.group(1);
-            HSQLDDLVerb verb = HSQLDDLVerb.get(verbString);
+            HSQLDDLInfo.Verb verb = HSQLDDLInfo.Verb.get(verbString);
             if (verb == null) {
                 return null;
             }
 
             String nounString = matcher.group(4);
-            HSQLDDLNoun noun = HSQLDDLNoun.get(nounString);
+            HSQLDDLInfo.Noun noun = HSQLDDLInfo.Noun.get(nounString);
             if (noun == null) {
                 return null;
             }
@@ -202,7 +145,7 @@ public class SQLLexer
             // cascade/if exists are interesting on alters and drops
             boolean cascade = false;
             boolean ifexists = false;
-            if (verb != HSQLDDLVerb.CREATE) {
+            if (verb != HSQLDDLInfo.Verb.CREATE) {
                 matcher = DDL_IFEXISTS_OR_CASCADE_CHECK.matcher(ddl);
                 if (matcher.matches()) {
                     for (int i = 0; i < 3; i++) {
