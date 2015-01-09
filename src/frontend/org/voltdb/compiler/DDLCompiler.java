@@ -2192,9 +2192,14 @@ public class DDLCompiler {
         int displayColCount = stmt.m_displayColumns.size();
         String msg = "Materialized view \"" + viewName + "\" ";
 
+        if (stmt.hasSubquery()) {
+            msg += "with subquery sources is not supported.";
+            throw m_compiler.new VoltCompilerException(msg);
+        }
+
         if (stmt.m_tableList.size() != 1) {
             msg += "has " + String.valueOf(stmt.m_tableList.size()) + " sources. " +
-            "Only one source view or source table is allowed.";
+            "Only one source table is allowed.";
             throw m_compiler.new VoltCompilerException(msg);
         }
 

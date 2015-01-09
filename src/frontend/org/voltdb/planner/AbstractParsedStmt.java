@@ -897,6 +897,7 @@ public abstract class AbstractParsedStmt {
             m_tableList.add(table);
             leafNode = new TableLeafNode(nodeId, joinExpr, whereExpr, (StmtTargetTableScan)tableScan);
         } else {
+            assert(tableScan instanceof StmtSubqueryScan);
             leafNode = new SubqueryLeafNode(nodeId, joinExpr, whereExpr, (StmtSubqueryScan)tableScan);
         }
 
@@ -978,11 +979,11 @@ public abstract class AbstractParsedStmt {
         }
     }
 
-    /** Get a list of the subqueries used by this statement.  This method
+    /** Get a list of the table subqueries used by this statement.  This method
      * may be overridden by subclasses, e.g., insert statements have a subquery
      * but does not use m_joinTree.
      **/
-    public List<StmtSubqueryScan> getSubqueries() {
+    public List<StmtSubqueryScan> getTableSubqueries() {
         List<StmtSubqueryScan> subqueries = new ArrayList<>();
 
         if (m_joinTree != null) {
@@ -1182,4 +1183,21 @@ public abstract class AbstractParsedStmt {
         }
         return exprs;
     }
+
+    /**
+     * Return true if a SQL statement contains a subquery of any kind
+     * @return TRUE is this statement contains a subquery
+     */
+    public boolean hasSubquery() {
+        // This method should be called only after the statement is parsed and join tree is built
+        assert(m_joinTree != null);
+        if (!getTableSubqueries().isEmpty()) {
+            return true;
+        }
+        // Verify expression subqueries
+        List<AbstractExpression> subqueryExprs = findAllSubexpressionsOfClass(
+                SelectSubqueryExpression.class);
+        return !subqueryExprs.isEmpty();
+    }
+
 }

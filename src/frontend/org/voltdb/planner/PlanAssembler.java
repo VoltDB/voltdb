@@ -328,7 +328,7 @@ public class PlanAssembler {
      */
     public CompiledPlan getBestCostPlan(AbstractParsedStmt parsedStmt) {
         // parse any subqueries that the statement contains
-        List<StmtSubqueryScan> subqueryNodes = parsedStmt.getSubqueries();
+        List<StmtSubqueryScan> subqueryNodes = parsedStmt.getTableSubqueries();
         ParsedResultAccumulator fromSubqueryResult = null;
         if (! subqueryNodes.isEmpty()) {
             fromSubqueryResult = getBestCostPlanForFromSubQueries(subqueryNodes);
@@ -1113,7 +1113,7 @@ public class PlanAssembler {
         assert (m_parsedInsert.m_tableList.size() == 1);
         Table targetTable = m_parsedInsert.m_tableList.get(0);
         StmtSubqueryScan subquery = m_parsedInsert.isInsertWithSubquery() ?
-                m_parsedInsert.getSubqueries().get(0) : null;
+                m_parsedInsert.getTableSubqueries().get(0) : null;
 
         CompiledPlan retval = null;
         if (subquery != null) {

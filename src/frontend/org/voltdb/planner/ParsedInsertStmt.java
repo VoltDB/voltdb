@@ -192,7 +192,7 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
      * there can be only one.
      */
     @Override
-    public List<StmtSubqueryScan> getSubqueries() {
+    public List<StmtSubqueryScan> getTableSubqueries() {
         List<StmtSubqueryScan> subqueries = new ArrayList<>();
 
         if (m_subquery != null) {
