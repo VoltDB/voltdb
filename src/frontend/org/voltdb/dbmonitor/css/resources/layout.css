@@ -1218,16 +1218,22 @@ top: 3px;}
 		 
 		.overlay-content {/*height: 150px;*/height:20%;}
 		.graphPop { height:110px; margin-bottom:20px;}
-		.restoreInfo .overlay-content { height:200px;}
-		.restoreCont {height:200px;}
+		/*.restoreInfo .overlay-content { height:200px;}
+		.restoreCont {height:200px;}*/
 		
 		
 		 }
+		 @media  (min-width: 480px) and (max-width: 640px) and (orientation:landscape) {
+			 
+			 .restoreInfo .overlay-content { height:120px;}
+			 .restoreCont {height:120px;}
+			 }
 		 
 @media (min-width: 480px) and (max-width: 1024px) and (orientation:landscape)   {		 
-	.VDBMonitorHelp { height:150px;  }
+		.VDBMonitorHelp { height:150px;  }
 		.VDBSchemaHelp { height:150px; overflow:auto;}
 		.VDBQueryHelp { height:150px; overflow:auto;}
+		
 			
 
 }
