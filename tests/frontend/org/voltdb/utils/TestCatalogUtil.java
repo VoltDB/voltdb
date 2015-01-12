@@ -914,7 +914,7 @@ public class TestCatalogUtil extends TestCase {
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
-                + "    <dr id='0'>"
+                + "    <dr id='-1'>"
                 + "        <connection source='master' enabled='false'/>"
                 + "    </dr>"
                 + "</deployment>";
@@ -930,7 +930,7 @@ public class TestCatalogUtil extends TestCase {
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
-                + "    <dr id='1' listen='true'>"
+                + "    <dr id='0' listen='true'>"
                 + "    </dr>"
                 + "</deployment>";
         final String drEnabledWithEnabledConnection =
@@ -1008,7 +1008,7 @@ public class TestCatalogUtil extends TestCase {
 
         assertTrue(catalog.getClusters().get("cluster").getDrmasterhost().isEmpty());
         assertTrue(catalog.getClusters().get("cluster").getDrproducerenabled());
-        assertTrue(catalog.getClusters().get("cluster").getDrclusterid() == 1);
+        assertTrue(catalog.getClusters().get("cluster").getDrclusterid() == 0);
 
         final File tmpEnabledWithConn = VoltProjectBuilder.writeStringToTempFile(drEnabledWithEnabledConnection);
         DeploymentType valid_deployment_enabledWithConn = CatalogUtil.getDeployment(new FileInputStream(tmpEnabledWithConn));

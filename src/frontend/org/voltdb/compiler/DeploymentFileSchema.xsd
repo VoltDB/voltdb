@@ -351,7 +351,7 @@
   <!-- restriction on id -->
   <xs:simpleType name="clusterIdType">
     <xs:restriction base="xs:int">
-      <xs:minInclusive value="1"/>
+      <xs:minInclusive value="0"/>
       <xs:maxInclusive value="127"/>
     </xs:restriction>
   </xs:simpleType>
