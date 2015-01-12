@@ -24,10 +24,10 @@
 package org.voltdb.jdbc;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import java.io.File;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.DriverManager;
@@ -43,20 +43,15 @@ import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.voltdb.BackendTarget;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.utils.MiscUtils;
+import org.voltdb.compiler.DeploymentBuilder;
 
 public class TestJDBCQueries {
-    private static final String TEST_XML = "jdbcparameterstest.xml";
-    private static final String TEST_JAR = "jdbcparameterstest.jar";
-    static String testjar;
-    static ServerThread server;
-    static Connection conn;
-    static Connection myconn;
-    static VoltProjectBuilder pb;
+    private static Configuration m_config;
+    private static ServerThread server;
+    private static Connection conn;
+    private static Connection myconn;
 
     static class Data
     {
@@ -132,14 +127,8 @@ public class TestJDBCQueries {
             ddl += String.format("CREATE TABLE %s(ID %s, VALUE VARCHAR(255)); ",
                                  d.tablename, d.typedecl);
         }
-
-        pb = new VoltProjectBuilder();
-        pb.addLiteralSchema(ddl);
-        boolean success = pb.compile(Configuration.getPathToCatalogForTest(TEST_JAR), 3, 1, 0);
-        assert(success);
-        MiscUtils.copyFile(pb.getPathToDeployment(), Configuration.getPathToCatalogForTest(TEST_XML));
-        testjar = Configuration.getPathToCatalogForTest(TEST_JAR);
-
+        m_config = Configuration.compile(TestJDBCQueries.class.getSimpleName(), ddl, new DeploymentBuilder(3));
+        assertNotNull("Configuration failed to compile", m_config);
         // Set up ServerThread and Connection
         startServer();
     }
@@ -147,8 +136,6 @@ public class TestJDBCQueries {
     @AfterClass
     public static void tearDown() throws Exception {
         stopServer();
-        File f = new File(testjar);
-        f.delete();
     }
 
     @Before
@@ -191,8 +178,7 @@ public class TestJDBCQueries {
     }
 
     private static void startServer() throws ClassNotFoundException, SQLException {
-        server = new ServerThread(testjar, pb.getPathToDeployment(),
-                                  BackendTarget.NATIVE_EE_JNI);
+        server = new ServerThread(m_config);
         server.start();
         server.waitForInitialization();
 

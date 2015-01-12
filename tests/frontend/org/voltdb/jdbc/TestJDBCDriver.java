@@ -23,8 +23,9 @@
 
 package org.voltdb.jdbc;
 
-import static junit.framework.Assert.assertFalse;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -50,28 +51,26 @@ import java.util.regex.Pattern;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.voltdb.BackendTarget;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltType;
 import org.voltdb.client.ArbitraryDurationProc;
 import org.voltdb.client.TestClientFeatures;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb.types.VoltDecimalHelper;
-import org.voltdb.utils.MiscUtils;
 
 public class TestJDBCDriver {
-    static String testjar;
-    static ServerThread server;
-    static Connection conn;
-    static Connection myconn;
-    static VoltProjectBuilder pb;
+    private static Configuration m_config;
+    private static ServerThread server;
+    private static Connection conn;
+    private static Connection myconn;
 
     @BeforeClass
     public static void setUp() throws Exception {
         // Fake out the constraints that were previously written against the
         // TPCC schema
-        String ddl =
+        CatalogBuilder cb = new CatalogBuilder(
             "CREATE TABLE TT(A1 INTEGER NOT NULL, A2_ID INTEGER, PRIMARY KEY(A1));" +
             "CREATE TABLE ORDERS(A1 INTEGER NOT NULL, A2_ID INTEGER, PRIMARY KEY(A1));" +
             "CREATE TABLE ORDER_THIS(A1 INTEGER NOT NULL, A2 INTEGER, PRIMARY KEY(A1));" +
@@ -102,20 +101,16 @@ public class TestJDBCDriver {
             "PARTITION TABLE NUMBER_NINE ON COLUMN A1;\n" +
             "CREATE UNIQUE INDEX UNIQUE_ORDERS_HASH ON ORDERS (A1, A2_ID); \n" +
             "CREATE INDEX IDX_ORDERS_HASH ON ORDERS (A2_ID); \n" +
-            "";
-
-
-        pb = new VoltProjectBuilder();
-        pb.catBuilder().addLiteralSchema(ddl)
+            "")
         .addSchema(TestClientFeatures.class.getResource("clientfeatures.sql"))
         .addProcedures(ArbitraryDurationProc.class)
-        .addStmtProcedure("InsertA", "INSERT INTO TT VALUES(?,?);", "TT.A1: 0")
+        .addStmtProcedure("InsertA", "INSERT INTO TT VALUES(?,?);", "TT.A1", 0)
         .addStmtProcedure("SelectB", "SELECT * FROM TT;")
         .addStmtProcedure("SelectC", "SELECT * FROM ALL_TYPES;")
         ;
-        assertTrue(pb.compile(Configuration.getPathToCatalogForTest("jdbcdrivertest.jar"), 3, 1, 0));
-        MiscUtils.copyFile(pb.getPathToDeployment(), Configuration.getPathToCatalogForTest("jdbcdrivertest.xml"));
-        testjar = Configuration.getPathToCatalogForTest("jdbcdrivertest.jar");
+        m_config = Configuration.compile(TestJDBCDriver.class.getSimpleName(), cb,
+                new DeploymentBuilder(3));
+        assertNotNull("Configuration failed to compile", m_config);
 
         // Set up ServerThread and Connection
         startServer();
@@ -124,13 +119,10 @@ public class TestJDBCDriver {
     @AfterClass
     public static void tearDown() throws Exception {
         stopServer();
-        File f = new File(testjar);
-        f.delete();
     }
 
     private static void startServer() throws ClassNotFoundException, SQLException {
-        server = new ServerThread(testjar, pb.getPathToDeployment(),
-                                  BackendTarget.NATIVE_EE_JNI);
+        server = new ServerThread(m_config);
         server.start();
         server.waitForInitialization();
 

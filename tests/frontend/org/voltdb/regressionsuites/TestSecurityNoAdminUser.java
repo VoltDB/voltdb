@@ -26,12 +26,10 @@ package org.voltdb.regressionsuites;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
-import java.io.IOException;
 
 import junit.framework.TestCase;
 
-import org.voltdb.BackendTarget;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
 public class TestSecurityNoAdminUser extends TestCase {
 
@@ -43,29 +41,17 @@ public class TestSecurityNoAdminUser extends TestCase {
 
     @Override
     public void setUp() throws Exception {
-        try {
-            //Build the catalog
-            VoltProjectBuilder builder = new VoltProjectBuilder();
-            builder.addLiteralSchema("");
-            builder.depBuilder().setSecurityEnabled(true, false);
-            String catalogJar = "dummy.jar";
-
-            LocalCluster config = new LocalCluster(catalogJar, 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-
-            config.setHasLocalServer(false);
-            //We expect it to crash
-            config.setExpectedToCrash(true);
-
-            boolean success = config.compile(builder);
-            assertTrue(success);
-
-            config.startUp();
-            pf = config.m_pipes.get(0);
-            Thread.currentThread().sleep(10000);
-        } catch (IOException ex) {
-            fail(ex.getMessage());
-        } finally {
-        }
+        //Build the catalog
+        DeploymentBuilder db = new DeploymentBuilder(2)
+        .setSecurityEnabled(true, false)
+        ;
+        LocalCluster config = LocalCluster.configure(getClass().getSimpleName(), "", db);
+        assertNotNull("LocalCluster failed to compile", config);
+        // We expect it to crash
+        config.expectToCrash();
+        config.startUp();
+        pf = config.m_pipes.get(0);
+        Thread.sleep(10000);
     }
 
     /*
@@ -74,15 +60,18 @@ public class TestSecurityNoAdminUser extends TestCase {
     public void testSecurityNoUsers() throws Exception {
         BufferedReader bi = new BufferedReader(new FileReader(new File(pf.m_filename)));
         String line;
-        boolean failed = true;
         final CharSequence cs = "Cannot enable security without defining at least one user in the built-in ADMINISTRATOR role in the deployment file.";
-        while ((line = bi.readLine()) != null) {
-            System.out.println(line);
-            if (line.contains(cs)) {
-                failed = false;
-                break;
+        try {
+            while ((line = bi.readLine()) != null) {
+                System.out.println(line);
+                if (line.contains(cs)) {
+                    return;
+                }
             }
+            fail();
         }
-        assertFalse(failed);
+        finally {
+            bi.close();
+        }
     }
 }

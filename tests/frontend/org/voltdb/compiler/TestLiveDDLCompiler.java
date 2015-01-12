@@ -52,10 +52,10 @@ public class TestLiveDDLCompiler extends TestCase {
         boolean success = compiler.compileFromDDL(jarOut.getPath(), schemaPath);
         assertTrue("Compilation failed unexpectedly", success);
 
-        Catalog catalog = new Catalog();
-        catalog.execute(CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(MiscUtils.fileToBytes(new File(jarOut.getPath()))).getFirst()));
+        byte[] bytes = MiscUtils.fileToBytes(new File(jarOut.getPath()));
+        Catalog catalog = CatalogUtil.deserializeCatalogFromJarFileBytes(bytes);
 
-        Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
+        Database db = CatalogUtil.getDatabase(catalog);
         Table t = db.getTables().get("T");
         assertEquals("C2", t.getPartitioncolumn().getTypeName());
     }
@@ -75,10 +75,10 @@ public class TestLiveDDLCompiler extends TestCase {
         boolean success = compiler.compileFromDDL(jarOut.getPath(), schemaPath);
         assertTrue("Compilation failed unexpectedly", success);
 
-        Catalog catalog = new Catalog();
-        catalog.execute(CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(MiscUtils.fileToBytes(new File(jarOut.getPath()))).getFirst()));
+        byte[] bytes = MiscUtils.fileToBytes(new File(jarOut.getPath()));
+        Catalog catalog = CatalogUtil.deserializeCatalogFromJarFileBytes(bytes);
 
-        Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
+        Database db = CatalogUtil.getDatabase(catalog);
         Table t = db.getTables().get("T");
         assertEquals(null, t);
     }
@@ -98,10 +98,10 @@ public class TestLiveDDLCompiler extends TestCase {
         boolean success = compiler.compileFromDDL(jarOut.getPath(), schemaPath);
         assertTrue("Compilation failed unexpectedly", success);
 
-        Catalog catalog = new Catalog();
-        catalog.execute(CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(MiscUtils.fileToBytes(new File(jarOut.getPath()))).getFirst()));
+        byte[] bytes = MiscUtils.fileToBytes(new File(jarOut.getPath()));
+        Catalog catalog = CatalogUtil.deserializeCatalogFromJarFileBytes(bytes);
 
-        Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
+        Database db = CatalogUtil.getDatabase(catalog);
         Table t = db.getTables().get("T");
         assertEquals(null, t);
     }

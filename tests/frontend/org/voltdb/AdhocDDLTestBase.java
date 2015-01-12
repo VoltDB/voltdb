@@ -26,15 +26,39 @@ package org.voltdb;
 import junit.framework.TestCase;
 
 import org.json_voltpatches.JSONObject;
+import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.common.Constants;
+import org.voltdb.compiler.DeploymentBuilder;
 
 public class AdhocDDLTestBase extends TestCase {
 
     protected ServerThread m_localServer;
     protected Client m_client;
+
+    /**
+     * @param literalSchema
+     * @param siteCount
+     * @return
+     */
+    protected Configuration configurationForTest(String literalSchema, int siteCount) {
+        return configurationForTest(getClass().getSimpleName(), literalSchema, siteCount);
+    }
+
+    /**
+     * @param literalSchema
+     * @param siteCount
+     * @return
+     */
+    private Configuration configurationForTest(String label, String literalSchema, int siteCount) {
+        DeploymentBuilder db = new DeploymentBuilder(siteCount)
+        .setUseAdHocDDL(true);
+        Configuration config = Configuration.compile(label, literalSchema, db);
+        assertNotNull("Configuration failed to compile", config);
+        return config;
+    }
 
     protected void startSystem(VoltDB.Configuration config) throws Exception
     {

@@ -463,7 +463,7 @@ public class TestVoltProcedure extends TestCase {
             Catalog catalog = new Catalog();
             catalog.execute(serializedCatalog);
             long now = System.currentTimeMillis();
-            m_context = new CatalogContext( now, now, catalog, null, new byte[] {}, 0, 0);
+            m_context = CatalogContext.simpleForTest(now, catalog, null);
             m_tracker = tracker;
         }
     }

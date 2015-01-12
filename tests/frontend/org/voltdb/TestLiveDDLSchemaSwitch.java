@@ -25,17 +25,16 @@ package org.voltdb;
 
 import java.io.File;
 
-import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientUtils;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb.compiler.VoltCompiler;
-import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.utils.InMemoryJarfile;
-import org.voltdb.utils.MiscUtils;
 
 public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
     // Test cases:
@@ -60,57 +59,55 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
     //    - Promote
     //    - Re-verify (2)
 
-    String m_pathToCatalog;
-    String m_pathToDeployment;
-    String m_pathToOtherCatalog;
-    String m_pathToOtherDeployment;
+    private File m_catalogFile;
+    private File m_otherCatalogFile;
+    private File m_deploymentFile;
+    private File m_otherDeploymentFile;
 
     void generateCatalogsAndDeployments(boolean useLiveDDL) throws Exception
     {
-        m_pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
-        m_pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
-        m_pathToOtherCatalog = Configuration.getPathToCatalogForTest("newadhocddl.jar");
-        m_pathToOtherDeployment = Configuration.getPathToCatalogForTest("newadhocddl.xml");
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(
+        CatalogBuilder cb = new CatalogBuilder(
                 "create table FOO (" +
                 "ID integer not null," +
                 "VAL bigint, " +
                 "constraint PK_TREE primary key (ID)" +
                 ");\n" +
+                "partition table FOO on column ID;\n" +
+
                 "create table FOO_R (" +
                 "ID integer not null," +
                 "VAL bigint, " +
                 "constraint PK_TREE_R primary key (ID)" +
-                ");\n"
-                );
-        builder.addPartitionInfo("FOO", "ID");
-        builder.setUseDDLSchema(useLiveDDL);
-        boolean success = builder.compile(m_pathToCatalog, 2, 1, 0);
-        assertTrue("Schema compilation failed", success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), m_pathToDeployment);
-
-        // get an alternate deployment file
-        builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(
+                ");\n" +
+                "")
+        ;
+        m_catalogFile = cb.compileToTempJar();
+        assertNotNull("Schema compilation failed", m_catalogFile);
+        CatalogBuilder cb2 = new CatalogBuilder(
                 "create table BAZ (" +
                 "ID integer not null," +
                 "VAL bigint, " +
                 "constraint PK_TREE primary key (ID)" +
                 ");\n" +
+                "partition table BAZ on column ID;\n" +
+
                 "create table FOO_R (" +
                 "ID integer not null," +
                 "VAL bigint, " +
                 "constraint PK_TREE_R primary key (ID)" +
-                ");\n"
-                );
-        builder.addPartitionInfo("BAZ", "ID");
-        builder.setUseDDLSchema(useLiveDDL);
-        builder.setDeadHostTimeout(6);
-        success = builder.compile(m_pathToOtherCatalog, 2, 1, 0);
-        assertTrue("2nd schema compilation failed", success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), m_pathToOtherDeployment);
+                ");\n" +
+                "")
+        ;
+        m_otherCatalogFile = cb2.compileToTempJar();
+        assertNotNull("2nd schema compilation failed", m_otherCatalogFile);
+
+        DeploymentBuilder db = new DeploymentBuilder(2)
+        .setUseAdHocDDL(useLiveDDL)
+        ;
+        m_deploymentFile = new File(db.writeXMLToTempFile());
+        // get an alternate deployment file
+        db.setDeadHostTimeout(6);
+        m_otherDeploymentFile = new File(db.writeXMLToTempFile());
     }
 
     void verifyDeploymentOnlyUAC() throws Exception
@@ -126,8 +123,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
         }
         assertTrue(found);
         assertEquals(org.voltcore.common.Constants.DEFAULT_HEARTBEAT_TIMEOUT_SECONDS, timeout);
-        ClientResponse results =
-            m_client.updateApplicationCatalog(null, new File(m_pathToOtherDeployment));
+        ClientResponse results = m_client.updateApplicationCatalog(null, m_otherDeploymentFile);
         assertEquals(ClientResponse.SUCCESS, results.getStatus());
         found = false;
         timeout = -1;
@@ -153,7 +149,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
     {
         assertFalse(findTableInSystemCatalogResults("FOO"));
         // UAC should work.
-        ClientResponse results = m_client.updateApplicationCatalog(new File(m_pathToCatalog), null);
+        ClientResponse results = m_client.updateApplicationCatalog(m_catalogFile, null);
         assertEquals(ClientResponse.SUCCESS, results.getStatus());
         assertTrue(findTableInSystemCatalogResults("FOO"));
         verifyDeploymentOnlyUAC();
@@ -197,7 +193,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
 
         // Fire up a cluster with no catalog
         VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToDeployment = m_pathToDeployment;
+        config.m_pathToDeployment = m_deploymentFile.getAbsolutePath();
 
         try {
             startSystem(config);
@@ -214,7 +210,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
         assertFalse(findTableInSystemCatalogResults("FOO"));
         boolean threw = false;
         try {
-            m_client.updateApplicationCatalog(new File(m_pathToCatalog), null);
+            m_client.updateApplicationCatalog(m_catalogFile, null);
         }
         catch (ProcCallException pce) {
             threw = true;
@@ -258,7 +254,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
 
         // Fire up a cluster with no catalog
         VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToDeployment = m_pathToDeployment;
+        config.m_pathToDeployment = m_deploymentFile.getAbsolutePath();
 
         try {
             startSystem(config);
@@ -274,7 +270,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
         // uac from master?
         TxnEgo txnid = TxnEgo.makeZero(MpInitiator.MP_INIT_PID);
         Object[] params = new Object[2];
-        params[0] = ClientUtils.fileToBytes(new File(m_pathToCatalog));
+        params[0] = ClientUtils.fileToBytes(m_catalogFile);
         params[1] = null;
         txnid = txnid.makeNext();
         // We're going to get odd responses for the sentinels, so catch and ignore the exceptions
@@ -292,7 +288,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
         verifyAdhocQuery();
         // undo our previous catalog update through the remote side so the promote test works
         params = new Object[2];
-        params[0] = ClientUtils.fileToBytes(new File(m_pathToOtherCatalog));
+        params[0] = ClientUtils.fileToBytes(m_otherCatalogFile);
         params[1] = null;
         txnid = txnid.makeNext();
         // We're going to get odd responses for the sentinels, so catch and ignore the exceptions
@@ -313,8 +309,8 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
 
         // Fire up a cluster with no catalog
         VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = m_pathToOtherCatalog;
-        config.m_pathToDeployment = m_pathToDeployment;
+        config.m_pathToCatalog = m_otherCatalogFile.getAbsolutePath();
+        config.m_pathToDeployment = m_deploymentFile.getAbsolutePath();
         config.m_replicationRole = ReplicationRole.REPLICA;
 
         try {
@@ -323,7 +319,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
             assertFalse(findTableInSystemCatalogResults("FOO"));
             boolean threw = false;
             try {
-                m_client.updateApplicationCatalog(new File(m_pathToCatalog), null);
+                m_client.updateApplicationCatalog(m_catalogFile, null);
             }
             catch (ProcCallException pce) {
                 threw = true;
@@ -335,7 +331,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
             // deployment-only UAC should fail
             threw = false;
             try {
-                m_client.updateApplicationCatalog(null, new File(m_pathToOtherDeployment));
+                m_client.updateApplicationCatalog(null, m_otherDeploymentFile);
             }
             catch (ProcCallException pce) {
                 threw = true;
@@ -391,8 +387,8 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
 
         // Fire up a cluster with no catalog
         VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = m_pathToOtherCatalog;
-        config.m_pathToDeployment = m_pathToDeployment;
+        config.m_pathToCatalog = m_otherCatalogFile.getAbsolutePath();
+        config.m_pathToDeployment = m_deploymentFile.getAbsolutePath();
         config.m_replicationRole = ReplicationRole.REPLICA;
 
         try {
@@ -401,7 +397,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
             assertFalse(findTableInSystemCatalogResults("FOO"));
             boolean threw = false;
             try {
-                m_client.updateApplicationCatalog(new File(m_pathToCatalog), null);
+                m_client.updateApplicationCatalog(m_catalogFile, null);
             }
             catch (ProcCallException pce) {
                 threw = true;
@@ -413,7 +409,7 @@ public class TestLiveDDLSchemaSwitch extends AdhocDDLTestBase {
             // deployment-only UAC should fail
             threw = false;
             try {
-                m_client.updateApplicationCatalog(null, new File(m_pathToOtherDeployment));
+                m_client.updateApplicationCatalog(null, m_otherDeploymentFile);
             }
             catch (ProcCallException pce) {
                 threw = true;

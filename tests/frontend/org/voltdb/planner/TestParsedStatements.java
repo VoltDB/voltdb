@@ -48,7 +48,7 @@ public class TestParsedStatements extends TestCase {
     protected void setUp() throws Exception {
         super.setUp();
 
-        m_db = TPCCProjectBuilder.createTPCCSchemaCatalog().getClusters().get("cluster").getDatabases().get("database");
+        m_db = TPCCProjectBuilder.createTPCCSchemaDatabase();
 
         URL url = TPCCProjectBuilder.class.getResource("tpcc-ddl.sql");
         m_hsql = HSQLInterface.loadHsqldb();

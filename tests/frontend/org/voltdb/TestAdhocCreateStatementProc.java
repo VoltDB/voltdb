@@ -25,39 +25,26 @@ package org.voltdb;
 
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.utils.MiscUtils;
 
 public class TestAdhocCreateStatementProc extends AdhocDDLTestBase {
 
     public void testBasicCreateStatementProc() throws Exception
     {
-        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
-        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(
+        Configuration config = configurationForTest(
                 "create table FOO (" +
                 "ID integer not null," +
                 "VAL bigint, " +
                 "constraint PK_TREE primary key (ID)" +
                 ");\n" +
+                "partition table FOO on column ID;\n" +
+
                 "create table FOO_R (" +
                 "ID integer not null," +
                 "VAL bigint, " +
                 "constraint PK_TREE_R primary key (ID)" +
-                ");\n"
-                );
-        builder.addPartitionInfo("FOO", "ID");
-        builder.setUseDDLSchema(true);
-        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
-        assertTrue("Schema compilation failed", success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = pathToCatalog;
-        config.m_pathToDeployment = pathToDeployment;
-
+                ");\n" +
+                "",
+                2);
         try {
             startSystem(config);
             // Procedure shouldn't exist

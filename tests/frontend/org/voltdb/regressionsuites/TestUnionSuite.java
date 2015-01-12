@@ -25,12 +25,12 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
 public class TestUnionSuite extends RegressionSuite {
     public TestUnionSuite(String name) {
@@ -444,11 +444,8 @@ public class TestUnionSuite extends RegressionSuite {
     }
 
     static public junit.framework.Test suite() {
-        LocalCluster config = null;
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestUnionSuite.class);
-        VoltProjectBuilder project = new VoltProjectBuilder();
-
-        project.catBuilder().addSchema(TestUnionSuite.class.getResource("testunion-ddl.sql"))
+        CatalogBuilder cb = new CatalogBuilder()
+        .addSchema(TestUnionSuite.class.getResource("testunion-ddl.sql"))
         .addStmtProcedure("InsertA", "INSERT INTO A VALUES(?, ?);")
         .addStmtProcedure("InsertB", "INSERT INTO B VALUES(?, ?);")
         .addStmtProcedure("InsertC", "INSERT INTO C VALUES(?, ?);")
@@ -459,22 +456,13 @@ public class TestUnionSuite extends RegressionSuite {
                 "    (SELECT I FROM C WHERE PKEY = CHAR_LENGTH(''||?))) UNION " +
                 "        SELECT I FROM D WHERE PKEY = ?")
         ;
-        // local
-        config = new LocalCluster("testunion-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        assertTrue(config.compile(project));
-        builder.addServerConfig(config);
-
-        // Cluster
-        config = new LocalCluster("testunion-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        assertTrue(config.compile(project));
-        builder.addServerConfig(config);
-
-        // HSQLDB
-        config = new LocalCluster("testunion-cluster.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        assertTrue(config.compile(project));
-        builder.addServerConfig(config);
-
-        return builder;
+        return multiClusterSuiteBuilder(TestUnionSuite.class, cb,
+                // single-host
+                new DeploymentBuilder(1),
+                // cluster
+                new DeploymentBuilder(2, 3, 1),
+                // HSQL backend
+                DeploymentBuilder.forHSQLBackend());
     }
 
 }

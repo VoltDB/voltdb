@@ -27,14 +27,13 @@ import java.io.IOException;
 
 import junit.framework.Test;
 
-import org.voltdb.BackendTarget;
-import org.voltdb.TheHashinator;
-import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltTable;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.benchmark.tpcc.procedures.UpdateNewOrder;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb_testprocs.regressionsuites.multipartitionprocs.MispartitionedInsert;
 import org.voltdb_testprocs.regressionsuites.multipartitionprocs.MispartitionedUpdate;
 import org.voltdb_testprocs.regressionsuites.multipartitionprocs.MultiSiteDelete;
@@ -49,17 +48,6 @@ import org.voltdb_testprocs.regressionsuites.multipartitionprocs.MultiSiteSelect
  *
  */
 public class TestMultiPartitionSuite extends RegressionSuite {
-
-    // procedures used by these tests
-    static final Class<?>[] PROCEDURES = {
-        MultiSiteSelect.class,
-        MultiSiteSelectDuped.class,
-        MultiSiteIndexSelect.class,
-        MultiSiteDelete.class, UpdateNewOrder.class,
-        MispartitionedInsert.class,
-        MispartitionedUpdate.class
-    };
-
     /**
      * Constructor needed for JUnit. Should just pass on parameters to superclass.
      * @param name The name of the method to test. This is just passed to the superclass.
@@ -268,52 +256,20 @@ public class TestMultiPartitionSuite extends RegressionSuite {
      * @return The TestSuite containing all the tests to be run.
      */
     static public Test suite() {
-        // the suite made here will all be using the tests from this class
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestMultiPartitionSuite.class);
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #1: 1 Local Site/Partitions running on JNI backend
-        /////////////////////////////////////////////////////////////
-
-        // get a server config for the native backend with one sites/partitions
-        VoltServerConfig config = new LocalCluster("distregression-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-
-        // build up a project builder for the workload
-        TPCCProjectBuilder project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
-        project.addProcedures(PROCEDURES);
-        project.addStmtProcedure("InsertNewOrder", "INSERT INTO NEW_ORDER VALUES (?, ?, ?);", "NEW_ORDER.NO_W_ID: 2");
-        // build the jarfile
-        boolean success = config.compile(project);
-        assertTrue(success);
-
-        // add this config to the set of tests to run
-        builder.addServerConfig(config);
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #2: 1 Local Site/Partition running on HSQL backend
-        /////////////////////////////////////////////////////////////
-
-        // get a server config that similar, but doesn't use the same backend
-        config = new LocalCluster("distregression-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-
-        // build the jarfile (note the reuse of the TPCC project)
-        success = config.compile(project);
-        assertTrue(success);
-
-        // add this config to the set of tests to run
-        builder.addServerConfig(config);
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #3: N=3 K=1 Cluster
-        /////////////////////////////////////////////////////////////
-        config = new LocalCluster("distregression-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
-
-        builder.addServerConfig(config);
-
-        return builder;
+        CatalogBuilder cb = TPCCProjectBuilder.catalogBuilderNoProcs()
+        .addProcedures(
+                MultiSiteSelect.class,
+                MultiSiteSelectDuped.class,
+                MultiSiteIndexSelect.class,
+                MultiSiteDelete.class, UpdateNewOrder.class,
+                MispartitionedInsert.class,
+                MispartitionedUpdate.class)
+        .addStmtProcedure("InsertNewOrder",
+                "INSERT INTO NEW_ORDER VALUES (?, ?, ?);", "NEW_ORDER.NO_W_ID", 2)
+        ;
+        return multiClusterSuiteBuilder(TestMultiPartitionSuite.class, cb,
+                new DeploymentBuilder(),
+                DeploymentBuilder.forHSQLBackend(),
+                new DeploymentBuilder(2, 3, 1));
     }
 }

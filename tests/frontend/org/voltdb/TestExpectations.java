@@ -30,30 +30,25 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.utils.MiscUtils;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb_testprocs.regressionsuites.failureprocs.CrushExpectations;
 
 public class TestExpectations extends TestCase {
     public void testSimple() throws Exception {
-        String simpleSchema =
-            "create table blah (" +
-            "ival bigint default 0 not null, " +
-            "sval varchar(255) not null, " +
-            "PRIMARY KEY(ival));";
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(simpleSchema);
-        builder.addPartitionInfo("blah", "ival");
-        builder.addStmtProcedure("Insert", "insert into blah values (?, ?);", null);
-        builder.addProcedures(CrushExpectations.class);
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("expectations.jar"), 1, 1, 0);
-        assert(success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("expectations.xml"));
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("expectations.jar");
-        config.m_pathToDeployment = Configuration.getPathToCatalogForTest("expectations.xml");
+        CatalogBuilder cb = new CatalogBuilder(
+                "create table blah (" +
+                "ival bigint default 0 not null, " +
+                "sval varchar(255) not null, " +
+                "PRIMARY KEY(ival));\n" +
+                "PARTITION TABLE blah ON COLUMN ival;\n" +
+                "")
+        .addStmtProcedure("Insert", "insert into blah values (?, ?);")
+        .addProcedures(CrushExpectations.class)
+        ;
+        Configuration config = Configuration.compile(getClass().getSimpleName(), cb,
+                new DeploymentBuilder());
+        assertNotNull("Configuration failed to compile", config);
         ServerThread localServer = new ServerThread(config);
         localServer.start();
         localServer.waitForInitialization();

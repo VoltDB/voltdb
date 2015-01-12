@@ -25,14 +25,14 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.SyncCallback;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
 public class TestLimitOffsetSuite extends RegressionSuite {
     public TestLimitOffsetSuite(String name)
@@ -285,11 +285,8 @@ public class TestLimitOffsetSuite extends RegressionSuite {
 
     static public junit.framework.Test suite()
     {
-        LocalCluster config = null;
-        MultiConfigSuiteBuilder builder =
-                new MultiConfigSuiteBuilder(TestLimitOffsetSuite.class);
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        project.catBuilder().addSchema(TestLimitOffsetSuite.class.getResource("testlimitoffset-ddl.sql"))
+        CatalogBuilder cb = new CatalogBuilder()
+        .addSchema(TestLimitOffsetSuite.class.getResource("testlimitoffset-ddl.sql"))
         .addPartitionInfo("A", "PKEY")
 
         .addStmtProcedure("InsertA", "INSERT INTO A VALUES(?, ?);")
@@ -299,21 +296,9 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         .addStmtProcedure("LimitAI", "SELECT * FROM A ORDER BY I LIMIT ? OFFSET ?;")
         .addStmtProcedure("LimitBI", "SELECT * FROM B ORDER BY I LIMIT ? OFFSET ?;")
         ;
-        // local
-        config = new LocalCluster("testlimitoffset-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        assertTrue(config.compile(project));
-        builder.addServerConfig(config);
-
-        // Cluster
-        config = new LocalCluster("testlimitoffset-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        assertTrue(config.compile(project));
-        builder.addServerConfig(config);
-
-        // HSQL for baseline
-        config = new LocalCluster("testlimitoffset-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        assertTrue(config.compile(project));
-        builder.addServerConfig(config);
-
-        return builder;
+        return multiClusterSuiteBuilder(TestLimitOffsetSuite.class, cb,
+                new DeploymentBuilder(),
+                DeploymentBuilder.forHSQLBackend(),
+                new DeploymentBuilder(2, 3, 1));
     }
 }

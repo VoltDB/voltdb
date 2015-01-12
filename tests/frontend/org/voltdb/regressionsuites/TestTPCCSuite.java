@@ -27,7 +27,6 @@ import java.io.IOException;
 
 import junit.framework.Test;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.TPCDataPrinter;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
@@ -37,6 +36,8 @@ import org.voltdb.benchmark.tpcc.procedures.ByteBuilder;
 import org.voltdb.benchmark.tpcc.procedures.slev;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb.types.TimestampType;
 
 /**
@@ -57,12 +58,6 @@ public class TestTPCCSuite extends RegressionSuite {
     static final int O_ID = 9;
     static final int C_ID = 42;
     static final int I_ID = 12345;
-
-    /**
-     * Supplemental classes needed by TPC-C procs.
-     */
-    public static final Class<?>[] SUPPLEMENTALS = {
-        ByteBuilder.class, Constants.class };
 
     /**
      * Constructor needed for JUnit. Should just pass on parameters to superclass.
@@ -766,30 +761,13 @@ public class TestTPCCSuite extends RegressionSuite {
      * @return The TestSuite containing all the tests to be run.
      */
     static public Test suite() {
-        VoltServerConfig config = null;
-        // the suite made here will all be using the tests from this class
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestTPCCSuite.class);
-
-        // build up a project builder for the TPC-C app
-        TPCCProjectBuilder project = new TPCCProjectBuilder();
-        //project.setBackendTarget(BackendTarget.NATIVE_EE_IPC);
-        project.addDefaultSchema();
-        project.addDefaultProcedures();
-        project.addDefaultPartitioning();
-        project.addSupplementalClasses(SUPPLEMENTALS);
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #1: 1 Local Site/Partition running on JNI backend
-        /////////////////////////////////////////////////////////////
-        config = new LocalCluster("tpcc.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        //config = new LocalSingleProcessServer("tpcc.jar", 1, BackendTarget.NATIVE_EE_IPC);
-        boolean success = config.compile(project);
-        assert(success);
-        builder.addServerConfig(config);
-
-        // no cluster tests as this is primarily a SQL correctness test
-
-        return builder;
+        CatalogBuilder cb = TPCCProjectBuilder.defaultCatalogBuilder();
+        return multiClusterSuiteBuilder(TestTPCCSuite.class, cb,
+                // no multi-host cluster tests as this is primarily a SQL correctness test
+                new DeploymentBuilder(1),
+                new DeploymentBuilder(3),
+                // no multi-host cluster tests as this is primarily a SQL correctness test
+                DeploymentBuilder.forHSQLBackend());
     }
 
 }

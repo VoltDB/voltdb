@@ -25,12 +25,11 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
 /*
  * Functional tests of the statements compiled in the test suite
@@ -38,7 +37,6 @@ import org.voltdb.compiler.VoltProjectBuilder;
  */
 
 public class TestIndexReverseScanSuite extends RegressionSuite {
-
     private final String[] procs = {"R1.insert", "P1.insert", "P2.insert", "P3.insert"};
     private final String [] tbs = {"R1","P1","P2","P3"};
 
@@ -280,10 +278,6 @@ public class TestIndexReverseScanSuite extends RegressionSuite {
     }
 
     static public junit.framework.Test suite() {
-        VoltServerConfig config = null;
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(
-                TestIndexReverseScanSuite.class);
-        VoltProjectBuilder project = new VoltProjectBuilder();
         final String literalSchema =
                 "CREATE TABLE R1 ( " +
                 "ID INTEGER DEFAULT '0' NOT NULL, " +
@@ -333,29 +327,9 @@ public class TestIndexReverseScanSuite extends RegressionSuite {
                 "create index P3_TREE_2 on P3 (b, c);" +
                 ""
                 ;
-        try {
-            project.addLiteralSchema(literalSchema);
-        } catch (IOException e) {
-            assertFalse(true);
-        }
-        boolean success;
-
-        config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-
-        config = new LocalCluster("plansgroupby-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-
-        // Cluster
-        config = new LocalCluster("plansgroupby-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-
-        return builder;
+        return multiClusterSuiteBuilder(TestIndexReverseScanSuite.class, literalSchema,
+                new DeploymentBuilder(),
+                DeploymentBuilder.forHSQLBackend(),
+                new DeploymentBuilder(2, 3, 1));
     }
 }

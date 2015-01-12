@@ -22,16 +22,12 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.Pair;
-import static org.voltdb.TheHashinator.valueToBytes;
 
 public class LegacyHashinator extends TheHashinator {
-    private final int catalogPartitionCount;
+    private final int m_catalogPartitionCount;
     private final byte m_configBytes[];
     private final long m_signature;
-    @SuppressWarnings("unused")
-    private static final VoltLogger hostLogger = new VoltLogger("HOST");
 
     @Override
     public int pHashinateLong(long value) {
@@ -40,7 +36,7 @@ public class LegacyHashinator extends TheHashinator {
 
         // hash the same way c++ does
         int index = (int)(value^(value>>>32));
-        return java.lang.Math.abs(index % catalogPartitionCount);
+        return java.lang.Math.abs(index % m_catalogPartitionCount);
     }
 
     @Override
@@ -50,7 +46,7 @@ public class LegacyHashinator extends TheHashinator {
         for (int ii = 0; ii < bytes.length; ii++) {
             hashCode = 31 * hashCode + bytes[offset++];
         }
-        return java.lang.Math.abs(hashCode % catalogPartitionCount);
+        return java.lang.Math.abs(hashCode % m_catalogPartitionCount);
     }
 
     /**
@@ -59,7 +55,7 @@ public class LegacyHashinator extends TheHashinator {
      * @param cooked       (ignored by legacy)
      */
     public LegacyHashinator(byte configBytes[], boolean cooked) {
-        catalogPartitionCount = ByteBuffer.wrap(configBytes).getInt();
+        m_catalogPartitionCount = ByteBuffer.wrap(configBytes).getInt();
         m_configBytes = Arrays.copyOf(configBytes, configBytes.length);
         m_signature = TheHashinator.computeConfigurationSignature(m_configBytes);
     }
@@ -142,7 +138,7 @@ public class LegacyHashinator extends TheHashinator {
     @Override
     protected Set<Integer> pGetPartitions() {
         Set<Integer> set = new HashSet<Integer>();
-        for (int ii = 0; ii < catalogPartitionCount; ii++) {
+        for (int ii = 0; ii < m_catalogPartitionCount; ii++) {
             set.add(ii);
         }
         return set;

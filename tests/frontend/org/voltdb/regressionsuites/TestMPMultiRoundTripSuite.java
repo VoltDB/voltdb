@@ -25,12 +25,12 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb_testprocs.regressionsuites.basecase.LoadP1;
 import org.voltdb_testprocs.regressionsuites.basecase.LoadR1;
 import org.voltdb_testprocs.regressionsuites.basecase.MultiRoundMixReadsAndWrites;
@@ -40,7 +40,6 @@ import org.voltdb_testprocs.regressionsuites.basecase.MultiRoundP1Count;
 import org.voltdb_testprocs.regressionsuites.basecase.MultiRoundR1Count;
 
 public class TestMPMultiRoundTripSuite extends RegressionSuite {
-
     public TestMPMultiRoundTripSuite(String name) {
         super(name);
     }
@@ -213,79 +212,50 @@ public class TestMPMultiRoundTripSuite extends RegressionSuite {
         assertEquals(resp2.getResults()[0].toString(), test_size * 2, resp.getResults()[0].asScalarLong());
     }
 
-
-    /** Procedures used by this suite */
-    static final Class<?>[] PROCEDURES = { LoadP1.class, LoadR1.class, MultiRoundP1Count.class,
-                                           MultiRoundR1Count.class,
-                                           MultiRoundMixedReads.class,
-                                           MultiRoundMixReadsAndWrites.class,
-                                           MultiRoundMixReplicatedReadsAndWrites.class };
-
     static public junit.framework.Test suite() {
-        VoltServerConfig config = null;
-        final MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestMPMultiRoundTripSuite.class);
-
-        final VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addStmtProcedure("CountP1", "select count(*) from p1;");
-        project.addStmtProcedure("GetP1", "select * from p1;");
+        CatalogBuilder cb = new CatalogBuilder(
+                "CREATE TABLE p1(key INTEGER NOT NULL, b1 INTEGER NOT NULL ASSUMEUNIQUE, " +
+                "b2 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL, PRIMARY KEY (b1,key)); " +
+                "PARTITION TABLE P1 ON COLUMN key;" +
+                // a replicated table (should not generate procedures).
+                "CREATE TABLE r1(key INTEGER NOT NULL, b1 INTEGER NOT NULL, " +
+                "b2 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL, PRIMARY KEY (b1));" +
+                "")
+        .addStmtProcedure("CountP1", "select count(*) from p1;")
+        .addStmtProcedure("GetP1", "select * from p1;")
 
         // update non-unique, non-partitioning attribute
-        project.addStmtProcedure("UpdateP1", "update p1 set b2 = 2");
-        project.addStmtProcedure("SumP1", "select sum(b2) from p1;");
+        .addStmtProcedure("UpdateP1", "update p1 set b2 = 2")
+        .addStmtProcedure("SumP1", "select sum(b2) from p1;")
 
-        project.addStmtProcedure("UpdateR1", "update r1 set b2 = 2");
-        project.addStmtProcedure("SumR1", "select sum(b2) from r1;");
+        .addStmtProcedure("UpdateR1", "update r1 set b2 = 2")
+        .addStmtProcedure("SumR1", "select sum(b2) from r1;")
 
         // update all pkeys to the same value.
-        project.addStmtProcedure("ConstraintViolationUpdate", "update p1 set b1 = 1");
-        project.addStmtProcedure("SumB1", "select sum(b1) from p1;");
+        .addStmtProcedure("ConstraintViolationUpdate", "update p1 set b1 = 1")
+        .addStmtProcedure("SumB1", "select sum(b1) from p1;")
 
-        project.addStmtProcedure("ConstraintViolationUpdate_R", "update r1 set b1 = 1");
-        project.addStmtProcedure("SumB1_R", "select sum(b1) from r1;");
+        .addStmtProcedure("ConstraintViolationUpdate_R", "update r1 set b1 = 1")
+        .addStmtProcedure("SumB1_R", "select sum(b1) from r1;")
 
         // update all partitioning keys to the same value.
-        project.addStmtProcedure("PartitionViolationUpdate", "update p1 set key = 1");
-        project.addStmtProcedure("SumKey", "select sum(key) from p1;");
+        .addStmtProcedure("PartitionViolationUpdate", "update p1 set key = 1")
+        .addStmtProcedure("SumKey", "select sum(key) from p1;")
 
         // Single-part update
-        project.addStmtProcedure("UpdateP1SP", "update p1 set b2 = 2 where key = ?", "p1.key:0");
+        .addStmtProcedure("UpdateP1SP", "update p1 set b2 = 2 where key = ?", "p1.key", 0)
 
-        project.addProcedures(PROCEDURES);
-
-        try {
-            project.addLiteralSchema(
-                    "CREATE TABLE p1(key INTEGER NOT NULL, b1 INTEGER NOT NULL ASSUMEUNIQUE, " +
-                    "b2 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL, PRIMARY KEY (b1,key)); " +
-                    "PARTITION TABLE P1 ON COLUMN key;"
-            );
-
-            // a replicated table (should not generate procedures).
-            project.addLiteralSchema(
-                    "CREATE TABLE r1(key INTEGER NOT NULL, b1 INTEGER NOT NULL, " +
-                    "b2 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL, PRIMARY KEY (b1));"
-            );
-
-        } catch (IOException error) {
-            fail(error.getMessage());
-        }
-
-        // JNI
-        config = new LocalCluster("sqltypes-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        boolean t1 = config.compile(project);
-        assertTrue(t1);
-        builder.addServerConfig(config);
-
-        config = new LocalCluster("sqltypes-onesite.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        boolean t3 = config.compile(project);
-        assertTrue(t3);
-        builder.addServerConfig(config);
-
-        // CLUSTER
-        config = new LocalCluster("sqltypes-cluster.jar", 2, 2, 0, BackendTarget.NATIVE_EE_JNI);
-        boolean t2 = config.compile(project);
-        assertTrue(t2);
-        builder.addServerConfig(config);
-
-        return builder;
+        .addProcedures(
+                LoadP1.class, LoadR1.class,
+                MultiRoundP1Count.class,
+                MultiRoundR1Count.class,
+                MultiRoundMixedReads.class,
+                MultiRoundMixReadsAndWrites.class,
+                MultiRoundMixReplicatedReadsAndWrites.class)
+        ;
+        return multiClusterSuiteBuilder(TestMPMultiRoundTripSuite.class, cb,
+                new DeploymentBuilder(),
+                new DeploymentBuilder(3),
+                new DeploymentBuilder(2, 2));
     }
 }

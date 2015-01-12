@@ -29,9 +29,7 @@ import java.security.SecureRandom;
 
 import junit.framework.TestCase;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.client.ConnectionUtil;
-import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestClientPortChannel extends TestCase {
 
@@ -52,43 +50,33 @@ public class TestClientPortChannel extends TestCase {
         m_clientPort = SecureRandom.getInstance("SHA1PRNG").nextInt(2000) + 22000;
         m_adminPort = m_clientPort + 1;
         System.out.println("Random Client port is: " + m_clientPort);
-        try {
-            //Build the catalog
-            VoltProjectBuilder builder = new VoltProjectBuilder();
-            String mySchema
-                    = "create table A ("
-                    + "s varchar(20) default null, "
-                    + "); "
-                    + "create table B ("
-                    + "clm_integer integer default 0 not null, "
-                    + "clm_tinyint tinyint default 0, "
-                    + "clm_smallint smallint default 0, "
-                    + "clm_bigint bigint default 0, "
-                    + "clm_string varchar(20) default null, "
-                    + "clm_decimal decimal default null, "
-                    + "clm_float float default null, "
-                    + "clm_timestamp timestamp default null, "
-                    + "clm_varinary varbinary(20) default null"
-                    + "); ";
-            builder.addLiteralSchema(mySchema);
-            String catalogJar = "dummy.jar";
+        //Build the catalog
+        String mySchema =
+                "create table A (" +
+                "s varchar(20) default null, " +
+                "); " +
+                "create table B (" +
+                "clm_integer integer default 0 not null, " +
+                "clm_tinyint tinyint default 0, " +
+                "clm_smallint smallint default 0, " +
+                "clm_bigint bigint default 0, " +
+                "clm_string varchar(20) default null, " +
+                "clm_decimal decimal default null, " +
+                "clm_float float default null, " +
+                "clm_timestamp timestamp default null, " +
+                "clm_varinary varbinary(20) default null" +
+                "); " +
+                "";
+        m_config = LocalCluster.configure(getClass().getSimpleName(), mySchema, 2);
+        assertNotNull("Configuration failed to compile", m_config);
+        m_config.portGenerator.enablePortProvider();
+        m_config.portGenerator.pprovider.setNextClient(m_clientPort);
+        m_config.portGenerator.pprovider.setAdmin(m_adminPort);
+        m_config.bypassInProcessServerThread();
 
-            m_config = new LocalCluster(catalogJar, 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        m_config.startUp();
 
-            m_config.portGenerator.enablePortProvider();
-            m_config.portGenerator.pprovider.setNextClient(m_clientPort);
-            m_config.portGenerator.pprovider.setAdmin(m_adminPort);
-            m_config.setHasLocalServer(false);
-            boolean success = m_config.compile(builder);
-            assertTrue(success);
-
-            m_config.startUp();
-
-            Thread.currentThread().sleep(5000);
-        } catch (IOException ex) {
-            fail(ex.getMessage());
-        } finally {
-        }
+        Thread.sleep(5000);
     }
 
     /**

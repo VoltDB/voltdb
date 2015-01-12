@@ -32,8 +32,8 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.utils.MiscUtils;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
 public class TestLikeQueries extends TestCase {
 
@@ -105,7 +105,9 @@ public class TestLikeQueries extends TestCase {
             "ID int default 0 not null, " +
             "VAL varchar(32) default null," +
             "PAT varchar(32) default null," +
-            "PRIMARY KEY(ID));";
+            "PRIMARY KEY(ID));\n" +
+            "PARTITION TABLE STRINGS ON COLUMN ID;\n" +
+            "";
 
     static final LikeTestData[] rowData = {
             new LikeTestData("aaaaaaa", "aaa%"),
@@ -261,23 +263,14 @@ public class TestLikeQueries extends TestCase {
     }
 
     public void testLikeClause() throws Exception {
-
-        String pathToCatalog = Configuration.getPathToCatalogForTest("adhoc_like.jar");
-        String pathToDeployment = Configuration.getPathToCatalogForTest("adhoc_like.xml");
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(schema);
-        builder.addPartitionInfo("STRINGS", "ID");
-        builder.addStmtProcedure("Insert", "insert into strings values (?, ?, ?);", null);
-        builder.addStmtProcedure("SelectLike", "select * from strings where  val like ?;");
-        builder.addStmtProcedure("SelectNotLike", "select * from strings where  val not like ?;");
-        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
-        assertTrue("Insert compilation failed", success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = pathToCatalog;
-        config.m_pathToDeployment = pathToDeployment;
+        CatalogBuilder cb = new CatalogBuilder(schema)
+        .addStmtProcedure("Insert", "insert into strings values (?, ?, ?);")
+        .addStmtProcedure("SelectLike", "select * from strings where  val like ?;")
+        .addStmtProcedure("SelectNotLike", "select * from strings where  val not like ?;")
+        ;
+        Configuration config = Configuration.compile(getClass().getSimpleName(), cb,
+                new DeploymentBuilder(2));
+        assertNotNull("Configuration failed to compile", config);
         ServerThread localServer = new ServerThread(config);
 
         Client client = null;

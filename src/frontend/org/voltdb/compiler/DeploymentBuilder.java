@@ -18,10 +18,8 @@
 package org.voltdb.compiler;
 
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.StringWriter;
-import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Properties;
@@ -30,6 +28,8 @@ import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBElement;
 import javax.xml.bind.Marshaller;
 
+import org.apache.commons.lang3.StringUtils;
+import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB;
 import org.voltdb.compiler.deploymentfile.AdminModeType;
 import org.voltdb.compiler.deploymentfile.ClusterType;
@@ -61,28 +61,40 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 
 public class DeploymentBuilder {
     public static final class UserInfo {
-        public final String name;
-        public String password;
-        public final String roles[];
+        private final String m_name;
+        private final String m_password;
+        private final String m_roles;
 
         public UserInfo (final String name, final String password, final String... roles){
-            this.name = name;
-            this.password = password;
-            this.roles = roles;
+            m_name = name;
+            assert(m_name != null);
+            m_password = password;
+            m_roles = (roles == null || roles.length == 0) ? null :
+                StringUtils.join(roles, ',').toLowerCase();
         }
 
-        @Override
-        public int hashCode() {
-            return name.hashCode();
-        }
+        public String getName() { return m_name; }
 
-        @Override
-        public boolean equals(final Object o) {
-            if (o instanceof UserInfo) {
-                final UserInfo oInfo = (UserInfo)o;
-                return name.equals(oInfo.name);
+        public String getPassword() { return m_password; }
+
+        /**
+         * @param user
+         */
+        private void initUserFromInfo(User user) {
+            user.setName(m_name);
+            user.setPassword(m_password);
+            if (m_roles != null) {
+                user.setRoles(m_roles);
             }
-            return false;
+        }
+
+        @Override
+        public int hashCode() { return m_name.hashCode(); }
+
+        @Override
+        public boolean equals(final Object other) {
+            return (other instanceof UserInfo) &&
+                    m_name.equals(((UserInfo)other).m_name);
         }
     }
 
@@ -93,7 +105,7 @@ public class DeploymentBuilder {
     private int m_adminPort = VoltDB.DEFAULT_ADMIN_PORT;
     private boolean m_adminOnStartup = false;
 
-    final LinkedHashSet<UserInfo> m_users = new LinkedHashSet<UserInfo>();
+    private final LinkedHashSet<UserInfo> m_users = new LinkedHashSet<UserInfo>();
 
     // zero defaults to first open port >= 8080.
     // negative one means disabled in the deployment file.
@@ -130,7 +142,7 @@ public class DeploymentBuilder {
     String m_elloader;
 
     // whether to allow DDL over adhoc or use full catalog updates
-    private boolean m_useDDLSchema = false;
+    private boolean m_useAdHocDDL = false;
     private Integer m_deadHostTimeout;
     private Integer m_elasticDuration;
     private Integer m_elasticThroughput;
@@ -139,8 +151,13 @@ public class DeploymentBuilder {
     static final org.voltdb.compiler.deploymentfile.ObjectFactory m_factory =
             new org.voltdb.compiler.deploymentfile.ObjectFactory();
 
-    public DeploymentBuilder() {
-        this(1, 1, 0);
+    public DeploymentBuilder() { this(1, 1, 0, 0, false); }
+
+    public DeploymentBuilder(final int sitesPerHost) { this(sitesPerHost, 1, 0, 0, false); }
+
+    public DeploymentBuilder(final int sitesPerHost, final int hostCount)
+    {
+        this(sitesPerHost, hostCount, 0, 0, false);
     }
 
     public DeploymentBuilder(final int sitesPerHost,
@@ -181,14 +198,10 @@ public class DeploymentBuilder {
             throw new RuntimeException("voltdbroot \"" + voltRootPath + "\" for test exists but is not writable");
         }
         m_voltRootPath = voltRootPath;
-
     }
 
-    public void resetFromVPB(int sitesPerHost, int hostCount, int replication)
-    {
-        m_sitesPerHost = sitesPerHost;
-        m_hostCount = hostCount;
-        m_replication = replication;
+    public void disableReplication() {
+        m_replication = 0;
     }
 
     public DeploymentBuilder useCustomAdmin(int adminPort, boolean adminOnStartup)
@@ -228,8 +241,8 @@ public class DeploymentBuilder {
     /**
      * whether to allow DDL over adhoc or use full catalog updates
      */
-    public DeploymentBuilder setUseDDLSchema(boolean useIt) {
-        m_useDDLSchema = useIt;
+    public DeploymentBuilder setUseAdHocDDL(boolean useIt) {
+        m_useAdHocDDL = useIt;
         return this;
     }
 
@@ -261,13 +274,9 @@ public class DeploymentBuilder {
     }
 
     public DeploymentBuilder removeUser(String userName) {
-        Iterator<UserInfo> iter = m_users.iterator();
-        while (iter.hasNext()) {
-            UserInfo info = iter.next();
-            if (info.name.equals(userName)) {
-                iter.remove();
-            }
-        }
+        // Remove the user whose name matches this dummy.
+        UserInfo dummy = new UserInfo(userName, null);
+        m_users.remove(dummy);
         return this;
     }
 
@@ -343,22 +352,6 @@ public class DeploymentBuilder {
         return this;
     }
 
-    public void writeXML(String path) {
-        File file;
-        try {
-            file = new File(path);
-
-            final FileWriter writer = new FileWriter(file);
-            writer.write(getXML());
-            writer.flush();
-            writer.close();
-        }
-        catch (final Exception e) {
-            e.printStackTrace();
-            assert(false);
-        }
-    }
-
     public String getXML() {
         // make sure voltroot exists
         new File(m_voltRootPath).mkdirs();
@@ -373,7 +366,7 @@ public class DeploymentBuilder {
         cluster.setHostcount(m_hostCount);
         cluster.setSitesperhost(m_sitesPerHost);
         cluster.setKfactor(m_replication);
-        cluster.setSchema(m_useDDLSchema ? SchemaType.DDL : SchemaType.CATALOG);
+        cluster.setSchema(m_useAdHocDDL ? SchemaType.DDL : SchemaType.CATALOG);
 
         // <paths>
         PathsType paths = m_factory.createPathsType();
@@ -497,19 +490,7 @@ public class DeploymentBuilder {
             for (final UserInfo info : m_users) {
                 User user = m_factory.createUsersTypeUser();
                 users.getUser().add(user);
-                user.setName(info.name);
-                user.setPassword(info.password);
-
-                // build up user/roles.
-                if (info.roles.length > 0) {
-                    final StringBuilder roles = new StringBuilder();
-                    for (final String role : info.roles) {
-                        if (roles.length() > 0)
-                            roles.append(",");
-                        roles.append(role.toLowerCase());
-                    }
-                    user.setRoles(roles.toString());
-                }
+                info.initUserFromInfo(user);
             }
         }
 
@@ -569,6 +550,7 @@ public class DeploymentBuilder {
         String xml = getXML();
         try {
             File tempFile = File.createTempFile("VoltDeployment", ".xml");
+            tempFile.deleteOnExit();
             MiscUtils.writeStringToFile(tempFile, xml);
             return tempFile.getPath();
         } catch (IOException e) {
@@ -594,6 +576,39 @@ public class DeploymentBuilder {
 
     public File getPathToVoltRoot() {
         return new File(m_voltRootPath);
+    }
+
+    public String topologyString() {
+        return backendName() + "-" + m_sitesPerHost + '-' + m_hostCount + '-' + m_replication;
+    }
+
+    private String backendName() {
+        return backendTarget().display;
+    }
+
+    public int sites() {
+        return m_sitesPerHost;
+    }
+
+    public int hosts() {
+        return m_hostCount;
+    }
+
+    public int replication() {
+        return m_replication;
+    }
+
+    public BackendTarget backendTarget() {
+        if (this == m_forHSQLBackend) {
+            return BackendTarget.HSQLDB_BACKEND;
+        }
+        return BackendTarget.NATIVE_EE_JNI;
+    }
+
+    static DeploymentBuilder m_forHSQLBackend = new DeploymentBuilder();
+
+    public static DeploymentBuilder forHSQLBackend() {
+        return m_forHSQLBackend;
     }
 
 }

@@ -25,13 +25,14 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
-import org.voltdb.BackendTarget;
+import junit.framework.TestCase;
+
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
 public class TestSubQueriesSuite extends RegressionSuite {
     public TestSubQueriesSuite(String name) {
@@ -330,18 +331,17 @@ public class TestSubQueriesSuite extends RegressionSuite {
 
     }
 
+    static final Class<? extends TestCase> TESTCASECLASS = TestSubQueriesSuite.class;
+
     static public junit.framework.Test suite()
     {
-        VoltServerConfig config = null;
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestSubQueriesSuite.class);
-        VoltProjectBuilder project = new VoltProjectBuilder();
         final String literalSchema =
                 "CREATE TABLE R1 ( " +
-                        "ID INTEGER DEFAULT 0 NOT NULL, " +
-                        "WAGE INTEGER, " +
-                        "DEPT INTEGER, " +
-                        "TM TIMESTAMP DEFAULT NULL, " +
-                        "PRIMARY KEY (ID) );" +
+                "ID INTEGER DEFAULT 0 NOT NULL, " +
+                "WAGE INTEGER, " +
+                "DEPT INTEGER, " +
+                "TM TIMESTAMP DEFAULT NULL, " +
+                "PRIMARY KEY (ID) );" +
 
                 "CREATE TABLE R2 ( " +
                 "ID INTEGER DEFAULT 0 NOT NULL, " +
@@ -372,9 +372,7 @@ public class TestSubQueriesSuite extends RegressionSuite {
                 "DEPT INTEGER NOT NULL, " +
                 "TM TIMESTAMP DEFAULT NULL, " +
                 "PRIMARY KEY (ID, WAGE) );" +
-                "PARTITION TABLE P3 ON COLUMN ID;"
-
-                +
+                "PARTITION TABLE P3 ON COLUMN ID;" +
 
                 "CREATE TABLE R4 ( " +
                 "ID INTEGER DEFAULT 0 NOT NULL, " +
@@ -393,30 +391,10 @@ public class TestSubQueriesSuite extends RegressionSuite {
 
                 ""
                 ;
-        try {
-            project.addLiteralSchema(literalSchema);
-        } catch (IOException e) {
-            assertFalse(true);
-        }
-        boolean success;
-
-        config = new LocalCluster("subselect-onesite.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-
-        config = new LocalCluster("subselect-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-
-        // Cluster
-        config = new LocalCluster("subselect-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-
-        return builder;
+        return multiClusterSuiteBuilder(TestSubQueriesSuite.class, literalSchema,
+        new DeploymentBuilder(2),
+        DeploymentBuilder.forHSQLBackend(),
+        new DeploymentBuilder(2,3,1));
     }
 
 }

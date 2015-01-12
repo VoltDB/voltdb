@@ -27,8 +27,8 @@ import java.io.IOException;
 import java.util.Random;
 
 import junit.framework.Test;
+import junit.framework.TestCase;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
@@ -36,21 +36,18 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
 
 public class TestSystemProcedureSuite extends RegressionSuite {
+    private static final Class<? extends TestCase> TESTCASECLASS = TestSystemProcedureSuite.class;
 
     private static int SITES = 3;
     private static int HOSTS = MiscUtils.isPro() ? 2 : 1;
     private static int KFACTOR = MiscUtils.isPro() ? 1 : 0;
     private static boolean hasLocalServer = false;
-
-    static final Class<?>[] PROCEDURES =
-    {
-     GoSleep.class
-    };
 
     public TestSystemProcedureSuite(String name) {
         super(name);
@@ -402,16 +399,13 @@ public class TestSystemProcedureSuite extends RegressionSuite {
     // JUnit magic that uses the regression suite helper classes.
     //
     static public Test suite() throws IOException {
-        VoltServerConfig config = null;
-
         MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestSystemProcedureSuite.class);
+                new MultiConfigSuiteBuilder(TestSystemProcedureSuite.class);
 
         // Not really using TPCC functionality but need a database.
         // The testLoadMultipartitionTable procedure assumes partitioning
         // on warehouse id.
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addLiteralSchema(
+        CatalogBuilder cb = new CatalogBuilder(
                         "CREATE TABLE WAREHOUSE (\n" +
                         "  W_ID SMALLINT DEFAULT '0' NOT NULL,\n" +
                         "  W_NAME VARCHAR(16) DEFAULT NULL,\n" +
@@ -424,6 +418,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                         "  W_YTD FLOAT DEFAULT NULL,\n" +
                         "  CONSTRAINT W_PK_TREE PRIMARY KEY (W_ID)\n" +
                         ");\n" +
+                        "PARTITION TABLE WAREHOUSE ON COLUMN W_ID;\n" +
                         "CREATE TABLE ITEM (\n" +
                         "  I_ID INTEGER DEFAULT '0' NOT NULL,\n" +
                         "  I_IM_ID INTEGER DEFAULT NULL,\n" +
@@ -434,29 +429,18 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                         ");\n" +
                         "CREATE TABLE NEW_ORDER (\n" +
                         "  NO_W_ID SMALLINT DEFAULT '0' NOT NULL\n" +
-                        ");\n");
-
-        project.addPartitionInfo("WAREHOUSE", "W_ID");
-        project.addPartitionInfo("NEW_ORDER", "NO_W_ID");
-        project.addProcedures(PROCEDURES);
-
-        /*config = new LocalCluster("sysproc-twosites.jar", 2, 1, 0,
-                                  BackendTarget.NATIVE_EE_JNI);
-        ((LocalCluster) config).setHasLocalServer(false);
-        config.compile(project);
-        builder.addServerConfig(config);*/
-
-        /*
-         * Add a cluster configuration for sysprocs too
-         */
-        config = new LocalCluster("sysproc-cluster.jar", TestSystemProcedureSuite.SITES, TestSystemProcedureSuite.HOSTS, TestSystemProcedureSuite.KFACTOR,
-                                  BackendTarget.NATIVE_EE_JNI);
-        ((LocalCluster) config).setHasLocalServer(hasLocalServer);
-        boolean success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-
-        return builder;
+                        ");\n" +
+                        "PARTITION TABLE NEW_ORDER ON COLUMN NO_W_ID;\n" +
+                        "")
+        .addProcedures(GoSleep.class)
+        ;
+        DeploymentBuilder db = new DeploymentBuilder(SITES, HOSTS, KFACTOR);
+        LocalCluster config = LocalCluster.configure(TESTCASECLASS.getSimpleName(), cb, db);
+        if ( ! hasLocalServer) {
+            config.bypassInProcessServerThread();
+        }
+        assertNotNull("LocalCluster compile failed", config);
+        return new MultiConfigSuiteBuilder(TESTCASECLASS, config);
     }
 }
 

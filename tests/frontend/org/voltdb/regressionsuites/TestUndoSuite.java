@@ -25,21 +25,18 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb_testprocs.regressionsuites.basecase.LoadP1;
 import org.voltdb_testprocs.regressionsuites.basecase.LoadP1_MP;
 import org.voltdb_testprocs.regressionsuites.basecase.LoadP1_SP;
 import org.voltdb_testprocs.regressionsuites.basecase.LoadR1;
 
 public class TestUndoSuite extends RegressionSuite {
-
-    static final Class<?>[] PROCEDURES = {LoadP1.class, LoadP1_MP.class, LoadP1_SP.class, LoadR1.class};
-
     public TestUndoSuite(String name) {
         super(name);
     }
@@ -123,44 +120,20 @@ public class TestUndoSuite extends RegressionSuite {
     }
 
     static public junit.framework.Test suite() {
-        VoltServerConfig config = null;
-        final MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestUndoSuite.class);
-
-        final VoltProjectBuilder project = new VoltProjectBuilder();
-
-        project.addStmtProcedure("CountP1", "select count(*) from p1;");
-        try {
-            project.addLiteralSchema(
-                    "CREATE TABLE p1(key INTEGER NOT NULL, b1 INTEGER NOT NULL ASSUMEUNIQUE, " +
-                    "b2 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL, PRIMARY KEY (b1, key)); " +
-                    "PARTITION TABLE P1 ON COLUMN key;"
-            );
-
-            // a replicated table (should not generate procedures).
-            project.addLiteralSchema(
-                    "CREATE TABLE r1(key INTEGER NOT NULL, b1 INTEGER NOT NULL, " +
-                    "b2 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL, PRIMARY KEY (b1));"
-            );
-
-            project.addProcedures(PROCEDURES);
-        } catch (IOException error) {
-            fail(error.getMessage());
-        }
-
-        // JNI
-        config = new LocalCluster("sqltypes-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        boolean t1 = config.compile(project);
-        assertTrue(t1);
-        builder.addServerConfig(config);
-
-        // CLUSTER
-        config = new LocalCluster("sqltypes-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        boolean t2 = config.compile(project);
-        assertTrue(t2);
-        builder.addServerConfig(config);
-
-        return builder;
-
+        CatalogBuilder cb = new CatalogBuilder(
+                "CREATE TABLE p1(key INTEGER NOT NULL, b1 INTEGER NOT NULL ASSUMEUNIQUE, " +
+                        "b2 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL, PRIMARY KEY (b1, key)); " +
+                "PARTITION TABLE P1 ON COLUMN key;" +
+                // a replicated table (should not generate procedures).
+                "CREATE TABLE r1(key INTEGER NOT NULL, b1 INTEGER NOT NULL, " +
+                        "b2 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL, PRIMARY KEY (b1));" +
+                "")
+        .addStmtProcedure("CountP1", "select count(*) from p1;")
+        .addProcedures(LoadP1.class, LoadP1_MP.class, LoadP1_SP.class, LoadR1.class)
+        ;
+        return multiClusterSuiteBuilder(TestUndoSuite.class, cb,
+                new DeploymentBuilder(),
+                new DeploymentBuilder(2, 3, 1));
     }
 
 }

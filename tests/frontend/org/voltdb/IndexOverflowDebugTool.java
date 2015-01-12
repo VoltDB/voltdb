@@ -30,13 +30,13 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.utils.MiscUtils;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
 public class IndexOverflowDebugTool extends TestCase {
 
     public void testSimple() throws Exception {
-        String simpleSchema =
+        CatalogBuilder cb = new CatalogBuilder(
             "CREATE TABLE P1 (\n" +
             "  ID INTEGER DEFAULT '0' NOT NULL,\n" +
             "  TINY TINYINT NOT NULL,\n" +
@@ -45,6 +45,7 @@ public class IndexOverflowDebugTool extends TestCase {
             "  PRIMARY KEY (ID)\n" +
             ");\n" +
             "CREATE UNIQUE INDEX I1 ON P1 (ID, TINY);\n" +
+            "PARTITION TABLE P1 PN COLUMN ID;\n" +
             "\n" +
             "CREATE TABLE R1 (\n" +
             "  ID INTEGER DEFAULT '0' NOT NULL,\n" +
@@ -52,23 +53,18 @@ public class IndexOverflowDebugTool extends TestCase {
             "  SMALL SMALLINT NOT NULL,\n" +
             "  BIG BIGINT NOT NULL,\n" +
             "  PRIMARY KEY (ID)\n" +
-            ");";
+            ");" +
+            "")
+        .addStmtProcedure("nocrash", "select * from P1 where ID = 6000000000;")
+        .addStmtProcedure("crash", "UPDATE P1 SET BIG = BIG + 4 WHERE P1.ID>= 5200704751286217677")
+        .addStmtProcedure("crash2", "SELECT * FROM P1 WHERE P1.ID>-6611959682909750107")
+        .addStmtProcedure("crash3", "SELECT * FROM P1 INNER JOIN R1 ON P1.ID = R1.BIG")
+        .addStmtProcedure("crash4", "SELECT * FROM P1 WHERE P1.ID = 5 AND P1.TINY > -2000;")
+        ;
+        Configuration config = Configuration.compile(getClass().getSimpleName(), cb,
+                new DeploymentBuilder());
+        assertNotNull("Configuration failed to compile", config);
 
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(simpleSchema);
-        builder.addPartitionInfo("P1", "ID");
-        builder.addStmtProcedure("nocrash", "select * from P1 where ID = 6000000000;");
-        builder.addStmtProcedure("crash", "UPDATE P1 SET BIG = BIG + 4 WHERE P1.ID>= 5200704751286217677");
-        builder.addStmtProcedure("crash2", "SELECT * FROM P1 WHERE P1.ID>-6611959682909750107");
-        builder.addStmtProcedure("crash3", "SELECT * FROM P1 INNER JOIN R1 ON P1.ID = R1.BIG");
-        builder.addStmtProcedure("crash4", "SELECT * FROM P1 WHERE P1.ID = 5 AND P1.TINY > -2000;");
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("indexoverflow.jar"), 1, 1, 0);
-        assert(success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("indexoverflow.xml"));
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("indexoverflow.jar");
-        config.m_pathToDeployment = Configuration.getPathToCatalogForTest("indexoverflow.xml");
         config.m_backend = BackendTarget.NATIVE_EE_IPC;
         config.m_ipcPort = 10001;
         ServerThread localServer = new ServerThread(config);

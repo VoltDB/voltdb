@@ -26,39 +26,30 @@ package org.voltdb.fullddlfeatures;
 import java.net.URL;
 import java.net.URLDecoder;
 
+import junit.framework.TestCase;
+
 import org.junit.Test;
 import org.voltdb.AdhocDDLTestBase;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.utils.MiscUtils;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
 public class TestDDLFeatures extends AdhocDDLTestBase {
-
-    String catalogJar = "DDLFeature.jar";
-    String pathToCatalog = Configuration.getPathToCatalogForTest("DDLFeature.jar");
-    String pathToDeployment = Configuration.getPathToCatalogForTest("DDLFeature.xml");
-
-    VoltProjectBuilder builder = new VoltProjectBuilder();
-
     @Override
     public void setUp() throws Exception
     {
         final URL url = TestDDLFeatures.class.getResource("fullDDL.sql");
         String schemaPath = URLDecoder.decode(url.getPath(), "UTF-8");
-        builder.catBuilder().addSchema(schemaPath);
-
-        assertTrue(builder.compile(pathToCatalog));
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = pathToCatalog;
-        config.m_pathToDeployment = pathToDeployment;
-
+        CatalogBuilder cb = new CatalogBuilder()
+        .addSchema(schemaPath)
+        ;
+        Configuration config = Configuration.compile(getClass().getSimpleName(), cb,
+                new DeploymentBuilder());
+        assertNotNull("Configuration failed to compile", config);
         startSystem(config);
     }
 

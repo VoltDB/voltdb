@@ -25,13 +25,12 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
 
 /**
@@ -1756,13 +1755,6 @@ public class TestFunctionsForJSON extends RegressionSuite {
     }
 
     static public junit.framework.Test suite() {
-
-        VoltServerConfig config = null;
-        MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestFunctionsForJSON.class);
-        boolean success;
-
-        VoltProjectBuilder project = new VoltProjectBuilder();
         final String literalSchema =
                 "CREATE TABLE JS1 (\n" +
                 "  ID INTEGER NOT NULL, \n" +
@@ -1851,34 +1843,14 @@ public class TestFunctionsForJSON extends RegressionSuite {
                 "  SELECT ID FROM JSBAD WHERE ID = ? AND ARRAY_LENGTH(FIELD(DOC, ?)) = ?\n" +
                 ";\n" +
                 "";
-        try {
-            project.addLiteralSchema(literalSchema);
-        } catch (IOException e) {
-            assertFalse(true);
-        }
-
-        // CONFIG #1: Local Site/Partition running on JNI backend
-        config = new LocalCluster("fixedsql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-
-        // CONFIG #2: Local Site/Partitions running on JNI backend
-        config = new LocalCluster("fixedsql-threesite.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-/*
-
-        // CONFIG #2: HSQL -- disabled, the functions being tested are not HSQL compatible
-        config = new LocalCluster("fixedsql-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-
-*/
-        // no clustering tests for functions
-
-        return builder;
+        return multiClusterSuiteBuilder(TestFunctionsForJSON.class, literalSchema,
+                //* JNI 1 site & 3 sites
+                // HSQL Backend is disabled, the functions being tested are not HSQL compatible
+                new DeploymentBuilder(1),
+                // DeploymentBuilder.forHSQLBackend(),
+                new DeploymentBuilder(3)
+                // no multi-host tests
+                //, new DeploymentBuilder(2, 3, 1)
+                );
     }
 }

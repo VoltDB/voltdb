@@ -32,7 +32,8 @@ import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
 public class TestSimpleCJK extends TestCase {
     public static final String POORLY_TRANSLATED_CHINESE =
@@ -63,35 +64,21 @@ public class TestSimpleCJK extends TestCase {
     public static final String POORLY_TRANSLATED_KOREAN = "두도";*/
 
     ServerThread startup() throws UnsupportedEncodingException {
-        String simpleSchema =
-            "create table cjk (" +
-            "sval1 varchar(1024) not null, " +
-            "sval2 varchar(1024) default 'foo', " +
-            "sval3 varchar(1024) default 'bar', " +
-            "PRIMARY KEY(sval1));\n" +
-            "PARTITION TABLE cjk ON COLUMN sval1;\n" +
-            "";
-
-        /*String simpleSchema =
-            "create table cjk (" +
-            "sval1 varchar(20) not null, " +
-            "sval2 varchar(20) default 'foo', " +
-            "sval3 varchar(20) default 'bar', " +
-            "PRIMARY KEY(sval1));\n" +
-            "PARTITION TABLE cjk ON COLUMN sval1;\n" +
-            "";*/
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.catBuilder().addLiteralSchema(simpleSchema)
+        CatalogBuilder cb = new CatalogBuilder(
+                "create table cjk (" +
+                        "sval1 varchar(1024) not null, " +
+                        "sval2 varchar(1024) default 'foo', " +
+                        "sval3 varchar(1024) default 'bar', " +
+                        "PRIMARY KEY(sval1));\n" +
+                        "PARTITION TABLE cjk ON COLUMN sval1;\n" +
+                        "")
         .addStmtProcedure("Insert", "insert into cjk values (?,?,?);")
         .addStmtProcedure("Select", "select * from cjk;")
         ;
-        builder.depBuilder().setHTTPDPort(8095);
-        assertTrue(builder.compile(Configuration.getPathToCatalogForTest("cjk.jar"), 1, 1, 0));
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("cjk.jar");
-        config.m_pathToDeployment = builder.getPathToDeployment();
+        DeploymentBuilder db = new DeploymentBuilder()
+        .setHTTPDPort(8095)
+        ;
+        Configuration config = Configuration.compile(getClass().getSimpleName(), cb, db);
         ServerThread server = new ServerThread(config);
         server.start();
         server.waitForInitialization();

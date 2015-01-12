@@ -27,7 +27,6 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.TreeSet;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
@@ -36,7 +35,8 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb_testprocs.regressionsuites.indexes.CheckMultiMultiIntGTEFailure;
 import org.voltdb_testprocs.regressionsuites.indexes.CompiledInLists;
 import org.voltdb_testprocs.regressionsuites.indexes.Insert;
@@ -48,11 +48,6 @@ import org.voltdb_testprocs.regressionsuites.indexes.Insert;
  */
 
 public class TestIndexesSuite extends RegressionSuite {
-
-    /** Procedures used by this suite */
-    static final Class<?>[] PROCEDURES = { Insert.class,
-        CheckMultiMultiIntGTEFailure.class, CompiledInLists.class};
-
     // Index stuff to test:
     // scans against tree
     // - < <= = > >=, range with > and <
@@ -1149,14 +1144,11 @@ public class TestIndexesSuite extends RegressionSuite {
     }
 
     static public junit.framework.Test suite() {
-
-        VoltServerConfig config = null;
-        MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestIndexesSuite.class);
-
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        project.catBuilder().addSchema(Insert.class.getResource("indexes-ddl.sql"))
-        .addProcedures(PROCEDURES)
+        CatalogBuilder cb = new CatalogBuilder()
+        .addSchema(Insert.class.getResource("indexes-ddl.sql"))
+        .addProcedures(Insert.class,
+                CheckMultiMultiIntGTEFailure.class,
+                CompiledInLists.class)
         .addStmtProcedure("Eng397LimitIndexR1", "select * from R1 where R1.ID > 2 Limit ?")
         .addStmtProcedure("Eng397LimitIndexP1", "select * from P1 where P1.ID > 2 Limit ?")
         .addStmtProcedure("Eng397LimitIndexR2", "select * from R2 where R2.ID > 2 Limit ?")
@@ -1202,27 +1194,10 @@ public class TestIndexesSuite extends RegressionSuite {
         //        ")" +
         //        " and NUM IN (111,222,333,444,555)");
         ;
-
-        //* CONFIG #1: HSQL -- keep this enabled by default with //
-        config = new LocalCluster("testindexes-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        assertTrue(config.compile(project));
-        builder.addServerConfig(config);
-        // end of easy-to-disable code section */
-
-        //* CONFIG #2: JNI -- keep this enabled by default with //
-        config = new LocalCluster("testindexes-threesite.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        assertTrue(config.compile(project));
-        builder.addServerConfig(config);
-        // end of easy-to-disable code section */
-
-        /*/ CONFIG #3: IPC -- keep this normally disabled with / * vs. //
-        config = new LocalCluster("testindexes-threesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
-        assertTrue(config.compile(project));
-        builder.addServerConfig(config);
-        // end of normally disabled section */
-
-        // no clustering tests for indexes
-        return builder;
+        return multiClusterSuiteBuilder(TestIndexesSuite.class, cb,
+                new DeploymentBuilder(),
+                DeploymentBuilder.forHSQLBackend(),
+                new DeploymentBuilder(3));
     }
 
 }

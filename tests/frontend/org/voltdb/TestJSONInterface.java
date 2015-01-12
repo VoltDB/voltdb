@@ -78,10 +78,11 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.compiler.CatalogBuilder.ProcedureInfo;
 import org.voltdb.compiler.CatalogBuilder.RoleInfo;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb.compiler.DeploymentBuilder.UserInfo;
-import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.procedures.CrazyBlahProc;
@@ -106,7 +107,8 @@ public class TestJSONInterface extends TestCase {
         public String exception = null;
     }
 
-    static String japaneseTestVarStrings = "Procedure=Insert&Parameters=%5B%22%5Cu3053%5Cu3093%5Cu306b%5Cu3061%5Cu306f%22%2C%22%5Cu4e16%5Cu754c%22%2C%22Japanese%22%5D";
+    static String japaneseTestVarStrings = "Procedure=Insert&Parameters=" +
+            "%5B%22%5Cu3053%5Cu3093%5Cu306b%5Cu3061%5Cu306f%22%2C%22%5Cu4e16%5Cu754c%22%2C%22Japanese%22%5D";
 
     static String getHTTPVarString(Map<String, String> params) throws UnsupportedEncodingException {
         String s = "";
@@ -177,15 +179,18 @@ public class TestJSONInterface extends TestCase {
         return response;
     }
 
-    public static String getUrlOverJSON(String url, String user, String password, String scheme, int expectedCode, String expectedCt) throws Exception {
+    public static String getUrlOverJSON(String url, String user, String password, String scheme,
+            int expectedCode, String expectedCt) throws Exception {
         return httpUrlOverJSON("GET", url, user, password, scheme, expectedCode, expectedCt, null);
     }
 
-    public static String postUrlOverJSON(String url, String user, String password, String scheme, int expectedCode, String expectedCt, Map<String,String> params) throws Exception {
+    public static String postUrlOverJSON(String url, String user, String password, String scheme,
+            int expectedCode, String expectedCt, Map<String,String> params) throws Exception {
         return httpUrlOverJSON("POST", url, user, password, scheme, expectedCode, expectedCt, params);
     }
 
-    public static String httpUrlOverJSON(String method, String url, String user, String password, String scheme, int expectedCode, String expectedCt, Map<String,String> params) throws Exception {
+    public static String httpUrlOverJSON(String method, String url, String user, String password,
+            String scheme, int expectedCode, String expectedCt, Map<String,String> params) throws Exception {
         URL jsonAPIURL = new URL(url);
 
         HttpURLConnection conn = (HttpURLConnection) jsonAPIURL.openConnection();
@@ -198,7 +203,8 @@ public class TestJSONInterface extends TestCase {
                 String h = user + ":" + Encoder.hexEncode(hashedPasswordBytes);
                 conn.setRequestProperty("Authorization", "Hashed " + h);
             } else if (scheme.equalsIgnoreCase("basic")) {
-                conn.setRequestProperty("Authorization", "Basic " + new String(Base64.encodeToString(new String(user + ":" + password).getBytes(), false)));
+                conn.setRequestProperty("Authorization", "Basic " + new String(Base64.encodeToString(
+                        new String(user + ":" + password).getBytes(), false)));
             }
         }
         conn.connect();
@@ -280,15 +286,19 @@ public class TestJSONInterface extends TestCase {
         return retval;
     }
 
-    public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash) throws Exception {
+    public static String callProcOverJSON(String procName, ParameterSet pset,
+            String username, String password, boolean preHash) throws Exception {
         return callProcOverJSON(procName, pset, username, password, preHash, false, 200 /* HTTP_OK */);
     }
 
-    public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash, boolean admin) throws Exception {
+    public static String callProcOverJSON(String procName, ParameterSet pset,
+            String username, String password, boolean preHash, boolean admin) throws Exception {
         return callProcOverJSON(procName, pset, username, password, preHash, admin, 200 /* HTTP_OK */);
     }
 
-    public static String callProcOverJSON(String procName, ParameterSet pset, String username, String password, boolean preHash, boolean admin, int expectedCode) throws Exception {
+    public static String callProcOverJSON(String procName, ParameterSet pset,
+            String username, String password, boolean preHash, boolean admin, int expectedCode)
+                    throws Exception {
         // Call insert
         String paramsInJSON = pset.toJSONString();
         //System.out.println(paramsInJSON);
@@ -346,7 +356,7 @@ public class TestJSONInterface extends TestCase {
 
     public void testAdminMode() throws Exception {
         try {
-            String simpleSchema =
+            CatalogBuilder cb = new CatalogBuilder(
                     "create table blah (" +
                     "ival bigint default 23 not null, " +
                     "sval varchar(200) default 'foo', " +
@@ -355,21 +365,16 @@ public class TestJSONInterface extends TestCase {
                     "decval decimal, " +
                     "PRIMARY KEY(ival));\n" +
                     "PARTITION TABLE blah ON COLUMN ival;\n" +
-                    "";
-
-            VoltDB.Configuration config = new VoltDB.Configuration();
-
-            VoltProjectBuilder project = new VoltProjectBuilder();
-            project.catBuilder().addLiteralSchema(simpleSchema)
+                    "")
             .addStmtProcedure("Insert", "insert into blah values (?,?,?,?,?);")
             .addProcedures(CrazyBlahProc.class)
             ;
-            project.depBuilder().setHTTPDPort(8095).useCustomAdmin(21213, true);
-            assertTrue(project.compile(Configuration.getPathToCatalogForTest("json.jar"), 1, 1, 0));
-
-            config.m_pathToCatalog = Configuration.getPathToCatalogForTest("json.jar");
-            config.m_pathToDeployment = project.getPathToDeployment();
-
+            DeploymentBuilder db = new DeploymentBuilder()
+            .setHTTPDPort(8095)
+            .useCustomAdmin(21213, true)
+            ;
+            Configuration config = Configuration.compile(getClass().getSimpleName(), cb, db);
+            assertNotNull("Configuration failed to compile", config);
             server = new ServerThread(config);
             server.start();
             server.waitForInitialization();
@@ -379,14 +384,16 @@ public class TestJSONInterface extends TestCase {
             Response response;
 
             // Call insert on admin port
-            pset = ParameterSet.fromArrayNoCopy(1, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
+            pset = ParameterSet.fromArrayNoCopy(1, "hello",
+                    new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
             responseJSON = callProcOverJSON("Insert", pset, null, null, false, true);
             System.out.println(responseJSON);
             response = responseFromJSON(responseJSON);
             assertTrue(response.status == ClientResponse.SUCCESS);
 
             // Call insert on closed client port and expect failure
-            pset = ParameterSet.fromArrayNoCopy(2, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
+            pset = ParameterSet.fromArrayNoCopy(2, "hello",
+                    new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
             responseJSON = callProcOverJSON("Insert", pset, null, null, false, false);
             System.out.println(responseJSON);
             response = responseFromJSON(responseJSON);
@@ -400,14 +407,16 @@ public class TestJSONInterface extends TestCase {
             assertTrue(response.status == ClientResponse.SUCCESS);
 
             // call insert on open client port
-            pset = ParameterSet.fromArrayNoCopy(2, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
+            pset = ParameterSet.fromArrayNoCopy(2, "hello",
+                    new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
             responseJSON = callProcOverJSON("Insert", pset, null, null, false, false);
             System.out.println(responseJSON);
             response = responseFromJSON(responseJSON);
             assertTrue(response.status == ClientResponse.SUCCESS);
 
             // call insert on admin port again (now that both ports are open)
-            pset = ParameterSet.fromArrayNoCopy(3, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
+            pset = ParameterSet.fromArrayNoCopy(3, "hello",
+                    new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
             responseJSON = callProcOverJSON("Insert", pset, null, null, false, true);
             System.out.println(responseJSON);
             response = responseFromJSON(responseJSON);
@@ -421,14 +430,16 @@ public class TestJSONInterface extends TestCase {
             assertTrue(response.status == ClientResponse.SUCCESS);
 
             // Call insert on admin port
-            pset = ParameterSet.fromArrayNoCopy(4, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
+            pset = ParameterSet.fromArrayNoCopy(4, "hello",
+                    new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
             responseJSON = callProcOverJSON("Insert", pset, null, null, false, true);
             System.out.println(responseJSON);
             response = responseFromJSON(responseJSON);
             assertTrue(response.status == ClientResponse.SUCCESS);
 
             // Call insert on closed client port and expect failure
-            pset = ParameterSet.fromArrayNoCopy(5, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
+            pset = ParameterSet.fromArrayNoCopy(5, "hello"
+                    , new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
             responseJSON = callProcOverJSON("Insert", pset, null, null, false, false);
             System.out.println(responseJSON);
             response = responseFromJSON(responseJSON);
@@ -444,7 +455,7 @@ public class TestJSONInterface extends TestCase {
 
     public void testSimple() throws Exception {
         try {
-            String simpleSchema =
+            CatalogBuilder cb = new CatalogBuilder(
                     "create table blah (" +
                     "ival bigint default 23 not null, " +
                     "sval varchar(200) default 'foo', " +
@@ -453,20 +464,15 @@ public class TestJSONInterface extends TestCase {
                     "decval decimal, " +
                     "PRIMARY KEY(ival));\n" +
                     "PARTITION TABLE blah ON COLUMN ival;" +
-                    "";
-
-            VoltDB.Configuration config = new VoltDB.Configuration();
-
-            VoltProjectBuilder project = new VoltProjectBuilder();
-            project.catBuilder().addLiteralSchema(simpleSchema)
+                    "")
             .addStmtProcedure("Insert", "insert into blah values (?,?,?,?,?);")
             .addProcedures(CrazyBlahProc.class);
-            project.depBuilder().setHTTPDPort(8095).useCustomAdmin(21213, false);
-            assertTrue(project.compile(Configuration.getPathToCatalogForTest("json.jar"), 1, 1, 0));
-
-            config.m_pathToCatalog = Configuration.getPathToCatalogForTest("json.jar");
-            config.m_pathToDeployment = project.getPathToDeployment();
-
+            ;
+            DeploymentBuilder db = new DeploymentBuilder()
+            .setHTTPDPort(8095).useCustomAdmin(21213, false);
+            ;
+            Configuration config = Configuration.compile(getClass().getSimpleName(), cb, db);
+            assertNotNull("Configuration failed to compile", config);
             server = new ServerThread(config);
             server.start();
             server.waitForInitialization();
@@ -476,7 +482,8 @@ public class TestJSONInterface extends TestCase {
             Response response;
 
             // Call insert
-            pset = ParameterSet.fromArrayNoCopy(1, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
+            pset = ParameterSet.fromArrayNoCopy(1, "hello",
+                    new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
             responseJSON = callProcOverJSON("Insert", pset, null, null, false);
             System.out.println(responseJSON);
             response = responseFromJSON(responseJSON);
@@ -592,7 +599,8 @@ public class TestJSONInterface extends TestCase {
             assertEquals(ClientResponse.SUCCESS, response.status);
 
             // now try jsonp
-            responseJSON = callProcOverJSONRaw("Procedure=@Statistics&Parameters=[TABLE]&jsonp=fooBar", 200);
+            responseJSON = callProcOverJSONRaw(
+                    "Procedure=@Statistics&Parameters=[TABLE]&jsonp=fooBar", 200);
             System.out.println(responseJSON);
             assertTrue(responseJSON.startsWith("fooBar("));
 
@@ -605,7 +613,8 @@ public class TestJSONInterface extends TestCase {
             assertEquals(ClientResponse.SUCCESS, response.status);
 
             // now try adhoc insert with a huge bigint
-            pset = ParameterSet.fromArrayNoCopy("insert into blah values (974599638818488300, NULL, NULL, NULL, NULL);");
+            pset = ParameterSet.fromArrayNoCopy(
+                    "insert into blah values (974599638818488300, NULL, NULL, NULL, NULL);");
             responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
             System.out.println(responseJSON);
             response = responseFromJSON(responseJSON);
@@ -624,12 +633,14 @@ public class TestJSONInterface extends TestCase {
             // Call @AdHoc with zero parameters
             pset = ParameterSet.emptyParameterSet();
             responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
-            assertTrue(responseJSON.contains("Adhoc system procedure requires at least the query parameter."));
+            assertTrue(responseJSON.contains(
+                    "Adhoc system procedure requires at least the query parameter."));
 
             // Call @AdHoc with many parameters (more than 2)
             pset = ParameterSet.fromArrayNoCopy("select * from blah", "foo", "bar");
             responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
-            assertTrue(responseJSON.contains("Unable to execute adhoc sql statement(s): Too many actual arguments were passed for the parameters in the sql statement(s): (2 vs. 0)"));
+            assertTrue(responseJSON.contains(
+                    "Unable to execute adhoc sql statement(s): Too many actual arguments were passed for the parameters in the sql statement(s): (2 vs. 0)"));
 
         } finally {
             if (server != null) {
@@ -642,7 +653,7 @@ public class TestJSONInterface extends TestCase {
 
     public void testJapaneseNastiness() throws Exception {
         try {
-            String simpleSchema =
+            CatalogBuilder cb = new CatalogBuilder(
                     "CREATE TABLE HELLOWORLD (\n" +
                     "    HELLO VARCHAR(15),\n" +
                     "    WORLD VARCHAR(15),\n" +
@@ -650,19 +661,16 @@ public class TestJSONInterface extends TestCase {
                     "    PRIMARY KEY (DIALECT)\n" +
                     ");\n" +
                     "PARTITION TABLE HELLOWORLD ON COLUMN DIALECT;\n" +
-                    "";
-            VoltProjectBuilder project = new VoltProjectBuilder();
-            project.catBuilder().addLiteralSchema(simpleSchema)
+                    "")
             .addStmtProcedure("Insert", "insert into HELLOWORLD values (?,?,?);")
             .addStmtProcedure("Select", "select * from HELLOWORLD;")
-            .addProcedures(SelectStarHelloWorld.class);
-
-            project.depBuilder().setHTTPDPort(8095);
-            assertTrue(project.compile(Configuration.getPathToCatalogForTest("json.jar")));
-
-            VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToCatalog = Configuration.getPathToCatalogForTest("json.jar");
-            config.m_pathToDeployment = project.getPathToDeployment();
+            .addProcedures(SelectStarHelloWorld.class)
+            ;
+            DeploymentBuilder db = new DeploymentBuilder()
+            .setHTTPDPort(8095);
+            ;
+            Configuration config = Configuration.compile(getClass().getSimpleName(), cb, db);
+            assertNotNull("Configuration failed to compile", config);
             server = new ServerThread(config);
             server.start();
             server.waitForInitialization();
@@ -698,7 +706,14 @@ public class TestJSONInterface extends TestCase {
 
     public void testJSONAuth() throws Exception {
         try {
-            String simpleSchema =
+            final String role = "foo";
+            // create 20 users, only the first one has an interesting user/pass
+            UserInfo[] ui = new UserInfo[15];
+            ui[0] = new UserInfo("ry@nlikesthe", "y@nkees", role);
+            for (int i = 1; i < ui.length; i++) {
+                ui[i] = new UserInfo("USER" + String.valueOf(i), "PASS" + String.valueOf(i), role);
+            }
+            CatalogBuilder cb = new CatalogBuilder(
                     "CREATE TABLE HELLOWORLD (\n" +
                     "    HELLO VARCHAR(15),\n" +
                     "    WORLD VARCHAR(20),\n" +
@@ -706,65 +721,64 @@ public class TestJSONInterface extends TestCase {
                     "    PRIMARY KEY (DIALECT)\n" +
                     ");\n" +
                     "PARTITION TABLE HELLOWORLD ON COLUMN DIALECT;\n" +
-                    "";
-            // create 20 users, only the first one has an interesting user/pass
-            UserInfo[] ui = new UserInfo[15];
-            ui[0] = new UserInfo("ry@nlikesthe", "y@nkees", new String[]{"foo"});
-            for (int i = 1; i < ui.length; i++) {
-                ui[i] = new UserInfo("USER" + String.valueOf(i), "PASS" + String.valueOf(i), new String[]{"foo"});
-            }
-            RoleInfo gi = new RoleInfo("foo", true, false, true, true, false, false);
-            ProcedureInfo[] pi = new ProcedureInfo[]{
-                    new ProcedureInfo(new String[]{"foo"}, "Insert", "insert into HELLOWORLD values (?,?,?);", null),
-                    new ProcedureInfo(new String[]{"foo"}, "Select", "select * from HELLOWORLD;", null)};
-
-            VoltProjectBuilder project = new VoltProjectBuilder();
-            project.catBuilder().addLiteralSchema(simpleSchema).addRoles(gi).addProcedures(pi);
-            project.depBuilder().addUsers(ui).setSecurityEnabled(true, true).setHTTPDPort(8095);
-
-            assertTrue(project.compile(Configuration.getPathToCatalogForTest("json.jar")));
-
-            VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToCatalog = Configuration.getPathToCatalogForTest("json.jar");
-            config.m_pathToDeployment = project.getPathToDeployment();
+                    "")
+            .addRoles(new RoleInfo(role, true, false, true, true, false, false))
+            .addProcedures(
+                    new ProcedureInfo("Insert", "insert into HELLOWORLD values (?,?,?);"),
+                    new ProcedureInfo("Select", "select * from HELLOWORLD;"))
+            ;
+            DeploymentBuilder db = new DeploymentBuilder()
+            .setHTTPDPort(8095)
+            .setSecurityEnabled(true, true)
+            .addUsers(ui)
+            ;
+            Configuration config = Configuration.compile(getClass().getSimpleName(), cb, db);
+            assertNotNull("Configuration failed to compile", config);
             server = new ServerThread(config);
             server.start();
             server.waitForInitialization();
 
             ParameterSet pset;
 
+            String uname;
+            String upasswd;
             // test good auths
             for (UserInfo u : ui) {
-                pset = ParameterSet.fromArrayNoCopy(u.name, u.password, u.name);
-                String response = callProcOverJSON("Insert", pset, u.name, u.password, true);
+                uname = u.getName();
+                upasswd = u.getPassword();
+                pset = ParameterSet.fromArrayNoCopy(uname, upasswd, uname);
+                String response = callProcOverJSON("Insert", pset, uname, upasswd, true);
                 Response r = responseFromJSON(response);
                 assertEquals(ClientResponse.SUCCESS, r.status);
             }
             // test re-using auths
             for (UserInfo u : ui) {
-                pset = ParameterSet.fromArrayNoCopy(u.name + "-X", u.password + "-X", u.name + "-X");
-                String response = callProcOverJSON("Insert", pset, u.name, u.password, false);
+                uname = u.getName();
+                upasswd = u.getPassword();
+                pset = ParameterSet.fromArrayNoCopy(uname + "-X", upasswd + "-X", uname + "-X");
+                String response = callProcOverJSON("Insert", pset, uname, upasswd, false);
                 Response r = responseFromJSON(response);
                 assertEquals(ClientResponse.SUCCESS, r.status);
             }
 
             // test bad auth
-            UserInfo u = ui[0];
-            pset = ParameterSet.fromArrayNoCopy(u.name + "-X1", u.password + "-X1", u.name + "-X1");
-            String response = callProcOverJSON("Insert", pset, u.name, "ick", true);
+            uname = ui[0].getName();
+            upasswd = ui[0].getPassword();
+            pset = ParameterSet.fromArrayNoCopy(uname + "-X1", upasswd + "-X1", uname + "-X1");
+            String response = callProcOverJSON("Insert", pset, uname, "ick", true);
             Response r = responseFromJSON(response);
             assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.status);
-            response = callProcOverJSON("Insert", pset, u.name, "ick", false);
+            response = callProcOverJSON("Insert", pset, uname, "ick", false);
             r = responseFromJSON(response);
             assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.status);
 
             // test malformed auth (too short hash)
-            pset = ParameterSet.fromArrayNoCopy(u.name + "-X2", u.password + "-X2", u.name + "-X2");
+            pset = ParameterSet.fromArrayNoCopy(uname + "-X2", upasswd + "-X2", uname + "-X2");
             String paramsInJSON = pset.toJSONString();
             HashMap<String, String> params = new HashMap<String, String>();
             params.put("Procedure", "Insert");
             params.put("Parameters", paramsInJSON);
-            params.put("User", u.name);
+            params.put("User", uname);
             params.put("Password", Encoder.hexEncode(new byte[]{1, 2, 3}));
             String varString = getHTTPVarString(params);
             response = callProcOverJSONRaw(varString, 200);
@@ -772,12 +786,12 @@ public class TestJSONInterface extends TestCase {
             assertEquals(ClientResponse.UNEXPECTED_FAILURE, r.status);
 
             // test malformed auth (gibberish password, but good length)
-            pset = ParameterSet.fromArrayNoCopy(u.name + "-X3", u.password + "-X3", u.name + "-X3");
+            pset = ParameterSet.fromArrayNoCopy(uname + "-X3", upasswd + "-X3", uname + "-X3");
             paramsInJSON = pset.toJSONString();
             params = new HashMap<String, String>();
             params.put("Procedure", "Insert");
             params.put("Parameters", paramsInJSON);
-            params.put("User", u.name);
+            params.put("User", uname);
             params.put("Password", "abcdefghiabcdefghiabcdefghiabcdefghi");
             varString = getHTTPVarString(params);
             response = callProcOverJSONRaw(varString, 200);
@@ -798,28 +812,27 @@ public class TestJSONInterface extends TestCase {
                         "welcomehackers" + String.valueOf(i),
                         new String[]{"foo"});
             }
+
             // do enough to get a new deployment file
-            VoltProjectBuilder builder2 = new VoltProjectBuilder();
-            builder2.catBuilder().addLiteralSchema(simpleSchema)
-            .addProcedures(pi)
-            // Same groups
-            .addRoles(gi);
-
-            builder2.depBuilder().addUsers(ui).setSecurityEnabled(true, true).setHTTPDPort(8095);
-
-            assertTrue(builder2.compile(Configuration.getPathToCatalogForTest("json-update.jar")));
+            DeploymentBuilder db2 = new DeploymentBuilder()
+            .setHTTPDPort(8095)
+            .setSecurityEnabled(true, true)
+            .addUsers(ui)
+            ;
+            Configuration config2 = Configuration.compile(getClass().getSimpleName(), cb, db2);
+            assertNotNull("Configuration failed to compile", config);
 
             pset = ParameterSet.fromArrayNoCopy(Encoder.hexEncode(MiscUtils.fileToBytes(new File(config.m_pathToCatalog))),
-                    new String(MiscUtils.fileToBytes(new File(builder2.getPathToDeployment())), "UTF-8"));
+                    new String(MiscUtils.fileToBytes(new File(config2.m_pathToDeployment)), "UTF-8"));
             response = callProcOverJSON("@UpdateApplicationCatalog", pset,
-                    ui[0].name, ui[0].password, true);
+                    ui[0].getName(), ui[0].getPassword(), true);
             r = responseFromJSON(response);
             assertEquals(ClientResponse.SUCCESS, r.status);
 
             // retest the good auths above
             for (UserInfo user : ui) {
-                ParameterSet ps = ParameterSet.fromArrayNoCopy(user.name + "-X3", user.password + "-X3", user.name + "-X3");
-                String respstr = callProcOverJSON("Insert", ps, user.name, user.password, false);
+                ParameterSet ps = ParameterSet.fromArrayNoCopy(user.getName() + "-X3", user.getPassword() + "-X3", user.getName() + "-X3");
+                String respstr = callProcOverJSON("Insert", ps, user.getName(), user.getPassword(), false);
                 Response resp = responseFromJSON(respstr);
                 assertEquals(ClientResponse.SUCCESS, resp.status);
             }
@@ -834,7 +847,7 @@ public class TestJSONInterface extends TestCase {
 
     public void testJSONDisabled() throws Exception {
         try {
-            String simpleSchema =
+            CatalogBuilder cb = new CatalogBuilder(
                     "CREATE TABLE HELLOWORLD (\n" +
                     "    HELLO VARCHAR(15),\n" +
                     "    WORLD VARCHAR(15),\n" +
@@ -842,19 +855,15 @@ public class TestJSONInterface extends TestCase {
                     "    PRIMARY KEY (DIALECT)\n" +
                     ");\n" +
                     "PARTITION TABLE HELLOWORLD ON COLUMN DIALECT;\n" +
-                    "";
-            VoltProjectBuilder project = new VoltProjectBuilder();
-            project.catBuilder().addLiteralSchema(simpleSchema)
+                    "")
             .addStmtProcedure("Insert", "insert into HELLOWORLD values (?,?,?);");
-
-            project.depBuilder().setHTTPDPort(8095).setJSONAPIEnabled(false);
-
-            boolean success = project.compile(Configuration.getPathToCatalogForTest("json.jar"));
-            assertTrue(success);
-
-            VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToCatalog = Configuration.getPathToCatalogForTest("json.jar");
-            config.m_pathToDeployment = project.getPathToDeployment();
+            ;
+            DeploymentBuilder db = new DeploymentBuilder()
+            .setHTTPDPort(8095)
+            .setJSONAPIEnabled(false);
+            ;
+            Configuration config = Configuration.compile(getClass().getSimpleName(), cb, db);
+            assertNotNull("Configuration failed to compile", config);
             server = new ServerThread(config);
             server.start();
             server.waitForInitialization();
@@ -878,23 +887,20 @@ public class TestJSONInterface extends TestCase {
 
     public void testLongProc() throws Exception {
         try {
-            String simpleSchema =
+            CatalogBuilder cb = new CatalogBuilder(
                     "CREATE TABLE foo (\n" +
                     "    bar BIGINT NOT NULL,\n" +
                     "    PRIMARY KEY (bar)\n" +
                     ");" +
                     "PARTITION TABLE foo ON COLUMN bar;\n" +
-                    "";
-
-            VoltProjectBuilder project = new VoltProjectBuilder();
-            project.catBuilder().addLiteralSchema(simpleSchema)
+                    "")
             .addProcedures(DelayProc.class);
-            project.depBuilder().setHTTPDPort(8095);
-            assertTrue(project.compile(Configuration.getPathToCatalogForTest("json.jar")));
-
-            VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToCatalog = Configuration.getPathToCatalogForTest("json.jar");
-            config.m_pathToDeployment = project.getPathToDeployment();
+            ;
+            DeploymentBuilder db = new DeploymentBuilder()
+            .setHTTPDPort(8095);
+            ;
+            Configuration config = Configuration.compile(getClass().getSimpleName(), cb, db);
+            assertNotNull("Configuration failed to compile", config);
             server = new ServerThread(config);
             server.start();
             server.waitForInitialization();
@@ -914,23 +920,21 @@ public class TestJSONInterface extends TestCase {
 
     public void testBinaryProc() throws Exception {
         try {
-            String simpleSchema =
+            CatalogBuilder cb = new CatalogBuilder(
                     "CREATE TABLE foo (\n" +
-                    "    bar BIGINT NOT NULL,\n" +
-                    "    b VARBINARY(256) DEFAULT NULL,\n" +
-                    "    PRIMARY KEY (bar)\n" +
-                    ");\n" +
+                            "    bar BIGINT NOT NULL,\n" +
+                            "    b VARBINARY(256) DEFAULT NULL,\n" +
+                            "    PRIMARY KEY (bar)\n" +
+                            ");\n" +
                     "PARTITION TABLE foo ON COLUMN bar;\n" +
-                    "";
-            VoltProjectBuilder project = new VoltProjectBuilder();
-            project.catBuilder().addLiteralSchema(simpleSchema)
+                    "")
             .addStmtProcedure("Insert", "insert into foo values (?, ?);");
-            project.depBuilder().setHTTPDPort(8095);
-            assertTrue(project.compile(Configuration.getPathToCatalogForTest("json.jar")));
-
-            VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToCatalog = Configuration.getPathToCatalogForTest("json.jar");
-            config.m_pathToDeployment = project.getPathToDeployment();
+            ;
+            DeploymentBuilder db = new DeploymentBuilder()
+            .setHTTPDPort(8095);
+            ;
+            Configuration config = Configuration.compile(getClass().getSimpleName(), cb, db);
+            assertNotNull("Configuration failed to compile", config);
             server = new ServerThread(config);
             server.start();
             server.waitForInitialization();
@@ -971,23 +975,20 @@ public class TestJSONInterface extends TestCase {
 
     public void testGarbageProcs() throws Exception {
         try {
-            String simpleSchema =
+            CatalogBuilder cb = new CatalogBuilder(
                     "CREATE TABLE foo (\n" +
                     "    bar BIGINT NOT NULL,\n" +
                     "    PRIMARY KEY (bar)\n" +
                     ");\n" +
                     "PARTITION TABLE foo ON COLUMN bar;\n" +
-                    "";
-
-            VoltProjectBuilder project = new VoltProjectBuilder();
-            project.catBuilder().addLiteralSchema(simpleSchema)
+                    "")
             .addProcedures(DelayProc.class);
-            project.depBuilder().setHTTPDPort(8095);
-            assertTrue(project.compile(Configuration.getPathToCatalogForTest("json.jar")));
-
-            VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToCatalog = Configuration.getPathToCatalogForTest("json.jar");
-            config.m_pathToDeployment = project.getPathToDeployment();
+            ;
+            DeploymentBuilder db = new DeploymentBuilder()
+            .setHTTPDPort(8095);
+            ;
+            Configuration config = Configuration.compile(getClass().getSimpleName(), cb, db);
+            assertNotNull("Configuration failed to compile", config);
             server = new ServerThread(config);
             server.start();
             server.waitForInitialization();
@@ -1005,25 +1006,20 @@ public class TestJSONInterface extends TestCase {
 
     public void testDeployment() throws Exception {
         try {
-            String simpleSchema =
+            CatalogBuilder cb = new CatalogBuilder(
                     "CREATE TABLE foo (\n" +
                     "    bar BIGINT NOT NULL,\n" +
                     "    PRIMARY KEY (bar)\n" +
                     ");" +
                     "PARTITION TABLE foo ON COLUMN bar;\n" +
-                    "";
-
-            String schemaPath = MiscUtils.writeStringToTempFileURL(simpleSchema);
-
-            VoltProjectBuilder project = new VoltProjectBuilder();
-            project.catBuilder().addSchema(schemaPath)
+                    "")
             .addProcedures(DelayProc.class);
-            project.depBuilder().setHTTPDPort(8095);
-            assertTrue(project.compile(Configuration.getPathToCatalogForTest("json.jar")));
-
-            VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToCatalog = Configuration.getPathToCatalogForTest("json.jar");
-            config.m_pathToDeployment = project.getPathToDeployment();
+            ;
+            DeploymentBuilder db = new DeploymentBuilder()
+            .setHTTPDPort(8095);
+            ;
+            Configuration config = Configuration.compile(getClass().getSimpleName(), cb, db);
+            assertNotNull("Configuration failed to compile", config);
             server = new ServerThread(config);
             server.start();
             server.waitForInitialization();
@@ -1076,26 +1072,25 @@ public class TestJSONInterface extends TestCase {
 
     public void testDeploymentSecurity() throws Exception {
         try {
-            String simpleSchema =
+            CatalogBuilder cb = new CatalogBuilder(
                     "CREATE TABLE foo (\n" +
                     "    bar BIGINT NOT NULL,\n" +
                     "    PRIMARY KEY (bar)\n" +
                     ");\n" +
                     "PARTITION TABLE foo ON COLUMN bar;\n" +
-                    "";
-
-            VoltProjectBuilder project = new VoltProjectBuilder();
-            project.catBuilder().addLiteralSchema(simpleSchema)
-            .addProcedures(DelayProc.class);
-            project.depBuilder().setHTTPDPort(8095).setSecurityEnabled(true, false)
-            .addUsers(new UserInfo("user1", "admin", "user"),
-                    new UserInfo("user2", "admin", "administrator"));
+                    "")
+            .addProcedures(DelayProc.class)
+            ;
+            DeploymentBuilder db = new DeploymentBuilder()
+            .setHTTPDPort(8095)
+            .setSecurityEnabled(true, false)
             // suite defines its own ADMINISTRATOR user
-            assertTrue(project.compile(Configuration.getPathToCatalogForTest("json.jar")));
-
-            VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToCatalog = Configuration.getPathToCatalogForTest("json.jar");
-            config.m_pathToDeployment = project.getPathToDeployment();
+            .addUsers(
+                    new UserInfo("user1", "admin", "user"),
+                    new UserInfo("user2", "admin", "administrator"))
+            ;
+            Configuration config = Configuration.compile(getClass().getSimpleName(), cb, db);
+            assertNotNull("Configuration failed to compile", config);
             server = new ServerThread(config);
             server.start();
             server.waitForInitialization();
@@ -1129,26 +1124,24 @@ public class TestJSONInterface extends TestCase {
 
     public void testDeploymentSecurityAuthorizationHashed() throws Exception {
         try {
-            String simpleSchema =
+            CatalogBuilder cb = new CatalogBuilder(
                     "CREATE TABLE foo (\n" +
                     "    bar BIGINT NOT NULL,\n" +
                     "    PRIMARY KEY (bar)\n" +
                     ");\n" +
                     "PARTITION TABLE foo ON COLUMN bar;\n" +
-                    "";
-            VoltProjectBuilder project = new VoltProjectBuilder();
-            project.catBuilder().addLiteralSchema(simpleSchema)
-            .addProcedures(DelayProc.class);
-
+                    "")
+            .addProcedures(DelayProc.class)
+            ;
+            DeploymentBuilder db = new DeploymentBuilder()
+            .setHTTPDPort(8095).setSecurityEnabled(true, false)
             // suite defines its own ADMINISTRATOR user
-            project.depBuilder().setHTTPDPort(8095).setSecurityEnabled(true, false)
-            .addUsers(new UserInfo("user1", "admin", "user"),
-                    new UserInfo("user2", "admin", "administrator"));
-            assertTrue(project.compile(Configuration.getPathToCatalogForTest("json.jar")));
-
-            VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToCatalog = Configuration.getPathToCatalogForTest("json.jar");
-            config.m_pathToDeployment = project.getPathToDeployment();
+            .addUsers(
+                    new UserInfo("user1", "admin", "user"),
+                    new UserInfo("user2", "admin", "administrator"))
+            ;
+            Configuration config = Configuration.compile(getClass().getSimpleName(), cb, db);
+            assertNotNull("Configuration failed to compile", config);
             server = new ServerThread(config);
             server.start();
             server.waitForInitialization();
@@ -1177,30 +1170,26 @@ public class TestJSONInterface extends TestCase {
 
     public void testDeploymentSecurityAuthorizationBasic() throws Exception {
         try {
-            String simpleSchema =
+            CatalogBuilder cb = new CatalogBuilder(
                     "CREATE TABLE foo (\n" +
                     "    bar BIGINT NOT NULL,\n" +
                     "    PRIMARY KEY (bar)\n" +
                     ");\n" +
                     "PARTITION TABLE foo ON COLUMN bar;\n" +
-                    "";
-            VoltProjectBuilder project = new VoltProjectBuilder();
-            project.catBuilder()
-            .addLiteralSchema(simpleSchema)
-            .addProcedures(DelayProc.class);
-
-            project.depBuilder()
+                    "")
+            .addProcedures(DelayProc.class)
+            ;
+            DeploymentBuilder db = new DeploymentBuilder()
             .setHTTPDPort(8095)
             .addUsers(new UserInfo("user1", "admin", "user"),
                     new UserInfo("user2", "admin", "administrator"))
 
             // suite defines its own ADMINISTRATOR user
-            .setSecurityEnabled(true, false);
-            assertTrue(project.compile(Configuration.getPathToCatalogForTest("json.jar")));
+            .setSecurityEnabled(true, false)
+            ;
+            Configuration config = Configuration.compile(getClass().getSimpleName(), cb, db);
+            assertNotNull("Configuration failed to compile", config);
 
-            VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToCatalog = Configuration.getPathToCatalogForTest("json.jar");
-            config.m_pathToDeployment = project.getPathToDeployment();
             server = new ServerThread(config);
             server.start();
             server.waitForInitialization();
@@ -1230,23 +1219,20 @@ public class TestJSONInterface extends TestCase {
 
     public void testProfile() throws Exception {
         try {
-            String simpleSchema =
+            CatalogBuilder cb = new CatalogBuilder(
                     "CREATE TABLE foo (\n" +
                     "    bar BIGINT NOT NULL,\n" +
                     "    PRIMARY KEY (bar)\n" +
                     ");" +
                     "PARTITION TABLE foo ON COLUMN bar;\n" +
-                    "";
-
-            VoltProjectBuilder project = new VoltProjectBuilder();
-            project.catBuilder().addLiteralSchema(simpleSchema)
-            .addProcedures(DelayProc.class);
-            project.depBuilder().setHTTPDPort(8095);
-            assertTrue(project.compile(Configuration.getPathToCatalogForTest("json.jar")));
-
-            VoltDB.Configuration config = new VoltDB.Configuration();
-            config.m_pathToCatalog = Configuration.getPathToCatalogForTest("json.jar");
-            config.m_pathToDeployment = project.getPathToDeployment();
+                    "")
+            .addProcedures(DelayProc.class)
+            ;
+            DeploymentBuilder db = new DeploymentBuilder()
+            .setHTTPDPort(8095)
+            ;
+            Configuration config = Configuration.compile(getClass().getSimpleName(), cb, db);
+            assertNotNull("Configuration failed to compile", config);
             server = new ServerThread(config);
             server.start();
             server.waitForInitialization();

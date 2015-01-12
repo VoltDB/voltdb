@@ -33,7 +33,6 @@ import junit.framework.TestCase;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.ServerThread;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -42,7 +41,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
 import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
 import org.voltdb.common.Constants;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb.types.TimestampType;
 
 /* This file is part of VoltDB.
@@ -70,11 +69,80 @@ import org.voltdb.types.TimestampType;
 
 public class TestVoltBulkLoader extends TestCase {
 
-    protected String pathToCatalog;
-    protected String pathToDeployment;
+    private final String m_schema_no_PK =
+            "create table BLAH (" +
+                    "clm_integer integer default 0 not null, " + // column that is partitioned on
+                    "clm_tinyint tinyint default 0, " +
+                    "clm_smallint smallint default 0, " +
+                    "clm_bigint bigint default 0, " +
+                    "clm_string varchar(20) default null, " +
+                    "clm_decimal decimal default null, " +
+                    "clm_float float default null, "+
+                    "clm_timestamp timestamp default null, " +
+                    "clm_varbinary varbinary(20) default null" +
+            "); \n" +
+            "partition table BLAH on column clm_integer;" +
+            "";
+
+    private final String m_schema_no_binary =
+            "create table BLAH (" +
+                    "clm_integer integer not null, " + // column that is partitioned on
+                    "clm_tinyint tinyint default 0, " +
+                    "clm_smallint smallint default 0, " +
+                    "clm_bigint bigint default 0, " +
+                    "clm_string varchar(20) default null, " +
+                    "clm_decimal decimal default null, " +
+                    "clm_float float default null, " +
+                    "clm_timestamp timestamp default null, " +
+                    //"clm_varbinary varbinary(20) default null," +
+                    "PRIMARY KEY(clm_integer) " +
+            "); \n" +
+            "partition table BLAH on column clm_integer;" +
+            "";
+
+    private final String m_schema_no_binary_no_partitioning =
+            "create table BLAH (" +
+                    "clm_integer integer default 0 not null, " + // column that is partitioned on
+                    "clm_tinyint tinyint default 0, " +
+                    "clm_smallint smallint default 0, " +
+                    "clm_bigint bigint default 0, " +
+                    "clm_string varchar(20) default null, " +
+                    "clm_decimal decimal default null, " +
+                    "clm_float float default null, "+
+                    "clm_timestamp timestamp default null " +
+                    //"clm_varbinary varbinary(20) default null," +
+                    "PRIMARY KEY(clm_integer) " +
+            "); \n" +
+            "";
+
+    private final String m_schema_no_binary_no_PK_no_partitioning =
+            "create table BLAH (" +
+                    "clm_integer integer default 0 not null, " + // column that is partitioned on
+                    "clm_tinyint tinyint default 0, " +
+                    "clm_smallint smallint default 0, " +
+                    "clm_bigint bigint default 0, " +
+                    "clm_string varchar(20) default null, " +
+                    "clm_decimal decimal default null, " +
+                    "clm_float float default null, "+
+                    "clm_timestamp timestamp default null " +
+                    //"clm_varbinary varbinary(20) default null," +
+                    //"PRIMARY KEY(clm_integer) " +
+            "); \n" +
+            "";
+
+    private final String m_schema_no_binary_no_PK = m_schema_no_binary_no_PK_no_partitioning +
+            "partition table BLAH on column clm_integer;";
+
+    private final String m_schema_string_first =
+            "create table BLAH (" +
+                    "clm_string varchar(20), " +
+                    "clm_integer integer default 0 not null, " + // column that is partitioned on
+                    "clm_tinyint tinyint default 0, " +
+                    "clm_smallint smallint default 0, " +
+                    "); ";
+
     protected ServerThread localServer;
-    protected VoltDB.Configuration config;
-    protected VoltProjectBuilder builder;
+    protected Configuration config;
     protected Client client1;
     protected Client client2;
     protected static final VoltLogger m_log = new VoltLogger("CONSOLE");
@@ -141,24 +209,10 @@ public class TestVoltBulkLoader extends TestCase {
 
     public void testCommon() throws Exception
     {
-        String mySchema =
-                "create table BLAH (" +
-                        "clm_integer integer default 0 not null, " + // column that is partitioned on
-
-                "clm_tinyint tinyint default 0, " +
-                "clm_smallint smallint default 0, " +
-                "clm_bigint bigint default 0, " +
-
-                "clm_string varchar(20) default null, " +
-                "clm_decimal decimal default null, " +
-                "clm_float float default null, "+
-                //"clm_varinary varbinary(20) default null," +
-                "clm_timestamp timestamp default null " +
-                "); ";
         int myBatchSize = 200;
         TimestampType currentTime = new TimestampType();
         Object [][]myData = {
-            {1 ,1,1,11111111,"first",1.10,1.11,currentTime},
+            {1,1,1,11111111,"first",1.10,1.11,currentTime},
             {2,2,2,222222,"second",3.30,"NULL",currentTime},
             {3,3,3,333333," third ",null,3.33,currentTime},
             {4,4,4,444444," NULL ",4.40 ,4.44,currentTime},
@@ -176,24 +230,11 @@ public class TestVoltBulkLoader extends TestCase {
         };
         Integer[] failures = {2,6,8,9,10,11,12,13};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
-        test_Interface(mySchema, myData, myBatchSize, expectedFailures, 0);
+        test_Interface(m_schema_no_binary_no_PK, myData, myBatchSize, expectedFailures, 0);
     }
 
     //Test batch option that splits.
     public void testBatchOptionThatSplits() throws Exception {
-        String mySchema =
-                "create table BLAH ("
-                + "clm_integer integer default 0 not null, "
-                + // column that is partitioned on
-                "clm_tinyint tinyint default 0, "
-                + "clm_smallint smallint default 0, "
-                + "clm_bigint bigint default 0, "
-                + "clm_string varchar(20) default null, "
-                + "clm_decimal decimal default null, "
-                + "clm_float float default null, "
-                + //"clm_varinary varbinary(20) default null," +
-                "clm_timestamp timestamp default null "
-                + "); ";
         int myBatchSize = 2;
         TimestampType currentTime = new TimestampType();
         Object [][] myData = {
@@ -215,24 +256,11 @@ public class TestVoltBulkLoader extends TestCase {
         };
         Integer[] failures = {9,10};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
-        test_Interface(mySchema, myData, myBatchSize, expectedFailures, 0);
+        test_Interface(m_schema_no_binary_no_PK, myData, myBatchSize, expectedFailures, 0);
     }
 
     //Test flush with good and bad rows in < maxBatch
     public void testBatchOptionCommitByFlush() throws Exception {
-        String mySchema
-                = "create table BLAH ("
-                + "clm_integer integer default 0 not null, "
-                + // column that is partitioned on
-                "clm_tinyint tinyint default 0, "
-                + "clm_smallint smallint default 0, "
-                + "clm_bigint bigint default 0, "
-                + "clm_string varchar(20) default null, "
-                + "clm_decimal decimal default null, "
-                + "clm_float float default null, "
-                + //"clm_varinary varbinary(20) default null," +
-                "clm_timestamp timestamp default null "
-                + "); ";
         //Make batch size large
         int myBatchSize = 200;
         TimestampType currentTime = new TimestampType();
@@ -255,25 +283,12 @@ public class TestVoltBulkLoader extends TestCase {
         };
         Integer[] failures = {9, 10};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
-        test_Interface(mySchema, myData, myBatchSize, expectedFailures, 2);
+        test_Interface(m_schema_no_binary_no_PK, myData, myBatchSize, expectedFailures, 2);
     }
 
     //Test that gets constraint violations.
     //has a batch that fully fails and 2 batches that has 50% failure.
     public void testBatchOptionThatSplitsAndGetsViolations() throws Exception {
-        String mySchema =
-                "create table BLAH ("
-                + "clm_integer integer not null, "
-                + // column that is partitioned on
-                "clm_tinyint tinyint default 0, "
-                + "clm_smallint smallint default 0, "
-                + "clm_bigint bigint default 0, "
-                + "clm_string varchar(20) default null, "
-                + "clm_decimal decimal default null, "
-                + "clm_float float default null, "
-                + "clm_timestamp timestamp default null, "
-                + "PRIMARY KEY(clm_integer) "
-                + "); ";
         int myBatchSize = 2;
         TimestampType currentTime = new TimestampType();
         Object [][] myData = {
@@ -297,25 +312,12 @@ public class TestVoltBulkLoader extends TestCase {
         };
         Integer[] failures = {5,6,9,10,14,15,16};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
-        test_Interface(mySchema, myData, myBatchSize, expectedFailures, 0);
+        test_Interface(m_schema_no_binary, myData, myBatchSize, expectedFailures, 0);
     }
 
     //Test that gets constraint violations.
     //has a batch that fully fails and 2 batches that has 50% failure.
     public void testBatchOptionAndGetsViolationsCommitByFlush() throws Exception {
-        String mySchema
-                = "create table BLAH ("
-                + "clm_integer integer not null, "
-                + // column that is partitioned on
-                "clm_tinyint tinyint default 0, "
-                + "clm_smallint smallint default 0, "
-                + "clm_bigint bigint default 0, "
-                + "clm_string varchar(20) default null, "
-                + "clm_decimal decimal default null, "
-                + "clm_float float default null, "
-                + "clm_timestamp timestamp default null, "
-                + "PRIMARY KEY(clm_integer) "
-                + "); ";
         int myBatchSize = 200;
         TimestampType currentTime = new TimestampType();
         Object[][] myData = {
@@ -339,24 +341,11 @@ public class TestVoltBulkLoader extends TestCase {
         };
         Integer[] failures = {5, 6, 9, 10, 14, 15, 16};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
-        test_Interface(mySchema, myData, myBatchSize, expectedFailures, 3);
+        test_Interface(m_schema_no_binary, myData, myBatchSize, expectedFailures, 3);
     }
 
     //Test batch option that splits and gets constraint violations.
     public void testBatchOptionThatSplitsAndGetsViolationsAndDataIsSmall() throws Exception {
-        String mySchema =
-                "create table BLAH ("
-                + "clm_integer integer not null, "
-                + // column that is partitioned on
-                "clm_tinyint tinyint default 0, "
-                + "clm_smallint smallint default 0, "
-                + "clm_bigint bigint default 0, "
-                + "clm_string varchar(20) default null, "
-                + "clm_decimal decimal default null, "
-                + "clm_float float default null, "
-                + "clm_timestamp timestamp default null, "
-                + "PRIMARY KEY(clm_integer) "
-                + "); ";
         int myBatchSize = 2;
         TimestampType currentTime = new TimestampType();
         Object [][] myData = {
@@ -367,24 +356,11 @@ public class TestVoltBulkLoader extends TestCase {
         };
         Integer[] failures = {3,4};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
-        test_Interface(mySchema, myData, myBatchSize, expectedFailures, 0);
+        test_Interface(m_schema_no_binary, myData, myBatchSize, expectedFailures, 0);
     }
 
     //Test batch option that splits and gets constraint violations.
     public void testBatchOptionThatSplitsAndGetsViolationsAndDataIsSmallInLastBatchFlush() throws Exception {
-        String mySchema
-                = "create table BLAH ("
-                + "clm_integer integer not null, "
-                + // column that is partitioned on
-                "clm_tinyint tinyint default 0, "
-                + "clm_smallint smallint default 0, "
-                + "clm_bigint bigint default 0, "
-                + "clm_string varchar(20) default null, "
-                + "clm_decimal decimal default null, "
-                + "clm_float float default null, "
-                + "clm_timestamp timestamp default null, "
-                + "PRIMARY KEY(clm_integer) "
-                + "); ";
         int myBatchSize = 2;
         TimestampType currentTime = new TimestampType();
         Object[][] myData = {
@@ -394,24 +370,11 @@ public class TestVoltBulkLoader extends TestCase {
         };
         Integer[] failures = {3};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
-        test_Interface(mySchema, myData, myBatchSize, expectedFailures, 2);
+        test_Interface(m_schema_no_binary, myData, myBatchSize, expectedFailures, 2);
     }
 
     //Test batch option that splits and gets constraint violations.
     public void testBatchOptionLastRowGetsViolationsByFlush() throws Exception {
-        String mySchema
-                = "create table BLAH ("
-                + "clm_integer integer not null, "
-                + // column that is partitioned on
-                "clm_tinyint tinyint default 0, "
-                + "clm_smallint smallint default 0, "
-                + "clm_bigint bigint default 0, "
-                + "clm_string varchar(20) default null, "
-                + "clm_decimal decimal default null, "
-                + "clm_float float default null, "
-                + "clm_timestamp timestamp default null, "
-                + "PRIMARY KEY(clm_integer) "
-                + "); ";
         int myBatchSize = 2;
         TimestampType currentTime = new TimestampType();
         Object[][] myData = {
@@ -419,21 +382,20 @@ public class TestVoltBulkLoader extends TestCase {
             {2, 1, 1, 11111111, "first", 1.10, 1.11, currentTime},};
         Integer[] failures = {2};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
-        test_Interface(mySchema, myData, myBatchSize, expectedFailures, 2);
+        test_Interface(m_schema_no_binary, myData, myBatchSize, expectedFailures, 2);
     }
 
     public void testOpenQuote() throws Exception
     {
-        String mySchema =
+        final String schema_narrow =
                 "create table BLAH (" +
                         "clm_integer integer default 0 not null, " + // column that is partitioned on
-
-                "clm_integer1 integer default 0, " +
-                "clm_bigint bigint default 0, " +
-
-                "clm_string varchar(200) default null, " +
-                "clm_timestamp timestamp default null " +
-                "); ";
+                        "clm_integer1 integer default 0, " +
+                        "clm_bigint bigint default 0, " +
+                        "clm_string varchar(200) default null, " +
+                        "clm_timestamp timestamp default null " +
+                "); \n" +
+                "";
         int myBatchSize = 200;
         TimestampType timeParam = new TimestampType("7777-12-25 14:35:26");
         Object [][]myData = {
@@ -441,25 +403,24 @@ public class TestVoltBulkLoader extends TestCase {
         };
         Integer[] failures = {};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
-        test_Interface(mySchema, myData, myBatchSize, expectedFailures, 0);
+        test_Interface(schema_narrow, myData, myBatchSize, expectedFailures, 0);
     }
 
     public void testNULL() throws Exception
     {
-        String mySchema =
+        String schema_no_timestamp_no_binary_no_PK =
                 "create table BLAH (" +
-                        "clm_integer integer default 0 not null, " + // column that is partitioned on
-
+                "clm_integer integer default 0 not null, " + // column that is partitioned on
                 "clm_tinyint tinyint default 0, " +
                 "clm_smallint smallint default 0, " +
                 "clm_bigint bigint default 0, " +
-
                 "clm_string varchar(20) default null, " +
                 "clm_decimal decimal default null, " +
-                "clm_float float default null "+
+                "clm_float float default null " +
                 //"clm_timestamp timestamp default null, " +
-                //"clm_varinary varbinary(20) default null" +
-                "); ";
+                //"clm_varbinary varbinary(20) default null" +
+                "); \n" +
+                "";
         int myBatchSize = 200;
         //Both \N and \\N as csv input are treated as NULL
         Object [][]myData = {
@@ -473,23 +434,11 @@ public class TestVoltBulkLoader extends TestCase {
         };
         Integer[] failures = {2};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
-        test_Interface(mySchema, myData, myBatchSize, expectedFailures, 0);
+        test_Interface(schema_no_timestamp_no_binary_no_PK, myData, myBatchSize, expectedFailures, 0);
     }
 
     public void testBlankNull() throws Exception
     {
-        String mySchema =
-                "create table BLAH (" +
-                        "clm_integer integer default 0 not null, " + // column that is partitioned on
-                        "clm_tinyint tinyint default 0, " +
-                        "clm_smallint smallint default 0, " +
-                        "clm_bigint bigint default 0, " +
-                        "clm_string varchar(20) default null, " +
-                        "clm_decimal decimal default null, " +
-                        "clm_float float default null, "+
-                        "clm_timestamp timestamp default null, " +
-                        "clm_varinary varbinary(20) default null" +
-                        "); ";
         int myBatchSize = 200;
 
         Object [][]myData = {
@@ -497,23 +446,11 @@ public class TestVoltBulkLoader extends TestCase {
         };
         Integer[] failures = {};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
-        test_Interface(mySchema, myData, myBatchSize, expectedFailures, 0);
+        test_Interface(m_schema_no_PK, myData, myBatchSize, expectedFailures, 0);
     }
 
     public void testBlankEmpty() throws Exception
     {
-        String mySchema =
-                "create table BLAH (" +
-                        "clm_integer integer default 0 not null, " + // column that is partitioned on
-                        "clm_tinyint tinyint default 0, " +
-                        "clm_smallint smallint default 0, " +
-                        "clm_bigint bigint default 0, " +
-                        "clm_string varchar(20) default null, " +
-                        "clm_decimal decimal default null, " +
-                        "clm_float float default null, "+
-                        "clm_timestamp timestamp default null, " +
-                        "clm_varinary varbinary(20) default null" +
-                        "); ";
         int myBatchSize = 200;
 
         Object [][]myData = {
@@ -521,12 +458,12 @@ public class TestVoltBulkLoader extends TestCase {
         };
         Integer[] failures = {};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
-        test_Interface(mySchema, myData, myBatchSize, expectedFailures, 0);
+        test_Interface(m_schema_no_PK, myData, myBatchSize, expectedFailures, 0);
     }
 
     public void testStrictQuote() throws Exception
     {
-        String mySchema =
+        String schema_minimal =
                 "create table BLAH (" +
                         "clm_integer integer default 0 not null, " + // column that is partitioned on
                         "clm_tinyint tinyint default 0, " +
@@ -542,40 +479,21 @@ public class TestVoltBulkLoader extends TestCase {
         };
         Integer[] failures = {1, 4};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
-        test_Interface(mySchema, myData, myBatchSize, expectedFailures, 0);
+        test_Interface(schema_minimal, myData, myBatchSize, expectedFailures, 0);
     }
 
     public void testEmptyFile() throws Exception
     {
-        String mySchema =
-                "create table BLAH (" +
-                        "clm_integer integer default 0 not null, " + // column that is partitioned on
-                        "clm_tinyint tinyint default 0, " +
-                        "clm_smallint smallint default 0, " +
-                        "clm_bigint bigint default 0, " +
-                        "clm_string varchar(20) default null, " +
-                        "clm_decimal decimal default null, " +
-                        "clm_float float default null, "+
-                        "clm_timestamp timestamp default null, " +
-                        "clm_varinary varbinary(20) default null" +
-                        "); ";
         int myBatchSize = 200;
 
         Object [][]myData = null;
         Integer[] failures = {};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
-        test_Interface(mySchema, myData, myBatchSize, expectedFailures, 0);
+        test_Interface(m_schema_no_PK, myData, myBatchSize, expectedFailures, 0);
     }
 
     public void testEscapeChar() throws Exception
     {
-        String mySchema =
-                "create table BLAH (" +
-                                "clm_string varchar(20), " +
-                        "clm_integer integer default 0 not null, " + // column that is partitioned on
-                        "clm_tinyint tinyint default 0, " +
-                        "clm_smallint smallint default 0, " +
-                        "); ";
         int myBatchSize = 200;
 
         Object [][]myData = {
@@ -585,18 +503,11 @@ public class TestVoltBulkLoader extends TestCase {
         };
         Integer[] failures = {};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
-        test_Interface(mySchema, myData, myBatchSize, expectedFailures, 0);
+        test_Interface(m_schema_string_first, myData, myBatchSize, expectedFailures, 0);
     }
 
     public void testNoWhiteSpace() throws Exception
     {
-        String mySchema =
-                "create table BLAH (" +
-                                "clm_string varchar(20), " +
-                        "clm_integer integer default 0 not null, " + // column that is partitioned on
-                        "clm_tinyint tinyint default 0, " +
-                        "clm_smallint smallint default 0, " +
-                        "); ";
         int myBatchSize = 200;
 
         Object [][]myData = {
@@ -607,18 +518,11 @@ public class TestVoltBulkLoader extends TestCase {
         };
         Integer[] failures = {};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
-        test_Interface(mySchema, myData, myBatchSize, expectedFailures, 0);
+        test_Interface(m_schema_string_first, myData, myBatchSize, expectedFailures, 0);
     }
 
     public void testColumnLimitSize() throws Exception
     {
-        String mySchema =
-                "create table BLAH (" +
-                                "clm_string varchar(20), " +
-                        "clm_integer integer default 0 not null, " + // column that is partitioned on
-                        "clm_tinyint tinyint default 0, " +
-                        "clm_smallint smallint default 0, " +
-                        "); ";
         int myBatchSize = 200;
 
         Object [][]myData = {
@@ -629,19 +533,19 @@ public class TestVoltBulkLoader extends TestCase {
         };
         Integer[] failures = {4};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
-        test_Interface(mySchema, myData, myBatchSize, expectedFailures, 0);
+        test_Interface(m_schema_string_first, myData, myBatchSize, expectedFailures, 0);
     }
 
     public void testColumnLimitSize2() throws Exception
     {
-        String mySchema =
+        String schema_tiny =
                 "create table BLAH (" +
                         "clm_integer integer default 0 not null, " + // column that is partitioned on
                         "clm_string varchar(20), "+
                         "); ";
         int myBatchSize = 200;
 
-        Object [][]myData = {
+        Object [][] myData = {
             {1,"\"Edwr"},
             {"Burnam\"",2,"\"Tabatha"},
             {"Gehling"}
@@ -649,34 +553,22 @@ public class TestVoltBulkLoader extends TestCase {
 
         Integer[] failures = {2, 3};
         ArrayList<Integer> expectedFailures = new ArrayList<Integer>(Arrays.asList(failures));
-        test_Interface(mySchema, myData, myBatchSize, expectedFailures, 0);
+        test_Interface(schema_tiny, myData, myBatchSize, expectedFailures, 0);
     }
 
     //Test multiple tables with Multiple Clients and no errors.
     public void testMultipleTablesWithMultipleClients() throws Exception {
-        String mySchema =
-                "create table BLAH ("
-                + "clm_integer integer not null, "
-                + // column that is partitioned on
-                "clm_tinyint tinyint default 0, "
-                + "clm_smallint smallint default 0, "
-                + "clm_bigint bigint default 0, "
-                + "clm_string varchar(20) default null, "
-                + "clm_decimal decimal default null, "
-                + "clm_float float default null, "
-                + "clm_timestamp timestamp default null, "
-                + "PRIMARY KEY(clm_integer) "
-                + "); "
-
-                + "create table BLAH2 ("
-                + "clm_integer integer not null, "
-                + // column that is partitioned on
-                  "clm_string varchar(20) default null, "
-                + "clm_decimal decimal default null, "
-                + "clm_float float default null, "
-                + "clm_timestamp timestamp default null, "
-                + "PRIMARY KEY(clm_integer) "
-                + "); ";
+        String schemaCombo =
+                m_schema_no_binary_no_PK_no_partitioning +
+                "create table BLAH2 (" +
+                    "clm_integer integer not null, " +
+                    "clm_string varchar(20) default null, " +
+                    "clm_decimal decimal default null, " +
+                    "clm_float float default null, " +
+                    "clm_timestamp timestamp default null, " +
+                    "PRIMARY KEY(clm_integer) " +
+                ");n" +
+                "";
         TimestampType currentTime = new TimestampType();
         Object [][] myData1 = {
             {1,1,1,11111111,"first",1.10,1.11,currentTime},
@@ -720,36 +612,24 @@ public class TestVoltBulkLoader extends TestCase {
         int myBatchSize2 = 200;
         Integer[] failures2 = {};
         ArrayList<Integer> expectedFailures2 = new ArrayList<Integer>(Arrays.asList(failures2));
-        test_multiplexing( mySchema, true, true, true,
+        test_multiplexing(schemaCombo, true, true, true,
                 "BLAH", myData1, myBatchSize1, expectedFailures1, false,
                 "BLAH2", myData2, myBatchSize2, expectedFailures2, false);
     }
 
     //Test multiple tables with no errors (MultiPartition).
     public void testMultipleTablesWithMultipleClientsMP() throws Exception {
-        String mySchema =
-                "create table BLAH ("
-                + "clm_integer integer not null, "
-                + // column that is partitioned on
-                "clm_tinyint tinyint default 0, "
-                + "clm_smallint smallint default 0, "
-                + "clm_bigint bigint default 0, "
-                + "clm_string varchar(20) default null, "
-                + "clm_decimal decimal default null, "
-                + "clm_float float default null, "
-                + "clm_timestamp timestamp default null, "
-                + "PRIMARY KEY(clm_integer) "
-                + "); "
-
-                + "create table BLAH2 ("
-                + "clm_integer integer not null, "
-                + // column that is partitioned on
-                  "clm_string varchar(20) default null, "
-                + "clm_decimal decimal default null, "
-                + "clm_float float default null, "
-                + "clm_timestamp timestamp default null, "
-                + "PRIMARY KEY(clm_integer) "
-                + "); ";
+        String schemaCombo =
+                m_schema_no_binary_no_PK_no_partitioning +
+                "create table BLAH2 (" +
+                        "clm_integer integer not null, " +
+                        "clm_string varchar(20) default null, " +
+                        "clm_decimal decimal default null, " +
+                        "clm_float float default null, " +
+                        "clm_timestamp timestamp default null, " +
+                        "PRIMARY KEY(clm_integer) " +
+                "); \n" +
+                "";
         TimestampType currentTime = new TimestampType();
         Object [][] myData1 = {
             {1,1,1,11111111,"first",1.10,1.11,currentTime},
@@ -793,26 +673,13 @@ public class TestVoltBulkLoader extends TestCase {
         int myBatchSize2 = 200;
         Integer[] failures2 = {};
         ArrayList<Integer> expectedFailures2 = new ArrayList<Integer>(Arrays.asList(failures2));
-        test_multiplexing( mySchema, true, true, true,
+        test_multiplexing(schemaCombo, true, true, true,
                 "BLAH", myData1, myBatchSize1, expectedFailures1, false,
                 "BLAH2", myData2, myBatchSize2, expectedFailures2, false);
     }
 
     //Test single table with multiple clients.
     public void testSingleTableOnMultipleClients() throws Exception {
-        String mySchema =
-                "create table BLAH ("
-                + "clm_integer integer not null, "
-                + // column that is partitioned on
-                "clm_tinyint tinyint default 0, "
-                + "clm_smallint smallint default 0, "
-                + "clm_bigint bigint default 0, "
-                + "clm_string varchar(20) default null, "
-                + "clm_decimal decimal default null, "
-                + "clm_float float default null, "
-                + "clm_timestamp timestamp default null, "
-                + "PRIMARY KEY(clm_integer) "
-                + "); ";
         TimestampType currentTime = new TimestampType();
         Object [][] myData1 = {
             {1,1,1,11111111,"first",1.10,1.11,currentTime},
@@ -860,26 +727,13 @@ public class TestVoltBulkLoader extends TestCase {
         int myBatchSize2 = 3;
         Integer[] failures2 = {};
         ArrayList<Integer> expectedFailures2 = new ArrayList<Integer>(Arrays.asList(failures2));
-        test_multiplexing( mySchema, true, true, false,
+        test_multiplexing(m_schema_no_binary_no_PK_no_partitioning, true, true, false,
                 "BLAH", myData1, myBatchSize1, expectedFailures1, false,
                 "BLAH", myData2, myBatchSize2, expectedFailures2, false);
     }
 
     //Test single table with single loader.
     public void testSingleTableOnSingleLoader() throws Exception {
-        String mySchema =
-                "create table BLAH ("
-                + "clm_integer integer not null, "
-                + // column that is partitioned on
-                "clm_tinyint tinyint default 0, "
-                + "clm_smallint smallint default 0, "
-                + "clm_bigint bigint default 0, "
-                + "clm_string varchar(20) default null, "
-                + "clm_decimal decimal default null, "
-                + "clm_float float default null, "
-                + "clm_timestamp timestamp default null, "
-                + "PRIMARY KEY(clm_integer) "
-                + "); ";
         TimestampType currentTime = new TimestampType();
         Object [][] myData1 = {
             {1,1,1,11111111,"first",1.10,1.11,currentTime},
@@ -927,26 +781,13 @@ public class TestVoltBulkLoader extends TestCase {
         int myBatchSize2 = 5;
         Integer[] failures2 = {};
         ArrayList<Integer> expectedFailures2 = new ArrayList<Integer>(Arrays.asList(failures2));
-        test_multiplexing( mySchema, false, false, false,
+        test_multiplexing(m_schema_no_binary_no_partitioning, false, false, false,
                 "BLAH", myData1, myBatchSize1, expectedFailures1, false,
                 "BLAH", myData2, myBatchSize2, expectedFailures2, false);
     }
 
     //Test single table with single loader (MultiPartition).
     public void testSingleTableOnSingleLoaderMP() throws Exception {
-        String mySchema =
-                "create table BLAH ("
-                + "clm_integer integer not null, "
-                + // column that is partitioned on
-                "clm_tinyint tinyint default 0, "
-                + "clm_smallint smallint default 0, "
-                + "clm_bigint bigint default 0, "
-                + "clm_string varchar(20) default null, "
-                + "clm_decimal decimal default null, "
-                + "clm_float float default null, "
-                + "clm_timestamp timestamp default null, "
-                + "PRIMARY KEY(clm_integer) "
-                + "); ";
         TimestampType currentTime = new TimestampType();
         Object [][] myData1 = {
             {1,1,1,11111111,"first",1.10,1.11,currentTime},
@@ -994,26 +835,17 @@ public class TestVoltBulkLoader extends TestCase {
         int myBatchSize2 = 5;
         Integer[] failures2 = {};
         ArrayList<Integer> expectedFailures2 = new ArrayList<Integer>(Arrays.asList(failures2));
-        test_multiplexing( mySchema, false, false, true,
+        test_multiplexing(m_schema_no_binary_no_PK_no_partitioning, false, false, true,
                 "BLAH", myData1, myBatchSize1, expectedFailures1, false,
                 "BLAH", myData2, myBatchSize2, expectedFailures2, false);
     }
 
-    public void test_Interface(String my_schema, Object[][] my_data,
+    private void test_Interface(String my_schema, Object[][] my_data,
             int my_batchSize, ArrayList<Integer> expectedFailList, int flushInterval) throws Exception {
-        try{
-            pathToCatalog = Configuration.getPathToCatalogForTest("vbl.jar");
-            pathToDeployment = Configuration.getPathToCatalogForTest("vbl.xml");
-            builder = new VoltProjectBuilder();
-
-            builder.addLiteralSchema(my_schema);
-            builder.addPartitionInfo("BLAH", "clm_integer");
-            boolean success = builder.compile(pathToCatalog, 2, 1, 0);
-            assertTrue(success);
-            MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-            config = new VoltDB.Configuration();
-            config.m_pathToCatalog = pathToCatalog;
-            config.m_pathToDeployment = pathToDeployment;
+        try {
+            Configuration config = Configuration.compile(getClass().getSimpleName(), "",
+                    new DeploymentBuilder(2));
+            assertNotNull("Configuration failed to compile", config);
             localServer = new ServerThread(config);
             client1 = null;
 
@@ -1096,39 +928,31 @@ public class TestVoltBulkLoader extends TestCase {
     }
 
 
-    public void test_multiplexing( String my_schema, boolean multipleClients, boolean multipleLoaders, boolean multiPartTable,
+    public void test_multiplexing(String my_schema, boolean multipleClients, boolean multipleLoaders, boolean multiPartTable,
             String my_tableName1, Object[][] my_data1, int my_batchSize1, ArrayList<Integer> expectedFailList1, boolean abort1,
             String my_tableName2, Object[][] my_data2, int my_batchSize2, ArrayList<Integer> expectedFailList2, boolean abort2) throws Exception {
-        try{
-            pathToCatalog = Configuration.getPathToCatalogForTest("vbl.jar");
-            pathToDeployment = Configuration.getPathToCatalogForTest("vbl.xml");
-            builder = new VoltProjectBuilder();
-
-            builder.addLiteralSchema(my_schema);
-            boolean sameTable = my_tableName1.equals(my_tableName2);
+        try {
+            StringBuilder sb = new StringBuilder(my_schema);
             assert(!(abort1 && abort2));
-            if (abort1 || abort2)
+            if (abort1 || abort2) {
                 // No point in testing abort with a single loader
                 assert(multipleLoaders);
-
-            if (!multiPartTable) {
-                builder.addPartitionInfo(my_tableName1, "clm_integer");
-                if (!sameTable)
-                    builder.addPartitionInfo(my_tableName2, "clm_integer");
             }
-            boolean success = builder.compile(pathToCatalog, 2, 1, 0);
-            assertTrue(success);
-            MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-            config = new VoltDB.Configuration();
-            config.m_pathToCatalog = pathToCatalog;
-            config.m_pathToDeployment = pathToDeployment;
+            if ( ! multiPartTable) {
+                sb.append("PARTITION TABLE " + my_tableName1 + " ON COLUMN clm_integer;\n");
+                if ( ! my_tableName1.equals(my_tableName2)) {
+                    sb.append("PARTITION TABLE " + my_tableName2 + " ON COLUMN clm_integer;\n");
+                }
+            }
+            Configuration config = Configuration.compile(getClass().getSimpleName(), sb.toString(),
+                    new DeploymentBuilder(2));
+            assertNotNull("Configuration failed to compile", config);
             localServer = new ServerThread(config);
             client1 = null;
             client2 = null;
 
             localServer.start();
             localServer.waitForInitialization();
-
 
             client1 = ClientFactory.createClient();
             client1.createConnection("localhost");
@@ -1149,13 +973,14 @@ public class TestVoltBulkLoader extends TestCase {
             VoltBulkLoader bulkLoader2;
             if (multipleLoaders) {
                 bulkLoader2 = client2.getNewBulkLoader(my_tableName2, my_batchSize2, testCallback2);
-                if (!multipleClients && sameTable) {
+                if (!multipleClients && my_tableName1.equals(my_tableName2)) {
                     assert(bulkLoader1.getMaxBatchSize() == Math.min(my_batchSize1, my_batchSize2));
                     assert(bulkLoader1.getMaxBatchSize() == bulkLoader2.getMaxBatchSize());
                 }
             }
-            else
+            else {
                 bulkLoader2 = bulkLoader1;
+            }
 
             // do the test
 

@@ -23,61 +23,38 @@
 
 package org.voltdb.planner;
 
-import java.io.File;
 import java.io.IOException;
 
 import junit.framework.TestCase;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.ServerThread;
+import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;
-import org.voltdb.benchmark.tpcc.Constants;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
-import org.voltdb.benchmark.tpcc.procedures.ByteBuilder;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.utils.BuildDirectoryUtils;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
 public class TPCCDebugTest extends TestCase {
-    protected Client client;
-    protected ServerThread server;
-
-    static final long W_ID = 3L;
-    static final long W2_ID = 4L;
-    static final long D_ID = 7L;
-    static final long D2_ID = 8L;
-    static final long O_ID = 9L;
-    static final long C_ID = 42L;
-    static final long I_ID = 12345L;
-
-    public static final Class<?>[] ALL_PROCEDURES = {
-        /*debugTPCCostat.class, debugTPCCpayment.class,*/ debugUpdateProc.class
-        /*debugTPCCdelivery.class, debugTPCCslev.class*/
-    };
-    public static final Class<?>[] SUPPLEMENTALS = {
-            ByteBuilder.class, Constants.class };
-
-    static final String JAR = "tpcc.jar";
+    private Client client;
+    private ServerThread server;
 
     @Override
     public void setUp() throws IOException {
-        Class<?>[] procedures = ALL_PROCEDURES;
-        int siteCount = 1;
-        BackendTarget target = BackendTarget.NATIVE_EE_JNI;
-        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
-        String catalogJar = testDir + File.separator + JAR;
-
-        TPCCProjectBuilder pb = new TPCCProjectBuilder();
-        pb.addDefaultSchema();
-        pb.addDefaultPartitioning();
-        pb.addProcedures(procedures);
-        pb.addSupplementalClasses(SUPPLEMENTALS);
-        pb.compile(catalogJar, siteCount, 0);
-
-        // start VoltDB server using hzsqlsb backend
-        server = new ServerThread(catalogJar, pb.getPathToDeployment(), target);
+        CatalogBuilder cb = TPCCProjectBuilder.catalogBuilderNoProcs()
+        .addProcedures(
+                /*debugTPCCostat.class, debugTPCCpayment.class,*/
+                /*debugTPCCdelivery.class, debugTPCCslev.class,*/
+                debugUpdateProc.class)
+        ;
+        Configuration config = Configuration.compile(getClass().getSimpleName(), cb,
+                new DeploymentBuilder());
+        assertNotNull("Configuration failed to compile", config);
+        // start VoltDB server
+        server = new ServerThread(config);
         server.start();
         server.waitForInitialization();
 

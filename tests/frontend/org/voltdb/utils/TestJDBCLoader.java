@@ -24,7 +24,6 @@
 package org.voltdb.utils;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -47,7 +46,7 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb.types.TimestampType;
 
 public class TestJDBCLoader {
@@ -55,7 +54,6 @@ public class TestJDBCLoader {
     protected static ServerThread localServer;
     protected static Client client;
     protected static final VoltLogger m_log = new VoltLogger("CONSOLE");
-
     protected static String userName = System.getProperty("user.name");
     protected static String reportDir = String.format("/tmp/%s_csv", userName);
     protected static String path_csv = String.format("%s/%s", reportDir, "test.csv");
@@ -83,41 +81,41 @@ public class TestJDBCLoader {
     {
         prepare();
 
-        String pathToCatalog = Configuration.getPathToCatalogForTest("csv.jar");
-        String pathToDeployment = Configuration.getPathToCatalogForTest("csv.xml");
-        VoltProjectBuilder builder = new VoltProjectBuilder();
+        String simpleSchema =
+                "create table BLAH (" +
+                "clm_integer integer not null, " +
+                "clm_tinyint tinyint default 0, " +
+                "clm_smallint smallint default 0, " +
+                "clm_bigint bigint default 0, " +
+                "clm_string varchar(20) default null, " +
+                "clm_decimal decimal default null, " +
+                "clm_float float default null, " +
+                "clm_timestamp timestamp default null, " +
+                "PRIMARY KEY(clm_integer) " +
+                ");\n" +
+                "PARTITION TABLE BLAH ON COLUMN clm_integer;\n" +
+                "create table JBLAH (" +
+                "clm_integer integer not null, " +
+                "clm_tinyint tinyint default 0, " +
+                "clm_smallint smallint default 0, " +
+                "clm_bigint bigint default 0, " +
+                "clm_string varchar(16) default null, " +
+                "clm_decimal decimal default null, " +
+                "clm_float float default null, " +
+                "clm_timestamp timestamp default null, " +
+                "PRIMARY KEY(clm_integer) " +
+                ");" +
+                "PARTITION TABLE JBLAH ON COLUMN clm_integer;\n" +
+                "";
+        ;
+        String testcaseclassname = TestJDBCLoader.class.getSimpleName();
 
-        builder.addLiteralSchema(
-                "create table BLAH ("
-                + "clm_integer integer not null, "
-                + "clm_tinyint tinyint default 0, "
-                + "clm_smallint smallint default 0, "
-                + "clm_bigint bigint default 0, "
-                + "clm_string varchar(20) default null, "
-                + "clm_decimal decimal default null, "
-                + "clm_float float default null, "
-                + "clm_timestamp timestamp default null, "
-                + "PRIMARY KEY(clm_integer) "
-                + ");\n"
-                + "create table JBLAH ("
-                + "clm_integer integer not null, "
-                + "clm_tinyint tinyint default 0, "
-                + "clm_smallint smallint default 0, "
-                + "clm_bigint bigint default 0, "
-                + "clm_string varchar(16) default null, "
-                + "clm_decimal decimal default null, "
-                + "clm_float float default null, "
-                + "clm_timestamp timestamp default null, "
-                + "PRIMARY KEY(clm_integer) "
-                + ");");
-        builder.addPartitionInfo("BLAH", "clm_integer");
-        builder.addPartitionInfo("JBLAH", "clm_integer");
-        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
-        assertTrue(success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-        Configuration config = new Configuration();
-        config.m_pathToCatalog = pathToCatalog;
-        config.m_pathToDeployment = pathToDeployment;
+        Configuration config = Configuration.compile(testcaseclassname, simpleSchema,
+                new DeploymentBuilder(2));
+        if (config == null) {
+            System.err.println("Configuration failed to compile.");
+            System.exit(-1);
+        }
         localServer = new ServerThread(config);
         client = null;
 

@@ -29,40 +29,17 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.List;
 
-
 import junit.framework.Test;
 
-import org.voltdb.BackendTarget;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.regressionsuites.LocalCluster;
-import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb.regressionsuites.RegressionSuite;
 
-public class TestJDBCConnectionFail extends RegressionSuite
-{
-
-    static LocalCluster m_config;
-    static int kfactor = 3;
+public class TestJDBCConnectionFail extends RegressionSuite {
+    private static int kfactor = 3;
 
     public TestJDBCConnectionFail(String name) {
         super(name);
-    }
-
-    static VoltProjectBuilder getBuilderForTest() throws IOException {
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("CREATE TABLE T("
-                + "A1 INTEGER NOT NULL, "
-                + "A2 DECIMAL, "
-                + "A3 DECIMAL DEFAULT 0, "
-                + "A4 DECIMAL DEFAULT 999, "
-                + "A5 DECIMAL DEFAULT 9.99E2, "
-                + "A6 DECIMAL DEFAULT 1.012345678901, "
-                + "PRIMARY KEY(A1));"
-        );
-        builder.addPartitionInfo("T", "A1");
-        builder.addStmtProcedure("Insert", "INSERT INTO T(A1) VALUES(?);", "T.A1: 0");
-        builder.addStmtProcedure("Select", "SELECT * FROM T WHERE A1 = ?;", "T.A1: 0");
-        return builder;
     }
 
     private static Connection connectClients(String URL) throws ClassNotFoundException, SQLException {
@@ -104,20 +81,22 @@ public class TestJDBCConnectionFail extends RegressionSuite
     }
 
     static public Test suite() throws IOException {
-        // the suite made here will all be using the tests from this class
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestJDBCConnectionFail.class);
-
-        // build up a project builder for the workload
-        VoltProjectBuilder project = getBuilderForTest();
-        boolean success;
-        m_config = new LocalCluster("decimal-default.jar", 4, 5, kfactor, BackendTarget.NATIVE_EE_JNI);
-        m_config.setHasLocalServer(true);
-        success = m_config.compile(project);
-        assertTrue(success);
-
-        // add this config to the set of tests to run
-        builder.addServerConfig(m_config);
-        return builder;
+        CatalogBuilder cb = new CatalogBuilder(
+                "CREATE TABLE T(" +
+                "A1 INTEGER NOT NULL, " +
+                "A2 DECIMAL, " +
+                "A3 DECIMAL DEFAULT 0, " +
+                "A4 DECIMAL DEFAULT 999, " +
+                "A5 DECIMAL DEFAULT 9.99E2, " +
+                "A6 DECIMAL DEFAULT 1.012345678901, " +
+                "PRIMARY KEY(A1));\n" +
+                "PARTITION TABLE T ON COLUMN A1;\n" +
+                "")
+        .addStmtProcedure("Insert", "INSERT INTO T(A1) VALUES(?);", "T.A1", 0)
+        .addStmtProcedure("Select", "SELECT * FROM T WHERE A1 = ?;", "T.A1", 0)
+        ;
+        return multiClusterSuiteBuilder(TestJDBCConnectionFail.class, cb,
+                new DeploymentBuilder(4, 5, kfactor));
     }
 }
 

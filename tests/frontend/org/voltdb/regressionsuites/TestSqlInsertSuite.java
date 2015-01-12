@@ -23,14 +23,12 @@
 
 package org.voltdb.regressionsuites;
 
-import java.io.IOException;
+import junit.framework.TestCase;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.client.Client;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
 public class TestSqlInsertSuite extends RegressionSuite {
-
     private void validateInsertStmt(String insertStmt, long... expectedValues) throws Exception {
         Client client = getClient();
 
@@ -82,11 +80,9 @@ public class TestSqlInsertSuite extends RegressionSuite {
         super(name);
     }
 
-    static public junit.framework.Test suite() {
+    static final Class<? extends TestCase> TESTCASECLASS = TestSqlInsertSuite.class;
 
-        VoltServerConfig config = null;
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestSqlInsertSuite.class);
-        VoltProjectBuilder project = new VoltProjectBuilder();
+    static public junit.framework.Test suite() {
         final String literalSchema =
                 "CREATE TABLE P1 ( " +
                 "ccc bigint default 10 not null, " +
@@ -95,28 +91,15 @@ public class TestSqlInsertSuite extends RegressionSuite {
                 "zzz bigint not null, " +
                 "yyy bigint default 14, " +
                 "xxx bigint " + // default null
-                ");" +
-                "PARTITION TABLE P1 ON COLUMN ccc;" +
-                ""
-                ;
-        try {
-            project.addLiteralSchema(literalSchema);
-        } catch (IOException e) {
-            assertFalse(true);
-        }
-        boolean success;
-
-        config = new LocalCluster("sqlinsert-onesite.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assert(success);
-        builder.addServerConfig(config);
-
-        // Cluster
-        config = new LocalCluster("sqlinsert-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assert(success);
-        builder.addServerConfig(config);
-
-        return builder;
+                "); \n" +
+                "PARTITION TABLE P1 ON COLUMN ccc;\n" +
+                "";
+        return multiClusterSuiteBuilder(TestSqlInsertSuite.class, literalSchema,
+                // two-site testing -- no multi-host cluster tests needed for SQL behavior tests.
+                new DeploymentBuilder(2),
+                // We never taught HSQL how to upsert.
+                DeploymentBuilder.forHSQLBackend(),
+                // multi-host cluster testing with replication
+                new DeploymentBuilder(2, 3, 1));
     }
 }

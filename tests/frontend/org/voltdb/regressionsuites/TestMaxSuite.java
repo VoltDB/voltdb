@@ -23,17 +23,12 @@
 
 package org.voltdb.regressionsuites;
 
-import java.io.IOException;
-
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
 public class TestMaxSuite extends RegressionSuite {
-
-    static final Class<?>[] PROCEDURES = {};
     private static int PARAMETERS_MAX_JOIN = 100;
     private static int PARAMETERS_MAX_COLUMN = 1024;
     private static int PARAMETERS_MAX_IN = 6000;
@@ -141,64 +136,32 @@ public class TestMaxSuite extends RegressionSuite {
     }
 
     static public junit.framework.Test suite() {
-        VoltServerConfig config = null;
-        final MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(
-                TestMaxSuite.class);
+        StringBuilder sb = new StringBuilder(
+                /** for max in */
+                "CREATE TABLE max_in_table(column0 INTEGER NOT NULL, column1 INTEGER NOT NULL, " +
+                        "PRIMARY KEY (column0));\n" +
+                "PARTITION TABLE max_in_table ON COLUMN column0;\n" +
+                /** for max column */
+                "CREATE TABLE max_column_table(\n" +
+                "");
+        for (int i = 0; i < PARAMETERS_MAX_COLUMN; i++) {
+            sb.append("column").append(i).append(" INTEGER NOT NULL,\n");
+        }
+        sb.append("PRIMARY KEY(column0));\n" +
+                "PARTITION TABLE max_column_table ON COLUMN column0;\n" +
+                "");
 
-        final VoltProjectBuilder project = new VoltProjectBuilder();
-
-        try {
-            /** for max column */
-            StringBuilder sb = new StringBuilder(
-                    "CREATE TABLE max_column_table(");
-            for (int i = 0; i < PARAMETERS_MAX_COLUMN; i++) {
-                sb.append("column");
-                sb.append(i);
-                sb.append(" INTEGER NOT NULL,");
-            }
-            sb.append("PRIMARY KEY(column0));");
-            project.addLiteralSchema(sb.toString());
-            project.addPartitionInfo("max_column_table", "column0");
-
-            /** for max join */
-            sb = new StringBuilder();
-            for (int i = 0; i < PARAMETERS_MAX_JOIN; i++) {
-                sb.append("create table max_join_table");
-                sb.append(i);
-                sb.append("(column0 INTEGER NOT NULL, column1 INTEGER NOT NULL, PRIMARY KEY (column0));");
-                project.addLiteralSchema(sb.toString());
-                // project.addPartitionInfo("p1", "b1");
-                sb.setLength(0);
-            }
-
-            /** for max in */
-            project.addLiteralSchema("CREATE TABLE max_in_table(column0 INTEGER NOT NULL, column1 INTEGER NOT NULL, PRIMARY KEY (column0));");
-            project.addPartitionInfo("max_in_table", "column0");
-
-        } catch (IOException error) {
-            fail(error.getMessage());
+        /** for max join */
+        for (int i = 0; i < PARAMETERS_MAX_JOIN; i++) {
+            sb.append("create table max_join_table")
+            .append(i)
+            .append("(column0 INTEGER NOT NULL, column1 INTEGER NOT NULL, PRIMARY KEY (column0));\n");
         }
 
-        // JNI
-        config = new LocalCluster("testMax-onesite.jar", 1, 1, 0,
-                BackendTarget.NATIVE_EE_JNI);
-        boolean t1 = config.compile(project);
-        assertTrue(t1);
-        builder.addServerConfig(config);
-
-        config = new LocalCluster("testMax-hsql.jar", 1, 1, 0,
-                BackendTarget.HSQLDB_BACKEND);
-        boolean success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-
-        // CLUSTER
-        config = new LocalCluster("testMax-cluster.jar", 2, 3, 1,
-                BackendTarget.NATIVE_EE_JNI);
-        boolean t2 = config.compile(project);
-        assertTrue(t2);
-        builder.addServerConfig(config);
-
-        return builder;
+        String literalSchema = sb.toString();
+        return multiClusterSuiteBuilder(TestMaxSuite.class, literalSchema,
+                new DeploymentBuilder(),
+                DeploymentBuilder.forHSQLBackend(),
+                new DeploymentBuilder(2,3,1));
     }
 }

@@ -35,6 +35,8 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.PortGenerator;
 import org.voltcore.utils.ShutdownHooks;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
@@ -101,47 +103,6 @@ public class VoltDB {
 
     /** Encapsulates VoltDB configuration parameters */
     public static class Configuration {
-
-        @Override
-        public String toString() {
-            return "" + m_ipcPort +
-                    m_backend +
-                    m_leader +
-                    m_pathToCatalog +
-                    m_pathToDeployment +
-                    m_deploymentDefault +
-                    m_pathToLicense +
-                    m_noLoadLibVOLTDB +
-                    m_zkInterface +
-                    m_port +
-                    m_clientInterface +
-                    m_adminPort +
-                    m_adminInterface +
-                    m_internalPort +
-                    m_internalPortInterface +
-                    m_externalInterface +
-                    m_internalInterface +
-                    m_drAgentPortStart +
-                    m_drInterface +
-                    m_httpPort +
-                    m_httpPortInterface +
-                    m_isEnterprise +
-                    m_deadHostTimeoutMS +
-                    m_startAction +
-                    m_startMode +
-                    m_replicationRole +
-                    m_selectedRejoinInterface +
-                    m_quietAdhoc +
-                    m_commitLogDir +
-                    m_timestampTestingSalt +
-                    m_isRejoinTest +
-                    m_networkCoreBindings +
-                    m_computationCoreBindings +
-                    m_executionCoreBindings +
-                    m_commandLogBinding +
-                    m_versionStringOverrideForTest +
-                    m_versionCompatibilityRegexOverrideForTest;
-    }
         public int m_ipcPort = DEFAULT_IPC_PORT;
 
         protected static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -257,7 +218,7 @@ public class VoltDB {
         }
 
         /** Behavior-less arg used to differentiate command lines from "ps" */
-        public String m_tag;
+        protected String m_tag;
 
         /** Force catalog upgrade even if version matches. */
         public static boolean m_forceCatalogUpgrade = false;
@@ -267,15 +228,21 @@ public class VoltDB {
         }
 
         public Configuration(PortGenerator ports) {
-            // Default iv2 configuration to the environment settings.
-            // Let explicit command line override the environment.
+            assignPorts(ports);
+            // Set start action create.  The cmd line validates that an action is specified, however,
+            // defaulting it to create for local cluster test scripts
+            m_startAction = StartAction.CREATE;
+        }
+
+        /**
+         * @param ports
+         */
+        public Configuration assignPorts(PortGenerator ports) {
             m_port = ports.nextClient();
             m_adminPort = ports.nextAdmin();
             m_internalPort = ports.next();
             m_zkInterface = "127.0.0.1:" + ports.next();
-            // Set start action create.  The cmd line validates that an action is specified, however,
-            // defaulting it to create for local cluster test scripts
-            m_startAction = StartAction.CREATE;
+            return this;
         }
 
         public Configuration(String args[]) {
@@ -316,11 +283,9 @@ public class VoltDB {
                 else if (arg.equals("valgrind")) {
                     m_backend = BackendTarget.NATIVE_EE_VALGRIND_IPC;
                 }
-                else if (arg.equals("quietadhoc"))
-                {
+                else if (arg.equals("quietadhoc")) {
                     m_quietAdhoc = true;
                 }
-                // handle from the command line as two strings <catalog> <filename>
                 else if (arg.equals("port")) {
                     String portStr = args[++i];
                     if (portStr.indexOf(':') != -1) {
@@ -330,7 +295,8 @@ public class VoltDB {
                     } else {
                         m_port = Integer.parseInt(portStr);
                     }
-                } else if (arg.equals("adminport")) {
+                }
+                else if (arg.equals("adminport")) {
                     String portStr = args[++i];
                     if (portStr.indexOf(':') != -1) {
                         HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, VoltDB.DEFAULT_ADMIN_PORT);
@@ -339,7 +305,8 @@ public class VoltDB {
                     } else {
                         m_adminPort = Integer.parseInt(portStr);
                     }
-                } else if (arg.equals("internalport")) {
+                }
+                else if (arg.equals("internalport")) {
                     String portStr = args[++i];
                     if (portStr.indexOf(':') != -1) {
                         HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, m_internalPort);
@@ -348,7 +315,8 @@ public class VoltDB {
                     } else {
                         m_internalPort = Integer.parseInt(portStr);
                     }
-                } else if (arg.equals("replicationport")) {
+                }
+                else if (arg.equals("replicationport")) {
                     String portStr = args[++i];
                     if (portStr.indexOf(':') != -1) {
                         HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, VoltDB.DEFAULT_DR_PORT);
@@ -357,7 +325,8 @@ public class VoltDB {
                     } else {
                         m_drAgentPortStart = Integer.parseInt(portStr);
                     }
-                } else if (arg.equals("httpport")) {
+                }
+                else if (arg.equals("httpport")) {
                     String portStr = args[++i];
                     if (portStr.indexOf(':') != -1) {
                         HostAndPort hap = MiscUtils.getHostAndPortFromHostnameColonPort(portStr, VoltDB.DEFAULT_HTTP_PORT);
@@ -366,7 +335,8 @@ public class VoltDB {
                     } else {
                         m_httpPort = Integer.parseInt(portStr);
                     }
-                } else if (arg.startsWith("zkport")) {
+                }
+                else if (arg.startsWith("zkport")) {
                     //zkport should be default to loopback but for openshift needs to be specified as loopback is unavalable.
                     String portStr = args[++i];
                     if (portStr.indexOf(':') != -1) {
@@ -375,7 +345,8 @@ public class VoltDB {
                     } else {
                         m_zkInterface = "127.0.0.1:" + portStr.trim();
                     }
-                } else if (arg.equals("externalinterface")) {
+                }
+                else if (arg.equals("externalinterface")) {
                     m_externalInterface = args[++i].trim();
                 }
                 else if (arg.startsWith("externalinterface ")) {
@@ -386,7 +357,8 @@ public class VoltDB {
                 }
                 else if (arg.startsWith("internalinterface ")) {
                     m_internalInterface = arg.substring("internalinterface ".length()).trim();
-                } else if (arg.startsWith("networkbindings")) {
+                }
+                else if (arg.startsWith("networkbindings")) {
                     for (String core : args[++i].split(",")) {
                         m_networkCoreBindings.offer(core);
                     }
@@ -403,7 +375,8 @@ public class VoltDB {
                         m_executionCoreBindings.offer(core);
                     }
                     System.out.println("Execution bindings are " + m_executionCoreBindings);
-                } else if (arg.startsWith("commandlogbinding")) {
+                }
+                else if (arg.startsWith("commandlogbinding")) {
                     String binding = args[++i];
                     if (binding.split(",").length > 1) {
                         throw new RuntimeException("Command log only supports a single set of bindings");
@@ -413,9 +386,11 @@ public class VoltDB {
                 }
                 else if (arg.equals("host") || arg.equals("leader")) {
                     m_leader = args[++i].trim();
-                } else if (arg.startsWith("host")) {
+                }
+                else if (arg.startsWith("host")) {
                     m_leader = arg.substring("host ".length()).trim();
-                } else if (arg.startsWith("leader")) {
+                }
+                else if (arg.startsWith("leader")) {
                     m_leader = arg.substring("leader ".length()).trim();
                 }
                 // synonym for "rejoin host" for backward compatibility
@@ -427,26 +402,29 @@ public class VoltDB {
                     m_startAction = StartAction.REJOIN;
                     m_leader = arg.substring("rejoinhost ".length()).trim();
                 }
-
                 else if (arg.equals("create")) {
                     m_startAction = StartAction.CREATE;
-                } else if (arg.equals("recover")) {
+                }
+                else if (arg.equals("recover")) {
                     m_startAction = StartAction.RECOVER;
                     if (   args.length > i + 1
                         && args[i+1].trim().equals("safemode")) {
                         m_startAction = StartAction.SAFE_RECOVER;
                         i += 1;
                     }
-                } else if (arg.equals("rejoin")) {
+                }
+                else if (arg.equals("rejoin")) {
                     m_startAction = StartAction.REJOIN;
-                } else if (arg.startsWith("live rejoin")) {
+                }
+                else if (arg.startsWith("live rejoin")) {
                     m_startAction = StartAction.LIVE_REJOIN;
-                } else if (arg.equals("live") && args.length > i + 1 && args[++i].trim().equals("rejoin")) {
+                }
+                else if (arg.equals("live") && args.length > i + 1 && args[++i].trim().equals("rejoin")) {
                     m_startAction = StartAction.LIVE_REJOIN;
-                } else if (arg.startsWith("add")) {
+                }
+                else if (arg.startsWith("add")) {
                     m_startAction = StartAction.JOIN;
                 }
-
                 else if (arg.equals("replica")) {
                     // We're starting a replica, so we must create a new database.
                     m_startAction = StartAction.CREATE;
@@ -455,7 +433,6 @@ public class VoltDB {
                 else if (arg.equals("dragentportstart")) {
                     m_drAgentPortStart = Integer.parseInt(args[++i]);
                 }
-
                 // handle timestampsalt
                 else if (arg.equals("timestampsalt")) {
                     m_timestampTestingSalt = Long.parseLong(args[++i]);
@@ -463,7 +440,6 @@ public class VoltDB {
                 else if (arg.startsWith("timestampsalt ")) {
                     m_timestampTestingSalt = Long.parseLong(arg.substring("timestampsalt ".length()));
                 }
-
                 // handle behaviorless tag field
                 else if (arg.equals("tag")) {
                     m_tag = args[++i];
@@ -471,7 +447,6 @@ public class VoltDB {
                 else if (arg.startsWith("tag ")) {
                     m_tag = arg.substring("tag ".length());
                 }
-
                 else if (arg.equals("catalog")) {
                     m_pathToCatalog = args[++i];
                 }
@@ -510,8 +485,8 @@ public class VoltDB {
             if (null == m_startAction) {
                 if (org.voltdb.utils.MiscUtils.isPro()) {
                     hostLog.fatal("You must specify a startup action, either create, recover, replica, rejoin, collect, or compile.");
-                } else
-                {
+                }
+                else {
                     hostLog.fatal("You must specify a startup action, either create, recover, rejoin, collect, or compile.");
                 }
                 System.out.println("Please refer to VoltDB documentation for command line usage.");
@@ -535,6 +510,35 @@ public class VoltDB {
                 !m_startAction.doesRejoin()) {
                 m_leader = "localhost";
             }
+        }
+
+        public Configuration(String pathToCatalog, String pathToDeployment) {
+            this();
+            m_pathToCatalog = pathToCatalog;
+            m_pathToDeployment = pathToDeployment;
+        }
+
+        public static Configuration compile(String prefix, CatalogBuilder cb, DeploymentBuilder db) {
+            prefix += db.topologyString();
+            String pathToCatalog = getPathToCatalogForTest(prefix + ".jar");
+            String pathToDeployment = getPathToCatalogForTest(prefix + ".xml");
+            if ( ! cb.compile(pathToCatalog)) {
+                return null;
+            }
+            db.writeXMLToFile(pathToDeployment);
+            Configuration result = new Configuration(pathToCatalog, pathToDeployment);
+            if (db == DeploymentBuilder.forHSQLBackend()) {
+                result.m_backend = BackendTarget.HSQLDB_BACKEND;
+            }
+            return result;
+        }
+
+        public static Configuration compile(String prefix, CatalogBuilder cb, int siteCount) {
+            return compile(prefix, cb, new DeploymentBuilder(siteCount));
+        }
+
+        public static Configuration compile(String prefix, String ddl, DeploymentBuilder db) {
+            return compile(prefix, new CatalogBuilder(ddl), db);
         }
 
         /**

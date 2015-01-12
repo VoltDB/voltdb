@@ -145,6 +145,7 @@ public class TestVoltCompiler extends TestCase {
             "<schema path='" + schemaPath + "' />" +
             "</schemas>" +
             "<procedures>" +
+            //TODO: Define this proc in the ddl and eliminate this project.xml.
             "<procedure class='Foo'>" +
             "<sql>select * from table1r_el;</sql>" +
             "</procedure>" +
@@ -161,14 +162,13 @@ public class TestVoltCompiler extends TestCase {
     }
 
     public void testUTF8XMLFromHSQL() throws IOException {
-        final String simpleSchema =
-                "create table blah  (pkey integer not null, strval varchar(200), PRIMARY KEY(pkey));\n";
-        VoltProjectBuilder pb = new VoltProjectBuilder();
-        pb.addLiteralSchema(simpleSchema);
-        pb.addStmtProcedure("utf8insert", "insert into blah values(1, 'něco za nic')");
-        pb.addPartitionInfo("blah", "pkey");
-        boolean success = pb.compile(Configuration.getPathToCatalogForTest("utf8xml.jar"));
-        assertTrue(success);
+        CatalogBuilder cb = new CatalogBuilder(
+                "create table blah  (pkey integer not null, strval varchar(200), PRIMARY KEY(pkey));\n" +
+                "partition table blah on column pkey;\n" +
+                "")
+        .addStmtProcedure("utf8insert", "insert into blah values(1, 'něco za nic')")
+        ;
+        assertTrue(cb.compile(Configuration.getPathToCatalogForTest("utf8xml.jar")));
     }
 
     private static String feedbackToString(List<Feedback> fbs) {
@@ -313,20 +313,19 @@ public class TestVoltCompiler extends TestCase {
             System.exit(-1);
         }
 
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        project.depBuilder().setSnapshotSettings("32m", 5, "/tmp", "woobar");
-        project.catBuilder().addSchema(schemaPath)
-        .addProcedures(org.voltdb.compiler.procedures.TPCCTestProc.class);
+        CatalogBuilder cb = new CatalogBuilder()
+        .addSchema(schemaPath)
+        ;
+        DeploymentBuilder db = new DeploymentBuilder()
+        .setSnapshotSettings("32m", 5, "/tmp", "woobar");
         try {
-            assertTrue(project.compile("/tmp/snapshot_settings_test.jar"));
-            final String catalogContents =
-                VoltCompilerUtils.readFileFromJarfile("/tmp/snapshot_settings_test.jar", "catalog.txt");
-            final Catalog cat = new Catalog();
-            cat.execute(catalogContents);
-            CatalogUtil.compileDeployment(cat, project.getPathToDeployment(), false);
-            SnapshotSchedule schedule =
-                cat.getClusters().get("cluster").getDatabases().
-                    get("database").getSnapshotschedule().get("default");
+            File jar = cb.compileToTempJar();
+            assertNotNull("Schema compile failed", jar);
+            final Catalog cat =
+                    VoltCompilerUtils.deserializeCatalogFromCatalogJarfile(jar.getAbsolutePath());
+            String deploymentFile = db.writeXMLToTempFile();
+            CatalogUtil.compileDeploymentForTest(cat, deploymentFile);
+            SnapshotSchedule schedule = CatalogUtil.getDatabase(cat).getSnapshotschedule().get("default");
             assertEquals(32, schedule.getFrequencyvalue());
             assertEquals("m", schedule.getFrequencyunit());
             //Will be empty because the deployment file initialization is what sets this value
@@ -341,35 +340,34 @@ public class TestVoltCompiler extends TestCase {
     // TestExportSuite tests most of these options are tested end-to-end; however need to test
     // that a disabled connector is really disabled and that auth data is correct.
     public void testExportSetting() throws IOException {
-        final VoltProjectBuilder project = new VoltProjectBuilder();
-        project.catBuilder().addSchema(getClass().getResource("ExportTester-ddl.sql"))
+        CatalogBuilder cb = new CatalogBuilder()
+        .addSchema(getClass().getResource("ExportTester-ddl.sql"))
         .setTableAsExportOnly("A")
         .setTableAsExportOnly("B");
-        project.depBuilder().addExport(false /* disabled */, null, null);
+        DeploymentBuilder db = new DeploymentBuilder()
+        .addExport(false /* disabled */, null, null);
+        String pathToDeployment = db.writeXMLToTempFile();
+        File jarFile = null;
         try {
-            assertTrue(project.compile("/tmp/exportsettingstest.jar"));
-            final String catalogContents =
-                VoltCompilerUtils.readFileFromJarfile("/tmp/exportsettingstest.jar", "catalog.txt");
-            final Catalog cat = new Catalog();
-            cat.execute(catalogContents);
-
-            Connector connector = cat.getClusters().get("cluster").getDatabases().
-                get("database").getConnectors().get("0");
+            jarFile = cb.compileToTempJar();
+            assertNotNull("Catalog failed to compile", jarFile);
+            final Catalog cat =
+                    VoltCompilerUtils.deserializeCatalogFromCatalogJarfile(jarFile.getAbsolutePath());
+            CatalogUtil.compileDeploymentForTest(cat, pathToDeployment);
+            Connector connector = CatalogUtil.getDatabase(cat).getConnectors().get("0");
             assertFalse(connector.getEnabled());
-
         } finally {
-            final File jar = new File("/tmp/exportsettingstest.jar");
-            jar.delete();
+            if (jarFile != null) {
+                jarFile.delete();
+            }
         }
-
     }
 
     // test that Export configuration is insensitive to the case of the table name
     public void testExportTableCase() throws IOException {
-        final VoltProjectBuilder project = new VoltProjectBuilder();
-        project.catBuilder().addSchema(TestVoltCompiler.class.getResource("ExportTester-ddl.sql"))
-        .addStmtProcedure("Dummy", "insert into a values (?, ?, ?);",
-                "a.a_id: 0")
+        CatalogBuilder cb = new CatalogBuilder()
+        .addSchema(TestVoltCompiler.class.getResource("ExportTester-ddl.sql"))
+        .addStmtProcedure("Dummy", "insert into a values (?, ?, ?);", "a.a_id", 0)
         .addPartitionInfo("A", "A_ID")
         .addPartitionInfo("B", "B_ID")
         .addPartitionInfo("e", "e_id")
@@ -378,16 +376,17 @@ public class TestVoltCompiler extends TestCase {
         .setTableAsExportOnly("b") // uppercase DDL, lowercase export
         .setTableAsExportOnly("E") // lowercase DDL, uppercase export
         .setTableAsExportOnly("f"); // lowercase DDL, lowercase export
-        project.depBuilder().addExport(true /* enabled */, null, null);
+        DeploymentBuilder db = new DeploymentBuilder()
+        .addExport(true /* enabled */, null, null);
+        String pathToDeployment = db.writeXMLToTempFile();
+        File jarFile = null;
         try {
-            assertTrue(project.compile("/tmp/exportsettingstest.jar"));
-            final String catalogContents =
-                VoltCompilerUtils.readFileFromJarfile("/tmp/exportsettingstest.jar", "catalog.txt");
-            final Catalog cat = new Catalog();
-            cat.execute(catalogContents);
-            CatalogUtil.compileDeployment(cat, project.getPathToDeployment(), false);
-            Connector connector = cat.getClusters().get("cluster").getDatabases().
-                get("database").getConnectors().get("0");
+            jarFile = cb.compileToTempJar();
+            assertNotNull("Catalog failed to compile", jarFile);
+            final Catalog cat =
+                    VoltCompilerUtils.deserializeCatalogFromCatalogJarfile(jarFile.getAbsolutePath());
+            CatalogUtil.compileDeploymentForTest(cat, pathToDeployment);
+            Connector connector = CatalogUtil.getDatabase(cat).getConnectors().get("0");
             assertTrue(connector.getEnabled());
             // Assert that all tables exist in the connector section of catalog
             assertNotNull(connector.getTableinfo().getIgnoreCase("a"));
@@ -395,41 +394,45 @@ public class TestVoltCompiler extends TestCase {
             assertNotNull(connector.getTableinfo().getIgnoreCase("e"));
             assertNotNull(connector.getTableinfo().getIgnoreCase("f"));
         } finally {
-            final File jar = new File("/tmp/exportsettingstest.jar");
-            jar.delete();
+            if (jarFile != null) {
+                jarFile.delete();
+            }
         }
     }
 
     // test that the source table for a view is not export only
     public void testViewSourceNotExportOnly() throws IOException {
-        final VoltProjectBuilder project = new VoltProjectBuilder();
-        project.catBuilder().addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"))
+        CatalogBuilder cb = new CatalogBuilder()
+        .addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"))
         .addStmtProcedure("Dummy", "select * from v_table1r_el_only")
         .setTableAsExportOnly("table1r_el_only")
         ;
-        project.depBuilder().addExport(true /* enabled */, null, null);
+        File tempJar = null;
         try {
-            assertFalse(project.compile("/tmp/exporttestview.jar"));
+            tempJar = cb.compileToTempJar();
+            assertNull(tempJar);
         }
         finally {
-            final File jar = new File("/tmp/exporttestview.jar");
-            jar.delete();
+            if (tempJar != null) {
+                tempJar.delete();
+            }
         }
     }
 
     // test that a view is not export only
     public void testViewNotExportOnly() throws IOException {
-        final VoltProjectBuilder project = new VoltProjectBuilder();
-        project.catBuilder().addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"))
+        CatalogBuilder cb = new CatalogBuilder()
+        .addSchema(TestVoltCompiler.class.getResource("ExportTesterWithView-ddl.sql"))
         .addStmtProcedure("Dummy", "select * from table1r_el_only")
         .setTableAsExportOnly("v_table1r_el_only");
-        project.depBuilder().addExport(true /* enabled */, null, null);
+        File jarFile = null;
         try {
-            assertFalse(project.compile("/tmp/exporttestview.jar"));
-        }
-        finally {
-            final File jar = new File("/tmp/exporttestview.jar");
-            jar.delete();
+            jarFile = cb.compileToTempJar();
+            assertNull("Catalog compile sould have failed for view on export table", jarFile);
+        } finally {
+            if (jarFile != null) {
+                jarFile.delete();
+            }
         }
     }
 
@@ -442,11 +445,11 @@ public class TestVoltCompiler extends TestCase {
 
     public void testBadClusterConfig() throws IOException {
         // check no hosts
-        ClusterConfig cluster_config = new ClusterConfig(0, 1, 0);
+        ClusterConfig cluster_config = new ClusterConfig(1, 0, 0);
         assertFalse(cluster_config.validate());
 
         // check no sites-per-hosts
-        cluster_config = new ClusterConfig(1, 0, 0);
+        cluster_config = new ClusterConfig(0, 1, 0);
         assertFalse(cluster_config.validate());
     }
 
@@ -464,6 +467,7 @@ public class TestVoltCompiler extends TestCase {
             "<schema path='" + schemaPath + "' />" +
             "</schemas>" +
             "<procedures>" +
+            //TODO: Define this proc in the ddl and eliminate this project.xml.
             "<procedure class='org.voltdb.compiler.procedures.AddBookBoxed' />" +
             "</procedures>" +
             "</database>" +
@@ -492,6 +496,7 @@ public class TestVoltCompiler extends TestCase {
             "<schema path='" + schemaPath + "' />" +
             "</schemas>" +
             "<procedures>" +
+            //TODO: Define these procs in the ddl and eliminate this project.xml.
             "<procedure class='org.voltdb.compiler.procedures.AddBook' />" +
             "<procedure class='Foo'>" +
             "<sql>select * from books;</sql>" +
@@ -540,7 +545,7 @@ public class TestVoltCompiler extends TestCase {
                 "262144 will be enforced as byte counts rather than UTF8 character counts. " +
                 "To eliminate this warning, specify \"VARCHAR(262154 BYTES)\"";
         assertEquals(expectedMsg, warningMsg);
-        Database db = compiler.getCatalog().getClusters().get("cluster").getDatabases().get("database");
+        Database db = compiler.getCatalogDatabase();
         Column var = db.getTables().get("BOOKS").getColumns().get("TITLE");
         assertTrue(var.getInbytes());
     }
@@ -576,16 +581,14 @@ public class TestVoltCompiler extends TestCase {
             "<project>" +
             "<database name='database'>" +
             "<schemas><schema path='" + schemaPath + "' /></schemas>" +
+            //TODO: Define this proc in the ddl and eliminate this project.xml.
             "<procedures><procedure class='org.voltdb.compiler.procedures.AddBook'/></procedures>" +
             "</database>" +
             "</project>";
 
         final String projectPath = MiscUtils.writeStringToTempFilePath(simpleProject);
-
         final VoltCompiler compiler = new VoltCompiler();
-
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-
         assertFalse(success);
 
         boolean found = false;
@@ -607,6 +610,7 @@ public class TestVoltCompiler extends TestCase {
             "<project>" +
             "<database name='database'>" +
             "<schemas><schema path='" + schemaPath + "' /></schemas>" +
+            //TODO: Define this proc in the ddl and eliminate this project.xml.
             "<procedures><procedure class='org.voltdb.compiler.procedures.AddBook' /></procedures>" +
             "</database>" +
             "</project>";
@@ -635,6 +639,7 @@ public class TestVoltCompiler extends TestCase {
             "<project>" +
             "<database name='database'>" +
             "<schemas><schema path='" + schemaPath + "' /></schemas>" +
+            //TODO: Define this proc in the ddl and eliminate this project.xml.
             "<procedures><procedure class='org.voltdb.compiler.procedures.TPCCTestProc' /></procedures>" +
             "</database>" +
             "</project>";
@@ -648,52 +653,26 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(success);
     }
 
-    public void testSeparateCatalogCompilation() throws IOException {
-        String schemaPath = "";
-        try {
-            final URL url = TPCCProjectBuilder.class.getResource("tpcc-ddl.sql");
-            schemaPath = URLDecoder.decode(url.getPath(), "UTF-8");
-        } catch (final UnsupportedEncodingException e) {
-            e.printStackTrace();
-            System.exit(-1);
-        }
+    public void testSeparateCatalogCompilation() throws Exception {
+        final URL url = TPCCProjectBuilder.class.getResource("tpcc-ddl.sql");
+        final String schemaPath = URLDecoder.decode(url.getPath(), "UTF-8");
 
-        final String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "<procedures><procedure class='org.voltdb.compiler.procedures.TPCCTestProc' /></procedures>" +
-            "</database>" +
-            "</project>";
-
-        //System.out.println(simpleProject);
-
-        final String projectPath = MiscUtils.writeStringToTempFilePath(simpleProject);
-
+        // Originally, this test mixed in a java procedure via custom project.xml a la:
+        //   "<procedures><procedure class='org.voltdb.compiler.procedures.TPCCTestProc' /></procedures>"
+        // If that's important to the effectiveness of this test, then the test should probably
+        // be extended to A) use a variant of "tpcc-ddl.sql" that adds an extra "CREATE PROCEDURE"
+        // and B) minimally validate the proc definition in the catalog so that the test actually
+        // fails the next time someone tries to optimize out this important facet.
+        // Since this test still passes without the proc, unless emma complains that we've lost coverage
+        // for some production code path, assume that the proc was irrelevant to the test case.
         final VoltCompiler compiler1 = new VoltCompiler();
         final VoltCompiler compiler2 = new VoltCompiler();
-        final Catalog catalog = compileCatalogFromProject(compiler1, projectPath);
+        Catalog catalog = compiler1.compileCatalogFromDDL(schemaPath);
         final String cat1 = catalog.serialize();
-        final boolean success = compiler2.compileWithProjectXML(projectPath, testout_jar);
-        final String cat2 = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
-
+        final boolean success = compiler2.compileFromDDL(testout_jar, schemaPath);
         assertTrue(success);
-        assertTrue(cat1.compareTo(cat2) == 0);
-    }
-
-    private Catalog compileCatalogFromProject(
-            final VoltCompiler compiler,
-            final String projectPath)
-    {
-        try {
-            return compiler.compileCatalogFromProject(projectPath);
-        }
-        catch (VoltCompilerException e) {
-            e.printStackTrace();
-            fail();
-            return null;
-        }
+        final String cat2 = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
+        assertEquals(0, cat1.compareTo(cat2));
     }
 
     private boolean compileFromDDL(VoltCompiler compiler, String schemaPath)
@@ -735,6 +714,7 @@ public class TestVoltCompiler extends TestCase {
             "<project>" +
             "<database name='database'>" +
             "<schemas><schema path='" + schemaPath + "' /></schemas>" +
+            //TODO: Define this proc in the ddl and eliminate this project.xml.
             "<procedures><procedure class='org.voltdb.compiler.procedures.TPCCTestProc' /></procedures>" +
             "</database>" +
             "</project>";
@@ -771,6 +751,7 @@ public class TestVoltCompiler extends TestCase {
             "<project>" +
             "<database name='database'>" +
             "<schemas><schema path='" + schemaPath + "' /></schemas>" +
+            //TODO: Define this proc in the ddl and eliminate this project.xml.
             "<procedures><procedure class='org.voltdb.compiler.procedures.TPCCTestProc' /></procedures>" +
             "</database>" +
             "</project>";
@@ -798,6 +779,8 @@ public class TestVoltCompiler extends TestCase {
             "<?xml version=\"1.0\"?>\n" +
             "<project>" +
             " <database name='database'>" +
+            //TODO: Define these partitionings and proc and export definition
+            // in the ddl and eliminate this project.xml.
             "  <partitions><partition table='books' column='cash'/></partitions> " +
             "  <schemas><schema path='" + schemaPath + "' /></schemas>" +
             "  <procedures><procedure class='org.voltdb.compiler.procedures.AddBook' /></procedures>" +
@@ -808,22 +791,15 @@ public class TestVoltCompiler extends TestCase {
             "</project>";
 
         final String projectPath = MiscUtils.writeStringToTempFilePath(simpleProject);
-
         final VoltCompiler compiler = new VoltCompiler();
-
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-
         assertTrue(success);
 
         final Catalog c1 = compiler.getCatalog();
         //System.out.println("PRINTING Catalog 1");
         //System.out.println(c1.serialize());
 
-        final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
-
-        final Catalog c2 = new Catalog();
-        c2.execute(catalogContents);
-
+        final Catalog c2 = VoltCompilerUtils.deserializeCatalogFromCatalogJarfile(testout_jar);
         assertTrue(c2.serialize().equals(c1.serialize()));
     }
 
@@ -839,6 +815,7 @@ public class TestVoltCompiler extends TestCase {
             "<project>" +
             "<database name='database'>" +
             "<schemas><schema path='" + schemaPath + "' /></schemas>" +
+            //TODO: Define this proc in the ddl and eliminate this project.xml.
             "<procedures><procedure class='org.voltdb.compiler.procedures.AddBook' /></procedures>" +
             "</database>" +
             "</project>";
@@ -857,12 +834,8 @@ public class TestVoltCompiler extends TestCase {
 
         assertTrue(success);
 
-        final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
-
-        final Catalog c2 = new Catalog();
-        c2.execute(catalogContents);
-
-        final Database db = c2.getClusters().get("cluster").getDatabases().get("database");
+        final Catalog c2 = VoltCompilerUtils.deserializeCatalogFromCatalogJarfile(testout_jar);
+        final Database db = CatalogUtil.getDatabase(c2);
         final Procedure addBook = db.getProcedures().get("AddBook");
         assertEquals(true, addBook.getSinglepartition());
     }
@@ -898,15 +871,10 @@ public class TestVoltCompiler extends TestCase {
         final VoltCompiler compiler = new VoltCompiler();
         compiler.setProcInfoOverrides(overrideMap);
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-
         assertTrue(success);
 
-        final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
-
-        final Catalog c2 = new Catalog();
-        c2.execute(catalogContents);
-
-        final Database db = c2.getClusters().get("cluster").getDatabases().get("database");
+        final Catalog c2 = VoltCompilerUtils.deserializeCatalogFromCatalogJarfile(testout_jar);
+        final Database db = CatalogUtil.getDatabase(c2);
         final Procedure addBook = db.getProcedures().get("AddBook");
         assertEquals(true, addBook.getSinglepartition());
     }
@@ -922,6 +890,7 @@ public class TestVoltCompiler extends TestCase {
             "<project>" +
             "<database name='database'>" +
             "<schemas><schema path='" + schemaPath + "' /></schemas>" +
+            //TODO: Define these proc and partitioning in the ddl and eliminate this project.xml.
             "<procedures><procedure class='@Foo'><sql>select * from books;</sql></procedure></procedures>" +
             "<partitions><partition table='BOOKS' column='CASH' /></partitions>" +
             "</database>" +
@@ -947,6 +916,7 @@ public class TestVoltCompiler extends TestCase {
             "<database name='database'>" +
             "<schemas><schema path='" + schemaPath + "' /></schemas>" +
             "<procedures/>" +
+            //TODO: Define this partitioning in the ddl and eliminate this project.xml.
             "<partitions><partition table='BOOKS' column='CASH' /></partitions>" +
             "</database>" +
             "</project>";
@@ -970,6 +940,7 @@ public class TestVoltCompiler extends TestCase {
             "<project>" +
             "<database name='database'>" +
             "<schemas><schema path='" + schemaPath + "' /></schemas>" +
+            //TODO: Define this proc in the ddl and eliminate this project.xml.
             "<procedures><procedure class='Foo'><sql>select * from books;</sql></procedure></procedures>" +
             "</database>" +
             "</project>";
@@ -1010,6 +981,7 @@ public class TestVoltCompiler extends TestCase {
             "<project>" +
             "<database name='database'>" +
             "<schemas><schema path='" + schemaPath + "' /></schemas>" +
+            //TODO: Define this proc in the ddl and eliminate this project.xml.
             "<procedures><procedure class='org.voltdb.compiler.procedures.AddBook' /></procedures>" +
             "</database>" +
             "</project>";
@@ -1022,9 +994,7 @@ public class TestVoltCompiler extends TestCase {
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
         assertTrue(success);
         final Catalog c1 = compiler.getCatalog();
-        final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
-        final Catalog c2 = new Catalog();
-        c2.execute(catalogContents);
+        final Catalog c2 = VoltCompilerUtils.deserializeCatalogFromCatalogJarfile(testout_jar);
         assertTrue(c2.serialize().equals(c1.serialize()));
     }
 
@@ -1041,6 +1011,7 @@ public class TestVoltCompiler extends TestCase {
             "<project>" +
             "<database name='database'>" +
             "<schemas><schema path='" + schemaPath + "' /></schemas>" +
+            //TODO: Define these procs in the ddl and eliminate this project.xml.
             "<procedures>" +
             "<procedure class='get'><sql>select * from books;</sql></procedure>" +
             "<procedure class='i1'><sql>insert into books values(5, 'AA');</sql></procedure>" +
@@ -1059,9 +1030,7 @@ public class TestVoltCompiler extends TestCase {
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
         assertTrue(success);
         final Catalog c1 = compiler.getCatalog();
-        final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
-        final Catalog c2 = new Catalog();
-        c2.execute(catalogContents);
+        final Catalog c2 = VoltCompilerUtils.deserializeCatalogFromCatalogJarfile(testout_jar);
         assertTrue(c2.serialize().equals(c1.serialize()));
     }
 
@@ -1081,9 +1050,7 @@ public class TestVoltCompiler extends TestCase {
         VoltCompiler compiler = compileValidLiteralSchema(simpleSchema);
 
         final Catalog c1 = compiler.getCatalog();
-        final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
-        final Catalog c2 = new Catalog();
-        c2.execute(catalogContents);
+        final Catalog c2 = VoltCompilerUtils.deserializeCatalogFromCatalogJarfile(testout_jar);
         assertTrue(c2.serialize().equals(c1.serialize()));
     }
 
@@ -1097,12 +1064,14 @@ public class TestVoltCompiler extends TestCase {
     // in this file.
     //
 
-    private VoltCompiler compileForDDLTest(String schemaPath, boolean expectSuccess) {
+    private VoltCompiler compileLiteralSchemaForDDLTest(String literalSchema, boolean expectSuccess) {
+        String schemaPath = MiscUtils.writeStringToTempFilePath(literalSchema);
         final String simpleProject =
             "<?xml version=\"1.0\"?>\n" +
             "<project>" +
             "<database name='database'>" +
             "<schemas><schema path='" + schemaPath + "' /></schemas>" +
+            //TODO: Define this proc in the ddl and eliminate this project.xml.
             "<procedures><procedure class='sample'><sql>select * from t</sql></procedure></procedures>" +
             "</database>" +
             "</project>";
@@ -1111,6 +1080,22 @@ public class TestVoltCompiler extends TestCase {
         final VoltCompiler compiler = new VoltCompiler();
         final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
         assertEquals(expectSuccess, success);
+        assertEquals(expectSuccess, ! compiler.hasErrors());
+        return compiler;
+    }
+
+    /**
+     * @param ddl -- valid sql ddl
+     * @param tables -- one or more table names supposed to be defined by the ddl
+     * @return the compiler to enable follow-on checks.
+     */
+    private VoltCompiler validateDefinedTables(final String ddl, final String... expectedTableSet) {
+        VoltCompiler compiler = compileLiteralSchemaForDDLTest(ddl, true);
+        CatalogMap<Table> definedTables = CatalogUtil.getDatabase(compiler.m_catalog).getTables();
+        assertEquals(expectedTableSet.length, definedTables.size());
+        for (String eachExpected : expectedTableSet) {
+            assertNotNull("Expected table: \"" + eachExpected + "\"", definedTables.get(eachExpected));
+        }
         return compiler;
     }
 
@@ -1120,220 +1105,178 @@ public class TestVoltCompiler extends TestCase {
             "- an invalid comment\n" +
             "create table t(id integer);";
 
-        VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), false);
-        assertTrue(c.hasErrors());
+        VoltCompiler compiler = compileLiteralSchemaForDDLTest(s, false);
+        assertTrue(compiler.hasErrors()); //TODO: improve w/ error message text matching
     }
 
+
     public void testDDLCompilerLeadingWhitespace() throws IOException {
-        final String s =
+        validateDefinedTables(
             "     \n" +
             "\n" +
-            "create table t(id integer);";
-        VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), true);
-        assertFalse(c.hasErrors());
-        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
+            "create table t(id integer);"
+            , "t");
     }
 
     public void testDDLCompilerLeadingComment() throws IOException {
-        final String s =
+        validateDefinedTables(
             "-- this is a leading comment\n" +
             "  -- with some leading whitespace\n" +
-            "     create table t(id integer);";
-        VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), true);
-        assertFalse(c.hasErrors());
-        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
+            "     create table t(id integer);"
+            , "t");
     }
 
     public void testDDLCompilerLeadingCommentAndHashMarks() throws IOException {
-        final String s =
+        validateDefinedTables(
             "-- ### this is a leading comment\n" +
             "  -- with some ### leading whitespace\n" +
-            "     create table t(id integer);";
-        VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), true);
-        assertFalse(c.hasErrors());
-        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
+            "     create table t(id integer);"
+            , "t");
     }
 
     public void testDDLCompilerNoNewlines() throws IOException {
-        final String s =
-            "create table t(id integer); create table r(id integer);";
-        VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), true);
-        assertFalse(c.hasErrors());
-        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 2);
+        validateDefinedTables(
+            "create table t(id integer); create table r(id integer);"
+            , "t", "r");
     }
 
     public void testDDLCompilerSplitLines() throws IOException {
-        final String s =
+        validateDefinedTables(
             "create\n" +
             "table\n" +
             "t(id\n" +
-            "integer);";
-        VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), true);
-        assertFalse(c.hasErrors());
-        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
+            "integer);"
+            , "t");
     }
 
     public void testDDLCompilerTrailingComment1() throws IOException {
-        final String s =
+        validateDefinedTables(
             "create table t(id integer) -- this is a trailing comment\n" +
             "-- and a line full of comments\n" +
-            ";\n";
-        VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), true);
-        assertFalse(c.hasErrors());
-        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
+            ";\n"
+            , "t");
     }
 
     public void testDDLCompilerTrailingComment2() throws IOException {
-        final String s =
+        validateDefinedTables(
             "create table t(id integer) -- this is a trailing comment\n" +
-            ";\n";
-        VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), true);
-        assertFalse(c.hasErrors());
-        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
+            ";\n"
+            , "t");
     }
 
     public void testDDLCompilerTrailingCommentAndHashMarks() throws IOException {
-        final String s =
+        validateDefinedTables(
             "create table t(id varchar(128) default '###')  -- ### this ###### is a trailing comment\n" +
-            ";\n";
-        VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), true);
-        assertFalse(c.hasErrors());
-        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
+            ";\n"
+            , "t");
     }
 
     public void testDDLCompilerTrailingComment3() throws IOException {
-        final String s =
+        validateDefinedTables(
             "create table t(id integer) -- this is a trailing comment\n" +
             "-- and a line full of comments\n" +
-            ";";
-        VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), true);
-        assertFalse(c.hasErrors());
-        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
+            ";"
+            , "t");
     }
 
     public void testDDLCompilerTrailingComment4() throws IOException {
-        final String s =
+        validateDefinedTables(
             "create table t(id integer) -- this is a trailing comment\n" +
-            ";";
-        VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), true);
-        assertFalse(c.hasErrors());
-        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
+            ";"
+            , "t");
     }
 
     public void testDDLCompilerTrailingComment5() throws IOException {
-        final String s =
+        validateDefinedTables(
             "create table t(id integer) -- this is a trailing comment\n" +
             "-- and a line full of comments\n" +
-            "    ;\n";
-        VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), true);
-        assertFalse(c.hasErrors());
-        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
+            "    ;\n"
+            , "t");
     }
 
     public void testDDLCompilerTrailingComment6() throws IOException {
-        final String s =
+        validateDefinedTables(
             "create table t(id integer) -- this is a trailing comment\n" +
             "-- and a line full of comments\n" +
             "    ;\n" +
-            "-- ends with a comment\n";
-        VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), true);
-        assertFalse(c.hasErrors());
-        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
+            "-- ends with a comment\n"
+            , "t");
     }
-
 
     public void testDDLCompilerInvalidStatement() throws IOException {
         final String s =
             "create table t for justice -- with a comment\n";
-        VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), false);
-        assertTrue(c.hasErrors());
+        VoltCompiler compiler = compileLiteralSchemaForDDLTest(s, false);
+        assertTrue(compiler.hasErrors()); //TODO: improve w/ error message text matching
     }
 
     public void testDDLCompilerCommentThatLooksLikeStatement() throws IOException {
-        final String s =
-            "create table t(id integer); -- create table r(id integer);";
-        VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), true);
-        assertFalse(c.hasErrors());
-        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
+        validateDefinedTables(
+            "create table t(id integer); -- create table r(id integer);"
+            , "t");
     }
 
     public void testDDLCompilerLeadingSemicolon() throws IOException {
         final String s = "; create table t(id integer);";
-        VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), false);
-        assertTrue(c.hasErrors());
+        VoltCompiler compiler = compileLiteralSchemaForDDLTest(s, false);
+        assertTrue(compiler.hasErrors()); //TODO: improve w/ error message text matching
     }
 
     public void testDDLCompilerMultipleStatementsOnMultipleLines() throws IOException {
-        final String s =
+        validateDefinedTables(
             "create table t(id integer); create\n" +
-            "table r(id integer); -- second table";
-        VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), true);
-        assertFalse(c.hasErrors());
-        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 2);
+            "table r(id integer); -- second table"
+            , "t", "r");
     }
 
     public void testDDLCompilerStringLiteral() throws IOException {
-        final String s =
-            "create table t(id varchar(3) default 'abc');";
-        VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), true);
-        assertFalse(c.hasErrors());
-        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
-
-        Table tbl = c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().getIgnoreCase("t");
+        VoltCompiler compiler = validateDefinedTables(
+            "create table t(id varchar(3) default 'abc');"
+            , "t");
+        Table tbl = CatalogUtil.getDatabase(compiler.m_catalog).getTables().getIgnoreCase("t");
         String defaultvalue = tbl.getColumns().getIgnoreCase("id").getDefaultvalue();
-        assertTrue(defaultvalue.equalsIgnoreCase("abc"));
+        assertTrue(defaultvalue.equals("abc"));
     }
 
     public void testDDLCompilerSemiColonInStringLiteral() throws IOException {
-        final String s =
-            "create table t(id varchar(5) default 'a;bc');";
-        VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), true);
-        assertFalse(c.hasErrors());
-        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
-
-        Table tbl = c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().getIgnoreCase("t");
+        VoltCompiler compiler = validateDefinedTables(
+            "create table t(id varchar(5) default 'a;bc');"
+            , "t");
+        Table tbl = CatalogUtil.getDatabase(compiler.m_catalog).getTables().getIgnoreCase("t");
         String defaultvalue = tbl.getColumns().getIgnoreCase("id").getDefaultvalue();
-        assertTrue(defaultvalue.equalsIgnoreCase("a;bc"));
+        assertTrue(defaultvalue.equals("a;bc"));
     }
 
     public void testDDLCompilerDashDashInStringLiteral() throws IOException {
-        final String s =
-            "create table t(id varchar(5) default 'a--bc');";
-        VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), true);
-        assertFalse(c.hasErrors());
-        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
-
-        Table tbl = c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().getIgnoreCase("t");
+        VoltCompiler compiler = validateDefinedTables(
+            "create table t(id varchar(5) default 'a--bc');"
+            , "t");
+        Table tbl = CatalogUtil.getDatabase(compiler.m_catalog).getTables().getIgnoreCase("t");
         String defaultvalue = tbl.getColumns().getIgnoreCase("id").getDefaultvalue();
-        assertTrue(defaultvalue.equalsIgnoreCase("a--bc"));
+        assertTrue(defaultvalue.equals("a--bc"));
     }
 
     public void testDDLCompilerNewlineInStringLiteral() throws IOException {
-        final String s =
-            "create table t(id varchar(5) default 'a\n" + "bc');";
-
-        VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), true);
-        assertFalse(c.hasErrors());
-        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
-        Table tbl = c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().getIgnoreCase("t");
+        VoltCompiler compiler = validateDefinedTables(
+            "create table t(id varchar(5) default 'a\n" + "bc');"
+            , "t");
+        Table tbl = CatalogUtil.getDatabase(compiler.m_catalog).getTables().getIgnoreCase("t");
         String defaultvalue = tbl.getColumns().getIgnoreCase("id").getDefaultvalue();
 
         // In the debugger, this looks valid at parse time but is mangled somewhere
         // later, perhaps in HSQL or in the catalog assembly?
         // ENG-681
         System.out.println(defaultvalue);
-        // assertTrue(defaultvalue.equalsIgnoreCase("a\nbc"));
+        // assertTrue(defaultvalue.equals("a\nbc"));
     }
 
     public void testDDLCompilerEscapedStringLiterals() throws IOException {
-        final String s =
-            "create table t(id varchar(10) default 'a''b''''c');";
-        VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), true);
-        assertFalse(c.hasErrors());
-        assertTrue(c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().size() == 1);
-        Table tbl = c.m_catalog.getClusters().get("cluster").getDatabases().get("database").getTables().getIgnoreCase("t");
+        VoltCompiler compiler = validateDefinedTables(
+            "create table t(id varchar(10) default 'a''b''''c');"
+            , "t");
+        Table tbl = CatalogUtil.getDatabase(compiler.m_catalog).getTables().getIgnoreCase("t");
         String defaultvalue = tbl.getColumns().getIgnoreCase("id").getDefaultvalue();
-        assertTrue(defaultvalue.equalsIgnoreCase("a'b''c"));
+        assertTrue(defaultvalue.equals("a'b''c"));
     }
 
     // Test that DDLCompiler's index creation adheres to the rules implicit in
@@ -1358,44 +1301,38 @@ public class TestVoltCompiler extends TestCase {
 
     public void testDDLCompilerIndexDefaultTypes()
     {
-        for (int i = 0; i < column_types.length; i++)
-        {
+        for (int i = 0; i < column_types.length; i++) {
             String s =
                 "create table t(id " + column_types[i] + " not null, num integer not null);\n" +
                 "create index idx_t_id on t(id);\n" +
                 "create index idx_t_idnum on t(id,num);";
-            VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), true);
-            assertFalse(c.hasErrors());
-            Database d = c.m_catalog.getClusters().get("cluster").getDatabases().get("database");
+            VoltCompiler compiler = compileLiteralSchemaForDDLTest(s, true);
+            Table t = CatalogUtil.getDatabase(compiler.m_catalog).getTables().getIgnoreCase("t");
             assertEquals(default_index_types[i].getValue(),
-                        d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_t_id").getType());
+                        t.getIndexes().getIgnoreCase("idx_t_id").getType());
             assertEquals(default_index_types[i].getValue(),
-                        d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_t_idnum").getType());
+                        t.getIndexes().getIgnoreCase("idx_t_idnum").getType());
         }
     }
 
     public void testDDLCompilerHashIndexAllowed()
     {
-        for (int i = 0; i < column_types.length; i++)
-        {
+        for (int i = 0; i < column_types.length; i++) {
             final String s =
                 "create table t(id " + column_types[i] + " not null, num integer not null);\n" +
                 "create index idx_t_id_hash on t(id);\n" +
                 "create index idx_t_idnum_hash on t(id,num);";
-            VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), can_be_hash[i]);
-            if (can_be_hash[i])
-            {
+            VoltCompiler compiler = compileLiteralSchemaForDDLTest(s, can_be_hash[i]);
+            if (can_be_hash[i]) {
                 // do appropriate index exists checks
-                assertFalse(c.hasErrors());
-                Database d = c.m_catalog.getClusters().get("cluster").getDatabases().get("database");
+                Table t = CatalogUtil.getDatabase(compiler.m_catalog).getTables().getIgnoreCase("t");
                 assertEquals(IndexType.HASH_TABLE.getValue(),
-                            d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_t_id_hash").getType());
+                            t.getIndexes().getIgnoreCase("idx_t_id_hash").getType());
                 assertEquals(IndexType.HASH_TABLE.getValue(),
-                            d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_t_idnum_hash").getType());
+                            t.getIndexes().getIgnoreCase("idx_t_idnum_hash").getType());
             }
-            else
-            {
-                assertTrue(c.hasErrors());
+            else {
+                assertTrue(compiler.hasErrors()); //TODO: improve w/ error message text matching
             }
         }
     }
@@ -1406,15 +1343,14 @@ public class TestVoltCompiler extends TestCase {
                 "create table t(id integer not null, num integer not null);\n" +
                 "create unique index idx_t_unique on t(id,num);\n" +
                 "create index idx_t on t(num);";
-        VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), true);
-        assertFalse(c.hasErrors());
-        Database d = c.m_catalog.getClusters().get("cluster").getDatabases().get("database");
-        assertTrue(d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_t_unique").getUnique());
-        assertFalse(d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_t").getUnique());
+        VoltCompiler compiler = compileLiteralSchemaForDDLTest(s, true);
+        Table t = CatalogUtil.getDatabase(compiler.m_catalog).getTables().getIgnoreCase("t");
+        assertTrue(t.getIndexes().getIgnoreCase("idx_t_unique").getUnique());
+        assertFalse(t.getIndexes().getIgnoreCase("idx_t").getUnique());
         // also validate that simple column indexes don't trigger the generalized expression index handling
         String noExpressionFound = "";
-        assertEquals(noExpressionFound, d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_t_unique").getExpressionsjson());
-        assertEquals(noExpressionFound, d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_t").getExpressionsjson());
+        assertEquals(noExpressionFound, t.getIndexes().getIgnoreCase("idx_t_unique").getExpressionsjson());
+        assertEquals(noExpressionFound, t.getIndexes().getIgnoreCase("idx_t").getExpressionsjson());
     }
 
     public void testFunctionIndexAllowed()
@@ -1423,15 +1359,14 @@ public class TestVoltCompiler extends TestCase {
                 "create table t(id integer not null, num integer not null);\n" +
                 "create unique index idx_ft_unique on t(abs(id+num));\n" +
                 "create index idx_ft on t(abs(num));";
-        VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), true);
-        assertFalse(c.hasErrors());
-        Database d = c.m_catalog.getClusters().get("cluster").getDatabases().get("database");
-        assertTrue(d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_ft_unique").getUnique());
-        assertFalse(d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_ft").getUnique());
+        VoltCompiler compiler = compileLiteralSchemaForDDLTest(s, true);
+        Table t = CatalogUtil.getDatabase(compiler.m_catalog).getTables().getIgnoreCase("t");
+        assertTrue(t.getIndexes().getIgnoreCase("idx_ft_unique").getUnique());
+        assertFalse(t.getIndexes().getIgnoreCase("idx_ft").getUnique());
         // Validate that general expression indexes get properly annotated with an expressionjson attribute
         String noExpressionFound = "";
-        assertNotSame(noExpressionFound, d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_ft_unique").getExpressionsjson());
-        assertNotSame(noExpressionFound, d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_ft").getExpressionsjson());
+        assertNotSame(noExpressionFound, t.getIndexes().getIgnoreCase("idx_ft_unique").getExpressionsjson());
+        assertNotSame(noExpressionFound, t.getIndexes().getIgnoreCase("idx_ft").getExpressionsjson());
     }
 
     public void testDDLCompilerVarcharTreeIndexAllowed()
@@ -1442,26 +1377,23 @@ public class TestVoltCompiler extends TestCase {
                 "create table t(id " + column_types[i] + " not null, num integer not null);\n" +
                 "create index idx_t_id_tree on t(id);\n" +
                 "create index idx_t_idnum_tree on t(id,num);";
-            VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), can_be_tree[i]);
-            assertFalse(c.hasErrors());
-            Database d = c.m_catalog.getClusters().get("cluster").getDatabases().get("database");
+            VoltCompiler compiler = compileLiteralSchemaForDDLTest(s, can_be_tree[i]);
+            Table t = CatalogUtil.getDatabase(compiler.m_catalog).getTables().getIgnoreCase("t");
             assertEquals(IndexType.BALANCED_TREE.getValue(),
-                        d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_t_id_tree").getType());
+                        t.getIndexes().getIgnoreCase("idx_t_id_tree").getType());
             assertEquals(IndexType.BALANCED_TREE.getValue(),
-                        d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_t_idnum_tree").getType());
+                        t.getIndexes().getIgnoreCase("idx_t_idnum_tree").getType());
         }
     }
 
     public void testDDLCompilerTwoIdenticalIndexes()
     {
-        final String s =
+        VoltCompiler compiler = validateDefinedTables(
                 "create table t(id integer not null, num integer not null);\n" +
                 "create index idx_t_idnum1 on t(id,num);\n" +
-                "create index idx_t_idnum2 on t(id,num);";
-
-        VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), true);
-        assertFalse(c.hasErrors());
-        assertTrue(c.hasErrorsOrWarnings());
+                "create index idx_t_idnum2 on t(id,num);"
+                , "t");
+        assertTrue(compiler.hasErrorsOrWarnings());
     }
 
     public void testDDLCompilerSameNameIndexesOnTwoTables()
@@ -1477,37 +1409,34 @@ public class TestVoltCompiler extends TestCase {
 
     public void testDDLCompilerTwoCoveringIndexes()
     {
-        final String s =
+        validateDefinedTables(
                 "create table t(id integer not null, num integer not null);\n" +
                 "create index idx_t_idnum_hash on t(id,num);\n" +
-                "create index idx_t_idnum_tree on t(id,num);";
-
-        compileLiteralDdl(s);
+                "create index idx_t_idnum_tree on t(id,num);"
+                , "t");
     }
 
     public void testDDLCompilerTwoSwappedOrderIndexes()
     {
-        final String s =
+        VoltCompiler compiler = validateDefinedTables(
                 "create table t(id integer not null, num integer not null);\n" +
                 "create index idx_t_idnum_a on t(num,id);\n" +
-                "create index idx_t_idnum_b on t(id,num);";
-
-        final VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), true);
-        assertEquals(false, c.hasErrorsOrWarnings());
+                "create index idx_t_idnum_b on t(id,num);"
+                , "t");
+        assertFalse(compiler.hasErrorsOrWarnings());
     }
 
     public void testDDLCompilerDropOneOfThreeIndexes()
     {
-        final String s =
+        VoltCompiler compiler = validateDefinedTables(
                 "create table t(id integer not null, num integer not null);\n" +
                 "create index idx_t_idnum_a on t(num,id);\n" +
                 "create index idx_t_idnum_b on t(id,num);\n" +
-                "create index idx_t_idnum_c on t(id,num);\n";
-
-        final VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), true);
-        assertEquals(true, c.hasErrorsOrWarnings());
+                "create index idx_t_idnum_c on t(id,num);\n"
+                , "t");
+        assertTrue(compiler.hasErrorsOrWarnings());
         int foundCount = 0;
-        for (VoltCompiler.Feedback f : c.m_warnings) {
+        for (VoltCompiler.Feedback f : compiler.m_warnings) {
             if (f.message.contains("Dropping index")) {
                 foundCount++;
             }
@@ -1517,19 +1446,11 @@ public class TestVoltCompiler extends TestCase {
 
     public void testDDLCompilerUniqueAndNonUniqueIndexOnSameColumns()
     {
-        final String s =
+        validateDefinedTables(
                 "create table t(id integer not null, num integer not null);\n" +
                 "create unique index idx_t_idnum_unique on t(id,num);\n" +
-                "create index idx_t_idnum on t(id,num);";
-
-        compileLiteralDdl(s);
-    }
-
-    /**
-     * @param s
-     */
-    private void compileLiteralDdl(final String s) {
-        compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), true);
+                "create index idx_t_idnum on t(id,num);"
+                , "t");
     }
 
     public void testDDLCompilerTwoIndexesWithSameName()
@@ -1546,7 +1467,7 @@ public class TestVoltCompiler extends TestCase {
      * @param ddl
      */
     private void failToCompileLiteralDdl(final String ddl) {
-        compileForDDLTest(MiscUtils.writeStringToTempFilePath(ddl), false);
+        compileLiteralSchemaForDDLTest(ddl, false);
     }
 
     public void testDDLCompilerIndexesOrMatViewContainSQLFunctionNOW()
@@ -1956,13 +1877,12 @@ public class TestVoltCompiler extends TestCase {
             int expectedLimit, String expectedStmt) {
         VoltCompiler compiler = checkDDLErrorMessage(ddl, expectedMessage);
 
-        if (compiler == null) {
+        if (expectedMessage != null) {
             return;
         }
         // We expected success and got it.  Verify that the catalog looks how we expect
-        Catalog cat = compiler.getCatalog();
-
-        Table tbl = cat.getClusters().get("cluster").getDatabases().get("database").getTables().getIgnoreCase(tblName);
+        Table tbl = compiler.getCatalogDatabase().getTables().getIgnoreCase(tblName);
+        assertNotNull("Table \"" + tblName + "\" not found in database", tbl);
 
         if (expectedLimit != -1) {
             assertEquals(expectedLimit, tbl.getTuplelimit());
@@ -2061,6 +1981,7 @@ public class TestVoltCompiler extends TestCase {
             "<project>" +
             "<database>" +
             "<schemas><schema path='" + schemaPath + "' /></schemas>" +
+            //TODO: Define these proc and partitioning in the ddl and eliminate this project.xml.
             "<partitions><partition table='books' column='cash'/></partitions> " +
             "<procedures><procedure class='org.voltdb.compiler.procedures.AddBook' /></procedures>" +
             "</database>" +
@@ -2095,20 +2016,19 @@ public class TestVoltCompiler extends TestCase {
     }
 
     public void test3324MPPlan() throws IOException {
-        final String simpleSchema =
-                "create table blah  (pkey integer not null, strval varchar(200), PRIMARY KEY(pkey));\n";
-        VoltProjectBuilder pb = new VoltProjectBuilder();
-        pb.enableDiagnostics();
-        pb.addLiteralSchema(simpleSchema);
-        pb.addPartitionInfo("blah", "pkey");
-        pb.addStmtProcedure("undeclaredspquery1", "select strval UNDECLARED1 from blah where pkey = ?");
-        pb.addStmtProcedure("undeclaredspquery2", "select strval UNDECLARED2 from blah where pkey = 12");
-        pb.addStmtProcedure("declaredspquery1", "select strval SODECLARED1 from blah where pkey = ?", "blah.pkey:0");
+        CatalogBuilder cb = new CatalogBuilder(
+                "create table blah (pkey integer not null, strval varchar(200), PRIMARY KEY(pkey));\n" +
+                "partition table blah on column pkey;\n" +
+                "")
+        .addStmtProcedure("undeclaredspquery1", "select strval UNDECLARED1 from blah where pkey = ?")
+        .addStmtProcedure("undeclaredspquery2", "select strval UNDECLARED2 from blah where pkey = 12")
+        .addStmtProcedure("declaredspquery1", "select strval SODECLARED1 from blah where pkey = ?", "blah.pkey", 0)
+        .enableDiagnostics()
+        ;
         // Currently no way to do this?
         // pb.addStmtProcedure("declaredspquery2", "select strval SODECLARED2 from blah where pkey = 12", "blah.pkey=12");
-        boolean success = pb.compile(Configuration.getPathToCatalogForTest("test3324.jar"));
-        assertTrue(success);
-        List<String> diagnostics = pb.harvestDiagnostics();
+        assertTrue(cb.compile(Configuration.getPathToCatalogForTest("test3324.jar")));
+        List<String> diagnostics = cb.harvestDiagnostics();
         // This asserts that the undeclared SP plans don't mistakenly get SP treatment
         // -- they must each include a RECEIVE plan node.
         assertEquals(2, countStringsMatching(diagnostics, ".*\"UNDECLARED.\".*\"PLAN_NODE_TYPE\":\"RECEIVE\".*"));
@@ -2144,6 +2064,7 @@ public class TestVoltCompiler extends TestCase {
             "<project>" +
             "<database name='database'>" +
             "<schemas><schema path='" + schemaPath + "' /></schemas>" +
+            //TODO: Define this proc in the ddl and eliminate this project.xml.
             "<procedures><procedure class='org.voltdb.compiler.procedures.AddBook' /></procedures>" +
             "</database>" +
             "</project>";
@@ -2677,12 +2598,8 @@ public class TestVoltCompiler extends TestCase {
 
         compileValidLiteralSchema(simpleSchema);
 
-        final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
-
-        final Catalog c2 = new Catalog();
-        c2.execute(catalogContents);
-
-        final Database db = c2.getClusters().get("cluster").getDatabases().get("database");
+        final Catalog c2 = VoltCompilerUtils.deserializeCatalogFromCatalogJarfile(testout_jar);
+        final Database db = CatalogUtil.getDatabase(c2);
         final Procedure addBook = db.getProcedures().get("AddBook");
         assertEquals(true, addBook.getSinglepartition());
     }
@@ -2695,13 +2612,8 @@ public class TestVoltCompiler extends TestCase {
                 "paRtItiOn prOcEdure NotAnnotatedAddBook On taBLe   books coLUmN cash   ParaMETer  0;";
 
         compileValidLiteralSchema(simpleSchema);
-
-        final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
-
-        final Catalog c2 = new Catalog();
-        c2.execute(catalogContents);
-
-        final Database db = c2.getClusters().get("cluster").getDatabases().get("database");
+        final Catalog c2 = VoltCompilerUtils.deserializeCatalogFromCatalogJarfile(testout_jar);
+        final Database db = CatalogUtil.getDatabase(c2);
         final Procedure addBook = db.getProcedures().get("NotAnnotatedAddBook");
         assertEquals(true, addBook.getSinglepartition());
     }
@@ -2756,28 +2668,7 @@ public class TestVoltCompiler extends TestCase {
                             ? ""
                             : compiler.m_errors.get(compiler.m_errors.size()-1).message);
         if (errorRegex == null) {
-            assertTrue(String.format("Expected success\nXML: %s\nDDL: %s\nERR: %s", rolesElem, ddl, error), success);
-
-            Database db = compiler.getCatalog().getClusters().get("cluster").getDatabases().get("database");
-            CatalogMap<Group> groups = db.getGroups();
-            CatalogMap<Connector> connectors = db.getConnectors();
-            if (connectors.get("0") == null ) {
-                connectors.add("0");
-            }
-
-            assertNotNull(groups);
-            assertTrue(roles.length <= groups.size());
-
-            for (TestRole role : roles) {
-                Group group = groups.get(role.name);
-                assertNotNull(String.format("Missing role \"%s\"", role.name), group);
-                assertEquals(String.format("Role \"%s\" sql flag mismatch:", role.name), role.sql, group.getSql());
-                assertEquals(String.format("Role \"%s\" sqlread flag mismatch:", role.name), role.sqlread, group.getSqlread());
-                assertEquals(String.format("Role \"%s\" admin flag mismatch:", role.name), role.sysproc, group.getAdmin());
-                assertEquals(String.format("Role \"%s\" defaultproc flag mismatch:", role.name), role.defaultproc, group.getDefaultproc());
-                assertEquals(String.format("Role \"%s\" defaultprocread flag mismatch:", role.name), role.defaultprocread, group.getDefaultprocread());
-                assertEquals(String.format("Role \"%s\" allproc flag mismatch:", role.name), role.allproc, group.getAllproc());
-            }
+            checkRoles(rolesElem, ddl, compiler, success, error, roles);
         }
         else {
             assertFalse(String.format("Expected error (\"%s\")\nXML: %s\nDDL: %s", errorRegex, rolesElem, ddl), success);
@@ -2787,21 +2678,47 @@ public class TestVoltCompiler extends TestCase {
         }
     }
 
+    /**
+     * @param rolesElem
+     * @param ddl
+     * @param compiler
+     * @param success
+     * @param error
+     * @param roles
+     */
+    private void checkRoles(String rolesElem, String ddl,
+            final VoltCompiler compiler, final boolean success, String error,
+            TestRole... roles) {
+        assertTrue(String.format("Expected success\nXML: %s\nDDL: %s\nERR: %s", rolesElem, ddl, error), success);
+
+        Database db = compiler.getCatalogDatabase();
+        CatalogMap<Group> groups = db.getGroups();
+        CatalogMap<Connector> connectors = db.getConnectors();
+        if (connectors.get("0") == null ) {
+            connectors.add("0");
+        }
+
+        assertNotNull(groups);
+        assertTrue(roles.length <= groups.size());
+
+        for (TestRole role : roles) {
+            Group group = groups.get(role.name);
+            assertNotNull(String.format("Missing role \"%s\"", role.name), group);
+            assertEquals(String.format("Role \"%s\" sql flag mismatch:", role.name), role.sql, group.getSql());
+            assertEquals(String.format("Role \"%s\" sqlread flag mismatch:", role.name), role.sqlread, group.getSqlread());
+            assertEquals(String.format("Role \"%s\" admin flag mismatch:", role.name), role.sysproc, group.getAdmin());
+            assertEquals(String.format("Role \"%s\" defaultproc flag mismatch:", role.name), role.defaultproc, group.getDefaultproc());
+            assertEquals(String.format("Role \"%s\" defaultprocread flag mismatch:", role.name), role.defaultprocread, group.getDefaultprocread());
+            assertEquals(String.format("Role \"%s\" allproc flag mismatch:", role.name), role.allproc, group.getAllproc());
+        }
+    }
+
     private void goodRoleDDL(String ddl, TestRole... roles) throws Exception {
         checkRoleXMLAndDDL(null, ddl, null, roles);
     }
 
     private void badRoleDDL(String ddl, String errorRegex) throws Exception {
         checkRoleXMLAndDDL(null, ddl, errorRegex);
-    }
-
-    public void testRoleXML() throws Exception {
-        checkRoleXMLAndDDL("<role name='r1'/>", null, null, new TestRole("r1"));
-    }
-
-    public void testBadRoleXML() throws Exception {
-        checkRoleXMLAndDDL("<rolex name='r1'/>", null, ".*rolex.*[{]role[}].*expected.*");
-        checkRoleXMLAndDDL("<role name='r1'/>", "create role r1;", ".*already exists.*");
     }
 
     public void testRoleDDL() throws Exception {
@@ -2840,50 +2757,21 @@ public class TestVoltCompiler extends TestCase {
         badRoleDDL("create role USER;", ".*already exists.*");
     }
 
-    private Database checkDDLAgainstSimpleSchema(String errorRegex, String... ddl) throws Exception {
+    private VoltCompiler checkDDLAgainstSimpleSchema(String errorSubstr, String... ddl) throws Exception {
         String schemaDDL =
             "create table books (cash integer default 23 NOT NULL, title varbinary(10) default NULL, PRIMARY KEY(cash)); " +
             "partition table books on column cash;" +
             StringUtils.join(ddl, " ");
-
-        String schemaPath = MiscUtils.writeStringToTempFilePath(schemaDDL.toString());
-
-        String projectXML =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "</database>" +
-            "</project>";
-
-        String projectPath = MiscUtils.writeStringToTempFilePath(projectXML);
-
-        VoltCompiler compiler = new VoltCompiler();
-
-        boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        String error = (success || compiler.m_errors.size() == 0
-                ? ""
-                : compiler.m_errors.get(compiler.m_errors.size()-1).message);
-        if (errorRegex == null) {
-            assertTrue(String.format("Expected success\nDDL: %s\n%s", ddl, error), success);
-            Catalog cat = compiler.getCatalog();
-            return cat.getClusters().get("cluster").getDatabases().get("database");
-        }
-        else {
-            assertFalse(String.format("Expected error (\"%s\")\nDDL: %s", errorRegex, ddl), success);
-            assertFalse("Expected at least one error message.", error.isEmpty());
-            Matcher m = Pattern.compile(errorRegex).matcher(error);
-            assertTrue(String.format("%s\nEXPECTED: %s", error, errorRegex), m.matches());
-            return null;
-        }
+        return checkDDLErrorMessage(schemaDDL, errorSubstr);
     }
 
     private Database goodDDLAgainstSimpleSchema(String... ddl) throws Exception {
-        return checkDDLAgainstSimpleSchema(null, ddl);
+        VoltCompiler compiler = checkDDLAgainstSimpleSchema(null, ddl);
+        return compiler.getCatalogDatabase();
     }
 
-    private void badDDLAgainstSimpleSchema(String errorRegex, String... ddl) throws Exception {
-        checkDDLAgainstSimpleSchema(errorRegex, ddl);
+    private void badDDLAgainstSimpleSchema(String errorSubstr, String... ddl) throws Exception {
+        checkDDLAgainstSimpleSchema(errorSubstr, ddl);
     }
 
     public void testGoodCreateProcedureWithAllow() throws Exception {
@@ -2938,13 +2826,13 @@ public class TestVoltCompiler extends TestCase {
     }
 
     public void testBadCreateProcedureWithAllow() throws Exception {
-        badDDLAgainstSimpleSchema(".*expected syntax.*",
+        badDDLAgainstSimpleSchema("expected syntax",
                 "create procedure p1 allow as select * from books;");
-        badDDLAgainstSimpleSchema(".*expected syntax.*",
+        badDDLAgainstSimpleSchema("expected syntax",
                 "create procedure p1 allow a b as select * from books;");
-        badDDLAgainstSimpleSchema(".*group rx that does not exist.*",
+        badDDLAgainstSimpleSchema("group rx that does not exist",
                 "create procedure p1 allow rx as select * from books;");
-        badDDLAgainstSimpleSchema(".*group rx that does not exist.*",
+        badDDLAgainstSimpleSchema("group rx that does not exist",
                 "create role r1;",
                 "create procedure p1 allow r1, rx as select * from books;");
     }
@@ -2970,19 +2858,19 @@ public class TestVoltCompiler extends TestCase {
         groups = db.getGroups();
         assertTrue(groups.get("r1") == null);
 
-        badDDLAgainstSimpleSchema(".*does not exist.*",
+        badDDLAgainstSimpleSchema("does not exist",
                 "create role r1;",
                 "drop role r2;");
 
-        badDDLAgainstSimpleSchema(".*does not exist.*",
+        badDDLAgainstSimpleSchema("does not exist",
                 "create role r1;",
                 "drop role r1;",
                 "drop role r1;");
 
-        badDDLAgainstSimpleSchema(".*may not drop.*",
+        badDDLAgainstSimpleSchema("may not drop",
                 "drop role administrator;");
 
-        badDDLAgainstSimpleSchema(".*may not drop.*",
+        badDDLAgainstSimpleSchema("may not drop",
                 "drop role user;");
     }
 
@@ -3013,37 +2901,37 @@ public class TestVoltCompiler extends TestCase {
 
     public void testBadExportTable() throws Exception {
 
-        badDDLAgainstSimpleSchema(".+\\sEXPORT statement: table non_existant was not present in the catalog.*",
+        badDDLAgainstSimpleSchema("EXPORT statement: table non_existant was not present in the catalog",
                 "export table non_existant;"
                 );
 
-        badDDLAgainstSimpleSchema(".+contains invalid identifier \"1table_name_not_valid\".*",
+        badDDLAgainstSimpleSchema("contains invalid identifier \"1table_name_not_valid\"",
                 "export table 1table_name_not_valid;"
                 );
 
-        badDDLAgainstSimpleSchema(".+Invalid EXPORT TABLE statement.*",
+        badDDLAgainstSimpleSchema("Invalid EXPORT TABLE statement",
                 "export table one, two, three;"
                 );
 
-        badDDLAgainstSimpleSchema(".+Invalid EXPORT TABLE statement.*",
+        badDDLAgainstSimpleSchema("Invalid EXPORT TABLE statement",
                 "export export table one;"
                 );
 
-        badDDLAgainstSimpleSchema(".+Invalid EXPORT TABLE statement.*",
+        badDDLAgainstSimpleSchema("Invalid EXPORT TABLE statement",
                 "export table table one;"
                 );
 
-        badDDLAgainstSimpleSchema("Table with indexes configured as an export table.*",
+        badDDLAgainstSimpleSchema("Table with indexes configured as an export table",
                 "export table books;"
                 );
 
-        badDDLAgainstSimpleSchema("Export table configured with materialized view.*",
+        badDDLAgainstSimpleSchema("Export table configured with materialized view",
                 "create table view_source( id integer, f1 varchar(16), f2 varchar(12));",
                 "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;",
                 "export table view_source;"
                 );
 
-        badDDLAgainstSimpleSchema("View configured as an export table.*",
+        badDDLAgainstSimpleSchema("View configured as an export table",
                 "create table view_source( id integer, f1 varchar(16), f2 varchar(12));",
                 "create view my_view as select f2, count(*) as f2cnt from view_source group by f2;",
                 "export table my_view;"

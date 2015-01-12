@@ -36,7 +36,6 @@ import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
-import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
@@ -418,11 +417,9 @@ public class TestDDLCompiler extends TestCase {
     }
 
     public void testNullAnnotation() throws IOException {
+        Database catalog_db = TPCCProjectBuilder.createTPCCSchemaDatabase();
 
-        Catalog catalog  = new TPCCProjectBuilder().createTPCCSchemaCatalog();
-        Database catalog_db = catalog.getClusters().get("cluster").getDatabases().get("database");
-
-        for(Table t : catalog_db.getTables()) {
+        for (Table t : catalog_db.getTables()) {
             assertNotNull(((TableAnnotation)t.getAnnotation()).ddl);
         }
     }

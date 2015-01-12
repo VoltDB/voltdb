@@ -44,7 +44,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.LockSupport;
 
 import javax.security.auth.Subject;
-import com.google_voltpatches.common.collect.ImmutableList;
 
 import jsr166y.ThreadLocalRandom;
 
@@ -877,7 +876,7 @@ class Distributer {
     {
         final Object socketChannelAndInstanceIdAndBuildString[] =
             ConnectionUtil.getAuthenticatedConnection(host, program, hashedPassword, port, m_subject);
-        InetSocketAddress address = new InetSocketAddress(host, port);
+        /*InetSocketAddress address = */ new InetSocketAddress(host, port); // for validation, only?
         final SocketChannel aChannel = (SocketChannel)socketChannelAndInstanceIdAndBuildString[0];
         final long instanceIdWhichIsTimestampAndLeaderIp[] = (long[])socketChannelAndInstanceIdAndBuildString[1];
         final int hostId = (int)instanceIdWhichIsTimestampAndLeaderIp[0];

@@ -25,18 +25,14 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
-import org.voltdb.BackendTarget;
-import org.voltdb.ClientResponseImpl;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb_testprocs.regressionsuites.basecase.eng7181;
 
 public class TestMPBasecaseSuite extends RegressionSuite {
-
-    static final Class<?>[] PROCEDURES = {eng7181.class};
-
     public TestMPBasecaseSuite(String name) {
         super(name);
     }
@@ -191,67 +187,41 @@ public class TestMPBasecaseSuite extends RegressionSuite {
     }
 
     static public junit.framework.Test suite() {
-        VoltServerConfig config = null;
-        final MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestMPBasecaseSuite.class);
+        CatalogBuilder cb = new CatalogBuilder(
+                "CREATE TABLE p1(key INTEGER NOT NULL, b1 INTEGER NOT NULL assumeunique, " +
+                "b2 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL, PRIMARY KEY (b1, key)); " +
+                "PARTITION TABLE P1 ON COLUMN key;\n" +
+                // a replicated table (should not generate procedures).
+                "CREATE TABLE r1(key INTEGER NOT NULL, b1 INTEGER NOT NULL, " +
+                "b2 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL, PRIMARY KEY (b1));" +
+        "")
 
-        final VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addStmtProcedure("CountP1", "select count(*) from p1;");
-        project.addStmtProcedure("CountR1", "select * from r1;");
+        .addStmtProcedure("CountP1", "select count(*) from p1;")
+        .addStmtProcedure("CountR1", "select * from r1;")
 
         // update non-unique, non-partitioning attribute
-        project.addStmtProcedure("UpdateP1", "update p1 set b2 = 2");
-        project.addStmtProcedure("SumP1", "select sum(b2) from p1;");
+        .addStmtProcedure("UpdateP1", "update p1 set b2 = 2")
+        .addStmtProcedure("SumP1", "select sum(b2) from p1;")
 
-        project.addStmtProcedure("UpdateR1", "update r1 set b2 = 2");
-        project.addStmtProcedure("SumR1", "select sum(b2) from r1;");
+        .addStmtProcedure("UpdateR1", "update r1 set b2 = 2")
+        .addStmtProcedure("SumR1", "select sum(b2) from r1;")
 
         // update all pkeys to the same value.
-        project.addStmtProcedure("ConstraintViolationUpdate", "update p1 set b1 = 1");
-        project.addStmtProcedure("SumB1", "select sum(b1) from p1;");
+        .addStmtProcedure("ConstraintViolationUpdate", "update p1 set b1 = 1")
+        .addStmtProcedure("SumB1", "select sum(b1) from p1;")
 
-        project.addStmtProcedure("ConstraintViolationUpdate_R", "update r1 set b1 = 1");
-        project.addStmtProcedure("SumB1_R", "select sum(b1) from r1;");
+        .addStmtProcedure("ConstraintViolationUpdate_R", "update r1 set b1 = 1")
+        .addStmtProcedure("SumB1_R", "select sum(b1) from r1;")
 
         // update all partitioning keys to the same value.
-        project.addStmtProcedure("PartitionViolationUpdate", "update p1 set key = 1");
-        project.addStmtProcedure("SumKey", "select sum(key) from p1;");
+        .addStmtProcedure("PartitionViolationUpdate", "update p1 set key = 1")
+        .addStmtProcedure("SumKey", "select sum(key) from p1;")
 
-        project.addProcedures(PROCEDURES);
-
-        try {
-            project.addLiteralSchema(
-                    "CREATE TABLE p1(key INTEGER NOT NULL, b1 INTEGER NOT NULL assumeunique, " +
-                    "b2 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL, PRIMARY KEY (b1, key)); " +
-                    "PARTITION TABLE P1 ON COLUMN key;"
-            );
-
-            // a replicated table (should not generate procedures).
-            project.addLiteralSchema(
-                    "CREATE TABLE r1(key INTEGER NOT NULL, b1 INTEGER NOT NULL, " +
-                    "b2 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL, PRIMARY KEY (b1));"
-            );
-
-        } catch (IOException error) {
-            fail(error.getMessage());
-        }
-
-        // JNI
-        config = new LocalCluster("sqltypes-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        boolean t1 = config.compile(project);
-        assertTrue(t1);
-        builder.addServerConfig(config);
-
-        config = new LocalCluster("sqltypes-onesite.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        boolean t3 = config.compile(project);
-        assertTrue(t3);
-        builder.addServerConfig(config);
-
-        // CLUSTER
-        config = new LocalCluster("sqltypes-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        boolean t2 = config.compile(project);
-        assertTrue(t2);
-        builder.addServerConfig(config);
-
-        return builder;
+        .addProcedures(eng7181.class)
+        ;
+        return multiClusterSuiteBuilder(TestMPBasecaseSuite.class, cb,
+                new DeploymentBuilder(),
+                new DeploymentBuilder(3),
+                new DeploymentBuilder(2, 3, 1));
     }
 }

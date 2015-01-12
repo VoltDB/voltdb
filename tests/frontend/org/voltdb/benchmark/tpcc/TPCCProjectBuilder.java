@@ -44,9 +44,10 @@ import org.voltdb.benchmark.tpcc.procedures.paymentByCustomerNameC;
 import org.voltdb.benchmark.tpcc.procedures.paymentByCustomerNameW;
 import org.voltdb.benchmark.tpcc.procedures.slev;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.Database;
 import org.voltdb.compiler.CatalogBuilder;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.utils.BuildDirectoryUtils;
+import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.MiscUtils;
 
 /**
  * A subclass of VoltProjectBuilder that already knows about all of the
@@ -54,12 +55,12 @@ import org.voltdb.utils.BuildDirectoryUtils;
  * some helper code for other tests that use part of TPC-C.
  *
  */
-public class TPCCProjectBuilder extends VoltProjectBuilder {
+public class TPCCProjectBuilder {
 
     /**
      * All procedures needed for TPC-C tests + benchmark
      */
-    public static Class<?> PROCEDURES[] = new Class<?>[] {
+    public static Class<?> PROCEDURES[] = {
         delivery.class, neworder.class, ostatByCustomerId.class,
         ostatByCustomerName.class, paymentByCustomerIdC.class,
         paymentByCustomerNameC.class, paymentByCustomerIdW.class,
@@ -69,12 +70,7 @@ public class TPCCProjectBuilder extends VoltProjectBuilder {
         paymentByCustomerName.class, paymentByCustomerId.class
     };
 
-    // procedures used by TestUpdateDeployment
-    private static Class<?>[] BASEPROCS = { org.voltdb.benchmark.tpcc.procedures.InsertNewOrder.class,
-        org.voltdb.benchmark.tpcc.procedures.SelectAll.class,
-        org.voltdb.benchmark.tpcc.procedures.delivery.class };
-
-    public static String partitioning[][] = new String[][] {
+    public static String partitioning[][] = {
         {"WAREHOUSE", "W_ID"},
         {"DISTRICT", "D_W_ID"},
         {"CUSTOMER", "C_W_ID"},
@@ -86,97 +82,66 @@ public class TPCCProjectBuilder extends VoltProjectBuilder {
     };
 
     public static final URL ddlURL = TPCCProjectBuilder.class.getResource("tpcc-ddl.sql");
-    public static final String jarFilename = "tpcc.jar";
-    private static final String m_jarFileName = "tpcc.jar";
 
     /**
-     * Add the TPC-C procedures to the VoltProjectBuilder base class.
+     * Add the TPC-C partitioning to the CatalogBuilder.
      */
-    public TPCCProjectBuilder addDefaultProcedures() {
-        catBuilder().addProcedures(PROCEDURES)
-        .addStmtProcedure("InsertCustomer", "INSERT INTO CUSTOMER VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", "CUSTOMER.C_W_ID: 2")
-        .addStmtProcedure("InsertWarehouse", "INSERT INTO WAREHOUSE VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);", "WAREHOUSE.W_ID: 0")
-        .addStmtProcedure("InsertStock", "INSERT INTO STOCK VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", "STOCK.S_W_ID: 1")
-        .addStmtProcedure("InsertOrders", "INSERT INTO ORDERS VALUES (?, ?, ?, ?, ?, ?, ?, ?);", "ORDERS.O_W_ID: 2")
-        .addStmtProcedure("InsertOrderLine", "INSERT INTO ORDER_LINE VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", "ORDER_LINE.OL_W_ID: 2")
-        .addStmtProcedure("InsertNewOrder", "INSERT INTO NEW_ORDER VALUES (?, ?, ?);", "NEW_ORDER.NO_W_ID: 2")
-        .addStmtProcedure("InsertItem", "INSERT INTO ITEM VALUES (?, ?, ?, ?, ?);")
-        .addStmtProcedure("InsertHistory", "INSERT INTO HISTORY VALUES (?, ?, ?, ?, ?, ?, ?, ?);", "HISTORY.H_W_ID: 4")
-        .addStmtProcedure("InsertDistrict", "INSERT INTO DISTRICT VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", "DISTRICT.D_W_ID: 1")
-        .addStmtProcedure("InsertCustomerName", "INSERT INTO CUSTOMER_NAME VALUES (?, ?, ?, ?, ?);")
-        ;
-        return this;
-    }
-
-    public TPCCProjectBuilder addBaseProcedures() {
-        catBuilder().addProcedures(BASEPROCS);
-        return this;
-    }
-
-    /**
-     * Add the TPC-C partitioning to the VoltProjectBuilder base class.
-     */
-    public TPCCProjectBuilder addDefaultPartitioning() {
-        CatalogBuilder cb = catBuilder();
+    public static CatalogBuilder addDefaultPartitioning(CatalogBuilder cb) {
         for (String pair[] : partitioning) {
             cb.addPartitionInfo(pair[0], pair[1]);
         }
-        return this;
+        return cb;
     }
 
-    /**
-     * Add the TPC-C schema to the VoltProjectBuilder base class.
-     */
-    public TPCCProjectBuilder addDefaultSchema() {
-        catBuilder().addSchema(ddlURL);
-        return this;
-    }
-
-    public void addDefaultExport() {
-        depBuilder().addExport(true /* enabled */, null, null);
-
-        /* Fixed after the loader completes. */
-        // setTableAsExportOnly("WAREHOUSE");
-        // setTableAsExportOnly("DISTRICT");
-        // setTableAsExportOnly("ITEM");
-        // setTableAsExportOnly("CUSTOMER");
-        // setTableAsExportOnly("CUSTOMER_NAME");
-        // setTableAsExportOnly("STOCK");
-
-        /* Modified by actual benchmark: approx 6.58 ins/del per txn. */
-        // setTableAsExportOnly("HISTORY");       // 1 insert per payment (43%)
-        // setTableAsExportOnly("ORDERS");        // 1 insert per new order (45%)
-        // setTableAsExportOnly("NEW_ORDER");     // 1 insert per new order; 10 deletes per delivery (4%)
-        // setTableAsExportOnly("ORDER_LINE");    // 10 inserts per new order */
-
-        catBuilder().setTableAsExportOnly("HISTORY");
-    }
-
-    // factory method
-    public static TPCCProjectBuilder defaultBuilder() {
-        return new TPCCProjectBuilder()
-        .addDefaultSchema()
-        .addDefaultProcedures()
-        .addDefaultPartitioning();
+   // factory method
+    public static CatalogBuilder defaultCatalogBuilder() {
+        return addDefaultPartitioning(new CatalogBuilder())
+        .addSchema(ddlURL)
+        .addProcedures(PROCEDURES)
+        .addStmtProcedure("InsertCustomer", "INSERT INTO CUSTOMER VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", "CUSTOMER.C_W_ID", 2)
+        .addStmtProcedure("InsertWarehouse", "INSERT INTO WAREHOUSE VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);", "WAREHOUSE.W_ID", 0)
+        .addStmtProcedure("InsertStock", "INSERT INTO STOCK VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", "STOCK.S_W_ID", 1)
+        .addStmtProcedure("InsertOrders", "INSERT INTO ORDERS VALUES (?, ?, ?, ?, ?, ?, ?, ?);", "ORDERS.O_W_ID", 2)
+        .addStmtProcedure("InsertOrderLine", "INSERT INTO ORDER_LINE VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", "ORDER_LINE.OL_W_ID", 2)
+        .addStmtProcedure("InsertNewOrder", "INSERT INTO NEW_ORDER VALUES (?, ?, ?);", "NEW_ORDER.NO_W_ID", 2)
+        .addStmtProcedure("InsertItem", "INSERT INTO ITEM VALUES (?, ?, ?, ?, ?);")
+        .addStmtProcedure("InsertHistory", "INSERT INTO HISTORY VALUES (?, ?, ?, ?, ?, ?, ?, ?);", "HISTORY.H_W_ID", 4)
+        .addStmtProcedure("InsertDistrict", "INSERT INTO DISTRICT VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", "DISTRICT.D_W_ID", 1)
+        .addStmtProcedure("InsertCustomerName", "INSERT INTO CUSTOMER_NAME VALUES (?, ?, ?, ?, ?);")
+        ;
         // addDefaultExport();
     }
 
-    public String getJARFilename() { return jarFilename; }
+    // factory method
+    public static CatalogBuilder catalogBuilderNoProcs() {
+        return addDefaultPartitioning(new CatalogBuilder()).addSchema(ddlURL);
+        // addDefaultExport();
+    }
 
     /**
      * Get a pointer to a compiled catalog for TPCC with all the procedures.
      */
-    static public Catalog createTPCCSchemaCatalog() throws IOException {
+    public static Catalog createTPCCSchemaCatalog() throws IOException {
         // compile a catalog
-        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
-        String catalogJar = testDir + File.separator + "tpcc-jni.jar";
-
-        TPCCProjectBuilder builder = defaultBuilder();
-        Catalog catalog = builder.compileToCatalog(catalogJar);
-        builder.setDeploymentPath(builder.compileToDeployment(1, 1, 0));
-
+        CatalogBuilder cb = defaultCatalogBuilder();
+        File catalogJar = File.createTempFile("TPCCProjectBuilder", ".jar");
+        String catalogPath = catalogJar.getAbsolutePath();
+        if ( ! cb.compile(catalogPath)) {
+            return null;
+        }
+        byte[] bytes = MiscUtils.fileToBytes(catalogJar);
+        Catalog catalog = CatalogUtil.deserializeCatalogFromJarFileBytes(bytes);
         assert(catalog != null);
         return catalog;
+    }
+
+    /**
+     * Get the database from a compiled catalog for TPCC with all the procedures.
+     */
+    static public Database createTPCCSchemaDatabase() throws IOException {
+        return createTPCCSchemaCatalog()
+                .getClusters().get("cluster")
+                .getDatabases().get("database");
     }
 
 }

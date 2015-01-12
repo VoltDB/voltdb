@@ -22,14 +22,13 @@
  */
 package org.voltdb.regressionsuites;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb_testprocs.regressionsuites.replication.SelectEmptyTable;
 
-public class TestFailureDetectSuite extends RegressionSuite
-{
+public class TestFailureDetectSuite extends RegressionSuite {
     public void testMultiPartitionTxnAfterFailure()
     throws Exception
     {
@@ -78,16 +77,12 @@ public class TestFailureDetectSuite extends RegressionSuite
 
     static public junit.framework.Test suite()
     {
-        VoltServerConfig config = null;
-        MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestFailureDetectSuite.class);
-
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        project.catBuilder().addSchema(SelectEmptyTable.class.getResource("replication-ddl.sql"))
+        CatalogBuilder cb = new CatalogBuilder()
+        .addSchema(SelectEmptyTable.class.getResource("replication-ddl.sql"))
         .addPartitionInfo("P1", "ID")
-        .addStmtProcedure("InsertSinglePart", "INSERT INTO P1 VALUES (?, ?, ?, ?);", "P1.ID: 0")
-        .addStmtProcedure("UpdateSinglePart", "UPDATE P1 SET P1.NUM = ? WHERE P1.ID = ?", "P1.ID: 0")
-        .addStmtProcedure("SelectSinglePart", "SELECT * FROM P1 WHERE P1.ID = ?", "P1.ID: 0")
+        .addStmtProcedure("InsertSinglePart", "INSERT INTO P1 VALUES (?, ?, ?, ?);", "P1.ID", 0)
+        .addStmtProcedure("UpdateSinglePart", "UPDATE P1 SET P1.NUM = ? WHERE P1.ID = ?", "P1.ID", 0)
+        .addStmtProcedure("SelectSinglePart", "SELECT * FROM P1 WHERE P1.ID = ?", "P1.ID", 0)
         .addStmtProcedure("InsertMultiPart", "INSERT INTO P1 VALUES (?, ?, ?, ?);")
         .addStmtProcedure("SelectMultiPart", "SELECT * FROM P1")
         .addStmtProcedure("UpdateMultiPart", "UPDATE P1 SET P1.NUM = ?")
@@ -95,27 +90,14 @@ public class TestFailureDetectSuite extends RegressionSuite
         .addStmtProcedure("SelectMultiPartRepl", "SELECT * FROM R1")
         .addStmtProcedure("UpdateMultiPartRepl", "UPDATE R1 SET R1.NUM = ?")
         ;
-
-        // CLUSTER, two hosts, each with two sites, replication of 1
-        config = new LocalCluster("replication-1-cluster.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
-        assertTrue(config.compile(project));
-        builder.addServerConfig(config);
-
-        // CLUSTER, three hosts, each with two sites, replication of 2
-        config = new LocalCluster("replication-2-cluster.jar", 2, 3, 2, BackendTarget.NATIVE_EE_JNI);
-        assertTrue(config.compile(project));
-        builder.addServerConfig(config);
-
-//        // CLUSTER, four hosts, each with three sites, replication of 2
-//        config = new LocalCluster("replication-2-cluster.jar", 3, 4, 2, BackendTarget.NATIVE_EE_JNI);
-//        assertTrue(config.compile(project));
-//        builder.addServerConfig(config);
-//
-//        // CLUSTER, 3 hosts, each with one site, replication of 1
-//        config = new LocalCluster("replication-odd-cluster.jar", 1, 3, 1, BackendTarget.NATIVE_EE_JNI);
-//        assertTrue(config.compile(project));
-//        builder.addServerConfig(config);
-
-        return builder;
+        return multiClusterSuiteBuilder(TestFailureDetectSuite.class, cb,
+                // CLUSTER, two hosts, each with two sites, replication of 1
+                new DeploymentBuilder(2, 2),
+                // CLUSTER, four hosts, each with three sites, replication of 2
+//                new DeploymentBuilder(3, 4, 2),
+                // CLUSTER, 3 hosts, each with one site, replication of 1
+//                new DeploymentBuilder(1, 3, 1),
+                // CLUSTER, three hosts, each with two sites, replication of 2
+                new DeploymentBuilder(2, 3, 2));
     }
 }

@@ -26,8 +26,12 @@ package org.voltdb.jni;
 import static org.mockito.Matchers.contains;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.verify;
+
+import java.io.IOException;
+
 import junit.framework.TestCase;
 
+import org.junit.BeforeClass;
 import org.mockito.Mockito;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.LegacyHashinator;
@@ -40,7 +44,7 @@ import org.voltdb.VoltType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Database;
 import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
@@ -50,11 +54,22 @@ import org.voltdb.utils.Encoder;
 
 public class TestFragmentProgressUpdate extends TestCase {
 
+    private ExecutionEngine m_ee;
+    private static String m_serializedCatalog;
+    private static final int CLUSTER_ID = 2;
+    private static final long NODE_ID = 1;
+    private int m_tableSize;
+    private int m_longOpthreshold;
+    private VoltTable m_warehousedata;
+    private VoltTable m_itemData;
+    private static int WAREHOUSE_TABLEID;
+    private static int ITEM_TABLEID;
+    private static Procedure m_testProc;
     private long READ_ONLY_TOKEN = Long.MAX_VALUE;
     private long WRITE_TOKEN = 0;
 
     public void testFragmentProgressUpdate() throws Exception {
-        m_ee.loadCatalog( 0, m_catalog.serialize());
+        m_ee.loadCatalog(0, m_serializedCatalog);
 
         m_tableSize = 5001;
         m_longOpthreshold = 10000;
@@ -104,7 +119,7 @@ public class TestFragmentProgressUpdate extends TestCase {
     }
 
     public void testTwoUpdates() throws Exception {
-        m_ee.loadCatalog( 0, m_catalog.serialize());
+        m_ee.loadCatalog(0, m_serializedCatalog);
 
         m_tableSize = 10000;
         m_longOpthreshold = 10000;
@@ -209,7 +224,7 @@ public class TestFragmentProgressUpdate extends TestCase {
     }
 
     public void testPeakLargerThanCurr() throws Exception {
-        m_ee.loadCatalog( 0, m_catalog.serialize());
+        m_ee.loadCatalog(0, m_serializedCatalog);
 
         m_tableSize = 20000;
         m_longOpthreshold = 10000;
@@ -268,8 +283,7 @@ public class TestFragmentProgressUpdate extends TestCase {
     private void verifyLongRunningQueries(int scale, int timeout, String query, boolean readOnly) {
         m_tableSize = scale;
 
-        m_ee.loadCatalog( 0, m_catalog.serialize());
-
+        m_ee.loadCatalog(0, m_serializedCatalog);
         m_itemData.clearRowData();
         for (int i = 0; i < m_tableSize; ++i) {
             m_itemData.addRow(i, i + 50, "item" + i, (double)i / 2, "data" + i);
@@ -355,17 +369,17 @@ public class TestFragmentProgressUpdate extends TestCase {
         tearDown(); setUp();
     }
 
-    private ExecutionEngine m_ee;
-    private static final int CLUSTER_ID = 2;
-    private static final long NODE_ID = 1;
-    private int m_tableSize;
-    private int m_longOpthreshold;
-    private VoltTable m_warehousedata;
-    private VoltTable m_itemData;
-    private Catalog m_catalog;
-    private int WAREHOUSE_TABLEID;
-    private int ITEM_TABLEID;
-    private Procedure m_testProc;
+    @BeforeClass
+    static void setupCatalog() throws IOException {
+        VoltDB.instance().readBuildInfo("Test");
+        Catalog m_catalog = TPCCProjectBuilder.createTPCCSchemaCatalog();
+        m_serializedCatalog = m_catalog.serialize();
+        Database database = CatalogUtil.getDatabase(m_catalog);
+        WAREHOUSE_TABLEID = database.getTables().get("WAREHOUSE").getRelativeIndex();
+        ITEM_TABLEID = database.getTables().get("ITEM").getRelativeIndex();
+        CatalogMap<Procedure> procedures = database.getProcedures();
+        m_testProc = procedures.getIgnoreCase("FragmentUpdateTestProcedure");
+    }
 
     @Override
     protected void setUp() throws Exception {
@@ -389,14 +403,6 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new VoltTable.ColumnInfo("I_PRICE", VoltType.FLOAT),
                 new VoltTable.ColumnInfo("I_DATA", VoltType.STRING)
                 );
-        m_catalog = new TPCCProjectBuilder().createTPCCSchemaCatalog();
-        Cluster cluster = m_catalog.getClusters().get("cluster");
-        WAREHOUSE_TABLEID = m_catalog.getClusters().get("cluster").getDatabases().
-                get("database").getTables().get("WAREHOUSE").getRelativeIndex();
-        ITEM_TABLEID = m_catalog.getClusters().get("cluster").getDatabases().
-                get("database").getTables().get("ITEM").getRelativeIndex();
-        CatalogMap<Procedure> procedures = cluster.getDatabases().get("database").getProcedures();
-        m_testProc = procedures.getIgnoreCase("FragmentUpdateTestProcedure");
         m_ee = new ExecutionEngineJNI(
                 CLUSTER_ID,
                 NODE_ID,
@@ -404,10 +410,7 @@ public class TestFragmentProgressUpdate extends TestCase {
                 0,
                 "",
                 100,
-                new HashinatorConfig(HashinatorType.LEGACY,
-                                     LegacyHashinator.getConfigureBytes(1),
-                                     0,
-                                     0));
+                new HashinatorConfig(HashinatorType.LEGACY, LegacyHashinator.getConfigureBytes(1), 0, 0));
     }
 
     @Override
