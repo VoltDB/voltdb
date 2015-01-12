@@ -81,10 +81,10 @@
             MatchNonBreakingCompoundKeywords =
                 /(\s+(?:explain|union|intersect|except|all)\s|(?:\())\s*((?:(?:\s\()*select)|insert|update|upsert|delete|truncate)\s+/gim,
             //   ($1------------------------------------------------)   ($2------------------------------------------------------)
-            // Note on           (?:.|\r|\n)
-            // It matches the new line character
-            MatchCreateView = /(\s*(?:create\s+view\s+)(?:[\s\S])*\s+as\s+)(select)/gim,
-            //                 ($1----------------------------------------)($2----)
+            // Note on           ([\s\S])
+            // It matches the any character including the new line character
+            MatchCreateView = /(\s*(?:create\s+view\s+)(?:(?!create\s+(?:view|procedure))[\s\S])*\s+as\s+)(select)/gim,
+            //                 ($1-----------------------------------------------------------------------)($2----)
             MatchCompoundKeywordDisguise = /#NON_BREAKING_SUFFIX_KEYWORD#/g,
             GenerateDisguisedCompoundKeywords = ' $1 #NON_BREAKING_SUFFIX_KEYWORD#$2 ';
 
