@@ -105,6 +105,8 @@ public interface SiteProcedureConnection {
             long uniqueId,
             boolean readOnly) throws EEException;
 
+    public void ensureProcLoaded(String procName);
+
     /**
      * Let the EE know which batch of sql is running so it can include this
      * information in any slow query progress log messages.

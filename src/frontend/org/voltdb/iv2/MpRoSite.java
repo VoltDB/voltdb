@@ -527,4 +527,9 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     public void applyBinaryLog(byte log[]) {
         throw new UnsupportedOperationException("RO MP Site doesn't do this, shouldn't be here");
     }
+
+    @Override
+    public void ensureProcLoaded(String procName) {
+        m_loadedProcedures.getProcByName(procName);
+    }
 }

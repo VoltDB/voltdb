@@ -175,6 +175,12 @@ public class FragmentTask extends TransactionTask
     // modifed to work in the new world
     public FragmentResponseMessage processFragmentTask(SiteProcedureConnection siteConnection)
     {
+        // XXX Ensure default procs loaded here
+        String procName = m_fragmentMsg.getProcedureName();
+        if (procName != null) {
+            siteConnection.ensureProcLoaded(procName);
+        }
+
         // IZZY: actually need the "executor" HSId these days?
         final FragmentResponseMessage currentFragResponse =
             new FragmentResponseMessage(m_fragmentMsg, m_initiator.getHSId());

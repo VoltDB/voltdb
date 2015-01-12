@@ -1660,6 +1660,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         final AuthSystem.AuthUser user = catalogContext.authSystem.getUser(handler.m_username);
 
         Procedure catProc = catalogContext.procedures.get(task.procName);
+        if (catProc == null) {
+            catProc = catalogContext.m_defaultProcs.checkForDefaultProcedure(task.procName);
+        }
 
         if (catProc == null) {
             String proc = task.procName;

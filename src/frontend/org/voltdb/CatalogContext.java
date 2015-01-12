@@ -67,6 +67,7 @@ public class CatalogContext {
     public final long m_transactionId;
     public long m_uniqueId;
     public final JdbcDatabaseMetaDataGenerator m_jdbc;
+    public final DefaultProcedureManager m_defaultProcs;
 
     /*
      * Planner associated with this catalog version.
@@ -140,6 +141,8 @@ public class CatalogContext {
                 }
             }
         }
+
+        m_defaultProcs = new DefaultProcedureManager(database);
     }
 
     public CatalogContext update(
