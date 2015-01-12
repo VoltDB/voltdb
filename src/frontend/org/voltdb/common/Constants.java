@@ -69,5 +69,6 @@ public class Constants
     /** String that can be used to indicate NULL value in CSV files */
     public static final String QUOTED_CSV_NULL = "\"\\N\"";
 
-    public static final String DEFAULT_EXPORT_CONNECTOR_NAME = "DefaultExportGroup";
+    // default export group to use when no group name is provided
+    public static final String DEFAULT_EXPORT_CONNECTOR_NAME = "__DEFAULT_EXPORT_GROUP__";
 }

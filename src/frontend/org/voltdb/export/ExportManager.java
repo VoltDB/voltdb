@@ -484,6 +484,8 @@ public class ExportManager
     private void updateProcessorConfig(final CatalogMap<Connector> connectors) {
         Map<String, Pair<Properties, Set<String>>> config = new HashMap<>();
 
+        // If the export source changes before the previous generation drains
+        // then the outstanding exports will go to the new source when export resumes.
         for (Connector conn : connectors) {
             // skip disabled connectors
             if (!conn.getEnabled() || conn.getTableinfo().isEmpty()) {
@@ -525,9 +527,8 @@ public class ExportManager
             m_loaderClass = null;
             return;
         }
-        else {
-            m_loaderClass = DEFAULT_LOADER_CLASS;
-        }
+
+        m_loaderClass = DEFAULT_LOADER_CLASS;
 
         File exportOverflowDirectory = new File(catalogContext.cluster.getExportoverflow());
 

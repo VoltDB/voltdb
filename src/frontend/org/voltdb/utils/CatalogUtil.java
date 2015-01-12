@@ -95,6 +95,7 @@ import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PropertyType;
 import org.voltdb.compiler.deploymentfile.SchemaType;
 import org.voltdb.compiler.deploymentfile.SecurityType;
+import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.UsersType;
@@ -1048,12 +1049,9 @@ public abstract class CatalogUtil {
                         exportClientClassName = exportConfiguration.getExportconnectorclass();
                     }
                     catch (ClassNotFoundException ex) {
-                        hostLog.error(
+                        throw new RuntimeException(
                                 "Custom Export failed to configure, failed to load " +
-                                "export plugin class: " + exportConfiguration.getExportconnectorclass() +
-                                " disabling export.");
-                        exportConfiguration.setEnabled(false);
-                        continue;
+                                "export plugin class: " + exportConfiguration.getExportconnectorclass());
                     } break;
             }
 
@@ -1063,8 +1061,13 @@ public abstract class CatalogUtil {
                 ConnectorProperty prop = catconn.getConfig().add(ExportDataProcessor.EXPORT_TO_TYPE);
                 prop.setName(ExportDataProcessor.EXPORT_TO_TYPE);
                 //Override for tests
-                String dexportClientClassName = System.getProperty(ExportDataProcessor.EXPORT_TO_TYPE, exportClientClassName);
-                prop.setValue(dexportClientClassName);
+                String dexportClientClassName = System.getProperty(ExportDataProcessor.EXPORT_TO_TYPE);
+                if (dexportClientClassName != null && dexportClientClassName.trim().length() > 0 &&
+                        exportConfiguration.getTarget().equals(ServerExportEnum.CUSTOM)) {
+                    prop.setValue(dexportClientClassName);
+                } else {
+                    prop.setValue(exportClientClassName);
+                }
             }
 
             List<PropertyType> configProperties = exportConfiguration.getProperty();
