@@ -199,7 +199,6 @@
   <xs:simpleType name="snapshotPriorityType">
     <xs:restriction base="xs:int">
       <xs:minInclusive value="0"/>
-      <xs:maxInclusive value="10"/>
     </xs:restriction>
   </xs:simpleType>
 
