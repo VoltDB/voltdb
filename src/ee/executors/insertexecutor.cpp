@@ -157,8 +157,10 @@ bool InsertExecutor::executePurgeFragmentIfNeeded(PersistentTable** ptrToTable) 
         // table is still around for undo purposes, but there is now a
         // new empty table we can insert into.  Update the caller's table
         // pointer to use it.
-        TableCatalogDelegate* tcd = m_engine->getTableDelegate(table->name());
-        *ptrToTable = tcd->getPersistentTable();
+        //
+        // The plan node will go through the table catalog delegate to get
+        // the correct instance of PersistentTable.
+        *ptrToTable = static_cast<PersistentTable*>(m_node->getTargetTable());
     }
 
     return true;
