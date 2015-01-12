@@ -37,8 +37,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.SortedMap;
-import java.util.SortedSet;
+import java.util.NavigableMap;
+import java.util.NavigableSet;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.regex.Matcher;
@@ -1149,8 +1149,8 @@ public class VoltCompiler {
         addDatabaseEstimatesInfo(m_estimates, db);
 
         // Process DDL exported tables
-        SortedMap<String, SortedSet<String>> exportTables = voltDdlTracker.getExportedTables();
-        for (Entry<String, SortedSet<String>> e : exportTables.entrySet()) {
+        NavigableMap<String, NavigableSet<String>> exportTables = voltDdlTracker.getExportedTables();
+        for (Entry<String, NavigableSet<String>> e : exportTables.entrySet()) {
             String groupName = e.getKey();
             for (String tableName : e.getValue()) {
                 addExportTableToConnector(groupName, tableName, db);
@@ -1982,7 +1982,7 @@ public class VoltCompiler {
             return;
         }
 
-        // Catalog Connector.ConnectorTableInfo
+        // This code is used for adding export tables to the default group connector
         if (export.getTables() != null) {
             for (Tables.Table xmltable : export.getTables().getTable()) {
                 addExportTableToConnector(Constants.DEFAULT_EXPORT_CONNECTOR_NAME, xmltable.getName(), catdb);

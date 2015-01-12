@@ -270,7 +270,7 @@
     <xs:sequence>
       <xs:element name="property" type="PropertyType" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
-    <xs:attribute name="group" type="xs:string" default="DefaultExportGroup"/>
+    <xs:attribute name="group" type="xs:string" default="__DEFAULT_EXPORT_GROUP__"/>
     <xs:attribute name="enabled" type="xs:boolean" default="true"/>
     <xs:attribute name="target" type="ServerExportEnum" default="file"/>
     <xs:attribute name="exportconnectorclass" type="xs:string" default=""/>

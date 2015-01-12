@@ -697,13 +697,11 @@ public class TestCatalogUtil extends TestCase {
         Catalog cat = compiler.compileCatalogFromDDL(x);
 
         String msg = CatalogUtil.compileDeployment(cat, bad_deployment, false);
-        assertTrue("Deployment file failed to parse: " + msg, msg == null);
-
-        Database db = cat.getClusters().get("cluster").getDatabases().get("database");
-        org.voltdb.catalog.Connector catconn = db.getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
-        assertNotNull(catconn);
-
-        assertFalse(bad_deployment.getExport().getConfiguration().get(0).isEnabled());
+        if (msg == null) {
+            fail("Should not accept a deployment file containing a missing export connector class.");
+        } else {
+            assertTrue(msg.contains("Custom Export failed to configure, failed to load export plugin class:"));
+        }
 
         //This is a good deployment with custom class that can be found
         final File tmpGood = VoltProjectBuilder.writeStringToTempFile(withGoodCustomExport);
@@ -713,8 +711,8 @@ public class TestCatalogUtil extends TestCase {
         msg = CatalogUtil.compileDeployment(cat2, good_deployment, false);
         assertTrue("Deployment file failed to parse: " + msg, msg == null);
 
-        db = cat2.getClusters().get("cluster").getDatabases().get("database");
-        catconn = db.getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
+        Database db = cat2.getClusters().get("cluster").getDatabases().get("database");
+        org.voltdb.catalog.Connector catconn = db.getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
         assertNotNull(catconn);
 
         assertTrue(good_deployment.getExport().getConfiguration().get(0).isEnabled());
@@ -837,7 +835,7 @@ public class TestCatalogUtil extends TestCase {
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
                 + "    <export>"
-                + "        <configuration group='foo' enabled='true' target='file'>"
+                + "        <configuration group='foo' enabled='true' target='custom' exportconnectorclass=\"org.voltdb.exportclient.NoOpTestExportClient\" >"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -866,13 +864,11 @@ public class TestCatalogUtil extends TestCase {
         Catalog cat = compiler.compileCatalogFromDDL(x);
 
         String msg = CatalogUtil.compileDeployment(cat, bad_deployment, false);
-        assertTrue("Deployment file failed to parse: " + msg, msg == null);
-
-        Database db = cat.getClusters().get("cluster").getDatabases().get("database");
-        org.voltdb.catalog.Connector catconn = db.getConnectors().get("foo");
-        assertNotNull(catconn);
-
-        assertFalse(bad_deployment.getExport().getConfiguration().get(0).isEnabled());
+        if (msg == null) {
+            fail("Should not accept a deployment file containing a missing export connector class.");
+        } else {
+            assertTrue(msg.contains("Custom Export failed to configure, failed to load export plugin class:"));
+        }
 
         //This is a bad deployment with the same export group defined multiple times
         final File tmpBadGrp = VoltProjectBuilder.writeStringToTempFile(withBadRepeatGroup);
@@ -893,8 +889,8 @@ public class TestCatalogUtil extends TestCase {
         msg = CatalogUtil.compileDeployment(cat3, unused_deployment, false);
         assertTrue("Deployment file failed to parse: " + msg, msg == null);
 
-        db = cat3.getClusters().get("cluster").getDatabases().get("database");
-        catconn = db.getConnectors().get("unused");
+        Database db = cat3.getClusters().get("cluster").getDatabases().get("database");
+        org.voltdb.catalog.Connector catconn = db.getConnectors().get("unused");
         assertNull(catconn);
 
         //This is a good deployment with custom class that can be found
@@ -906,15 +902,19 @@ public class TestCatalogUtil extends TestCase {
         assertTrue("Deployment file failed to parse: " + msg, msg == null);
 
         db = cat4.getClusters().get("cluster").getDatabases().get("database");
+
         catconn = db.getConnectors().get("foo");
         assertNotNull(catconn);
+        assertTrue(good_deployment.getExport().getConfiguration().get(0).isEnabled());
+        ConnectorProperty prop = catconn.getConfig().get(ExportDataProcessor.EXPORT_TO_TYPE);
+        assertEquals(prop.getValue(), "org.voltdb.exportclient.NoOpTestExportClient");
+        assertEquals(good_deployment.getExport().getConfiguration().get(0).getTarget(), ServerExportEnum.CUSTOM);
+
         catconn = db.getConnectors().get("bar");
         assertNotNull(catconn);
-
-        assertTrue(good_deployment.getExport().getConfiguration().get(0).isEnabled());
-        assertEquals(good_deployment.getExport().getConfiguration().get(0).getTarget(), ServerExportEnum.FILE);
-
         assertTrue(good_deployment.getExport().getConfiguration().get(1).isEnabled());
+        prop = catconn.getConfig().get(ExportDataProcessor.EXPORT_TO_TYPE);
+        assertEquals(prop.getValue(), "org.voltdb.exportclient.ExportToFileClient");
         assertEquals(good_deployment.getExport().getConfiguration().get(1).getTarget(), ServerExportEnum.FILE);
     }
 
@@ -931,19 +931,46 @@ public class TestCatalogUtil extends TestCase {
                 + "        </configuration>"
                 + "    </export>"
                 + "</deployment>";
+        final String withGoodFileExport =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <export enabled='true' target='file' >"
+                + "        <configuration>"
+                + "            <property name=\"foo\">false</property>"
+                + "            <property name=\"type\">CSV</property>"
+                + "            <property name=\"with-schema\">false</property>"
+                + "        </configuration>"
+                + "    </export>"
+                + "</deployment>";
         final String ddl =
                 "CREATE TABLE export_data ( id BIGINT default 0 , value BIGINT DEFAULT 0 );\n"
                 + "EXPORT TABLE export_data;";
 
         final File tmpDdl = VoltProjectBuilder.writeStringToTempFile(ddl);
 
+        VoltCompiler compiler = new VoltCompiler();
+        String x[] = {tmpDdl.getAbsolutePath()};
+
+        Catalog cat = compiler.compileCatalogFromDDL(x);
         final File tmpGood = VoltProjectBuilder.writeStringToTempFile(withGoodCustomExport);
         DeploymentType good_deployment = CatalogUtil.getDeployment(new FileInputStream(tmpGood));
+        String msg = CatalogUtil.compileDeployment(cat, good_deployment, false);
+        assertTrue("Deployment file failed to parse: " + msg, msg == null);
 
         assertTrue(good_deployment.getExport().getConfiguration().get(0).isEnabled());
         assertEquals(good_deployment.getExport().getConfiguration().get(0).getExportconnectorclass(),
                 "org.voltdb.exportclient.NoOpTestExportClient");
         assertEquals(good_deployment.getExport().getConfiguration().get(0).getTarget(), ServerExportEnum.CUSTOM);
+
+        Catalog cat2 = compiler.compileCatalogFromDDL(x);
+        final File tmpFileGood = VoltProjectBuilder.writeStringToTempFile(withGoodFileExport);
+        DeploymentType good_file_deployment = CatalogUtil.getDeployment(new FileInputStream(tmpFileGood));
+        msg = CatalogUtil.compileDeployment(cat2, good_file_deployment, false);
+        assertTrue("Deployment file failed to parse: " + msg, msg == null);
+
+        assertTrue(good_file_deployment.getExport().getConfiguration().get(0).isEnabled());
+        assertEquals(good_file_deployment.getExport().getConfiguration().get(0).getTarget(), ServerExportEnum.FILE);
     }
 
     /**

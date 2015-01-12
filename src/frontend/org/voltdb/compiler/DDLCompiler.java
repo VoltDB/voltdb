@@ -388,8 +388,8 @@ public class DDLCompiler {
             "\\A"  +                            // start statement
             "EXPORT\\s+TABLE\\s+"  +            // EXPORT TABLE
             "([\\w.$]+)" +                      // (1) <table name>
-            "(\\s+GROUP\\s+" +                  // begin optional GROUP clause (also regex group 2)
-            "([\\w.$]+)" +                      // (3) <export group>
+            "(?:\\s+GROUP\\s+" +                // begin optional GROUP clause
+            "([\\w.$]+)" +                      // (2) <export group>
             ")?" +                              // end optional GROUP clause
             "\\s*;\\z"                          // (end statement)
             );
@@ -1003,10 +1003,8 @@ public class DDLCompiler {
             String tableName = checkIdentifierStart(statementMatcher.group(1), statement);
 
             // group names should be the third group captured
-            boolean hasGroupName = (statementMatcher.groupCount() > 1) && (statementMatcher.group(3) != null);
-
-            String groupName = hasGroupName ?
-                    checkIdentifierStart(statementMatcher.group(3), statement) :
+            String groupName = ((statementMatcher.groupCount() > 1) && (statementMatcher.group(2) != null)) ?
+                    checkIdentifierStart(statementMatcher.group(2), statement) :
                     Constants.DEFAULT_EXPORT_CONNECTOR_NAME;
 
             VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
