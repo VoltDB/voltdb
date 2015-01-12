@@ -162,7 +162,8 @@
 {"testName":"DdlCreateTable","sqlCmd":"create table ddl_table (i integer)","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
 {"testName":"DdlAlterTableDropColumn","sqlCmd":"drop table ddl_table;\ncreate table ddl_table (i integer, j tinyint);\nalter table ddl_table drop column j;","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
 {"testName":"DdlAlterTableAlterColumn","sqlCmd":"drop table ddl_table;\ncreate table ddl_table (i integer, j tinyint);\nalter table ddl_table alter column j float default 3.4","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
-{"testName":"DdlCreateView","sqlCmd":"create view ddl_table_view (gb integer, ct integer) as select i, count(*) from ddl_table group by i","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+{"testName":"DdlCreateView","sqlCmd":"create view ddl_table_view (gb, ct) as select i, count(*) from ddl_table group by i","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+{"testName":"DdlCreateView","sqlCmd":"create view ddl_table_view \n (gb,\n ct\n) \nas \nselect i, count(*) from ddl_table group by i","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
 #
 #
 #/////////
@@ -173,7 +174,8 @@
 # not insert them, hence the following cause parse errors.
 {"testName":"DdlAlterTableDropDrop","sqlCmd":"drop table ddl_table;\ncreate table ddl_table (i integer, j tinyint, k bigint);\nalter table ddl_table drop column j alter table ddl_table drop column k","response":{"result":"ERROR","status":"FAILURE"}}
 {"testName":"DdlAlterTableAddAdd","sqlCmd":"drop table ddl_table;\ncreate table ddl_table (i integer);\nalter table ddl_table add column j bigint alter table ddl_table add column k tinyint","response":{"result":"ERROR","status":"FAILURE"}}
-{"testName":"DdlCreateViewInvalid","sqlCmd":"create view ddl_no_table_view (gb integer, ct integer) as select i, count(*) from ddl_table group by i","response":{"result":"ERROR","status":"FAILURE"}}
+# try to create a view from an undefined table
+{"testName":"DdlCreateViewInvalid","sqlCmd":"create view ddl_no_table_view (gb, ct) as select i, count(*) from ddl_no_table_exists group by i","response":{"result":"ERROR","status":"FAILURE"}}
 #
 # Finally, drop ddl_table so test is repeatable.
 {"testName":"DdlDropTable","sqlCmd":"drop table ddl_table","response":{"result":{"status":["0"]},"status":"SUCCESS"}}

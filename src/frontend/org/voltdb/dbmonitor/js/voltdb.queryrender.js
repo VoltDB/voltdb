@@ -83,8 +83,8 @@
             //   ($1------------------------------------------------)   ($2------------------------------------------------------)
             // Note on           (?:.|\r|\n)
             // It matches the new line character
-            MatchCreateView = /(\s*(?:create\s+view\s+)(?:.|\r|\n)*\s+as\s+)(select)/gim,
-            //                 ($1-----------------------------------------)($2----)
+            MatchCreateView = /(\s*(?:create\s+view\s+)(?:[\s\S])*\s+as\s+)(select)/gim,
+            //                 ($1----------------------------------------)($2----)
             MatchCompoundKeywordDisguise = /#NON_BREAKING_SUFFIX_KEYWORD#/g,
             GenerateDisguisedCompoundKeywords = ' $1 #NON_BREAKING_SUFFIX_KEYWORD#$2 ';
 
