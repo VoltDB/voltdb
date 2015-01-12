@@ -85,6 +85,9 @@
             // It matches the any character including the new line character
             MatchCreateView = /(\s*(?:create\s+view\s+)(?:(?!create\s+(?:view|procedure))[\s\S])*\s+as\s+)(select)/gim,
             //                 ($1-----------------------------------------------------------------------)($2----)
+            MatchCreateSingleQueryProcedure =
+                /(\s*(?:create\s+procedure\s+)(?:(?!create\s+(?:view|procedure))[\s\S])*\s+as\s+)(select|insert|update|upsert|delete|truncate)/gim,
+            //   ($1----------------------------------------------------------------------------)($2-----------------------------------------)
             MatchCompoundKeywordDisguise = /#NON_BREAKING_SUFFIX_KEYWORD#/g,
             GenerateDisguisedCompoundKeywords = ' $1 #NON_BREAKING_SUFFIX_KEYWORD#$2 ';
 
@@ -149,6 +152,7 @@
             src = src.replace(MatchNonBreakingInsertIntoSelect, GenerateDisguisedCompoundKeywords);
             src = src.replace(MatchNonBreakingCompoundKeywords, GenerateDisguisedCompoundKeywords);
             src = src.replace(MatchCreateView, GenerateDisguisedCompoundKeywords);
+            src = src.replace(MatchCreateSingleQueryProcedure, GenerateDisguisedCompoundKeywords);
 
             if (!src.match("^explain")) {
                 // Start a new statement before each remaining statement keyword.

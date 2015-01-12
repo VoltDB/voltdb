@@ -162,10 +162,13 @@
 {"testName":"DdlCreateTable","sqlCmd":"create table ddl_table (i integer)","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
 {"testName":"DdlAlterTableDropColumn","sqlCmd":"drop table ddl_table;\ncreate table ddl_table (i integer, j tinyint);\nalter table ddl_table drop column j;","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
 {"testName":"DdlAlterTableAlterColumn","sqlCmd":"drop table ddl_table;\ncreate table ddl_table (i integer, j tinyint);\nalter table ddl_table alter column j float default 3.4","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
-{"testName":"DdlCreateView1","sqlCmd":"create view ddl_table_view (gb, ct) as select i, count(*) from ddl_table group by i","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
-{"testName":"DdlCreateView2","sqlCmd":"create view ddl_table_view \n (gb,\n ct\n) \nas \nselect i, count(*) from ddl_table group by i","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+{"testName":"DdlCreateView1","sqlCmd":"create view ddl_table_view1 (gb, ct) as select i, count(*) from ddl_table group by i","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+{"testName":"DdlCreateView2","sqlCmd":"create view ddl_table_view2 \n (gb,\n ct\n) \nas \nselect i, count(*) from ddl_table group by i","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
 # not sure how multiple statements work in GEB, but this is necessary to be tested
 {"testName":"DdlCreateView3","sqlCmd":"create table tb (i integer, j integer); \n create view tb_view1 (gb, ct) as select i, count(*) from tb_view1 group by i;\n create view tb_view2 (gb, ct) as select i, count(*) from tb_view1 group by i;","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+# Create procedure test: there are other queries has not been tested update, truncate, upsert
+{"testName":"DdlCreateProcedure1","sqlCmd":"create procedure \np1 as insert into tb values(1, 1);\n ","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+{"testName":"DdlCreateProcedure2","sqlCmd":"create procedure \np21 as select i \nfrom tb;\n  create procedure p22\n as delete from tb;","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
 #
 #
 #/////////
