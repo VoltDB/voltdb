@@ -354,10 +354,21 @@ public class PlanAssembler {
         }
 
         if (parsedStmt instanceof ParsedInsertStmt  && !plan.isOrderDeterministic()) {
+            ParsedInsertStmt parsedInsert = (ParsedInsertStmt)parsedStmt;
+            boolean targetHasLimitRowsTrigger = parsedInsert.targetTableHasLimitRowsTrigger();
+
             if (parsedStmt.m_isUpsert) {
                 throw new PlanningErrorException(
                         "UPSERT statement manipulates data in a non-deterministic way.  "
                         + "Adding an ORDER BY clause to UPSERT INTO ... SELECT may address this issue.");
+            }
+            else if (targetHasLimitRowsTrigger) {
+                throw new PlanningErrorException(
+                        "Order of rows produced by SELECT statement in INSERT INTO ... SELECT is "
+                        + "non-deterministic.  Since the table being insert into has a row limit "
+                        + "trigger, the SELECT output must be ordered.  Add an ORDER BY clause "
+                        + "to address this issue."
+                        );
             }
             else if (plan.hasLimitOrOffset()) {
                 throw new PlanningErrorException(

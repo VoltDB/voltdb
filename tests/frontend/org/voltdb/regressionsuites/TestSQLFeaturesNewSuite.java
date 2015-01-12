@@ -299,35 +299,52 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         client.callProcedure("@AdHoc", "DELETE FROM CAPPED3_LIMIT_ROWS_EXEC");
     }
 
-    public void testTableLimitPartitionRowsExecMultiRow() throws IOException, ProcCallException {
+    public void testTableLimitPartitionRowsExecMultiRowSelfInsert() throws Exception {
 
         if (isHSQL())
                 return;
 
         Client client = getClient();
 
-        // For multi-row insert, the insert trigger should not fire.
         client.callProcedure("CAPPED3_LIMIT_ROWS_EXEC.insert", 1, 10, 20);
         client.callProcedure("CAPPED3_LIMIT_ROWS_EXEC.insert", 1, 20, 40);
         client.callProcedure("CAPPED3_LIMIT_ROWS_EXEC.insert", 1, 30, 60);
 
-        verifyStmtFails(client,
-                        "INSERT INTO CAPPED3_LIMIT_ROWS_EXEC "
-                        + "SELECT purge_me, wage + 1, dept from CAPPED3_LIMIT_ROWS_EXEC WHERE WAGE = 20",
-                        "exceeds table maximum row count 3");
+        // Fails determinism check
+        String stmt = "INSERT INTO CAPPED3_LIMIT_ROWS_EXEC "
+                + "SELECT purge_me, wage + 1, dept from CAPPED3_LIMIT_ROWS_EXEC WHERE WAGE = 20";
+        verifyStmtFails(client, stmt,
+                        "Since the table being insert into has a row limit "
+                        + "trigger, the SELECT output must be ordered.");
+
+        // It passes when we add an ORDER BY clause
+        stmt += " ORDER BY purge_me, wage, dept";
+        validateTableOfScalarLongs(client, stmt,
+                new long[] {1});
 
         String selectAll = "SELECT * FROM CAPPED3_LIMIT_ROWS_EXEC ORDER BY WAGE";
         VoltTable vt = client.callProcedure("@AdHoc", selectAll).getResults()[0];
-        validateTableOfLongs(vt, new long[][] {{1, 10, 20}, {1, 20, 40}, {1, 30, 60}});
+        validateTableOfLongs(vt, new long[][] {{1, 21, 40}});
 
-        // Upsert fails too.
-        verifyStmtFails(client,
+        client.callProcedure("CAPPED3_LIMIT_ROWS_EXEC.insert", 1, 40, 80);
+        client.callProcedure("CAPPED3_LIMIT_ROWS_EXEC.insert", 1, 50, 100);
+
+        // Select rows where PK is 31, 50 and 60 for upsert.
+        // inserting 31 will trigger deletes, so should have
+        // Just 50 and 60
+        validateTableOfScalarLongs(client,
                         "UPSERT INTO CAPPED3_LIMIT_ROWS_EXEC "
-                        + "SELECT purge_me, wage + 1, dept from CAPPED3_LIMIT_ROWS_EXEC WHERE WAGE = 20 "
+                        + "SELECT purge_me, wage + 10, ((wage + 10) * 2) + 5 from CAPPED3_LIMIT_ROWS_EXEC "
                         + "ORDER BY 1, 2, 3",
-                        "exceeds table maximum row count 3");
+                        new long[] {3});
+
         vt = client.callProcedure("@AdHoc", selectAll).getResults()[0];
-        validateTableOfLongs(vt, new long[][] {{1, 10, 20}, {1, 20, 40}, {1, 30, 60}});
+        validateTableOfLongs(vt, new long[][] {
+                {1, 31, 67},
+                {1, 50, 105},
+                {1, 60, 125}
+
+        });
     }
 
     public void testTableLimitPartitionRowsExecUpsert() throws Exception {
@@ -617,9 +634,15 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         // Insert into select into a capped table with a trigger
         // NOTE: if target table has a cap, then the SELECT output must be
         // strictly ordered!  Otherwise the effect is not deterministic.
-        VoltTable vt = client.callProcedure("@AdHoc",
-                "INSERT INTO capped3_limit_rows_exec "
-                + "SELECT 1, wage, dept FROM nocapped")
+        String stmt = "INSERT INTO capped3_limit_rows_exec "
+                + "SELECT 1, wage, dept FROM nocapped";
+        verifyStmtFails(client, stmt,
+                "Since the table being insert into has a row limit "
+                + "trigger, the SELECT output must be ordered");
+
+        // Add an order by clause to order the select
+        stmt += " ORDER BY id, wage, dept";
+        VoltTable vt = client.callProcedure("@AdHoc", stmt)
                 .getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {11});
 

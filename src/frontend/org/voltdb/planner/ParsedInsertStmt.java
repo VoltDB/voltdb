@@ -213,4 +213,14 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
         assert(getSubselectStmt() != null);
         return getSubselectStmt().isOrderDeterministicInSpiteOfUnorderedSubqueries();
     }
+
+    /**
+     * Returns true if the table being inserted into has a trigger executed
+     * when row limit is met
+     */
+    public boolean targetTableHasLimitRowsTrigger() {
+        // TODO Auto-generated method stub
+        assert(m_tableList.size() == 1);
+        return m_tableList.get(0).getTuplelimitdeletestmt().size() != 0;
+    }
 }
