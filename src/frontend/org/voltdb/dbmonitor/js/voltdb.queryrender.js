@@ -81,6 +81,10 @@
             MatchNonBreakingCompoundKeywords =
                 /(\s+(?:explain|union|intersect|except|all)\s|(?:\())\s*((?:(?:\s\()*select)|insert|update|upsert|delete|truncate)\s+/gim,
             //   ($1------------------------------------------------)   ($2------------------------------------------------------)
+            // Note on           (?:.|\r|\n)
+            // It matches the new line character
+            MatchCreateView = /(\s*(?:create\s+view\s+)(?:.|\r|\n)*\s+as\s+)(select)/gim,
+            //                 ($1-----------------------------------------)($2----)
             MatchCompoundKeywordDisguise = /#NON_BREAKING_SUFFIX_KEYWORD#/g,
             GenerateDisguisedCompoundKeywords = ' $1 #NON_BREAKING_SUFFIX_KEYWORD#$2 ';
 
@@ -144,6 +148,7 @@
             //* Enable this to debug in the browser */ console.log("pre-processed queries:'" + src + "'");
             src = src.replace(MatchNonBreakingInsertIntoSelect, GenerateDisguisedCompoundKeywords);
             src = src.replace(MatchNonBreakingCompoundKeywords, GenerateDisguisedCompoundKeywords);
+            src = src.replace(MatchCreateView, GenerateDisguisedCompoundKeywords);
 
             if (!src.match("^explain")) {
                 // Start a new statement before each remaining statement keyword.
