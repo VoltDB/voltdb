@@ -520,7 +520,9 @@ function loadAdminPage() {
                 $("#navAdmin").hide();
                 popup.close();
             });
-        }
+        },
+        closeContent: '',
+        modal: true
     });
 
     var showUpdateMessage = function (msg) {
