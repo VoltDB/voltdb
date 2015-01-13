@@ -511,8 +511,8 @@ function loadAdminPage() {
         afterOpen: function (event, ui, ele) {
             var popup = $(this)[0];
            
-            $("#btnLoginWarningOk").on('click', function () {
-                VoltDbAdminConfig.isAdmin = false;                
+            $("#btnLoginWarningOk").unbind("click");
+            $("#btnLoginWarningOk").on('click', function () {                
                 if (VoltDbUI.CurrentTab == NavigationTabs.Admin) {
                     $("#navDbmonitor").click();
                 }

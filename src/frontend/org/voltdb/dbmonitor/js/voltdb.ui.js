@@ -519,9 +519,11 @@ var loadPage = function (serverName, portid) {
         
         //Load Admin configurations                
         voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues, rawConfigValues) {
-            if (rawConfigValues.status == -3)
+            if (rawConfigValues.status == -3 && VoltDbAdminConfig.isAdmin) {
+                VoltDbAdminConfig.isAdmin = false;
                 $("#loginWarnPopup").click();
-            else
+                
+            } else
                 VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues, rawConfigValues);
         });
     };
