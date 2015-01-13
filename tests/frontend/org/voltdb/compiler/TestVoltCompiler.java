@@ -1323,14 +1323,14 @@ public class TestVoltCompiler extends TestCase {
                   + "from class org.voltdb.compiler.procedures.AddBook",
                     "has partition properties defined both in class");
 
-        // Class proc with preceding ALLOW clause
+        // Class proc with ALLOW before PARTITION clause
         tester.test("create role r1;\n"
                   + "create procedure "
                   + "allow r1 "
                   + "partition on table books column cash "
                   + "from class org.voltdb.compiler.procedures.NotAnnotatedAddBook");
 
-        // Class proc with trailing ALLOW clause
+        // Class proc with ALLOW after PARTITION clause
         tester.test("create role r1;\n"
                   + "create procedure "
                   + "partition on table books column cash "
@@ -1353,29 +1353,20 @@ public class TestVoltCompiler extends TestCase {
                     "    }\n" +
                     "### LANGUAGE GROOVY");
 
-        // Class proc with two PARTITION clauses (outer regex failure causes general error)
-        tester.test("create procedure "
-                  + "partition on table books column cash "
-                  + "partition on table books column cash "
-                  + "partition on table books column cash "
-                  + "from class org.voltdb.compiler.procedures.NotAnnotatedAddBook",
-                    "Invalid CREATE PROCEDURE statement");
-
-/* Enable after parser detects these.
         // Class proc with two PARTITION clauses (inner regex failure causes specific error)
         tester.test("create procedure "
                   + "partition on table books column cash "
                   + "partition on table books column cash "
                   + "from class org.voltdb.compiler.procedures.NotAnnotatedAddBook",
-                    "blah");
+                    "Only one PARTITION clause is allowed for CREATE PROCEDURE");
 
-        // Class proc with two ALLOW clauses (inner regex failure causes specific error)
+        // Class proc with two ALLOW clauses (should work)
         tester.test("create role r1;\n"
+                  + "create role r2;\n"
                   + "create procedure "
                   + "allow r1 "
-                  + "allow r1 "
-                  + "from class org.voltdb.compiler.procedures.NotAnnotatedAddBook");
-*/
+                  + "allow r2 "
+                  + "from class org.voltdb.compiler.procedures.AddBook");
     }
 
     public void testUseInnerClassAsProc() throws Exception {
