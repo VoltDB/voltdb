@@ -1335,7 +1335,7 @@ public class SQLCommand
         if (splitStrings.length < 2) {
             printUsage("Missing input value for " + splitStrings[0]);
         }
-        return splitStrings[1];
+        return arg.split("=")[1];
     }
 
     // Application entry point
