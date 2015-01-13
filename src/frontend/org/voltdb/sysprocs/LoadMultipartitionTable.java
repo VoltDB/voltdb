@@ -25,6 +25,7 @@ import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.SystemProcedureExecutionContext;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -171,8 +172,7 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
                             tableName));
         }
 
-        // statements of all single-statement procs are named "sql"
-        Statement catStmt = proc.getStatements().get("sql");
+        Statement catStmt = proc.getStatements().get(VoltDB.ANON_STMT_NAME);
         if (catStmt == null) {
             throw new VoltAbortException(
                     String.format("Unable to find SQL statement for found table %s: BAD",

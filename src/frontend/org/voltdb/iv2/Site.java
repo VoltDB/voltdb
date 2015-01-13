@@ -667,7 +667,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     static boolean filter(TransactionInfoBaseMessage tibm)
     {
-        // don't log sysproc fragments or iv2 intiiate task messages.
+        // don't log sysproc fragments or iv2 initiate task messages.
         // this is all jealously; should be refactored to ask tibm
         // if it wants to be filtered for rejoin and eliminate this
         // horrible introspection. This implementation mimics the

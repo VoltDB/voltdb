@@ -34,6 +34,7 @@ import org.voltdb.exceptions.InterruptException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.utils.Encoder;
@@ -175,10 +176,19 @@ public class FragmentTask extends TransactionTask
     // modifed to work in the new world
     public FragmentResponseMessage processFragmentTask(SiteProcedureConnection siteConnection)
     {
-        // XXX Ensure default procs loaded here
+        // Ensure default procs loaded here
         String procName = m_fragmentMsg.getProcedureName();
         if (procName != null) {
             siteConnection.ensureProcLoaded(procName);
+        }
+        // @LoadMultipartitionTable also uses a default proc plan for insert into
+        // replicated tables, so it needed to be awkwardly teased out here.
+        if (procName.startsWith("@LoadMultipartitionTable")) {
+            Iv2InitiateTaskMessage itm = m_fragmentMsg.getInitiateTask();
+            if (itm != null) {
+                String tableName = (String) itm.getParameters()[0];
+                siteConnection.ensureProcLoaded(tableName.toUpperCase() + ".insert");
+            }
         }
 
         // IZZY: actually need the "executor" HSId these days?
