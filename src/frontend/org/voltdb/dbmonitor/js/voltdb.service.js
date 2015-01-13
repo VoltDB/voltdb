@@ -504,7 +504,7 @@
                             VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
                                 status = connection.Metadata['@SHORTAPI_DEPLOYMENT_status'];
                                 statusString = connection.Metadata['@SHORTAPI_DEPLOYMENT_statusString'];
-                                onConnectionAdded(connection, status,statusString);
+                                onConnectionAdded(connection);
                                 
                             }, shortApiDetails);
                         }
@@ -514,7 +514,7 @@
                     VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
                         status = connection.Metadata['@SHORTAPI_DEPLOYMENT_status'];
                         statusString = connection.Metadata['@SHORTAPI_DEPLOYMENT_statusString'];
-                        onConnectionAdded(connection, status, statusString);
+                        onConnectionAdded(connection);
                         
                     }, shortApiDetails);
 

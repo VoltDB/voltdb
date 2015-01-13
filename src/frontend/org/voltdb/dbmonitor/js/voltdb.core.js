@@ -496,11 +496,7 @@
             connectionQueue.Start();
 
             if (shortApiCallDetails != null && shortApiCallDetails.isShortApiCall) {
-                connectionQueue.BeginExecute([], [], function (data) {
-                    if (processName == "SHORTAPI_DEPLOYMENT") {
-                        connection.Metadata[processName + "_" + "status"] = data.status;
-                        connection.Metadata[processName + "_statusstring"] = data.statusstring;
-                    }                    
+                connectionQueue.BeginExecute([], [], function (data) {                                      
                     connection.Metadata[processName] = data;
                     
                 }, shortApiCallDetails);
@@ -635,9 +631,7 @@ jQuery.extend({
 });
 
 jQuery.extend({
-    getJSON: function (url, formData, callback, authorization) {
-        formData += '&User=admin&Hashedpassword=20e3aae7fc23385295505a6b703fd1fba66760d5';
-
+    getJSON: function (url, formData, callback, authorization) {     
         if (VoltDBCore.hostIP == "") {
             jQuery.ajax({
                 type: 'GET',

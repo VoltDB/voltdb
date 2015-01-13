@@ -342,12 +342,12 @@ function alertNodeClicked(obj) {
 
         this.GetAdminDeploymentInformation = function (checkSecurity, onInformationLoaded) {
             if (VoltDbAdminConfig.isAdmin || checkSecurity) {
-                VoltDBService.GetShortApiDeployment(function (connection,status,statusString) {
+                VoltDBService.GetShortApiDeployment(function (connection) {
                     var rawData;
                     if (connection != null)
                         rawData = connection.Metadata['SHORTAPI_DEPLOYMENT'];
 
-                    onInformationLoaded(loadAdminDeploymentInformation(connection), rawData,status,statusString);
+                    onInformationLoaded(loadAdminDeploymentInformation(connection), rawData);
                 });
             }
         };
