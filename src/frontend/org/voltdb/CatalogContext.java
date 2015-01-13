@@ -67,6 +67,9 @@ public class CatalogContext {
     public final long m_transactionId;
     public long m_uniqueId;
     public final JdbcDatabaseMetaDataGenerator m_jdbc;
+    // Default procs are loaded on the fly
+    // The DPM knows which default procs COULD EXIST
+    //  and also how to get SQL for them.
     public final DefaultProcedureManager m_defaultProcs;
 
     /*
@@ -143,8 +146,6 @@ public class CatalogContext {
                 }
             }
         }
-
-
     }
 
     public CatalogContext update(

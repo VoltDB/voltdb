@@ -1252,9 +1252,4 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         paramBuffer.put(log);
         m_ee.executeTask( TaskType.APPLY_BINARY_LOG, paramBuffer);
     }
-
-    @Override
-    public void ensureProcLoaded(String procName) {
-        m_loadedProcedures.getProcByName(procName);
-    }
 }

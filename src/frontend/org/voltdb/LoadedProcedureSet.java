@@ -17,8 +17,6 @@
 
 package org.voltdb;
 
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -26,37 +24,20 @@ import java.util.Set;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.CatalogContext.ProcedurePartitionInfo;
 import org.voltdb.SystemProcedureCatalog.Config;
-import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Database;
-import org.voltdb.catalog.PlanFragment;
-import org.voltdb.catalog.ProcParameter;
 import org.voltdb.catalog.Procedure;
-import org.voltdb.catalog.Statement;
-import org.voltdb.catalog.StmtParameter;
-import org.voltdb.catalog.Table;
 import org.voltdb.compiler.Language;
 import org.voltdb.compiler.PlannerTool;
+import org.voltdb.compiler.StatementCompiler;
 import org.voltdb.groovy.GroovyScriptProcedureDelegate;
-import org.voltdb.planner.CompiledPlan;
-import org.voltdb.planner.StatementPartitioning;
-import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.PlanNodeList;
-import org.voltdb.types.QueryType;
-import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 
-import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.ImmutableMap;
 
 public class LoadedProcedureSet {
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
-
-    Database m_fakeDb = null;
 
     // user procedures.
     ImmutableMap<String, ProcedureRunner> procs = ImmutableMap.<String, ProcedureRunner>builder().build();
@@ -100,8 +81,7 @@ public class LoadedProcedureSet {
             BackendTarget backendTarget,
             CatalogSpecificPlanner csp)
     {
-        // default proc caches
-        m_fakeDb = new Catalog().getClusters().add("cluster").getDatabases().add("database");
+        // default proc caches clear on catalog update
         m_defaultProcCache.clear();
 
         m_defaultProcManager = catalogContext.m_defaultProcs;
@@ -243,140 +223,28 @@ public class LoadedProcedureSet {
 
     public ProcedureRunner getProcByName(String procName)
     {
+        // Check the procs from the catalog
         ProcedureRunner pr = procs.get(procName);
+
+        // if not there, check the default proc cache
         if (pr == null) {
             pr = m_defaultProcCache.get(procName);
-            if (pr == null) {
-                Procedure catProc = m_defaultProcManager.checkForDefaultProcedure(procName);
-                if (catProc != null) {
-                    String sqlText = m_defaultProcManager.sqlForDefaultProc(catProc);
-                    Table table = catProc.getPartitiontable();
+        }
 
-                    // determine the type of the query
-                    QueryType qtype = QueryType.getFromSQL(sqlText);
-
-                    StatementPartitioning partitioning =
-                            catProc.getSinglepartition() ? StatementPartitioning.forceSP() :
-                                                           StatementPartitioning.forceMP();
-
-                    CompiledPlan plan = m_plannerTool.planSqlCore(sqlText, partitioning);
-
-                    VoltProcedure voltProc = new ProcedureRunner.StmtProcedure();
-                    Procedure newCatProc = m_fakeDb.getProcedures().add(procName);
-                    newCatProc.setClassname(catProc.getClassname());
-                    newCatProc.setDefaultproc(true);
-                    newCatProc.setEverysite(false);
-                    newCatProc.setHasjava(false);
-                    newCatProc.setPartitioncolumn(catProc.getPartitioncolumn());
-                    newCatProc.setPartitionparameter(catProc.getPartitionparameter());
-                    newCatProc.setPartitiontable(catProc.getPartitiontable());
-                    newCatProc.setReadonly(catProc.getReadonly());
-                    newCatProc.setSinglepartition(catProc.getSinglepartition());
-                    newCatProc.setSystemproc(false);
-
-                    if (catProc.getPartitionparameter() >= 0) {
-                        newCatProc.setAttachment(
-                                new ProcedurePartitionInfo(
-                                        VoltType.get((byte) catProc.getPartitioncolumn().getType()),
-                                        catProc.getPartitionparameter()));
-                    }
-
-                    CatalogMap<Statement> statements = newCatProc.getStatements();
-                    assert(statements != null);
-
-                    Statement stmt = statements.add(VoltDB.ANON_STMT_NAME);
-                    stmt.setSqltext(sqlText);
-                    stmt.setReadonly(catProc.getReadonly());
-                    stmt.setQuerytype(qtype.getValue());
-                    stmt.setSinglepartition(catProc.getSinglepartition());
-                    stmt.setBatched(false);
-                    stmt.setIscontentdeterministic(true);
-                    stmt.setIsorderdeterministic(true);
-                    stmt.setNondeterminismdetail("NO CONTENT FOR DEFAULT PROCS");
-                    stmt.setSeqscancount(plan.countSeqScans());
-                    stmt.setReplicatedtabledml(!catProc.getReadonly() && table.getIsreplicated());
-                    stmt.setParamnum(plan.parameters.length);
-
-                    // Input Parameters
-                    // We will need to update the system catalogs with this new information
-                    for (int i = 0; i < plan.parameters.length; ++i) {
-                        StmtParameter catalogParam = stmt.getParameters().add(String.valueOf(i));
-                        catalogParam.setJavatype(plan.parameters[i].getValueType().getValue());
-                        catalogParam.setIsarray(plan.parameters[i].getParamIsVector());
-                        catalogParam.setIndex(i);
-                    }
-
-                    PlanFragment frag = stmt.getFragments().add("0");
-
-                    // compute a hash of the plan
-                    MessageDigest md = null;
-                    try {
-                        md = MessageDigest.getInstance("SHA-1");
-                    } catch (NoSuchAlgorithmException e) {
-                        e.printStackTrace();
-                        assert(false);
-                        System.exit(-1); // should never happen with healthy jvm
-                    }
-
-                    byte[] planBytes = writePlanBytes(frag, plan.rootPlanGraph);
-                    md.update(planBytes, 0, planBytes.length);
-                    // compute the 40 bytes of hex from the 20 byte sha1 hash of the plans
-                    md.reset();
-                    md.update(planBytes);
-                    frag.setPlanhash(Encoder.hexEncode(md.digest()));
-
-                    if (plan.subPlanGraph != null) {
-                        frag.setHasdependencies(true);
-                        frag.setNontransactional(true);
-                        frag.setMultipartition(true);
-
-                        frag = stmt.getFragments().add("1");
-                        frag.setHasdependencies(false);
-                        frag.setNontransactional(false);
-                        frag.setMultipartition(true);
-                        byte[] subBytes = writePlanBytes(frag, plan.subPlanGraph);
-                        // compute the 40 bytes of hex from the 20 byte sha1 hash of the plans
-                        md.reset();
-                        md.update(subBytes);
-                        frag.setPlanhash(Encoder.hexEncode(md.digest()));
-                    }
-                    else {
-                        frag.setHasdependencies(false);
-                        frag.setNontransactional(false);
-                        frag.setMultipartition(false);
-                    }
-
-                    // set the procedure parameter types from the statement parameter types
-                    int paramCount = 0;
-                    for (StmtParameter stmtParam : CatalogUtil.getSortedCatalogItems(stmt.getParameters(), "index")) {
-                        // name each parameter "param1", "param2", etc...
-                        ProcParameter procParam = newCatProc.getParameters().add("param" + String.valueOf(paramCount));
-                        procParam.setIndex(stmtParam.getIndex());
-                        procParam.setIsarray(stmtParam.getIsarray());
-                        procParam.setType(stmtParam.getJavatype());
-                        paramCount++;
-                    }
-
-                    ProcedureRunner runner = m_runnerFactory.create(voltProc, newCatProc, m_csp);
-                    m_defaultProcCache.put(procName, runner);
-                    return runner;
-                }
+        // if not in the cache, compile the full default proc and put it in the cache
+        if (pr == null) {
+            Procedure catProc = m_defaultProcManager.checkForDefaultProcedure(procName);
+            if (catProc != null) {
+                String sqlText = m_defaultProcManager.sqlForDefaultProc(catProc);
+                Procedure newCatProc = StatementCompiler.compileDefaultProcedure(m_plannerTool, catProc, sqlText);
+                VoltProcedure voltProc = new ProcedureRunner.StmtProcedure();
+                ProcedureRunner runner = m_runnerFactory.create(voltProc, newCatProc, m_csp);
+                m_defaultProcCache.put(procName, runner);
+                return runner;
             }
         }
-        return pr;
-    }
 
-    /**
-     * Update the plan fragment and return the bytes of the plan
-     */
-    static byte[] writePlanBytes(PlanFragment fragment, AbstractPlanNode planGraph) {
-        // get the plan bytes
-        PlanNodeList node_list = new PlanNodeList(planGraph);
-        String json = node_list.toJSONString();
-        // Place serialized version of PlanNodeTree into a PlanFragment
-        byte[] jsonBytes = json.getBytes(Charsets.UTF_8);
-        String bin64String = Encoder.compressAndBase64Encode(jsonBytes);
-        fragment.setPlannodetree(bin64String);
-        return jsonBytes;
+        // return what we got, hopefully not null
+        return pr;
     }
 }

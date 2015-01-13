@@ -156,6 +156,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private static final VoltLogger authLog = new VoltLogger("AUTH");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger networkLog = new VoltLogger("NETWORK");
+
+    /** Ad hoc async work is either regular planning, ad hoc explain, or default proc explain. */
+    public enum ExplainMode {
+        NONE, EXPLAIN_ADHOC, EXPLAIN_DEFAULT_PROC;
+    }
+
     private final ClientAcceptor m_acceptor;
     private ClientAcceptor m_adminAcceptor;
 
@@ -1318,6 +1324,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 new VoltTable[0], realReason, handle);
     }
 
+    /**
+     * Take the response from the async ad hoc planning process and put the explain
+     * plan in a table with the right format.
+     */
     private void processExplainPlannedStmtBatch(  AdHocPlannedStmtBatch planBatch ) {
         final Connection c = (Connection)planBatch.clientData;
         Database db = m_catalogContext.get().database;
@@ -1343,14 +1353,19 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         response.flattenToBuffer(buf);
         buf.flip();
         c.writeStream().enqueue(buf);
-
-        //do not cache the plans for explainAdhoc
     }
 
+    /**
+     * Explain Proc for a default proc is routed through the regular Explain
+     * path using ad hoc planning and all. Take the result from that async
+     * process and format it like other explains for procedures.
+     */
     private void processExplainDefaultProc(AdHocPlannedStmtBatch planBatch) {
         final Connection c = (Connection)planBatch.clientData;
         Database db = m_catalogContext.get().database;
 
+        // there better be one statement if this is really sql
+        // from a default procedure
         assert(planBatch.getPlannedStatementCount() == 1);
         AdHocPlannedStatement ahps = planBatch.getPlannedStatement(0);
         String sql = new String(ahps.sql, Charsets.UTF_8);
@@ -1388,11 +1403,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             // look in the catalog
             Procedure proc = m_catalogContext.get().procedures.get(procName);
             if (proc == null) {
-                // check default procs
+                // check default procs and send them off to be explained using the regular
+                // adhoc explain process
                 proc = m_catalogContext.get().m_defaultProcs.checkForDefaultProcedure(procName);
                 if (proc != null) {
                     String sql = m_catalogContext.get().m_defaultProcs.sqlForDefaultProc(proc);
-                    dispatchAdHocCommon(task, handler, ccxn, ExplainMode.EXPLAIN_PROC, sql, new Object[0], null, user);
+                    dispatchAdHocCommon(task, handler, ccxn, ExplainMode.EXPLAIN_DEFAULT_PROC, sql, new Object[0], null, user);
                     return null;
                 }
 
@@ -1459,10 +1475,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         ExplainMode explainMode = isExplain ? ExplainMode.EXPLAIN_ADHOC : ExplainMode.NONE;
         dispatchAdHocCommon(task, handler, ccxn, explainMode, sql, userParams, userPartitionKey, user);
         return null;
-    }
-
-    public enum ExplainMode {
-        NONE, EXPLAIN_ADHOC, EXPLAIN_PROC;
     }
 
     private final void dispatchAdHocCommon(StoredProcedureInvocation task,
@@ -2192,7 +2204,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         else if (explainMode == ExplainMode.EXPLAIN_ADHOC) {
                             processExplainPlannedStmtBatch(plannedStmtBatch);
                         }
-                        else if (explainMode == ExplainMode.EXPLAIN_PROC) {
+                        else if (explainMode == ExplainMode.EXPLAIN_DEFAULT_PROC) {
                             processExplainDefaultProc(plannedStmtBatch);
                         }
                         else {

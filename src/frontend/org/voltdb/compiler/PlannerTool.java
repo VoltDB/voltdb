@@ -104,6 +104,9 @@ public class PlannerTool {
         return planSql(sqlIn, infer);
     }
 
+    /**
+     * Stripped down compile that is used to plan default procs.
+     */
     public synchronized CompiledPlan planSqlCore(String sql, StatementPartitioning partitioning) {
         TrivialCostModel costModel = new TrivialCostModel();
         DatabaseEstimates estimates = new DatabaseEstimates();

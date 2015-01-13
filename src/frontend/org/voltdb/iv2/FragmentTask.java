@@ -179,7 +179,8 @@ public class FragmentTask extends TransactionTask
         // Ensure default procs loaded here
         String procName = m_fragmentMsg.getProcedureName();
         if (procName != null) {
-            siteConnection.ensureProcLoaded(procName);
+            // this will ensure proc is loaded
+            siteConnection.getProcedureRunner(procName);
         }
         // @LoadMultipartitionTable also uses a default proc plan for insert into
         // replicated tables, so it needed to be awkwardly teased out here.
@@ -187,7 +188,8 @@ public class FragmentTask extends TransactionTask
             Iv2InitiateTaskMessage itm = m_fragmentMsg.getInitiateTask();
             if (itm != null) {
                 String tableName = (String) itm.getParameters()[0];
-                siteConnection.ensureProcLoaded(tableName.toUpperCase() + ".insert");
+                // this will ensure proc is loaded
+                siteConnection.getProcedureRunner(tableName.toUpperCase() + ".insert");
             }
         }
 

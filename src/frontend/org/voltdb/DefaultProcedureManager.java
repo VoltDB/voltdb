@@ -37,63 +37,24 @@ import org.voltdb.catalog.Table;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.utils.CatalogUtil;
 
+/**
+ * The DefaultProcedureManager is the hub for all default procedure code and it lives in the
+ * CatalogContext. It doesn't exist outside of a running VoltDB.
+ *
+ * It has three jobs. First, know what the set of callable default procs is. This is used by
+ * the system catalog stats (jdbc metadata, etc..) and by ClientInterface to accept calls for
+ * default procs. Second, it has to generate SQL for default procs. Third, it actually supplies
+ * compiled org.voltdb.catalog.Procedure instaces to execution sites upon request.
+ *
+ */
 public class DefaultProcedureManager {
 
     Map<String, Procedure> m_defaultProcMap = new HashMap<>();
 
     final Database m_db;
+    // fake db makes it easy to create procedures that aren't
+    // part of the main catalog
     final Database m_fakeDb;
-
-    private void addShimProcedure(String name,
-                                  Table table,
-                                  Constraint pkey,
-                                  boolean tableCols,
-                                  int partitionParamIndex,
-                                  Column partitionColumn,
-                                  boolean readOnly)
-    {
-        Procedure proc = m_fakeDb.getProcedures().add(name);
-        proc.setClassname(name);
-        proc.setDefaultproc(true);
-        proc.setHasjava(false);
-        proc.setHasseqscans(false);
-        proc.setSinglepartition(partitionParamIndex >= 0);
-        proc.setPartitioncolumn(partitionColumn);
-        proc.setPartitionparameter(partitionParamIndex);
-        proc.setReadonly(readOnly);
-        proc.setEverysite(false);
-        proc.setSystemproc(false);
-        proc.setPartitiontable(table);
-        if (partitionParamIndex >= 0) {
-            proc.setAttachment(new ProcedurePartitionInfo(VoltType.get((byte) partitionColumn.getType()), partitionParamIndex));
-        }
-
-        int paramCount = 0;
-        if (tableCols) {
-            for (Column col : table.getColumns()) {
-                // name each parameter "param1", "param2", etc...
-                ProcParameter procParam = proc.getParameters().add("param" + String.valueOf(paramCount));
-                procParam.setIndex(col.getIndex());
-                procParam.setIsarray(false);
-                procParam.setType(col.getType());
-                paramCount++;
-            }
-        }
-        if (pkey != null) {
-            CatalogMap<ColumnRef> pkeycols = pkey.getIndex().getColumns();
-            int paramCount2 = paramCount;
-            for (ColumnRef cref : pkeycols) {
-                // name each parameter "param1", "param2", etc...
-                ProcParameter procParam = proc.getParameters().add("param" + String.valueOf(paramCount2));
-                procParam.setIndex(cref.getIndex() + paramCount);
-                procParam.setIsarray(false);
-                procParam.setType(cref.getColumn().getType());
-                paramCount2++;
-            }
-        }
-
-        m_defaultProcMap.put(name.toLowerCase(), proc);
-    }
 
     public DefaultProcedureManager(Database db) {
         m_db = db;
@@ -476,5 +437,56 @@ public class DefaultProcedureManager {
         sb.append(';');
 
         return sb.toString();
+    }
+
+    private void addShimProcedure(String name,
+            Table table,
+            Constraint pkey,
+            boolean tableCols,
+            int partitionParamIndex,
+            Column partitionColumn,
+            boolean readOnly)
+    {
+        Procedure proc = m_fakeDb.getProcedures().add(name);
+        proc.setClassname(name);
+        proc.setDefaultproc(true);
+        proc.setHasjava(false);
+        proc.setHasseqscans(false);
+        proc.setSinglepartition(partitionParamIndex >= 0);
+        proc.setPartitioncolumn(partitionColumn);
+        proc.setPartitionparameter(partitionParamIndex);
+        proc.setReadonly(readOnly);
+        proc.setEverysite(false);
+        proc.setSystemproc(false);
+        proc.setPartitiontable(table);
+        if (partitionParamIndex >= 0) {
+            proc.setAttachment(new ProcedurePartitionInfo(VoltType.get((byte) partitionColumn.getType()), partitionParamIndex));
+        }
+
+        int paramCount = 0;
+        if (tableCols) {
+            for (Column col : table.getColumns()) {
+                // name each parameter "param1", "param2", etc...
+                ProcParameter procParam = proc.getParameters().add("param" + String.valueOf(paramCount));
+                procParam.setIndex(col.getIndex());
+                procParam.setIsarray(false);
+                procParam.setType(col.getType());
+                paramCount++;
+            }
+        }
+        if (pkey != null) {
+            CatalogMap<ColumnRef> pkeycols = pkey.getIndex().getColumns();
+            int paramCount2 = paramCount;
+            for (ColumnRef cref : pkeycols) {
+                // name each parameter "param1", "param2", etc...
+                ProcParameter procParam = proc.getParameters().add("param" + String.valueOf(paramCount2));
+                procParam.setIndex(cref.getIndex() + paramCount);
+                procParam.setIsarray(false);
+                procParam.setType(cref.getColumn().getType());
+                paramCount2++;
+            }
+        }
+
+        m_defaultProcMap.put(name.toLowerCase(), proc);
     }
 }
