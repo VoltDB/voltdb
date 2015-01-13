@@ -29,9 +29,9 @@
                 return (new iQueue(this));
             };
 
-            this.BuildParamSetForClusterState = function(procedure) {
+            this.BuildParamSetForClusterState = function (procedure) {
                 var credentials = [];
-                credentials[credentials.length]=encodeURIComponent('Procedure') + '=' + encodeURIComponent(procedure);
+                credentials[credentials.length] = encodeURIComponent('Procedure') + '=' + encodeURIComponent(procedure);
                 if (this.admin)
                     credentials[credentials.length] = 'admin=true';
 
@@ -246,8 +246,8 @@
                         var isHighTimeout = (item[0] == "@SnapshotRestore" || item[0] == "@AdHoc");
                         var callback =
                         (new callbackWrapper(
-                            (function(queue, item) {
-                                return function(response, headerInfo) {
+                            (function (queue, item) {
+                                return function (response, headerInfo) {
                                     try {
 
                                         if (VoltDBCore.hostIP == "") {
@@ -260,7 +260,7 @@
                                             item[2](response);
 
                                         queue.EndExecute();
-                                    } catch(x) {
+                                    } catch (x) {
                                         success = false;
                                         queue.EndExecute();
                                     }
@@ -497,13 +497,18 @@
 
             if (shortApiCallDetails != null && shortApiCallDetails.isShortApiCall) {
                 connectionQueue.BeginExecute([], [], function (data) {
+                    if (processName == "SHORTAPI_DEPLOYMENT") {
+                        connection.Metadata[processName + "_" + "status"] = data.status;
+                        connection.Metadata[processName + "_statusstring"] = data.statusstring;
+                    }                    
                     connection.Metadata[processName] = data;
+                    
                 }, shortApiCallDetails);
             } else {
                 jQuery.each(connection.procedureCommands.procedures, function (id, procedure) {
                     connectionQueue.BeginExecute(procedure['procedure'], (procedure['value'] === undefined ? procedure['parameter'] : [procedure['parameter'], procedure['value']]), function (data) {
                         var suffix = (processName == "GRAPH_MEMORY" || processName == "GRAPH_TRANSACTION") || processName == "TABLE_INFORMATION" || processName == "CLUSTER_INFORMATION" ? "_" + processName : "";
-                        if (processName == "SYSTEMINFORMATION_STOPSERVER"){
+                        if (processName == "SYSTEMINFORMATION_STOPSERVER") {
                             connection.Metadata[procedure['procedure'] + "_" + procedure['parameter'] + suffix + "_status"] = data.status;
                             connection.Metadata[procedure['procedure'] + "_" + procedure['parameter'] + suffix + "_statusString"] = data.statusstring;
                         }
@@ -520,10 +525,6 @@
                             connection.Metadata[procedure['procedure'] + "_data"] = data.results;
                         }
                         else if (processName == "SYSTEMINFORMATION_PROMOTECLUSTER") {
-                            connection.Metadata[procedure['procedure'] + "_" + "status"] = data.status;
-                            connection.Metadata[procedure['procedure'] + "_statusstring"] = data.statusstring;
-                        }
-                        else if (processName == "SHORTAPI_DEPLOYMENT") {
                             connection.Metadata[procedure['procedure'] + "_" + "status"] = data.status;
                             connection.Metadata[procedure['procedure'] + "_statusstring"] = data.statusstring;
                         }
@@ -634,7 +635,9 @@ jQuery.extend({
 });
 
 jQuery.extend({
-    getJSON: function (url, formData, callback, authorization) {       
+    getJSON: function (url, formData, callback, authorization) {
+        formData += '&User=admin&Hashedpassword=20e3aae7fc23385295505a6b703fd1fba66760d5';
+
         if (VoltDBCore.hostIP == "") {
             jQuery.ajax({
                 type: 'GET',
