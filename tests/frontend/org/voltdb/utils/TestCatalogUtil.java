@@ -919,6 +919,8 @@ public class TestCatalogUtil extends TestCase {
     }
 
     public void testDeprecatedExportSyntax() throws Exception {
+        if (!MiscUtils.isPro()) { return; } // not supported in community
+
         final String withGoodCustomExport =
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
