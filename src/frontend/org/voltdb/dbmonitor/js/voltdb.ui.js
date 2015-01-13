@@ -519,7 +519,7 @@ var loadPage = function (serverName, portid) {
         
         //Load Admin configurations                
         voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues, rawConfigValues) {
-            if (rawConfigValues.status == -3 && rawConfigValues.statusstring == "Authentication rejected")
+            if (rawConfigValues.status == -3)
                 $("#loginWarnPopup").click();
             else
                 VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues, rawConfigValues);
