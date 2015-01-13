@@ -80,7 +80,7 @@ STATUS_STRINGS = {
 "VOLTDB_USER_ABORT": -1,
 }
 
-STATUS_CODES = {v: k for k, v in STATUS_STRINGS.items()}
+STATUS_CODES = dict((v,k) for k, v in STATUS_STRINGS.iteritems())
 
 pause_on_error=False
 def ts():
