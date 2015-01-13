@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,6 +22,7 @@ import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.plannodes.SchemaColumn;
 
 /**
  * This class represents an instance of a column in a parsed statement.
@@ -131,6 +132,11 @@ public class ParsedColInfo implements Cloneable {
         }
 
         return orderCol;
+    }
+
+    /** Return this as an instance of SchemaColumn */
+    public SchemaColumn asSchemaColumn() {
+        return new SchemaColumn(tableName, tableAlias, columnName, alias, expression);
     }
 
     @Override

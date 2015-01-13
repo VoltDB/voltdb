@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -24,6 +24,7 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.util.UUID;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -488,9 +489,75 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         vt = client.callProcedure("CAPPED3_LIMIT_EXEC_COMPLEX.insert", 37, 8, 0, "important", 17000).getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {1});
 
-        // my fancy assertTablesAreEqual doesn't work for the below query.  Why?
         vt = client.callProcedure("@AdHoc", "select dept from capped3_limit_exec_complex order by dept asc").getResults()[0];
         validateTableOfScalarLongs(vt, new long[] {5, 6, 8});
+    }
+
+    // DELETE .. LIMIT <n> is intended to support the row limit trigger
+    // so let's test it here.
+    public void testLimitPartitionRowsDeleteWithLimit() throws Exception {
+        if (isHSQL())
+            return;
+
+        final long partitionRowLimit = 5; // from DDL
+        final long numPartitions = getLogicalPartitionCount();
+
+        Client client = getClient();
+
+        // The table EVENTS is capped at 5 rows/partition.  Inserts that
+        // would cause the constraint to fail trigger a delete of
+        // the oldest row.
+
+        VoltTable vt;
+        for (int i = 0; i < 50; ++i) {
+            String uuid = UUID.randomUUID().toString();
+            vt = client.callProcedure("@AdHoc",
+                    "INSERT INTO events_capped VALUES ('" + uuid + "', NOW, " + i + ")")
+                    .getResults()[0];
+
+            // Note: this should be *one*, even if insert triggered a delete
+            validateTableOfScalarLongs(vt, new long[] {1});
+        }
+
+        // Check the contents
+
+        if (numPartitions > 1) {
+            // For multi-partition tables, it's possible that just one partition
+            // got all the rows, or that rows were evenly distributed (all partitions full).
+            final long minRows = partitionRowLimit;
+            final long maxRows = partitionRowLimit * numPartitions;
+            vt = client.callProcedure("@AdHoc",
+                    "select count(*) from events_capped")
+                    .getResults()[0];
+            long numRows = vt.asScalarLong();
+            assertTrue ("Too many rows in target table: ", numRows <= maxRows);
+            assertTrue ("Too few rows in target table: ", numRows >= minRows);
+
+            // Get all rows in descending order, skipping the 5 most recent rows
+            // (we check the 5 most recent below)
+            vt = client.callProcedure("@AdHoc",
+                    "SELECT info FROM events_capped "
+                    + "ORDER BY when_occurred desc, info desc "
+                    + "LIMIT 50 OFFSET 5")
+                    .getResults()[0];
+            long prevValue = 50;
+            while (vt.advanceRow()) {
+                long curValue = vt.getLong(0);
+
+                // row numbers may not be adjacent, depending on how UUID hashed,
+                // but there should be no duplicates
+                assertTrue(curValue < prevValue);
+                prevValue = curValue;
+
+                // not sure what else we could assert here?
+            }
+        }
+
+        // Should have all of the most recent 5 rows.
+        vt = client.callProcedure("@AdHoc",
+                "select info from events_capped order by when_occurred desc, info desc limit 5")
+                .getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {49, 48, 47, 46, 45});
     }
 
     /**

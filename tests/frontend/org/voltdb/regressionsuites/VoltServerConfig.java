@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -115,4 +115,8 @@ public interface VoltServerConfig {
 
     public File[] getPathInSubroots(File path) throws IOException;
 
+    /**
+     * @return the number of logical partitions in this configuration
+     * I.e. (sitesPerHost * numHosts) when K safetey is zero. */
+    public int getLogicalPartitionCount();
 }

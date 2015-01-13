@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -51,8 +51,6 @@ import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.multipartitionprocs.MultiSiteSelect;
 
 public class TestTwoSitePlans extends TestCase {
-    private ExecutionSite site1;
-    private ExecutionSite site2;
     private ExecutionEngine ee1;
     private ExecutionEngine ee2;
 
@@ -63,6 +61,8 @@ public class TestTwoSitePlans extends TestCase {
     private PlanFragment selectTopFrag = null;
     private PlanFragment selectBottomFrag = null;
     private PlanFragment insertFrag = null;
+
+    static final String JAR = "distplanningregression.jar";
 
     @SuppressWarnings("deprecation")
     @Override
@@ -129,10 +129,8 @@ public class TestTwoSitePlans extends TestCase {
         site2Thread.join();
 
         // create two EEs
-        site1 = new ExecutionSite(0); // site 0
         ee1 = site1Reference.get();
         ee1.loadCatalog(0, catalog.serialize());
-        site2 = new ExecutionSite(1); // site 1
         ee2 = site2Reference.get();
         ee2.loadCatalog(0, catalog.serialize());
 
@@ -225,7 +223,6 @@ public class TestTwoSitePlans extends TestCase {
         try {
             System.out.println(dependency1.toString());
         } catch (Exception e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
         }
         assertTrue(dependency1 != null);
@@ -240,7 +237,6 @@ public class TestTwoSitePlans extends TestCase {
         try {
             System.out.println(dependency2.toString());
         } catch (Exception e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
         }
         assertTrue(dependency2 != null);
@@ -259,7 +255,6 @@ public class TestTwoSitePlans extends TestCase {
             System.out.println("Final Result");
             System.out.println(dependency1.toString());
         } catch (Exception e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
         }
     }

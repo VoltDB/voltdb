@@ -1,6 +1,6 @@
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2014 VoltDB Inc.
+# Copyright (C) 2008-2015 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -373,7 +373,8 @@ class JavaBundle(object):
            cli.StringOption(None, '--admin', 'adminport', 'specify the admin port as [ipaddress:]port-number'),
            cli.StringOption(None, '--http', 'httpport', 'specify the http port as [ipaddress:]port-number'),
            cli.StringOption(None, '--internalinterface', 'internalinterface', 'specify the network interface to use for internal communication, such as the internal and zookeeper ports'),
-           cli.StringOption(None, '--externalinterface', 'externalinterface', 'specify the network interface to use for external ports, such as the admin and client ports'))
+           cli.StringOption(None, '--externalinterface', 'externalinterface', 'specify the network interface to use for external ports, such as the admin and client ports'),
+           cli.StringOption(None, '--publicinterface', 'publicinterface', 'For hosted or cloud environments with non-public interfaces, this argument specifies a publicly-accessible alias for reaching the server. Particularly useful for remote access to the VoltDB Management Center.'))
 
     def start(self, verb, runner):
         pass
@@ -497,6 +498,8 @@ class ServerBundle(JavaBundle):
             final_args.extend(['zkport', runner.opts.zkport])
         if runner.opts.externalinterface:
             final_args.extend(['externalinterface', runner.opts.externalinterface])
+        if runner.opts.publicinterface:
+            final_args.extend(['publicinterface', runner.opts.publicinterface])
         if runner.args:
             final_args.extend(runner.args)
         kwargs = {}

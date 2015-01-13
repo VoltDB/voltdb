@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,6 +25,13 @@ import org.voltcore.logging.VoltLogger;
 public class SQLLexer
 {
     private static final VoltLogger COMPILER_LOG = new VoltLogger("COMPILER");
+
+    // Match single-line comments
+    private static final Pattern SINGLE_LINE_COMMENT_MATCH = Pattern.compile(
+            "^\\s*" + // start of line, 0 or more whitespace
+            "--" + // start of comment
+            ".*$"); // everything to end of line
+
     // Simplest possible SQL DDL token lexer
     private static final Pattern DDL_MATCH = Pattern.compile(
             "^\\s*" +  // start of line, 0 or more whitespace
@@ -73,6 +80,12 @@ public class SQLLexer
 
     private static final Pattern[] BLACKLISTS = { BLACKLIST_1, BLACKLIST_2 };
 
+    public static boolean isComment(String sql)
+    {
+        Matcher commentMatcher = SINGLE_LINE_COMMENT_MATCH.matcher(sql);
+        return commentMatcher.matches();
+    }
+
     /**
      * Get the DDL token, if any, at the start of this statement.
      * @return returns token, or null if it wasn't DDL
@@ -87,17 +100,48 @@ public class SQLLexer
         return ddlToken;
     }
 
+    // Extracts the table name for DDL batch conflicting command checks.
+    private static final Pattern CREATE_DROP_TABLE_PREAMBLE = Pattern.compile(
+            "^\\s*" +  // start of line, 0 or more whitespace
+            "(create|drop)" + // DDL commands we're looking for
+            "\\s+" + // one or more whitespace
+            "table" +
+            "\\s+" + // one or more whitespace
+            "([a-z][a-z0-9_]*)" + // table name symbol
+            ".*$", // all the rest
+            Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL
+            );
+
+    /**
+     * Get the table name for a CREATE or DROP DDL statement.
+     * @return returns token, or null if the DDL isn't (CREATE|DROP) TABLE
+     */
+    public static String extractDDLTableName(String sql)
+    {
+        Matcher matcher = CREATE_DROP_TABLE_PREAMBLE.matcher(sql);
+        if (matcher.find()) {
+            return matcher.group(2).toLowerCase();
+        }
+        return null;
+    }
+
     // Naive filtering for stuff we haven't implemented yet.
     // Hopefully this gets whittled away and eventually disappears.
     public static boolean isPermitted(String sql)
     {
+        boolean hadWLMatch = false;
         for (Pattern wl : WHITELISTS) {
             Matcher wlMatcher = wl.matcher(sql);
-            if (!wlMatcher.matches()) {
-                COMPILER_LOG.info("Statement: " + sql + " , failed whitelist: " + wlMatcher.toString());
-                return false;
+            if (wlMatcher.matches()) {
+                hadWLMatch = true;
             }
         }
+
+        if (!hadWLMatch) {
+            COMPILER_LOG.info("Statement: " + sql + " , failed to match any whitelist");
+            return false;
+        }
+
         for (Pattern bl : BLACKLISTS) {
             Matcher blMatcher = bl.matcher(sql);
             if (blMatcher.matches()) {
@@ -105,6 +149,7 @@ public class SQLLexer
                 return false;
             }
         }
-        return true;
+
+        return hadWLMatch;
     }
 }

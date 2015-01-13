@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -295,11 +295,11 @@ public class HTTPAdminListener {
                            throws IOException, ServletException {
             //jsonp is specified when response is expected to go to javascript function.
             String jsonp = request.getParameter("jsonp");
-
+            AuthenticationResult authResult = null;
             try {
                 response.setContentType("application/json;charset=utf-8");
                 response.setStatus(HttpServletResponse.SC_OK);
-                AuthenticationResult authResult = authenticate(baseRequest);
+                authResult = authenticate(baseRequest);
                 if (!authResult.isAuthenticated()) {
                     response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, authResult.m_message));
                 } else {
@@ -314,6 +314,8 @@ public class HTTPAdminListener {
                 baseRequest.setHandled(true);
             } catch (Exception ex) {
               logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage(), ex);
+            } finally {
+                httpClientInterface.releaseClient(authResult);
             }
         }
     }
@@ -378,13 +380,13 @@ public class HTTPAdminListener {
 
             //jsonp is specified when response is expected to go to javascript function.
             String jsonp = request.getParameter("jsonp");
-
+            AuthenticationResult authResult = null;
             try {
                 response.setContentType("application/json;charset=utf-8");
                 response.setStatus(HttpServletResponse.SC_OK);
 
                 //Requests require authentication.
-                AuthenticationResult authResult = authenticate(baseRequest);
+                authResult = authenticate(baseRequest);
                 if (!authResult.isAuthenticated()) {
                     response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, authResult.m_message));
                     baseRequest.setHandled(true);
@@ -419,6 +421,8 @@ public class HTTPAdminListener {
                 baseRequest.setHandled(true);
             } catch (Exception ex) {
               logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage(), ex);
+            } finally {
+                httpClientInterface.releaseClient(authResult);
             }
         }
 
@@ -443,7 +447,7 @@ public class HTTPAdminListener {
                 //New users if valid will get updated.
                 //For Scrambled passowrd this will work also but new passwords will be unscrambled
                 //TODO: add switch to post to scramble??
-                if (newDeployment.getSecurity().isEnabled()) {
+                if (newDeployment.getSecurity() != null && newDeployment.getSecurity().isEnabled()) {
                     DeploymentType currentDeployment = this.getDeployment();
                     List<User> users = currentDeployment.getUsers().getUser();
                     for (UsersType.User user : newDeployment.getUsers().getUser()) {
@@ -583,6 +587,8 @@ public class HTTPAdminListener {
 
             ///api/1.0/
             ContextHandler apiRequestHandler = new ContextHandler("/api/1.0");
+            // the default is 200k which well short of out 2M row size limit
+            apiRequestHandler.setMaxFormContentSize(2* 1024 * 1024);
             apiRequestHandler.setHandler(new APIRequestHandler());
 
             ///catalog
@@ -614,14 +620,16 @@ public class HTTPAdminListener {
 
             m_server.setHandler(handlers);
 
+            int poolsize = Integer.getInteger("HTTP_POOL_SIZE", 50);
+            int timeout = Integer.getInteger("HTTP_REQUEST_TIMEOUT_SECONDS", 15);
             /*
              * Don't force us to look at a huge pile of threads
              */
-            final QueuedThreadPool qtp = new QueuedThreadPool();
-            qtp.setMaxIdleTimeMs(15000);
+            final QueuedThreadPool qtp = new QueuedThreadPool(poolsize);
+            qtp.setMaxIdleTimeMs(timeout * 1000);
             qtp.setMinThreads(1);
             m_server.setThreadPool(qtp);
-
+            httpClientInterface.setTimeout(timeout);
             m_jsonEnabled = jsonEnabled;
         } catch (Exception e) {
             // double try to make sure the port doesn't get eaten

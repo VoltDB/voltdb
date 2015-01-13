@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -346,6 +346,7 @@ public class SystemInformation extends VoltSystemProcedure
         int zkPort = VoltDB.DEFAULT_ZK_PORT;
         String drInterface = null;
         int drPort = VoltDB.DEFAULT_DR_PORT;
+        String publicInterface = null;
         try {
             String localMetadata = VoltDB.instance().getLocalMetadata();
             JSONObject jsObj = new JSONObject(localMetadata);
@@ -364,6 +365,7 @@ public class SystemInformation extends VoltSystemProcedure
             zkInterface = jsObj.getString("zkInterface");
             drPort = jsObj.getInt("drPort");
             drInterface = jsObj.getString("drInterface");
+            publicInterface = jsObj.getString("publicInterface");
         } catch (JSONException e) {
             hostLog.info("Failed to get local metadata, falling back to first resolvable IP address.");
         } catch (UnknownHostException e) {
@@ -388,6 +390,7 @@ public class SystemInformation extends VoltSystemProcedure
         vt.addRow(hostId, "ZKPORT", Integer.toString(zkPort));
         vt.addRow(hostId, "DRINTERFACE", drInterface);
         vt.addRow(hostId, "DRPORT", Integer.toString(drPort));
+        vt.addRow(hostId, "PUBLICINTERFACE", publicInterface);
 
         // build string
         vt.addRow(hostId, "BUILDSTRING", VoltDB.instance().getBuildString());

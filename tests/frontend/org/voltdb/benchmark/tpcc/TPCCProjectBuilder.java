@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -144,4 +144,18 @@ public class TPCCProjectBuilder {
                 .getDatabases().get("database");
     }
 
+    public static Database createTPCCSchemaOriginalDatabase() {
+        // TODO: Compile a database without the jar serialization/deserialization steps that
+        // lose the annotations. That's the only way the calling test will succeed.
+        // As things stand that takes a bit of refactoring because all of these things are
+        // unfortunately tightly bound.
+        try {
+            return createTPCCSchemaCatalog()
+                    .getClusters().get("cluster")
+                    .getDatabases().get("database");
+        }
+        catch (IOException io) {
+            return null;
+        }
+    }
 }

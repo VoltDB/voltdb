@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -87,6 +87,15 @@ OrderByExecutor::p_init(AbstractPlanNode* abstract_node,
     limit_node =
         dynamic_cast<LimitPlanNode*>(node->
                                      getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
+
+#if defined(VOLT_LOG_LEVEL)
+#if VOLT_LOG_LEVEL<=VOLT_LEVEL_TRACE
+    const std::vector<AbstractExpression*>& sortExprs = node->getSortExpressions();
+    for (int i = 0; i < sortExprs.size(); ++i) {
+        VOLT_TRACE("Sort key[%d]:\n%s", i, sortExprs[i]->debug(true).c_str());
+    }
+#endif
+#endif
 
     return true;
 }
