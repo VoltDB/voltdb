@@ -630,7 +630,7 @@
                 var delta = currentTimedTransactionCount - monitor.lastTimedTransactionCount;
                 var calculatedValue = parseFloat(delta * 1000.0 / (currentTimerTick - monitor.lastTimerTick)).toFixed(1) * 1;
                 
-                if (calculatedValue < 0 || (currentTimerTick - monitor.lastTimerTick == 0))
+                if (calculatedValue < 0 || isNaN(calculatedValue) || (currentTimerTick - monitor.lastTimerTick == 0))
                     calculatedValue = 0;
 
                 if (tpsSecCount >= 6 || monitor.tpsFirstData) {
