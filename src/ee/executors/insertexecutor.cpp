@@ -125,7 +125,7 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
     return true;
 }
 
-bool InsertExecutor::executePurgeFragmentIfNeeded(PersistentTable* table) {
+bool InsertExecutor::executePurgeFragmentIfNeeded(PersistentTable** ptrToTable) {
     InsertPlanNode *insertPlanNode = static_cast<InsertPlanNode*>(getPlanNode());
     if (insertPlanNode->isMultiRowInsert()) {
         // Multi-row inserts triggering a purge is not supported yet.
@@ -134,6 +134,7 @@ bool InsertExecutor::executePurgeFragmentIfNeeded(PersistentTable* table) {
         return true;
     }
 
+    PersistentTable* table = *ptrToTable;
     int tupleLimit = table->tupleLimit();
     int numTuples = table->visibleTupleCount();
 
@@ -151,6 +152,15 @@ bool InsertExecutor::executePurgeFragmentIfNeeded(PersistentTable* table) {
                        tupleLimit);
             return false;
         }
+
+        // If the purge fragment did a truncate table, then the old
+        // table is still around for undo purposes, but there is now a
+        // new empty table we can insert into.  Update the caller's table
+        // pointer to use it.
+        //
+        // The plan node will go through the table catalog delegate to get
+        // the correct instance of PersistentTable.
+        *ptrToTable = static_cast<PersistentTable*>(m_node->getTargetTable());
     }
 
     return true;
@@ -249,8 +259,12 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
             // try to put the tuple into the target table
 
             if (m_hasPurgeFragment) {
-                if (!executePurgeFragmentIfNeeded(persistentTable))
+                if (!executePurgeFragmentIfNeeded(&persistentTable))
                     return false;
+                // purge fragment might have truncated the table, and
+                // refreshed the persistent table pointer.  Make sure to
+                // use it when doing the insert below.
+                targetTable = persistentTable;
             }
 
             if (!targetTable->insertTuple(templateTuple)) {
@@ -270,7 +284,7 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
                 // try to put the tuple into the target table
 
                 if (m_hasPurgeFragment) {
-                    if (!executePurgeFragmentIfNeeded(persistentTable))
+                    if (!executePurgeFragmentIfNeeded(&persistentTable))
                         return false;
                 }
 
@@ -289,7 +303,7 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
                 if (!persistentTable->updateTupleWithSpecificIndexes(existsTuple, tempTuple,
                         persistentTable->allIndexes())) {
                     VOLT_INFO("Failed to update existsTuple from table '%s'",
-                            upsertTable->name().c_str());
+                            persistentTable->name().c_str());
                     return false;
                 }
             }
@@ -311,7 +325,7 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     }
 
     // add to the planfragments count of modified tuples
-    m_engine->m_tuplesModified += modifiedTuples;
+    m_engine->addToTuplesModified(modifiedTuples);
     VOLT_DEBUG("Finished inserting tuple");
     return true;
 }
