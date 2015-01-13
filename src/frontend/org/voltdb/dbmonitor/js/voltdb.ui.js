@@ -241,7 +241,9 @@ $(document).ready(function () {
 
     //If security is enabled, then it displays login popup. After user is verified, it calls loadPage().
     //If security is not enabled, then it simply calls loadPage().
-    voltDbRenderer.HandleLogin(serverName, portid, function () { loadPage(serverName, portid); });
+    voltDbRenderer.HandleLogin(serverName, portid, function() {
+        loadPage(serverName, portid);
+    });
 });
 
 function logout() {
@@ -373,7 +375,6 @@ var loadPage = function (serverName, portid) {
 
     var refreshClusterHealth = function () {
         //loads cluster health and other details on the top banner
-
         var loadClusterHealth = function () {
             voltDbRenderer.GetClusterHealth(function (htmlData, alertHtmlData) {
                 $("#clusterHealth").html(htmlData).show();
@@ -515,9 +516,13 @@ var loadPage = function (serverName, portid) {
 
         voltDbRenderer.GetSystemInformation(loadClusterHealth, loadAdminTabPortAndOverviewDetails, loadAdminServerList);
 
-        //Load Admin configurations
-        voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues, rawConfigValues) {
-            VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues, rawConfigValues);
+        
+        //Load Admin configurations                
+        voltDbRenderer.GetAdminDeploymentInformation(false, function (adminConfigValues, rawConfigValues, status, statusString) {
+            if (status == -3 && statusString == "Authentication rejected")
+                $("#loginWarnPopup").click();
+            else
+                VoltDbAdminConfig.displayAdminConfiguration(adminConfigValues, rawConfigValues);
         });
     };
 
@@ -1269,7 +1274,7 @@ var loadPage = function (serverName, portid) {
 
         }
 
-    });
+    });   
 
     refreshClusterHealth();
     refreshGraphAndData($.cookie("graph-view"), VoltDbUI.CurrentTab);

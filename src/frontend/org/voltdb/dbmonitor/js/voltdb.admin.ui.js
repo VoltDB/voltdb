@@ -505,6 +505,23 @@ function loadAdminPage() {
             });
         }
     });
+    
+
+    $("#loginWarnPopup").popup({
+        afterOpen: function (event, ui, ele) {
+            var popup = $(this)[0];
+           
+            $("#btnLoginWarningOk").on('click', function () {
+                VoltDbAdminConfig.isAdmin = false;                
+                if (VoltDbUI.CurrentTab == NavigationTabs.Admin) {
+                    $("#navDbmonitor").click();
+                }
+
+                $("#navAdmin").hide();
+                popup.close();
+            });
+        }
+    });
 
     var showUpdateMessage = function (msg) {
         adminClusterObjects.updateMessageBar.html(msg);

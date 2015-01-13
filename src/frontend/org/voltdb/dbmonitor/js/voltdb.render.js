@@ -342,12 +342,12 @@ function alertNodeClicked(obj) {
 
         this.GetAdminDeploymentInformation = function (checkSecurity, onInformationLoaded) {
             if (VoltDbAdminConfig.isAdmin || checkSecurity) {
-                VoltDBService.GetShortApiDeployment(function (connection) {
+                VoltDBService.GetShortApiDeployment(function (connection,status,statusString) {
                     var rawData;
                     if (connection != null)
                         rawData = connection.Metadata['SHORTAPI_DEPLOYMENT'];
 
-                    onInformationLoaded(loadAdminDeploymentInformation(connection), rawData);
+                    onInformationLoaded(loadAdminDeploymentInformation(connection), rawData,status,statusString);
                 });
             }
         };
@@ -653,6 +653,9 @@ function alertNodeClicked(obj) {
 
         var populateSystemInformation = function (connection) {
             var updatedSystemOverview = {};
+            if (connection.Metadata['@SystemInformation_OVERVIEW'] == null) {
+                return;
+            }
             connection.Metadata['@SystemInformation_OVERVIEW'].data.forEach(function (entry) {
                 var singleData = entry;
                 var id = singleData[0];
@@ -838,7 +841,7 @@ function alertNodeClicked(obj) {
             if (connection != null) {
 
                 var isPopulateSortData = checkSortColumnSortable();
-                if (connection.Metadata['@Statistics_PROCEDUREPROFILE'] != undefined) {
+                if (connection.Metadata['@Statistics_PROCEDUREPROFILE'] != null) {
                     connection.Metadata['@Statistics_PROCEDUREPROFILE'].data.forEach(function (entry) {
                         var name = entry[procedureNameIndex];
                         minLatency = entry[minLatencyIndex] * Math.pow(10, -6);

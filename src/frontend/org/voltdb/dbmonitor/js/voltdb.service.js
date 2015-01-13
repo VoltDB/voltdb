@@ -496,17 +496,26 @@
 
                 _connection = VoltDBCore.HasConnection(server, port, admin, user, processName);
                 if (_connection == null) {
+                    var status = "";
+                    var statusString = "";
+                    
                     VoltDBCore.TestConnection(server, port, admin, user, password, isHashedPassword, processName, function (result) {
                         if (result == true) {
                             VoltDBCore.AddConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, function (connection, status) {
-                                onConnectionAdded(connection, status);
+                                status = connection.Metadata['@SHORTAPI_DEPLOYMENT_status'];
+                                statusString = connection.Metadata['@SHORTAPI_DEPLOYMENT_statusString'];
+                                onConnectionAdded(connection, status,statusString);
+                                
                             }, shortApiDetails);
                         }
                     });
 
                 } else {
                     VoltDBCore.updateConnection(server, port, admin, user, password, isHashedPassword, procedureNames, parameters, values, processName, _connection, function (connection, status) {
-                        onConnectionAdded(connection, status);
+                        status = connection.Metadata['@SHORTAPI_DEPLOYMENT_status'];
+                        statusString = connection.Metadata['@SHORTAPI_DEPLOYMENT_statusString'];
+                        onConnectionAdded(connection, status, statusString);
+                        
                     }, shortApiDetails);
 
                 }

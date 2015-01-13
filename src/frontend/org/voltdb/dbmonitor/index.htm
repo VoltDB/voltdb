@@ -41,7 +41,7 @@
 <body>
     <iframe name="versioncheck" id="versioncheck" style="display: none;" width="1" height="1" frameborder="0" src="about:blank"></iframe>
     <div class="page-wrap">
-         <div class="snapshotStatusBar" style="display: none" id="snapshotBar">Snapshot saved successfully.</div>
+        <div class="snapshotStatusBar" style="display: none" id="snapshotBar">Snapshot saved successfully.</div>
         <div id="wrapper">
             <div class="header" id="headerMain">
                 <div class="headLeft">
@@ -64,11 +64,11 @@
                 <div class="headRight">
                     <ul class="topRightList" id="userSection">
                         <li><a href="#logoutPopup" id="btnlogOut">
-                                <div class="userN"></div>
-                            </a></li>
+                            <div class="userN"></div>
+                        </a></li>
                         <li><a href="#logoutPopup" id="logOut">
-                                <div class="user" title="Log Out"></div>
-                            </a></li>
+                            <div class="user" title="Log Out"></div>
+                        </a></li>
                         <li class="line" id="userLine"></li>
                         <li class="help"><a href="#help" id="showMyHelp">Help</a></li>
                         <li class="responsiveMenuPlaceHolder">&nbsp;</li>
@@ -273,14 +273,14 @@
                                 <li><a href="#restorePop" id="restoreConfirmation" class="restoreConfirmationDisable">Restore</a></li>
                                 <li><a href="#shutDownConfirmationPop" class="shutdown" id="shutDownConfirmation">Shutdown</a></li>
                             </ul>
-                           
-                            
+
+
                         </div>
                         <div class="clear"></div>
                     </div>
                     <div class="adminRight">
                         <div class="downloadConfig">
-                            <a id="downloadAdminConfigurations" href="javascript:void(0)" download="deployment.xml"  class="btnDown">Download Configuration</a>
+                            <a id="downloadAdminConfigurations" href="javascript:void(0)" download="deployment.xml" class="btnDown">Download Configuration</a>
                         </div>
                         <div class="adminServer">
                             <div class="serverName" id="serverName">Server<span class="setServer adminIcons"></span></div>
@@ -342,7 +342,7 @@
                                 </tr>
                                 <tr class="security" id="securityRow">
                                     <td class="configLabel">Security</td>
-                                    <td align="right" class="securitytd">                                        
+                                    <td align="right" class="securitytd">
                                         <div id="securityOptionIcon" class="offIcon"></div>
                                         <input type="checkbox" id="chkSecurity" class="chkSecurity" />
                                         <div id="loadingSecurity" class="loading-small" style="display: none"></div>
@@ -591,28 +591,28 @@
                                 <h1>Directories</h1>
                             </div>
                             <div class="adminDirect">
-                            <table width="100%" border="0" cellspacing="0" cellpadding="0" class="adminTbl2">
-                                <tr>
-                                    <td width="76%">Root (Destination)</td>
-                                    <td id="voltdbroot" width="24%"></td>
-                                </tr>
-                                <tr>
-                                    <td>Snapshot</td>
-                                    <td id="snapshotpath"></td>
-                                </tr>
-                                <tr>
-                                    <td>Export Overflow</td>
-                                    <td id="exportOverflow"></td>
-                                </tr>
-                                <tr>
-                                    <td>Command Logs</td>
-                                    <td id="commandlogpath"></td>
-                                </tr>
-                                <tr>
-                                    <td>Command log Snapshots</td>
-                                    <td id="commandlogsnapshotpath"></td>
-                                </tr>
-                            </table>
+                                <table width="100%" border="0" cellspacing="0" cellpadding="0" class="adminTbl2">
+                                    <tr>
+                                        <td width="76%">Root (Destination)</td>
+                                        <td id="voltdbroot" width="24%"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Snapshot</td>
+                                        <td id="snapshotpath"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Export Overflow</td>
+                                        <td id="exportOverflow"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Command Logs</td>
+                                        <td id="commandlogpath"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Command log Snapshots</td>
+                                        <td id="commandlogsnapshotpath"></td>
+                                    </tr>
+                                </table>
                             </div>
                         </div>
                     </div>
@@ -921,7 +921,7 @@
         <div class="overlay-btns"><a id="startConfirmOk" class="btn">Ok</a> <a id="startConfirmCancel" class="btn btn-gray">Cancel</a></div>
     </div>
     <!-- POPUP stopConfirmationPop -->
-    
+
     <!-- POPUP promoteConfirmationPop -->
     <div id="promoteConfirmationPop" style="display: none">
         <div class="overlay-title icon-alert">Promote: Confirmation</div>
@@ -1013,6 +1013,21 @@
     </div>
     <!-- POPUP securityPop -->
 
+    <!-- POPUP securityWarningPop -->
+    <div style="display: none"><a id="loginWarnPopup" href="#loginWarningPopup">login error</a></div>
+    <div id="loginWarningPopup" style="display: none">
+        <div class="overlay-title ">
+            <img src="css/resources/images/error.png" class="imgError" />Error
+        </div>
+        <div class="clear"></div>
+        <div class="overlay-contentError errorMsg">
+            <p>Security settings has been changed.So, you have insufficient permission to view the page.</p>
+            <br />
+            <div class="overlay-btns"><a class="btn" id="btnLoginWarningOk">Ok</a></div>
+        </div>
+    </div>
+    <!-- POPUP securityWarningPop -->
+
     <!-- POPUP savePop -->
     <div id="savePop" style="display: none">
         <div class="overlay-title icon-alert">Save</div>
@@ -1023,13 +1038,11 @@
                     <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblSave">
                         <tr>
                             <td>Directory:</td>
-                            <td id="tdSnapshotDirectory">
-                            </td>
+                            <td id="tdSnapshotDirectory"></td>
                         </tr>
                         <tr>
                             <td>Snapshot Name:</td>
-                            <td id="tdSnapshotName">
-                            </td>
+                            <td id="tdSnapshotName"></td>
                         </tr>
                     </table>
                 </form>
@@ -1054,28 +1067,29 @@
                 <div class="overlay-content">
                     <div class="restoreCont">
                         <form id="formSearchSnapshot" method="get" action="">
-                        <div class="directoryRestore">
-                            <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblRestore">
-                                <tr>
-                                    <th align="left">Directory</th>
-                                    <td align="left" id="tdSearchSnapshots">
-                                        <!--<input id="txtSearchSnapshots" type="text">--></td>
-                                    <td align="left" id="tdSearchSnapshotsBtn"><!--<a id="btnSearchSnapshots" class="save-search" title="Search" href="#">Search</a>--></td>
-                                </tr>  
+                            <div class="directoryRestore">
+                                <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblRestore">
+                                    <tr>
+                                        <th align="left">Directory</th>
+                                        <td align="left" id="tdSearchSnapshots">
+                                            <!--<input id="txtSearchSnapshots" type="text">-->
+                                        </td>
+                                        <td align="left" id="tdSearchSnapshotsBtn">
+                                            <!--<a id="btnSearchSnapshots" class="save-search" title="Search" href="#">Search</a>-->
+                                        </td>
+                                    </tr>
 
-                            </table>
+                                </table>
 
-                        </div>
+                            </div>
                         </form>
                         <form id="formRestoreSnapshot" method="get" action="">
-                        <div class="restoreSnapshot">
-                            <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblRestore" id="tblSearchList">
-                            
-                            
-                            </table>
+                            <div class="restoreSnapshot">
+                                <table width="100%" border="0" cellspacing="0" cellpadding="0" class="tblRestore" id="tblSearchList">
+                                </table>
 
-                        </div>
-                        <div id="errorRestoreMsgContainer" class="errorLabelMsg"></div>
+                            </div>
+                            <div id="errorRestoreMsgContainer" class="errorLabelMsg"></div>
                         </form>
 
                     </div>
@@ -1087,7 +1101,7 @@
                 <div class="overlay-content ">
                     <div class="confirmationInfo">Are you sure you want to Restore?</div>
                 </div>
-                <div id="divConfirm" class="overlay-btns"><a id="btnRestoreSnapshotOk" class="btn">Yes</a> <a  class="btn btn-gray confirmNoRestore">No</a> </div>
+                <div id="divConfirm" class="overlay-btns"><a id="btnRestoreSnapshotOk" class="btn">Yes</a> <a class="btn btn-gray confirmNoRestore">No</a> </div>
             </div>
         </div>
     </div>
@@ -1151,7 +1165,7 @@
         </div>
     </div>
     <!-- POPUP SaveSnapshotPopup -->
-    
+
     <!-- Error Promote Popup-->
     <div style="display: none"><a href="#errorPromotePopup" id="btnErrorPromotePopup">Cluster Promote Error</a></div>
     <div id="errorPromotePopup" style="display: none">
@@ -1187,7 +1201,7 @@
         </div>
     </div>
     <!--Update error Popup-->
-    
+
 
     <!--Update error Auto Snapshot Popup-->
     <div style="display: none"><a href="#updateSnapshotErrorPopup" id="updateErrorSnapshotPopupLink">Update Error</a></div>
@@ -1208,7 +1222,7 @@
         </div>
     </div>
     <!--Update error Popup-->
-    
+
     <!--Update Query Time out error Popup-->
     <div style="display: none"><a href="#queryTimeoutUpdateErrorPopup" id="queryTimeoutUpdateErrorPopupLink">Update Error</a></div>
     <div id="queryTimeoutUpdateErrorPopup" style="display: none">
@@ -1229,7 +1243,7 @@
     <!--Update error Popup-->
 
     <!-- POPUP StopServerErrorPopup-->
-    <div id="divStopServerError" style="display: none; ">
+    <div id="divStopServerError" style="display: none;">
         <div class="overlay-title icon-alert">Stop Error</div>
         <div class="clear"></div>
         <div class="overlay-content resizeCon">
@@ -1247,7 +1261,7 @@
         <div class="loading"></div>
     </div>
     <!-- Loading -->
-    
+
 
     <!-- Loading -->
     <div id="adminActionOverlay" style="display: none;">

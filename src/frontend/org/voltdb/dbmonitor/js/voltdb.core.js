@@ -506,19 +506,27 @@
                         if (processName == "SYSTEMINFORMATION_STOPSERVER"){
                             connection.Metadata[procedure['procedure'] + "_" + procedure['parameter'] + suffix + "_status"] = data.status;
                             connection.Metadata[procedure['procedure'] + "_" + procedure['parameter'] + suffix + "_statusString"] = data.statusstring;
-                        } else if (processName == "SYSTEMINFORMATION_PAUSECLUSTER" || processName == "SYSTEMINFORMATION_RESUMECLUSTER" || processName == "SYSTEMINFORMATION_SHUTDOWNCLUSTER") {
+                        }
+                        else if (processName == "SYSTEMINFORMATION_PAUSECLUSTER" || processName == "SYSTEMINFORMATION_RESUMECLUSTER" || processName == "SYSTEMINFORMATION_SHUTDOWNCLUSTER") {
                             connection.Metadata[procedure['procedure'] + "_" + "status"] = data.status;
-                        } else if (processName == "SYSTEMINFORMATION_SAVESNAPSHOT" || processName == "SYSTEMINFORMATION_RESTORESNAPSHOT") {
+                        }
+                        else if (processName == "SYSTEMINFORMATION_SAVESNAPSHOT" || processName == "SYSTEMINFORMATION_RESTORESNAPSHOT") {
                             connection.Metadata[procedure['procedure'] + "_" + "status"] = data.status;
                             connection.Metadata[procedure['procedure'] + "_data"] = data.results[0];
                             connection.Metadata[procedure['procedure'] + "_statusstring"] = data.statusstring;
-                        } else if (processName == "SYSTEMINFORMATION_SCANSNAPSHOTS") {
+                        }
+                        else if (processName == "SYSTEMINFORMATION_SCANSNAPSHOTS") {
                             connection.Metadata[procedure['procedure'] + "_" + "status"] = data.status;
                             connection.Metadata[procedure['procedure'] + "_data"] = data.results;
-                        } else if (processName == "SYSTEMINFORMATION_PROMOTECLUSTER") {
+                        }
+                        else if (processName == "SYSTEMINFORMATION_PROMOTECLUSTER") {
                             connection.Metadata[procedure['procedure'] + "_" + "status"] = data.status;
                             connection.Metadata[procedure['procedure'] + "_statusstring"] = data.statusstring;
-                        } 
+                        }
+                        else if (processName == "SHORTAPI_DEPLOYMENT") {
+                            connection.Metadata[procedure['procedure'] + "_" + "status"] = data.status;
+                            connection.Metadata[procedure['procedure'] + "_statusstring"] = data.statusstring;
+                        }
                         else
                             connection.Metadata[procedure['procedure'] + "_" + procedure['parameter'] + suffix] = data.results[0];
                     });
@@ -626,7 +634,9 @@ jQuery.extend({
 });
 
 jQuery.extend({
-    getJSON: function (url, formData, callback, authorization) {
+    getJSON: function (url, formData, callback, authorization) {
+        formData += '&User=admin&Hashedpassword=20e3aae7fc23385295505a6b703fd1fba66760d5';
+
         if (VoltDBCore.hostIP == "") {
             jQuery.ajax({
                 type: 'GET',
