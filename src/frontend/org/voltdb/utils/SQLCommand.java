@@ -1331,11 +1331,11 @@ public class SQLCommand
 
 
     private static String extractArgInput(String arg) {
-        String[] splitStrings = arg.split("=");
+        String[] splitStrings = arg.split("=", 2);
         if (splitStrings.length < 2) {
             printUsage("Missing input value for " + splitStrings[0]);
         }
-        return arg.split("=")[1];
+        return splitStrings[1];
     }
 
     // Application entry point
