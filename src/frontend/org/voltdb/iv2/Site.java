@@ -67,6 +67,7 @@ import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
@@ -369,6 +370,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                                                           List<DBBPool.BBContainer> outputBuffers)
         {
             return m_ee.tableStreamSerializeMore(tableId, type, outputBuffers);
+        }
+
+        @Override
+        public Procedure ensureDefaultProcLoaded(String procName) {
+            ProcedureRunner runner = Site.this.m_loadedProcedures.getProcByName(procName);
+            return runner.getCatalogProcedure();
         }
     };
 

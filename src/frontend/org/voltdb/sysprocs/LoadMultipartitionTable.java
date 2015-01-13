@@ -164,7 +164,7 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
 
         // find the insert statement for this table
         String insertProcName = String.format("%s.insert", tableName);
-        Procedure proc = ctx.getDatabase().getProcedures().get(insertProcName);
+        Procedure proc = ctx.ensureDefaultProcLoaded(insertProcName);
         if (proc == null) {
             throw new VoltAbortException(
                     String.format("Unable to locate auto-generated CRUD insert statement for table %s",

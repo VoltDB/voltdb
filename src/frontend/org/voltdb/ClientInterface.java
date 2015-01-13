@@ -73,6 +73,7 @@ import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.AuthSystem.AuthProvider;
+import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
 import org.voltdb.ClientInterfaceHandleManager.Iv2InFlight;
 import org.voltdb.SystemProcedureCatalog.Config;
@@ -1350,7 +1351,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     }
 
     // Go to the catalog and fetch all the "explain plan" strings of the queries in the procedure.
-    ClientResponseImpl dispatchExplainProcedure(StoredProcedureInvocation task, ClientInputHandler handler, Connection ccxn) {
+    ClientResponseImpl dispatchExplainProcedure(StoredProcedureInvocation task, ClientInputHandler handler, Connection ccxn, AuthUser user) {
         ParameterSet params = task.getParams();
         //String procs = (String) params.toArray()[0];
         List<String> procNames = MiscUtils.splitSQLStatements( (String)params.toArray()[0]);
@@ -1359,8 +1360,17 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         for( int i=0; i<size; i++ ) {
             String procName = procNames.get(i);
 
+            // look in the catalog
             Procedure proc = m_catalogContext.get().procedures.get(procName);
-            if(proc == null) {
+            if (proc == null) {
+                // check default procs
+                /*proc = m_catalogContext.get().m_defaultProcs.checkForDefaultProcedure(procName);
+                if (proc != null) {
+                    String sql = m_catalogContext.get().m_defaultProcs.sqlForDefaultProc(proc);
+                    dispatchAdHocCommon(task, handler, ccxn, true, sql, new Object[0], null, user);
+                    return null;
+                }*/
+
                 ClientResponseImpl errorResponse =
                         new ClientResponseImpl(
                                 ClientResponseImpl.UNEXPECTED_FAILURE,
@@ -1751,7 +1761,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 return dispatchAdHoc(task, handler, ccxn, true, user);
             }
             else if (task.procName.equals("@ExplainProc")) {
-                return dispatchExplainProcedure(task, handler, ccxn);
+                return dispatchExplainProcedure(task, handler, ccxn, user);
             }
             else if (task.procName.equals("@SendSentinel")) {
                 dispatchSendSentinel(handler.connectionId(), nowNanos, buf.capacity(), task);
