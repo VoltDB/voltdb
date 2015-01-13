@@ -156,7 +156,7 @@ public class JSONClient {
             } else {
                 site = new BlogSession("writer", "reader");
             }
-            site.props.put("last-login", new Long(System.currentTimeMillis()).toString());
+            site.props.put("last-login", new Long(System.currentTimeMillis()));
             // Return the generated login
             return new LoginRecord(username, "pwd", gson.toJson(site));
         }

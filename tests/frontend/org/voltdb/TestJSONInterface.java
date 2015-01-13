@@ -72,11 +72,10 @@ import java.util.Map.Entry;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import static junit.framework.Assert.assertEquals;
 
 import junit.framework.TestCase;
-import org.codehaus.jackson.map.ObjectMapper;
 
+import org.codehaus.jackson.map.ObjectMapper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;

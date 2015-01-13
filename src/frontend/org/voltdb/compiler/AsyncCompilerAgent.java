@@ -121,6 +121,9 @@ public class AsyncCompilerAgent {
             SortedSet<String> conflictTables = new TreeSet<String>();
             Set<String> createdTables = new HashSet<String>();
             for (String stmt : w.sqlStatements) {
+                if (SQLLexer.isComment(stmt)) {
+                    continue;
+                }
                 String ddlToken = SQLLexer.extractDDLToken(stmt);
                 if (hasDDL == null) {
                     hasDDL = (ddlToken != null) ? true : false;
