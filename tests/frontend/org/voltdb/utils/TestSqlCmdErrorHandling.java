@@ -455,14 +455,15 @@ public class TestSqlCmdErrorHandling extends TestCase {
 
     private final String prompts = "sqlcmd did not fail as expected";
     public void testDDLModeBadCommandLineInput() throws Exception {
-        assertEquals(prompts, 255, callSQLcmdWithErrors("--servers=", "Invalid value for --servers"));
-        assertEquals(prompts, 255, callSQLcmdWithErrors("--port=", "Invalid value for --port"));
-        assertEquals(prompts, 255, callSQLcmdWithErrors("--user=", "Invalid value for --user"));
-        assertEquals(prompts, 255, callSQLcmdWithErrors("--password=", "Invalid value for --password"));
-        assertEquals(prompts, 255, callSQLcmdWithErrors("--kerberos=", "Invalid value for --kerberos"));
-        assertEquals(prompts, 255, callSQLcmdWithErrors("--output-format=", "Invalid value for --output-format"));
-        assertEquals(prompts, 255, callSQLcmdWithErrors("--stop-on-error=", "Invalid value for --stop-on-error"));
-        assertEquals(prompts, 255, callSQLcmdWithErrors("--ddl-file=", "Invalid value for --ddl-file"));
+        String errorMsgPrefix = "Missing input value for ";
+        assertEquals(prompts, 255, callSQLcmdWithErrors("--servers=", errorMsgPrefix + "--servers"));
+        assertEquals(prompts, 255, callSQLcmdWithErrors("--port=", errorMsgPrefix + "--port"));
+        assertEquals(prompts, 255, callSQLcmdWithErrors("--user=", errorMsgPrefix + "--user"));
+        assertEquals(prompts, 255, callSQLcmdWithErrors("--password=", errorMsgPrefix + "--password"));
+        assertEquals(prompts, 255, callSQLcmdWithErrors("--kerberos=", errorMsgPrefix + "--kerberos"));
+        assertEquals(prompts, 255, callSQLcmdWithErrors("--output-format=", errorMsgPrefix + "--output-format"));
+        assertEquals(prompts, 255, callSQLcmdWithErrors("--stop-on-error=", errorMsgPrefix + "--stop-on-error"));
+        assertEquals(prompts, 255, callSQLcmdWithErrors("--ddl-file=", errorMsgPrefix + "--ddl-file"));
 
         assertEquals(prompts, 255, callSQLcmdWithErrors("--ddl-file= haha.txt", "DDL file not found at path: haha.txt"));
         assertEquals(prompts, 255, callSQLcmdWithErrors("--output-format=haha", "Invalid value for --output-format"));
