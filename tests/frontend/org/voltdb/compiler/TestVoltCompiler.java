@@ -1291,6 +1291,93 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(success);
     }
 
+    public void testCreateProcedureWithPartition() throws IOException {
+        class Tester {
+            final VoltCompiler compiler = new VoltCompiler();
+            final String baseDDL =
+                "create table books (cash integer default 23 not null, "
+                                  + "title varchar(3) default 'foo', "
+                                  + "primary key(cash));\n"
+              + "partition table books on column cash";
+
+            void test(String ddl) {
+                test(ddl, null);
+            }
+
+            void test(String ddl, String expectedError) {
+                final String schema = String.format("%s;\n%s;", baseDDL, ddl);
+                boolean success = compileDDL(schema, compiler);
+                checkCompilerErrorMessages(expectedError, compiler, success);
+            }
+        }
+        Tester tester = new Tester();
+
+        // Class proc
+        tester.test("create procedure "
+                  + "partition on table books column cash "
+                  + "from class org.voltdb.compiler.procedures.NotAnnotatedAddBook");
+
+        // Class proc with previously-defined partition properties (expect error)
+        tester.test("create procedure "
+                  + "partition on table books column cash "
+                  + "from class org.voltdb.compiler.procedures.AddBook",
+                    "has partition properties defined both in class");
+
+        // Class proc with preceding ALLOW clause
+        tester.test("create role r1;\n"
+                  + "create procedure "
+                  + "allow r1 "
+                  + "partition on table books column cash "
+                  + "from class org.voltdb.compiler.procedures.NotAnnotatedAddBook");
+
+        // Class proc with trailing ALLOW clause
+        tester.test("create role r1;\n"
+                  + "create procedure "
+                  + "partition on table books column cash "
+                  + "allow r1 "
+                  + "from class org.voltdb.compiler.procedures.NotAnnotatedAddBook");
+
+        // Statement proc
+        tester.test("create procedure Foo "
+                  + "PARTITION on table books COLUMN cash PARAMETER 0 "
+                  + "AS select * from books where cash = ?");
+
+        // Inline code proc
+        tester.test("CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                    "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                    "CREATE PROCEDURE Foo PARTITION ON TABLE PKEY_INTEGER COLUMN PKEY AS ###\n" +
+                    "    stmt = new SQLStmt('SELECT PKEY, DESCR FROM PKEY_INTEGER WHERE PKEY = ?')\n" +
+                    "    transactOn = { int key -> \n" +
+                    "        voltQueueSQL(stmt,key)\n" +
+                    "        voltExecuteSQL(true)\n" +
+                    "    }\n" +
+                    "### LANGUAGE GROOVY");
+
+        // Class proc with two PARTITION clauses (outer regex failure causes general error)
+        tester.test("create procedure "
+                  + "partition on table books column cash "
+                  + "partition on table books column cash "
+                  + "partition on table books column cash "
+                  + "from class org.voltdb.compiler.procedures.NotAnnotatedAddBook",
+                    "Invalid CREATE PROCEDURE statement");
+
+/* Enable after parser detects these.
+        // Class proc with two PARTITION clauses (inner regex failure causes specific error)
+        tester.test("create procedure "
+                  + "partition on table books column cash "
+                  + "partition on table books column cash "
+                  + "from class org.voltdb.compiler.procedures.NotAnnotatedAddBook",
+                    "blah");
+
+        // Class proc with two ALLOW clauses (inner regex failure causes specific error)
+        tester.test("create role r1;\n"
+                  + "create procedure "
+                  + "allow r1 "
+                  + "allow r1 "
+                  + "from class org.voltdb.compiler.procedures.NotAnnotatedAddBook");
+*/
+    }
+
     public void testUseInnerClassAsProc() throws Exception {
         final String simpleSchema =
             "create procedure from class org.voltdb_testprocs.regressionsuites.fixedsql.TestENG2423$InnerProc;";
@@ -2570,7 +2657,7 @@ public class TestVoltCompiler extends TestCase {
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "PARTITION PROCEDURE NotDefinedPartitionParamInteger ON TABLE PKEY_INTEGER COLUMN PKEY;"
                 );
-        expectedError = "Partition in referencing an undefined procedure \"NotDefinedPartitionParamInteger\"";
+        expectedError = "Partition references an undefined procedure \"NotDefinedPartitionParamInteger\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
         fbs = checkInvalidProcedureDDL(
