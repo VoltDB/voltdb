@@ -2179,7 +2179,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
             // 6.1. If we are a DR master, update the DR table signature hash
             if (m_nodeDRGateway != null) {
-                m_nodeDRGateway.updateCatalog(true, m_catalogContext);
+                m_nodeDRGateway.updateCatalog(m_catalogContext);
             }
 
             new ConfigLogging().logCatalogAndDeployment();

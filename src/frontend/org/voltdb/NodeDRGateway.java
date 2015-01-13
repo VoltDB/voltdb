@@ -59,5 +59,5 @@ public interface NodeDRGateway {
     public abstract void start();
     public abstract void shutdown() throws InterruptedException;
 
-    public abstract void updateCatalog(boolean calledFromUAP, CatalogContext catalog);
+    public abstract void updateCatalog(CatalogContext catalog);
 }

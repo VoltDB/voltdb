@@ -1194,6 +1194,9 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const string &catalogPayloa
     // throws SerializeEEExceptions on error.
     m_catalog->execute(catalogPayload);
 
+    // Set DR flag based on current catalog state
+    m_drStream.m_enabled = m_catalog->clusters().get("cluster")->drProducerEnabled();
+
     if (updateCatalogDatabaseReference() == false) {
         VOLT_ERROR("Error re-caching catalog references.");
         return false;
