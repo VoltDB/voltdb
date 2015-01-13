@@ -85,7 +85,7 @@ public abstract class ActivePlanRepository {
             frag = m_plansByHash.get(key);
         }
         assert(frag != null);
-        assert(frag.stmtText != null);
+        //assert(frag.stmtText != null);
         return frag.stmtText;
     }
 

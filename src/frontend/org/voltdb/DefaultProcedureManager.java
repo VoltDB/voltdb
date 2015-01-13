@@ -31,6 +31,7 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.ProcParameter;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
 import org.voltdb.types.ConstraintType;
@@ -43,7 +44,14 @@ public class DefaultProcedureManager {
     final Database m_db;
     final Database m_fakeDb;
 
-    private void addShimProcedure(String name, Table table, int partitionParamIndex, Column partitionColumn, boolean readOnly) {
+    private void addShimProcedure(String name,
+                                  Table table,
+                                  Constraint pkey,
+                                  boolean tableCols,
+                                  int partitionParamIndex,
+                                  Column partitionColumn,
+                                  boolean readOnly)
+    {
         Procedure proc = m_fakeDb.getProcedures().add(name);
         proc.setClassname(name);
         proc.setDefaultproc(true);
@@ -59,6 +67,31 @@ public class DefaultProcedureManager {
         if (partitionParamIndex >= 0) {
             proc.setAttachment(new ProcedurePartitionInfo(VoltType.get((byte) partitionColumn.getType()), partitionParamIndex));
         }
+
+        int paramCount = 0;
+        if (tableCols) {
+            for (Column col : table.getColumns()) {
+                // name each parameter "param1", "param2", etc...
+                ProcParameter procParam = proc.getParameters().add("param" + String.valueOf(paramCount));
+                procParam.setIndex(col.getIndex());
+                procParam.setIsarray(false);
+                procParam.setType(col.getType());
+                paramCount++;
+            }
+        }
+        if (pkey != null) {
+            CatalogMap<ColumnRef> pkeycols = pkey.getIndex().getColumns();
+            int paramCount2 = paramCount;
+            for (ColumnRef cref : pkeycols) {
+                // name each parameter "param1", "param2", etc...
+                ProcParameter procParam = proc.getParameters().add("param" + String.valueOf(paramCount2));
+                procParam.setIndex(cref.getIndex() + paramCount);
+                procParam.setIsarray(false);
+                procParam.setType(cref.getColumn().getType());
+                paramCount2++;
+            }
+        }
+
         m_defaultProcMap.put(name.toLowerCase(), proc);
     }
 
@@ -100,12 +133,12 @@ public class DefaultProcedureManager {
 
             if (table.getIsreplicated()) {
                 // Creating multi-partition insert procedures for replicated table
-                addShimProcedure(prefix + "insert", table, -1, null, false);
+                addShimProcedure(prefix + "insert", table, null, true, -1, null, false);
                 // Creating multi-partition delete/update/upsert procedures for replicated table with pkey
                 if (pkey != null) {
-                    addShimProcedure(prefix + "delete", table, -1, null, false);
-                    addShimProcedure(prefix + "update", table, -1, null, false);
-                    addShimProcedure(prefix + "upsert", table, -1, null, false);
+                    addShimProcedure(prefix + "delete", table, pkey, false, -1, null, false);
+                    addShimProcedure(prefix + "update", table, pkey, true, -1, null, false);
+                    addShimProcedure(prefix + "upsert", table, null, true, -1, null, false);
                 }
                 continue;
             }
@@ -115,7 +148,7 @@ public class DefaultProcedureManager {
             final int partitionIndex = partitioncolumn.getIndex();
 
             // all partitioned tables get insert crud procs
-            addShimProcedure(prefix + "insert", table, partitionIndex, partitioncolumn, false);
+            addShimProcedure(prefix + "insert", table, null, true, partitionIndex, partitioncolumn, false);
 
             // Skip creation of CRUD select/delete/update for partitioned table if no primary key is declared.
             if (pkey == null) {
@@ -146,12 +179,12 @@ public class DefaultProcedureManager {
             // select, delete, update and upsert here (insert generated above)
             // these next 3 prefix params with the pkey so the partition on the index of the partition column
             // within the pkey
-            addShimProcedure(prefix + "select", table, pkeyPartitionIndex, partitioncolumn, true);
-            addShimProcedure(prefix + "delete", table, pkeyPartitionIndex, partitioncolumn, false);
+            addShimProcedure(prefix + "select", table, pkey, false, pkeyPartitionIndex, partitioncolumn, true);
+            addShimProcedure(prefix + "delete", table, pkey, false, pkeyPartitionIndex, partitioncolumn, false);
             // update partitions on the pkey column after the regular column
-            addShimProcedure(prefix + "update", table, columnCount + pkeyPartitionIndex, partitioncolumn, false);
+            addShimProcedure(prefix + "update", table, pkey, true, columnCount + pkeyPartitionIndex, partitioncolumn, false);
             // upsert partitions like a regular insert
-            addShimProcedure(prefix + "upsert", table, partitionIndex, partitioncolumn, false);
+            addShimProcedure(prefix + "upsert", table, null, true, partitionIndex, partitioncolumn, false);
         }
     }
 

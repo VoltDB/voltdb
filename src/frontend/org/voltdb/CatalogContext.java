@@ -129,7 +129,9 @@ public class CatalogContext {
         this.deploymentHash = CatalogUtil.makeCatalogOrDeploymentHash(deploymentBytes);
         m_memoizedDeployment = null;
 
-        m_jdbc = new JdbcDatabaseMetaDataGenerator(catalog, m_jarfile);
+        m_defaultProcs = new DefaultProcedureManager(database);
+
+        m_jdbc = new JdbcDatabaseMetaDataGenerator(catalog, m_defaultProcs, m_jarfile);
         m_ptool = new PlannerTool(cluster, database, version);
         catalogVersion = version;
 
@@ -142,7 +144,7 @@ public class CatalogContext {
             }
         }
 
-        m_defaultProcs = new DefaultProcedureManager(database);
+
     }
 
     public CatalogContext update(
