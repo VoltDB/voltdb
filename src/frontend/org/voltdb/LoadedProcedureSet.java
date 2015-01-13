@@ -56,7 +56,7 @@ public class LoadedProcedureSet {
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
-    final Database m_fakeDb;
+    Database m_fakeDb = null;
 
     // user procedures.
     ImmutableMap<String, ProcedureRunner> procs = ImmutableMap.<String, ProcedureRunner>builder().build();
@@ -76,7 +76,6 @@ public class LoadedProcedureSet {
     final SiteProcedureConnection m_site;
 
     public LoadedProcedureSet(SiteProcedureConnection site, ProcedureRunnerFactory runnerFactory, long siteId, int siteIndex) {
-        m_fakeDb = new Catalog().getClusters().add("cluster").getDatabases().add("database");
         m_runnerFactory = runnerFactory;
         m_siteId = siteId;
         m_siteIndex = siteIndex;
@@ -101,6 +100,10 @@ public class LoadedProcedureSet {
             BackendTarget backendTarget,
             CatalogSpecificPlanner csp)
     {
+        // default proc caches
+        m_fakeDb = new Catalog().getClusters().add("cluster").getDatabases().add("database");
+        m_defaultProcCache.clear();
+
         m_defaultProcManager = catalogContext.m_defaultProcs;
         m_csp = csp;
         m_plannerTool = catalogContext.m_ptool;

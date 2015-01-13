@@ -296,7 +296,6 @@ public class DefaultProcedureManager {
                 partitionOffset = pkc.getIndex();
             }
         }
-        sb.append(";");
         return partitionOffset;
 
     }
@@ -356,6 +355,7 @@ public class DefaultProcedureManager {
         sb.append("DELETE FROM " + table.getTypeName());
 
         generateCrudPKeyWhereClause(partitioncolumn, pkey, sb);
+        sb.append(';');
 
         return sb.toString();
     }
@@ -370,6 +370,7 @@ public class DefaultProcedureManager {
 
         generateCrudExpressionColumns(table, sb);
         generateCrudPKeyWhereClause(partitioncolumn, pkey, sb);
+        sb.append(';');
 
         return sb.toString();
     }
@@ -430,6 +431,7 @@ public class DefaultProcedureManager {
 
         generateCrudExpressionColumns(table, sb);
         generateCrudPKeyWhereClause(null, pkey, sb);
+        sb.append(';');
 
         return sb.toString();
     }
@@ -445,6 +447,7 @@ public class DefaultProcedureManager {
         sb.append("DELETE FROM " + table.getTypeName());
 
         generateCrudPKeyWhereClause(null, pkey, sb);
+        sb.append(';');
 
         return sb.toString();
     }
@@ -470,6 +473,7 @@ public class DefaultProcedureManager {
         sb.append("SELECT * FROM " + table.getTypeName());
 
         generateCrudPKeyWhereClause(partitioncolumn, pkey, sb);
+        sb.append(';');
 
         return sb.toString();
     }

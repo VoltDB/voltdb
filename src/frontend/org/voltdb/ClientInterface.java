@@ -88,6 +88,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.common.Constants;
+import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.AdHocPlannerWork;
 import org.voltdb.compiler.AsyncCompilerResult;
@@ -1344,10 +1345,34 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         c.writeStream().enqueue(buf);
 
         //do not cache the plans for explainAdhoc
-        //        planBatch.clientData = null;
-        //        for (int index = 0; index < planBatch.getPlannedStatementCount(); index++) {
-        //            m_adhocCache.put(planBatch.getPlannedStatement(index));
-        //        }
+    }
+
+    private void processExplainDefaultProc(AdHocPlannedStmtBatch planBatch) {
+        final Connection c = (Connection)planBatch.clientData;
+        Database db = m_catalogContext.get().database;
+
+        assert(planBatch.getPlannedStatementCount() == 1);
+        AdHocPlannedStatement ahps = planBatch.getPlannedStatement(0);
+        String sql = new String(ahps.sql, Charsets.UTF_8);
+        String explain = planBatch.explainStatement(0, db);
+
+        VoltTable vt = new VoltTable(new VoltTable.ColumnInfo( "SQL_STATEMENT", VoltType.STRING),
+                new VoltTable.ColumnInfo( "EXECUTION_PLAN", VoltType.STRING));
+        vt.addRow(sql, explain);
+
+        ClientResponseImpl response =
+                new ClientResponseImpl(
+                        ClientResponseImpl.SUCCESS,
+                        ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
+                        null,
+                        new VoltTable[] { vt },
+                        null);
+        response.setClientHandle( planBatch.clientHandle );
+        ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
+        buf.putInt(buf.capacity() - 4);
+        response.flattenToBuffer(buf);
+        buf.flip();
+        c.writeStream().enqueue(buf);
     }
 
     // Go to the catalog and fetch all the "explain plan" strings of the queries in the procedure.
@@ -1364,12 +1389,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             Procedure proc = m_catalogContext.get().procedures.get(procName);
             if (proc == null) {
                 // check default procs
-                /*proc = m_catalogContext.get().m_defaultProcs.checkForDefaultProcedure(procName);
+                proc = m_catalogContext.get().m_defaultProcs.checkForDefaultProcedure(procName);
                 if (proc != null) {
                     String sql = m_catalogContext.get().m_defaultProcs.sqlForDefaultProc(proc);
-                    dispatchAdHocCommon(task, handler, ccxn, true, sql, new Object[0], null, user);
+                    dispatchAdHocCommon(task, handler, ccxn, ExplainMode.EXPLAIN_PROC, sql, new Object[0], null, user);
                     return null;
-                }*/
+                }
 
                 ClientResponseImpl errorResponse =
                         new ClientResponseImpl(
@@ -1383,7 +1408,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                   new VoltTable.ColumnInfo( "EXECUTION_PLAN", VoltType.STRING));
 
             for( Statement stmt : proc.getStatements() ) {
-                vt[i].addRow( stmt.getSqltext()+"\n", Encoder.hexDecodeToString( stmt.getExplainplan() ) );
+                vt[i].addRow( stmt.getSqltext(), Encoder.hexDecodeToString( stmt.getExplainplan() ) );
             }
         }
 
@@ -1412,7 +1437,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (params.size() > 1) {
             userParams = Arrays.copyOfRange(paramArray, 1, paramArray.length);
         }
-        dispatchAdHocCommon(task, handler, ccxn, isExplain, sql, userParams, null, user);
+        ExplainMode explainMode = isExplain ? ExplainMode.EXPLAIN_ADHOC : ExplainMode.NONE;
+        dispatchAdHocCommon(task, handler, ccxn, explainMode, sql, userParams, null, user);
         return null;
     }
 
@@ -1430,12 +1456,17 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (params.size() > 2) {
             userParams = Arrays.copyOfRange(paramArray, 2, paramArray.length);
         }
-        dispatchAdHocCommon(task, handler, ccxn, isExplain, sql, userParams, userPartitionKey, user);
+        ExplainMode explainMode = isExplain ? ExplainMode.EXPLAIN_ADHOC : ExplainMode.NONE;
+        dispatchAdHocCommon(task, handler, ccxn, explainMode, sql, userParams, userPartitionKey, user);
         return null;
     }
 
+    public enum ExplainMode {
+        NONE, EXPLAIN_ADHOC, EXPLAIN_PROC;
+    }
+
     private final void dispatchAdHocCommon(StoredProcedureInvocation task,
-            ClientInputHandler handler, Connection ccxn, boolean isExplain,
+            ClientInputHandler handler, Connection ccxn, ExplainMode explainMode,
             String sql, Object[] userParams, Object[] userPartitionKey, AuthSystem.AuthUser user) {
         List<String> sqlStatements = MiscUtils.splitSQLStatements(sql);
         String[] stmtsArray = sqlStatements.toArray(new String[sqlStatements.size()]);
@@ -1444,7 +1475,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 m_siteId,
                 task.clientHandle, handler.connectionId(),
                 handler.isAdmin(), ccxn,
-                sql, stmtsArray, userParams, null, isExplain,
+                sql, stmtsArray, userParams, null, explainMode,
                 userPartitionKey == null, userPartitionKey,
                 task.procName, task.type, task.originalTxnId, task.originalUniqueId,
                 VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
@@ -2144,6 +2175,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 if (result.errorMsg == null) {
                     if (result instanceof AdHocPlannedStmtBatch) {
                         final AdHocPlannedStmtBatch plannedStmtBatch = (AdHocPlannedStmtBatch) result;
+                        ExplainMode explainMode = plannedStmtBatch.getExplainMode();
 
                         // assume all stmts have the same catalog version
                         if ((plannedStmtBatch.getPlannedStatementCount() > 0) &&
@@ -2157,8 +2189,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                             m_mailbox.send(m_plannerSiteId, work);
                         }
-                        else if( plannedStmtBatch.isExplainWork() ) {
-                            processExplainPlannedStmtBatch( plannedStmtBatch );
+                        else if (explainMode == ExplainMode.EXPLAIN_ADHOC) {
+                            processExplainPlannedStmtBatch(plannedStmtBatch);
+                        }
+                        else if (explainMode == ExplainMode.EXPLAIN_PROC) {
+                            processExplainDefaultProc(plannedStmtBatch);
                         }
                         else {
                             try {
