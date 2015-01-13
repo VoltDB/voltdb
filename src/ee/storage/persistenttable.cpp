@@ -305,6 +305,14 @@ void PersistentTable::truncateTable(VoltDBEngine* engine) {
         assert(targetEmptyTable);
         new MaterializedViewMetadata(emptyTable, targetEmptyTable, originalView->getMaterializedViewInfo());
     }
+
+    // If there is a purge fragment on the old table, pass it on to the new one
+    if (hasPurgeFragment()) {
+        assert(! emptyTable->hasPurgeFragment());
+        boost::shared_ptr<ExecutorVector> evPtr = getPurgeExecutorVector();
+        emptyTable->swapPurgeExecutorVector(evPtr);
+    }
+
     engine->rebuildTableCollections();
 
     UndoQuantum *uq = ExecutorContext::currentUndoQuantum();

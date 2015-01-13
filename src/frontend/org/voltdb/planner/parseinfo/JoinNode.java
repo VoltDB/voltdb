@@ -493,4 +493,5 @@ public abstract class JoinNode implements Cloneable {
     public StmtTableScan getTableScan() {
         return null;
     }
+
 }
