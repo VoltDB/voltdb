@@ -121,13 +121,15 @@ public class TestTableHelper extends TestCase {
      * @throws Exception
      */
     public void testDataGeneration() throws Exception {
-        Random r = new Random();
+        TableHelper.Configuration helperConfig = new TableHelper.Configuration();
+        helperConfig.rand = new Random();
+        TableHelper helper = new TableHelper(helperConfig);
 
         VoltTable t = TableHelper.quickTable("Ryan (likes:smallint, TINYINT/'8', A:VARBINARY/'ABCD')");
-        TableHelper.randomFill(t, 10, 128, r);
+        helper.randomFill(t, 10, 128);
 
         t = TableHelper.quickTable("FOO (BIGINT-N, BAR:TINYINT, A:VARCHAR12-U/'foo') PK(2,BAR)");
-        TableHelper.randomFill(t, 10, 128, r);
+        helper.randomFill(t, 10, 128);
         System.out.println(t.toString());
 
         VoltTable t2 = TableHelper.quickTable("FOO (BAR:DOUBLE, C0:BIGINT-N, A:VARCHAR14/'foo') PK(2,BAR)");
@@ -142,12 +144,13 @@ public class TestTableHelper extends TestCase {
      * @throws Exception
      */
     public void testRandomTables() throws Exception {
-        Random r = new Random(0);
+        TableHelper helper = new TableHelper();
         for (int i = 0; i < 1000; i++) {
-            VoltTable t1 = TableHelper.getTotallyRandomTable("foo", r);
-            VoltTable t2 = TableHelper.mutateTable(t1, true, r);
+            TableHelper.RandomTable trt = helper.getTotallyRandomTable("foo");
+            VoltTable t1 = trt.table;
+            VoltTable t2 = helper.mutateTable(t1, true);
             TableHelper.getAlterTableDDLToMigrate(t1, t2);
-            TableHelper.randomFill(t1, 50, 32, r);
+            helper.randomFill(t1, 50, 32);
             TableHelper.migrateTable(t1, t2);
         }
     }
