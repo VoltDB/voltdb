@@ -1097,6 +1097,8 @@ public class VoltCompiler {
             ddlcompiler.loadSchema(cannonicalDDLIfAny, db, whichProcs);
         }
 
+        dirtyTables.clear();
+
         for (final VoltCompilerReader schemaReader : schemaReaders) {
             // add the file object's path to the list of files for the jar
             m_ddlFilePaths.put(schemaReader.getName(), schemaReader.getPath());

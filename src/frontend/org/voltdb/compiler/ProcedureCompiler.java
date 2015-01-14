@@ -696,7 +696,9 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
         boolean cacheHit = false;
 
         // find any previous statement and ensure it's partitioned the same
-        if ((previousProcIfAny != null) && (previousProcIfAny.getPartitionparameter() >= 0)) {
+        if ((previousProcIfAny != null) &&
+            ((previousProcIfAny.getPartitioncolumn() != null) != info.singlePartition))
+        {
             Statement previousStatement = previousProcIfAny.getStatements().get(VoltDB.ANON_STMT_NAME);
             // check if the stmt exists and if it's the same sql text
             if ((previousStatement != null) && (previousStatement.getSqltext().equals(procedureDescriptor.m_singleStmt))) {

@@ -542,13 +542,28 @@ public class DDLCompiler {
 
     private void applyDiff(VoltXMLDiff stmtDiff)
     {
+        // record which tables changed
+        for (String tableName : stmtDiff.getChangedNodes().keySet()) {
+            m_compiler.dirtyTables.add(tableName);
+        }
+        for (VoltXMLElement tableXML : stmtDiff.getRemovedNodes()) {
+            String tableName = tableXML.attributes.get("name");
+            assert(tableName != null);
+            m_compiler.dirtyTables.add(tableName);
+        }
+        for (VoltXMLElement tableXML : stmtDiff.getAddedNodes()) {
+            String tableName = tableXML.attributes.get("name");
+            assert(tableName != null);
+            m_compiler.dirtyTables.add(tableName);
+        }
+
         m_schema.applyDiff(stmtDiff);
         // now go back and clean up anything that wasn't resolvable just by applying the diff
         // For now, this is:
         // - ensuring that the partition columns on tables are correct.  The hard
         // case is when the partition column is dropped from the table
 
-        // Each statement can affect at most one table.  Check to see if the table is listed in
+        // Each statement can change at most one table. Check to see if the table is listed in
         // the changed nodes
         if (stmtDiff.getChangedNodes().isEmpty()) {
             return;
