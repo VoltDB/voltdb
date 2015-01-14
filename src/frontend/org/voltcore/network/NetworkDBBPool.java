@@ -35,7 +35,7 @@ public class NetworkDBBPool {
         m_allocationSize = SIZE;
     }
 
-    public NetworkDBBPool(int numBuffers, int allocSize) {
+    NetworkDBBPool(int numBuffers, int allocSize) {
         m_numBuffers = numBuffers;
         m_allocationSize = allocSize;
     }
