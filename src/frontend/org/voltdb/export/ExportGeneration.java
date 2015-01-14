@@ -392,13 +392,13 @@ public class ExportGeneration {
          * Now create datasources based on the catalog
          */
         for (Connector conn : connectors) {
-            // TODO: might want to not create datasources for disabled export connectors
+            if (conn.getEnabled()) {
+                for (ConnectorTableInfo ti : conn.getTableinfo()) {
+                    Table table = ti.getTable();
+                    addDataSources(table, hostId, partitions);
 
-            for (ConnectorTableInfo ti : conn.getTableinfo()) {
-                Table table = ti.getTable();
-                addDataSources(table, hostId, partitions);
-
-                partitionsInUse.addAll(partitions);
+                    partitionsInUse.addAll(partitions);
+                }
             }
         }
 
