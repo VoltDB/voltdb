@@ -156,6 +156,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     // Cache the DR gateway here so that we can pass it to tasks as they are reconstructed from
     // the task log
     private final PartitionDRGateway m_drGateway;
+    private final PartitionDRGateway m_mpDrGateway;
 
     // Current topology
     int m_partitionId;
@@ -380,7 +381,20 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         @Override
         public Runnable forceAllDRNodeBuffersToDisk(final boolean nofsync)
         {
-            return Site.this.m_drGateway.forceAllDRNodeBuffersToDisk(nofsync);
+            final Runnable runnable = Site.this.m_drGateway.forceAllDRNodeBuffersToDisk(nofsync);
+            if (m_mpDrGateway == null) {
+                return runnable;
+            } else {
+                final Runnable mpRunnable = m_mpDrGateway.forceAllDRNodeBuffersToDisk(nofsync);
+                return new Runnable() {
+                    @Override
+                    public void run()
+                    {
+                        runnable.run();
+                        mpRunnable.run();
+                    }
+                };
+            }
         }
     };
 
@@ -399,7 +413,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             MemoryStats memStats,
             String coreBindIds,
             TaskLog rejoinTaskLog,
-            PartitionDRGateway drGateway)
+            PartitionDRGateway drGateway,
+            PartitionDRGateway mpDrGateway)
     {
         m_siteId = siteId;
         m_context = context;
@@ -419,6 +434,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_coreBindIds = coreBindIds;
         m_rejoinTaskLog = rejoinTaskLog;
         m_drGateway = drGateway;
+        m_mpDrGateway = mpDrGateway;
         m_hashinator = TheHashinator.getCurrentHashinator();
 
         if (agent != null) {
@@ -490,7 +506,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         m_context.cluster.getDeployment().get("deployment").
                         getSystemsettings().get("systemsettings").getTemptablemaxsize(),
                         hashinatorConfig,
-                        true);
+                        m_mpDrGateway != null);
             }
             else {
                 // set up the EE over IPC
@@ -506,7 +522,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             m_backend,
                             VoltDB.instance().getConfig().m_ipcPort,
                             hashinatorConfig,
-                            true);
+                            m_mpDrGateway != null);
             }
             eeTemp.loadCatalog(m_startupConfig.m_timestamp, m_startupConfig.m_serializableCatalog.serialize());
             eeTemp.setTimeoutLatency(m_context.cluster.getDeployment().get("deployment").

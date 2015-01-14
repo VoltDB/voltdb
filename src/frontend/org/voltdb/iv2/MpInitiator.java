@@ -75,7 +75,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
                           CommandLog cl,
                           NodeDRGateway drGateway,
                           ConsumerDRGateway consumerDRGateway,
-                          String coreBindIds)
+                          boolean createMpDRGateway, String coreBindIds)
         throws KeeperException, InterruptedException, ExecutionException
     {
         // note the mp initiator always uses a non-ipc site, even though it's never used for anything
@@ -84,7 +84,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
         }
 
         super.configureCommon(backend, catalogContext,
-                csp, numberOfPartitions, startAction, null, null, cl, coreBindIds, null);
+                csp, numberOfPartitions, startAction, null, null, cl, coreBindIds, null, null);
         // Hacky
         MpScheduler sched = (MpScheduler)m_scheduler;
         MpRoSitePool sitePool = new MpRoSitePool(m_initiatorMailbox.getHSId(),
