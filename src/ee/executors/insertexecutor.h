@@ -97,8 +97,14 @@ public:
         /** If the table is at or over its tuple limit, this method
          * executes the purge fragment for the table.  Returns true if
          * nothing went wrong (regardless of whether the purge
-         * fragment was executed) and false otherwise. */
-        bool executePurgeFragmentIfNeeded(PersistentTable* table);
+         * fragment was executed) and false otherwise.
+         *
+         * The purge fragment might perform a truncate table,
+         * in which case the persistent table object we're inserting
+         * into might change.  Passing a pointer-to-pointer allows
+         * the callee to update the persistent table pointer.
+         */
+        bool executePurgeFragmentIfNeeded(PersistentTable** table);
 
         /** A tuple with the target table's schema that is populated
          * with default values for each field. */
