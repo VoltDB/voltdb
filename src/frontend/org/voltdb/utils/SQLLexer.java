@@ -198,9 +198,9 @@ public class SQLLexer
         boolean inQuote = false;
         char quoteChar = ' '; // will be written before use
         boolean lastCharWasDash = false;
-        int commentStart = ddlLine.length();
+        int length = ddlLine.length();
 
-        for (int i = commentStart - 1; i >= 0; i--) {
+        for (int i = 0; i < length; i++) {
             char c = ddlLine.charAt(i);
             if (inQuote) {
                 if (quoteChar == c) {
@@ -210,7 +210,7 @@ public class SQLLexer
             else {
                 if (c == '-') {
                     if (lastCharWasDash) {
-                        commentStart = i;
+                        return ddlLine.substring(0, i - 1);
                     }
                     else {
                         lastCharWasDash = true;
@@ -226,7 +226,7 @@ public class SQLLexer
             }
         }
 
-        return ddlLine.substring(0, commentStart);
+        return ddlLine;
     }
 
     // Extracts the table name for DDL batch conflicting command checks.
@@ -240,8 +240,6 @@ public class SQLLexer
             ".*$", // all the rest
             Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL
             );
-
-
 
     /**
      * Get the table name for a CREATE or DROP DDL statement.
