@@ -64,6 +64,12 @@ PARTITION TABLE events_capped ON COLUMN event_id;
 CREATE UNIQUE INDEX events_capped_when_id
        ON events_capped (when_occurred, event_id);
 
+CREATE TABLE capped_truncate (
+  i integer,
+  CONSTRAINT limit_5_truncate LIMIT PARTITION ROWS 5
+  EXECUTE (DELETE FROM capped_truncate)
+);
+
 
 CREATE TABLE RTABLE (
     ID INTEGER DEFAULT 0 NOT NULL,
