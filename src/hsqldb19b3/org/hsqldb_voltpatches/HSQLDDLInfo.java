@@ -68,12 +68,26 @@ public class HSQLDDLInfo {
 
     public final HSQLDDLInfo.Verb verb;
     public final HSQLDDLInfo.Noun noun;
+    // the index/table/view that goes with the noun (subject of the verb)
     public final String name;
+    // used today to hold the table that new indexes are created on
+    // CREATE INDEX name ON TABLE secondName ...
     public final String secondName;
-    public boolean cascade;
-    public boolean ifexists;
+    public final boolean cascade;
+    public final boolean ifexists;
 
-    public HSQLDDLInfo(HSQLDDLInfo.Verb verb, HSQLDDLInfo.Noun noun, String name, String secondName, boolean cascade, boolean ifexists) {
-        this.verb = verb; this.noun = noun; this.name = name; this.secondName = secondName; this.cascade = cascade; this.ifexists = ifexists;
+    public HSQLDDLInfo(HSQLDDLInfo.Verb verb,
+                       HSQLDDLInfo.Noun noun,
+                       String name,
+                       String secondName,
+                       boolean cascade,
+                       boolean ifexists)
+    {
+        this.verb = verb;
+        this.noun = noun;
+        this.name = name;
+        this.secondName = secondName;
+        this.cascade = cascade;
+        this.ifexists = ifexists;
     }
 }

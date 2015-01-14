@@ -20,9 +20,8 @@ package org.voltdb.utils;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.HSQLDDLInfo;
-import org.hsqldb_voltpatches.HSQLDDLInfo.Noun;
-import org.hsqldb_voltpatches.HSQLDDLInfo.Verb;
 import org.voltcore.logging.VoltLogger;
 
 public class SQLLexer
@@ -114,23 +113,25 @@ public class SQLLexer
             "([a-z][a-z0-9_]*)" + // table/view/index name symbol
             "(\\s+on\\s+([a-z][a-z0-9_]*))?" + // on table/view second name
             ".*$", // all the rest
-            Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL
+            Pattern.CASE_INSENSITIVE | Pattern.DOTALL
             );
 
     // does ddl the statement end with cascade or have if exists in the right place
     private static final Pattern DDL_IFEXISTS_OR_CASCADE_CHECK = Pattern.compile(
             "^.*?" + // start of line, then anything (greedy)
-            "(\\s+if\\s+exists)?" + // may contain if exists preceded by whitespace
-            "(\\s+cascade)?" + // may contain cascade preceded by whitespace
+            "(?<ie>\\s+if\\s+exists)?" + // may contain if exists preceded by whitespace
+            "(?<c>\\s+cascade)?" + // may contain cascade preceded by whitespace
             "\\s*;?\\s*" + // then optional whitespace, a single optional semi, then ws
             "$", // end of line
-            Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL
+            Pattern.CASE_INSENSITIVE | Pattern.DOTALL
             );
 
     /**
      * Glean some basic info about DDL statements sent to HSQLDB
      */
     public static HSQLDDLInfo preprocessHSQLDDL(String ddl) {
+        ddl = stripComments(ddl);
+
         Matcher matcher = HSQL_DDL_PREPROCESSOR.matcher(ddl);
         if (matcher.find()) {
             String verbString = matcher.group(1);
@@ -161,18 +162,71 @@ public class SQLLexer
             if (verb != HSQLDDLInfo.Verb.CREATE) {
                 matcher = DDL_IFEXISTS_OR_CASCADE_CHECK.matcher(ddl);
                 if (matcher.matches()) {
-                    for (int i = 0; i < 3; i++) {
-                        System.out.println(matcher.group(i));
-                    }
-                    System.out.println();
-                    ifexists = matcher.group(1) != null;
-                    cascade = matcher.group(2) != null;
+                    ifexists = matcher.group("ie") != null;
+                    cascade = matcher.group("c") != null;
                 }
             }
 
             return new HSQLDDLInfo(verb, noun, name.toLowerCase(), secondName, cascade, ifexists);
         }
         return null;
+    }
+
+    /** Remove c-style comments globally and -- comments from the end of lines */
+    public static String stripComments(String ddl) {
+        ddl = removeCStyleComments(ddl);
+        StringBuilder sb = new StringBuilder();
+        String[] ddlLines = ddl.split("\n");
+        for (String ddlLine : ddlLines) {
+            sb.append(stripCommentFromLine(ddlLine)).append(' ');
+        }
+        return sb.toString();
+    }
+
+    private static final Pattern STRIP_CSTYLE_COMMENTS = Pattern.compile(
+            "/\\*(.|\\n)*?\\*/"
+            );
+
+    /** Remove c-style comments from a string aggressively */
+    public static String removeCStyleComments(String ddl) {
+        String[] parts = STRIP_CSTYLE_COMMENTS.split(ddl);
+        return StringUtils.join(parts);
+    }
+
+    /** Strip -- comments from the end of a single line */
+    public static String stripCommentFromLine(String ddlLine) {
+        boolean inQuote = false;
+        char quoteChar = ' '; // will be written before use
+        boolean lastCharWasDash = false;
+        int commentStart = ddlLine.length();
+
+        for (int i = commentStart - 1; i >= 0; i--) {
+            char c = ddlLine.charAt(i);
+            if (inQuote) {
+                if (quoteChar == c) {
+                    inQuote = false;
+                }
+            }
+            else {
+                if (c == '-') {
+                    if (lastCharWasDash) {
+                        commentStart = i;
+                    }
+                    else {
+                        lastCharWasDash = true;
+                    }
+                }
+                else {
+                    lastCharWasDash = false;
+                    if (c == '\"' || c == '\'') {
+                        inQuote = true;
+                        quoteChar = c;
+                    }
+                }
+            }
+        }
+
+        return ddlLine.substring(0, commentStart);
     }
 
     // Extracts the table name for DDL batch conflicting command checks.

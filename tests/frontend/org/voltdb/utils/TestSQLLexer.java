@@ -176,7 +176,16 @@ public class TestSQLLexer {
         checkValidHSQLPreprocessing("alter index pants rename to shorts CASCADE;", HSQLDDLInfo.Verb.ALTER, HSQLDDLInfo.Noun.INDEX, "pants", null, false, true);
         checkValidHSQLPreprocessing("alter table pants alter column rename to shorts;", HSQLDDLInfo.Verb.ALTER, HSQLDDLInfo.Noun.TABLE, "pants", null, false, false);
         checkValidHSQLPreprocessing("alter table pants alter column rename to shorts CASCADE;", HSQLDDLInfo.Verb.ALTER, HSQLDDLInfo.Noun.TABLE, "pants", null, false, true);
+
+        // these next few statements are pretty much the same just with increasing parser mess
         checkValidHSQLPreprocessing("alter table FOO drop column VIEWCOL cascade;", HSQLDDLInfo.Verb.ALTER, HSQLDDLInfo.Noun.TABLE, "foo", null, false, true);
+        checkValidHSQLPreprocessing("alter table FOO drop\n-- comment line\ncolumn VIEWCOL cascade;", HSQLDDLInfo.Verb.ALTER, HSQLDDLInfo.Noun.TABLE, "foo", null, false, true);
+        checkValidHSQLPreprocessing("alter table FOO drop column VIEWCOL cascade; --comment baby", HSQLDDLInfo.Verb.ALTER, HSQLDDLInfo.Noun.TABLE, "foo", null, false, true);
+        checkValidHSQLPreprocessing("alter table FOO drop column VIEWCOL --comment baby\n cascade;", HSQLDDLInfo.Verb.ALTER, HSQLDDLInfo.Noun.TABLE, "foo", null, false, true);
+        checkValidHSQLPreprocessing("alter table FOO drop /* \" */column VIEWCOL --comment baby\n cascade;", HSQLDDLInfo.Verb.ALTER, HSQLDDLInfo.Noun.TABLE, "foo", null, false, true);
+        checkValidHSQLPreprocessing("alter table FOO drop /* \n */column VIEWCOL ---comment baby\n cascade;", HSQLDDLInfo.Verb.ALTER, HSQLDDLInfo.Noun.TABLE, "foo", null, false, true);
+        checkValidHSQLPreprocessing("alter table FOO drop /* \" */column VIEWCOL \"quote'--\" --comment 'st--uf-f' baby\n cascade;", HSQLDDLInfo.Verb.ALTER, HSQLDDLInfo.Noun.TABLE, "foo", null, false, true);
+
         checkInvalidHSQLPreprocessing("altre table pants blargy blarg;");
         checkInvalidHSQLPreprocessing("alter tabel pants blargy blarg;");
         checkValidHSQLPreprocessing("CREATE ASSUMEUNIQUE INDEX absVal ON T2 (     ABS(area * 2) ,   ABS(volume / 2) );", HSQLDDLInfo.Verb.CREATE, HSQLDDLInfo.Noun.INDEX, "absval", "t2", false, false);
