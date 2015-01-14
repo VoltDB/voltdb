@@ -65,6 +65,7 @@ import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
+import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.utils.NotImplementedException;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
@@ -985,6 +986,9 @@ public class VoltProjectBuilder {
 
         ServerExportEnum exportTarget = ServerExportEnum.fromValue(m_elExportTarget.toLowerCase());
         export.setTarget(exportTarget);
+        if (exportTarget.equals(ServerExportEnum.CUSTOM)) {
+            export.setExportconnectorclass(System.getProperty(ExportDataProcessor.EXPORT_TO_TYPE));
+        }
         if((m_elConfig != null) && (m_elConfig.size() > 0)) {
             ExportConfigurationType exportConfig = factory.createExportConfigurationType();
             List<PropertyType> configProperties = exportConfig.getProperty();
