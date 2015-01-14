@@ -78,7 +78,7 @@ public interface SystemProcedureExecutionContext {
 
     boolean activateTableStream(int tableId, TableStreamType type, boolean undo, byte[] predicates);
 
-    public Runnable forceAllDRNodeBuffersToDisk(final boolean nofsync);
+    public void forceAllDRNodeBuffersToDisk(final boolean nofsync);
 
     Pair<Long, int[]> tableStreamSerializeMore(int tableId, TableStreamType type,
                                                List<DBBPool.BBContainer> outputBuffers);

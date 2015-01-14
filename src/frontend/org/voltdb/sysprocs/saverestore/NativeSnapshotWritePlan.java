@@ -201,9 +201,13 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                 }
 
                 // Only sync the DR Log on Native Snapshots
-                Runnable forceDrBuffersToDisk = context.forceAllDRNodeBuffersToDisk(false);
-                if (forceDrBuffersToDisk != null)
-                    SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(forceDrBuffersToDisk);
+                SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(new Runnable() {
+                    @Override
+                    public void run()
+                    {
+                        context.forceAllDRNodeBuffersToDisk(false);
+                    }
+                });
 
                 return true;
             }

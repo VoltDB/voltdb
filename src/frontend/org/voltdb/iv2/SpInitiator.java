@@ -94,6 +94,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                           CommandLog cl,
                           NodeDRGateway nodeDRGateway,
                           ConsumerDRGateway consumerDRGateway,
+                          boolean createMpDRGateway,
                           String coreBindIds)
         throws KeeperException, InterruptedException, ExecutionException
     {
@@ -110,8 +111,14 @@ public class SpInitiator extends BaseInitiator implements Promotable
         ((SpScheduler) m_scheduler).setDRGateway(drGateway);
         m_consumerDRGateway = consumerDRGateway;
 
+        PartitionDRGateway mpPDRG = null;
+        if (createMpDRGateway) {
+            mpPDRG = PartitionDRGateway.getInstance(MpInitiator.MP_INIT_PID, nodeDRGateway, startAction);
+            ((SpScheduler) m_scheduler).setMpDRGateway(mpPDRG);
+        }
+
         super.configureCommon(backend, catalogContext,
-                csp, numberOfPartitions, startAction, agent, memStats, cl, coreBindIds, drGateway);
+                csp, numberOfPartitions, startAction, agent, memStats, cl, coreBindIds, drGateway, mpPDRG);
 
         m_tickProducer.start();
 

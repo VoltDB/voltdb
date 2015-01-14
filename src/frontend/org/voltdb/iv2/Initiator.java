@@ -48,7 +48,7 @@ public interface Initiator
                           CommandLog cl,
                           NodeDRGateway nodeDRGateway,
                           ConsumerDRGateway consumerDRGateway,
-                          String coreBindIds)
+                          boolean createMpDRGateway, String coreBindIds)
         throws KeeperException, InterruptedException, ExecutionException;
 
     /** Shutdown an Initiator and its sub-components. */
