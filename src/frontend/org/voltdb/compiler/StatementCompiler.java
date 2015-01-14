@@ -97,6 +97,7 @@ public abstract class StatementCompiler {
 
         catalogStmt.setReadonly(qtype.isReadOnly());
         catalogStmt.setQuerytype(qtype.getValue());
+        catalogStmt.setDeterminismmode(String.valueOf(detMode.toChar()));
 
         // put the data in the catalog that we have
         if (!stmt.endsWith(";")) {
@@ -104,8 +105,6 @@ public abstract class StatementCompiler {
         }
         catalogStmt.setSqltext(stmt);
         catalogStmt.setSinglepartition(partitioning.wasSpecifiedAsSingle());
-        catalogStmt.setBatched(false);
-        catalogStmt.setParamnum(0);
 
         String name = catalogStmt.getParent().getTypeName() + "-" + catalogStmt.getTypeName();
         String sql = catalogStmt.getSqltext();

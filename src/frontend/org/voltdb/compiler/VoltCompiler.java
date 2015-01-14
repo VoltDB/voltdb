@@ -123,7 +123,9 @@ public class VoltCompiler {
     // was this voltcompiler instantiated in a main(), or as part of VoltDB
     public final boolean standaloneCompiler;
 
-    public Set<String> dirtyTables = new TreeSet<>();
+    private boolean m_previousCatalogReuseEnabled = false;
+    private Set<String> m_dirtyTables = new TreeSet<>();
+    private Map<String, Statement> m_previousCatalogStmts = new HashMap<>();
 
     // feedback by filename
     ArrayList<Feedback> m_infos = new ArrayList<Feedback>();
@@ -1097,7 +1099,7 @@ public class VoltCompiler {
             ddlcompiler.loadSchema(cannonicalDDLIfAny, db, whichProcs);
         }
 
-        dirtyTables.clear();
+        m_dirtyTables.clear();
 
         for (final VoltCompilerReader schemaReader : schemaReaders) {
             // add the file object's path to the list of files for the jar
@@ -1346,6 +1348,16 @@ public class VoltCompiler {
                                    CatalogMap<Procedure> prevProcsIfAny,
                                    InMemoryJarfile jarOutput) throws VoltCompilerException
     {
+        // build a cache of previous SQL stmts
+        m_previousCatalogStmts.clear();
+        if (prevProcsIfAny != null) {
+            for (Procedure prevProc : prevProcsIfAny) {
+                for (Statement prevStmt : prevProc.getStatements()) {
+                    addStatementToCache(prevStmt);
+                }
+            }
+        }
+
         // Ignore class dependencies if ignoring java stored procs.
         // This extra qualification anticipates some (undesirable) overlap between planner
         // testing and additional library code in the catalog jar file.
@@ -2821,5 +2833,45 @@ public class VoltCompiler {
             }
         }
         return upgradedFromVersion;
+    }
+
+    void markTableAsDirty(String tableName) {
+        m_dirtyTables.add(tableName.toLowerCase());
+    }
+
+    boolean hasTableChangedSincePreviousCatalog(String tableName) {
+        return m_dirtyTables.contains(tableName.toLowerCase());
+    }
+
+    void addStatementToCache(Statement stmt) {
+        DeterminismMode detMode = DeterminismMode.fromStr(stmt.getDeterminismmode());
+        if (detMode == null) {
+            return; // uncacheable and quite weird
+        }
+
+        String key = detMode.toChar() + (stmt.getSinglepartition() ? 'P' : 'R') + '#' + stmt.getSqltext();
+
+        m_previousCatalogStmts.put(key, stmt);
+    }
+
+    Statement getCachedStatement(String sql, boolean partitioned, DeterminismMode detMode) {
+        if (!m_previousCatalogReuseEnabled) {
+            return null;
+        }
+
+        String key = detMode.toChar() + (partitioned ? 'P' : 'R') + '#' + sql;
+
+        Statement candidate = m_previousCatalogStmts.get(key);
+
+        // check that no underlying tables have been modified since the proc had been compiled
+        boolean safe = true;
+        String tablesTouched[] = candidate.getTablestouched().split(",");
+        for (String tableName : tablesTouched) {
+            if (hasTableChangedSincePreviousCatalog(tableName)) {
+                safe = false;
+            }
+        }
+
+        return safe ? candidate : null;
     }
 }

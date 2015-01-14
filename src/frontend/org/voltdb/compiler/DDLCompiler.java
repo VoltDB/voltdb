@@ -544,17 +544,17 @@ public class DDLCompiler {
     {
         // record which tables changed
         for (String tableName : stmtDiff.getChangedNodes().keySet()) {
-            m_compiler.dirtyTables.add(tableName);
+            m_compiler.markTableAsDirty(tableName);
         }
         for (VoltXMLElement tableXML : stmtDiff.getRemovedNodes()) {
             String tableName = tableXML.attributes.get("name");
             assert(tableName != null);
-            m_compiler.dirtyTables.add(tableName);
+            m_compiler.markTableAsDirty(tableName);
         }
         for (VoltXMLElement tableXML : stmtDiff.getAddedNodes()) {
             String tableName = tableXML.attributes.get("name");
             assert(tableName != null);
-            m_compiler.dirtyTables.add(tableName);
+            m_compiler.markTableAsDirty(tableName);
         }
 
         m_schema.applyDiff(stmtDiff);

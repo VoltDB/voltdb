@@ -695,55 +695,37 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
         Statement catalogStmt = procedure.getStatements().add(VoltDB.ANON_STMT_NAME);
         boolean cacheHit = false;
 
-        // find any previous statement and ensure it's partitioned the same
-        if ((previousProcIfAny != null) &&
-            ((previousProcIfAny.getPartitioncolumn() != null) != info.singlePartition))
-        {
-            Statement previousStatement = previousProcIfAny.getStatements().get(VoltDB.ANON_STMT_NAME);
-            // check if the stmt exists and if it's the same sql text
-            if ((previousStatement != null) && (previousStatement.getSqltext().equals(procedureDescriptor.m_singleStmt))) {
-                // check that no underlying tables have been modified since the proc had been compiled
-                boolean safe = true;
-                String tablesTouched[] = previousStatement.getTablestouched().split(",");
-                for (String tableName : tablesTouched) {
-                    if (compiler.dirtyTables.contains(tableName)) {
-                        safe = false;
-                    }
-                }
+        // find any previous statement
+        Statement previousStatement = compiler.getCachedStatement(procedureDescriptor.m_singleStmt, info.singlePartition, DeterminismMode.FASTER);
+        // check if the stmt exists and if it's the same sql text
+        if (previousStatement != null) {
+            catalogStmt.setAnnotation(previousStatement.getAnnotation());
+            catalogStmt.setAttachment(previousStatement.getAttachment());
+            catalogStmt.setCost(previousStatement.getCost());
+            catalogStmt.setExplainplan(previousStatement.getExplainplan());
+            catalogStmt.setIscontentdeterministic(previousStatement.getIscontentdeterministic());
+            catalogStmt.setIsorderdeterministic(previousStatement.getIsorderdeterministic());
+            catalogStmt.setNondeterminismdetail(previousStatement.getNondeterminismdetail());
+            catalogStmt.setQuerytype(previousStatement.getQuerytype());
+            catalogStmt.setReadonly(previousStatement.getReadonly());
+            catalogStmt.setReplicatedtabledml(previousStatement.getReplicatedtabledml());
+            catalogStmt.setSeqscancount(previousStatement.getSeqscancount());
+            catalogStmt.setSinglepartition(previousStatement.getSinglepartition());
+            catalogStmt.setSqltext(previousStatement.getSqltext());
+            catalogStmt.setTablestouched(previousStatement.getTablestouched());
 
-                if (safe) {
-                    catalogStmt.setAnnotation(previousStatement.getAnnotation());
-                    catalogStmt.setAttachment(previousStatement.getAttachment());
-                    catalogStmt.setBatched(previousStatement.getBatched());
-                    catalogStmt.setCost(previousStatement.getCost());
-                    catalogStmt.setExplainplan(previousStatement.getExplainplan());
-                    catalogStmt.setIscontentdeterministic(previousStatement.getIscontentdeterministic());
-                    catalogStmt.setIsorderdeterministic(previousStatement.getIsorderdeterministic());
-                    catalogStmt.setNondeterminismdetail(previousStatement.getNondeterminismdetail());
-                    catalogStmt.setParamnum(previousStatement.getParamnum());
-                    catalogStmt.setQuerytype(previousStatement.getQuerytype());
-                    catalogStmt.setReadonly(previousStatement.getReadonly());
-                    catalogStmt.setReplicatedtabledml(previousStatement.getReplicatedtabledml());
-                    catalogStmt.setSeqscancount(previousStatement.getSeqscancount());
-                    catalogStmt.setSinglepartition(previousStatement.getSinglepartition());
-                    catalogStmt.setSqltext(previousStatement.getSqltext());
-                    catalogStmt.setTablestouched(previousStatement.getTablestouched());
-
-                    for (StmtParameter oldSp : previousStatement.getParameters()) {
-                        StmtParameter newSp = catalogStmt.getParameters().add(oldSp.getTypeName());
-                        newSp.setAnnotation(oldSp.getAnnotation());
-                        newSp.setAttachment(oldSp.getAttachment());
-                        newSp.setIndex(oldSp.getIndex());
-                        newSp.setIsarray(oldSp.getIsarray());
-                        newSp.setJavatype(oldSp.getJavatype());
-                        newSp.setSqltype(oldSp.getSqltype());
-                    }
-
-                    cacheHit = true;
-                }
+            for (StmtParameter oldSp : previousStatement.getParameters()) {
+                StmtParameter newSp = catalogStmt.getParameters().add(oldSp.getTypeName());
+                newSp.setAnnotation(oldSp.getAnnotation());
+                newSp.setAttachment(oldSp.getAttachment());
+                newSp.setIndex(oldSp.getIndex());
+                newSp.setIsarray(oldSp.getIsarray());
+                newSp.setJavatype(oldSp.getJavatype());
+                newSp.setSqltype(oldSp.getSqltype());
             }
-        }
 
+            cacheHit = true;
+        }
 
         // ADD THE STATEMENT
         StatementPartitioning partitioning =
