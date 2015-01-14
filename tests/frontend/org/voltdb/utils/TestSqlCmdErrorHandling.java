@@ -443,14 +443,23 @@ public class TestSqlCmdErrorHandling extends TestCase {
         Process process = pb.start();
 
         // Only doing cmd line arguments work, SQLCMD process should finish in 1 second.
-        Thread.sleep(1000);
+        final int SLEEP = 200;
+        final int TIMES = 50; // 10s before timing out
+        for (int i = 0; i < TIMES; i++) {
+            Thread.sleep(SLEEP);
+            try {
+                int exitValue = process.exitValue();
 
-        int exitValue = process.exitValue();
+                String message = new Scanner(out).useDelimiter("\\Z").next();
+                assertTrue(message.contains(errorMessage));
+                return exitValue;
+            } catch (Exception e) {
+                System.err.println("External process (" + commandPath + ") has not yet exited after " + (i+1) * SLEEP + "ms");
+            }
+        }
 
-        String message = new Scanner(out).useDelimiter("\\Z").next();
-        assertTrue(message.contains(errorMessage));
-
-        return exitValue;
+        // sqlcmd process has not finished, time out this tests
+        return -1;
     }
 
     private final String prompts = "sqlcmd did not fail as expected";
