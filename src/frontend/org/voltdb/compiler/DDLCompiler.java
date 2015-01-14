@@ -40,9 +40,9 @@ import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.FunctionSQL;
+import org.hsqldb_voltpatches.HSQLDDLInfo;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
-import org.hsqldb_voltpatches.SQLLexer;
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.hsqldb_voltpatches.VoltXMLElement.VoltXMLDiff;
 import org.json_voltpatches.JSONException;
@@ -82,6 +82,7 @@ import org.voltdb.utils.CatalogSchemaTools;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
+import org.voltdb.utils.SQLLexer;
 import org.voltdb.utils.VoltTypeUtil;
 
 
@@ -510,7 +511,7 @@ public class DDLCompiler {
                     m_fullDDL += Encoder.hexEncode(stmt.statement) + "\n";
 
                     // figure out what table this DDL might affect to minimize diff processing
-                    SQLLexer.HSQLDDLInfo ddlStmtInfo = SQLLexer.preprocessHSQLDDL(stmt.statement);
+                    HSQLDDLInfo ddlStmtInfo = SQLLexer.preprocessHSQLDDL(stmt.statement);
 
                     // Get the diff that results from applying this statement and apply it
                     // to our local tree (with Volt-specific additions)
@@ -2341,9 +2342,14 @@ public class DDLCompiler {
         int displayColCount = stmt.m_displayColumns.size();
         String msg = "Materialized view \"" + viewName + "\" ";
 
+        if (stmt.hasSubquery()) {
+            msg += "with subquery sources is not supported.";
+            throw m_compiler.new VoltCompilerException(msg);
+        }
+
         if (stmt.m_tableList.size() != 1) {
             msg += "has " + String.valueOf(stmt.m_tableList.size()) + " sources. " +
-            "Only one source view or source table is allowed.";
+            "Only one source table is allowed.";
             throw m_compiler.new VoltCompilerException(msg);
         }
 

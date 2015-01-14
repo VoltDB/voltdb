@@ -27,7 +27,6 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.StringUtils;
-import org.hsqldb_voltpatches.SQLLexer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.LocalObjectMessage;
@@ -39,6 +38,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.planner.StatementPartitioning;
+import org.voltdb.utils.SQLLexer;
 
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
@@ -121,6 +121,9 @@ public class AsyncCompilerAgent {
             SortedSet<String> conflictTables = new TreeSet<String>();
             Set<String> createdTables = new HashSet<String>();
             for (String stmt : w.sqlStatements) {
+                if (SQLLexer.isComment(stmt)) {
+                    continue;
+                }
                 String ddlToken = SQLLexer.extractDDLToken(stmt);
                 if (hasDDL == null) {
                     hasDDL = (ddlToken != null) ? true : false;

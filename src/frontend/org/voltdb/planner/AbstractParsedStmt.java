@@ -640,6 +640,7 @@ public abstract class AbstractParsedStmt {
             m_tableList.add(table);
             leafNode = new TableLeafNode(nodeId, joinExpr, whereExpr, (StmtTargetTableScan)tableScan);
         } else {
+            assert(tableScan instanceof StmtSubqueryScan);
             leafNode = new SubqueryLeafNode(nodeId, joinExpr, whereExpr, (StmtSubqueryScan)tableScan);
         }
 
@@ -1066,4 +1067,12 @@ public abstract class AbstractParsedStmt {
         return null;
     }
 
+    /**
+     * Return true if a SQL statement contains a subquery of any kind
+     * @return TRUE is this statement contains a subquery
+     */
+    public boolean hasSubquery() {
+        // This method should be called only after the statement is parsed and join tree is built
+        return !getSubqueries().isEmpty();
+    }
 }

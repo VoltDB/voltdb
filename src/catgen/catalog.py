@@ -512,7 +512,6 @@ def gencpp( classes, javaOnlyClasses, prepath, postpath ):
 
         # write removeChild(...)
         write ( interp( 'bool $clsname::removeChild(const std::string &collectionName, const std::string &childName) {', locals() ) )
-        write ( interp( '    assert (m_childCollections.find(collectionName) != m_childCollections.end());', locals() ) )
         for field in actualFields:
             if field.type[-1] == "*":
                 privname = 'm_' + field.name
