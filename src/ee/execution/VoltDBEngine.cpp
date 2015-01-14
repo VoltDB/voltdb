@@ -1875,7 +1875,7 @@ void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
 }
 
 int VoltDBEngine::executePurgeFragment(PersistentTable* table) {
-    ExecutorVector *pev = table->getPurgeExecutorVector();
+    boost::shared_ptr<ExecutorVector> pev = table->getPurgeExecutorVector();
 
     // Push a new frame onto the stack for this executor vector
     // to report its tuples modified.  We don't want to actually

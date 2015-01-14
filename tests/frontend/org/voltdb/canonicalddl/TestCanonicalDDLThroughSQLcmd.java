@@ -85,7 +85,13 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
 
         m_client.callProcedure("@AdHoc", firstCanonicalDDL);
 
-        assertEquals(compiler.getCanonicalDDL(), firstCanonicalDDL);
+        // First line of canonical DDL differs thanks to creation time.  Avoid
+        // it in the comparison
+        // Sanity check that we're not trimming the entire fullddl.sql file away
+        assertTrue(firstCanonicalDDL.indexOf('\n') < 100);
+        String secondDDL = compiler.getCanonicalDDL();
+        assertEquals(firstCanonicalDDL.substring(firstCanonicalDDL.indexOf('\n')),
+                secondDDL.substring(secondDDL.indexOf('\n')));
 
         teardownSystem();
     }
@@ -123,11 +129,16 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
         assertEquals("sqlcmd failed on input:\n" + firstCanonicalDDL, 0, callSQLcmd(firstCanonicalDDL, fastModeDDL));
         roundtripDDL = getDDLFromHTTP(httpdPort);
         // IZZY: we force single statement SQL keywords to lower case, it seems
-        assertTrue(firstCanonicalDDL.equalsIgnoreCase(roundtripDDL));
+        // Sanity check that we're not trimming the entire fullddl.sql file away
+        assertTrue(firstCanonicalDDL.indexOf('\n') < 100);
+        assertEquals(firstCanonicalDDL.substring(firstCanonicalDDL.indexOf('\n')).toLowerCase(),
+                roundtripDDL.substring(roundtripDDL.indexOf('\n')).toLowerCase());
 
         assertEquals("sqlcmd failed on last call", 0, callSQLcmd("CREATE TABLE NONSENSE (id INTEGER);\n", fastModeDDL));
         roundtripDDL = getDDLFromHTTP(httpdPort);
-        assertFalse(firstCanonicalDDL.equals(roundtripDDL));
+        assertTrue(firstCanonicalDDL.indexOf('\n') < 100);
+        assertFalse(firstCanonicalDDL.substring(firstCanonicalDDL.indexOf('\n')).toLowerCase().equals(
+                roundtripDDL.substring(roundtripDDL.indexOf('\n')).toLowerCase()));
 
         teardownSystem();
     }

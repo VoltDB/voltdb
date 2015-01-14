@@ -491,10 +491,6 @@ SnapshotCompletionInterest, Promotable
         m_replayAgent.setCallback(this);
     }
 
-    public void setCatalogContext(CatalogContext context) {
-        m_replayAgent.setCatalogContext(context);
-    }
-
     public void setInitiator(TransactionCreator initiator) {
         m_initiator = initiator;
         m_initiator.bindAdapter(m_restoreAdapter);
