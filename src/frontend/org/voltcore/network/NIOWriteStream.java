@@ -347,7 +347,28 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
                 buffer = m_currentWriteBuffer.b();
             }
 
-            rc = channel.write(buffer);
+            try {
+                rc = channel.write(buffer);
+            } catch (IOException ioe) {
+                //We might fail after writing few bytes. make sure the ones that are written accounted for.
+                //Not sure if we need to do any backpressure magic as client is dead and so no backpressure on this may be needed.
+                if (m_queuedBuffers.isEmpty() && m_hadBackPressure && m_queuedWrites.size() <= m_maxQueuedWritesBeforeBackpressure) {
+                    backpressureEnded();
+                }
+                //Same here I dont know if we do need to do this housekeeping??
+                if (!isEmpty()) {
+                    if (bytesWritten > 0) {
+                        m_lastPendingWriteTime = EstTime.currentTimeMillis();
+                    }
+                } else {
+                    m_lastPendingWriteTime = -1;
+                }
+                if (bytesWritten > 0) {
+                    updateQueued(-bytesWritten, false);
+                    m_bytesWritten += bytesWritten;
+                }
+                throw ioe;
+            }
 
             //Discard the buffer back to a pool if no data remains
             if (buffer.hasRemaining()) {
