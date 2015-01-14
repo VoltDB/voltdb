@@ -201,7 +201,7 @@ public class DefaultProcedureManager {
                 return generateCrudReplicatedUpsert(table, pkey);
             }
         default:
-            throw new RuntimeException("Invlid input to default proc SQL generator.");
+            throw new RuntimeException("Invalid input to default proc SQL generator.");
         }
     }
 
