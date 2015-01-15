@@ -238,9 +238,8 @@ public class LoadedProcedureSet {
                 String sqlText = m_defaultProcManager.sqlForDefaultProc(catProc);
                 Procedure newCatProc = StatementCompiler.compileDefaultProcedure(m_plannerTool, catProc, sqlText);
                 VoltProcedure voltProc = new ProcedureRunner.StmtProcedure();
-                ProcedureRunner runner = m_runnerFactory.create(voltProc, newCatProc, m_csp);
-                m_defaultProcCache.put(procName, runner);
-                return runner;
+                pr = m_runnerFactory.create(voltProc, newCatProc, m_csp);
+                m_defaultProcCache.put(procName, pr);
             }
         }
 
