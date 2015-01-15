@@ -19,6 +19,8 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.VoltZK;
 
+import com.google_voltpatches.common.base.Charsets;
+
 public class TestStateMachine extends ZKTestBase {
     private final int NUM_AGREEMENT_SITES = 4;
     enum stateMachines {
@@ -34,8 +36,8 @@ public class TestStateMachine extends ZKTestBase {
     ByteStateMachine[] m_byteStateMachinesForGroup2 = new ByteStateMachine[NUM_AGREEMENT_SITES];
 
     Boolean[] rawBooleanStates = new Boolean[] {false, true};
-    ByteBuffer[] bsm_states = new ByteBuffer[] {ByteBuffer.wrap(rawBooleanStates[0].toString().getBytes()),
-                                                ByteBuffer.wrap(rawBooleanStates[1].toString().getBytes())};
+    ByteBuffer[] bsm_states = new ByteBuffer[] {ByteBuffer.wrap(rawBooleanStates[0].toString().getBytes(Charsets.UTF_8)),
+                                                ByteBuffer.wrap(rawBooleanStates[1].toString().getBytes(Charsets.UTF_8))};
     byte[] rawByteStates = new byte[] {100, 110, 120};
     ByteBuffer[] msm_states = new ByteBuffer[] {ByteBuffer.wrap(new byte[]{rawByteStates[0]}),
                                                 ByteBuffer.wrap(new byte[]{rawByteStates[1]}),
@@ -157,7 +159,7 @@ public class TestStateMachine extends ZKTestBase {
 
         public ByteBuffer toByteBuffer(boolean b) {
             String str = Boolean.toString(b);
-            return ByteBuffer.wrap(str.getBytes());
+            return ByteBuffer.wrap(str.getBytes(Charsets.UTF_8));
         }
 
         public BooleanStateMachine(SynchronizedStatesManager ssm, String instanceName) {
@@ -191,7 +193,7 @@ public class TestStateMachine extends ZKTestBase {
                 }
                 else {
                     assertTrue(startTask);
-                    proposed = ByteBuffer.wrap(taskString.getBytes());
+                    proposed = ByteBuffer.wrap(taskString.getBytes(Charsets.UTF_8));
                     initiateCoordinatedTask(coorelatedTask, proposed);
                     assertTrue("State machine local lock held after bool delayed task request", debugIsLocalStateUnlocked());
                 }
@@ -239,9 +241,9 @@ public class TestStateMachine extends ZKTestBase {
         @Override
         protected void taskRequested(ByteBuffer taskRequest) {
             assertTrue("State machine local lock held after bool task notification", debugIsLocalStateUnlocked());
-            assertTrue(taskRequest.equals(ByteBuffer.wrap(taskString.getBytes())));
+            assertTrue(taskRequest.equals(ByteBuffer.wrap(taskString.getBytes(Charsets.UTF_8))));
             if (!ignoreProposal) {
-                ByteBuffer completedResult = ByteBuffer.wrap(taskResultString.getBytes());
+                ByteBuffer completedResult = ByteBuffer.wrap(taskResultString.getBytes(Charsets.UTF_8));
                 requestedTaskComplete(completedResult);
                 assertTrue("State machine local lock held after bool task completion", debugIsLocalStateUnlocked());
             }
@@ -250,7 +252,7 @@ public class TestStateMachine extends ZKTestBase {
         @Override
         protected void correlatedTaskCompleted(boolean ourTask, ByteBuffer taskRequest, Map<String, ByteBuffer> results) {
             assertTrue("State machine local lock held after bool correlated task completion", debugIsLocalStateUnlocked());
-            assertTrue(taskRequest.equals(ByteBuffer.wrap(taskString.getBytes())));
+            assertTrue(taskRequest.equals(ByteBuffer.wrap(taskString.getBytes(Charsets.UTF_8))));
             assertTrue(ourTask == startTask);
             startTask = false;
             acceptProposalOrTask = true;
@@ -267,7 +269,7 @@ public class TestStateMachine extends ZKTestBase {
         @Override
         protected void uncorrelatedTaskCompleted(boolean ourTask, ByteBuffer taskRequest, Set<ByteBuffer> results) {
             assertTrue("State machine local lock held after bool uncorrelated task completion", debugIsLocalStateUnlocked());
-            assertTrue(taskRequest.equals(ByteBuffer.wrap(taskString.getBytes())));
+            assertTrue(taskRequest.equals(ByteBuffer.wrap(taskString.getBytes(Charsets.UTF_8))));
             assertTrue(ourTask == startTask);
             coorelatedTask = true;
             startTask = false;
@@ -288,7 +290,7 @@ public class TestStateMachine extends ZKTestBase {
             uncorrelatedResults = null;
             startTask = true;
             if (requestLock()) {
-                proposed = ByteBuffer.wrap(taskString.getBytes());
+                proposed = ByteBuffer.wrap(taskString.getBytes(Charsets.UTF_8));
                 initiateCoordinatedTask(coorelatedTask, proposed);
                 assertTrue("State machine local lock held after bool task request", debugIsLocalStateUnlocked());
             }
@@ -372,7 +374,7 @@ public class TestStateMachine extends ZKTestBase {
                 }
                 else {
                     assertTrue(startTask);
-                    proposed = ByteBuffer.wrap(taskString.getBytes());
+                    proposed = ByteBuffer.wrap(taskString.getBytes(Charsets.UTF_8));
                     initiateCoordinatedTask(coorelatedTask, proposed);
                     assertTrue("State machine local lock held after byte delayed task request", debugIsLocalStateUnlocked());
                 }
@@ -418,9 +420,9 @@ public class TestStateMachine extends ZKTestBase {
         @Override
         protected void taskRequested(ByteBuffer taskRequest) {
             assertTrue("State machine local lock held after byte task notification", debugIsLocalStateUnlocked());
-            assertTrue(taskRequest.equals(ByteBuffer.wrap(taskString.getBytes())));
+            assertTrue(taskRequest.equals(ByteBuffer.wrap(taskString.getBytes(Charsets.UTF_8))));
             if (!ignoreProposal) {
-                ByteBuffer completedResult = ByteBuffer.wrap(taskResultString.getBytes());
+                ByteBuffer completedResult = ByteBuffer.wrap(taskResultString.getBytes(Charsets.UTF_8));
                 requestedTaskComplete(completedResult);
                 assertTrue("State machine local lock held after byte task completion", debugIsLocalStateUnlocked());
             }
@@ -429,7 +431,7 @@ public class TestStateMachine extends ZKTestBase {
         @Override
         protected void correlatedTaskCompleted(boolean ourTask, ByteBuffer taskRequest, Map<String, ByteBuffer> results) {
             assertTrue("State machine local lock held after byte correlated task completion", debugIsLocalStateUnlocked());
-            assertTrue(taskRequest.equals(ByteBuffer.wrap(taskString.getBytes())));
+            assertTrue(taskRequest.equals(ByteBuffer.wrap(taskString.getBytes(Charsets.UTF_8))));
             assertTrue(ourTask == startTask);
             assertTrue(!ourTask || coorelatedTask);
             startTask = false;
@@ -447,7 +449,7 @@ public class TestStateMachine extends ZKTestBase {
         @Override
         protected void uncorrelatedTaskCompleted(boolean ourTask, ByteBuffer taskRequest, Set<ByteBuffer> results) {
             assertTrue("State machine local lock held after byte uncorrelated task completion", debugIsLocalStateUnlocked());
-            assertTrue(taskRequest.equals(ByteBuffer.wrap(taskString.getBytes())));
+            assertTrue(taskRequest.equals(ByteBuffer.wrap(taskString.getBytes(Charsets.UTF_8))));
             assertTrue(ourTask == startTask);
             assertFalse(ourTask || coorelatedTask);
             coorelatedTask = true;
@@ -469,7 +471,7 @@ public class TestStateMachine extends ZKTestBase {
             startTask = true;
             ourProposalOrTaskFinished = false;
             if (requestLock()) {
-                proposed = ByteBuffer.wrap(taskString.getBytes());
+                proposed = ByteBuffer.wrap(taskString.getBytes(Charsets.UTF_8));
                 initiateCoordinatedTask(coorelatedTask, proposed);
                 assertTrue("State machine local lock held after byte task request", debugIsLocalStateUnlocked());
             }
