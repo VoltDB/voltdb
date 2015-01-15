@@ -49,6 +49,7 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 public class MpInitiator extends BaseInitiator implements Promotable
 {
     public static final int MP_INIT_PID = TxnEgo.PARTITIONID_MAX_VALUE;
+    private ConsumerDRGateway m_consumerDRGateway = null;
 
     public MpInitiator(HostMessenger messenger, List<Long> buddyHSIds, StatsAgent agent)
     {
@@ -82,6 +83,8 @@ public class MpInitiator extends BaseInitiator implements Promotable
         if ((backend == BackendTarget.NATIVE_EE_IPC) || (backend == BackendTarget.NATIVE_EE_VALGRIND_IPC)) {
             backend = BackendTarget.NATIVE_EE_JNI;
         }
+
+        m_consumerDRGateway = consumerDRGateway;
 
         super.configureCommon(backend, catalogContext,
                 csp, numberOfPartitions, startAction, null, null, cl, coreBindIds, null, null);
@@ -119,10 +122,12 @@ public class MpInitiator extends BaseInitiator implements Promotable
                 // term syslogs the start of leader promotion.
                 long txnid = Long.MIN_VALUE;
                 long uniqueId = UniqueIdGenerator.makeZero(MP_INIT_PID);
+                long binaryLogUniqueId = Long.MIN_VALUE;
                 try {
                     RepairResult res = repair.start().get();
                     txnid = res.m_txnId;
                     uniqueId = res.m_uniqueId;
+                    binaryLogUniqueId = res.m_binaryLogUniqueId;
                     success = true;
                 } catch (CancellationException e) {
                     success = false;
@@ -158,6 +163,10 @@ public class MpInitiator extends BaseInitiator implements Promotable
                     LeaderCacheWriter iv2masters = new LeaderCache(m_messenger.getZK(),
                             m_zkMailboxNode);
                     iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
+
+                    if (m_consumerDRGateway != null) {
+                        m_consumerDRGateway.promotePartition(m_partitionId, binaryLogUniqueId);
+                    }
                 }
                 else {
                     // The only known reason to fail is a failed replica during

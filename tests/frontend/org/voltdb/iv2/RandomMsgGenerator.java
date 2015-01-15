@@ -59,18 +59,24 @@ public class RandomMsgGenerator
         m_mpiTxnEgo = TxnEgo.makeZero(MpInitiator.MP_INIT_PID);
     }
 
-    private Iv2InitiateTaskMessage makeIv2InitiateTaskMsg(boolean readOnly, boolean binaryLog)
+    private Iv2InitiateTaskMessage makeIv2InitiateTaskMsg(boolean readOnly, boolean binaryLog, boolean isMp)
     {
         StoredProcedureInvocation spi = mock(StoredProcedureInvocation.class);
         ParameterSet ps = mock(ParameterSet.class);
         when(spi.getParams()).thenReturn(ps);
         Iv2InitiateTaskMessage msg =
-            new Iv2InitiateTaskMessage(0l, 0l, 0l, Long.MIN_VALUE, 0l, readOnly, true, spi,
+            new Iv2InitiateTaskMessage(0l, 0l, 0l, Long.MIN_VALUE, 0l, readOnly, !isMp, spi,
                     0l, 0l, false);
         if (binaryLog) {
-            when(spi.getProcName()).thenReturn("@ApplyBinaryLogSP");
+            if (!isMp) {
+                when(spi.getProcName()).thenReturn("@ApplyBinaryLogSP");
+            } else {
+                when(spi.getProcName()).thenReturn("@ApplyBinaryLogMP");
+            }
             // dummy end unique id
             when(ps.getParam(3)).thenReturn(Long.MIN_VALUE);
+        } else {
+            when(spi.getProcName()).thenReturn("dummy");
         }
         return msg;
     }
@@ -97,13 +103,15 @@ public class RandomMsgGenerator
             double type = m_rand.nextDouble();
             boolean readOnly = (type < READCHANCE);
             boolean binaryLog = (!readOnly && type < BINARYLOGCHANCE);
-            Iv2InitiateTaskMessage msg = makeIv2InitiateTaskMsg(readOnly, binaryLog);
+            Iv2InitiateTaskMessage msg = makeIv2InitiateTaskMsg(readOnly, binaryLog, false);
             return msg;
         }
         else if (!m_mpInProgress) {
-            m_currentMpReadOnly = (m_rand.nextDouble() < READCHANCE);
+            double type = m_rand.nextDouble();
+            m_currentMpReadOnly = (type < READCHANCE);
+            boolean binaryLog = (!m_currentMpReadOnly && type < BINARYLOGCHANCE);
             FragmentTaskMessage msg = makeFragmentTaskMsg(m_currentMpReadOnly, false);
-            msg.setStateForDurability(mock(Iv2InitiateTaskMessage.class), Sets.newHashSet(0, 1, 2));
+            msg.setStateForDurability(makeIv2InitiateTaskMsg(false, binaryLog, true), Sets.newHashSet(0, 1, 2));
             m_mpInProgress = true;
             return msg;
         }
