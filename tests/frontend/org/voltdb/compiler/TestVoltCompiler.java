@@ -1342,6 +1342,30 @@ public class TestVoltCompiler extends TestCase {
                   + "PARTITION on table books COLUMN cash PARAMETER 0 "
                   + "AS select * from books where cash = ?");
 
+        // Statement proc with ALLOW before PARTITION clause
+        tester.test("create role r1;\n"
+                  + "create procedure Foo "
+                  + "allow r1 "
+                  + "PARTITION on table books COLUMN cash PARAMETER 0 "
+                  + "AS select * from books where cash = ?");
+
+        // Statement proc with ALLOW after PARTITION clause
+        tester.test("create role r1;\n"
+                  + "create procedure Foo "
+                  + "PARTITION on table books COLUMN cash PARAMETER 0 "
+                  + "allow r1 "
+                  + "AS select * from books where cash = ?");
+
+        // Inspired by a problem with fullDDL.sql
+        tester.test(
+                "create role admin;\n" +
+                "CREATE TABLE T26 (age BIGINT NOT NULL, gender TINYINT);\n" +
+                "PARTITION TABLE T26 ON COLUMN age;\n" +
+                "CREATE TABLE T26a (age BIGINT NOT NULL, gender TINYINT);\n" +
+                "PARTITION TABLE T26a ON COLUMN age;\n" +
+                "CREATE PROCEDURE p4 ALLOW admin PARTITION ON TABLE T26 COLUMN age PARAMETER 0 AS SELECT COUNT(*) FROM T26 WHERE age = ?;\n" +
+                "CREATE PROCEDURE PARTITION ON TABLE T26a COLUMN age ALLOW admin FROM CLASS org.voltdb_testprocs.fullddlfeatures.testCreateProcFromClassProc");
+
         // Inline code proc
         tester.test("CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
                     "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
