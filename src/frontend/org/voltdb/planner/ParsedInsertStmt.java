@@ -24,8 +24,10 @@ import java.util.Map.Entry;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ConstantValueExpression;
@@ -212,5 +214,17 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
     public boolean isOrderDeterministicInSpiteOfUnorderedSubqueries() {
         assert(getSubselectStmt() != null);
         return getSubselectStmt().isOrderDeterministicInSpiteOfUnorderedSubqueries();
+    }
+
+    /**
+     * Returns true if the table being inserted into has a trigger executed
+     * when row limit is met
+     */
+    public boolean targetTableHasLimitRowsTrigger() {
+        assert(m_tableList.size() == 1);
+        CatalogMap<Statement> stmtMap = m_tableList.get(0).getTuplelimitdeletestmt();
+        if (stmtMap != null && stmtMap.size() > 0)
+            return true;
+        return false;
     }
 }
