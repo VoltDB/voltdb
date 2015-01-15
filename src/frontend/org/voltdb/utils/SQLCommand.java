@@ -750,6 +750,8 @@ public class SQLCommand
             printUsage("DDL file not found at path:" + ddlFilePath);
         }
 
+        boolean proceduresLoaded = false;
+
         String query = "";
         StringBuilder batchedDDL = new StringBuilder();
         while ((query = br.readLine()) != null) {
@@ -762,6 +764,21 @@ public class SQLCommand
                 if (batchedDDL.length() > 0) {
                     VoltDB.callProcedure("@AdHoc", batchedDDL.toString());
                     batchedDDL.setLength(0);
+                }
+
+                if (! proceduresLoaded) {
+                     // Load system procedures
+                    loadSystemProcedures();
+                    // Load user stored procs
+                    loadStoredProcedures(Procedures, Classlist);
+
+                    proceduresLoaded = true;
+                }
+
+                // handle statements that are converted to regular database commands
+                query = handleTranslatedCommands(query);
+                if (query == null) {
+                    continue;
                 }
 
                 // process the special command
@@ -1221,6 +1238,10 @@ public class SQLCommand
         if (response.getStatus() != ClientResponse.SUCCESS) {
             throw new Exception("Execution Error: " + response.getStatusString());
         }
+        // DDL file mode does not need to print results
+        if (m_ddlFileMode) {
+            return;
+        }
 
         long elapsedTime = System.nanoTime() - m_startTime;
         for (VoltTable t : response.getResults()) {
@@ -1542,6 +1563,8 @@ public class SQLCommand
         return splitStrings[1];
     }
 
+    private static boolean m_ddlFileMode = false;
+
     // Application entry point
     public static void main(String args[])
     {
@@ -1615,6 +1638,7 @@ public class SQLCommand
                 }
             }
             else if (arg.startsWith("--ddl-file=")) {
+                m_ddlFileMode = true;
                 ddlFilePath = extractArgInput(arg);
             }
             else if (arg.equals("--help")) {
@@ -1655,17 +1679,17 @@ public class SQLCommand
         }
 
         try {
+            if (m_ddlFileMode) {
+                // fast DDL Loader mode
+                executeFastLoadingDDL(ddlFilePath);
+                System.exit(m_exitCode);
+            }
+
             // Load system procedures
             loadSystemProcedures();
 
             // Load user stored procs
             loadStoredProcedures(Procedures, Classlist);
-
-            if (! ddlFilePath.equals("")) {
-                // fast DDL Loader mode
-                executeFastLoadingDDL(ddlFilePath);
-                System.exit(m_exitCode);
-            }
 
             in = new FileInputStream(FileDescriptor.in);
             out = System.out;

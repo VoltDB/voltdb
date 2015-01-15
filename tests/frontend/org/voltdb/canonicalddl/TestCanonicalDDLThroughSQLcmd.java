@@ -38,6 +38,8 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLDecoder;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
 import org.junit.Test;
 import org.voltcore.utils.PortGenerator;
@@ -65,23 +67,29 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
         return compiler.getCanonicalDDL();
     }
 
+    private String getFirstVoterDDLFromSQLCMD() throws Exception {
+        int httpdPort = startEmptyDatabase();
+
+        URL url = TestDDLFeatures.class.getResource("voter-ddl.sql");
+        String pathToSchema = URLDecoder.decode(url.getPath(), "UTF-8");
+        String ddl = new String (Files.readAllBytes(Paths.get(pathToSchema)));
+        assertTrue(ddl.contains("LOAD CLASSES voter-procs.jar"));
+
+        url = TestDDLFeatures.class.getResource("voter-procs.jar");
+        String pathToVoterJars = URLDecoder.decode(url.getPath(), "UTF-8");
+        ddl = ddl.replace("voter-procs.jar", pathToVoterJars);
+
+        assertEquals(0, callSQLcmd(ddl, true));
+        String firstDDL = getDDLFromHTTP(httpdPort);
+
+        teardownSystem();
+        return firstDDL;
+    }
+
     private void secondCanonicalDDLFromAdhoc() throws Exception {
-        String pathToCatalog = Configuration.getPathToCatalogForTest("emptyDDL.jar");
-        String pathToDeployment = Configuration.getPathToCatalogForTest("emptyDDL.xml");
+        startEmptyDatabase();
 
         VoltCompiler compiler = new VoltCompiler();
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-
-        builder.setUseDDLSchema(true);
-        boolean success = builder.compile(pathToCatalog);
-        assertTrue(success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = pathToCatalog;
-        config.m_pathToDeployment = pathToDeployment;
-
-        startSystem(config);
 
         m_client.callProcedure("@AdHoc", firstCanonicalDDL);
 
@@ -97,24 +105,7 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
     }
 
     private void secondCanonicalDDLFromSQLcmd(boolean fastModeDDL) throws Exception {
-        String pathToCatalog = Configuration.getPathToCatalogForTest("emptyDDL.jar");
-        String pathToDeployment = Configuration.getPathToCatalogForTest("emptyDDL.xml");
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-
-        builder.setUseDDLSchema(true);
-        PortGenerator pg = new PortGenerator();
-        int httpdPort = pg.next();
-        builder.setHTTPDPort(httpdPort);
-        boolean success = builder.compile(pathToCatalog);
-        assertTrue(success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = pathToCatalog;
-        config.m_pathToDeployment = pathToDeployment;
-
-        startSystem(config);
+        int httpdPort = startEmptyDatabase();
 
         String roundtripDDL;
 
@@ -250,4 +241,59 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
         System.out.println(String.format("SQLcmd elapsed %d ms", sqlcmdTime));
         System.out.println(String.format("SQLcmd fast DDL mode elapsed %d ms", sqlcmdTimeDDLmode));
     }
+
+    private int startEmptyDatabase() throws Exception {
+        String pathToCatalog = Configuration.getPathToCatalogForTest("emptyDDL.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("emptyDDL.xml");
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+
+        builder.setUseDDLSchema(true);
+        PortGenerator pg = new PortGenerator();
+        int httpdPort = pg.next();
+        builder.setHTTPDPort(httpdPort);
+        boolean success = builder.compile(pathToCatalog);
+        assertTrue(success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = pathToCatalog;
+        config.m_pathToDeployment = pathToDeployment;
+
+        startSystem(config);
+
+        return httpdPort;
+    }
+
+    private void validVoterDDLFromAdHoc(String voterCanonicalDDL) throws Exception {
+        startEmptyDatabase();
+
+        VoltCompiler compiler = new VoltCompiler();
+
+        // load the user procedure jars
+        URL urlJar = TestDDLFeatures.class.getResource("voter-procs.jar");
+        String pathToVoterJars = URLDecoder.decode(urlJar.getPath(), "UTF-8");
+        m_client.updateClasses(new File(pathToVoterJars), "");
+
+        m_client.callProcedure("@AdHoc", voterCanonicalDDL);
+
+        // First line of canonical DDL differs thanks to creation time.  Avoid
+        // it in the comparison
+        // Sanity check that we're not trimming the entire fullddl.sql file away
+        assertTrue(voterCanonicalDDL.indexOf('\n') < 100);
+        String secondDDL = compiler.getCanonicalDDL();
+
+        assertEquals(voterCanonicalDDL.substring(voterCanonicalDDL.indexOf('\n')),
+                secondDDL.substring(secondDDL.indexOf('\n')));
+
+        teardownSystem();
+    }
+
+    @Test
+    public void testCanonicalDDLRoundtripForVoterDDL() throws Exception {
+        // get the initial voter DDL running from SQLCMD
+        String voterCanonicalDDL = getFirstVoterDDLFromSQLCMD();
+
+        validVoterDDLFromAdHoc(voterCanonicalDDL);
+    }
+
 }
