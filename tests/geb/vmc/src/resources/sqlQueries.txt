@@ -172,6 +172,8 @@
 # Create procedure test: there are other queries has not been tested update, truncate, upsert
 {"testName":"DdlCreateProcedure1","sqlCmd":"create procedure \np1 as insert into tb values(1, 1);\n ","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
 {"testName":"DdlCreateProcedure2","sqlCmd":"create procedure \np21 as select i \nfrom tb;\n  create procedure p22\n as delete from tb;","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+{"testName":"DdlCreateProcedure3","sqlCmd":"create procedure p31 as ( select i, j-1 from tb ) union (select i, j+1 from tb);","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+{"testName":"DdlCreateProcedure4","sqlCmd":"create procedure\np41\n as\n ( \nselect i, j-1 from tb )\nunion \n(select i, j+1 from tb);","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
 #
 #
 #/////////
