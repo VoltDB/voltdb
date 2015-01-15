@@ -221,7 +221,6 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
      * when row limit is met
      */
     public boolean targetTableHasLimitRowsTrigger() {
-        // TODO Auto-generated method stub
         assert(m_tableList.size() == 1);
         CatalogMap<Statement> stmtMap = m_tableList.get(0).getTuplelimitdeletestmt();
         if (stmtMap != null && stmtMap.size() > 0)

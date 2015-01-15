@@ -365,7 +365,7 @@ public class PlanAssembler {
             else if (targetHasLimitRowsTrigger) {
                 throw new PlanningErrorException(
                         "Order of rows produced by SELECT statement in INSERT INTO ... SELECT is "
-                        + "non-deterministic.  Since the table being insert into has a row limit "
+                        + "non-deterministic.  Since the table being inserted into has a row limit "
                         + "trigger, the SELECT output must be ordered.  Add an ORDER BY clause "
                         + "to address this issue."
                         );
