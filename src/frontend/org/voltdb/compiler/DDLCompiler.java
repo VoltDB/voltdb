@@ -544,6 +544,8 @@ public class DDLCompiler {
     {
         // record which tables changed
         for (String tableName : stmtDiff.getChangedNodes().keySet()) {
+            assert(tableName.startsWith("table"));
+            tableName = tableName.substring("table".length());
             m_compiler.markTableAsDirty(tableName);
         }
         for (VoltXMLElement tableXML : stmtDiff.getRemovedNodes()) {
