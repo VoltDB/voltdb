@@ -566,6 +566,9 @@ public class VoltProjectBuilder {
         if ((exportTarget != null) && !exportTarget.trim().isEmpty()) {
             exportConnector.put("elExportTarget", exportTarget);
         }
+        else {
+            exportConnector.put("elExportTarget", "file");
+        }
         exportConnector.put("elGroup", group);
         m_elExportConnectors.add(exportConnector);
     }
