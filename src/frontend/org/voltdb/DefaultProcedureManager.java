@@ -106,6 +106,10 @@ public class DefaultProcedureManager {
 
             // get the partition column
             final Column partitioncolumn = table.getPartitioncolumn();
+            // this check is an accommodation for some tests that don't flesh out a catalog
+            if (partitioncolumn == null) {
+                continue;
+            }
             final int partitionIndex = partitioncolumn.getIndex();
 
             // all partitioned tables get insert crud procs
