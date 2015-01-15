@@ -34,6 +34,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.Scanner;
 
 import junit.framework.TestCase;
 
@@ -176,9 +177,10 @@ public class TestSqlCmdErrorHandling extends TestCase {
         return 1 == result.asScalarLong();
     }
 
-    private int callSQLcmd(boolean stopOnError, String inputText) throws Exception {
-        final String commandPath = "bin/sqlcmd";
-        final long timeout = 60000; // 60,000 millis -- give up after 1 minute of trying.
+    @SuppressWarnings("resource")
+    private int callSQLcmdBase(boolean stopOnError, String inputText,
+            boolean fastModeDDL, String expectedErrorMsg) throws Exception {
+        String commandPath = "bin/sqlcmd";
 
         File f = new File("ddl.sql");
         f.deleteOnExit();
@@ -190,14 +192,19 @@ public class TestSqlCmdErrorHandling extends TestCase {
 
         File error = new File("error.log");
 
-        ProcessBuilder pb =
-                new ProcessBuilder(commandPath, "--stop-on-error=" + (stopOnError ? "true" : "false"));
-        pb.redirectInput(f);
+        ProcessBuilder pb = null;
+        if (fastModeDDL) {
+            pb = new ProcessBuilder(commandPath, "--ddl-file=" + f.getPath());
+        } else {
+            pb = new ProcessBuilder(commandPath, "--stop-on-error=" + (stopOnError ? "true" : "false"));
+            pb.redirectInput(f);
+        }
         pb.redirectOutput(out);
         pb.redirectError(error);
         Process process = pb.start();
 
         // Set timeout to 1 minute
+        final long timeout = 60000; // 60,000 millis -- give up after 1 minute of trying.
         long starttime = System.currentTimeMillis();
         long elapsedtime = 0;
         long pollcount = 1;
@@ -215,6 +222,14 @@ public class TestSqlCmdErrorHandling extends TestCase {
                 //*/enable for debug*/ System.err.println(commandPath + " returned " + exitValue);
                 //*/enable for debug*/ System.err.println(" in " + (System.currentTimeMillis() - starttime)+ "ms");
                 //*/enable for debug*/ System.err.println(" on input:\n" + inputText);
+
+                if (fastModeDDL) {
+                    String errorMsg = new Scanner(error).useDelimiter("\\Z").next();
+                    if (expectedErrorMsg != null && !expectedErrorMsg.equals("")) {
+                        assertTrue(errorMsg.contains(expectedErrorMsg));
+                    }
+                }
+
                 return exitValue;
             }
             catch (Exception e) {
@@ -238,7 +253,15 @@ public class TestSqlCmdErrorHandling extends TestCase {
         }
         cmdErr.close();
         fail("External process (" + commandPath + ") timed out after " + elapsedtime + "ms on input:\n" + inputText);
-        return 0;
+        return -1;
+    }
+
+    private int callSQLcmd(boolean stopOnError, String inputText) throws Exception {
+        return callSQLcmdBase(stopOnError, inputText, false, "");
+    }
+
+    private int callSQLcmdDDLMode(String inputText, String errorMessage) throws Exception {
+        return callSQLcmdBase(false, inputText, true, errorMessage);
     }
 
     public void test10Error() throws Exception
@@ -404,5 +427,68 @@ public class TestSqlCmdErrorHandling extends TestCase {
         String inputText = execWithNullCommand(type, id);
         assertEquals("sqlcmd was expected to succeed, but failed", 0, callSQLcmd(true, inputText));
         assertTrue("did not write row as expected", checkIfWritten(id));
+    }
+
+    @SuppressWarnings("resource")
+    private int callSQLcmdWithErrors(String optionArg, String errorMessage) throws Exception {
+        String commandPath = "bin/sqlcmd";
+
+        File out = new File("out.log");
+        File error = new File("error.log");
+
+        ProcessBuilder pb = new ProcessBuilder(commandPath, optionArg);
+
+        pb.redirectOutput(out);
+        pb.redirectError(error);
+        Process process = pb.start();
+
+        // Only doing cmd line arguments work, SQLCMD process should finish in 1 second.
+        final int SLEEP = 200;
+        final int TIMES = 50; // 10s before timing out
+        for (int i = 0; i < TIMES; i++) {
+            Thread.sleep(SLEEP);
+            try {
+                int exitValue = process.exitValue();
+
+                String message = new Scanner(out).useDelimiter("\\Z").next();
+                assertTrue(message.contains(errorMessage));
+                return exitValue;
+            } catch (Exception e) {
+                System.err.println("External process (" + commandPath + ") has not yet exited after " + (i+1) * SLEEP + "ms");
+            }
+        }
+
+        // sqlcmd process has not finished, time out this tests
+        return -1;
+    }
+
+    private final String prompts = "sqlcmd did not fail as expected";
+    public void testDDLModeBadCommandLineInput() throws Exception {
+        String errorMsgPrefix = "Missing input value for ";
+        assertEquals(prompts, 255, callSQLcmdWithErrors("--servers=", errorMsgPrefix + "--servers"));
+        assertEquals(prompts, 255, callSQLcmdWithErrors("--port=", errorMsgPrefix + "--port"));
+        assertEquals(prompts, 255, callSQLcmdWithErrors("--user=", errorMsgPrefix + "--user"));
+        assertEquals(prompts, 255, callSQLcmdWithErrors("--password=", errorMsgPrefix + "--password"));
+        assertEquals(prompts, 255, callSQLcmdWithErrors("--kerberos=", errorMsgPrefix + "--kerberos"));
+        assertEquals(prompts, 255, callSQLcmdWithErrors("--output-format=", errorMsgPrefix + "--output-format"));
+        assertEquals(prompts, 255, callSQLcmdWithErrors("--stop-on-error=", errorMsgPrefix + "--stop-on-error"));
+        assertEquals(prompts, 255, callSQLcmdWithErrors("--ddl-file=", errorMsgPrefix + "--ddl-file"));
+
+        assertEquals(prompts, 255, callSQLcmdWithErrors("--ddl-file= haha.txt", "DDL file not found at path: haha.txt"));
+        assertEquals(prompts, 255, callSQLcmdWithErrors("--output-format=haha", "Invalid value for --output-format"));
+        assertEquals(prompts, 255, callSQLcmdWithErrors("--stop-on-error=haha", "Invalid value for --stop-on-error"));
+    }
+
+    public void testDDLModeBadInput() throws Exception
+    {
+        String inputDDL = "";
+
+        inputDDL = "CREATE TABLE NONSENSE (id INTEGER);\n"
+                + "INSERT INTO NONSENSE VALUES_HHH  (1);\n";
+        assertEquals(prompts, 255, callSQLcmdDDLMode(inputDDL, "DDL mixed with DML and queries is unsupported."));
+
+        inputDDL = "CREATE TABLE NONSENSE (id INTEGER);\n"
+                + "INSERT INTO NONSENSE VALUES (1);\n";
+        assertEquals(prompts, 255, callSQLcmdDDLMode(inputDDL, "DDL mixed with DML and queries is unsupported."));
     }
 }

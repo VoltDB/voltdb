@@ -85,10 +85,6 @@ public class DefaultCommandLogReinitiator implements CommandLogReinitiator
     }
 
     @Override
-    public void setCatalogContext(CatalogContext context) {
-    }
-
-    @Override
     public void setInitiator(TransactionCreator initiator) {
     }
 
