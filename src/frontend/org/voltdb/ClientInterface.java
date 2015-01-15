@@ -73,6 +73,7 @@ import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltcore.utils.RateLimitedLogger;
 import org.voltdb.AuthSystem.AuthProvider;
+import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.CatalogContext.ProcedurePartitionInfo;
 import org.voltdb.ClientInterfaceHandleManager.Iv2InFlight;
 import org.voltdb.SystemProcedureCatalog.Config;
@@ -87,6 +88,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.common.Constants;
+import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.AdHocPlannerWork;
 import org.voltdb.compiler.AsyncCompilerResult;
@@ -154,6 +156,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private static final VoltLogger authLog = new VoltLogger("AUTH");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger networkLog = new VoltLogger("NETWORK");
+
+    /** Ad hoc async work is either regular planning, ad hoc explain, or default proc explain. */
+    public enum ExplainMode {
+        NONE, EXPLAIN_ADHOC, EXPLAIN_DEFAULT_PROC;
+    }
+
     private final ClientAcceptor m_acceptor;
     private ClientAcceptor m_adminAcceptor;
 
@@ -1316,6 +1324,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 new VoltTable[0], realReason, handle);
     }
 
+    /**
+     * Take the response from the async ad hoc planning process and put the explain
+     * plan in a table with the right format.
+     */
     private void processExplainPlannedStmtBatch(  AdHocPlannedStmtBatch planBatch ) {
         final Connection c = (Connection)planBatch.clientData;
         Database db = m_catalogContext.get().database;
@@ -1341,16 +1353,45 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         response.flattenToBuffer(buf);
         buf.flip();
         c.writeStream().enqueue(buf);
+    }
 
-        //do not cache the plans for explainAdhoc
-        //        planBatch.clientData = null;
-        //        for (int index = 0; index < planBatch.getPlannedStatementCount(); index++) {
-        //            m_adhocCache.put(planBatch.getPlannedStatement(index));
-        //        }
+    /**
+     * Explain Proc for a default proc is routed through the regular Explain
+     * path using ad hoc planning and all. Take the result from that async
+     * process and format it like other explains for procedures.
+     */
+    private void processExplainDefaultProc(AdHocPlannedStmtBatch planBatch) {
+        final Connection c = (Connection)planBatch.clientData;
+        Database db = m_catalogContext.get().database;
+
+        // there better be one statement if this is really sql
+        // from a default procedure
+        assert(planBatch.getPlannedStatementCount() == 1);
+        AdHocPlannedStatement ahps = planBatch.getPlannedStatement(0);
+        String sql = new String(ahps.sql, Charsets.UTF_8);
+        String explain = planBatch.explainStatement(0, db);
+
+        VoltTable vt = new VoltTable(new VoltTable.ColumnInfo( "SQL_STATEMENT", VoltType.STRING),
+                new VoltTable.ColumnInfo( "EXECUTION_PLAN", VoltType.STRING));
+        vt.addRow(sql, explain);
+
+        ClientResponseImpl response =
+                new ClientResponseImpl(
+                        ClientResponseImpl.SUCCESS,
+                        ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
+                        null,
+                        new VoltTable[] { vt },
+                        null);
+        response.setClientHandle( planBatch.clientHandle );
+        ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
+        buf.putInt(buf.capacity() - 4);
+        response.flattenToBuffer(buf);
+        buf.flip();
+        c.writeStream().enqueue(buf);
     }
 
     // Go to the catalog and fetch all the "explain plan" strings of the queries in the procedure.
-    ClientResponseImpl dispatchExplainProcedure(StoredProcedureInvocation task, ClientInputHandler handler, Connection ccxn) {
+    ClientResponseImpl dispatchExplainProcedure(StoredProcedureInvocation task, ClientInputHandler handler, Connection ccxn, AuthUser user) {
         ParameterSet params = task.getParams();
         //String procs = (String) params.toArray()[0];
         List<String> procNames = MiscUtils.splitSQLStatements( (String)params.toArray()[0]);
@@ -1359,8 +1400,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         for( int i=0; i<size; i++ ) {
             String procName = procNames.get(i);
 
+            // look in the catalog
             Procedure proc = m_catalogContext.get().procedures.get(procName);
-            if(proc == null) {
+            if (proc == null) {
+                // check default procs and send them off to be explained using the regular
+                // adhoc explain process
+                proc = m_catalogContext.get().m_defaultProcs.checkForDefaultProcedure(procName);
+                if (proc != null) {
+                    String sql = m_catalogContext.get().m_defaultProcs.sqlForDefaultProc(proc);
+                    dispatchAdHocCommon(task, handler, ccxn, ExplainMode.EXPLAIN_DEFAULT_PROC, sql, new Object[0], null, user);
+                    return null;
+                }
+
                 ClientResponseImpl errorResponse =
                         new ClientResponseImpl(
                                 ClientResponseImpl.UNEXPECTED_FAILURE,
@@ -1373,7 +1424,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                   new VoltTable.ColumnInfo( "EXECUTION_PLAN", VoltType.STRING));
 
             for( Statement stmt : proc.getStatements() ) {
-                vt[i].addRow( stmt.getSqltext()+"\n", Encoder.hexDecodeToString( stmt.getExplainplan() ) );
+                vt[i].addRow( stmt.getSqltext(), Encoder.hexDecodeToString( stmt.getExplainplan() ) );
             }
         }
 
@@ -1402,7 +1453,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (params.size() > 1) {
             userParams = Arrays.copyOfRange(paramArray, 1, paramArray.length);
         }
-        dispatchAdHocCommon(task, handler, ccxn, isExplain, sql, userParams, null, user);
+        ExplainMode explainMode = isExplain ? ExplainMode.EXPLAIN_ADHOC : ExplainMode.NONE;
+        dispatchAdHocCommon(task, handler, ccxn, explainMode, sql, userParams, null, user);
         return null;
     }
 
@@ -1420,12 +1472,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (params.size() > 2) {
             userParams = Arrays.copyOfRange(paramArray, 2, paramArray.length);
         }
-        dispatchAdHocCommon(task, handler, ccxn, isExplain, sql, userParams, userPartitionKey, user);
+        ExplainMode explainMode = isExplain ? ExplainMode.EXPLAIN_ADHOC : ExplainMode.NONE;
+        dispatchAdHocCommon(task, handler, ccxn, explainMode, sql, userParams, userPartitionKey, user);
         return null;
     }
 
     private final void dispatchAdHocCommon(StoredProcedureInvocation task,
-            ClientInputHandler handler, Connection ccxn, boolean isExplain,
+            ClientInputHandler handler, Connection ccxn, ExplainMode explainMode,
             String sql, Object[] userParams, Object[] userPartitionKey, AuthSystem.AuthUser user) {
         List<String> sqlStatements = MiscUtils.splitSQLStatements(sql);
         String[] stmtsArray = sqlStatements.toArray(new String[sqlStatements.size()]);
@@ -1434,7 +1487,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 m_siteId,
                 task.clientHandle, handler.connectionId(),
                 handler.isAdmin(), ccxn,
-                sql, stmtsArray, userParams, null, isExplain,
+                sql, stmtsArray, userParams, null, explainMode,
                 userPartitionKey == null, userPartitionKey,
                 task.procName, task.type, task.originalTxnId, task.originalUniqueId,
                 VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
@@ -1660,6 +1713,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         final AuthSystem.AuthUser user = catalogContext.authSystem.getUser(handler.m_username);
 
         Procedure catProc = catalogContext.procedures.get(task.procName);
+        if (catProc == null) {
+            catProc = catalogContext.m_defaultProcs.checkForDefaultProcedure(task.procName);
+        }
 
         if (catProc == null) {
             String proc = task.procName;
@@ -1748,7 +1804,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 return dispatchAdHoc(task, handler, ccxn, true, user);
             }
             else if (task.procName.equals("@ExplainProc")) {
-                return dispatchExplainProcedure(task, handler, ccxn);
+                return dispatchExplainProcedure(task, handler, ccxn, user);
             }
             else if (task.procName.equals("@SendSentinel")) {
                 dispatchSendSentinel(handler.connectionId(), nowNanos, buf.capacity(), task);
@@ -2131,6 +2187,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 if (result.errorMsg == null) {
                     if (result instanceof AdHocPlannedStmtBatch) {
                         final AdHocPlannedStmtBatch plannedStmtBatch = (AdHocPlannedStmtBatch) result;
+                        ExplainMode explainMode = plannedStmtBatch.getExplainMode();
 
                         // assume all stmts have the same catalog version
                         if ((plannedStmtBatch.getPlannedStatementCount() > 0) &&
@@ -2144,8 +2201,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                             m_mailbox.send(m_plannerSiteId, work);
                         }
-                        else if( plannedStmtBatch.isExplainWork() ) {
-                            processExplainPlannedStmtBatch( plannedStmtBatch );
+                        else if (explainMode == ExplainMode.EXPLAIN_ADHOC) {
+                            processExplainPlannedStmtBatch(plannedStmtBatch);
+                        }
+                        else if (explainMode == ExplainMode.EXPLAIN_DEFAULT_PROC) {
+                            processExplainDefaultProc(plannedStmtBatch);
                         }
                         else {
                             try {

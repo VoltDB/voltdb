@@ -162,6 +162,12 @@
 {"testName":"DdlCreateTable","sqlCmd":"create table ddl_table (i integer)","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
 {"testName":"DdlAlterTableDropColumn","sqlCmd":"drop table ddl_table;\ncreate table ddl_table (i integer, j tinyint);\nalter table ddl_table drop column j;","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
 {"testName":"DdlAlterTableAlterColumn","sqlCmd":"drop table ddl_table;\ncreate table ddl_table (i integer, j tinyint);\nalter table ddl_table alter column j float default 3.4","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+{"testName":"DdlCreateView1","sqlCmd":"create view ddl_table_view1 (gb, ct) as select i, count(*) from ddl_table group by i","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+{"testName":"DdlCreateView2","sqlCmd":"create view ddl_table_view2 \n (gb,\n ct\n) \nas \nselect i, count(*) from ddl_table group by i","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+# not sure how multiple statements work in GEB, but this is necessary to be tested
+{"testName":"DdlCreateView3","sqlCmd":"create table tb (i integer, j integer); \n create view tb_view1 (gb, ct) as select i, count(*) from tb_view1 group by i;\n create view tb_view2 (gb, ct) as select i, count(*) from tb_view1 group by i;","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+{"testName":"DdlCreateView_required","sqlCmd":"create\nview\nddl_table_view_required(gb,ct)\nas\nselect\ni,count(*)\nfrom\nddl_table\ngroup\nby\ni","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+{"testName":"DdlCreateView_allowed","sqlCmd":"create\nview\nddl_table_view_allowed\n(gb\n,\nct\n)\nas\nselect\ni\n,\ncount(*)\nfrom\nddl_table\ngroup\nby\ni\n","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
 #
 #
 #/////////
@@ -172,6 +178,8 @@
 # not insert them, hence the following cause parse errors.
 {"testName":"DdlAlterTableDropDrop","sqlCmd":"drop table ddl_table;\ncreate table ddl_table (i integer, j tinyint, k bigint);\nalter table ddl_table drop column j alter table ddl_table drop column k","response":{"result":"ERROR","status":"FAILURE"}}
 {"testName":"DdlAlterTableAddAdd","sqlCmd":"drop table ddl_table;\ncreate table ddl_table (i integer);\nalter table ddl_table add column j bigint alter table ddl_table add column k tinyint","response":{"result":"ERROR","status":"FAILURE"}}
+# try to create a view from an undefined table
+{"testName":"DdlCreateViewInvalid","sqlCmd":"create view ddl_no_table_view (gb, ct) as select i, count(*) from ddl_no_table_exists group by i","response":{"result":"ERROR","status":"FAILURE"}}
 #
 # Finally, drop ddl_table so test is repeatable.
 {"testName":"DdlDropTable","sqlCmd":"drop table ddl_table","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
