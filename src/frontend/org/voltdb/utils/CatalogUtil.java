@@ -47,8 +47,6 @@ import javax.xml.bind.Unmarshaller;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
-import com.google_voltpatches.common.collect.Maps;
-import com.google_voltpatches.common.collect.Sets;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -89,6 +87,7 @@ import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
 import org.voltdb.compiler.deploymentfile.CommandLogType.Frequency;
+import org.voltdb.compiler.deploymentfile.ConnectionType;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.DrType;
 import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
@@ -116,6 +115,8 @@ import org.voltdb.types.ConstraintType;
 import org.xml.sax.SAXException;
 
 import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.collect.Maps;
+import com.google_voltpatches.common.collect.Sets;
 
 /**
  *
@@ -1254,13 +1255,19 @@ public abstract class CatalogUtil {
     private static void setDrInfo(Catalog catalog, DrType dr) {
         if (dr != null) {
             Cluster cluster = catalog.getClusters().get("cluster");
-            String drSource = dr.getConnection().getSource();
-            if (dr.getConnection().isEnabled()) {
-                cluster.setDrmasterhost(drSource);
-                hostLog.info("Configured connection for DR replica role to host " + drSource);
-            } else {
-                hostLog.info("DR data source " + drSource + " disabled for DR replica role. " +
-                        "Starting cluster as replica will be disabled.");
+            ConnectionType drConnection = dr.getConnection();
+            cluster.setDrproducerenabled(dr.isListen());
+            cluster.setDrclusterid(dr.getId());
+            cluster.setDrproducerport(dr.getPort());
+            if (drConnection != null) {
+                String drSource = drConnection.getSource();
+                if (drConnection.isEnabled()) {
+                    cluster.setDrmasterhost(drSource);
+                    hostLog.info("Configured connection for DR replica role to host " + drSource);
+                } else {
+                    hostLog.info("DR data source " + drSource + " disabled for DR replica role. " +
+                            "Starting cluster as replica will be disabled.");
+                }
             }
         }
     }

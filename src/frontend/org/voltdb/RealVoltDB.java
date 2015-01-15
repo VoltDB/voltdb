@@ -2179,7 +2179,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
             // 6.1. If we are a DR master, update the DR table signature hash
             if (m_nodeDRGateway != null) {
-                m_nodeDRGateway.calculateTableSignature(m_catalogContext.database);
+                m_nodeDRGateway.updateCatalog(m_catalogContext);
             }
 
             new ConfigLogging().logCatalogAndDeployment();
@@ -2597,7 +2597,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         try {
             if (m_nodeDRGateway != null) {
                 m_nodeDRGateway.start();
-                m_nodeDRGateway.bindPorts();
+                m_nodeDRGateway.bindPorts(m_catalogContext.cluster.getDrproducerenabled());
             }
             if (m_consumerDRGateway != null) {
                 // TODO: don't always request a snapshot

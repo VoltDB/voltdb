@@ -326,10 +326,12 @@
   <xs:complexType name="drType">
     <xs:sequence>
         <!-- Currently, only one DR data source is allowed -->
-        <xs:element name="connection" type="connectionType" minOccurs="1" maxOccurs="1"/>
+        <xs:element name="connection" type="connectionType" minOccurs="0" maxOccurs="1"/>
     </xs:sequence>
     <xs:attribute name="name" type="xs:string" default=""/>
-    <xs:attribute name="id" type="xs:int" default="0"/>
+    <xs:attribute name="id" type="clusterIdType" use="required"/>
+    <xs:attribute name="listen" type="xs:boolean" default="false" />
+    <xs:attribute name="port" type="xs:int" default="5555"/>
   </xs:complexType>
   
   <xs:complexType name="connectionType">
@@ -345,4 +347,13 @@
     <xs:attribute name="enabled" type="xs:boolean" default="true" />
     <xs:attribute name="group" type="xs:string" default="" />
   </xs:complexType>
+  
+  <!-- restriction on id -->
+  <xs:simpleType name="clusterIdType">
+    <xs:restriction base="xs:int">
+      <xs:minInclusive value="0"/>
+      <xs:maxInclusive value="127"/>
+    </xs:restriction>
+  </xs:simpleType>
+  
 </xs:schema>

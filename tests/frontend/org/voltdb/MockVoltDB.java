@@ -196,6 +196,12 @@ public class MockVoltDB implements VoltDBInterface
         getTable(tableName).setSignature(tableName);
     }
 
+    public void setDRProducerClusterId(int clusterId)
+    {
+        getCluster().setDrproducerenabled(true);
+        getCluster().setDrclusterid(clusterId);
+    }
+
     public void configureLogging(boolean enabled, boolean sync,
             int fsyncInterval, int maxTxns, String logPath, String snapshotPath) {
         org.voltdb.catalog.CommandLog logConfig = getCluster().getLogconfig().get("log");

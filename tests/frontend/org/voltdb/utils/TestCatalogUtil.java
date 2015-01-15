@@ -877,18 +877,11 @@ public class TestCatalogUtil extends TestCase {
     }
 
     public void testDRConnection() throws Exception {
-        final String noConnections =
-                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
-                + "<deployment>"
-                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
-                + "    <dr name='test' id='0'>"
-                + "    </dr>"
-                + "</deployment>";
         final String multipleConnections =
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
-                + "    <dr name='test' id='0'>"
+                + "    <dr name='test' id='1'>"
                 + "        <connection source='master'/>"
                 + "        <connection source='imposter'/>"
                 + "    </dr>"
@@ -897,7 +890,7 @@ public class TestCatalogUtil extends TestCase {
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
-                + "    <dr name='test' id='0'>"
+                + "    <dr name='test' id='1'>"
                 + "        <connection source='master'/>"
                 + "    </dr>"
                 + "</deployment>";
@@ -905,7 +898,7 @@ public class TestCatalogUtil extends TestCase {
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
-                + "    <dr>"
+                + "    <dr id='1'>"
                 + "        <connection source='master' enabled='true'/>"
                 + "    </dr>"
                 + "</deployment>";
@@ -913,18 +906,62 @@ public class TestCatalogUtil extends TestCase {
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
-                + "    <dr>"
+                + "    <dr id='1'>"
+                + "        <connection source='master' enabled='false'/>"
+                + "    </dr>"
+                + "</deployment>";
+        final String clusterIdTooSmall =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <dr id='-1'>"
+                + "        <connection source='master' enabled='false'/>"
+                + "    </dr>"
+                + "</deployment>";
+        final String clusterIdTooLarge =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <dr id='128'>"
+                + "        <connection source='master' enabled='false'/>"
+                + "    </dr>"
+                + "</deployment>";
+        final String drEnabledNoConnection =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <dr id='0' listen='true'>"
+                + "    </dr>"
+                + "</deployment>";
+        final String drEnabledWithEnabledConnection =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <dr id='1' listen='true'>"
+                + "        <connection source='master' enabled='true'/>"
+                + "    </dr>"
+                + "</deployment>";
+        final String drEnabledWithPort =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <dr id='1' listen='true' port='100'>"
                 + "        <connection source='master' enabled='false'/>"
                 + "    </dr>"
                 + "</deployment>";
 
-        final File tmpNoParse = VoltProjectBuilder.writeStringToTempFile(noConnections);
-        assertNull(CatalogUtil.getDeployment(new FileInputStream(tmpNoParse)));
-
         final File tmpInvalidMultiple = VoltProjectBuilder.writeStringToTempFile(multipleConnections);
         assertNull(CatalogUtil.getDeployment(new FileInputStream(tmpInvalidMultiple)));
 
+        final File tmpLowClusterId = VoltProjectBuilder.writeStringToTempFile(clusterIdTooSmall);
+        assertNull(CatalogUtil.getDeployment(new FileInputStream(tmpLowClusterId)));
+
+        final File tmpHighClusterId = VoltProjectBuilder.writeStringToTempFile(clusterIdTooLarge);
+        assertNull(CatalogUtil.getDeployment(new FileInputStream(tmpHighClusterId)));
+
         assertTrue(catalog.getClusters().get("cluster").getDrmasterhost().isEmpty());
+        assertFalse(catalog.getClusters().get("cluster").getDrproducerenabled());
+        assertTrue(catalog.getClusters().get("cluster").getDrclusterid() == 0);
 
         final File tmpDefault = VoltProjectBuilder.writeStringToTempFile(oneConnection);
         DeploymentType valid_deployment = CatalogUtil.getDeployment(new FileInputStream(tmpDefault));
@@ -934,6 +971,8 @@ public class TestCatalogUtil extends TestCase {
         assertTrue("Deployment file failed to parse", msg == null);
 
         assertEquals("master", catalog.getClusters().get("cluster").getDrmasterhost());
+        assertFalse(catalog.getClusters().get("cluster").getDrproducerenabled());
+        assertTrue(catalog.getClusters().get("cluster").getDrclusterid() == 1);
 
         final File tmpEnabled = VoltProjectBuilder.writeStringToTempFile(oneEnabledConnection);
         DeploymentType valid_deployment_enabled = CatalogUtil.getDeployment(new FileInputStream(tmpEnabled));
@@ -944,6 +983,8 @@ public class TestCatalogUtil extends TestCase {
         assertTrue("Deployment file failed to parse", msg == null);
 
         assertEquals("master", catalog.getClusters().get("cluster").getDrmasterhost());
+        assertFalse(catalog.getClusters().get("cluster").getDrproducerenabled());
+        assertTrue(catalog.getClusters().get("cluster").getDrclusterid() == 1);
 
         final File tmpDisabled = VoltProjectBuilder.writeStringToTempFile(oneDisabledConnection);
         DeploymentType valid_deployment_disabled = CatalogUtil.getDeployment(new FileInputStream(tmpDisabled));
@@ -954,6 +995,44 @@ public class TestCatalogUtil extends TestCase {
         assertTrue("Deployment file failed to parse", msg == null);
 
         assertTrue(catalog.getClusters().get("cluster").getDrmasterhost().isEmpty());
+        assertFalse(catalog.getClusters().get("cluster").getDrproducerenabled());
+        assertTrue(catalog.getClusters().get("cluster").getDrclusterid() == 1);
+
+        final File tmpEnabledNoConn = VoltProjectBuilder.writeStringToTempFile(drEnabledNoConnection);
+        DeploymentType valid_deployment_enabledNoConn = CatalogUtil.getDeployment(new FileInputStream(tmpEnabledNoConn));
+        assertNotNull(valid_deployment_enabledNoConn);
+
+        setUp();
+        msg = CatalogUtil.compileDeployment(catalog, valid_deployment_enabledNoConn, false);
+        assertTrue("Deployment file failed to parse", msg == null);
+
+        assertTrue(catalog.getClusters().get("cluster").getDrmasterhost().isEmpty());
+        assertTrue(catalog.getClusters().get("cluster").getDrproducerenabled());
+        assertTrue(catalog.getClusters().get("cluster").getDrclusterid() == 0);
+
+        final File tmpEnabledWithConn = VoltProjectBuilder.writeStringToTempFile(drEnabledWithEnabledConnection);
+        DeploymentType valid_deployment_enabledWithConn = CatalogUtil.getDeployment(new FileInputStream(tmpEnabledWithConn));
+        assertNotNull(valid_deployment_enabledWithConn);
+
+        setUp();
+        msg = CatalogUtil.compileDeployment(catalog, valid_deployment_enabledWithConn, false);
+        assertTrue("Deployment file failed to parse", msg == null);
+
+        assertEquals("master", catalog.getClusters().get("cluster").getDrmasterhost());
+        assertTrue(catalog.getClusters().get("cluster").getDrproducerenabled());
+        assertTrue(catalog.getClusters().get("cluster").getDrclusterid() == 1);
+
+        final File tmpEnabledWithPort = VoltProjectBuilder.writeStringToTempFile(drEnabledWithPort);
+        DeploymentType valid_deployment_port = CatalogUtil.getDeployment(new FileInputStream(tmpEnabledWithPort));
+        assertNotNull(valid_deployment_port);
+
+        setUp();
+        msg = CatalogUtil.compileDeployment(catalog, valid_deployment_port, false);
+        assertTrue("Deployment file failed to parse", msg == null);
+
+        assertTrue(catalog.getClusters().get("cluster").getDrmasterhost().isEmpty());
+        assertTrue(catalog.getClusters().get("cluster").getDrproducerenabled());
+        assertTrue(catalog.getClusters().get("cluster").getDrproducerport() == 100);
     }
 
     public void testDRTableSignatureCrc() throws IOException

@@ -17,8 +17,6 @@
 
 package org.voltdb;
 
-import org.voltdb.catalog.Database;
-
 import java.io.IOException;
 
 public interface NodeDRGateway {
@@ -26,7 +24,7 @@ public interface NodeDRGateway {
     /**
      * Start listening on the ports
      */
-    public abstract void bindPorts();
+    public abstract void bindPorts(boolean drProducerEnabled);
 
     /**
      * @return true if bindPorts has been called.
@@ -61,6 +59,5 @@ public interface NodeDRGateway {
     public abstract void start();
     public abstract void shutdown() throws InterruptedException;
 
-    public abstract void calculateTableSignature(Database catalog);
-
+    public abstract void updateCatalog(CatalogContext catalog);
 }
