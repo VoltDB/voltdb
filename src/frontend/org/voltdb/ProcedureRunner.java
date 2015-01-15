@@ -212,6 +212,10 @@ public class ProcedureRunner {
         reflect();
     }
 
+    public Procedure getCatalogProcedure() {
+        return m_catProc;
+    }
+
     public boolean isSystemProcedure() {
         return m_isSysProc;
     }

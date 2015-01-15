@@ -22,11 +22,18 @@ import java.security.NoSuchAlgorithmException;
 
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.voltdb.CatalogContext.ProcedurePartitionInfo;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.PlanFragment;
+import org.voltdb.catalog.ProcParameter;
+import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
+import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compilereport.StatementAnnotation;
 import org.voltdb.planner.CompiledPlan;
@@ -290,4 +297,142 @@ public abstract class StatementCompiler {
         return false;
     }
 
+    /**
+     * This procedure compiles a shim org.voltdb.catalog.Procedure representing a default proc.
+     * The shim has no plan and few details that are expensive to compute.
+     * The returned proc instance has a full plan and can be used to create a ProcedureRunner.
+     * Note that while there are two procedure objects here, none are rooted in a real catalog;
+     * they are entirely parallel to regular, catalog procs.
+     *
+     * This code could probably go a few different places. It duplicates a bit too much of the
+     * StatmentCompiler code for my taste, so I put it here. Next pass could reduce some of the
+     * duplication?
+     */
+    public static Procedure compileDefaultProcedure(PlannerTool plannerTool, Procedure catProc, String sqlText) {
+        // fake db makes it easy to create procedures that aren't part of the main catalog
+        Database fakeDb = new Catalog().getClusters().add("cluster").getDatabases().add("database");
+
+        Table table = catProc.getPartitiontable();
+
+        // determine the type of the query
+        QueryType qtype = QueryType.getFromSQL(sqlText);
+
+        StatementPartitioning partitioning =
+                catProc.getSinglepartition() ? StatementPartitioning.forceSP() :
+                                               StatementPartitioning.forceMP();
+
+        CompiledPlan plan = plannerTool.planSqlCore(sqlText, partitioning);
+
+
+        Procedure newCatProc = fakeDb.getProcedures().add(catProc.getTypeName());
+        newCatProc.setClassname(catProc.getClassname());
+        newCatProc.setDefaultproc(true);
+        newCatProc.setEverysite(false);
+        newCatProc.setHasjava(false);
+        newCatProc.setPartitioncolumn(catProc.getPartitioncolumn());
+        newCatProc.setPartitionparameter(catProc.getPartitionparameter());
+        newCatProc.setPartitiontable(catProc.getPartitiontable());
+        newCatProc.setReadonly(catProc.getReadonly());
+        newCatProc.setSinglepartition(catProc.getSinglepartition());
+        newCatProc.setSystemproc(false);
+
+        if (catProc.getPartitionparameter() >= 0) {
+            newCatProc.setAttachment(
+                    new ProcedurePartitionInfo(
+                            VoltType.get((byte) catProc.getPartitioncolumn().getType()),
+                            catProc.getPartitionparameter()));
+        }
+
+        CatalogMap<Statement> statements = newCatProc.getStatements();
+        assert(statements != null);
+
+        Statement stmt = statements.add(VoltDB.ANON_STMT_NAME);
+        stmt.setSqltext(sqlText);
+        stmt.setReadonly(catProc.getReadonly());
+        stmt.setQuerytype(qtype.getValue());
+        stmt.setSinglepartition(catProc.getSinglepartition());
+        stmt.setBatched(false);
+        stmt.setIscontentdeterministic(true);
+        stmt.setIsorderdeterministic(true);
+        stmt.setNondeterminismdetail("NO CONTENT FOR DEFAULT PROCS");
+        stmt.setSeqscancount(plan.countSeqScans());
+        stmt.setReplicatedtabledml(!catProc.getReadonly() && table.getIsreplicated());
+        stmt.setParamnum(plan.parameters.length);
+
+        // Input Parameters
+        // We will need to update the system catalogs with this new information
+        for (int i = 0; i < plan.parameters.length; ++i) {
+            StmtParameter catalogParam = stmt.getParameters().add(String.valueOf(i));
+            catalogParam.setJavatype(plan.parameters[i].getValueType().getValue());
+            catalogParam.setIsarray(plan.parameters[i].getParamIsVector());
+            catalogParam.setIndex(i);
+        }
+
+        PlanFragment frag = stmt.getFragments().add("0");
+
+        // compute a hash of the plan
+        MessageDigest md = null;
+        try {
+            md = MessageDigest.getInstance("SHA-1");
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+            assert(false);
+            System.exit(-1); // should never happen with healthy jvm
+        }
+
+        byte[] planBytes = writePlanBytes(frag, plan.rootPlanGraph);
+        md.update(planBytes, 0, planBytes.length);
+        // compute the 40 bytes of hex from the 20 byte sha1 hash of the plans
+        md.reset();
+        md.update(planBytes);
+        frag.setPlanhash(Encoder.hexEncode(md.digest()));
+
+        if (plan.subPlanGraph != null) {
+            frag.setHasdependencies(true);
+            frag.setNontransactional(true);
+            frag.setMultipartition(true);
+
+            frag = stmt.getFragments().add("1");
+            frag.setHasdependencies(false);
+            frag.setNontransactional(false);
+            frag.setMultipartition(true);
+            byte[] subBytes = writePlanBytes(frag, plan.subPlanGraph);
+            // compute the 40 bytes of hex from the 20 byte sha1 hash of the plans
+            md.reset();
+            md.update(subBytes);
+            frag.setPlanhash(Encoder.hexEncode(md.digest()));
+        }
+        else {
+            frag.setHasdependencies(false);
+            frag.setNontransactional(false);
+            frag.setMultipartition(false);
+        }
+
+        // set the procedure parameter types from the statement parameter types
+        int paramCount = 0;
+        for (StmtParameter stmtParam : CatalogUtil.getSortedCatalogItems(stmt.getParameters(), "index")) {
+            // name each parameter "param1", "param2", etc...
+            ProcParameter procParam = newCatProc.getParameters().add("param" + String.valueOf(paramCount));
+            procParam.setIndex(stmtParam.getIndex());
+            procParam.setIsarray(stmtParam.getIsarray());
+            procParam.setType(stmtParam.getJavatype());
+            paramCount++;
+        }
+
+        return newCatProc;
+    }
+
+    /**
+     * Update the plan fragment and return the bytes of the plan
+     */
+    static byte[] writePlanBytes(PlanFragment fragment, AbstractPlanNode planGraph) {
+        // get the plan bytes
+        PlanNodeList node_list = new PlanNodeList(planGraph);
+        String json = node_list.toJSONString();
+        // Place serialized version of PlanNodeTree into a PlanFragment
+        byte[] jsonBytes = json.getBytes(Charsets.UTF_8);
+        String bin64String = Encoder.compressAndBase64Encode(jsonBytes);
+        fragment.setPlannodetree(bin64String);
+        return jsonBytes;
+    }
 }
