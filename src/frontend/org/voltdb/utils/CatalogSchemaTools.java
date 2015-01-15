@@ -17,6 +17,9 @@
 
 package org.voltdb.utils;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -28,6 +31,7 @@ import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.json_voltpatches.JSONException;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
@@ -56,6 +60,10 @@ import org.voltdb.types.ConstraintType;
 public abstract class CatalogSchemaTools {
 
     final static String spacer = "   ";
+
+    // Set to true to enable dumping to /tmp/canonical-<timestamp>.sql
+    // Make sure it's false before committing.
+    final static boolean dumpSchema = false;
 
     /**
      * Convert a Table catalog object into the proper SQL DDL, including all indexes,
@@ -410,12 +418,14 @@ public abstract class CatalogSchemaTools {
         ProcedureAnnotation annot = (ProcedureAnnotation) proc.getAnnotation();
         if (proc.getSinglepartition()) {
             if (annot != null && annot.classAnnotated) {
-                sb.append("--Annotated Partitioning Takes Precedence Over DDL Procedure Partitioning Statement\n--");
+                partitionClause.append("--Annotated Partitioning Takes Precedence Over DDL Procedure Partitioning Statement\n--");
             }
-            partitionClause.append("\n");
+            else {
+                partitionClause.append("\n");
+            }
             partitionClause.append(spacer);
             partitionClause.append(String.format(
-                    "PARTITION ON TABLE %s COLUMN %S",
+                    "PARTITION ON TABLE %s COLUMN %s",
                     proc.getPartitiontable().getTypeName(),
                     proc.getPartitioncolumn().getTypeName() ));
             if (proc.getPartitionparameter() != 0) {
@@ -454,7 +464,6 @@ public abstract class CatalogSchemaTools {
                     allowClause,
                     partitionClause.toString(),
                     spacer,
-                    spacer,
                     annot.scriptImpl));
         }
 
@@ -478,7 +487,6 @@ public abstract class CatalogSchemaTools {
             sb.append(importLine);
         }
     }
-
 
     /**
      * Convert a catalog into a string containing all DDL statements.
@@ -528,6 +536,18 @@ public abstract class CatalogSchemaTools {
                     toSchema(sb, proc);
                 }
                 sb.append("\n");
+            }
+        }
+
+        if (dumpSchema) {
+            String ts = new SimpleDateFormat("MMddHHmmssSSS").format(new Date());
+            File f = new File(String.format("/tmp/canonical-%s.sql", ts));
+            try {
+                FileWriter fw = new FileWriter(f);
+                fw.write(sb.toString());
+                fw.close();
+            } catch (IOException e) {
+                e.printStackTrace();
             }
         }
 

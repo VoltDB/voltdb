@@ -2957,7 +2957,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(isFeedbackPresent(expectedError, fbs));
     }
 
-    public void testInvalidGtroovyProcedureDDL() throws Exception {
+    public void testInvalidGroovyProcedureDDL() throws Exception {
         ArrayList<Feedback> fbs;
         String expectedError;
 
