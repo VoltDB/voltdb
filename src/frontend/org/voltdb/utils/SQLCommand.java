@@ -1072,7 +1072,7 @@ public class SQLCommand
                     if (objectParams[1] != null) {
                         depfile = new File((String)objectParams[1]);
                     }
-                    printResponse(VoltDB.updateApplicationCatalog(catfile, depfile));
+                    printDdlResponse(VoltDB.updateApplicationCatalog(catfile, depfile));
 
                     // Need to update the stored procedures after a catalog change (could have added/removed SPs!).  ENG-3726
                     loadStoredProcedures(Procedures, Classlist);
@@ -1082,7 +1082,7 @@ public class SQLCommand
                     if (objectParams[0] != null) {
                         jarfile = new File((String)objectParams[0]);
                     }
-                    printResponse(VoltDB.updateClasses(jarfile, (String)objectParams[1]));
+                    printDdlResponse(VoltDB.updateClasses(jarfile, (String)objectParams[1]));
                     // Need to reload the procedures and classes
                     loadStoredProcedures(Procedures, Classlist);
                 }
@@ -1112,10 +1112,13 @@ public class SQLCommand
             }
             else { // All other commands get forwarded to @AdHoc
                 query = StripCRLF.matcher(query).replaceAll(" ");
-                printResponse(VoltDB.callProcedure("@AdHoc", query));
                 // if the query was DDL, reload the stored procedures.
                 if (SQLLexer.extractDDLToken(query) != null) {
+                    printDdlResponse(VoltDB.callProcedure("@AdHoc", query));
                     loadStoredProcedures(Procedures, Classlist);
+                }
+                else {
+                    printResponse(VoltDB.callProcedure("@AdHoc", query));
                 }
             }
         } catch(Exception exc) {
@@ -1196,10 +1199,19 @@ public class SQLCommand
                 rowCount = t.fetchRow(0).getLong(0);
             }
             if (m_outputShowMetadata) {
-                System.out.printf("\n\n(Returned %d rows in %.2fs)\n",
+                System.out.printf("\n(Returned %d rows in %.2fs)\n",
                         rowCount, elapsedTime / 1000000000.0);
             }
         }
+    }
+
+    private static void printDdlResponse(ClientResponse response) throws Exception {
+        if (response.getStatus() != ClientResponse.SUCCESS) {
+            throw new Exception("Execution Error: " + response.getStatusString());
+        }
+        //TODO: In the future, if/when we change the prompt when waiting for the remainder of an unfinished command,
+        // successful DDL commands may just silently return to a normal prompt without this verbose feedback.
+        System.out.println("Command succeeded.");
     }
 
     // VoltDB connection support
