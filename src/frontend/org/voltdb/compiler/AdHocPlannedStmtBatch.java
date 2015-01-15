@@ -26,6 +26,7 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.network.Connection;
+import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.ParameterConverter;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltType;
@@ -312,8 +313,8 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
         return statements;
     }
 
-    public boolean isExplainWork() {
-        return work.isExplainWork;
+    public ExplainMode getExplainMode() {
+        return work.explainMode;
     }
 
     /*
