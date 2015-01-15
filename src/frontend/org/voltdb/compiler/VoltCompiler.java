@@ -117,7 +117,6 @@ public class VoltCompiler {
     // was this voltcompiler instantiated in a main(), or as part of VoltDB
     public final boolean standaloneCompiler;
 
-    private boolean m_previousCatalogReuseEnabled = false;
     private Set<String> m_dirtyTables = new TreeSet<>();
     private Map<String, Statement> m_previousCatalogStmts = new HashMap<>();
 
@@ -1392,6 +1391,9 @@ public class VoltCompiler {
         }
         // done handling files
         m_currentFilename = null;
+
+        // allow gc to reclaim any cache memory here
+        m_previousCatalogStmts.clear();
     }
 
     private void setGroupedTablePartitionColumn(MaterializedViewInfo mvi, Column partitionColumn)
@@ -2365,39 +2367,52 @@ public class VoltCompiler {
         m_dirtyTables.add(tableName.toLowerCase());
     }
 
-    boolean hasTableChangedSincePreviousCatalog(String tableName) {
-        return m_dirtyTables.contains(tableName.toLowerCase());
-    }
-
-    void addStatementToCache(Statement stmt) {
-        DeterminismMode detMode = DeterminismMode.fromStr(stmt.getDeterminismmode());
-        if (detMode == null) {
-            return; // uncacheable and quite weird
-        }
-
-        String key = detMode.toChar() + (stmt.getSinglepartition() ? 'P' : 'R') + '#' + stmt.getSqltext();
-
-        m_previousCatalogStmts.put(key, stmt);
-    }
-
-    Statement getCachedStatement(String sql, boolean partitioned, DeterminismMode detMode) {
-        if (!m_previousCatalogReuseEnabled) {
+    String getKeyPrefix(StatementPartitioning partitioning, DeterminismMode detMode, String joinOrder) {
+        // no caching for inferred yet
+        if (partitioning.isInferred()) {
             return null;
         }
 
-        String key = detMode.toChar() + (partitioned ? 'P' : 'R') + '#' + sql;
+        String joinOrderPrefix = "#";
+        if (joinOrder != null) {
+            joinOrderPrefix += joinOrder;
+        }
+
+        boolean partitioned = partitioning.wasSpecifiedAsSingle();
+
+        return joinOrderPrefix + String.valueOf(detMode.toChar()) + (partitioned ? "P#" : "R#");
+    }
+
+    void addStatementToCache(Statement stmt) {
+        String key = stmt.getCachekeyprefix() + stmt.getSqltext();
+        m_previousCatalogStmts.put(key, stmt);
+    }
+
+    // track hits and misses for debugging
+    static long m_stmtCacheHits = 0;
+    static long m_stmtCacheMisses = 0;
+
+    Statement getCachedStatement(String keyPrefix, String sql) {
+        String key = keyPrefix + sql;
 
         Statement candidate = m_previousCatalogStmts.get(key);
+        if (candidate == null) {
+            ++m_stmtCacheMisses;
+            return null;
+        }
 
         // check that no underlying tables have been modified since the proc had been compiled
-        boolean safe = true;
         String tablesTouched[] = candidate.getTablestouched().split(",");
         for (String tableName : tablesTouched) {
-            if (hasTableChangedSincePreviousCatalog(tableName)) {
-                safe = false;
+            if (m_dirtyTables.contains(tableName.toLowerCase())) {
+                ++m_stmtCacheMisses;
+                return null;
             }
         }
 
-        return safe ? candidate : null;
+        ++m_stmtCacheHits;
+        // easy debugging line
+        //System.out.printf("Hits: %d, Misses %d, Percent %.2f\n", hits, misses, (hits * 100.0) / (hits + misses));
+        return candidate;
     }
 }

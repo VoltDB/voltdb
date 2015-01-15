@@ -93,48 +93,52 @@ public abstract class StatementCompiler {
             DeterminismMode detMode, StatementPartitioning partitioning)
     throws VoltCompiler.VoltCompilerException {
 
-        Statement previousStatement = compiler.getCachedStatement(stmt, partitioning.wasSpecifiedAsSingle(), detMode);
-        // check if the stmt exists and if it's the same sql text
-        if (previousStatement != null) {
-            catalogStmt.setAnnotation(previousStatement.getAnnotation());
-            catalogStmt.setAttachment(previousStatement.getAttachment());
-            catalogStmt.setCost(previousStatement.getCost());
-            catalogStmt.setExplainplan(previousStatement.getExplainplan());
-            catalogStmt.setIscontentdeterministic(previousStatement.getIscontentdeterministic());
-            catalogStmt.setIsorderdeterministic(previousStatement.getIsorderdeterministic());
-            catalogStmt.setNondeterminismdetail(previousStatement.getNondeterminismdetail());
-            catalogStmt.setQuerytype(previousStatement.getQuerytype());
-            catalogStmt.setReadonly(previousStatement.getReadonly());
-            catalogStmt.setReplicatedtabledml(previousStatement.getReplicatedtabledml());
-            catalogStmt.setSeqscancount(previousStatement.getSeqscancount());
-            catalogStmt.setSinglepartition(previousStatement.getSinglepartition());
-            catalogStmt.setSqltext(previousStatement.getSqltext());
-            catalogStmt.setTablestouched(previousStatement.getTablestouched());
+        String keyPrefix = compiler.getKeyPrefix(partitioning, detMode, joinOrder);
 
-            for (StmtParameter oldSp : previousStatement.getParameters()) {
-                StmtParameter newSp = catalogStmt.getParameters().add(oldSp.getTypeName());
-                newSp.setAnnotation(oldSp.getAnnotation());
-                newSp.setAttachment(oldSp.getAttachment());
-                newSp.setIndex(oldSp.getIndex());
-                newSp.setIsarray(oldSp.getIsarray());
-                newSp.setJavatype(oldSp.getJavatype());
-                newSp.setSqltype(oldSp.getSqltype());
+        if (keyPrefix != null) {
+            Statement previousStatement = compiler.getCachedStatement(keyPrefix, stmt);
+            // check if the stmt exists and if it's the same sql text
+            if (previousStatement != null) {
+                catalogStmt.setAnnotation(previousStatement.getAnnotation());
+                catalogStmt.setAttachment(previousStatement.getAttachment());
+                catalogStmt.setCachekeyprefix(previousStatement.getCachekeyprefix());
+                catalogStmt.setCost(previousStatement.getCost());
+                catalogStmt.setExplainplan(previousStatement.getExplainplan());
+                catalogStmt.setIscontentdeterministic(previousStatement.getIscontentdeterministic());
+                catalogStmt.setIsorderdeterministic(previousStatement.getIsorderdeterministic());
+                catalogStmt.setNondeterminismdetail(previousStatement.getNondeterminismdetail());
+                catalogStmt.setQuerytype(previousStatement.getQuerytype());
+                catalogStmt.setReadonly(previousStatement.getReadonly());
+                catalogStmt.setReplicatedtabledml(previousStatement.getReplicatedtabledml());
+                catalogStmt.setSeqscancount(previousStatement.getSeqscancount());
+                catalogStmt.setSinglepartition(previousStatement.getSinglepartition());
+                catalogStmt.setSqltext(previousStatement.getSqltext());
+                catalogStmt.setTablestouched(previousStatement.getTablestouched());
+
+                for (StmtParameter oldSp : previousStatement.getParameters()) {
+                    StmtParameter newSp = catalogStmt.getParameters().add(oldSp.getTypeName());
+                    newSp.setAnnotation(oldSp.getAnnotation());
+                    newSp.setAttachment(oldSp.getAttachment());
+                    newSp.setIndex(oldSp.getIndex());
+                    newSp.setIsarray(oldSp.getIsarray());
+                    newSp.setJavatype(oldSp.getJavatype());
+                    newSp.setSqltype(oldSp.getSqltype());
+                }
+
+                for (PlanFragment oldFrag : previousStatement.getFragments()) {
+                    PlanFragment newFrag = catalogStmt.getFragments().add(oldFrag.getTypeName());
+                    newFrag.setAnnotation(oldFrag.getAnnotation());
+                    newFrag.setAttachment(oldFrag.getAttachment());
+                    newFrag.setHasdependencies(oldFrag.getHasdependencies());
+                    newFrag.setMultipartition(oldFrag.getMultipartition());
+                    newFrag.setNontransactional(oldFrag.getNontransactional());
+                    newFrag.setPlanhash(oldFrag.getPlanhash());
+                    newFrag.setPlannodetree(oldFrag.getPlannodetree());
+                }
+
+                return;
             }
-
-            for (PlanFragment oldFrag : previousStatement.getFragments()) {
-                PlanFragment newFrag = catalogStmt.getFragments().add(oldFrag.getTypeName());
-                newFrag.setAnnotation(oldFrag.getAnnotation());
-                newFrag.setAttachment(oldFrag.getAttachment());
-                newFrag.setHasdependencies(oldFrag.getHasdependencies());
-                newFrag.setMultipartition(oldFrag.getMultipartition());
-                newFrag.setNontransactional(oldFrag.getNontransactional());
-                newFrag.setPlanhash(oldFrag.getPlanhash());
-                newFrag.setPlannodetree(oldFrag.getPlannodetree());
-            }
-
-            return;
         }
-
 
         // Cleanup whitespace newlines for catalog compatibility
         // and to make statement parsing easier.
@@ -147,7 +151,9 @@ public abstract class StatementCompiler {
 
         catalogStmt.setReadonly(qtype.isReadOnly());
         catalogStmt.setQuerytype(qtype.getValue());
-        catalogStmt.setDeterminismmode(String.valueOf(detMode.toChar()));
+
+        // might be null if not cacheable
+        catalogStmt.setCachekeyprefix(keyPrefix);
 
         // put the data in the catalog that we have
         if (!stmt.endsWith(";")) {
@@ -397,13 +403,11 @@ public abstract class StatementCompiler {
         stmt.setReadonly(catProc.getReadonly());
         stmt.setQuerytype(qtype.getValue());
         stmt.setSinglepartition(catProc.getSinglepartition());
-        stmt.setBatched(false);
         stmt.setIscontentdeterministic(true);
         stmt.setIsorderdeterministic(true);
         stmt.setNondeterminismdetail("NO CONTENT FOR DEFAULT PROCS");
         stmt.setSeqscancount(plan.countSeqScans());
         stmt.setReplicatedtabledml(!catProc.getReadonly() && table.getIsreplicated());
-        stmt.setParamnum(plan.parameters.length);
 
         // Input Parameters
         // We will need to update the system catalogs with this new information

@@ -851,6 +851,9 @@ public class DDLCompiler {
                 if (tableXML != null) {
                     tableXML.attributes.put("partitioncolumn", columnName.toUpperCase());
                     // Column validity check done by VoltCompiler in post-processing
+
+                    // mark the table as dirty for the purposes of caching sql statements
+                    m_compiler.markTableAsDirty(tableName);
                 }
                 else {
                     throw m_compiler.new VoltCompilerException(String.format(
@@ -908,6 +911,9 @@ public class DDLCompiler {
             VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
             if (tableXML != null) {
                 tableXML.attributes.remove("partitioncolumn");
+
+                // mark the table as dirty for the purposes of caching sql statements
+                m_compiler.markTableAsDirty(tableName);
             }
             else {
                 throw m_compiler.new VoltCompilerException(String.format(

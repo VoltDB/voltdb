@@ -163,7 +163,7 @@ begin Statement           "A parameterized SQL statement embedded in a stored pr
   int seqscancount          "The number of sequential table scans in the plan"
   string explainplan        "A human-readable plan description"
   string tablestouched      "A CSV list of tables this statement touches"
-  string determinismmode    "Was the statement compiled with forced determinism."
+  string cachekeyprefix     "Unique string that combines with the SQL text to identify a unique corresponding plan."
 end
 
 begin StmtParameter javaonly   "A parameter for a parameterized SQL statement"
