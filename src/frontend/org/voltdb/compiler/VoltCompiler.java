@@ -1396,11 +1396,7 @@ public class VoltCompiler {
             else {
                 m_currentFilename = procedureName;
             }
-            Procedure previousProcIfAny = null;
-            if (prevProcsIfAny != null) {
-                previousProcIfAny = prevProcsIfAny.get(procedureName);
-            }
-            ProcedureCompiler.compile(this, hsql, m_estimates, m_catalog, db, procedureDescriptor, previousProcIfAny, jarOutput);
+            ProcedureCompiler.compile(this, hsql, m_estimates, m_catalog, db, procedureDescriptor, jarOutput);
         }
         // done handling files
         m_currentFilename = null;

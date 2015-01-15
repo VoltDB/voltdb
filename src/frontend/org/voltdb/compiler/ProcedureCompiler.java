@@ -75,7 +75,6 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
                         Catalog catalog,
                         Database db,
                         ProcedureDescriptor procedureDescriptor,
-                        Procedure previousProcIfAny,
                         InMemoryJarfile jarOutput)
                                 throws VoltCompiler.VoltCompilerException
     {
@@ -85,10 +84,10 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
         assert(estimates != null);
 
         if (procedureDescriptor.m_singleStmt == null) {
-            compileJavaProcedure(compiler, hsql, estimates, catalog, db, procedureDescriptor, previousProcIfAny, jarOutput);
+            compileJavaProcedure(compiler, hsql, estimates, catalog, db, procedureDescriptor, jarOutput);
         }
         else {
-            compileSingleStmtProcedure(compiler, hsql, estimates, catalog, db, previousProcIfAny, procedureDescriptor);
+            compileSingleStmtProcedure(compiler, hsql, estimates, catalog, db, procedureDescriptor);
         }
     }
 
@@ -284,7 +283,6 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
                                      Catalog catalog,
                                      Database db,
                                      ProcedureDescriptor procedureDescriptor,
-                                     Procedure previousProcIfAny,
                                      InMemoryJarfile jarOutput)
                                              throws VoltCompiler.VoltCompilerException
     {
@@ -645,7 +643,6 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
                                            DatabaseEstimates estimates,
                                            Catalog catalog,
                                            Database db,
-                                           Procedure previousProcIfAny,
                                            ProcedureDescriptor procedureDescriptor)
                                                    throws VoltCompiler.VoltCompilerException
     {
@@ -693,39 +690,6 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
         assert(info != null);
 
         Statement catalogStmt = procedure.getStatements().add(VoltDB.ANON_STMT_NAME);
-        boolean cacheHit = false;
-
-        // find any previous statement
-        Statement previousStatement = compiler.getCachedStatement(procedureDescriptor.m_singleStmt, info.singlePartition, DeterminismMode.FASTER);
-        // check if the stmt exists and if it's the same sql text
-        if (previousStatement != null) {
-            catalogStmt.setAnnotation(previousStatement.getAnnotation());
-            catalogStmt.setAttachment(previousStatement.getAttachment());
-            catalogStmt.setCost(previousStatement.getCost());
-            catalogStmt.setExplainplan(previousStatement.getExplainplan());
-            catalogStmt.setIscontentdeterministic(previousStatement.getIscontentdeterministic());
-            catalogStmt.setIsorderdeterministic(previousStatement.getIsorderdeterministic());
-            catalogStmt.setNondeterminismdetail(previousStatement.getNondeterminismdetail());
-            catalogStmt.setQuerytype(previousStatement.getQuerytype());
-            catalogStmt.setReadonly(previousStatement.getReadonly());
-            catalogStmt.setReplicatedtabledml(previousStatement.getReplicatedtabledml());
-            catalogStmt.setSeqscancount(previousStatement.getSeqscancount());
-            catalogStmt.setSinglepartition(previousStatement.getSinglepartition());
-            catalogStmt.setSqltext(previousStatement.getSqltext());
-            catalogStmt.setTablestouched(previousStatement.getTablestouched());
-
-            for (StmtParameter oldSp : previousStatement.getParameters()) {
-                StmtParameter newSp = catalogStmt.getParameters().add(oldSp.getTypeName());
-                newSp.setAnnotation(oldSp.getAnnotation());
-                newSp.setAttachment(oldSp.getAttachment());
-                newSp.setIndex(oldSp.getIndex());
-                newSp.setIsarray(oldSp.getIsarray());
-                newSp.setJavatype(oldSp.getJavatype());
-                newSp.setSqltype(oldSp.getSqltype());
-            }
-
-            cacheHit = true;
-        }
 
         // ADD THE STATEMENT
         StatementPartitioning partitioning =
@@ -733,13 +697,11 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
                                        StatementPartitioning.forceMP();
 
         // add the statement to the catalog
-        if (!cacheHit) {
-            // compile the statement
-            // default to FASTER detmode because stmt procs can't feed read output into writes
-            StatementCompiler.compileFromSqlTextAndUpdateCatalog(compiler, hsql, catalog, db,
-                    estimates, catalogStmt, procedureDescriptor.m_singleStmt,
-                    procedureDescriptor.m_joinOrder, DeterminismMode.FASTER, partitioning);
-        }
+        // compile the statement
+        // default to FASTER detmode because stmt procs can't feed read output into writes
+        StatementCompiler.compileFromSqlTextAndUpdateCatalog(compiler, hsql, catalog, db,
+                estimates, catalogStmt, procedureDescriptor.m_singleStmt,
+                procedureDescriptor.m_joinOrder, DeterminismMode.FASTER, partitioning);
 
         // if the single stmt is not read only, then the proc is not read only
         boolean procHasWriteStmts = (catalogStmt.getReadonly() == false);
