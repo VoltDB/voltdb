@@ -235,6 +235,14 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
         return m_hadBackPressure;
     }
 
+    /**
+     * Used by tests.
+     * @return
+     */
+    public long getPendingBytes() {
+        return m_pendingTxnBytes;
+    }
+
     /*
      * Invoked when queueing response bytes back to a connection. Can be invoked with positive/negative
      * values to indicate whether data is being flushed or added. The same resource pool counter is used

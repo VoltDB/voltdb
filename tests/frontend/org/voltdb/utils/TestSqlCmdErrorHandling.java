@@ -443,26 +443,36 @@ public class TestSqlCmdErrorHandling extends TestCase {
         Process process = pb.start();
 
         // Only doing cmd line arguments work, SQLCMD process should finish in 1 second.
-        Thread.sleep(1000);
+        final int SLEEP = 200;
+        final int TIMES = 50; // 10s before timing out
+        for (int i = 0; i < TIMES; i++) {
+            Thread.sleep(SLEEP);
+            try {
+                int exitValue = process.exitValue();
 
-        int exitValue = process.exitValue();
+                String message = new Scanner(out).useDelimiter("\\Z").next();
+                assertTrue(message.contains(errorMessage));
+                return exitValue;
+            } catch (Exception e) {
+                System.err.println("External process (" + commandPath + ") has not yet exited after " + (i+1) * SLEEP + "ms");
+            }
+        }
 
-        String message = new Scanner(out).useDelimiter("\\Z").next();
-        assertTrue(message.contains(errorMessage));
-
-        return exitValue;
+        // sqlcmd process has not finished, time out this tests
+        return -1;
     }
 
     private final String prompts = "sqlcmd did not fail as expected";
     public void testDDLModeBadCommandLineInput() throws Exception {
-        assertEquals(prompts, 255, callSQLcmdWithErrors("--servers=", "Invalid value for --servers"));
-        assertEquals(prompts, 255, callSQLcmdWithErrors("--port=", "Invalid value for --port"));
-        assertEquals(prompts, 255, callSQLcmdWithErrors("--user=", "Invalid value for --user"));
-        assertEquals(prompts, 255, callSQLcmdWithErrors("--password=", "Invalid value for --password"));
-        assertEquals(prompts, 255, callSQLcmdWithErrors("--kerberos=", "Invalid value for --kerberos"));
-        assertEquals(prompts, 255, callSQLcmdWithErrors("--output-format=", "Invalid value for --output-format"));
-        assertEquals(prompts, 255, callSQLcmdWithErrors("--stop-on-error=", "Invalid value for --stop-on-error"));
-        assertEquals(prompts, 255, callSQLcmdWithErrors("--ddl-file=", "Invalid value for --ddl-file"));
+        String errorMsgPrefix = "Missing input value for ";
+        assertEquals(prompts, 255, callSQLcmdWithErrors("--servers=", errorMsgPrefix + "--servers"));
+        assertEquals(prompts, 255, callSQLcmdWithErrors("--port=", errorMsgPrefix + "--port"));
+        assertEquals(prompts, 255, callSQLcmdWithErrors("--user=", errorMsgPrefix + "--user"));
+        assertEquals(prompts, 255, callSQLcmdWithErrors("--password=", errorMsgPrefix + "--password"));
+        assertEquals(prompts, 255, callSQLcmdWithErrors("--kerberos=", errorMsgPrefix + "--kerberos"));
+        assertEquals(prompts, 255, callSQLcmdWithErrors("--output-format=", errorMsgPrefix + "--output-format"));
+        assertEquals(prompts, 255, callSQLcmdWithErrors("--stop-on-error=", errorMsgPrefix + "--stop-on-error"));
+        assertEquals(prompts, 255, callSQLcmdWithErrors("--ddl-file=", errorMsgPrefix + "--ddl-file"));
 
         assertEquals(prompts, 255, callSQLcmdWithErrors("--ddl-file= haha.txt", "DDL file not found at path: haha.txt"));
         assertEquals(prompts, 255, callSQLcmdWithErrors("--output-format=haha", "Invalid value for --output-format"));
