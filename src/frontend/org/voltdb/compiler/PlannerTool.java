@@ -104,7 +104,36 @@ public class PlannerTool {
         return planSql(sqlIn, infer);
     }
 
-    AdHocPlannedStatement planSql(String sqlIn, StatementPartitioning partitioning) {
+    /**
+     * Stripped down compile that is used to plan default procs.
+     */
+    public synchronized CompiledPlan planSqlCore(String sql, StatementPartitioning partitioning) {
+        TrivialCostModel costModel = new TrivialCostModel();
+        DatabaseEstimates estimates = new DatabaseEstimates();
+        QueryPlanner planner = new QueryPlanner(
+            sql, "PlannerTool", "PlannerToolProc", m_cluster, m_database,
+            partitioning, m_hsql, estimates, true,
+            AD_HOC_JOINED_TABLE_LIMIT, costModel, null, null, DeterminismMode.FASTER);
+
+        CompiledPlan plan = null;
+        try {
+            // If not caching or there was no cache hit, do the expensive full planning.
+            planner.parse();
+            plan = planner.plan();
+            assert(plan != null);
+        }
+        catch (Exception e) {
+            throw new RuntimeException("Error compiling query: " + e.toString(), e);
+        }
+
+        if (plan == null) {
+            throw new RuntimeException("Null plan received in PlannerTool.planSql");
+        }
+
+        return plan;
+    }
+
+    synchronized AdHocPlannedStatement planSql(String sqlIn, StatementPartitioning partitioning) {
         CacheUse cacheUse = CacheUse.FAIL;
         if (m_plannerStats != null) {
             m_plannerStats.startStatsCollection();

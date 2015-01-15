@@ -97,7 +97,7 @@ public class LoadSinglepartitionTable extends VoltSystemProcedure
 
         // find the insert statement for this table
         String insertProcName = String.format("%s.insert", tableName);
-        Procedure p = ctx.getDatabase().getProcedures().get(insertProcName);
+        Procedure p = ctx.ensureDefaultProcLoaded(insertProcName);
         if (p == null) {
             throw new VoltAbortException(
                     String.format("Unable to locate auto-generated CRUD insert statement for table %s",
