@@ -88,6 +88,18 @@
             MatchCreateSingleQueryProcedure =
                 /(\s*(?:create\s+procedure\s+)(?:(?!create\s+(?:view|procedure))[\s\S])*\s+as\s+)((?:(?:\s\()*select)|insert|update|upsert|delete|truncate)\s+/gim,
             //   ($1----------------------------------------------------------------------------)($2------------------------------------------------------)
+
+            // LIMIT PARTITION ROWS <n> EXECUTE (DELETE ...)
+            // There are three keywords that may start statements to escape:
+            //
+            //   partition, execute, and delete
+            //
+            // They require escaping when they are immediately preceded by
+            // "limit", "rows <n>", and "execute(", respectively.
+            MatchLimitPartition = /(\s*limit\s+)(partition)/gim,
+            MatchRowcountExecute = /(\s*rows\s+\d+\s+)(execute)/gim,
+            MatchExecuteDelete = /(\s*execute\s*\(\s*)(delete)/gim,
+
             MatchCompoundKeywordDisguise = /#NON_BREAKING_SUFFIX_KEYWORD#/g,
             GenerateDisguisedCompoundKeywords = ' $1 #NON_BREAKING_SUFFIX_KEYWORD#$2 ';
 
@@ -153,6 +165,10 @@
             src = src.replace(MatchNonBreakingCompoundKeywords, GenerateDisguisedCompoundKeywords);
             src = src.replace(MatchCreateView, GenerateDisguisedCompoundKeywords);
             src = src.replace(MatchCreateSingleQueryProcedure, GenerateDisguisedCompoundKeywords);
+
+            src = src.replace(MatchLimitPartition, GenerateDisguisedCompoundKeywords);
+            src = src.replace(MatchRowcountExecute, GenerateDisguisedCompoundKeywords);
+            src = src.replace(MatchExecuteDelete, GenerateDisguisedCompoundKeywords);
 
             if (!src.match("^explain")) {
                 // Start a new statement before each remaining statement keyword.
@@ -259,7 +275,7 @@
 
         $("#runBTn").attr('disabled', 'disabled');
         $("#runBTn").addClass("graphOpacity");
-        
+
         var statements = CommandParser.parseUserInput(source);
         var start = (new Date()).getTime();
         var connectionQueue = connection.getQueue();
