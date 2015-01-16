@@ -67,8 +67,6 @@ import com.google_voltpatches.common.collect.ImmutableMap;
  */
 public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
 
-    private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
-
     static void compile(VoltCompiler compiler,
                         HSQLInterface hsql,
                         DatabaseEstimates estimates,
@@ -412,11 +410,12 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
             StatementPartitioning partitioning =
                 info.singlePartition ? StatementPartitioning.forceSP() :
                                        StatementPartitioning.forceMP();
-            StatementCompiler.compileFromSqlTextAndUpdateCatalog(compiler, hsql, catalog, db,
+            boolean cacheHit = StatementCompiler.compileFromSqlTextAndUpdateCatalog(compiler, hsql, catalog, db,
                     estimates, catalogStmt, stmt.getText(), stmt.getJoinOrder(),
                     detMode, partitioning);
 
-            if (partitioning.wasSpecifiedAsSingle()) {
+            // if this was a cache hit or specified single, don't worry about figuring out more partitioning
+            if (partitioning.wasSpecifiedAsSingle() || cacheHit) {
                 procWantsCommonPartitioning = false; // Don't try to infer what's already been asserted.
                 // The planner does not currently attempt to second-guess a plan declared as single-partition, maybe some day.
                 // In theory, the PartitioningForStatement would confirm the use of (only) a parameter as a partition key --
@@ -689,15 +688,15 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
         }
         assert(info != null);
 
-        Statement catalogStmt = procedure.getStatements().add(VoltDB.ANON_STMT_NAME);
-
         // ADD THE STATEMENT
-        StatementPartitioning partitioning =
-                info.singlePartition ? StatementPartitioning.forceSP() :
-                                       StatementPartitioning.forceMP();
 
         // add the statement to the catalog
+        Statement catalogStmt = procedure.getStatements().add(VoltDB.ANON_STMT_NAME);
+
         // compile the statement
+        StatementPartitioning partitioning =
+            info.singlePartition ? StatementPartitioning.forceSP() :
+                                   StatementPartitioning.forceMP();
         // default to FASTER detmode because stmt procs can't feed read output into writes
         StatementCompiler.compileFromSqlTextAndUpdateCatalog(compiler, hsql, catalog, db,
                 estimates, catalogStmt, procedureDescriptor.m_singleStmt,

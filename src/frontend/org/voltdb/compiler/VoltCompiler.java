@@ -2363,10 +2363,20 @@ public class VoltCompiler {
         return upgradedFromVersion;
     }
 
+    /**
+     * Note that a table changed in order to invalidate potential cached
+     * statements that reference the changed table.
+     */
     void markTableAsDirty(String tableName) {
         m_dirtyTables.add(tableName.toLowerCase());
     }
 
+    /**
+     * Key prefix includes attributes that make a cached statement usable if they match
+     *
+     * For example, if the SQL is the same, but the partitioning isn't, then the statements
+     * aren't actually interchangeable.
+     */
     String getKeyPrefix(StatementPartitioning partitioning, DeterminismMode detMode, String joinOrder) {
         // no caching for inferred yet
         if (partitioning.isInferred()) {
@@ -2392,6 +2402,7 @@ public class VoltCompiler {
     static long m_stmtCacheHits = 0;
     static long m_stmtCacheMisses = 0;
 
+    /** Look for a match from the previous catalog that matches the key + sql */
     Statement getCachedStatement(String keyPrefix, String sql) {
         String key = keyPrefix + sql;
 

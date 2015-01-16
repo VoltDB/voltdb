@@ -87,14 +87,16 @@ public abstract class StatementCompiler {
      * @param  detMode      Pass through parameter to QueryPlanner
      * @param  partitioning Partition info for statement
     */
-    static void compileStatementAndUpdateCatalog(VoltCompiler compiler, HSQLInterface hsql,
+    static boolean compileStatementAndUpdateCatalog(VoltCompiler compiler, HSQLInterface hsql,
             Catalog catalog, Database db, DatabaseEstimates estimates,
             Statement catalogStmt, VoltXMLElement xml, String stmt, String joinOrder,
             DeterminismMode detMode, StatementPartitioning partitioning)
     throws VoltCompiler.VoltCompilerException {
 
+        // if this key + sql is the same, then a cached stmt can be used
         String keyPrefix = compiler.getKeyPrefix(partitioning, detMode, joinOrder);
 
+        // if the key is cache-able, look for a previous statement
         if (keyPrefix != null) {
             Statement previousStatement = compiler.getCachedStatement(keyPrefix, stmt);
             // check if the stmt exists and if it's the same sql text
@@ -136,7 +138,7 @@ public abstract class StatementCompiler {
                     newFrag.setPlannodetree(oldFrag.getPlannodetree());
                 }
 
-                return;
+                return true;
             }
         }
 
@@ -294,14 +296,16 @@ public abstract class StatementCompiler {
         // Planner should have rejected with an exception any statement with an unrecognized type.
         int validType = catalogStmt.getQuerytype();
         assert(validType != QueryType.INVALID.getValue());
+
+        return false;
     }
 
-    static void compileFromSqlTextAndUpdateCatalog(VoltCompiler compiler, HSQLInterface hsql,
+    static boolean compileFromSqlTextAndUpdateCatalog(VoltCompiler compiler, HSQLInterface hsql,
             Catalog catalog, Database db, DatabaseEstimates estimates,
             Statement catalogStmt, String sqlText, String joinOrder,
             DeterminismMode detMode, StatementPartitioning partitioning)
     throws VoltCompiler.VoltCompilerException {
-        compileStatementAndUpdateCatalog(compiler, hsql, catalog, db, estimates, catalogStmt,
+        return compileStatementAndUpdateCatalog(compiler, hsql, catalog, db, estimates, catalogStmt,
                 null, sqlText, joinOrder, detMode, partitioning);
     }
 
