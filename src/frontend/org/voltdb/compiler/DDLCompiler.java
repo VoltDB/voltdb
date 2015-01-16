@@ -542,13 +542,30 @@ public class DDLCompiler {
 
     private void applyDiff(VoltXMLDiff stmtDiff)
     {
+        // record which tables changed
+        for (String tableName : stmtDiff.getChangedNodes().keySet()) {
+            assert(tableName.startsWith("table"));
+            tableName = tableName.substring("table".length());
+            m_compiler.markTableAsDirty(tableName);
+        }
+        for (VoltXMLElement tableXML : stmtDiff.getRemovedNodes()) {
+            String tableName = tableXML.attributes.get("name");
+            assert(tableName != null);
+            m_compiler.markTableAsDirty(tableName);
+        }
+        for (VoltXMLElement tableXML : stmtDiff.getAddedNodes()) {
+            String tableName = tableXML.attributes.get("name");
+            assert(tableName != null);
+            m_compiler.markTableAsDirty(tableName);
+        }
+
         m_schema.applyDiff(stmtDiff);
         // now go back and clean up anything that wasn't resolvable just by applying the diff
         // For now, this is:
         // - ensuring that the partition columns on tables are correct.  The hard
         // case is when the partition column is dropped from the table
 
-        // Each statement can affect at most one table.  Check to see if the table is listed in
+        // Each statement can change at most one table. Check to see if the table is listed in
         // the changed nodes
         if (stmtDiff.getChangedNodes().isEmpty()) {
             return;
@@ -836,6 +853,9 @@ public class DDLCompiler {
                 if (tableXML != null) {
                     tableXML.attributes.put("partitioncolumn", columnName.toUpperCase());
                     // Column validity check done by VoltCompiler in post-processing
+
+                    // mark the table as dirty for the purposes of caching sql statements
+                    m_compiler.markTableAsDirty(tableName);
                 }
                 else {
                     throw m_compiler.new VoltCompilerException(String.format(
@@ -893,6 +913,9 @@ public class DDLCompiler {
             VoltXMLElement tableXML = m_schema.findChild("table", tableName.toUpperCase());
             if (tableXML != null) {
                 tableXML.attributes.remove("partitioncolumn");
+
+                // mark the table as dirty for the purposes of caching sql statements
+                m_compiler.markTableAsDirty(tableName);
             }
             else {
                 throw m_compiler.new VoltCompilerException(String.format(
