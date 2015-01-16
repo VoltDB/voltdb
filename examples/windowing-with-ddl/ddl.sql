@@ -1,15 +1,15 @@
 -- Table that stores values that are timestamped and
 -- are partitioned by UUID.
 --
--- Limit table to 165,000 rows per partition.
+-- Limit table to 82,500 rows per partition.
 -- If an insert wil exceed the limit, then
 -- execute a delete statement that will purge
 -- the oldest 1500 rows that are older than 30s.
 --
--- With insert rate of 20k/s and 4 partitions,
+-- With insert rate of 20k/s and 8 partitions,
 -- this will store a bit more about 33s worth of rows.
 -- When the table is full, the row limit trigger will
--- attempt to delete the last 1.5s worth of data.
+-- attempt to delete the oldest 1500 rows of data.
 --
 -- Create a unique constraint (implemented as an index)
 -- that lets us evaluate the DELETE's ORDER BY and WHERE
@@ -20,7 +20,7 @@ CREATE TABLE timedata
   val BIGINT NOT NULL,
   update_ts TIMESTAMP NOT NULL,
   CONSTRAINT update_ts_uuid UNIQUE (update_ts, uuid),
-  CONSTRAINT row_limit LIMIT PARTITION ROWS 165000
+  CONSTRAINT row_limit LIMIT PARTITION ROWS 82500
     EXECUTE (DELETE FROM timedata
              WHERE update_ts
                    < TO_TIMESTAMP(SECOND, SINCE_EPOCH(SECOND, NOW) - 30)
