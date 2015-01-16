@@ -1294,7 +1294,6 @@ public class SQLCommand
         + "              [--output-format=(fixed|csv|tab)]\n"
         + "              [--output-skip-metadata]\n"
         + "              [--stop-on-error=(true|false)]\n"
-        + "              [--ddl-file=file]\n"
         + "              [--debug]\n"
         + "\n"
         + "[--servers=comma_separated_server_list]\n"
@@ -1334,8 +1333,7 @@ public class SQLCommand
         + "  Causes the utility to stop immediately or continue after detecting an error.\n"
         + "  In interactive mode, a value of \"true\" discards any unprocessed input\n"
         + "  and returns to the command prompt.\n"
-        + "[--ddl-file=file]\n"
-        + "  Fast DDL file loader with file path.\n"
+        + "\n"
         + "[--debug]\n"
         + "  Causes the utility to print out stack traces for all exceptions.\n"
         );

@@ -126,14 +126,6 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
 }
 
 bool InsertExecutor::executePurgeFragmentIfNeeded(PersistentTable** ptrToTable) {
-    InsertPlanNode *insertPlanNode = static_cast<InsertPlanNode*>(getPlanNode());
-    if (insertPlanNode->isMultiRowInsert()) {
-        // Multi-row inserts triggering a purge is not supported yet.
-        // This should not be difficult to support, just need to
-        // remove this check and add testing.
-        return true;
-    }
-
     PersistentTable* table = *ptrToTable;
     int tupleLimit = table->tupleLimit();
     int numTuples = table->visibleTupleCount();

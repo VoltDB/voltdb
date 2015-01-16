@@ -157,13 +157,13 @@ begin Statement           "A parameterized SQL statement embedded in a stored pr
   bool iscontentdeterministic "Is the result of this statement deterministic not accounting for row order"
   bool isorderdeterministic "Is the result of this statement deterministic even accounting for row order"
   string nondeterminismdetail "Explanation for any non-determinism in the statement result"
-  bool batched              ""
-  int paramnum              ""
   StmtParameter* parameters "The set of parameters to this SQL statement"
   PlanFragment* fragments   "The set of plan fragments used to execute this statement"
   int cost                  "The cost of this plan measured in arbitrary units"
   int seqscancount          "The number of sequential table scans in the plan"
   string explainplan        "A human-readable plan description"
+  string tablestouched      "A CSV list of tables this statement touches"
+  string cachekeyprefix     "Unique string that combines with the SQL text to identify a unique corresponding plan."
 end
 
 begin StmtParameter javaonly   "A parameter for a parameterized SQL statement"
@@ -171,7 +171,6 @@ begin StmtParameter javaonly   "A parameter for a parameterized SQL statement"
   int javatype                 "The Java class of the parameter (int/float/date/etc)"
   bool isarray                 "Is the parameter an array of value"
   int index                    "The index of the parameter in the set of statement parameters"
-  ProcParameter? procparameter "Reference back to original input parameter"
 end
 
 begin PlanFragment               "Instructions to the executor to execute part of an execution plan"
