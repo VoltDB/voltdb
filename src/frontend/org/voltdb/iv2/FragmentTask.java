@@ -156,6 +156,14 @@ public class FragmentTask extends TransactionTask
                 m_txnState.setBeginUndoToken(siteConnection.getLatestUndoToken());
             }
         }
+
+        // Ensure default procs loaded here
+        String procName = m_fragmentMsg.getProcedureName();
+        if (procName != null) {
+            // this will ensure proc is loaded
+            siteConnection.getProcedureRunner(procName);
+        }
+
         // ignore response.
         processFragmentTask(siteConnection);
         completeFragment();
@@ -182,6 +190,7 @@ public class FragmentTask extends TransactionTask
             // this will ensure proc is loaded
             siteConnection.getProcedureRunner(procName);
         }
+
         // @LoadMultipartitionTable also uses a default proc plan for insert into
         // replicated tables, so it needed to be awkwardly teased out here.
         if (procName.startsWith("@LoadMultipartitionTable")) {
