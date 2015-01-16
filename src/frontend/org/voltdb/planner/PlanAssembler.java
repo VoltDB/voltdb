@@ -24,8 +24,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.NavigableSet;
 import java.util.Set;
-import java.util.SortedSet;
 
 import org.json_voltpatches.JSONException;
 import org.voltdb.VoltType;
@@ -190,7 +190,7 @@ public class PlanAssembler {
      */
     private boolean tableListIncludesExportOnly(List<Table> tableList) {
         // list of all export tables (assume uppercase)
-        SortedSet<String> exportTables = CatalogUtil.getExportTableNames(m_catalogDb);
+        NavigableSet<String> exportTables = CatalogUtil.getExportTableNames(m_catalogDb);
 
         // this loop is O(number-of-joins * number-of-export-tables)
         // which seems acceptable if not great. Probably faster than

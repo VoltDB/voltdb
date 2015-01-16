@@ -99,6 +99,9 @@ public abstract class BuildDirectoryUtils {
         if (envPath != null) {
             File path = new File(envPath);
             path.mkdirs();
+            if (!path.exists() || !path.isDirectory() || !path.canRead() || !path.canWrite() || !path.canExecute()) {
+                throw new RuntimeException("Could not create test directory");
+            }
             return envPath;
         } else {
             return ".";

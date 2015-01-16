@@ -33,6 +33,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableSet;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeMap;
@@ -110,9 +111,12 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.ConstraintType;
 
 import com.google_voltpatches.common.base.Charsets;
+
 import java.io.StringWriter;
+
 import javax.xml.bind.Marshaller;
 import javax.xml.namespace.QName;
+
 import org.voltdb.compiler.deploymentfile.AdminModeType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
@@ -361,8 +365,8 @@ public abstract class CatalogUtil {
         return (columns);
     }
 
-    public static SortedSet<Table> getExportTables(Database db) {
-        SortedSet<Table> exportTables = new TreeSet<>();
+    public static NavigableSet<Table> getExportTables(Database db) {
+        NavigableSet<Table> exportTables = new TreeSet<>();
         for (Connector connector : db.getConnectors()) {
             for (ConnectorTableInfo tinfo : connector.getTableinfo()) {
                 exportTables.add(tinfo.getTable());
@@ -371,8 +375,8 @@ public abstract class CatalogUtil {
         return exportTables;
     }
 
-    public static SortedSet<String> getExportTableNames(Database db) {
-        SortedSet<String> exportTables = new TreeSet<>();
+    public static NavigableSet<String> getExportTableNames(Database db) {
+        NavigableSet<String> exportTables = new TreeSet<>();
         for (Connector connector : db.getConnectors()) {
             for (ConnectorTableInfo tinfo : connector.getTableinfo()) {
                 exportTables.add(tinfo.getTable().getTypeName());

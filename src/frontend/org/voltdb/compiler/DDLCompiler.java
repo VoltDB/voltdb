@@ -1115,7 +1115,7 @@ public class DDLCompiler {
 
     // Fill the table stuff in VoltDDLElementTracker from the VoltXMLElement tree at the end when
     // requested from the compiler
-    private void fillTrackerFromXML() throws VoltCompilerException
+    private void fillTrackerFromXML()
     {
         for (VoltXMLElement e : m_schema.children) {
             if (e.name.equals("table")) {

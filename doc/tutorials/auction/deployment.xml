@@ -12,7 +12,7 @@
         </configuration>
         <configuration group="foo" enabled="true" target="file">
             <property name="type">csv</property>
-            <property name="nonce">NingSucks</property>
+            <property name="nonce">Bids</property>
             <property name="period">3</property>
         </configuration>
     </export>
