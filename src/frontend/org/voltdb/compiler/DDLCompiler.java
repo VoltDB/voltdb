@@ -886,10 +886,10 @@ public class DDLCompiler {
                     parseCreateProcedureClauses(descriptor, statementMatcher.group(2));
 
             // track the defined procedure
-            m_tracker.add(descriptor);
+            String procName = m_tracker.add(descriptor);
 
             // add partitioning if specified
-            addProcedurePartitionInfo(className, partitionData, statement);
+            addProcedurePartitionInfo(procName, partitionData, statement);
 
             return true;
         }
