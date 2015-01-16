@@ -444,6 +444,26 @@ AS
     FROM T26
     WHERE gender = ? AND age = ?;
 
+-- This would not have worked before the PARTITION clause existed,
+-- e.g. a separate PARTITION PROCEDURE statement would be too late.
+CREATE PROCEDURE p4a
+ALLOW
+    admin
+PARTITION ON
+    TABLE
+        T26
+    COLUMN
+        age
+    PARAMETER
+        0
+AS
+    SELECT *
+    FROM T26
+    WHERE age = ? UNION ALL (
+        SELECT *
+        FROM T26
+        WHERE age = ?);
+
 CREATE PROCEDURE
 ALLOW
     admin
