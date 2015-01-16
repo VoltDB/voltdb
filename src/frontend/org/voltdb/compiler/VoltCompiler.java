@@ -117,7 +117,11 @@ public class VoltCompiler {
     // was this voltcompiler instantiated in a main(), or as part of VoltDB
     public final boolean standaloneCompiler;
 
+    // tables that change between the previous compile and this one
+    // used for Live-DDL caching of plans
     private Set<String> m_dirtyTables = new TreeSet<>();
+    // A collection of statements from the previous catalog
+    // used for Live-DDL caching of plans
     private Map<String, Statement> m_previousCatalogStmts = new HashMap<>();
 
     // feedback by filename
@@ -2097,14 +2101,14 @@ public class VoltCompiler {
                 Constants.UTF8ENCODING);
         compilerLog.trace("OLD DDL: " + oldDDL);
 
-        VoltCompilerStringReader cannonicalDDLReader = null;
+        VoltCompilerStringReader canonicalDDLReader = null;
         VoltCompilerStringReader newDDLReader = null;
 
         // Use the in-memory jarfile-provided class loader so that procedure
         // classes can be found and copied to the new file that gets written.
         ClassLoader originalClassLoader = m_classLoader;
         try {
-            cannonicalDDLReader = new VoltCompilerStringReader(VoltCompiler.AUTOGEN_DDL_FILE_NAME, oldDDL);
+            canonicalDDLReader = new VoltCompilerStringReader(VoltCompiler.AUTOGEN_DDL_FILE_NAME, oldDDL);
             newDDLReader = new VoltCompilerStringReader("ADHOCDDL.sql", newDDL);
 
             List<VoltCompilerReader> ddlList = new ArrayList<>();
@@ -2112,7 +2116,7 @@ public class VoltCompiler {
 
             m_classLoader = jarfile.getLoader();
             // Do the compilation work.
-            InMemoryJarfile jarOut = compileInternal(null, cannonicalDDLReader, oldCatalog, ddlList, jarfile);
+            InMemoryJarfile jarOut = compileInternal(null, canonicalDDLReader, oldCatalog, ddlList, jarfile);
             // Trim the compiler output to try to provide a concise failure
             // explanation
             if (jarOut != null) {
@@ -2135,8 +2139,8 @@ public class VoltCompiler {
             // Restore the original class loader
             m_classLoader = originalClassLoader;
 
-            if (cannonicalDDLReader != null) {
-                try { cannonicalDDLReader.close(); } catch (IOException ioe) {}
+            if (canonicalDDLReader != null) {
+                try { canonicalDDLReader.close(); } catch (IOException ioe) {}
             }
             if (newDDLReader != null) {
                 try { newDDLReader.close(); } catch (IOException ioe) {}
