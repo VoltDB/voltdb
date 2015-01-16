@@ -369,7 +369,7 @@ public class ExportManager
                 if (!m_generations.containsKey(catalogContext.m_uniqueId)) {
                     final ExportGeneration currentGeneration = new ExportGeneration(
                             catalogContext.m_uniqueId,
-                            exportOverflowDirectory, isRejoin);
+                            exportOverflowDirectory, isRejoin, true);
                     currentGeneration.setGenerationDrainRunnable(new GenerationDrainRunnable(currentGeneration));
                     currentGeneration.initializeGenerationFromCatalog(conn, m_hostId, m_messenger, partitions);
                     m_generations.put(catalogContext.m_uniqueId, currentGeneration);
@@ -498,7 +498,7 @@ public class ExportManager
         ExportGeneration newGeneration = null;
         try {
             newGeneration = new ExportGeneration(
-                    catalogContext.m_uniqueId, exportOverflowDirectory, false);
+                    catalogContext.m_uniqueId, exportOverflowDirectory, false, false);
             newGeneration.setGenerationDrainRunnable(new GenerationDrainRunnable(newGeneration));
             newGeneration.initializeGenerationFromCatalog(conn, m_hostId, m_messenger, partitions);
             m_generations.put(catalogContext.m_uniqueId, newGeneration);

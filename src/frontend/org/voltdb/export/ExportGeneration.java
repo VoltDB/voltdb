@@ -161,9 +161,10 @@ public class ExportGeneration {
      * @param exportOverflowDirectory
      * @throws IOException
      */
-    public ExportGeneration(long txnId, File exportOverflowDirectory, boolean isRejoin) throws IOException {
+    public ExportGeneration(long txnId, File exportOverflowDirectory, boolean isRejoin, boolean iscontinueing) throws IOException {
         m_timestamp = txnId;
         m_directory = new File(exportOverflowDirectory, Long.toString(txnId));
+        m_isContinueingGeneration = iscontinueing;
         if (!isRejoin) {
             if (!m_directory.mkdirs()) {
                 throw new IOException("Could not create " + m_directory);
@@ -175,7 +176,6 @@ public class ExportGeneration {
                 }
             }
         }
-        m_isContinueingGeneration = true;
         exportLog.info("Creating new export generation " + m_timestamp);
     }
 
@@ -330,9 +330,13 @@ public class ExportGeneration {
                             public void processResult(final int rc, final String path, Object ctx,
                                                       final List<String> children) {
                                 KeeperException.Code code = KeeperException.Code.get(rc);
+                                if (code == KeeperException.Code.SESSIONEXPIRED || code == KeeperException.Code.CONNECTIONLOSS) {
+                                    exportLog.info("Session expired for: " + path);
+                                    return;
+                                }
                                 if (code != KeeperException.Code.OK) {
                                     VoltDB.crashLocalVoltDB(
-                                            "Error in export leader election",
+                                            "Error in export leader election for: " + path,
                                             true,
                                             KeeperException.create(code));
                                 }
@@ -348,10 +352,7 @@ public class ExportGeneration {
                                 });
                             }
                         };
-                        m_zk.getChildren(
-                                m_leadersZKPath + "/" + partition,
-                                constructLeaderChildWatcher(partition),
-                                childrenCallback, null);
+                        m_zk.getChildren(m_leadersZKPath + "/" + partition, constructLeaderChildWatcher(partition), childrenCallback, null);
                     }
                 };
                 m_childUpdatingThread.execute(processRunnable);
