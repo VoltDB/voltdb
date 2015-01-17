@@ -93,6 +93,17 @@ public abstract class StatementCompiler {
             DeterminismMode detMode, StatementPartitioning partitioning)
     throws VoltCompiler.VoltCompilerException {
 
+        // Cleanup whitespace newlines for catalog compatibility
+        // and to make statement parsing easier.
+        stmt = stmt.replaceAll("\n", " ");
+        stmt = stmt.trim();
+        compiler.addInfo("Compiling Statement: " + stmt);
+
+        // put the data in the catalog that we have
+        if (!stmt.endsWith(";")) {
+            stmt += ";";
+        }
+
         // if this key + sql is the same, then a cached stmt can be used
         String keyPrefix = compiler.getKeyPrefix(partitioning, detMode, joinOrder);
 
@@ -142,11 +153,7 @@ public abstract class StatementCompiler {
             }
         }
 
-        // Cleanup whitespace newlines for catalog compatibility
-        // and to make statement parsing easier.
-        stmt = stmt.replaceAll("\n", " ");
-        stmt = stmt.trim();
-        compiler.addInfo("Compiling Statement: " + stmt);
+
 
         // determine the type of the query
         QueryType qtype = QueryType.getFromSQL(stmt);
@@ -157,10 +164,7 @@ public abstract class StatementCompiler {
         // might be null if not cacheable
         catalogStmt.setCachekeyprefix(keyPrefix);
 
-        // put the data in the catalog that we have
-        if (!stmt.endsWith(";")) {
-            stmt += ";";
-        }
+
         catalogStmt.setSqltext(stmt);
         catalogStmt.setSinglepartition(partitioning.wasSpecifiedAsSingle());
 
