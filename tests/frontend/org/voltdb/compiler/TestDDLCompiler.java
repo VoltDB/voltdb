@@ -35,12 +35,6 @@ import junit.framework.TestCase;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
-import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
-import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Table;
-import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
-import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.utils.MiscUtils;
 
 public class TestDDLCompiler extends TestCase {
@@ -169,24 +163,11 @@ public class TestDDLCompiler extends TestCase {
 
         // similar schema with not null and unique constraints (should have no warnings)
         String schema2 =  "create table t0 (id bigint not null, primary key (id));\n";
-
-        // boilerplate for making a project
-        final String simpleProject =
-                "<?xml version=\"1.0\"?>\n" +
-                "<project><database><schemas>" +
-                "<schema path='%s' />" +
-                "</schemas></database></project>";
-
         // RUN EXPECTING WARNINGS
         String schemaPath = MiscUtils.writeStringToTempFilePath(schema1);
-
-        String projectPath = MiscUtils.writeStringToTempFilePath(
-                String.format(simpleProject, schemaPath));
-
-
         // compile successfully (but with two warnings hopefully)
         VoltCompiler compiler = new VoltCompiler();
-        boolean success = compiler.compileWithProjectXML(projectPath, jarOut.getPath());
+        boolean success = compiler.compileFromDDL(jarOut.getPath(), schemaPath);
         assertTrue(success);
 
         // verify the warnings exist
@@ -209,15 +190,11 @@ public class TestDDLCompiler extends TestCase {
         // RUN EXPECTING NO WARNINGS
         schemaPath = MiscUtils.writeStringToTempFilePath(schema2);
 
-        projectPath = MiscUtils.writeStringToTempFilePath(
-                String.format(simpleProject, schemaPath));
-
-
         // don't reinitialize the compiler to test that it can be re-called
         //compiler = new VoltCompiler();
 
         // compile successfully with no warnings
-        success = compiler.compileWithProjectXML(projectPath, jarOut.getPath());
+        success = compiler.compileFromDDL(jarOut.getPath(), schemaPath);
         assertTrue(success);
 
         // verify no warnings
@@ -237,14 +214,7 @@ public class TestDDLCompiler extends TestCase {
 
         // compile and fail on bad import
         VoltCompiler compiler = new VoltCompiler();
-        try {
-            return compiler.compileFromDDL(jarOut.getPath(), schemaPath);
-        }
-        catch (VoltCompilerException e) {
-            e.printStackTrace();
-            fail();
-            return false;
-        }
+        return compiler.compileFromDDL(jarOut.getPath(), schemaPath);
     }
 
     public void testExtraClasses() {
@@ -278,17 +248,9 @@ public class TestDDLCompiler extends TestCase {
 
         // compile and fail on bad import
         VoltCompiler compiler = new VoltCompiler();
-        try {
-            boolean rslt = compiler.compileFromDDL(jarOut.getPath(), schemaPath1, schemaPath2);
-            assertTrue(checkWarn^compiler.m_warnings.isEmpty());
-            return rslt;
-        }
-        catch (VoltCompilerException e) {
-            e.printStackTrace();
-            fail();
-            assertTrue(checkWarn^compiler.m_warnings.isEmpty());
-            return false;
-        }
+        boolean rslt = compiler.compileFromDDL(jarOut.getPath(), schemaPath1, schemaPath2);
+        assertTrue(checkWarn^compiler.m_warnings.isEmpty());
+        return rslt;
     }
 
     public void testExtraClassesFrom2Ddls() {
@@ -376,22 +338,11 @@ public class TestDDLCompiler extends TestCase {
         };
 
         int expectWarning[] = { 2, 0, 0, 1, 2 };
-        // boilerplate for making a project
-        final String simpleProject =
-                "<?xml version=\"1.0\"?>\n" +
-                "<project><database><schemas>" +
-                "<schema path='%s' />" +
-                "</schemas></database></project>";
-
         VoltCompiler compiler = new VoltCompiler();
         for (int ii = 0; ii < schema.length; ++ii) {
             String schemaPath = MiscUtils.writeStringToTempFilePath(schema[ii]);
-
-            String projectPath = MiscUtils.writeStringToTempFilePath(
-                    String.format(simpleProject, schemaPath));
-
-            // compile successfully (but with two warnings hopefully)
-            boolean success = compiler.compileWithProjectXML(projectPath, jarOut.getPath());
+            // compile successfully (but with the expected number of warnings hopefully)
+            boolean success = compiler.compileFromDDL(jarOut.getPath(), schemaPath);
             assertTrue(success);
 
             // verify the warnings exist
@@ -417,13 +368,14 @@ public class TestDDLCompiler extends TestCase {
         }
     }
 
-    public void testNullAnnotation() throws IOException {
-
-        Catalog catalog  = new TPCCProjectBuilder().createTPCCSchemaCatalog();
-        Database catalog_db = catalog.getClusters().get("cluster").getDatabases().get("database");
-
-        for(Table t : catalog_db.getTables()) {
-            assertNotNull(((TableAnnotation)t.getAnnotation()).ddl);
-        }
-    }
+    //FIXME: restore this when createTPCCSchemaOriginalDatabase gets re-implemented more directly
+    // -- through a CatalogBuilder/VoltCompiler fast path that preserves DDLCompiler annotations.
+    //public void testNullAnnotation() throws IOException {
+    //    Database catalog_db = TPCCProjectBuilder.createTPCCSchemaOriginalDatabase();
+    //    for (Table t : catalog_db.getTables()) {
+    //        TableAnnotation annotation = (TableAnnotation)t.getAnnotation();
+    //        assertNotNull(annotation);
+    //        assertNotNull(annotation.ddl);
+    //    }
+    //}
 }

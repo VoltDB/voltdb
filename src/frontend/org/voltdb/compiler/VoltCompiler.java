@@ -61,6 +61,7 @@ import org.voltdb.ProcInfoData;
 import org.voltdb.RealVoltDB;
 import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltDBInterface;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
@@ -119,7 +120,7 @@ public class VoltCompiler {
     public final static boolean DEBUG_MODE = System.getProperties().contains("compilerdebug");
 
     // was this voltcompiler instantiated in a main(), or as part of VoltDB
-    public final boolean standaloneCompiler;
+    private final boolean m_standaloneCompiler;
 
     // feedback by filename
     ArrayList<Feedback> m_infos = new ArrayList<Feedback>();
@@ -349,14 +350,16 @@ public class VoltCompiler {
     }
 
     /** Passing true to constructor indicates the compiler is being run in standalone mode */
-    public VoltCompiler(boolean standaloneCompiler) {
-        this.standaloneCompiler = standaloneCompiler;
+    private VoltCompiler(boolean standaloneCompiler) {
+        m_standaloneCompiler = standaloneCompiler;
     }
 
     /** Parameterless constructor is for embedded VoltCompiler use only. */
     public VoltCompiler() {
-        this(false);
+        m_standaloneCompiler = false;
     }
+
+    public boolean isStandAloneCompiler() { return m_standaloneCompiler; }
 
     public boolean hasErrors() {
         return m_errors.size() > 0;
@@ -381,7 +384,7 @@ public class VoltCompiler {
     void addInfo(final String msg, final int lineNo) {
         final Feedback fb = new Feedback(Severity.INFORMATIONAL, msg, m_currentFilename, lineNo);
         m_infos.add(fb);
-        if (standaloneCompiler) {
+        if (m_standaloneCompiler) {
             compilerLog.info(fb.getLogString());
         }
         else {
@@ -412,9 +415,20 @@ public class VoltCompiler {
     public boolean compileFromDDL(
             final String jarOutputPath,
             final String... ddlFilePaths)
-                    throws VoltCompilerException
     {
-        return compileWithProjectXML(null, jarOutputPath, ddlFilePaths);
+        if (ddlFilePaths.length == 0) {
+            compilerLog.error("At least one DDL file is required.");
+            return false;
+        }
+        List<VoltCompilerReader> ddlReaderList;
+        try {
+            ddlReaderList = DDLPathsToReaderList(ddlFilePaths);
+        }
+        catch (VoltCompilerException e) {
+            compilerLog.error("Unable to open DDL file.", e);
+            return false;
+        }
+        return compileInternalToFile(jarOutputPath, ddlReaderList, null);
     }
 
     /**
@@ -431,33 +445,29 @@ public class VoltCompiler {
             final String jarOutputPath,
             final String... ddlFilePaths)
     {
+        assert(projectFileURL != null);
         VoltCompilerReader projectReader = null;
-        if (projectFileURL != null) {
-            try {
-                projectReader = new VoltCompilerFileReader(projectFileURL);
-            }
-            catch (IOException e) {
-                compilerLog.error(String.format(
-                        "Failed to initialize reader for project file \"%s\".",
-                        projectFileURL));
-                return false;
-            }
+        try {
+            projectReader = new VoltCompilerFileReader(projectFileURL);
         }
-        else if (ddlFilePaths.length == 0) {
-            compilerLog.error(String.format(
-                    "At least one DDL file is required if no project file is specified.",
-                    projectFileURL));
+        catch (IOException e) {
+            compilerLog.error("Failed to initialize reader for project file \"" +
+                    projectFileURL + "\".");
             return false;
         }
-        List<VoltCompilerReader> ddlReaderList;
         try {
-            ddlReaderList = DDLPathsToReaderList(ddlFilePaths);
+            List<VoltCompilerReader> ddlReaderList = DDLPathsToReaderList(ddlFilePaths);
+            return compileWithProjectInternalToFile(projectReader, jarOutputPath, ddlReaderList, null);
         }
         catch (VoltCompilerException e) {
             compilerLog.error("Unable to open DDL file.", e);
-            return false;
         }
-        return compileInternalToFile(projectReader, jarOutputPath, ddlReaderList, null);
+        finally {
+            try {
+                projectReader.close();
+            } catch (IOException e) { }
+        }
+        return false;
     }
 
     /**
@@ -479,7 +489,7 @@ public class VoltCompiler {
             compilerLog.error("Failed to add DDL file to empty in-memory jar.");
             return false;
         }
-        return compileInternalToFile(null, jarOutputPath, ddlReaderList, jarFile);
+        return compileInternalToFile(jarOutputPath, ddlReaderList, jarFile);
     }
 
     private static void addBuildInfo(final InMemoryJarfile jarOutput) {
@@ -508,10 +518,9 @@ public class VoltCompiler {
         autoGenCompiler.m_classLoader = origJarFile.getLoader();
         List<VoltCompilerReader> autogenReaderList = new ArrayList<VoltCompilerReader>(1);
         autogenReaderList.add(new VoltCompilerJarFileReader(origJarFile, AUTOGEN_DDL_FILE_NAME));
-        DatabaseType autoGenDatabase = getProjectDatabase(null);
         InMemoryJarfile autoGenJarOutput = new InMemoryJarfile();
         autoGenCompiler.m_currentFilename = AUTOGEN_DDL_FILE_NAME;
-        Catalog autoGenCatalog = autoGenCompiler.compileCatalogInternal(autoGenDatabase,
+        Catalog autoGenCatalog = autoGenCompiler.compileCatalogInternal(
                 autogenReaderList, autoGenJarOutput);
         FilteredCatalogDiffEngine diffEng = new FilteredCatalogDiffEngine(origCatalog, autoGenCatalog);
         String diffCmds = diffEng.commands();
@@ -533,7 +542,7 @@ public class VoltCompiler {
      * @param jarOutputRet The in-memory jar to populate or null if the caller doesn't provide one.
      * @return true if successful
      */
-    private boolean compileInternalToFile(
+    private boolean compileWithProjectInternalToFile(
             final VoltCompilerReader projectReader,
             final String jarOutputPath,
             final List<VoltCompilerReader> ddlReaderList,
@@ -544,7 +553,7 @@ public class VoltCompiler {
             return false;
         }
 
-        InMemoryJarfile jarOutput = compileInternal(projectReader, ddlReaderList, jarOutputRet);
+        InMemoryJarfile jarOutput = compileInternalWithProject(projectReader, ddlReaderList, jarOutputRet);
         if (jarOutput == null) {
             return false;
         }
@@ -562,32 +571,62 @@ public class VoltCompiler {
     }
 
     /**
-     * Internal method for compiling with and without a project.xml file or DDL files.
+     * Internal method for compiling DDL files without a project.xml file.
+     *
+     * @param jarOutputPath The location to put the finished JAR to.
+     * @param ddlReaderList The list of DDL file readers to compile (when no project is provided).
+     * @param jarOutputRet The in-memory jar to populate or null if the caller doesn't provide one.
+     * @return true if successful
+     */
+    private boolean compileInternalToFile(
+            final String jarOutputPath,
+            final List<VoltCompilerReader> ddlReaderList,
+            final InMemoryJarfile jarOutputRet)
+    {
+        if (jarOutputPath == null) {
+            addErr("The output jar path is null.");
+            return false;
+        }
+
+        InMemoryJarfile jarOutput = compileInternal(ddlReaderList, jarOutputRet);
+        if (jarOutput == null) {
+            return false;
+        }
+
+        try {
+            jarOutput.writeToFile(new File(jarOutputPath)).run();
+        }
+        catch (final Exception e) {
+            e.printStackTrace();
+            addErr("Error writing catalog jar to disk: " + e.getMessage());
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Internal method for compiling with a project.xml file or DDL files.
      *
      * @param projectReader Reader for project file or null if a project file is not used.
-     * @param ddlFilePaths The list of DDL files to compile (when no project is provided).
+     * @param ddlReaderList The list of DDL file readers to compile (when no project is provided).
      * @param jarOutputRet The in-memory jar to populate or null if the caller doesn't provide one.
      * @return The InMemoryJarfile containing the compiled catalog if
      * successful, null if not.  If the caller provided an InMemoryJarfile, the
      * return value will be the same object, not a copy.
      */
     private InMemoryJarfile compileInternal(
-            final VoltCompilerReader projectReader,
             final List<VoltCompilerReader> ddlReaderList,
             final InMemoryJarfile jarOutputRet)
     {
-        // Expect to have either >1 ddl file or a project file.
-        assert(ddlReaderList.size() > 0 || projectReader != null);
+        // Expect to have > 1 ddl file.
+        assert(ddlReaderList != null);
+        assert( ! ddlReaderList.isEmpty());
         // Make a temporary local output jar if one wasn't provided.
         final InMemoryJarfile jarOutput = (jarOutputRet != null
                                                 ? jarOutputRet
                                                 : new InMemoryJarfile());
-        m_projectFileURL = (projectReader != null ? projectReader.getPath() : null);
-
-        if (m_projectFileURL == null && (ddlReaderList == null || ddlReaderList.isEmpty())) {
-            addErr("One or more DDL files are required.");
-            return null;
-        }
+        m_projectFileURL = null;
+        m_currentFilename = "null";
 
         // clear out the warnings and errors
         m_warnings.clear();
@@ -595,15 +634,21 @@ public class VoltCompiler {
         m_errors.clear();
 
         // do all the work to get the catalog
-        DatabaseType database = getProjectDatabase(projectReader);
-        if (database == null) {
-            return null;
-        }
-        final Catalog catalog = compileCatalogInternal(database, ddlReaderList, jarOutput);
+        final Catalog catalog = compileCatalogInternal(ddlReaderList, jarOutput);
         if (catalog == null) {
             return null;
         }
 
+        return writeCatalog(jarOutput, catalog);
+    }
+
+    /**
+     * @param jarOutput
+     * @param catalog
+     * @return
+     */
+    private InMemoryJarfile writeCatalog(final InMemoryJarfile jarOutput,
+            final Catalog catalog) {
         // Build DDL from Catalog Data
         m_canonicalDDL = CatalogSchemaTools.toSchema(catalog, m_importLines);
 
@@ -614,7 +659,7 @@ public class VoltCompiler {
             File file = null;
 
             // write to working dir when using VoltCompiler directly
-            if (standaloneCompiler) {
+            if (m_standaloneCompiler) {
                 file = new File("catalog-report.html");
             }
             else {
@@ -678,6 +723,45 @@ public class VoltCompiler {
     }
 
     /**
+     * Internal method for compiling with and without a project.xml file or DDL files.
+     *
+     * @param projectReader Reader for project file or null if a project file is not used.
+     * @param ddlReaderList The list of DDL file readers to compile (when no project is provided).
+     * @param jarOutputRet The in-memory jar to populate or null if the caller doesn't provide one.
+     * @return The InMemoryJarfile containing the compiled catalog if
+     * successful, null if not.  If the caller provided an InMemoryJarfile, the
+     * return value will be the same object, not a copy.
+     */
+    private InMemoryJarfile compileInternalWithProject(
+            final VoltCompilerReader projectReader,
+            final List<VoltCompilerReader> ddlReaderList,
+            final InMemoryJarfile jarOutputRet)
+    {
+        // Make a temporary local output jar if one wasn't provided.
+        final InMemoryJarfile jarOutput = (jarOutputRet != null
+                                                ? jarOutputRet
+                                                : new InMemoryJarfile());
+        m_projectFileURL = projectReader.getPath();
+        // do all the work to get the catalog
+        DatabaseType database = getProjectDatabase(projectReader);
+        if (database == null) {
+            return null;
+        }
+
+        // clear out the warnings and errors
+        m_warnings.clear();
+        m_infos.clear();
+        m_errors.clear();
+
+        final Catalog catalog = compileCatalogInternalWithProject(database, ddlReaderList, jarOutput);
+        if (catalog == null) {
+            return null;
+        }
+
+        return writeCatalog(jarOutput, catalog);
+    }
+
+    /**
      * Get textual explain plan info for each plan from the
      * catalog to be shoved into the catalog jarfile.
      */
@@ -729,33 +813,11 @@ public class VoltCompiler {
     public Catalog compileCatalogFromDDL(final String... ddlFilePaths)
             throws VoltCompilerException
     {
-        DatabaseType database = getProjectDatabase(null);
+        // No project.xml - create a stub object.
+        m_currentFilename = "null";
+        List<VoltCompilerReader> ddlReaderList = DDLPathsToReaderList(ddlFilePaths);
         InMemoryJarfile jarOutput = new InMemoryJarfile();
-        return compileCatalogInternal(database, DDLPathsToReaderList(ddlFilePaths), jarOutput);
-    }
-
-    /**
-     * Compile from project file (without explicit DDL file paths).
-     * @param projectFileURL  project file URL/path
-     * @return  compiled catalog
-     * @throws VoltCompilerException
-     */
-    public Catalog compileCatalogFromProject(final String projectFileURL)
-            throws VoltCompilerException
-    {
-        VoltCompilerReader projectReader = null;
-        try {
-            projectReader = new VoltCompilerFileReader(projectFileURL);
-        }
-        catch (IOException e) {
-            throw new VoltCompilerException(String.format(
-                    "Unable to create project reader for \"%s\": %s",
-                    projectFileURL, e.getMessage()));
-        }
-        DatabaseType database = getProjectDatabase(projectReader);
-        InMemoryJarfile jarOutput = new InMemoryJarfile();
-        // Provide an empty DDL reader list.
-        return compileCatalogInternal(database, DDLPathsToReaderList(), jarOutput);
+        return compileCatalogInternal(ddlReaderList, jarOutput);
     }
 
     /**
@@ -831,6 +893,47 @@ public class VoltCompiler {
      * @return true if successful
      */
     private Catalog compileCatalogInternal(
+            final List<VoltCompilerReader> ddlReaderList,
+            final InMemoryJarfile jarOutput)
+    {
+        // Compiler instance is reusable. Clear the cache.
+        cachedAddedClasses.clear();
+
+        m_catalog = new Catalog();
+        // Initialize the catalog for one cluster
+        m_catalog.execute("add / clusters cluster");
+        m_catalog.getClusters().get("cluster").setSecurityenabled(false);
+
+        // shutdown and make a new hsqldb
+        try {
+            final ArrayList<Class<?>> classDependencies = new ArrayList<Class<?>>();
+            final VoltDDLElementTracker voltDdlTracker = new VoltDDLElementTracker(this);
+
+            Database db = initCatalogDatabase();
+            // shutdown and make a new hsqldb
+            HSQLInterface hsql = HSQLInterface.loadHsqldb();
+            compileDatabase(db, hsql, voltDdlTracker, ddlReaderList, null, classDependencies,
+                            DdlProceduresToLoad.ALL_DDL_PROCEDURES, jarOutput);
+        } catch (final VoltCompilerException e) {
+            return null;
+        }
+
+        // add epoch info to catalog
+        final int epoch = (int)(TransactionIdManager.getEpoch() / 1000);
+        m_catalog.getClusters().get("cluster").setLocalepoch(epoch);
+
+        return m_catalog;
+    }
+
+    /**
+     * Internal method for compiling the catalog.
+     *
+     * @param database catalog-related info parsed from a project file
+     * @param ddlReaderList Reader objects for ddl files.
+     * @param jarOutput The in-memory jar to populate or null if the caller doesn't provide one.
+     * @return true if successful
+     */
+    private Catalog compileCatalogInternalWithProject(
             final DatabaseType database,
             final List<VoltCompilerReader> ddlReaderList,
             final InMemoryJarfile jarOutput)
@@ -843,18 +946,105 @@ public class VoltCompiler {
         m_catalog.execute("add / clusters cluster");
         m_catalog.getClusters().get("cluster").setSecurityenabled(false);
 
-        if (database != null) {
-            final String databaseName = database.getName();
-            // schema does not verify that the database is named "database"
-            if (databaseName.equals("database") == false) {
-                return null; // error messaging handled higher up
+        final ArrayList<Class<?>> classDependencies = new ArrayList<Class<?>>();
+        final VoltDDLElementTracker voltDdlTracker = new VoltDDLElementTracker(this);
+
+        Database db = initCatalogDatabase();
+
+        try {
+            /**
+             * Load a ddl file with full support for VoltDB extensions (partitioning, procedures,
+             * export), AND full support for input via a project xml file's "database" node.
+             */
+            // schemas/schema
+            if (database.getSchemas() != null) {
+                for (SchemasType.Schema schema : database.getSchemas().getSchema()) {
+                    compilerLog.l7dlog( Level.INFO, LogKeys.compiler_VoltCompiler_CatalogPath.name(),
+                                        new Object[] {schema.getPath()}, null);
+                    // Prefer to use the in-memory copy.
+                    // All ddl.sql is placed in the jar root folder.
+                    File schemaFile = new File(schema.getPath());
+                    String schemaName = schemaFile.getName();
+                    if (jarOutput != null && jarOutput.containsKey(schemaName)) {
+                        ddlReaderList.add(new VoltCompilerJarFileReader(jarOutput, schemaName));
+                    }
+                    else {
+                        ddlReaderList.add(createDDLFileReader(schema.getPath()));
+                    }
+                }
             }
+
+            // groups/group (alias for roles/role).
+            if (database.getGroups() != null) {
+                for (GroupsType.Group group : database.getGroups().getGroup()) {
+                    org.voltdb.catalog.Group catGroup = db.getGroups().add(group.getName());
+                    catGroup.setSql(group.isAdhoc());
+                    catGroup.setSqlread(catGroup.getSql());
+                    catGroup.setDefaultproc(group.isDefaultproc() || catGroup.getSql());
+                    catGroup.setDefaultprocread(
+                            group.isDefaultprocread() ||
+                            catGroup.getDefaultproc() ||
+                            catGroup.getSqlread());
+
+                    if (group.isSysproc()) {
+                        catGroup.setAdmin(true);
+                        catGroup.setSql(true);
+                        catGroup.setSqlread(true);
+                        catGroup.setDefaultproc(true);
+                        catGroup.setDefaultprocread(true);
+                    }
+                }
+            }
+
+            // roles/role (alias for groups/group).
+            if (database.getRoles() != null) {
+                for (RolesType.Role role : database.getRoles().getRole()) {
+                    org.voltdb.catalog.Group catGroup = db.getGroups().add(role.getName());
+                    catGroup.setSql(role.isAdhoc());
+                    catGroup.setSqlread(catGroup.getSql());
+                    catGroup.setDefaultproc(role.isDefaultproc() || catGroup.getSql());
+                    catGroup.setDefaultprocread(
+                            role.isDefaultprocread() ||
+                            catGroup.getDefaultproc() ||
+                            catGroup.getSqlread());
+
+                    if (role.isSysproc()) {
+                        catGroup.setAdmin(true);
+                        catGroup.setSql(true);
+                        catGroup.setSqlread(true);
+                        catGroup.setDefaultproc(true);
+                        catGroup.setDefaultprocread(true);
+                    }
+                }
+            }
+
+            // procedures/procedure
+            if (database.getProcedures() != null) {
+                for (ProceduresType.Procedure proc : database.getProcedures().getProcedure()) {
+                    voltDdlTracker.add(getProcedure(proc));
+                }
+            }
+
+            // classdependencies/classdependency
+            if (database.getClassdependencies() != null) {
+                for (Classdependency dep : database.getClassdependencies().getClassdependency()) {
+                    classDependencies.add(getClassDependency(dep));
+                }
+            }
+
+            // partitions/table
+            if (database.getPartitions() != null) {
+                for (PartitionsType.Partition table : database.getPartitions().getPartition()) {
+                    voltDdlTracker.addPartition(table.getTable(), table.getColumn());
+                }
+            }
+
             // shutdown and make a new hsqldb
-            try {
-                compileDatabaseNode(database, ddlReaderList, jarOutput);
-            } catch (final VoltCompilerException e) {
-                return null;
-            }
+            HSQLInterface hsql = HSQLInterface.loadHsqldb();
+            compileDatabase(db, hsql, voltDdlTracker, ddlReaderList, database.getExport(),
+                    classDependencies, DdlProceduresToLoad.ALL_DDL_PROCEDURES, jarOutput);
+        } catch (final VoltCompilerException e) {
+            return null;
         }
         assert(m_catalog != null);
 
@@ -943,108 +1133,6 @@ public class VoltCompiler {
         compileDatabase(db, hsql, voltDdlTracker, ddlReaderList, null, null, whichProcs, jarOutput);
 
         return m_catalog;
-    }
-
-    /**
-     * Load a ddl file with full support for VoltDB extensions (partitioning, procedures,
-     * export), AND full support for input via a project xml file's "database" node.
-     * @param database catalog-related info parsed from a project file
-     * @param ddlReaderList Reader objects for ddl files.
-     * @param jarOutput The in-memory jar to populate or null if the caller doesn't provide one.
-     * @throws VoltCompilerException
-     */
-    private void compileDatabaseNode(
-            final DatabaseType database,
-            final List<VoltCompilerReader> ddlReaderList,
-            final InMemoryJarfile jarOutput)
-                    throws VoltCompilerException
-    {
-        final ArrayList<Class<?>> classDependencies = new ArrayList<Class<?>>();
-        final VoltDDLElementTracker voltDdlTracker = new VoltDDLElementTracker(this);
-
-        Database db = initCatalogDatabase();
-
-        // schemas/schema
-        if (database.getSchemas() != null) {
-            for (SchemasType.Schema schema : database.getSchemas().getSchema()) {
-                compilerLog.l7dlog( Level.INFO, LogKeys.compiler_VoltCompiler_CatalogPath.name(),
-                                    new Object[] {schema.getPath()}, null);
-                // Prefer to use the in-memory copy.
-                // All ddl.sql is placed in the jar root folder.
-                File schemaFile = new File(schema.getPath());
-                String schemaName = schemaFile.getName();
-                if (jarOutput != null && jarOutput.containsKey(schemaName)) {
-                    ddlReaderList.add(new VoltCompilerJarFileReader(jarOutput, schemaName));
-                }
-                else {
-                    ddlReaderList.add(createDDLFileReader(schema.getPath()));
-                }
-            }
-        }
-
-        // groups/group (alias for roles/role).
-        if (database.getGroups() != null) {
-            for (GroupsType.Group group : database.getGroups().getGroup()) {
-                org.voltdb.catalog.Group catGroup = db.getGroups().add(group.getName());
-                catGroup.setSql(group.isAdhoc());
-                catGroup.setSqlread(catGroup.getSql());
-                catGroup.setDefaultproc(group.isDefaultproc() || catGroup.getSql());
-                catGroup.setDefaultprocread(group.isDefaultprocread() || catGroup.getDefaultproc() || catGroup.getSqlread());
-
-                if (group.isSysproc()) {
-                    catGroup.setAdmin(true);
-                    catGroup.setSql(true);
-                    catGroup.setSqlread(true);
-                    catGroup.setDefaultproc(true);
-                    catGroup.setDefaultprocread(true);
-                }
-            }
-        }
-
-        // roles/role (alias for groups/group).
-        if (database.getRoles() != null) {
-            for (RolesType.Role role : database.getRoles().getRole()) {
-                org.voltdb.catalog.Group catGroup = db.getGroups().add(role.getName());
-                catGroup.setSql(role.isAdhoc());
-                catGroup.setSqlread(catGroup.getSql());
-                catGroup.setDefaultproc(role.isDefaultproc() || catGroup.getSql());
-                catGroup.setDefaultprocread(role.isDefaultprocread() || catGroup.getDefaultproc() || catGroup.getSqlread());
-
-                if (role.isSysproc()) {
-                    catGroup.setAdmin(true);
-                    catGroup.setSql(true);
-                    catGroup.setSqlread(true);
-                    catGroup.setDefaultproc(true);
-                    catGroup.setDefaultprocread(true);
-                }
-            }
-        }
-
-        // procedures/procedure
-        if (database.getProcedures() != null) {
-            for (ProceduresType.Procedure proc : database.getProcedures().getProcedure()) {
-                voltDdlTracker.add(getProcedure(proc));
-            }
-        }
-
-        // classdependencies/classdependency
-        if (database.getClassdependencies() != null) {
-            for (Classdependency dep : database.getClassdependencies().getClassdependency()) {
-                classDependencies.add(getClassDependency(dep));
-            }
-        }
-
-        // partitions/table
-        if (database.getPartitions() != null) {
-            for (PartitionsType.Partition table : database.getPartitions().getPartition()) {
-                voltDdlTracker.addPartition(table.getTable(), table.getColumn());
-            }
-        }
-
-        // shutdown and make a new hsqldb
-        HSQLInterface hsql = HSQLInterface.loadHsqldb();
-        compileDatabase(db, hsql, voltDdlTracker, ddlReaderList, database.getExport(), classDependencies,
-                        DdlProceduresToLoad.ALL_DDL_PROCEDURES, jarOutput);
     }
 
     /**
@@ -2089,11 +2177,7 @@ public class VoltCompiler {
                                      + "      .xml and .jar are invalid DDL file extensions.");
                     System.exit(-1);
                 }
-                try {
-                    success = compiler.compileFromDDL(args[0], ArrayUtils.subarray(args, 1, args.length));
-                } catch (VoltCompilerException e) {
-                    System.err.printf("Compiler exception: %s\n", e.getMessage());
-                }
+                success = compiler.compileFromDDL(args[0], ArrayUtils.subarray(args, 1, args.length));
             }
             else {
                 System.err.printf("Usage: %s\n", usageNew);
@@ -2540,7 +2624,7 @@ public class VoltCompiler {
         try {
             m_classLoader = jarfile.getLoader();
             // Do the compilation work.
-            InMemoryJarfile jarOut = compileInternal(null, ddlReaderList, jarfile);
+            InMemoryJarfile jarOut = compileInternal(ddlReaderList, jarfile);
             // Trim the compiler output to try to provide a concise failure
             // explanation
             if (jarOut != null) {
@@ -2579,30 +2663,54 @@ public class VoltCompiler {
         // getBuildInfoFromJar() performs some validation.
         String[] buildInfoLines = CatalogUtil.getBuildInfoFromJar(outputJar);
         String versionFromCatalog = buildInfoLines[0];
-        // Set if an upgrade happens.
-        String upgradedFromVersion = null;
-
         // Check if it's compatible (or the upgrade is being forced).
         // getConfig() may return null if it's being mocked for a test.
-        if (   VoltDB.Configuration.m_forceCatalogUpgrade
-            || !versionFromCatalog.equals(VoltDB.instance().getVersionString())) {
+        if (( ! Configuration.m_forceCatalogUpgrade)
+            && versionFromCatalog.equals(VoltDB.instance().getVersionString())) {
+            return null;
+        }
 
+        // Set if an upgrade happens.
+        String upgradedFromVersion = null;
+        // Patch the buildinfo.
+        String versionFromVoltDB = VoltDB.instance().getVersionString();
+        buildInfoLines[0] = versionFromVoltDB;
+        buildInfoLines[1] = String.format("voltdb-auto-upgrade-to-%s", versionFromVoltDB);
+        byte[] buildInfoBytes = StringUtils.join(buildInfoLines, "\n").getBytes();
+        outputJar.put(CatalogUtil.CATALOG_BUILDINFO_FILENAME, buildInfoBytes);
+
+        // Gather DDL files for recompilation if not using a project file.
+        List<VoltCompilerReader> ddlReaderList = new ArrayList<VoltCompilerReader>();
+
+        // Use the in-memory jarfile-provided class loader so that procedure
+        // classes can be found and copied to the new file that gets written.
+        // Compile and save the file to voltdbroot. Assume it's a test environment if there
+        // is no catalog context available.
+        String jarName = String.format("catalog-%s.jar", versionFromVoltDB);
+        String textName = String.format("catalog-%s.out", versionFromVoltDB);
+        CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
+        final String outputJarPath = (catalogContext != null
+                ? new File(catalogContext.cluster.getVoltroot(), jarName).getPath()
+                : Configuration.getPathToCatalogForTest(jarName));
+            // Place the compiler output in a text file in the same folder.
+        final String outputTextPath = (catalogContext != null
+                ? new File(catalogContext.cluster.getVoltroot(), textName).getPath()
+                : Configuration.getPathToCatalogForTest(textName));
+        ClassLoader originalClassLoader = m_classLoader;
+        try {
+            m_classLoader = outputJar.getLoader();
+            consoleLog.info(String.format(
+                    "Version %s catalog will be automatically upgraded to version %s.",
+                    versionFromCatalog, versionFromVoltDB));
+            boolean success;
             // Check if there's a project.
-            VoltCompilerReader projectReader =
-                    (outputJar.containsKey("project.xml")
-                        ? new VoltCompilerJarFileReader(outputJar, "project.xml")
-                        : null);
-
-            // Patch the buildinfo.
-            String versionFromVoltDB = VoltDB.instance().getVersionString();
-            buildInfoLines[0] = versionFromVoltDB;
-            buildInfoLines[1] = String.format("voltdb-auto-upgrade-to-%s", versionFromVoltDB);
-            byte[] buildInfoBytes = StringUtils.join(buildInfoLines, "\n").getBytes();
-            outputJar.put(CatalogUtil.CATALOG_BUILDINFO_FILENAME, buildInfoBytes);
-
-            // Gather DDL files for recompilation if not using a project file.
-            List<VoltCompilerReader> ddlReaderList = new ArrayList<VoltCompilerReader>();
-            if (projectReader == null) {
+            if (outputJar.containsKey("project.xml")) {
+                VoltCompilerReader projectReader = new VoltCompilerJarFileReader(outputJar, "project.xml");
+                // Do the compilation work.
+                success = compileWithProjectInternalToFile(
+                        projectReader, outputJarPath, ddlReaderList, outputJar);
+            }
+            else {
                 Entry<String, byte[]> entry = outputJar.firstEntry();
                 while (entry != null) {
                     String path = entry.getKey();
@@ -2613,118 +2721,95 @@ public class VoltCompiler {
                     }
                     entry = outputJar.higherEntry(entry.getKey());
                 }
+                success = compileInternalToFile(outputJarPath, ddlReaderList, outputJar);
             }
 
-            // Use the in-memory jarfile-provided class loader so that procedure
-            // classes can be found and copied to the new file that gets written.
-            ClassLoader originalClassLoader = m_classLoader;
-
-            // Compile and save the file to voltdbroot. Assume it's a test environment if there
-            // is no catalog context available.
-            String jarName = String.format("catalog-%s.jar", versionFromVoltDB);
-            String textName = String.format("catalog-%s.out", versionFromVoltDB);
-            CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
-            final String outputJarPath = (catalogContext != null
-                    ? new File(catalogContext.cluster.getVoltroot(), jarName).getPath()
-                    : VoltDB.Configuration.getPathToCatalogForTest(jarName));
-            // Place the compiler output in a text file in the same folder.
-            final String outputTextPath = (catalogContext != null
-                    ? new File(catalogContext.cluster.getVoltroot(), textName).getPath()
-                    : VoltDB.Configuration.getPathToCatalogForTest(textName));
-            try {
-                m_classLoader = outputJar.getLoader();
-
-                consoleLog.info(String.format(
-                        "Version %s catalog will be automatically upgraded to version %s.",
-                        versionFromCatalog, versionFromVoltDB));
-
-                // Do the compilation work.
-                boolean success = compileInternalToFile(projectReader, outputJarPath, ddlReaderList, outputJar);
-
-                // Sanitize the *.sql files in the jarfile so that only the autogenerated
-                // canonical DDL file will be used for future compilations
-                // Bomb out if we failed to generate the canonical DDL
-                if (success) {
-                    boolean foundCanonicalDDL = false;
-                    Entry<String, byte[]> entry = outputJar.firstEntry();
-                    while (entry != null) {
-                        String path = entry.getKey();
-                        if (path.toLowerCase().endsWith(".sql")) {
-                            if (!path.toLowerCase().equals(AUTOGEN_DDL_FILE_NAME)) {
-                                outputJar.remove(path);
-                            }
-                            else {
-                                foundCanonicalDDL = true;
-                            }
+            // Sanitize the *.sql files in the jarfile so that only the autogenerated
+            // canonical DDL file will be used for future compilations
+            // Bomb out if we failed to generate the canonical DDL
+            if (success) {
+                boolean foundCanonicalDDL = false;
+                Entry<String, byte[]> entry = outputJar.firstEntry();
+                while (entry != null) {
+                    String path = entry.getKey();
+                    if (path.toLowerCase().endsWith(".sql")) {
+                        if (!path.toLowerCase().equals(AUTOGEN_DDL_FILE_NAME)) {
+                            outputJar.remove(path);
                         }
-                        entry = outputJar.higherEntry(entry.getKey());
+                        else {
+                            foundCanonicalDDL = true;
+                        }
                     }
-                    success = foundCanonicalDDL;
+                    entry = outputJar.higherEntry(entry.getKey());
                 }
-
-                if (success) {
+                if (foundCanonicalDDL) {
                     // Set up the return string.
                     upgradedFromVersion = versionFromCatalog;
                 }
+                success = foundCanonicalDDL;
+            }
 
-                // Summarize the results to a file.
-                // Briefly log success or failure and mention the output text file.
-                PrintStream outputStream = new PrintStream(outputTextPath);
-                try {
-                    if (success) {
-                        summarizeSuccess(outputStream, outputStream, outputJarPath);
-                        consoleLog.info(String.format(
-                                "The catalog was automatically upgraded from " +
-                                "version %s to %s and saved to \"%s\". " +
-                                "Compiler output is available in \"%s\".",
-                                versionFromCatalog, versionFromVoltDB,
-                                outputJarPath, outputTextPath));
-                    }
-                    else {
-                        summarizeErrors(outputStream, outputStream);
-                        outputStream.close();
-                        compilerLog.error("Catalog upgrade failed.");
-                        compilerLog.info(String.format(
-                                "Had attempted to perform an automatic version upgrade of a " +
-                                "catalog that was compiled by an older %s version of VoltDB, " +
-                                "but the automatic upgrade failed. The cluster  will not be " +
-                                "able to start until the incompatibility is fixed. " +
-                                "Try re-compiling the catalog with the newer %s version " +
-                                "of the VoltDB compiler. Compiler output from the failed " +
-                                "upgrade is available in \"%s\".",
-                                versionFromCatalog, versionFromVoltDB, outputTextPath));
-                        throw new IOException(String.format(
-                                "Catalog upgrade failed. You will need to recompile using voltdb compile."));
-                    }
+            // Summarize the results to a file.
+            // Briefly log success or failure and mention the output text file.
+            PrintStream outputStream = new PrintStream(outputTextPath);
+            try {
+                if (success) {
+                    summarizeSuccess(outputStream, outputStream, outputJarPath);
+                    consoleLog.info(String.format(
+                            "The catalog was automatically upgraded from " +
+                            "version %s to %s and saved to \"%s\". " +
+                            "Compiler output is available in \"%s\".",
+                            versionFromCatalog, versionFromVoltDB,
+                            outputJarPath, outputTextPath));
                 }
-                finally {
+                else {
+                    summarizeErrors(outputStream, outputStream);
                     outputStream.close();
+                    compilerLog.error("Catalog upgrade failed.");
+                    compilerLog.info(String.format(
+                            "Had attempted to perform an automatic version upgrade of a " +
+                            "catalog that was compiled by an older %s version of VoltDB, " +
+                            "but the automatic upgrade failed. The cluster  will not be " +
+                            "able to start until the incompatibility is fixed. " +
+                            "Try re-compiling the catalog with the newer %s version " +
+                            "of the VoltDB compiler. Compiler output from the failed " +
+                            "upgrade is available in \"%s\".",
+                            versionFromCatalog, versionFromVoltDB, outputTextPath));
+                    throw new IOException(String.format(
+                            "Catalog upgrade failed. You will need to recompile using voltdb compile."));
                 }
-            }
-            catch (IOException ioe) {
-                // Do nothing because this could come from the normal failure path
-                throw ioe;
-            }
-            catch (Exception e) {
-                compilerLog.error("Catalog upgrade failed with error:");
-                compilerLog.error(e.getMessage());
-                compilerLog.info(String.format(
-                        "Had attempted to perform an automatic version upgrade of a " +
-                        "catalog that was compiled by an older %s version of VoltDB, " +
-                        "but the automatic upgrade failed. The cluster  will not be " +
-                        "able to start until the incompatibility is fixed. " +
-                        "Try re-compiling the catalog with the newer %s version " +
-                        "of the VoltDB compiler. Compiler output from the failed " +
-                        "upgrade is available in \"%s\".",
-                        versionFromCatalog, versionFromVoltDB, outputTextPath));
-                throw new IOException(String.format(
-                        "Catalog upgrade failed. You will need to recompile using voltdb compile."));
             }
             finally {
-                // Restore the original class loader
-                m_classLoader = originalClassLoader;
+                outputStream.close();
             }
         }
+        catch (IOException ioe) {
+            // Do nothing because this could come from the normal failure path
+            throw ioe;
+        }
+        catch (Exception e) {
+            compilerLog.error("Catalog upgrade failed with error:");
+            compilerLog.error(e.getMessage());
+            compilerLog.info(String.format(
+                    "Had attempted to perform an automatic version upgrade of a " +
+                    "catalog that was compiled by an older %s version of VoltDB, " +
+                    "but the automatic upgrade failed. The cluster  will not be " +
+                    "able to start until the incompatibility is fixed. " +
+                    "Try re-compiling the catalog with the newer %s version " +
+                    "of the VoltDB compiler. Compiler output from the failed " +
+                    "upgrade is available in \"%s\".",
+                    versionFromCatalog, versionFromVoltDB, outputTextPath));
+            throw new IOException(String.format(
+                    "Catalog upgrade failed. You will need to recompile using voltdb compile."));
+        }
+        finally {
+            // Restore the original class loader
+            m_classLoader = originalClassLoader;
+        }
         return upgradedFromVersion;
+    }
+
+    public static VoltCompiler standAloneCompilerForTest() {
+        return new VoltCompiler(true);
     }
 }

@@ -34,7 +34,7 @@ import java.util.Map;
 
 import org.jfree.util.Log;
 import org.voltdb.ProcInfoData;
-import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
+import org.voltdb.compiler.VoltCompiler.Feedback;
 import org.voltdb.utils.MiscUtils;
 
 /**
@@ -376,13 +376,7 @@ public class CatalogBuilder {
             compiler.enableDetailedCapture();
         }
 
-        boolean success = false;
-        try {
-            success = compiler.compileFromDDL(jarPath, schemaPath);
-        } catch (VoltCompilerException e1) {
-            e1.printStackTrace();
-            return false;
-        }
+        boolean success = compiler.compileFromDDL(jarPath, schemaPath);
 
         m_diagnostics = compiler.harvestCapturedDetail();
         if (m_compilerDebugPrintStream != null) {

@@ -45,7 +45,7 @@ public class TestInMemoryJarfile extends TestCase {
     protected Catalog m_catalog;
     protected Database m_catalogDb;
 
-    private Catalog createTestJarFile(String jarFileName, boolean adhoc, String elemPfx)
+    private Catalog createTestJarFile(String jarFileName, boolean adhoc)
     {
         String schemaPath = "";
         try {
@@ -59,15 +59,15 @@ public class TestInMemoryJarfile extends TestCase {
             "<?xml version=\"1.0\"?>\n" +
             "<project>" +
             "<database name='database'>" +
-            "<%ss>" +
-            "<%s adhoc='" + Boolean.toString(adhoc) + "' name='default' sysproc='false'/>" +
-            "</%ss>" +
+            "<roles>" +
+            "<role adhoc='" + Boolean.toString(adhoc) + "' name='default' sysproc='false'/>" +
+            "</roles>" +
             "<schemas><schema path='" + schemaPath + "' /></schemas>" +
             "<procedures><procedure class='org.voltdb.compiler.procedures.TPCCTestProc' /></procedures>" +
             "<partitions><partition table='WAREHOUSE' column='W_ID' /></partitions>" +
             "</database>" +
             "</project>";
-        String simpleProject = String.format(simpleProjectTmpl, elemPfx, elemPfx, elemPfx);
+        String simpleProject = String.format(simpleProjectTmpl);
         System.out.println(simpleProject);
         String projectPath = MiscUtils.writeStringToTempFilePath(simpleProject);
         VoltCompiler compiler = new VoltCompiler();
@@ -75,15 +75,11 @@ public class TestInMemoryJarfile extends TestCase {
         return compiler.getCatalog();
     }
 
-    private Catalog createTestJarFile(String jarFileName, boolean adhoc) {
-        return createTestJarFile(jarFileName, adhoc, "role");
-    }
-
     @Override
     protected void setUp() throws Exception {
         System.out.print("START: " + System.currentTimeMillis());
         super.setUp();
-        m_catalog = createTestJarFile("testout.jar", true, "role");
+        m_catalog = createTestJarFile("testout.jar", true);
         assertNotNull(m_catalog);
         m_catalogDb = m_catalog.getClusters().get("cluster").getDatabases().get("database");
         assertNotNull(m_catalogDb);

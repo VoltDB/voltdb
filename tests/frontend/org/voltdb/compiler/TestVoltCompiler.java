@@ -56,7 +56,6 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltCompiler.Feedback;
-import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
@@ -124,39 +123,27 @@ public class TestVoltCompiler extends TestCase {
     public void testBrokenLineParsing() {
         final String simpleSchema1 =
             "create table table1r_el  (pkey integer, column2_integer integer, PRIMARY KEY(pkey));\n" +
+
             "create view v_table1r_el (column2_integer, num_rows) as\n" +
             "select column2_integer as column2_integer,\n" +
                 "count(*) as num_rows\n" +
             "from table1r_el\n" +
             "group by column2_integer;\n" +
+
             "create view v_table1r_el2 (column2_integer, num_rows) as\n" +
             "select column2_integer as column2_integer,\n" +
                 "count(*) as num_rows\n" +
             "from table1r_el\n" +
-            "group by column2_integer\n;\n";
+            "group by column2_integer\n;\n" +
 
+            "create procedure Foo as select * from table1r_el;" +
+
+            "";
         final String schemaPath = MiscUtils.writeStringToTempFilePath(simpleSchema1);
-
-        final String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas>" +
-            "<schema path='" + schemaPath + "' />" +
-            "</schemas>" +
-            "<procedures>" +
-            "<procedure class='Foo'>" +
-            "<sql>select * from table1r_el;</sql>" +
-            "</procedure>" +
-            "</procedures>" +
-            "</database>" +
-            "</project>";
-
-        final String projectPath = MiscUtils.writeStringToTempFilePath(simpleProject);
 
         final VoltCompiler compiler = new VoltCompiler();
 
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        final boolean success = compiler.compileFromDDL(testout_jar, schemaPath);
         assertTrue(success);
     }
 
@@ -435,8 +422,7 @@ public class TestVoltCompiler extends TestCase {
 
     public void testBadPath() {
         final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML("invalidnonsense", nothing_jar);
-
+        final boolean success = compiler.compileFromDDL(nothing_jar, "invalidnonsense");
         assertFalse(success);
     }
 
@@ -451,86 +437,36 @@ public class TestVoltCompiler extends TestCase {
     }
 
     public void testProcWithBoxedParam() throws IOException {
-        final String simpleSchema =
-            "create table books (cash integer default 23, title varchar(3) default 'foo', PRIMARY KEY(cash));";
-
-        final String schemaPath = MiscUtils.writeStringToTempFilePath(simpleSchema);
-
-        final String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas>" +
-            "<schema path='" + schemaPath + "' />" +
-            "</schemas>" +
-            "<procedures>" +
-            "<procedure class='org.voltdb.compiler.procedures.AddBookBoxed' />" +
-            "</procedures>" +
-            "</database>" +
-            "</project>";
-
-        final String projectPath = MiscUtils.writeStringToTempFilePath(simpleProject);
-
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertFalse(success);
+                "create table books (\n" +
+                        "cash integer default 23 not null, \n" +
+                        "title varchar(10) default 'foo', \n" +
+                        "PRIMARY KEY(cash));\n" +
+                "create procedure from class org.voltdb.compiler.procedures.AddBookBoxed;" +
+                "";
+        compileValidLiteralSchema(simpleSchema);
     }
 
     public void testDDLWithNoLengthString() throws IOException {
-
         // DO NOT COPY PASTE THIS INVALID EXAMPLE!
-        final String simpleSchema1 =
-            "create table books (cash integer default 23, title varchar default 'foo', PRIMARY KEY(cash));";
-
-        final String schemaPath = MiscUtils.writeStringToTempFilePath(simpleSchema1);
-
-        final String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas>" +
-            "<schema path='" + schemaPath + "' />" +
-            "</schemas>" +
-            "<procedures>" +
-            "<procedure class='org.voltdb.compiler.procedures.AddBook' />" +
-            "<procedure class='Foo'>" +
-            "<sql>select * from books;</sql>" +
-            "</procedure>" +
-            "</procedures>" +
-            "</database>" +
-            "</project>";
-
-        final String projectPath = MiscUtils.writeStringToTempFilePath(simpleProject);
-
+        final String simpleSchema =
+            "create table books (cash integer default 23, title varchar" + // <-- forgot the [10]
+            " default 'foo', PRIMARY KEY(cash));" +
+            "";
+        final String schemaPath = MiscUtils.writeStringToTempFilePath(simpleSchema);
         final VoltCompiler compiler = new VoltCompiler();
-
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        final boolean success = compiler.compileFromDDL(testout_jar, schemaPath);
         assertFalse(success);
     }
 
     public void testDDLWithLongStringInCharacters() throws IOException {
         int length = VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS + 10;
         final String simpleSchema1 =
-            "create table books (cash integer default 23, " +
-            "title varchar("+length+") default 'foo', PRIMARY KEY(cash));";
-
+                "create table books (cash integer default 23, " +
+                        "title varchar("+length+") default 'foo', PRIMARY KEY(cash));" +
+                "";
         final String schemaPath = MiscUtils.writeStringToTempFilePath(simpleSchema1);
-
-        final String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas>" +
-            "<schema path='" + schemaPath + "' />" +
-            "</schemas>" +
-            "</database>" +
-            "</project>";
-
-        final String projectPath = MiscUtils.writeStringToTempFilePath(simpleProject);
-
         final VoltCompiler compiler = new VoltCompiler();
-
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        final boolean success = compiler.compileFromDDL(testout_jar, schemaPath);
         assertTrue(success);
 
         // Check warnings
@@ -549,16 +485,16 @@ public class TestVoltCompiler extends TestCase {
         int length = VoltType.MAX_VALUE_LENGTH + 10;
         String simpleSchema1 =
                 "create table books (cash integer default 23, " +
-                        "title varbinary("+length+") , PRIMARY KEY(cash));";
-
+                        "title varbinary("+length+") , PRIMARY KEY(cash));" +
+                "";
         String error1 = "VARBINARY column size for column BOOKS.TITLE is > "
                 + VoltType.MAX_VALUE_LENGTH+" char maximum.";
         checkDDLErrorMessage(simpleSchema1, error1);
 
         String simpleSchema2 =
                 "create table books (cash integer default 23, " +
-                        "title varchar("+length+") , PRIMARY KEY(cash));";
-
+                        "title varchar("+length+") , PRIMARY KEY(cash));" +
+                "";
         String error2 = "VARCHAR column size for column BOOKS.TITLE is > "
                 + VoltType.MAX_VALUE_LENGTH+" char maximum.";
         checkDDLErrorMessage(simpleSchema2, error2);
@@ -566,26 +502,16 @@ public class TestVoltCompiler extends TestCase {
 
     public void testNullablePartitionColumn() throws IOException {
         final String simpleSchema =
-            "create table books (cash integer default 23, title varchar(3) default 'foo', PRIMARY KEY(cash));" +
-            "partition table books on column cash;";
-
+                "create table books (\n" +
+                        "cash integer default 23, \n" + // OH NO: forgot "not null"
+                        "title varchar(10) default 'foo', \n" +
+                        "PRIMARY KEY(cash));\n" +
+                "partition table books on column cash;\n" +
+                "create procedure from class org.voltdb.compiler.procedures.AddBook;" +
+                "";
         final String schemaPath = MiscUtils.writeStringToTempFilePath(simpleSchema);
-
-        final String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "<procedures><procedure class='org.voltdb.compiler.procedures.AddBook'/></procedures>" +
-            "</database>" +
-            "</project>";
-
-        final String projectPath = MiscUtils.writeStringToTempFilePath(simpleProject);
-
         final VoltCompiler compiler = new VoltCompiler();
-
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-
+        final boolean success = compiler.compileFromDDL(testout_jar, schemaPath);
         assertFalse(success);
 
         boolean found = false;
@@ -596,26 +522,17 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(found);
     }
 
-    public void testXMLFileWithBadDDL() throws IOException {
+    public void testProcWithMismatchedDDL() throws IOException {
         final String simpleSchema =
-            "create table books (id integer default 0, strval varchar(33000) default '', PRIMARY KEY(id));";
-
+                "create table books (\n" +
+                        "id integer default 23, \n" + // OH NO: AddBooks expects "id" to be named "cash"
+                        "strval varchar(10) default 'foo', \n" + // and "strval" to be named "title"
+                        "PRIMARY KEY(id));\n" +
+                "create procedure from class org.voltdb.compiler.procedures.AddBook;" +
+                "";
         final String schemaPath = MiscUtils.writeStringToTempFilePath(simpleSchema);
-
-        final String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "<procedures><procedure class='org.voltdb.compiler.procedures.AddBook' /></procedures>" +
-            "</database>" +
-            "</project>";
-
-        final String projectPath = MiscUtils.writeStringToTempFilePath(simpleProject);
-
         final VoltCompiler compiler = new VoltCompiler();
-
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        final boolean success = compiler.compileFromDDL(testout_jar, schemaPath);
         assertFalse(success);
     }
 
@@ -629,22 +546,12 @@ public class TestVoltCompiler extends TestCase {
             e.printStackTrace();
             System.exit(-1);
         }
-
-        final String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "<procedures><procedure class='org.voltdb.compiler.procedures.TPCCTestProc' /></procedures>" +
-            "</database>" +
-            "</project>";
-
-        //System.out.println(simpleProject);
-
-        final String projectPath = MiscUtils.writeStringToTempFilePath(simpleProject);
-
+        final String procSchema =
+                "create procedure from class org.voltdb.compiler.procedures.TPCCTestProc;" +
+                "";
+        final String procPath = MiscUtils.writeStringToTempFilePath(procSchema);
         final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        final boolean success = compiler.compileFromDDL(testout_jar, schemaPath, procPath);
         assertTrue(success);
     }
 
@@ -710,14 +617,7 @@ public class TestVoltCompiler extends TestCase {
 
     private static boolean compileFromDDL(String pathToJar,
             VoltCompiler compiler, String... schemaPaths) {
-        try {
-            return compiler.compileFromDDL(pathToJar, schemaPaths);
-        }
-        catch (VoltCompilerException e) {
-            e.printStackTrace();
-            fail();
-            return false;
-        }
+        return compiler.compileFromDDL(pathToJar, schemaPaths);
     }
 
     public void testDDLTableTooManyColumns() {
@@ -730,22 +630,12 @@ public class TestVoltCompiler extends TestCase {
             System.exit(-1);
         }
 
-        final String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "<procedures><procedure class='org.voltdb.compiler.procedures.TPCCTestProc' /></procedures>" +
-            "</database>" +
-            "</project>";
-
-        //System.out.println(simpleProject);
-
-        final String projectPath = MiscUtils.writeStringToTempFilePath(simpleProject);
-
+        final String procSchema =
+                "create procedure from class org.voltdb.compiler.procedures.TPCCTestProc;" +
+                "";
+        final String procPath = MiscUtils.writeStringToTempFilePath(procSchema);
         final VoltCompiler compiler = new VoltCompiler();
-
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        final boolean success = compiler.compileFromDDL(testout_jar, schemaPath, procPath);
         assertFalse(success);
 
         boolean found = false;
@@ -765,54 +655,28 @@ public class TestVoltCompiler extends TestCase {
             e.printStackTrace();
             System.exit(-1);
         }
-
-        final String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "<procedures><procedure class='org.voltdb.compiler.procedures.TPCCTestProc' /></procedures>" +
-            "</database>" +
-            "</project>";
-
-        //System.out.println(simpleProject);
-
-        final String projectPath = MiscUtils.writeStringToTempFilePath(simpleProject);
-
+        final String procSchema =
+                "create procedure from class org.voltdb.compiler.procedures.TPCCTestProc;" +
+                "";
+        final String procPath = MiscUtils.writeStringToTempFilePath(procSchema);
         final VoltCompiler compiler = new VoltCompiler();
-
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        final boolean success = compiler.compileFromDDL(testout_jar, schemaPath, procPath);
         assertTrue(success);
-
         final String sql = VoltCompilerUtils.readFileFromJarfile(testout_jar, VoltCompiler.AUTOGEN_DDL_FILE_NAME);
         assertNotNull(sql);
     }
 
     public void testXMLFileWithELEnabled() throws IOException {
         final String simpleSchema =
-            "create table books (cash integer default 23 NOT NULL, title varchar(3) default 'foo');";
-
+                "create table books (\n" +
+                        "cash integer default 23 not null, \n" +
+                        "title varchar(10) default 'foo');\n" + // export does not like primary key.
+                "create procedure from class org.voltdb.compiler.procedures.AddBook;" +
+                "export table books;" +
+                "";
         final String schemaPath = MiscUtils.writeStringToTempFilePath(simpleSchema);
-
-        final String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            " <database name='database'>" +
-            "  <partitions><partition table='books' column='cash'/></partitions> " +
-            "  <schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "  <procedures><procedure class='org.voltdb.compiler.procedures.AddBook' /></procedures>" +
-            "  <export>" +
-            "    <tables><table name='books'/></tables>" +
-            "  </export>" +
-            " </database>" +
-            "</project>";
-
-        final String projectPath = MiscUtils.writeStringToTempFilePath(simpleProject);
-
         final VoltCompiler compiler = new VoltCompiler();
-
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-
+        final boolean success = compiler.compileFromDDL(testout_jar, schemaPath);
         assertTrue(success);
 
         final Catalog c1 = compiler.getCatalog();
@@ -829,22 +693,14 @@ public class TestVoltCompiler extends TestCase {
 
     public void testOverrideProcInfo() throws IOException {
         final String simpleSchema =
-            "create table books (cash integer default 23 not null, title varchar(3) default 'foo', PRIMARY KEY(cash));" +
-            "PARTITION TABLE books ON COLUMN cash;";
-
+                "create table books (\n" +
+                        "cash integer default 23 not null, \n" +
+                        "title varchar(10) default 'foo', \n" +
+                        "PRIMARY KEY(cash));\n" +
+                "partition table books on column cash;\n" +
+                "create procedure from class org.voltdb.compiler.procedures.AddBook;" +
+                "";
         final String schemaPath = MiscUtils.writeStringToTempFilePath(simpleSchema);
-
-        final String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "<procedures><procedure class='org.voltdb.compiler.procedures.AddBook' /></procedures>" +
-            "</database>" +
-            "</project>";
-
-        final String projectPath = MiscUtils.writeStringToTempFilePath(simpleProject);
-
         final ProcInfoData info = new ProcInfoData();
         info.singlePartition = true;
         info.partitionInfo = "BOOKS.CASH: 0";
@@ -853,7 +709,7 @@ public class TestVoltCompiler extends TestCase {
 
         final VoltCompiler compiler = new VoltCompiler();
         compiler.setProcInfoOverrides(overrideMap);
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        final boolean success = compiler.compileFromDDL(testout_jar, schemaPath);
 
         assertTrue(success);
 
@@ -869,26 +725,15 @@ public class TestVoltCompiler extends TestCase {
 
     public void testOverrideNonAnnotatedProcInfo() throws IOException {
         final String simpleSchema =
-            "create table books (cash integer default 23 not null, title varchar(3) default 'foo', PRIMARY KEY(cash));" +
-            "PARTITION TABLE books ON COLUMN cash;" +
-            "create procedure from class org.voltdb.compiler.procedures.AddBook;" +
-            "partition procedure AddBook ON TABLE books COLUMN cash;";
-
+                "create table books (\n" +
+                        "cash integer default 23 not null, \n" +
+                        "title varchar(10) default 'foo', \n" +
+                        "PRIMARY KEY(cash));\n" +
+                "partition table books on column cash;\n" +
+                "create procedure from class org.voltdb.compiler.procedures.AddBook;" +
+                "partition procedure AddBook ON TABLE books COLUMN cash;" +
+                "";
         final String schemaPath = MiscUtils.writeStringToTempFilePath(simpleSchema);
-
-        final String simpleProject =
-                "<?xml version=\"1.0\"?>\n"
-                        + "<project>"
-                        + "<database name='database'>"
-                        + "<schemas>"
-                        + "<schema path='" + schemaPath + "' />"
-                        + "</schemas>"
-                        + "<procedures/>"
-                        + "</database>"
-                        + "</project>";
-
-        final String projectPath = MiscUtils.writeStringToTempFilePath(simpleProject);
-
         final ProcInfoData info = new ProcInfoData();
         info.singlePartition = true;
         info.partitionInfo = "BOOKS.CASH: 0";
@@ -897,8 +742,7 @@ public class TestVoltCompiler extends TestCase {
 
         final VoltCompiler compiler = new VoltCompiler();
         compiler.setProcInfoOverrides(overrideMap);
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-
+        final boolean success = compiler.compileFromDDL(testout_jar, schemaPath);
         assertTrue(success);
 
         final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
@@ -913,114 +757,50 @@ public class TestVoltCompiler extends TestCase {
 
     public void testBadStmtProcName() throws IOException {
         final String simpleSchema =
-            "create table books (cash integer default 23 not null, title varchar(10) default 'foo', PRIMARY KEY(cash));";
-
+                "create table books (\n" +
+                        "cash integer default 23 not null, \n" +
+                        "title varchar(10) default 'foo', \n" +
+                        "PRIMARY KEY(cash));\n" +
+                "partition table books on column cash;\n" +
+                "create procedure @Foo as select * from books;\n" +
+                "";
         final String schemaPath = MiscUtils.writeStringToTempFilePath(simpleSchema);
-
-        final String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "<procedures><procedure class='@Foo'><sql>select * from books;</sql></procedure></procedures>" +
-            "<partitions><partition table='BOOKS' column='CASH' /></partitions>" +
-            "</database>" +
-            "</project>";
-
-        final String projectPath = MiscUtils.writeStringToTempFilePath(simpleProject);
-
         final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertFalse(success);
-    }
-
-    public void testBadDdlStmtProcName() throws IOException {
-        final String simpleSchema =
-            "create table books (cash integer default 23 not null, title varchar(10) default 'foo', PRIMARY KEY(cash));" +
-            "create procedure @Foo as select * from books;";
-
-        final String schemaPath = MiscUtils.writeStringToTempFilePath(simpleSchema);
-
-        final String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "<procedures/>" +
-            "<partitions><partition table='BOOKS' column='CASH' /></partitions>" +
-            "</database>" +
-            "</project>";
-
-        final String projectPath = MiscUtils.writeStringToTempFilePath(simpleProject);
-
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        final boolean success = compiler.compileFromDDL(testout_jar, schemaPath);
         assertFalse(success);
     }
 
     public void testGoodStmtProcName() throws IOException {
         final String simpleSchema =
-            "create table books (cash integer default 23 not null, title varchar(3) default 'foo', PRIMARY KEY(cash));" +
-            "PARTITION TABLE books ON COLUMN cash;";
-
-        final String schemaPath = MiscUtils.writeStringToTempFilePath(simpleSchema);
-
-        final String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "<procedures><procedure class='Foo'><sql>select * from books;</sql></procedure></procedures>" +
-            "</database>" +
-            "</project>";
-
-        final String projectPath = MiscUtils.writeStringToTempFilePath(simpleProject);
-
-        final VoltCompiler compiler = new VoltCompiler();
-
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
-    }
-
-    public void testGoodDdlStmtProcName() throws IOException {
-        final String simpleSchema =
-            "create table books (cash integer default 23 not null, title varchar(3) default 'foo', PRIMARY KEY(cash));" +
-            "PARTITION TABLE books ON COLUMN cash;" +
-            "CREATE PROCEDURE Foo AS select * from books where cash = ?;" +
-            "PARTITION PROCEDURE Foo ON TABLE BOOKS COLUMN CASH PARAMETER 0;";
+                "create table books (\n" +
+                        "cash integer default 23 not null, \n" +
+                        "title varchar(10) default 'foo', \n" +
+                        "PRIMARY KEY(cash));\n" +
+                "partition table books on column cash;\n" +
+                "create procedure Foo as select * from books;\n" +
+                "";
         compileValidLiteralSchema(simpleSchema);
     }
 
     public void testUseInnerClassAsProc() throws Exception {
         String simpleSchema =
-                "create procedure from class org.voltdb_testprocs.regressionsuites.fixedsql.TestENG2423$InnerProc;";
+                "create procedure from class org.voltdb_testprocs.regressionsuites.fixedsql.TestENG2423$InnerProc;" +
+                "";
         compileValidLiteralSchema(simpleSchema);
     }
 
     public void testMaterializedView() throws IOException {
         final String simpleSchema =
-            "create table books (cash integer default 23 NOT NULL, title varchar(10) default 'foo', PRIMARY KEY(cash));\n" +
-            "partition table books on column cash;\n" +
-            "create view matt (title, cash, num, foo) as select title, cash, count(*), sum(cash) from books group by title, cash;";
-
-        final String schemaPath = MiscUtils.writeStringToTempFilePath(simpleSchema);
-
-        final String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "<procedures><procedure class='org.voltdb.compiler.procedures.AddBook' /></procedures>" +
-            "</database>" +
-            "</project>";
-
-        final String projectPath = MiscUtils.writeStringToTempFilePath(simpleProject);
-
-        final VoltCompiler compiler = new VoltCompiler();
-        // final ClusterConfig cluster_config = new ClusterConfig(1, 1, 0, "localhost");
-
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
+                "create table books (\n" +
+                        "cash integer default 23 not null, \n" +
+                        "title varchar(10) default 'foo', \n" +
+                        "PRIMARY KEY(cash));\n" +
+                "partition table books on column cash;\n" +
+                "create procedure from class org.voltdb.compiler.procedures.AddBook;" +
+                "create view matt (title, cash, num, foo) as " +
+                        "select title, cash, count(*), sum(cash) from books group by title, cash;\n" +
+                "";
+        VoltCompiler compiler = compileValidLiteralSchema(simpleSchema);
         final Catalog c1 = compiler.getCatalog();
         final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
         final Catalog c2 = new Catalog();
@@ -1031,55 +811,21 @@ public class TestVoltCompiler extends TestCase {
 
     public void testVarbinary() throws IOException {
         final String simpleSchema =
-            "create table books (cash integer default 23 NOT NULL, title varbinary(10) default NULL, PRIMARY KEY(cash));" +
-            "partition table books on column cash;";
-
-        final String schemaPath = MiscUtils.writeStringToTempFilePath(simpleSchema);
-
-        final String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "<procedures>" +
-            "<procedure class='get'><sql>select * from books;</sql></procedure>" +
-            "<procedure class='i1'><sql>insert into books values(5, 'AA');</sql></procedure>" +
-            "<procedure class='i2'><sql>insert into books values(5, ?);</sql></procedure>" +
-            "<procedure class='s1'><sql>update books set title = 'bb';</sql></procedure>" +
-            "</procedures>" +
-            //"<procedures><procedure class='org.voltdb.compiler.procedures.AddBook' /></procedures>" +
-            "</database>" +
-            "</project>";
-
-        final String projectPath = MiscUtils.writeStringToTempFilePath(simpleProject);
-
-        final VoltCompiler compiler = new VoltCompiler();
-        // final ClusterConfig cluster_config = new ClusterConfig(1, 1, 0, "localhost");
-
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
-        final Catalog c1 = compiler.getCatalog();
-        final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
-        final Catalog c2 = new Catalog();
-        c2.execute(catalogContents);
-        assertTrue(c2.serialize().equals(c1.serialize()));
-    }
-
-    public void testDdlProcVarbinary() throws IOException {
-        final String simpleSchema =
-            "create table books (cash integer default 23 NOT NULL, title varbinary(10) default NULL, PRIMARY KEY(cash));" +
-            "partition table books on column cash;" +
-            "create procedure get as select * from books;" +
-            "create procedure i1 as insert into books values(5, 'AA');" +
-            "create procedure i2 as insert into books values(5, ?);" +
-            "create procedure s1 as update books set title = 'bb';" +
-            "create procedure i3 as insert into books values( ?, ?);" +
-            "partition procedure i3 on table books column cash;" +
-            "create procedure d1 as delete from books where title = ? and cash = ?;" +
-            "partition procedure d1 on table books column cash parameter 1;";
-
+                "create table books (\n" +
+                        "cash integer default 23 not null, \n" +
+                        "title varbinary(10), \n" + // using varbinary instead of usual varchar.
+                        "PRIMARY KEY(cash));\n" +
+                "partition table books on column cash;\n" +
+                "create procedure get as select * from books;\n" +
+                "create procedure i1 as insert into books values(5, 'AA');\n" +
+                "create procedure i2 as insert into books values(5, ?);\n" +
+                "create procedure s1 as update books set title = 'bb';\n" +
+                "create procedure i3 as insert into books values(?, ?);" +
+                "partition procedure i3 on table books column cash;" +
+                "create procedure d1 as delete from books where title = ? and cash = ?;" +
+                "partition procedure d1 on table books column cash parameter 1;" +
+                "";
         VoltCompiler compiler = compileValidLiteralSchema(simpleSchema);
-
         final Catalog c1 = compiler.getCatalog();
         final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
         final Catalog c2 = new Catalog();
@@ -1092,36 +838,30 @@ public class TestVoltCompiler extends TestCase {
     // verifying HSQL behaviour. Additionally, there are users of PlannerAideDeCamp
     // that verify plans for various DDL/SQL combinations.
     //
-    // I'm going to add some DDL parsing validation tests here, as they seem to have
-    // more to do with compiling a catalog.. and there are some related tests already
-    // in this file.
+    // The DDL parsing validation tests here have more to do with compiling a catalog..
+    // there were some related tests already in this file.
     //
 
-    private VoltCompiler compileForDDLTest(String schemaPath, boolean expectSuccess) {
-        final String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "<procedures><procedure class='sample'><sql>select * from t</sql></procedure></procedures>" +
-            "</database>" +
-            "</project>";
-
-        final String projectPath = MiscUtils.writeStringToTempFilePath(simpleProject);
+    private VoltCompiler compileLiteralSchemaForDDLTest(String literalSchema, boolean expectSuccess) {
+        String schemaPath = MiscUtils.writeStringToTempFilePath(literalSchema);
+        // There use to be project.xml-based code to wedge a single-statement procedure into the schema
+        // here equivalent to "create procedure sample as select * from t;".
+        // That was probably extraneous to the purpose of these test cases?
         final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        final boolean success = compiler.compileFromDDL(testout_jar, schemaPath);
         assertEquals(expectSuccess, success);
         return compiler;
     }
 
     public void testDDLCompilerLeadingGarbage() throws IOException {
         final String s =
-            "-- a valid comment\n" +
-            "- an invalid comment\n" +
-            "create table t(id integer);";
-
-        VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), false);
-        assertTrue(c.hasErrors());
+                "-- a valid comment\n" +
+                "- an invalid comment\n" +
+                "create table t(id integer);" +
+                "";
+        VoltCompiler compiler = compileLiteralSchemaForDDLTest(s, false);
+        //TODO: strengthen test w/ error message text matching -- see checkDDLErrorMessage
+        assertTrue(compiler.hasErrors());
     }
 
     public void testDDLCompilerLeadingWhitespace() throws IOException {
@@ -1245,8 +985,9 @@ public class TestVoltCompiler extends TestCase {
     public void testDDLCompilerInvalidStatement() throws IOException {
         final String s =
             "create table t for justice -- with a comment\n";
-        VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), false);
-        assertTrue(c.hasErrors());
+        VoltCompiler compiler = compileLiteralSchemaForDDLTest(s, false);
+        //TODO: strengthen test w/ error message text matching -- see checkDDLErrorMessage
+        assertTrue(compiler.hasErrors());
     }
 
     public void testDDLCompilerCommentThatLooksLikeStatement() throws IOException {
@@ -1258,9 +999,11 @@ public class TestVoltCompiler extends TestCase {
     }
 
     public void testDDLCompilerLeadingSemicolon() throws IOException {
-        final String s = "; create table t(id integer);";
-        VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), false);
-        assertTrue(c.hasErrors());
+        final String s = "; create table t(id integer);" +
+                "";
+        VoltCompiler compiler = compileLiteralSchemaForDDLTest(s, false);
+        //TODO: strengthen test w/ error message text matching -- see checkDDLErrorMessage
+        assertTrue(compiler.hasErrors());
     }
 
     public void testDDLCompilerMultipleStatementsOnMultipleLines() throws IOException {
@@ -1363,10 +1106,10 @@ public class TestVoltCompiler extends TestCase {
             String s =
                 "create table t(id " + column_types[i] + " not null, num integer not null);\n" +
                 "create index idx_t_id on t(id);\n" +
-                "create index idx_t_idnum on t(id,num);";
-            VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), true);
-            assertFalse(c.hasErrors());
-            Database d = c.m_catalog.getClusters().get("cluster").getDatabases().get("database");
+                "create index idx_t_idnum on t(id,num);" +
+                "";
+            VoltCompiler compiler = compileLiteralSchemaForDDLTest(s, true);
+            Table t = CatalogUtil.getDatabase(compiler.m_catalog).getTables().getIgnoreCase("t");
             assertEquals(default_index_types[i].getValue(),
                         d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_t_id").getType());
             assertEquals(default_index_types[i].getValue(),
@@ -1376,15 +1119,14 @@ public class TestVoltCompiler extends TestCase {
 
     public void testDDLCompilerHashIndexAllowed()
     {
-        for (int i = 0; i < column_types.length; i++)
-        {
+        for (int i = 0; i < column_types.length; i++) {
             final String s =
                 "create table t(id " + column_types[i] + " not null, num integer not null);\n" +
                 "create index idx_t_id_hash on t(id);\n" +
-                "create index idx_t_idnum_hash on t(id,num);";
-            VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), can_be_hash[i]);
-            if (can_be_hash[i])
-            {
+                "create index idx_t_idnum_hash on t(id,num);" +
+                "";
+            VoltCompiler compiler = compileLiteralSchemaForDDLTest(s, can_be_hash[i]);
+            if (can_be_hash[i]) {
                 // do appropriate index exists checks
                 assertFalse(c.hasErrors());
                 Database d = c.m_catalog.getClusters().get("cluster").getDatabases().get("database");
@@ -1393,9 +1135,9 @@ public class TestVoltCompiler extends TestCase {
                 assertEquals(IndexType.HASH_TABLE.getValue(),
                             d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_t_idnum_hash").getType());
             }
-            else
-            {
-                assertTrue(c.hasErrors());
+            else {
+                //TODO: strengthen test w/ error message text matching -- see checkDDLErrorMessage
+                assertTrue(compiler.hasErrors());
             }
         }
     }
@@ -1405,12 +1147,12 @@ public class TestVoltCompiler extends TestCase {
         final String s =
                 "create table t(id integer not null, num integer not null);\n" +
                 "create unique index idx_t_unique on t(id,num);\n" +
-                "create index idx_t on t(num);";
-        VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), true);
-        assertFalse(c.hasErrors());
-        Database d = c.m_catalog.getClusters().get("cluster").getDatabases().get("database");
-        assertTrue(d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_t_unique").getUnique());
-        assertFalse(d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_t").getUnique());
+                "create index idx_t on t(num);" +
+                "";
+        VoltCompiler compiler = compileLiteralSchemaForDDLTest(s, true);
+        Table t = CatalogUtil.getDatabase(compiler.m_catalog).getTables().getIgnoreCase("t");
+        assertTrue(t.getIndexes().getIgnoreCase("idx_t_unique").getUnique());
+        assertFalse(t.getIndexes().getIgnoreCase("idx_t").getUnique());
         // also validate that simple column indexes don't trigger the generalized expression index handling
         String noExpressionFound = "";
         assertEquals(noExpressionFound, d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_t_unique").getExpressionsjson());
@@ -1422,12 +1164,12 @@ public class TestVoltCompiler extends TestCase {
         final String s =
                 "create table t(id integer not null, num integer not null);\n" +
                 "create unique index idx_ft_unique on t(abs(id+num));\n" +
-                "create index idx_ft on t(abs(num));";
-        VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), true);
-        assertFalse(c.hasErrors());
-        Database d = c.m_catalog.getClusters().get("cluster").getDatabases().get("database");
-        assertTrue(d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_ft_unique").getUnique());
-        assertFalse(d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_ft").getUnique());
+                "create index idx_ft on t(abs(num));" +
+                "";
+        VoltCompiler compiler = compileLiteralSchemaForDDLTest(s, true);
+        Table t = CatalogUtil.getDatabase(compiler.m_catalog).getTables().getIgnoreCase("t");
+        assertTrue(t.getIndexes().getIgnoreCase("idx_ft_unique").getUnique());
+        assertFalse(t.getIndexes().getIgnoreCase("idx_ft").getUnique());
         // Validate that general expression indexes get properly annotated with an expressionjson attribute
         String noExpressionFound = "";
         assertNotSame(noExpressionFound, d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_ft_unique").getExpressionsjson());
@@ -1441,10 +1183,10 @@ public class TestVoltCompiler extends TestCase {
             final String s =
                 "create table t(id " + column_types[i] + " not null, num integer not null);\n" +
                 "create index idx_t_id_tree on t(id);\n" +
-                "create index idx_t_idnum_tree on t(id,num);";
-            VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), can_be_tree[i]);
-            assertFalse(c.hasErrors());
-            Database d = c.m_catalog.getClusters().get("cluster").getDatabases().get("database");
+                "create index idx_t_idnum_tree on t(id,num);" +
+                "";
+            VoltCompiler compiler = compileLiteralSchemaForDDLTest(s, can_be_tree[i]);
+            Table t = CatalogUtil.getDatabase(compiler.m_catalog).getTables().getIgnoreCase("t");
             assertEquals(IndexType.BALANCED_TREE.getValue(),
                         d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_t_id_tree").getType());
             assertEquals(IndexType.BALANCED_TREE.getValue(),
@@ -1457,11 +1199,11 @@ public class TestVoltCompiler extends TestCase {
         final String s =
                 "create table t(id integer not null, num integer not null);\n" +
                 "create index idx_t_idnum1 on t(id,num);\n" +
-                "create index idx_t_idnum2 on t(id,num);";
-
-        VoltCompiler c = compileForDDLTest(MiscUtils.writeStringToTempFilePath(s), true);
-        assertFalse(c.hasErrors());
-        assertTrue(c.hasErrorsOrWarnings());
+                "create index idx_t_idnum2 on t(id,num);"
+                , "t");
+        //TODO: strengthen test w/ error message text matching -- see checkDDLErrorMessage
+        // and/or checkDDLWarningMessage
+        assertTrue(compiler.hasErrorsOrWarnings());
     }
 
     public void testDDLCompilerSameNameIndexesOnTwoTables()
@@ -1470,8 +1212,8 @@ public class TestVoltCompiler extends TestCase {
                 "create table t1(id integer not null, num integer not null);\n" +
                 "create table t2(id integer not null, num integer not null);\n" +
                 "create index idx_t_idnum on t1(id,num);\n" +
-                "create index idx_t_idnum on t2(id,num);";
-
+                "create index idx_t_idnum on t2(id,num);" +
+                "";
         failToCompileLiteralDdl(s);
     }
 
@@ -1498,7 +1240,9 @@ public class TestVoltCompiler extends TestCase {
 
     public void testDDLCompilerDropOneOfThreeIndexes()
     {
-        final String s =
+        //TODO: refactor to use checkDDLWarningMessage? That the table
+        // gets defined does not seem to be the critical issue under test, here.
+        VoltCompiler compiler = validateDefinedTables(
                 "create table t(id integer not null, num integer not null);\n" +
                 "create index idx_t_idnum_a on t(num,id);\n" +
                 "create index idx_t_idnum_b on t(id,num);\n" +
@@ -1537,8 +1281,8 @@ public class TestVoltCompiler extends TestCase {
         final String s =
                 "create table t(id integer not null, num integer not null);\n" +
                 "create index idx_t_idnum on t(id);\n" +
-                "create index idx_t_idnum on t(id,num);";
-
+                "create index idx_t_idnum on t(id,num);" +
+                "";
         failToCompileLiteralDdl(s);
     }
 
@@ -1555,48 +1299,56 @@ public class TestVoltCompiler extends TestCase {
         String ddl = "";
         String errorIndexMsg = "Index IDX_T_TM cannot include the function NOW or CURRENT_TIMESTAMP.";
         ddl = "create table t(id integer not null, tm timestamp);\n" +
-              "create index idx_t_tm on t(since_epoch(second, CURRENT_TIMESTAMP) - since_epoch(second, tm));";
+                "create index idx_t_tm on t(since_epoch(second, CURRENT_TIMESTAMP) - since_epoch(second, tm));" +
+                "";
         checkDDLErrorMessage(ddl, errorIndexMsg);
 
         ddl = "create table t(id integer not null, tm timestamp);\n" +
-              "create index idx_t_tm on t(since_epoch(second, NOW) - since_epoch(second, tm));";
+                "create index idx_t_tm on t(since_epoch(second, NOW) - since_epoch(second, tm));" +
+                "";
         checkDDLErrorMessage(ddl, errorIndexMsg);
 
         ddl = "create table t(id integer not null, tm timestamp);\n" +
-              "create index idx_t_tm on t(CURRENT_TIMESTAMP);";
+                "create index idx_t_tm on t(CURRENT_TIMESTAMP);" +
+                "";
         checkDDLErrorMessage(ddl, errorIndexMsg);
 
         // Test MatView.
         String errorMatviewMsg = "Materialized view \"MY_VIEW\" cannot include the function NOW or CURRENT_TIMESTAMP.";
         ddl = "create table t(id integer not null, tm timestamp);\n" +
-              "create view my_view as select since_epoch(second, CURRENT_TIMESTAMP) - since_epoch(second, tm), " +
-              "count(*) from t group by since_epoch(second, CURRENT_TIMESTAMP) - since_epoch(second, tm);";
+                "create view my_view as select since_epoch(second, CURRENT_TIMESTAMP) - since_epoch(second, tm), " +
+                "count(*) from t group by since_epoch(second, CURRENT_TIMESTAMP) - since_epoch(second, tm);" +
+                "";
         checkDDLErrorMessage(ddl, errorMatviewMsg);
 
         ddl = "create table t(id integer not null, tm timestamp);\n" +
                 "create view my_view as select since_epoch(second, NOW) - since_epoch(second, tm), " +
-                "count(*) from t group by since_epoch(second, NOW) - since_epoch(second, tm);";
+                "count(*) from t group by since_epoch(second, NOW) - since_epoch(second, tm);" +
+                "";
         checkDDLErrorMessage(ddl, errorMatviewMsg);
 
         ddl = "create table t(id integer not null, tm timestamp);\n" +
-                "create view my_view as select tm, count(*), count(CURRENT_TIMESTAMP)  from t group by tm;";
+                "create view my_view as select tm, count(*), count(CURRENT_TIMESTAMP)  from t group by tm;" +
+                "";
         checkDDLErrorMessage(ddl, errorMatviewMsg);
 
         ddl = "create table t(id integer not null, tm timestamp);\n" +
-                "create view my_view as select tm, count(*), count(NOW)  from t group by tm;";
+                "create view my_view as select tm, count(*), count(NOW)  from t group by tm;" +
+                "";
         checkDDLErrorMessage(ddl, errorMatviewMsg);
 
         ddl = "create table t(id integer not null, tm timestamp);\n" +
                 "create view my_view as select tm, count(*) from t " +
                 "where since_epoch(second, CURRENT_TIMESTAMP) - since_epoch(second, tm) > 60 " +
-                "group by tm;";
+                "group by tm;" +
+                "";
         checkDDLErrorMessage(ddl, errorMatviewMsg);
     }
 
     private static final String msgP = "does not include the partitioning column";
     private static final String msgPR =
-            "ASSUMEUNIQUE is not valid for an index that includes the partitioning column. " +
-            "Please use UNIQUE instead";
+                "ASSUMEUNIQUE is not valid for an index that includes the partitioning column. " +
+                "Please use UNIQUE instead";
 
     public void testColumnUniqueGiveException()
     {
@@ -1681,13 +1433,15 @@ public class TestVoltCompiler extends TestCase {
 
         // unique/assumeunique constraint added via ALTER TABLE to replicated table
         schema = "create table t0 (id bigint not null, name varchar(32) not null);\n" +
-                "ALTER TABLE t0 ADD UNIQUE(name);";
+                "ALTER TABLE t0 ADD UNIQUE(name);" +
+                "";
         checkValidUniqueAndAssumeUnique(schema, null, null);
 
         // unique/assumeunique constraint added via ALTER TABLE to partitioned table
         schema = "create table t0 (id bigint not null, name varchar(32) not null);\n" +
                 "PARTITION TABLE t0 ON COLUMN id;\n" +
-                "ALTER TABLE t0 ADD UNIQUE(name);";
+                "ALTER TABLE t0 ADD UNIQUE(name);" +
+                "";
         checkValidUniqueAndAssumeUnique(schema, msgP, null);
 
         // ENG-7242, kinda
@@ -1713,7 +1467,8 @@ public class TestVoltCompiler extends TestCase {
         // (1) ****** Replicate tables
         // A unique index on the non-primary key for replicated table gets no error.
         schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
-                "CREATE UNIQUE INDEX user_index0 ON t0 (name) ;";
+                "CREATE UNIQUE INDEX user_index0 ON t0 (name) ;" +
+                "";
         checkValidUniqueAndAssumeUnique(schema, null, null);
 
 
@@ -1721,25 +1476,29 @@ public class TestVoltCompiler extends TestCase {
         // A unique index on the partitioning key ( no primary key) gets no error.
         schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer);\n" +
                 "PARTITION TABLE t0 ON COLUMN id;\n" +
-                "CREATE UNIQUE INDEX user_index1 ON t0 (id) ;";
+                "CREATE UNIQUE INDEX user_index1 ON t0 (id) ;" +
+                "";
         checkValidUniqueAndAssumeUnique(schema, null, msgPR);
 
         // A unique index on the partitioning key ( also primary key) gets no error.
         schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
                 "PARTITION TABLE t0 ON COLUMN id;\n" +
-                "CREATE UNIQUE INDEX user_index2 ON t0 (id) ;";
+                "CREATE UNIQUE INDEX user_index2 ON t0 (id) ;" +
+                "";
         checkValidUniqueAndAssumeUnique(schema, null, msgPR);
 
         // A unique compound index on the partitioning key and another column gets no error.
         schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
                 "PARTITION TABLE t0 ON COLUMN id;\n" +
-                "CREATE UNIQUE INDEX user_index3 ON t0 (id, age) ;";
+                "CREATE UNIQUE INDEX user_index3 ON t0 (id, age) ;" +
+                "";
         checkValidUniqueAndAssumeUnique(schema, null, msgPR);
 
         // A unique index on the partitioning key and an expression like abs(age) gets no error.
         schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
                 "PARTITION TABLE t0 ON COLUMN id;\n" +
-                "CREATE UNIQUE INDEX user_index4 ON t0 (id, abs(age)) ;";
+                "CREATE UNIQUE INDEX user_index4 ON t0 (id, abs(age)) ;" +
+                "";
         checkValidUniqueAndAssumeUnique(schema, null, msgPR);
 
 
@@ -1747,37 +1506,43 @@ public class TestVoltCompiler extends TestCase {
         // A unique index on the partitioning key ( no primary key) gets one error.
         schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer);\n" +
                 "PARTITION TABLE t0 ON COLUMN id;\n" +
-                "CREATE UNIQUE INDEX user_index7 ON t0 (name) ;";
+                "CREATE UNIQUE INDEX user_index7 ON t0 (name) ;" +
+                "";
         checkValidUniqueAndAssumeUnique(schema, msgP, null);
 
         // A unique index on the non-partitioning key gets one error.
         schema = "create table t0 (id bigint not null, name varchar(32), age integer,  primary key (id));\n" +
                 "PARTITION TABLE t0 ON COLUMN id;\n" +
-                "CREATE UNIQUE INDEX user_index8 ON t0 (name) ;";
+                "CREATE UNIQUE INDEX user_index8 ON t0 (name) ;" +
+                "";
         checkValidUniqueAndAssumeUnique(schema, msgP, null);
 
         // A unique index on an unrelated expression like abs(age) gets a error.
         schema = "create table t0 (id bigint not null, name varchar(32), age integer,  primary key (id));\n" +
                 "PARTITION TABLE t0 ON COLUMN id;\n" +
-                "CREATE UNIQUE INDEX user_index9 ON t0 (abs(age)) ;";
+                "CREATE UNIQUE INDEX user_index9 ON t0 (abs(age)) ;" +
+                "";
         checkValidUniqueAndAssumeUnique(schema, msgP, null);
 
         // A unique index on the partitioning key ( non-primary key) gets one error.
         schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
-                "PARTITION TABLE t0 ON COLUMN name;";
+                "PARTITION TABLE t0 ON COLUMN name;" +
+                "";
         checkValidUniqueAndAssumeUnique(schema, msgP, msgP);
 
         // A unique index on an expression of the partitioning key like substr(1, 2, name) gets two errors.
         schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
                 "PARTITION TABLE t0 ON COLUMN name;\n" +
-                "CREATE UNIQUE INDEX user_index10 ON t0 (substr(name, 1, 2 )) ;";
+                "CREATE UNIQUE INDEX user_index10 ON t0 (substr(name, 1, 2 )) ;" +
+                "";
         // 1) unique index, 2) primary key
         checkValidUniqueAndAssumeUnique(schema, msgP, msgP);
 
         // A unique index on the non-partitioning key, non-partitioned column gets two errors.
         schema = "create table t0 (id bigint not null, name varchar(32) not null, age integer,  primary key (id));\n" +
                 "PARTITION TABLE t0 ON COLUMN name;\n" +
-                "CREATE UNIQUE INDEX user_index12 ON t0 (age) ;";
+                "CREATE UNIQUE INDEX user_index12 ON t0 (age) ;" +
+                "";
         // 1) unique index, 2) primary key
         checkValidUniqueAndAssumeUnique(schema, msgP, msgP);
     }
@@ -1789,7 +1554,8 @@ public class TestVoltCompiler extends TestCase {
         String ddl;
 
         ddl = "create table t(id integer not null, num integer);\n" +
-                "create view my_view as select num, count(*) from t group by num order by num;";
+                "create view my_view as select num, count(*) from t group by num order by num;" +
+                "";
         checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with ORDER BY clause is not supported.");
 
         ddl = "create table t(id integer not null, num integer, wage integer);\n" +
@@ -1801,15 +1567,18 @@ public class TestVoltCompiler extends TestCase {
         checkDDLErrorMessage(ddl, "A materialized view (MY_VIEW2) can not be defined on another view (MY_VIEW1)");
 
         ddl = "create table t(id integer not null, num integer);\n" +
-                "create view my_view as select num, count(*) from t group by num limit 1;";
+                "create view my_view as select num, count(*) from t group by num limit 1;" +
+                "";
         checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with LIMIT or OFFSET clause is not supported.");
 
         ddl = "create table t(id integer not null, num integer);\n" +
-                "create view my_view as select num, count(*) from t group by num limit 1 offset 10;";
+                "create view my_view as select num, count(*) from t group by num limit 1 offset 10;" +
+                "";
         checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with LIMIT or OFFSET clause is not supported.");
 
         ddl = "create table t(id integer not null, num integer);\n" +
-                "create view my_view as select num, count(*) from t group by num having count(*) > 3;";
+                "create view my_view as select num, count(*) from t group by num having count(*) > 3;" +
+                "";
         checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW\" with HAVING clause is not supported.");
     }
 
@@ -1820,135 +1589,138 @@ public class TestVoltCompiler extends TestCase {
         // Test CREATE
         // test failed cases
         ddl = "create table t(id integer not null, num integer," +
-                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 6xx);";
+                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 6xx);" +
+                "";
         checkDDLErrorMessage(ddl, "unexpected token: XX");
 
         ddl = "create table t(id integer not null, num integer," +
-                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 66666666666666666666666666666666);";
+                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 66666666666666666666666666666666);" +
+                "";
         checkDDLErrorMessage(ddl, "incompatible data type in operation");
 
         ddl = "create table t(id integer not null, num integer," +
-                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS -10);";
+                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS -10);" +
+                "";
         checkDDLErrorMessage(ddl, "Invalid constraint limit number '-10'");
 
         ddl = "create table t(id integer not null, num integer," +
-                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 5, CONSTRAINT tblimit2 LIMIT PARTITION ROWS 7);";
+                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 5, CONSTRAINT tblimit2 LIMIT PARTITION ROWS 7);" +
+                "";
         checkDDLErrorMessage(ddl, "Multiple LIMIT PARTITION ROWS constraints on table T are forbidden");
 
         ddl = "create table t(id integer not null, num integer," +
-                "CONSTRAINT tblimit1 LIMIT PARTITION Row 6);";
+                "CONSTRAINT tblimit1 LIMIT PARTITION Row 6);" +
+                "";
         checkDDLErrorMessage(ddl, "unexpected token: ROW required: ROWS");
 
         ddl = "create table t(id integer not null, num integer," +
-                "CONSTRAINT tblimit1 LIMIT Rows 6);";
+                "CONSTRAINT tblimit1 LIMIT Rows 6);" +
+                "";
         checkDDLErrorMessage(ddl, "unexpected token: ROWS required: PARTITION");
 
 
         // Test success cases
         ddl = "create table t(id integer not null, num integer," +
-                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 6);";
+                "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 6);" +
+                "";
         checkDDLErrorMessage(ddl, null);
 
         ddl = "create table t(id integer not null, num integer," +
-                "LIMIT PARTITION ROWS 6);";
+                "LIMIT PARTITION ROWS 6);" +
+                "";
         checkDDLErrorMessage(ddl, null);
 
+        final String createBase = "create table t(id integer not null, num integer);";
         // Test alter
         // Test failed cases
-        ddl = "create table t(id integer not null, num integer);" +
-              "alter table t add constraint foo LIMIT PARTITION ROWS 6XX;";
+        ddl = createBase + "alter table t add constraint foo LIMIT PARTITION ROWS 6XX;";
         checkDDLErrorMessage(ddl, "unexpected token: XX");
 
-        ddl = "create table t(id integer not null, num integer);" +
-              "alter table t add constraint foo LIMIT PARTITION ROWS 66666666666666666666666;";
+        ddl = createBase + "alter table t add constraint foo LIMIT PARTITION ROWS 66666666666666666666666;";
         checkDDLErrorMessage(ddl, "incompatible data type in operation");
 
-        ddl = "create table t(id integer not null, num integer);" +
-              "alter table t add constraint foo LIMIT PARTITION ROWS -10;";
+        ddl = createBase + "alter table t add constraint foo LIMIT PARTITION ROWS -10;";
         checkDDLErrorMessage(ddl, "Invalid constraint limit number '-10'");
 
-        ddl = "create table t(id integer not null, num integer);" +
-              "alter table t add constraint foo LIMIT PARTITION ROW 6;";
+        ddl = createBase + "alter table t add constraint foo LIMIT PARTITION ROW 6;";
         checkDDLErrorMessage(ddl, "unexpected token: ROW required: ROWS");
 
-        ddl = "create table t(id integer not null, num integer);" +
-              "alter table t add constraint foo LIMIT ROWS 6;";
+        ddl = createBase + "alter table t add constraint foo LIMIT ROWS 6;";
         checkDDLErrorMessage(ddl, "unexpected token: ROWS required: PARTITION");
 
-        ddl = "create table t(id integer not null, num integer);" +
-              "alter table t2 add constraint foo LIMIT PARTITION ROWS 6;";
+        ddl = createBase + "alter table t2 add constraint foo LIMIT PARTITION ROWS 6;";
         checkDDLErrorMessage(ddl, "object not found: T2");
 
         // Test alter successes
-        ddl = "create table t(id integer not null, num integer);" +
-              "alter table t add constraint foo LIMIT PARTITION ROWS 6;";
+        ddl = createBase + "alter table t add constraint foo LIMIT PARTITION ROWS 6;";
         checkDDLErrorMessage(ddl, null);
 
-        ddl = "create table t(id integer not null, num integer);" +
-              "alter table t add LIMIT PARTITION ROWS 6;";
+        ddl = createBase + "alter table t add LIMIT PARTITION ROWS 6;";
         checkDDLErrorMessage(ddl, null);
 
         // Successive alter statements are okay
-        ddl = "create table t(id integer not null, num integer);" +
-              "alter table t add LIMIT PARTITION ROWS 6;" +
-              "alter table t add LIMIT PARTITION ROWS 7;";
+        ddl = createBase +
+                "alter table t add LIMIT PARTITION ROWS 6;" +
+                "alter table t add LIMIT PARTITION ROWS 7;" +
+                "";
         checkDDLErrorMessage(ddl, null);
 
         // Alter after constraint set in create is okay
         ddl = "create table t(id integer not null, num integer," +
                 "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 6);" +
-              "alter table t add LIMIT PARTITION ROWS 7;";
+                "alter table t add LIMIT PARTITION ROWS 7;" +
+                "";
         checkDDLErrorMessage(ddl, null);
 
         // Test drop
         // Test failed cases
-        ddl = "create table t(id integer not null, num integer);" +
-              "alter table t drop constraint tblimit2;";
+        ddl = createBase + "alter table t drop constraint tblimit2;";
         checkDDLErrorMessage(ddl, "object not found: TBLIMIT2");
 
         ddl = "create table t(id integer not null, num integer," +
                 "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 6);" +
-              "alter table t drop constraint tblimit2;";
+                "alter table t drop constraint tblimit2;" +
+                "";
         checkDDLErrorMessage(ddl, "object not found: TBLIMIT2");
 
-        ddl = "create table t(id integer not null, num integer);" +
-              "alter table t add LIMIT PARTITION ROWS 6;" +
-              "alter table t drop constraint tblimit2;";
+        ddl = createBase +
+                "alter table t add LIMIT PARTITION ROWS 6;" +
+                "alter table t drop constraint tblimit2;" +
+                "";
         checkDDLErrorMessage(ddl, "object not found: TBLIMIT2");
 
-        ddl = "create table t(id integer not null, num integer);" +
-              "alter table t drop LIMIT PARTITION ROWS;";
+        ddl = createBase + "alter table t drop LIMIT PARTITION ROWS;";
         checkDDLErrorMessage(ddl, "object not found");
 
-        ddl = "create table t(id integer not null, num integer);" +
-              "alter table t drop LIMIT PARTITIONS ROWS;";
+        ddl = createBase + "alter table t drop LIMIT PARTITIONS ROWS;";
         checkDDLErrorMessage(ddl, "unexpected token: PARTITIONS required: PARTITION");
 
-        ddl = "create table t(id integer not null, num integer);" +
-              "alter table t drop LIMIT PARTITION ROW;";
+        ddl = createBase + "alter table t drop LIMIT PARTITION ROW;";
         checkDDLErrorMessage(ddl, "unexpected token: ROW required: ROWS");
 
-        ddl = "create table t(id integer not null, num integer);" +
-              "alter table t drop PARTITION ROWS;";
+        ddl = createBase + "alter table t drop PARTITION ROWS;";
         checkDDLErrorMessage(ddl, "unexpected token: PARTITION");
 
         // Test successes
         // named drop
         ddl = "create table t(id integer not null, num integer," +
                 "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 6);" +
-              "alter table t drop constraint tblimit1;";
+                "alter table t drop constraint tblimit1;" +
+                "";
         checkDDLErrorMessage(ddl, null);
 
         // magic drop
-        ddl = "create table t(id integer not null, num integer);" +
-              "alter table t add LIMIT PARTITION ROWS 6;" +
-              "alter table t drop LIMIT PARTITION ROWS;";
+        ddl = createBase +
+                "alter table t add LIMIT PARTITION ROWS 6;" +
+                "alter table t drop LIMIT PARTITION ROWS;" +
+                "";
         checkDDLErrorMessage(ddl, null);
 
         // magic drop of named constraint
         ddl = "create table t(id integer not null, num integer," +
                 "CONSTRAINT tblimit1 LIMIT PARTITION ROWS 6);" +
-              "alter table t drop LIMIT PARTITION ROWS;";
+                "alter table t drop LIMIT PARTITION ROWS;" +
+                "";
         checkDDLErrorMessage(ddl, null);
     }
 
@@ -2007,28 +1779,32 @@ public class TestVoltCompiler extends TestCase {
 
         // This exercises adding a limit constraint with a DELETE statement
         ddl = "create table t(id integer not null);\n" +
-                "alter table t add limit partition rows 10 execute (delete from t where id > 0);";
+                "alter table t add limit partition rows 10 execute (delete from t where id > 0);" +
+                "";
         compileLimitDeleteStmtAndCheckCatalog(ddl, null, "t", 10, "delete from t where id > 0");
 
         // This exercises making a change to the delete statement of an existing constraint
         ddl = "create table t(id integer not null, "
                 + "constraint c1 limit partition rows 10 execute (delete from t where id > 0)"
                 + ");\n"
-                + "alter table t add limit partition rows 15 execute (delete from t where id between 0 and 100);";
+                + "alter table t add limit partition rows 15 execute (delete from t where id between 0 and 100);" +
+                "";
         compileLimitDeleteStmtAndCheckCatalog(ddl, null, "t", 15, "delete from t where id between 0 and 100");
 
         // test dropping a limit contraint with a delete
         ddl = "create table t(id integer not null, "
                 + "constraint c1 limit partition rows 10 execute (delete from t where id > 0)"
                 + ");\n"
-                + "alter table t drop limit partition rows;";
+                + "alter table t drop limit partition rows;" +
+                "";
         compileLimitDeleteStmtAndCheckCatalog(ddl, null, "t", -1, null);
 
         // test dropping constraint by referencing the constraint name
         ddl = "create table t(id integer not null, "
                 + "constraint c1 limit partition rows 10 execute (delete from t where id > 0)"
                 + ");\n"
-                + "alter table t drop constraint c1;";
+                + "alter table t drop constraint c1;" +
+                "";
         compileLimitDeleteStmtAndCheckCatalog(ddl, null, "t", -1, null);
 
         // test dropping constraint by referencing the constraint name
@@ -2036,14 +1812,16 @@ public class TestVoltCompiler extends TestCase {
         ddl = "create table t(id integer not null, "
                 + "constraint c1 limit partition rows 10 execute (delete from t where id > 0)"
                 + ");\n"
-                + "alter table t drop constraint c34;";
+                + "alter table t drop constraint c34;" +
+                "";
         compileLimitDeleteStmtAndCheckCatalog(ddl, "object not found", "t", -1, null);
 
         // Alter the table by removing the LIMIT DELETE statement, but not the row limit
         ddl = "create table t(id integer not null, "
                 + "constraint c1 limit partition rows 10 execute (delete from t where id > 0)"
                 + ");\n"
-                + "alter table t add limit partition rows 10;";
+                + "alter table t add limit partition rows 10;" +
+                "";
         compileLimitDeleteStmtAndCheckCatalog(ddl, null, "t", 10, null);
 
         // See also regression testing that ensures EE picks up catalog changes
@@ -2052,46 +1830,16 @@ public class TestVoltCompiler extends TestCase {
 
     public void testPartitionOnBadType() {
         final String simpleSchema =
-            "create table books (cash float default 0.0 NOT NULL, title varchar(10) default 'foo', PRIMARY KEY(cash));";
-
+                "create table books (\n" +
+                        "cash float default 0.0 not null, \n" + // OH NO: float type for partition key
+                        "title varchar(10) default 'foo', PRIMARY KEY(cash));\n" +
+                "partition table books on column cash;\n" +
+                "create procedure from class org.voltdb.compiler.procedures.AddBook;" +
+                "";
         final String schemaPath = MiscUtils.writeStringToTempFilePath(simpleSchema);
-
-        final String simpleProject =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database>" +
-            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "<partitions><partition table='books' column='cash'/></partitions> " +
-            "<procedures><procedure class='org.voltdb.compiler.procedures.AddBook' /></procedures>" +
-            "</database>" +
-            "</project>";
-
-        final String projectPath = MiscUtils.writeStringToTempFilePath(simpleProject);
-
         final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        final boolean success = compiler.compileFromDDL(testout_jar, schemaPath);
         assertFalse(success);
-    }
-
-    public void testOmittedProcedureList() {
-        final String simpleSchema =
-                "create table books (cash float default 0.0 NOT NULL, title varchar(10) default 'foo', PRIMARY KEY(cash));";
-
-        final String schemaPath = MiscUtils.writeStringToTempFilePath(simpleSchema);
-
-        final String simpleProject =
-                "<?xml version=\"1.0\"?>\n" +
-                "<project>" +
-                "<database>" +
-                "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-                "</database>" +
-                "</project>";
-
-        final String projectPath = MiscUtils.writeStringToTempFilePath(simpleProject);
-
-        final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        assertTrue(success);
     }
 
     public void test3324MPPlan() throws IOException {
@@ -2121,38 +1869,27 @@ public class TestVoltCompiler extends TestCase {
 
     public void testBadDDLErrorLineNumber() throws IOException {
         final String schema =
-            "-- a comment\n" +                          // 1
-            "create table books (\n" +                  // 2
-            " id integer default 0,\n" +                // 3
-            " strval varchar(33000) default '',\n" +    // 4
-            " PRIMARY KEY(id)\n" +                      // 5
-            ");\n" +                                    // 6
-            "\n" +                                      // 7
-            "-- another comment\n" +                    // 8
-            "create view badview (\n" +                 // 9 * error reported here *
-            " id,\n" +
-            " COUNT(*),\n" +
-            " total\n" +
-            " as\n" +
-            "select id, COUNT(*), SUM(cnt)\n" +
-            " from books\n" +
-            " group by id;";
+                "-- a comment\n" +                          // 1
+                "create table books (\n" +                  // 2
+                " id integer default 0,\n" +                // 3
+                " strval varchar(33000) default '',\n" +    // 4
+                " PRIMARY KEY(id)\n" +                      // 5
+                ");\n" +                                    // 6
+                "\n" +                                      // 7
+                "-- another comment\n" +                    // 8
+                "create view badview (\n" +                 // 9 * error reported here *
+                " id,\n" +
+                " COUNT(*),\n" +
+                " total\n" +
+                " as\n" +
+                "select id, COUNT(*), SUM(cnt)\n" +
+                " from books\n" +
+                " group by id;" +
+                "create procedure from class org.voltdb.compiler.procedures.AddBook;" +
+                "";
         final String schemaPath = MiscUtils.writeStringToTempFilePath(schema);
-
-        final String project =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "<procedures><procedure class='org.voltdb.compiler.procedures.AddBook' /></procedures>" +
-            "</database>" +
-            "</project>";
-
-        final String projectPath = MiscUtils.writeStringToTempFilePath(project);
-
         final VoltCompiler compiler = new VoltCompiler();
-
-        final boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
+        final boolean success = compiler.compileFromDDL(testout_jar, schemaPath);
         assertFalse(success);
         for (Feedback error: compiler.m_errors) {
             assertEquals(9, error.lineNo);
@@ -2671,10 +2408,12 @@ public class TestVoltCompiler extends TestCase {
 
     public void testValidAnnotatedProcedureDLL() throws Exception {
         final String simpleSchema =
-                "create table books (cash integer default 23 not null, title varchar(3) default 'foo', PRIMARY KEY(cash));" +
-                "PARTITION TABLE books ON COLUMN cash;" +
-                "creAte PrOcEdUrE FrOm CLasS org.voltdb.compiler.procedures.AddBook;";
-
+                "create table books (\n" +
+                        "cash integer default 23 not null, \n" +
+                        "title varchar(10) default 'foo', PRIMARY KEY(cash));\n" +
+                "PARTITION TABLE books ON COLUMN cash;\n" +
+                "creAte PrOcEdUrE FrOm CLasS org.voltdb.compiler.procedures.AddBook;" +
+                "";
         compileValidLiteralSchema(simpleSchema);
 
         final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
@@ -2689,11 +2428,13 @@ public class TestVoltCompiler extends TestCase {
 
     public void testValidNonAnnotatedProcedureDDL() throws Exception {
         final String simpleSchema =
-                "create table books (cash integer default 23 not null, title varchar(3) default 'foo', PRIMARY KEY(cash));" +
+                "create table books (\n" +
+                        "cash integer default 23 not null, \n" +
+                        "title varchar(10) default 'foo', PRIMARY KEY(cash));\n" +
                 "PARTITION TABLE books ON COLUMN cash;" +
                 "create procedure from class org.voltdb.compiler.procedures.NotAnnotatedAddBook;" +
-                "paRtItiOn prOcEdure NotAnnotatedAddBook On taBLe   books coLUmN cash   ParaMETer  0;";
-
+                "paRtItiOn prOcEdure NotAnnotatedAddBook On taBLe   books coLUmN cash   ParaMETer  0;" +
+                "";
         compileValidLiteralSchema(simpleSchema);
 
         final String catalogContents = VoltCompilerUtils.readFileFromJarfile(testout_jar, "catalog.txt");
@@ -2842,40 +2583,13 @@ public class TestVoltCompiler extends TestCase {
 
     private Database checkDDLAgainstSimpleSchema(String errorRegex, String... ddl) throws Exception {
         String schemaDDL =
-            "create table books (cash integer default 23 NOT NULL, title varbinary(10) default NULL, PRIMARY KEY(cash)); " +
-            "partition table books on column cash;" +
-            StringUtils.join(ddl, " ");
-
-        String schemaPath = MiscUtils.writeStringToTempFilePath(schemaDDL.toString());
-
-        String projectXML =
-            "<?xml version=\"1.0\"?>\n" +
-            "<project>" +
-            "<database name='database'>" +
-            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "</database>" +
-            "</project>";
-
-        String projectPath = MiscUtils.writeStringToTempFilePath(projectXML);
-
-        VoltCompiler compiler = new VoltCompiler();
-
-        boolean success = compiler.compileWithProjectXML(projectPath, testout_jar);
-        String error = (success || compiler.m_errors.size() == 0
-                ? ""
-                : compiler.m_errors.get(compiler.m_errors.size()-1).message);
-        if (errorRegex == null) {
-            assertTrue(String.format("Expected success\nDDL: %s\n%s", ddl, error), success);
-            Catalog cat = compiler.getCatalog();
-            return cat.getClusters().get("cluster").getDatabases().get("database");
-        }
-        else {
-            assertFalse(String.format("Expected error (\"%s\")\nDDL: %s", errorRegex, ddl), success);
-            assertFalse("Expected at least one error message.", error.isEmpty());
-            Matcher m = Pattern.compile(errorRegex).matcher(error);
-            assertTrue(String.format("%s\nEXPECTED: %s", error, errorRegex), m.matches());
-            return null;
-        }
+                "create table books (\n" +
+                        "cash integer default 23 not null, \n" +
+                        "title varchar(10) default 'foo', \n" +
+                        "PRIMARY KEY(cash));\n" +
+                "partition table books on column cash;\n" +
+                StringUtils.join(ddl, " ");
+        return checkDDLErrorMessage(schemaDDL, errorSubstr);
     }
 
     private Database goodDDLAgainstSimpleSchema(String... ddl) throws Exception {
@@ -3074,13 +2788,7 @@ public class TestVoltCompiler extends TestCase {
 
         // Trivially test that VoltCompiler politely refuses to compile 0 schema files.
         // Should we care?
-        try {
-            assertFalse(compiler.compileFromDDL(testout_jar));
-        }
-        catch (VoltCompilerException e) {
-            e.printStackTrace();
-            fail();
-        }
+        assertFalse(compiler.compileFromDDL(testout_jar));
     }
 
     private int countStringsMatching(List<String> diagnostics, String pattern) {

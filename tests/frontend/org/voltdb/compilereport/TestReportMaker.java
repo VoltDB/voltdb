@@ -53,7 +53,7 @@ public class TestReportMaker extends TestCase {
             ddlWriter = new PrintWriter(ddlName);
             ddlWriter.println(ddl);
             ddlWriter.close();
-            VoltCompiler vc = new VoltCompiler(true); // trick it into behaving like standalone
+            VoltCompiler vc = VoltCompiler.standAloneCompilerForTest(); // factory for standalone compiler.
             boolean success = vc.compileFromDDL(jarName, ddlName);
             assertTrue("Catalog compilation failed!", success);
             report = new String(Files.readAllBytes(Paths.get("catalog-report.html")), Charsets.UTF_8);
