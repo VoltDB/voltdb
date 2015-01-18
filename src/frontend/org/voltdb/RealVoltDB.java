@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -603,6 +603,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                             partsToHSIdsToRejoin.values(),
                             m_catalogContext.cluster.getVoltroot(),
                             m_config.m_startAction == StartAction.LIVE_REJOIN);
+                    m_joinCoordinator.initialize(m_catalogContext.getDeployment().getCluster().getKfactor());
                     m_messenger.registerMailbox(m_joinCoordinator);
                     if (m_config.m_startAction == StartAction.LIVE_REJOIN) {
                         hostLog.info("Using live rejoin.");
@@ -1551,6 +1552,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             stringer.key("zkInterface").value(zkInterface[0]);
             stringer.key("drPort").value(m_config.m_drAgentPortStart);
             stringer.key("drInterface").value(m_config.m_drInterface);
+            stringer.key("publicInterface").value(m_config.m_publicInterface);
             stringer.endObject();
             JSONObject obj = new JSONObject(stringer.toString());
             // possibly atomic swap from null to realz

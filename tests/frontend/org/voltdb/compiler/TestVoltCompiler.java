@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -1552,6 +1552,23 @@ public class TestVoltCompiler extends TestCase {
     {
         // Test MatView.
         String ddl;
+
+        ddl = "create table t(id integer not null, num integer, wage integer);\n" +
+                "create view my_view1 (num, total) " +
+                "as select num, count(*) from (select num from t) subt group by num; \n";
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW1\" with subquery sources is not supported.");
+
+        ddl = "create table t1(id integer not null, num integer, wage integer);\n" +
+                "create table t2(id integer not null, num integer, wage integer);\n" +
+                "create view my_view1 (id, num, total) " +
+                "as select t1.id, t2.num, count(*) from t1 join t2 on t1.id = t2.id group by t1.id, t2.num; \n";
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW1\" has 2 sources. Only one source table is allowed.");
+
+        ddl = "create table t1(id integer not null, num integer, wage integer);\n" +
+                "create table t2(id integer not null, num integer, wage integer);\n" +
+                "create view my_view1 (id, num, total) " +
+                "as select t1.id, st2.num, count(*) from t1 join (select id ,num from t2) st2 on t1.id = st2.id group by t1.id, st2.num; \n";
+        checkDDLErrorMessage(ddl, "Materialized view \"MY_VIEW1\" with subquery sources is not supported.");
 
         ddl = "create table t(id integer not null, num integer);\n" +
                 "create view my_view as select num, count(*) from t group by num order by num;" +

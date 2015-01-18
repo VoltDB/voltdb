@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -153,8 +153,7 @@ public class QueryPlanner {
         // and subsequent placement of UPSERT_TAG should be pushed down
         // into getXMLCompiledStatement)
         m_sql = m_sql.trim();
-        String queryPrefix = m_sql.substring(0,6).toUpperCase();
-        if (queryPrefix.startsWith("UPSERT")) {
+        if (m_sql.length() > 6 && m_sql.substring(0,6).toUpperCase().startsWith("UPSERT")) { // ENG-7395
             m_isUpsert = true;
             m_sql = "INSERT" + m_sql.substring(6);
         }
@@ -269,6 +268,7 @@ public class QueryPlanner {
 
                 // note, expect real planning errors ignored here to be thrown again below
                 m_recentErrorMsg = null;
+                m_partitioning.resetAnalysisState();
             }
         }
         // if parameterization isn't requested or if it failed, plan here
@@ -414,7 +414,9 @@ public class QueryPlanner {
     }
 
     public static AbstractPlanNode replaceInsertPlanNodeWithUpsert(AbstractPlanNode root) {
-        if (root == null) return null;
+        if (root == null) {
+            return null;
+        }
 
         List<AbstractPlanNode> inserts = root.findAllNodesOfType(PlanNodeType.INSERT);
         if (inserts.size() == 1) {

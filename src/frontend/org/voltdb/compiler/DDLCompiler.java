@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -2333,9 +2333,14 @@ public class DDLCompiler {
         int displayColCount = stmt.m_displayColumns.size();
         String msg = "Materialized view \"" + viewName + "\" ";
 
+        if (stmt.hasSubquery()) {
+            msg += "with subquery sources is not supported.";
+            throw m_compiler.new VoltCompilerException(msg);
+        }
+
         if (stmt.m_tableList.size() != 1) {
             msg += "has " + String.valueOf(stmt.m_tableList.size()) + " sources. " +
-            "Only one source view or source table is allowed.";
+            "Only one source table is allowed.";
             throw m_compiler.new VoltCompilerException(msg);
         }
 

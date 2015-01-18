@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -156,7 +156,7 @@ public class JSONClient {
             } else {
                 site = new BlogSession("writer", "reader");
             }
-            site.props.put("last-login", new Long(System.currentTimeMillis()).toString());
+            site.props.put("last-login", new Long(System.currentTimeMillis()));
             // Return the generated login
             return new LoginRecord(username, "pwd", gson.toJson(site));
         }
