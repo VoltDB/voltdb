@@ -143,7 +143,9 @@ public class DDLCompiler {
     static final Pattern partitionTablePattern = Pattern.compile(
             "(?i)\\APARTITION\\s+TABLE\\s+([\\w$]+)\\s+ON\\s+COLUMN\\s+([\\w$]+)\\s*;\\z"
             );
+
     /**
+     * PARTITION PROCEDURE statement
      * NB supports only unquoted table and column names
      *
      * Regex Description:
@@ -180,98 +182,189 @@ public class DDLCompiler {
      * ; -- a semicolon
      * \\z -- end of string
      * </pre>
+     *
+     * Capture groups:
+     *  (1) Procedure name
+     *  (2) Table name
+     *  (3) Column name
+     *  (4) Parameter number
      */
-    static final Pattern partitionProcedurePattern = Pattern.compile(
-            "(?i)\\APARTITION\\s+PROCEDURE\\s+([\\w$]+)\\s+ON\\s+TABLE\\s+" +
-            "([\\w$]+)\\s+COLUMN\\s+([\\w$]+)(?:\\s+PARAMETER\\s+(\\d+))?\\s*;\\z"
-            );
+    static final Pattern partitionProcedureStatementPattern = Pattern.compile(
+                "(?i)\\APARTITION\\s+PROCEDURE\\s+([\\w$]+)\\s+ON\\s+TABLE\\s+" +
+                "([\\w$]+)\\s+COLUMN\\s+([\\w$]+)(?:\\s+PARAMETER\\s+(\\d+))?\\s*;\\z");
+
+    /**
+     * ALLOW clause that can be used to assign roles in CREATE PROCEDURE statements.
+     * @param nonCapturing the regex group doesn't capture
+     * @return pattern string
+     *
+     * Regex Description:
+     * <pre>
+     *  ALLOW\\s+                   -- ALLOW token and trailing whitespace
+     *  ( or (?:                    -- begin group (1 if capturing)
+     *    [\\w.$]+                  -- first role name
+     *    (?:                       -- begin non-capturing group for additional role names
+     *      \\s*,\\s*               -- comma and optional surrounding whitespace
+     *      [\\w.$]+                -- additional role name
+     *    )*                        -- end non-capturing group for additional role names with repetition
+     *  )                           -- end group
+     * </pre>
+     *
+     * Capture groups (if not non-capturing):
+     *  (1) Entire role list with commas and internal whitespace
+     */
+    static String formatProcedureAllowClause(boolean nonCapturing) {
+        final String groupPrefix = nonCapturing ? "(?:" : "(";
+        return String.format("ALLOW\\s+%s[\\w.$]+(?:\\s*,\\s*[\\w.$]+)*)", groupPrefix);
+    }
+
+    /**
+     * Build a PARTITION clause for a CREATE PROCEDURE statement.
+     * NB supports only unquoted table and column names
+     *
+     * @param nonCapturing the regex group doesn't capture
+     * @return pattern string
+     *
+     * Regex Description:
+     * <pre>
+     *  PARTITION\\s+               -- PARTITION token plus whitespace
+     *  ON\\s+TABLE\\s+             -- ON TABLE tokens plus whitespace
+     *  ([\\w$]+) or (?:[\\w$]+)    -- table name group (1 if capturing)
+     *  \\s+COLUMN\\s+              -- COLUMN token and whitespace
+     *  ([\\w$]+) or (?:[\\w$]+)    -- column name group (2 if capturing)
+     *  (?:                         -- begin optional non-capturing parameter group
+     *    \\s+PARAMETER\\s+         -- PARAMETER token and whitespace
+     *    (\\d+)                    -- parameter number group (3 if capturing)
+     *  )?                          -- end optional non-capturing parameter group
+     * </pre>
+     *
+     * Capture groups (if not non-capturing):
+     *  (1) Procedure name
+     *  (2) Table name
+     *  (3) Column name
+     */
+    static final String formatProcedurePartitionClause(boolean nonCapturing)
+    {
+        final String groupPrefix = nonCapturing ? "(?:" : "(";
+        return String.format(
+            "PARTITION\\s+ON\\s+TABLE\\s+%s[\\w$]+)\\s+COLUMN\\s+%s[\\w$]+)(?:\\s+PARAMETER\\s+%s\\d+))?",
+            groupPrefix, groupPrefix, groupPrefix);
+    }
+
+    /**
+     * Optional ALLOW or PARTITION clause that can modify CREATE PROCEDURE statements.
+     * 2 repetitions support one of each possible clause. The code should check that
+     * if there are two clauses it is one of each, not one repeated twice. The code
+     * should also not care about ordering.
+     *
+     * Regex Description:
+     * <pre>
+     *  (?:"                        -- begin OR group with both possible clauses (non-capturing)
+     *    (?:<allow-clause>)        -- ALLOW clause group (non-capturing)
+     *    |                         -- OR operator
+     *    (?:<partition-clause>)    -- PARTITION clause group (non-capturing)
+     *  )                           -- end OR group with both possible clauses
+     * </pre>
+     *
+     * Capture groups (if not non-capturing):
+     *  (1) Entire role list with commas and internal whitespace
+     */
+    static String formatCreateProcedureClause(boolean nonCapturing) {
+        return String.format("(?:(?:%s)|(?:%s))",
+                             formatProcedureAllowClause(nonCapturing),
+                             formatProcedurePartitionClause(nonCapturing));
+    }
 
     /**
      * CREATE PROCEDURE from Java class statement regex
      * NB supports only unquoted table and column names
-     * Capture groups are tagged as (1) and (2) in comments below.
+     * Capture groups are in parentheses.
+     *
+     * Regex Description:
+     * <pre>
+     *  (?i)\\A                     -- ignore case instruction and beginning of statement
+     *  CREATE\\s+PROCEDURE         -- CREATE PROCEDURE tokens with whitespace separator
+     *  (<clauses>*)                -- (1) optional ALLOW and or PARTITION clause(s)
+     *  \\s+FROM\\s+CLASS\\s+       -- FROM CLASS tokens with interspersed whitespace
+     *  ([\\w$.]+)                  -- (2) class name
+     *  \\s*;\\z                    -- trailing whitespace, semi-colon and end of statement
+     * </pre>
+     *
+     * Capture groups:
+     *  (1) ALLOW/PARTITION clauses - needs further parsing
+     *  (2) Class name
      */
-    static final Pattern procedureClassPattern = Pattern.compile(
-            "(?i)" +                                // ignore case
-            "\\A" +                                 // beginning of statement
-            "CREATE" +                              // CREATE token
-            "\\s+" +                                // one or more spaces
-            "PROCEDURE" +                           // PROCEDURE token
-            "(?:" +                                 // begin optional ALLOW clause
-            "\\s+" +                                //   one or more spaces
-            "ALLOW" +                               //   ALLOW token
-            "\\s+" +                                //   one or more spaces
-            "([\\w.$]+(?:\\s*,\\s*[\\w.$]+)*)" +    //   (1) comma-separated role list
-            ")?" +                                  // end optional ALLOW clause
-            "\\s+" +                                // one or more spaces
-            "FROM" +                                // FROM token
-            "\\s+" +                                // one or more spaces
-            "CLASS" +                               // CLASS token
-            "\\s+" +                                // one or more spaces
-            "([\\w$.]+)" +                          // (2) class name
-            "\\s*" +                                // zero or more spaces
-            ";" +                                   // semi-colon terminator
-            "\\z"                                   // end of statement
-            );
+    static final Pattern procedureClassPattern = Pattern.compile(String.format(
+            "(?i)\\ACREATE\\s+PROCEDURE((?:\\s+%s)*)\\s+FROM\\s+CLASS\\s+([\\w$.]+)\\s*;\\z",
+            formatCreateProcedureClause(true)));
 
     /**
      * CREATE PROCEDURE with single SELECT or DML statement regex
      * NB supports only unquoted table and column names
-     * Capture groups are tagged as (1) and (2) in comments below.
+     * Capture groups are in parentheses.
+     *
+     * Regex Description:
+     * <pre>
+     *  (?i)\\A                     -- ignore case instruction and beginning of statement
+     *  CREATE\\s+PROCEDURE\\s+     -- CREATE PROCEDURE tokens with whitespace
+     *  ([\\w$.]+)                  -- (1) procedure name
+     *  (<clauses>*)                -- (2) optional ALLOW and or PARTITION clause(s)
+     *  \\s+AS\\s+                  -- AS token with surrounding whitespace
+     *  (.+)                        -- (3) SELECT or DML statement
+     *  ;\\z                        -- semi-colon and end of statement
+     * </pre>
+     *
+     * Capture groups:
+     *  (1) Procedure name
+     *  (2) ALLOW/PARTITION clauses - needs further parsing
+     *  (3) SELECT or DML statement
      */
-    static final Pattern procedureSingleStatementPattern = Pattern.compile(
-            "(?i)" +                                // ignore case
-            "\\A" +                                 // beginning of DDL statement
-            "CREATE" +                              // CREATE token
-            "\\s+" +                                // one or more spaces
-            "PROCEDURE" +                           // PROCEDURE token
-            "\\s+" +                                // one or more spaces
-            "([\\w.$]+)" +                          // (1) procedure name
-            "(?:" +                                 // begin optional ALLOW clause
-            "\\s+" +                                //   one or more spaces
-            "ALLOW" +                               //   ALLOW token
-            "\\s+" +                                //   one or more spaces
-            "([\\w.$]+(?:\\s*,\\s*[\\w.$]+)*)" +    //   (2) comma-separated role list
-            ")?" +                                  // end optional ALLOW clause
-            "\\s+" +                                // one or more spaces
-            "AS" +                                  // AS token
-            "\\s+" +                                // one or more spaces
-            "(.+)" +                                // (3) SELECT or DML statement
-            ";" +                                   // semi-colon terminator
-            "\\z"                                   // end of DDL statement
-            );
+    static final Pattern procedureSingleStatementPattern = Pattern.compile(String.format(
+            "(?i)\\ACREATE\\s+PROCEDURE\\s+([\\w.$]+)((?:\\s+%s)*)\\s+AS\\s+(.+);\\z",
+            formatCreateProcedureClause(true)));
 
     static final char   BLOCK_DELIMITER_CHAR = '#';
     static final String BLOCK_DELIMITER = "###";
 
-    static final Pattern procedureWithScriptPattern = Pattern.compile(
-            "\\A" +                                 // beginning of DDL statement
-            "CREATE" +                              // CREATE token
-            "\\s+" +                                // one or more spaces
-            "PROCEDURE" +                           // PROCEDURE token
-            "\\s+" +                                // one or more spaces
-            "([\\w.$]+)" +                          // (1) procedure name
-            "(?:" +                                 // begin optional ALLOW clause
-            "\\s+" +                                //   one or more spaces
-            "ALLOW" +                               //   ALLOW token
-            "\\s+" +                                //   one or more spaces
-            "([\\w.$]+(?:\\s*,\\s*[\\w.$]+)*)" +    //   (2) comma-separated role list
-            ")?" +                                  // end optional ALLOW clause
-            "\\s+" +                                // one or more spaces
-            "AS" +                                  // AS token
-            "\\s+" +                                // one or more spaces
-            BLOCK_DELIMITER +                       // block delimiter ###
-            "(.+)" +                                // (3) code block content
-            BLOCK_DELIMITER +                       // block delimiter ###
-            "\\s+" +                                // one or more spaces
-            "LANGUAGE" +                            // LANGUAGE token
-            "\\s+" +                                // one or more spaces
-            "(GROOVY)" +                            // (4) language name
-            "\\s*" +                                // zero or more spaces
-            ";" +                                   // semi-colon terminator
-            "\\z",                                  // end of DDL statement
-            Pattern.CASE_INSENSITIVE|Pattern.MULTILINE|Pattern.DOTALL
-            );
+    /**
+     * CREATE PROCEDURE with inline implementation script, e.g. Groovy, statement regex
+     * NB supports only unquoted table and column names
+     * Capture groups are in parentheses.
+     *
+     * Regex Description:
+     * <pre>
+     *  (?i)\\A                     -- ignore case instruction and beginning of statement
+     *  CREATE\\s+PROCEDURE\\s+     -- CREATE PROCEDURE tokens with whitespace
+     *  ([\\w$.]+)                  -- (1) procedure name
+     *  (<clauses>*)                -- (2) optional ALLOW and or PARTITION clause(s)
+     *  \\s+AS\\s+                  -- AS token with leading and trailing whitespace
+     *  BLOCK_DELIMITER             -- leading block delimiter ###
+     *  (.+)                        -- (3) code block content
+     *  BLOCK_DELIMITER             -- trailing block delimiter ###
+     *  \\s+LANGUAGE\\s+            -- LANGUAGE token with surrounding whitespace
+     *  (GROOVY)                    -- (4) language name
+     *  \\s*;\\z                    -- trailing whitespace, semi-colon and end of statement
+     * </pre>
+     *
+     * Capture groups:
+     *  (1) Procedure name
+     *  (2) ALLOW/PARTITION clauses - needs further parsing
+     *  (3) Code block content
+     *  (4) Language name
+     */
+    static final Pattern procedureWithScriptPattern = Pattern.compile(String.format(
+            "(?i)\\ACREATE\\s+PROCEDURE\\s+([\\w.$]+)((?:\\s+%s)*)\\s+AS\\s+%s(.+)%s\\s+LANGUAGE\\s+(GROOVY)\\S*;\\z",
+            formatCreateProcedureClause(true), BLOCK_DELIMITER, BLOCK_DELIMITER),
+            Pattern.CASE_INSENSITIVE|Pattern.MULTILINE|Pattern.DOTALL);
+
+    /**
+     * Pattern for parsing the ALLOW and PARTITION clauses inside CREATE PROCEDURE statements.
+     * Capture groups are enabled.
+     */
+    static final String procedureClausePatternString = formatCreateProcedureClause(false);
+    static final Pattern procedureClausePattern = Pattern.compile(
+            procedureClausePatternString,
+            Pattern.CASE_INSENSITIVE|Pattern.MULTILINE|Pattern.DOTALL);
 
     /**
      * DROP PROCEDURE  statement regex
@@ -711,7 +804,7 @@ public class DDLCompiler {
         // either PROCEDURE, REPLICATE, PARTITION, ROLE, or EXPORT
         String commandPrefix = statementMatcher.group(1).toUpperCase();
 
-        // matches if it is CREATE PROCEDURE [ALLOW <role> ...] FROM CLASS <class-name>;
+        // matches if it is CREATE PROCEDURE [ALLOW <role> ...] [PARTITION ON ...] FROM CLASS <class-name>;
         statementMatcher = procedureClassPattern.matcher(statement);
         if (statementMatcher.matches()) {
             if (whichProcs != DdlProceduresToLoad.ALL_DDL_PROCEDURES) {
@@ -739,24 +832,21 @@ public class DDLCompiler {
             ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
                     new ArrayList<String>(), Language.JAVA, null, clazz);
 
-            // Add roles if specified.
-            if (statementMatcher.group(1) != null) {
-                for (String roleName : StringUtils.split(statementMatcher.group(1), ',')) {
-                    // Don't put the same role in the list more than once.
-                    String roleNameFixed = roleName.trim().toLowerCase();
-                    if (!descriptor.m_authGroups.contains(roleNameFixed)) {
-                        descriptor.m_authGroups.add(roleNameFixed);
-                    }
-                }
-            }
+            // Parse the ALLOW and PARTITION clauses.
+            // Populate descriptor roles and returned partition data as needed.
+            CreateProcedurePartitionData partitionData =
+                    parseCreateProcedureClauses(descriptor, statementMatcher.group(1));
 
             // track the defined procedure
-            m_tracker.add(descriptor);
+            String procName = m_tracker.add(descriptor);
+
+            // add partitioning if specified
+            addProcedurePartitionInfo(procName, partitionData, statement);
 
             return true;
         }
 
-        // matches if it is CREATE PROCEDURE <proc-name> [ALLOW <role> ...] AS <select-or-dml-statement>
+        // matches if it is CREATE PROCEDURE <proc-name> [ALLOW <role> ...] [PARTITION ON ...] AS <select-or-dml-statement>
         statementMatcher = procedureSingleStatementPattern.matcher(statement);
         if (statementMatcher.matches()) {
             String clazz = checkIdentifierStart(statementMatcher.group(1), statement);
@@ -765,19 +855,20 @@ public class DDLCompiler {
             ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
                     new ArrayList<String>(), clazz, sqlStatement, null, null, false, null, null, null);
 
-            // Add roles if specified.
-            if (statementMatcher.group(2) != null) {
-                for (String roleName : StringUtils.split(statementMatcher.group(2), ',')) {
-                    descriptor.m_authGroups.add(roleName.trim().toLowerCase());
-                }
-            }
+            // Parse the ALLOW and PARTITION clauses.
+            // Populate descriptor roles and returned partition data as needed.
+            CreateProcedurePartitionData partitionData =
+                    parseCreateProcedureClauses(descriptor, statementMatcher.group(2));
 
             m_tracker.add(descriptor);
+
+            // add partitioning if specified
+            addProcedurePartitionInfo(clazz, partitionData, statement);
 
             return true;
         }
 
-        // matches  if it is CREATE PROCEDURE <proc-name> [ALLOW <role> ...] AS
+        // matches  if it is CREATE PROCEDURE <proc-name> [ALLOW <role> ...] [PARTITION ON ...] AS
         // ### <code-block> ### LANGUAGE <language-name>
         statementMatcher = procedureWithScriptPattern.matcher(statement);
         if (statementMatcher.matches()) {
@@ -785,7 +876,6 @@ public class DDLCompiler {
             String className = checkIdentifierStart(statementMatcher.group(1), statement);
             String codeBlock = statementMatcher.group(3);
             Language language = Language.valueOf(statementMatcher.group(4).toUpperCase());
-
 
             Class<?> scriptClass = null;
 
@@ -807,14 +897,16 @@ public class DDLCompiler {
             ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
                     new ArrayList<String>(), language, codeBlock, scriptClass);
 
-            // Add roles if specified.
-            if (statementMatcher.group(2) != null) {
-                for (String roleName : StringUtils.split(statementMatcher.group(2), ',')) {
-                    descriptor.m_authGroups.add(roleName.trim().toLowerCase());
-                }
-            }
+            // Parse the ALLOW and PARTITION clauses.
+            // Populate descriptor roles and returned partition data as needed.
+            CreateProcedurePartitionData partitionData =
+                    parseCreateProcedureClauses(descriptor, statementMatcher.group(2));
+
             // track the defined procedure
-            m_tracker.add(descriptor);
+            String procName = m_tracker.add(descriptor);
+
+            // add partitioning if specified
+            addProcedurePartitionInfo(procName, partitionData, statement);
 
             return true;
         }
@@ -870,7 +962,7 @@ public class DDLCompiler {
                 // matches if it is
                 //   PARTITION PROCEDURE <procedure>
                 //      ON  TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]
-                statementMatcher = partitionProcedurePattern.matcher(statement);
+                statementMatcher = partitionProcedureStatementPattern.matcher(statement);
 
                 if ( ! statementMatcher.matches()) {
                     throw m_compiler.new VoltCompilerException(String.format(
@@ -1088,6 +1180,87 @@ public class DDLCompiler {
 
         // Not a VoltDB-specific DDL statement.
         return false;
+    }
+
+    private class CreateProcedurePartitionData {
+        String tableName = null;
+        String columnName = null;
+        String parameterNo = null;
+    }
+
+    /**
+     * Parse and validate the substring containing ALLOW and PARTITION
+     * clauses for CREATE PROCEDURE.
+     * @param clauses  the substring to parse
+     * @param descriptor  procedure descriptor populated with role names from ALLOW clause
+     * @return  parsed and validated partition data or null if there was no PARTITION clause
+     * @throws VoltCompilerException
+     */
+    private CreateProcedurePartitionData parseCreateProcedureClauses(
+            ProcedureDescriptor descriptor,
+            String clauses) throws VoltCompilerException {
+        assert clauses != null;
+        CreateProcedurePartitionData data = null;
+
+        Matcher matcher = procedureClausePattern.matcher(clauses);
+        int start = 0;
+        while (matcher.find(start)) {
+            start = matcher.end();
+
+            if (matcher.group(1) != null) {
+                // Add roles if it's an ALLOW clause. More that one ALLOW clause is okay.
+                for (String roleName : StringUtils.split(matcher.group(1), ',')) {
+                    // Don't put the same role in the list more than once.
+                   String roleNameFixed = roleName.trim().toLowerCase();
+                    if (!descriptor.m_authGroups.contains(roleNameFixed)) {
+                        descriptor.m_authGroups.add(roleNameFixed);
+                    }
+                }
+            }
+            else {
+                // Add partition info if it's a PARTITION clause. Only one is allowed.
+                if (data != null) {
+                    throw m_compiler.new VoltCompilerException(
+                        "Only one PARTITION clause is allowed for CREATE PROCEDURE.");
+                }
+                data = new CreateProcedurePartitionData();
+                data.tableName = matcher.group(2);
+                data.columnName = matcher.group(3);
+                data.parameterNo = matcher.group(4);
+            }
+        }
+
+        return data;
+    }
+
+    private void addProcedurePartitionInfo(
+            String procName,
+            CreateProcedurePartitionData data,
+            String statement) throws VoltCompilerException {
+
+        assert(procName != null);
+
+        // Will be null when there is no optional partition clause.
+        if (data == null) {
+            return;
+        }
+
+        assert(data.tableName != null);
+        assert(data.columnName != null);
+
+        // Check the identifiers.
+        checkIdentifierStart(procName, statement);
+        checkIdentifierStart(data.tableName, statement);
+        checkIdentifierStart(data.columnName, statement);
+
+        // if not specified default parameter index to 0
+        if (data.parameterNo == null) {
+            data.parameterNo = "0";
+        }
+
+        String partitionInfo = String.format("%s.%s: %s", data.tableName, data.columnName, data.parameterNo);
+
+        m_tracker.addProcedurePartitionInfoTo(procName, partitionInfo);
     }
 
     public void compileToCatalog(Database db) throws VoltCompilerException {

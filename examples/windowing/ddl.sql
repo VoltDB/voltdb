@@ -36,17 +36,10 @@ AS SELECT TRUNCATE(SECOND, update_ts), COUNT(*), SUM(val)
 LOAD CLASSES windowing-procs.jar;
 
 -- stored procedures
-CREATE PROCEDURE FROM CLASS windowing.DeleteAfterDate;
-PARTITION PROCEDURE DeleteAfterDate ON TABLE timedata COLUMN uuid;
-
-CREATE PROCEDURE FROM CLASS windowing.DeleteOldestToTarget;
-PARTITION PROCEDURE DeleteOldestToTarget ON TABLE timedata COLUMN uuid;
-
-CREATE PROCEDURE FROM CLASS windowing.InsertAndDeleteAfterDate;
-PARTITION PROCEDURE InsertAndDeleteAfterDate ON TABLE timedata COLUMN uuid;
-
-CREATE PROCEDURE FROM CLASS windowing.InsertAndDeleteOldestToTarget;
-PARTITION PROCEDURE InsertAndDeleteOldestToTarget ON TABLE timedata COLUMN uuid;
+CREATE PROCEDURE PARTITION ON TABLE timedata COLUMN uuid FROM CLASS windowing.DeleteAfterDate;
+CREATE PROCEDURE PARTITION ON TABLE timedata COLUMN uuid FROM CLASS windowing.DeleteOldestToTarget;
+CREATE PROCEDURE PARTITION ON TABLE timedata COLUMN uuid FROM CLASS windowing.InsertAndDeleteAfterDate;
+CREATE PROCEDURE PARTITION ON TABLE timedata COLUMN uuid FROM CLASS windowing.InsertAndDeleteOldestToTarget;
 
 -- Find the average value over all tuples across all partitions for the last
 -- N seconds, where N is a parameter the user supplies.
