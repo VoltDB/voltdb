@@ -472,7 +472,7 @@ public class CatalogDiffEngine {
             String nullness = column.getNullable() ? "NULL" : "NOT NULL";
             retval[0] = parent.getTypeName();
             retval[1] = String.format(
-                    "Unable to add %s column %s because table %s is not empty.",
+                    "Unable to add %s column %s because table %s is not empty and no default value was specified.",
                     nullness, suspect.getTypeName(), retval[0]);
             return retval;
         }
