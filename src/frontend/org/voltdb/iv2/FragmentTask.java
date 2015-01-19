@@ -162,6 +162,17 @@ public class FragmentTask extends TransactionTask
         if (procName != null) {
             // this will ensure proc is loaded
             siteConnection.getProcedureRunner(procName);
+
+            // @LoadMultipartitionTable also uses a default proc plan for insert into
+            // replicated tables, so it needed to be awkwardly teased out here.
+            if (procName.startsWith("@LoadMultipartitionTable")) {
+                Iv2InitiateTaskMessage itm = m_fragmentMsg.getInitiateTask();
+                if (itm != null) {
+                    String tableName = (String) itm.getParameters()[0];
+                    // this will ensure proc is loaded
+                    siteConnection.getProcedureRunner(tableName.toUpperCase() + ".insert");
+                }
+            }
         }
 
         // ignore response.
@@ -189,16 +200,16 @@ public class FragmentTask extends TransactionTask
         if (procName != null) {
             // this will ensure proc is loaded
             siteConnection.getProcedureRunner(procName);
-        }
 
-        // @LoadMultipartitionTable also uses a default proc plan for insert into
-        // replicated tables, so it needed to be awkwardly teased out here.
-        if (procName.startsWith("@LoadMultipartitionTable")) {
-            Iv2InitiateTaskMessage itm = m_fragmentMsg.getInitiateTask();
-            if (itm != null) {
-                String tableName = (String) itm.getParameters()[0];
-                // this will ensure proc is loaded
-                siteConnection.getProcedureRunner(tableName.toUpperCase() + ".insert");
+            // @LoadMultipartitionTable also uses a default proc plan for insert into
+            // replicated tables, so it needed to be awkwardly teased out here.
+            if (procName.startsWith("@LoadMultipartitionTable")) {
+                Iv2InitiateTaskMessage itm = m_fragmentMsg.getInitiateTask();
+                if (itm != null) {
+                    String tableName = (String) itm.getParameters()[0];
+                    // this will ensure proc is loaded
+                    siteConnection.getProcedureRunner(tableName.toUpperCase() + ".insert");
+                }
             }
         }
 
