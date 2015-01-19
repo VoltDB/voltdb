@@ -145,7 +145,7 @@ public class TestCanonicalDDLThroughSQLcmd extends AdhocDDLTestBase {
 
     private int callSQLcmd(String ddl, boolean fastModeDDL) throws Exception {
         String commandPath = "bin/sqlcmd";
-        final long timeout = 60000; // 60,000 millis -- give up after 1 minute of trying.
+        final long timeout = 300000; // 300,000 millis -- give up after 5 minutes of trying.
 
         File f = new File("ddl.sql");
         f.deleteOnExit();
