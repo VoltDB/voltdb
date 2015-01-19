@@ -2426,8 +2426,16 @@ public class VoltCompiler {
         }
 
         ++m_stmtCacheHits;
-        // easy debugging line
-        //System.out.printf("Hits: %d, Misses %d, Percent %.2f\n", hits, misses, (hits * 100.0) / (hits + misses));
+        // easy debugging stmt
+        //printStmtCacheStats();
         return candidate;
+    }
+
+    @SuppressWarnings("unused")
+    private void printStmtCacheStats() {
+        System.out.printf("Hits: %d, Misses %d, Percent %.2f\n",
+                m_stmtCacheHits, m_stmtCacheMisses,
+                (m_stmtCacheHits * 100.0) / (m_stmtCacheHits + m_stmtCacheMisses));
+        System.out.flush();
     }
 }
