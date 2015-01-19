@@ -469,11 +469,10 @@ public class CatalogDiffEngine {
 
         if ((suspect instanceof Column) && (parent instanceof Table) && (changeType == ChangeType.ADDITION)) {
             Column column = (Column)suspect;
-            String nullness = column.getNullable() ? "NULL" : "NOT NULL";
             retval[0] = parent.getTypeName();
             retval[1] = String.format(
-                    "Unable to add %s column %s because table %s is not empty.",
-                    nullness, suspect.getTypeName(), retval[0]);
+                    "Unable to add NOT NULL column %s because table %s is not empty and no default value was specified.",
+                    suspect.getTypeName(), retval[0]);
             return retval;
         }
 
