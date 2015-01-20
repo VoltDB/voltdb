@@ -1,15 +1,15 @@
 -- Table that stores values that are timestamped and
 -- are partitioned by UUID.
 --
--- Limit table to 165,000 rows per partition.
+-- Limit table to 82,500 rows per partition.
 -- If an insert wil exceed the limit, then
 -- execute a delete statement that will purge
 -- the oldest 1500 rows that are older than 30s.
 --
--- With insert rate of 20k/s and 4 partitions,
+-- With insert rate of 20k/s and 8 partitions,
 -- this will store a bit more about 33s worth of rows.
 -- When the table is full, the row limit trigger will
--- attempt to delete the last 1.5s worth of data.
+-- attempt to delete the oldest 1500 rows of data.
 --
 -- Create a unique constraint (implemented as an index)
 -- that lets us evaluate the DELETE's ORDER BY and WHERE
@@ -20,7 +20,7 @@ CREATE TABLE timedata
   val BIGINT NOT NULL,
   update_ts TIMESTAMP NOT NULL,
   CONSTRAINT update_ts_uuid UNIQUE (update_ts, uuid),
-  CONSTRAINT row_limit LIMIT PARTITION ROWS 165000
+  CONSTRAINT row_limit LIMIT PARTITION ROWS 82500
     EXECUTE (DELETE FROM timedata
              WHERE update_ts
                    < TO_TIMESTAMP(SECOND, SINCE_EPOCH(SECOND, NOW) - 30)
@@ -47,15 +47,17 @@ AS SELECT TRUNCATE(SECOND, update_ts), COUNT(*), SUM(val)
    FROM timedata
    GROUP BY TRUNCATE(SECOND, update_ts);
 
--- Find the average value over all tuples across all partitions for the last
--- N seconds, where N is a parameter the user supplies.
+-- Find the average value over all tuples across all partitions for
+-- the last N seconds, where N is a parameter the user supplies.
 --
--- Uses the materialized view so it has to scan fewer tuples. For example,
--- If tuples are being inserted at a rate of 4k/sec and there are 4 partitions,
--- then to compute the average for the last 10s, VoltDB would need to scan
--- 40k rows. In this case, it needs to scan 1 row per second times the number of
--- partitions, or 40 rows. That's a tremendous advantage of pre-aggregating the
--- table sums and counts by second.
+-- Uses the materialized view so it has to scan fewer tuples. For
+-- example, if tuples are being inserted at a rate of 20k/sec and
+-- there are 8 partitions, then each partition will have 2,500 rows
+-- for one second's worth of data.  To compute the average for the
+-- last 10s, each partition would need to scan 25,000 rows. In this
+-- case, it needs to scan 1 row per second times the number of
+-- partitions, or 80 rows. That's a tremendous advantage of
+-- pre-aggregating the table sums and counts by second.
 CREATE PROCEDURE ddlwindowing.Average AS
     SELECT SUM(sum_values) / SUM(count_values)
     FROM agg_by_second

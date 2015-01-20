@@ -301,13 +301,13 @@ class FastSerializer:
             print "ERROR: Connection failed. Please check that the host and port are correct."
             raise e
         except socket.timeout:
-            raise SystemExit("Authentication timed out after %d seconds."
+            raise RuntimeError("Authentication timed out after %d seconds."
                                 % self.socket.gettimeout())
         version = self.readByte()
         status = self.readByte()
 
         if status != 0:
-            raise SystemExit("Authentication failed.")
+            raise RuntimeError("Authentication failed.")
 
         self.readInt32()
         self.readInt64()
