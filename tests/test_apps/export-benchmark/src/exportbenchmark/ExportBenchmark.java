@@ -33,7 +33,7 @@ public class ExportBenchmark {
         VoltBulkLoader bulkLoader = null;
         try {
             client.createConnection("localhost");
-            bulkLoader = client.getNewBulkLoader("log4j", 1, new VoltDBLog4JAppenderCallback());
+            bulkLoader = client.getNewBulkLoader("valuesToExport", 1, new VoltDBLog4JAppenderCallback());
         }
         catch (Exception e) {
             System.err.printf("Connection to VoltDB failed\n" + e.getMessage());
@@ -46,7 +46,7 @@ public class ExportBenchmark {
             System.out.println("Inserting objects");
             Object rowHandle = null;
             for (int i = 0; i < 1000000; i++) {
-                bulkLoader.insertRow(rowHandle, i);
+                bulkLoader.insertRow(rowHandle, i, i+1);
             }
             System.out.println("Object insertion complete");
         } catch (Exception e) {
