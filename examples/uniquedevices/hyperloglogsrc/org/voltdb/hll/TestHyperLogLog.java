@@ -25,7 +25,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 /*
- * Copyright (C) 2011 Clearspring Technologies, Inc.
+ * Copyright (C) 2012 Clearspring Technologies, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,7 +39,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 /* This code was originally sourced from https://github.com/addthis/stream-lib
    in December 2014. */
 
