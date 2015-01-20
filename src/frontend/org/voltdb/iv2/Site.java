@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -67,6 +67,7 @@ import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
@@ -370,6 +371,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         {
             return m_ee.tableStreamSerializeMore(tableId, type, outputBuffers);
         }
+
+        @Override
+        public Procedure ensureDefaultProcLoaded(String procName) {
+            ProcedureRunner runner = Site.this.m_loadedProcedures.getProcByName(procName);
+            return runner.getCatalogProcedure();
+        }
     };
 
     /** Create a new execution site and the corresponding EE */
@@ -660,7 +667,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     static boolean filter(TransactionInfoBaseMessage tibm)
     {
-        // don't log sysproc fragments or iv2 intiiate task messages.
+        // don't log sysproc fragments or iv2 initiate task messages.
         // this is all jealously; should be refactored to ask tibm
         // if it wants to be filtered for rejoin and eliminate this
         // horrible introspection. This implementation mimics the

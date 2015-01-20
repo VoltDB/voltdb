@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -46,7 +46,7 @@ public class SystemStatsCollector {
     static long starttime = System.currentTimeMillis();
     static final long javamaxheapmem = ManagementFactory.getMemoryMXBean().getHeapMemoryUsage().getMax();
     static long memorysize = 256;
-    static int pid;
+    static int pid = 0;
     static boolean initialized = false;
     static GetRSSMode mode = GetRSSMode.PS;
     static Thread thread = null;
@@ -352,6 +352,11 @@ public class SystemStatsCollector {
         catch (Exception e) {
             return -1;
         }
+    }
+
+    public static synchronized long getRSSMB() {
+        Datum d = generateCurrentSample();
+        return d.rss;
     }
 
     /**

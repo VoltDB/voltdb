@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,6 +26,7 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.network.Connection;
+import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.ParameterConverter;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltType;
@@ -312,8 +313,8 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
         return statements;
     }
 
-    public boolean isExplainWork() {
-        return work.isExplainWork;
+    public ExplainMode getExplainMode() {
+        return work.explainMode;
     }
 
     /*

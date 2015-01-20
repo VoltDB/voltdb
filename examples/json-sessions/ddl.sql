@@ -14,7 +14,6 @@ CREATE INDEX session_site_moderator ON user_session_table (field(json_data, 'sit
 CREATE INDEX session_props ON user_session_table (field(field(json_data, 'props'), 'download_version'), field(field(json_data, 'props'), 'client_language'), username);
 
 -- Update classes from jar to that server will know about classes but not procedures yet.
-exec @UpdateClasses json-procs.jar '';
+LOAD CLASSES json-procs.jar;
 
-CREATE PROCEDURE FROM CLASS jsonsessions.Login;
-PARTITION PROCEDURE Login ON TABLE user_session_table COLUMN username;
+CREATE PROCEDURE PARTITION ON TABLE user_session_table COLUMN username FROM CLASS jsonsessions.Login;

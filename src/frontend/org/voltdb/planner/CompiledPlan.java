@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -79,6 +79,8 @@ public class CompiledPlan {
      * be the sum of tuples changed on all replicas.
      */
     public boolean replicatedTableDML = false;
+
+    public String[] touchedTables = null;
 
     /** Does the statement write? */
     private boolean m_readOnly = false;

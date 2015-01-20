@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -21,9 +21,10 @@ import java.math.BigDecimal;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.Random;
+import java.util.Set;
 import java.util.SortedMap;
-import java.util.TreeMap;
 import java.util.logging.Logger;
 
 import org.voltdb.VoltType;
@@ -333,5 +334,41 @@ public abstract class VoltTypeUtil {
         }
 
         return result;
+    }
+
+    /**
+     * Randomizer that can be used to repeatedly generate random values based on type.
+     * If unique is true it tracks generated values and retries until new ones are unique.
+     */
+    public static class Randomizer {
+        private final VoltType type;
+        private final int maxSize;
+        private final double nullFraction;
+        private final Set<Object> uniqueValues;
+        private final Random rand;
+
+        public Randomizer(VoltType type, int maxSize, double nullFraction, boolean unique, Random rand) {
+            this.type = type;
+            this.maxSize = maxSize;
+            this.nullFraction = nullFraction;
+            this.uniqueValues = unique ? new HashSet<Object>() : null;
+            this.rand = rand;
+        }
+
+        public Object getValue() {
+            Object value = null;
+            while (value == null) {
+                value = getRandomValue(this.type, this.maxSize, this.nullFraction, this.rand);
+                // If we need a unique value and it isn't force a retry.
+                if (this.uniqueValues != null && uniqueValues.contains(value)) {
+                    value = null;
+                }
+            }
+            if (uniqueValues != null) {
+                // Keep track of unique values.
+                uniqueValues.add(value);
+            }
+            return value;
+        }
     }
 }

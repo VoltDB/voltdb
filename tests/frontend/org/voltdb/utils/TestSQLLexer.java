@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,8 +23,12 @@
 
 package org.voltdb.utils;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
+import org.hsqldb_voltpatches.HSQLDDLInfo;
 import org.junit.Test;
 
 public class TestSQLLexer {
@@ -116,5 +120,74 @@ public class TestSQLLexer {
         assertFalse(SQLLexer.isPermitted("alter table pants alter column rename to shorts;"));
         assertFalse(SQLLexer.isPermitted("altre table pants blargy blarg;"));
         assertFalse(SQLLexer.isPermitted("alter tabel pants blargy blarg;"));
+    }
+
+    void checkValidHSQLPreprocessing(String ddl,
+                                     HSQLDDLInfo.Verb verb,
+                                     HSQLDDLInfo.Noun noun,
+                                     String name,
+                                     String secondName,
+                                     boolean ifexists,
+                                     boolean cascade)
+    {
+        HSQLDDLInfo info = SQLLexer.preprocessHSQLDDL(ddl);
+        assertNotNull(info);
+        assertEquals(verb, info.verb);
+        assertEquals(noun, info.noun);
+        assertEquals(name, info.name);
+        assertEquals(secondName, info.secondName);
+        assertEquals(ifexists, info.ifexists);
+        assertEquals(cascade, info.cascade);
+    }
+
+    void checkInvalidHSQLPreprocessing(String ddl) {
+        HSQLDDLInfo info = SQLLexer.preprocessHSQLDDL(ddl);
+        assertEquals(null, info);
+    }
+
+    @Test
+    public void testHSQLPreprocessing() {
+        // basic test
+        checkValidHSQLPreprocessing("create table foo ...", HSQLDDLInfo.Verb.CREATE, HSQLDDLInfo.Noun.TABLE, "foo", null, false, false);
+
+        // some tests borrowed from above
+        checkValidHSQLPreprocessing("create table PANTS (ID int, RENAME varchar(50));", HSQLDDLInfo.Verb.CREATE, HSQLDDLInfo.Noun.TABLE, "pants", null, false, false);
+        checkValidHSQLPreprocessing("create table PANTS (\n ID int,\n RENAME varchar(50)\n);", HSQLDDLInfo.Verb.CREATE, HSQLDDLInfo.Noun.TABLE, "pants", null, false, false);
+        checkValidHSQLPreprocessing("create view PANTS (ID int, RENAME varchar(50));", HSQLDDLInfo.Verb.CREATE, HSQLDDLInfo.Noun.VIEW, "pants", null, false, false);
+        checkValidHSQLPreprocessing("create index PANTS (ID int, RENAME varchar(50));", HSQLDDLInfo.Verb.CREATE, HSQLDDLInfo.Noun.INDEX, "pants", null, false, false);
+        checkValidHSQLPreprocessing("create index PANTS on Fuz (ID int, RENAME varchar(50));", HSQLDDLInfo.Verb.CREATE, HSQLDDLInfo.Noun.INDEX, "pants", "fuz", false, false);
+        checkInvalidHSQLPreprocessing("create tabel PANTS (ID int, RENAME varchar(50));");
+        checkInvalidHSQLPreprocessing("craete table PANTS (ID int, RENAME varchar(50));");
+        checkInvalidHSQLPreprocessing("create role pants with pockets;");
+        checkInvalidHSQLPreprocessing("create role\n pants\n with cuffs;\n");
+        checkValidHSQLPreprocessing("drop table pants;", HSQLDDLInfo.Verb.DROP, HSQLDDLInfo.Noun.TABLE, "pants", null, false, false);
+        checkValidHSQLPreprocessing("drop table pants if exists;", HSQLDDLInfo.Verb.DROP, HSQLDDLInfo.Noun.TABLE, "pants", null, true, false);
+        checkValidHSQLPreprocessing("drop view pants;", HSQLDDLInfo.Verb.DROP, HSQLDDLInfo.Noun.VIEW, "pants", null, false, false);
+        checkValidHSQLPreprocessing("drop view pants cascade;", HSQLDDLInfo.Verb.DROP, HSQLDDLInfo.Noun.VIEW, "pants", null, false, true);
+        checkValidHSQLPreprocessing("drop index pants   IF    EXISTS   CAsCaDe  ;", HSQLDDLInfo.Verb.DROP, HSQLDDLInfo.Noun.INDEX, "pants", null, true, true);
+        checkInvalidHSQLPreprocessing("dorp table pants;");
+        checkInvalidHSQLPreprocessing("drop tabel pants;");
+        checkValidHSQLPreprocessing("drop table pants cascade if exists;", HSQLDDLInfo.Verb.DROP, HSQLDDLInfo.Noun.TABLE, "pants", null, true, false);// wrong cascade order
+        checkValidHSQLPreprocessing("drop table pants if exists.;", HSQLDDLInfo.Verb.DROP, HSQLDDLInfo.Noun.TABLE, "pants", null, false, false); // period invalidates if exists
+        checkValidHSQLPreprocessing("alter table pants add column blargy blarg;", HSQLDDLInfo.Verb.ALTER, HSQLDDLInfo.Noun.TABLE, "pants", null, false, false);
+        checkValidHSQLPreprocessing("alter table pants add constraint blargy blarg;", HSQLDDLInfo.Verb.ALTER, HSQLDDLInfo.Noun.TABLE, "pants", null, false, false);
+        checkValidHSQLPreprocessing("alter index pants", HSQLDDLInfo.Verb.ALTER, HSQLDDLInfo.Noun.INDEX, "pants", null, false, false);
+        checkValidHSQLPreprocessing("alter table pants rename to shorts IF \nexists ;", HSQLDDLInfo.Verb.ALTER, HSQLDDLInfo.Noun.TABLE, "pants", null, true, false);
+        checkValidHSQLPreprocessing("alter index pants rename to shorts CASCADE;", HSQLDDLInfo.Verb.ALTER, HSQLDDLInfo.Noun.INDEX, "pants", null, false, true);
+        checkValidHSQLPreprocessing("alter table pants alter column rename to shorts;", HSQLDDLInfo.Verb.ALTER, HSQLDDLInfo.Noun.TABLE, "pants", null, false, false);
+        checkValidHSQLPreprocessing("alter table pants alter column rename to shorts CASCADE;", HSQLDDLInfo.Verb.ALTER, HSQLDDLInfo.Noun.TABLE, "pants", null, false, true);
+
+        // these next few statements are pretty much the same just with increasing parser mess
+        checkValidHSQLPreprocessing("alter table FOO drop column VIEWCOL cascade;", HSQLDDLInfo.Verb.ALTER, HSQLDDLInfo.Noun.TABLE, "foo", null, false, true);
+        checkValidHSQLPreprocessing("alter table FOO drop\n-- comment line\ncolumn VIEWCOL cascade;", HSQLDDLInfo.Verb.ALTER, HSQLDDLInfo.Noun.TABLE, "foo", null, false, true);
+        checkValidHSQLPreprocessing("alter table FOO drop column VIEWCOL cascade; --comment baby", HSQLDDLInfo.Verb.ALTER, HSQLDDLInfo.Noun.TABLE, "foo", null, false, true);
+        checkValidHSQLPreprocessing("alter table FOO drop column VIEWCOL --comment baby\n cascade;", HSQLDDLInfo.Verb.ALTER, HSQLDDLInfo.Noun.TABLE, "foo", null, false, true);
+        checkValidHSQLPreprocessing("alter table FOO drop /* \" */column VIEWCOL --comment baby\n cascade;", HSQLDDLInfo.Verb.ALTER, HSQLDDLInfo.Noun.TABLE, "foo", null, false, true);
+        checkValidHSQLPreprocessing("alter table FOO drop /* \n */column VIEWCOL ---comment baby\n cascade;", HSQLDDLInfo.Verb.ALTER, HSQLDDLInfo.Noun.TABLE, "foo", null, false, true);
+        checkValidHSQLPreprocessing("alter table FOO drop /* \" */column VIEWCOL \"quote'--\" --comment 'st--uf-f' baby\n cascade;", HSQLDDLInfo.Verb.ALTER, HSQLDDLInfo.Noun.TABLE, "foo", null, false, true);
+
+        checkInvalidHSQLPreprocessing("altre table pants blargy blarg;");
+        checkInvalidHSQLPreprocessing("alter tabel pants blargy blarg;");
+        checkValidHSQLPreprocessing("CREATE ASSUMEUNIQUE INDEX absVal ON T2 (     ABS(area * 2) ,   ABS(volume / 2) );", HSQLDDLInfo.Verb.CREATE, HSQLDDLInfo.Noun.INDEX, "absval", "t2", false, false);
     }
 }

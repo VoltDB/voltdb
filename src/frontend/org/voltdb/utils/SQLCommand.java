@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -41,6 +41,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Scanner;
 import java.util.TimeZone;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
@@ -384,6 +385,105 @@ public class SQLCommand
     private static final Pattern FileToken = Pattern.compile("^\\s*file\\s*['\"]*([^;'\"]+)['\"]*\\s*;*\\s*", Pattern.CASE_INSENSITIVE);
     private static List<String> RecallableSessionLines = new ArrayList<String>();
 
+    @SuppressWarnings("serial")
+    private static class LocalCommandParseException extends Exception
+    {
+        final String message;
+
+        LocalCommandParseException(String format, Object... args)
+        {
+            this.message = String.format(format, args);
+        }
+    }
+
+    /**
+     * Parses locally-interpreted commands with a prefix and a single quoted
+     * or unquoted string argument.
+     * This can be more general if the need arises, e.g. more than one argument
+     * or other argument data types.
+     */
+    private static class SingleArgumentCommandParser
+    {
+        final String prefix;
+        final Pattern patPrefix;
+        final Pattern patFull;
+        final String argName;
+
+        /**
+         * Constructor
+         * @param prefix  command prefix (blank separator is replaced with \s+)
+         */
+        SingleArgumentCommandParser(String prefix, String argName)
+        {
+            // Replace single space with flexible whitespace pattern.
+            this.prefix = prefix.toUpperCase();
+            String prefixPat = prefix.replace(" ", "\\s+");
+            this.patPrefix = Pattern.compile(String.format("^\\s*%s\\s.*$", prefixPat), Pattern.CASE_INSENSITIVE);
+            this.patFull = Pattern.compile(String.format("^\\s*%s\\s+([^;]+)[;\\s]*$", prefixPat), Pattern.CASE_INSENSITIVE);
+            this.argName = argName;
+        }
+
+        /**
+         * Parse line and return argument or null if parsing fails.
+         * @param line  input line
+         * @return      output argument or null if parsing fails
+         */
+        String parse(String line) throws LocalCommandParseException
+        {
+            // If it doesn't start with the expected command prefix return null.
+            // Allows better errors for missing or inappropriate arguments,
+            // rather than passing it along to the engine for a strange error.
+            if (line == null || !this.patPrefix.matcher(line).matches()) {
+                return null;
+            }
+            Matcher matcher = this.patFull.matcher(line);
+            String arg = null;
+            if (matcher.matches()) {
+                arg = parseOptionallyQuotedString(matcher.group(1));
+                if (arg == null) {
+                    throw new LocalCommandParseException("Bad %s argument to %s: %s", this.argName, this.prefix, arg);
+                }
+            }
+            else {
+                throw new LocalCommandParseException("Missing %s argument to %s.", this.argName, this.prefix);
+            }
+
+            return arg;
+        }
+
+        private static String parseOptionallyQuotedString(String sIn) throws LocalCommandParseException
+        {
+            String sOut = null;
+            if (sIn != null) {
+                // If it starts with a quote make sure it ends with the same one.
+                if (sIn.startsWith("'") || sIn.startsWith("\"")) {
+                    if (sIn.length() > 1 && sIn.endsWith(sIn.substring(0, 1))) {
+                        sOut = sIn.substring(1, sIn.length() - 1);
+                    }
+                    else {
+                        throw new LocalCommandParseException("Quoted string is not properly closed: %s", sIn);
+                    }
+                }
+                else {
+                    // Unquoted string returned as is.
+                    sOut = sIn;
+                }
+            }
+            return sOut;
+        }
+    }
+
+    // The argument capture group for LOAD/REMOVE CLASSES loosely captures everything
+    // through the trailing semi-colon. It relies on post-parsing code to make sure
+    // the argument is reasonable.
+    // Capture group 1 for LOAD CLASSES is the jar file.
+    private static final SingleArgumentCommandParser loadClassesParser =
+            new SingleArgumentCommandParser("load classes", "jar file");
+    private static final SingleArgumentCommandParser removeClassesParser =
+            new SingleArgumentCommandParser("remove classes", "class selector");
+    private static final Pattern ClassSelectorToken = Pattern.compile(
+            "^[\\w*.$]+$", Pattern.CASE_INSENSITIVE);
+
     /**
      * The list of recognized basic tab-complete-able SQL command prefixes.
      * Comparisons are done in uppercase.
@@ -401,6 +501,8 @@ public class SQLCommand
         "LIST PROCEDURES",
         "LIST TABLES",
         "LIST CLASSES",
+        "LOAD CLASSES",
+        "REMOVE CLASSES",
         "SHOW PROCEDURES",
         "SHOW TABLES",
         "SHOW CLASSES",
@@ -499,6 +601,14 @@ public class SQLCommand
                     line = ";";
                 }
 
+                // handle statements that are converted to regular database commands
+                line = handleTranslatedCommands(line);
+                if (line == null) {
+                    // something bad happened interpreting the translated command
+                    executeImmediate = false; // return to prompt
+                    continue;
+                }
+
                 // If the line is a FILE command - include the content of the file into the query queue
                 //TODO: executing statements (from files) as they are read rather than queuing them
                 // would improve performance and error handling.
@@ -519,6 +629,7 @@ public class SQLCommand
                     }
                     // else treat the line(s) from the file(s) as regular database commands
                 }
+
                 // else treat the input line as a regular database command
             }
             else {
@@ -543,6 +654,46 @@ public class SQLCommand
         return parsedQueries;
     }
 
+    /// Returns the original command, a replacement command, or null (on error).
+    private static String handleTranslatedCommands(String lineIn)
+    {
+        String lineOut = null;
+        try {
+            // LOAD CLASS <jar>?
+            if (lineOut == null) {
+                String arg = loadClassesParser.parse(lineIn);
+                if (arg != null) {
+                    if (! new File(arg).isFile()) {
+                        throw new LocalCommandParseException("Jar file not found: %s", arg);
+                    }
+                    lineOut = String.format("exec @UpdateClasses '%s', NULL;", arg);
+                }
+            }
+            // REMOVE CLASS <class-selector>?
+            if (lineOut == null) {
+                String arg = removeClassesParser.parse(lineIn);
+                if (arg != null) {
+                    // reject obviously bad class selectors
+                    if (!ClassSelectorToken.matcher(arg).matches()) {
+                        throw new LocalCommandParseException("Bad characters in class selector: %s", arg);
+                    }
+                    lineOut = String.format("exec @UpdateClasses NULL, '%s';", arg);
+                }
+            }
+            // None of the above - return the untranslated input command.
+            if (lineOut == null) {
+                lineOut = lineIn;
+            }
+        }
+        catch(LocalCommandParseException e) {
+            System.out.printf("%d> %s\n",  RecallableSessionLines.size(), e.message);
+        }
+
+        //* enable to debug */ if (lineOut != null && !lineOut.equals(lineIn)) System.err.printf("Translated: %s -> %s\n", lineIn, lineOut);
+
+        return lineOut;
+    }
+
     /// A stripped down variant of the processing in "interactWithTheUser" suitable for
     /// applying to a command script. It skips all the interactive-only options.
     public static void executeNoninteractive() throws Exception
@@ -564,6 +715,12 @@ public class SQLCommand
             }
             //* enable to debug */ else System.err.println("Read non-null batch line: (" + line + ")");
 
+            // handle statements that are converted to regular database commands
+            line = handleTranslatedCommands(line);
+            if (line == null) {
+                continue;
+            }
+
             // If the line is a FILE command - include the content of the file into the query queue
             Matcher fileMatcher = FileToken.matcher(line);
             if (fileMatcher.matches()) {
@@ -574,6 +731,7 @@ public class SQLCommand
                     continue;
                 }
             }
+
             // else treat the input line as a regular database command
 
             // Collect the lines ...
@@ -757,6 +915,13 @@ public class SQLCommand
                       GoToken.matcher(line).matches()) {
                     continue;
                 }
+
+                // handle statements that are converted to regular database commands
+                line = handleTranslatedCommands(line);
+                if (line == null) {
+                    continue;
+                }
+
                 // Recursively process FILE commands, any failure will cause a recursive failure
                 Matcher fileMatcher = FileToken.matcher(line);
                 if (fileMatcher.matches()) {
@@ -770,6 +935,7 @@ public class SQLCommand
                         return null;
                     }
                 }
+
                 query.append(line);
                 query.append("\n");
             }
@@ -906,7 +1072,7 @@ public class SQLCommand
                     if (objectParams[1] != null) {
                         depfile = new File((String)objectParams[1]);
                     }
-                    printResponse(VoltDB.updateApplicationCatalog(catfile, depfile));
+                    printDdlResponse(VoltDB.updateApplicationCatalog(catfile, depfile));
 
                     // Need to update the stored procedures after a catalog change (could have added/removed SPs!).  ENG-3726
                     loadStoredProcedures(Procedures, Classlist);
@@ -916,7 +1082,7 @@ public class SQLCommand
                     if (objectParams[0] != null) {
                         jarfile = new File((String)objectParams[0]);
                     }
-                    printResponse(VoltDB.updateClasses(jarfile, (String)objectParams[1]));
+                    printDdlResponse(VoltDB.updateClasses(jarfile, (String)objectParams[1]));
                     // Need to reload the procedures and classes
                     loadStoredProcedures(Procedures, Classlist);
                 }
@@ -946,10 +1112,13 @@ public class SQLCommand
             }
             else { // All other commands get forwarded to @AdHoc
                 query = StripCRLF.matcher(query).replaceAll(" ");
-                printResponse(VoltDB.callProcedure("@AdHoc", query));
                 // if the query was DDL, reload the stored procedures.
                 if (SQLLexer.extractDDLToken(query) != null) {
+                    printDdlResponse(VoltDB.callProcedure("@AdHoc", query));
                     loadStoredProcedures(Procedures, Classlist);
+                }
+                else {
+                    printResponse(VoltDB.callProcedure("@AdHoc", query));
                 }
             }
         } catch(Exception exc) {
@@ -1030,10 +1199,19 @@ public class SQLCommand
                 rowCount = t.fetchRow(0).getLong(0);
             }
             if (m_outputShowMetadata) {
-                System.out.printf("\n\n(Returned %d rows in %.2fs)\n",
+                System.out.printf("(Returned %d rows in %.2fs)\n",
                         rowCount, elapsedTime / 1000000000.0);
             }
         }
+    }
+
+    private static void printDdlResponse(ClientResponse response) throws Exception {
+        if (response.getStatus() != ClientResponse.SUCCESS) {
+            throw new Exception("Execution Error: " + response.getStatusString());
+        }
+        //TODO: In the future, if/when we change the prompt when waiting for the remainder of an unfinished command,
+        // successful DDL commands may just silently return to a normal prompt without this verbose feedback.
+        System.out.println("Command succeeded.");
     }
 
     // VoltDB connection support
@@ -1167,6 +1345,7 @@ public class SQLCommand
         + "  Causes the utility to stop immediately or continue after detecting an error.\n"
         + "  In interactive mode, a value of \"true\" discards any unprocessed input\n"
         + "  and returns to the command prompt.\n"
+        + "\n"
         + "[--debug]\n"
         + "  Causes the utility to print out stack traces for all exceptions.\n"
         );
@@ -1325,6 +1504,16 @@ public class SQLCommand
     private static InputStream in = null;
     private static OutputStream out = null;
 
+
+    private static String extractArgInput(String arg) {
+        // the input arguments has "=" character when this function is called
+        String[] splitStrings = arg.split("=", 2);
+        if (splitStrings[1].isEmpty()) {
+            printUsage("Missing input value for " + splitStrings[0]);
+        }
+        return splitStrings[1];
+    }
+
     // Application entry point
     public static void main(String args[])
     {
@@ -1336,20 +1525,21 @@ public class SQLCommand
         String password = "";
         String kerberos = "";
         List<String> queries = null;
+        String ddlFile = "";
 
         // Parse out parameters
         for (int i = 0; i < args.length; i++) {
             String arg = args[i];
             if (arg.startsWith("--servers=")) {
-                serverList = arg.split("=")[1];
+                serverList = extractArgInput(arg);
             } else if (arg.startsWith("--port=")) {
-                port = Integer.valueOf(arg.split("=")[1]);
+                port = Integer.valueOf(extractArgInput(arg));
             } else if (arg.startsWith("--user=")) {
-                user = arg.split("=")[1];
+                user = extractArgInput(arg);
             } else if (arg.startsWith("--password=")) {
-                password = arg.split("=")[1];
+                password = extractArgInput(arg);
             } else if (arg.startsWith("--kerberos=")) {
-                kerberos = arg.split("=")[1];
+                kerberos = extractArgInput(arg);
             } else if (arg.startsWith("--kerberos")) {
                 kerberos = "VoltDBClient";
             } else if (arg.startsWith("--query=")) {
@@ -1364,7 +1554,7 @@ public class SQLCommand
                 }
             }
             else if (arg.startsWith("--output-format=")) {
-                String formatName = arg.split("=")[1].toLowerCase();
+                String formatName = extractArgInput(arg).toLowerCase();
                 if (formatName.equals("fixed")) {
                     m_outputFormatter = new SQLCommandOutputFormatterDefault();
                 }
@@ -1385,7 +1575,7 @@ public class SQLCommand
                 m_debug = true;
             }
             else if (arg.startsWith("--stop-on-error=")) {
-                String optionName = arg.split("=")[1].toLowerCase();
+                String optionName = extractArgInput(arg).toLowerCase();
                 if (optionName.equals("true")) {
                     m_stopOnError = true;
                 }
@@ -1394,6 +1584,14 @@ public class SQLCommand
                 }
                 else {
                     printUsage("Invalid value for --stop-on-error");
+                }
+            }
+            else if (arg.startsWith("--ddl-file=")) {
+                String ddlFilePath = extractArgInput(arg);
+                try {
+                    ddlFile = new Scanner(new File(ddlFilePath)).useDelimiter("\\Z").next();
+                } catch (FileNotFoundException e) {
+                    printUsage("DDL file not found at path:" + ddlFilePath);
                 }
             }
             else if (arg.equals("--help")) {
@@ -1434,6 +1632,13 @@ public class SQLCommand
         }
 
         try {
+            if (! ddlFile.equals("")) {
+                // fast DDL Loader mode
+                // System.out.println("fast DDL Loader mode with DDL input:\n" + ddlFile);
+                VoltDB.callProcedure("@AdHoc", ddlFile);
+                System.exit(m_exitCode);
+            }
+
             // Load system procedures
             loadSystemProcedures();
 

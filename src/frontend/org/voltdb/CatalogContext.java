@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -67,6 +67,10 @@ public class CatalogContext {
     public final long m_transactionId;
     public long m_uniqueId;
     public final JdbcDatabaseMetaDataGenerator m_jdbc;
+    // Default procs are loaded on the fly
+    // The DPM knows which default procs COULD EXIST
+    //  and also how to get SQL for them.
+    public final DefaultProcedureManager m_defaultProcs;
 
     /*
      * Planner associated with this catalog version.
@@ -128,7 +132,9 @@ public class CatalogContext {
         this.deploymentHash = CatalogUtil.makeCatalogOrDeploymentHash(deploymentBytes);
         m_memoizedDeployment = null;
 
-        m_jdbc = new JdbcDatabaseMetaDataGenerator(catalog, m_jarfile);
+        m_defaultProcs = new DefaultProcedureManager(database);
+
+        m_jdbc = new JdbcDatabaseMetaDataGenerator(catalog, m_defaultProcs, m_jarfile);
         m_ptool = new PlannerTool(cluster, database, version);
         catalogVersion = version;
 
