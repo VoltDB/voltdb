@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -59,7 +59,7 @@ import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.hll.MurmurHash;
 
-public class AsyncBenchmark {
+public class UniqueDevicesClient {
 
     // handy, rather than typing this out several times
     static final String HORIZONTAL_RULE =
@@ -144,7 +144,7 @@ public class AsyncBenchmark {
      *
      * @param config Parsed & validated CLI options.
      */
-    public AsyncBenchmark(UniqueDevicesConfig config) {
+    public UniqueDevicesClient(UniqueDevicesConfig config) {
         this.config = config;
 
         generator = new UniqueIdGenerator(config.appcount);
@@ -385,9 +385,9 @@ public class AsyncBenchmark {
     public static void main(String[] args) throws Exception {
         // create a configuration from the arguments
         UniqueDevicesConfig config = new UniqueDevicesConfig();
-        config.parse(AsyncBenchmark.class.getName(), args);
+        config.parse(UniqueDevicesClient.class.getName(), args);
 
-        AsyncBenchmark benchmark = new AsyncBenchmark(config);
-        benchmark.runBenchmark();
+        UniqueDevicesClient udc = new UniqueDevicesClient(config);
+        udc.runBenchmark();
     }
 }

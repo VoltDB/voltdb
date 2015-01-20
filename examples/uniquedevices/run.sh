@@ -121,7 +121,7 @@ function rejoin() {
 function client() {
     jars-ifneeded
     java -classpath $CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
-        uniquedevices.AsyncBenchmark \
+        uniquedevices.UniqueDevicesClient \
         --displayinterval=5 \
         --duration=120 \
         --servers=localhost:21212 \
@@ -132,7 +132,7 @@ function client() {
 # Use this target for argument help
 function client-help() {
     jars-ifneeded
-    java -classpath $CLIENTCLASSPATH uniquedevices.AsyncBenchmark --help
+    java -classpath $CLIENTCLASSPATH uniquedevices.UniqueDevicesClient --help
 }
 
 function help() {

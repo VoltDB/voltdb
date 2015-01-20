@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2014 VoltDB Inc.
+ * Copyright (C) 2008-2015 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -24,9 +24,6 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-
-package org.voltdb.hll;
-
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements. See the NOTICE file distributed with this
@@ -43,6 +40,11 @@ package org.voltdb.hll;
  * License for the specific language governing permissions and limitations under
  * the License.
  */
+
+/* This code was originally sourced from https://github.com/addthis/stream-lib
+   in December 2014. */
+
+package org.voltdb.hll;
 
 /**
  * This is a very fast, non-cryptographic hash suitable for general hash-based

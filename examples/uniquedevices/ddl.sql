@@ -26,8 +26,8 @@ CREATE TABLE exact
 );
 PARTITION TABLE exact ON COLUMN appid;
 
--- Update classes from jar to that server will know about classes but not procedures yet.
-exec @UpdateClasses uniquedevices-procs.jar '';
+-- load classes from jar to that server will know about classes but not procedures yet.
+LOAD CLASSES uniquedevices-procs.jar;
 
 -- stored procedures
 
