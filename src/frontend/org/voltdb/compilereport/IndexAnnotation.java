@@ -30,6 +30,7 @@ import org.voltdb.catalog.Statement;
  *
  */
 public class IndexAnnotation {
+    // the statement is only used by LIMIT PARTITION ROW DELETE statement
     public SortedSet<Statement> statementsThatUseThis = new TreeSet<Statement>();
     public SortedSet<Procedure> proceduresThatUseThis = new TreeSet<Procedure>();
 }

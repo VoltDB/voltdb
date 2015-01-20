@@ -138,6 +138,10 @@ public class ReportMaker {
                 sb.append(StringUtils.join(procs, ", "));
                 sb.append("</p>");
             }
+            if (annotation.statementsThatUseThis.size() > 0) {
+                assert(annotation.statementsThatUseThis.size() == 1);
+                sb.append("<p>Used by the LIMIT PARTITION ROWS " + table.getTuplelimit() + " Statement</p>");
+            }
         }
 
         sb.append("</td></tr>\n");

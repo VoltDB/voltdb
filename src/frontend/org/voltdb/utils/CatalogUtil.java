@@ -23,6 +23,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.StringWriter;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.ByteBuffer;
@@ -40,7 +41,9 @@ import java.util.TreeSet;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBElement;
 import javax.xml.bind.JAXBException;
+import javax.xml.bind.Marshaller;
 import javax.xml.bind.Unmarshaller;
+import javax.xml.namespace.QName;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
@@ -81,15 +84,19 @@ import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.VoltCompiler;
+import org.voltdb.compiler.deploymentfile.AdminModeType;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
 import org.voltdb.compiler.deploymentfile.CommandLogType.Frequency;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ExportType;
+import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
+import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PropertyType;
+import org.voltdb.compiler.deploymentfile.ReplicationType;
 import org.voltdb.compiler.deploymentfile.SchemaType;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
@@ -104,16 +111,9 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.ConstraintType;
+import org.xml.sax.SAXException;
 
 import com.google_voltpatches.common.base.Charsets;
-import java.io.StringWriter;
-import javax.xml.bind.Marshaller;
-import javax.xml.namespace.QName;
-import org.voltdb.compiler.deploymentfile.AdminModeType;
-import org.voltdb.compiler.deploymentfile.HeartbeatType;
-import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
-import org.voltdb.compiler.deploymentfile.ReplicationType;
-import org.xml.sax.SAXException;
 
 /**
  *
@@ -1593,21 +1593,38 @@ public abstract class CatalogUtil {
         // LIMIT EXECUTE DELETE statements are parented by tables,
         // not stored procedures.
         CatalogType parent = stmt.getParent();
-        if (!(parent instanceof Procedure))
-                return;
 
+        if (!(parent instanceof Procedure)) {
+            IndexAnnotation ia = (IndexAnnotation) index.getAnnotation();
+            if (ia == null) {
+                ia = new IndexAnnotation();
+                index.setAnnotation(ia);
+            }
+            ia.statementsThatUseThis.add(stmt);
+
+            return ;
+        }
+
+        assert(parent instanceof Procedure);
         Procedure proc = (Procedure) parent;
+
         // skip CRUD generated procs
         if (proc.getDefaultproc()) {
             return;
         }
+
+        StatementAnnotation sa = (StatementAnnotation) stmt.getAnnotation();
+        if (sa == null) {
+            sa = new StatementAnnotation();
+            stmt.setAnnotation(sa);
+        }
+        sa.indexesUsed.add(index);
 
         IndexAnnotation ia = (IndexAnnotation) index.getAnnotation();
         if (ia == null) {
             ia = new IndexAnnotation();
             index.setAnnotation(ia);
         }
-        ia.statementsThatUseThis.add(stmt);
         ia.proceduresThatUseThis.add(proc);
 
         ProcedureAnnotation pa = (ProcedureAnnotation) proc.getAnnotation();
@@ -1616,13 +1633,6 @@ public abstract class CatalogUtil {
             proc.setAnnotation(pa);
         }
         pa.indexesUsed.add(index);
-
-        StatementAnnotation sa = (StatementAnnotation) stmt.getAnnotation();
-        if (sa == null) {
-            sa = new StatementAnnotation();
-            stmt.setAnnotation(sa);
-        }
-        sa.indexesUsed.add(index);
     }
 
     private static void updateTableUsageAnnotation(Table table, Statement stmt, boolean read) {
