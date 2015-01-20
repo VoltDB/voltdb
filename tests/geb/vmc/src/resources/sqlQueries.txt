@@ -175,7 +175,7 @@
 {"testName":"DdlDropView1","sqlCmd":"DROP view view1;","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
 {"testName":"DdlDropViews","sqlCmd":"DROP view view2 if exists;\nDROP view view3a if exists;\nDROP view view3b if exists;\nDROP view view_required if exists;\nDROP view view_allowed if exists;","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
 #
-# Create procedure tests: (there are other queries tested here: update, truncate, upsert)
+# Create procedure tests: (there are other queries not tested here: update, truncate, upsert)
 {"testName":"DdlCreateTableForProcedures","sqlCmd":"DROP table ddl_table if exists;\nCreate table ddl_table (i integer, j integer);","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
 {"testName":"DdlCreateProcedure1","sqlCmd":"Create procedure p1 as\n  insert into ddl_table values(1, 1);","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
 {"testName":"DdlCreateProcedure2","sqlCmd":"Create procedure p2a as\n  select i \nfrom ddl_table;\nCreate procedure p2b as\n delete from ddl_table;","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
