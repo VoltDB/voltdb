@@ -168,6 +168,8 @@ public class ExportManager
             if (m_generations.containsValue(drainedGeneration)) {
                 m_generations.remove(drainedGeneration.m_timestamp);
                 m_generationGhosts.add(drainedGeneration.m_timestamp);
+                //If I am draining current generation create new processor. Otherwise its just older on disk generations
+                // that are getting drained.
                 installNewProcessor = (m_processor.get().getExportGeneration() == drainedGeneration);
                 exportLog.info("Finished draining generation " + drainedGeneration.m_timestamp);
             } else {
@@ -188,6 +190,7 @@ public class ExportManager
                         newProcessor.setProcessorConfig(m_processorConfig);
                         newProcessor.readyForData();
                     } else {
+                        //Just set the next generation.
                         m_processor.get().setExportGeneration(nextGeneration);
                     }
 
@@ -212,6 +215,7 @@ public class ExportManager
                         }
                     }
                     if (installNewProcessor) {
+                        //If we installed new processor get old one to shutdown.
                         oldProcessor = m_processor.getAndSet(newProcessor);
                     }
                 }
