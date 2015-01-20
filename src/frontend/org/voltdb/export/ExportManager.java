@@ -163,28 +163,33 @@ public class ExportManager
     private void rollToNextGeneration(ExportGeneration drainedGeneration) throws Exception {
         ExportDataProcessor newProcessor = null;
         ExportDataProcessor oldProcessor = null;
+        boolean installNewProcessor = false;
         synchronized (ExportManager.this) {
-            boolean installNewProcessor = false;
             if (m_generations.containsValue(drainedGeneration)) {
                 m_generations.remove(drainedGeneration.m_timestamp);
                 m_generationGhosts.add(drainedGeneration.m_timestamp);
                 installNewProcessor = (m_processor.get().getExportGeneration() == drainedGeneration);
                 exportLog.info("Finished draining generation " + drainedGeneration.m_timestamp);
             } else {
+                installNewProcessor = false;
                 exportLog.warn("Finished draining a generation that is not known to export generations.");
             }
 
             try {
-                if (m_loaderClass != null && !m_generations.isEmpty() && installNewProcessor) {
-                    exportLog.info("Creating connector " + m_loaderClass);
-                    final Class<?> loaderClass = Class.forName(m_loaderClass);
-                    //Make it so
+                if (m_loaderClass != null && !m_generations.isEmpty()) {
+                    //Pick next generation.
                     ExportGeneration nextGeneration = m_generations.firstEntry().getValue();
-                    newProcessor = (ExportDataProcessor) loaderClass.newInstance();
-                    newProcessor.addLogger(exportLog);
-                    newProcessor.setExportGeneration(nextGeneration);
-                    newProcessor.setProcessorConfig(m_processorConfig);
-                    newProcessor.readyForData();
+                    if (installNewProcessor) {
+                        exportLog.info("Creating connector " + m_loaderClass);
+                        final Class<?> loaderClass = Class.forName(m_loaderClass);
+                        newProcessor = (ExportDataProcessor) loaderClass.newInstance();
+                        newProcessor.addLogger(exportLog);
+                        newProcessor.setExportGeneration(nextGeneration);
+                        newProcessor.setProcessorConfig(m_processorConfig);
+                        newProcessor.readyForData();
+                    } else {
+                        m_processor.get().setExportGeneration(nextGeneration);
+                    }
 
                     if (!nextGeneration.isContinueingGeneration()) {
                         /*
@@ -206,7 +211,9 @@ public class ExportManager
                             nextGeneration.acceptMastershipTask(partitionId);
                         }
                     }
-                    oldProcessor = m_processor.getAndSet(newProcessor);
+                    if (installNewProcessor) {
+                        oldProcessor = m_processor.getAndSet(newProcessor);
+                    }
                 }
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Error creating next export processor", true, e);
@@ -216,7 +223,7 @@ public class ExportManager
         /*
          * The old processor should shutdown if we installed a new processor.
          */
-        if (oldProcessor != null) {
+        if (oldProcessor != null && installNewProcessor) {
             oldProcessor.shutdown();
         }
         try {
@@ -257,9 +264,6 @@ public class ExportManager
      * @param partitionId
      */
     synchronized public void acceptMastership(int partitionId) {
-        if (m_loaderClass == null) {
-            return;
-        }
         Preconditions.checkArgument(
                 m_masterOfPartitions.add(partitionId),
                 "can't acquire mastership twice for partition id: " + partitionId
@@ -269,6 +273,9 @@ public class ExportManager
          * Only the first generation will have a processor which
          * makes it safe to accept mastership.
          */
+        if (m_generations.isEmpty() || m_generations.firstEntry() == null) {
+            return;
+        }
         ExportGeneration gen = m_generations.firstEntry().getValue();
         if (gen != null && gen.isContinueingGeneration()) {
             gen.acceptMastershipTask(partitionId);
@@ -369,7 +376,7 @@ public class ExportManager
                 if (!m_generations.containsKey(catalogContext.m_uniqueId)) {
                     final ExportGeneration currentGeneration = new ExportGeneration(
                             catalogContext.m_uniqueId,
-                            exportOverflowDirectory, isRejoin, true);
+                            exportOverflowDirectory, isRejoin);
                     currentGeneration.setGenerationDrainRunnable(new GenerationDrainRunnable(currentGeneration));
                     currentGeneration.initializeGenerationFromCatalog(conn, m_hostId, m_messenger, partitions);
                     m_generations.put(catalogContext.m_uniqueId, currentGeneration);
@@ -498,7 +505,7 @@ public class ExportManager
         ExportGeneration newGeneration = null;
         try {
             newGeneration = new ExportGeneration(
-                    catalogContext.m_uniqueId, exportOverflowDirectory, false, false);
+                    catalogContext.m_uniqueId, exportOverflowDirectory, false);
             newGeneration.setGenerationDrainRunnable(new GenerationDrainRunnable(newGeneration));
             newGeneration.initializeGenerationFromCatalog(conn, m_hostId, m_messenger, partitions);
             m_generations.put(catalogContext.m_uniqueId, newGeneration);

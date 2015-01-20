@@ -161,10 +161,10 @@ public class ExportGeneration {
      * @param exportOverflowDirectory
      * @throws IOException
      */
-    public ExportGeneration(long txnId, File exportOverflowDirectory, boolean isRejoin, boolean iscontinueing) throws IOException {
+    public ExportGeneration(long txnId, File exportOverflowDirectory, boolean isRejoin) throws IOException {
         m_timestamp = txnId;
         m_directory = new File(exportOverflowDirectory, Long.toString(txnId));
-        m_isContinueingGeneration = iscontinueing;
+        m_isContinueingGeneration = true;
         if (!isRejoin) {
             if (!m_directory.mkdirs()) {
                 throw new IOException("Could not create " + m_directory);
