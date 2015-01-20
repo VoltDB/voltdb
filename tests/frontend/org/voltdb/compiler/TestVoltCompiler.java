@@ -3588,9 +3588,9 @@ public class TestVoltCompiler extends TestCase {
                 "create procedure p1 allow as select * from books;");
         badDDLAgainstSimpleSchema(".*expected syntax.*",
                 "create procedure p1 allow a b as select * from books;");
-        badDDLAgainstSimpleSchema(".*group rx that does not exist.*",
+        badDDLAgainstSimpleSchema(".*role rx that does not exist.*",
                 "create procedure p1 allow rx as select * from books;");
-        badDDLAgainstSimpleSchema(".*group rx that does not exist.*",
+        badDDLAgainstSimpleSchema(".*role rx that does not exist.*",
                 "create role r1;",
                 "create procedure p1 allow r1, rx as select * from books;");
     }
