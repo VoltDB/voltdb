@@ -332,7 +332,7 @@ public class ExportGeneration {
                                 KeeperException.Code code = KeeperException.Code.get(rc);
                                 if (code != KeeperException.Code.OK) {
                                     VoltDB.crashLocalVoltDB(
-                                            "Error in export leader election for",
+                                            "Error in export leader election",
                                             true,
                                             KeeperException.create(code));
                                 }
