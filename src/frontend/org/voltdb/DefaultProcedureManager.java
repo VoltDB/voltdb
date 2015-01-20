@@ -35,6 +35,7 @@ import org.voltdb.catalog.ProcParameter;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
 import org.voltdb.types.ConstraintType;
+import org.voltdb.utils.CatalogUtil;
 
 /**
  * The DefaultProcedureManager is the hub for all default procedure code and it lives in the
@@ -66,9 +67,7 @@ public class DefaultProcedureManager {
     }
 
     private void build() {
-        // skip this for ENG-7523 -- rollback when that bug is fixed
-
-        /*for (Table table : m_db.getTables()) {
+        for (Table table : m_db.getTables()) {
             String prefix = table.getTypeName() + '.';
 
             // skip export tables XXX why no insert?
@@ -151,7 +150,7 @@ public class DefaultProcedureManager {
             addShimProcedure(prefix + "update", table, pkey, true, columnCount + pkeyPartitionIndex, partitioncolumn, false);
             // upsert partitions like a regular insert
             addShimProcedure(prefix + "upsert", table, null, true, partitionIndex, partitioncolumn, false);
-        }*/
+        }
     }
 
     public String sqlForDefaultProc(Procedure defaultProc) {
