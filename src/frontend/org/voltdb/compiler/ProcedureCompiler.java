@@ -299,7 +299,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
         for (String groupName : procedureDescriptor.m_authGroups) {
             final Group group = db.getGroups().get(groupName);
             if (group == null) {
-                throw compiler.new VoltCompilerException("Procedure " + className + " has a group " + groupName + " that does not exist");
+                throw compiler.new VoltCompilerException("Procedure " + className + " allows access by a role " + groupName + " that does not exist");
             }
             final GroupRef groupRef = procedure.getAuthgroups().add(groupName);
             groupRef.setGroup(group);
@@ -663,7 +663,7 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
         for (String groupName : procedureDescriptor.m_authGroups) {
             final Group group = db.getGroups().get(groupName);
             if (group == null) {
-                throw compiler.new VoltCompilerException("Procedure " + className + " has a group " + groupName + " that does not exist");
+                throw compiler.new VoltCompilerException("Procedure " + className + " allows access by a role " + groupName + " that does not exist");
             }
             final GroupRef groupRef = procedure.getAuthgroups().add(groupName);
             groupRef.setGroup(group);

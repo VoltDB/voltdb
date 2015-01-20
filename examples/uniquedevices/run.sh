@@ -36,7 +36,7 @@ APPCLASSPATH=$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_LIB"/*.jar; \
     \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
 } 2> /dev/null | paste -sd ':' - )
-CLIENTCLASSPATH=ddlwindowing-client.jar:$CLASSPATH:$({ \
+CLIENTCLASSPATH=uniquedevices-client.jar:$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdbclient-*.jar; \
     \ls -1 "$VOLTDB_LIB"/commons-cli-1.2.jar; \
 } 2> /dev/null | paste -sd ':' - )
@@ -46,81 +46,98 @@ HOST="localhost"
 
 # remove binaries, logs, runtime artifacts, etc... but keep the jars
 function clean() {
-    rm -rf client/ddlwindowing/*.class debugoutput \
-           voltdbroot log catalog-report.html statement-plans
+    rm -rf voltdbroot log \
+        hyperloglogsrc/uniquedevices/org/voltdb/hll/*.class \
+        procedures/uniquedevices/*.class \
+        client/uniquedevices/*.class
 }
 
 # remove everything from "clean" as well as the jarfiles
 function cleanall() {
     clean
-    rm -rf ddlwindowing-client.jar
+    rm -rf uniquedevices-procs.jar uniquedevices-client.jar
 }
 
-# compile the source code for the client into a jarfile
+# compile the source code for procedures and the client into jarfiles
 function jars() {
     # compile java source
-    javac -target 1.7 -source 1.7 -classpath $CLIENTCLASSPATH client/ddlwindowing/*.java
+    javac -target 1.7 -source 1.7 \
+        hyperloglogsrc/org/voltdb/hll/HyperLogLog.java \
+        hyperloglogsrc/org/voltdb/hll/MurmurHash.java \
+        hyperloglogsrc/org/voltdb/hll/RegisterSet.java
+    javac -target 1.7 -source 1.7 -classpath hyperloglogsrc:$APPCLASSPATH \
+        procedures/uniquedevices/*.java
+    javac -target 1.7 -source 1.7 -classpath hyperloglogsrc:$CLIENTCLASSPATH \
+        client/uniquedevices/*.java
     # build procedure and client jars
-    jar cf ddlwindowing-client.jar -C client ddlwindowing
+    jar cf uniquedevices-procs.jar -C procedures uniquedevices
+    jar uf uniquedevices-procs.jar -C hyperloglogsrc org
+    jar cf uniquedevices-client.jar -C client uniquedevices
+    jar uf uniquedevices-client.jar -C hyperloglogsrc org
     # remove compiled .class files
-    rm -rf client/ddlwindowing/*.class
+    rm -rf \
+        procedures/uniquedevices/*.class \
+        hyperloglogsrc/org/org/voltdb/hll/*.class \
+        client/uniquedevices/*.class
 }
 
 # compile the procedure and client jarfiles if they don't exist
 function jars-ifneeded() {
-    if [ ! -e voter-client.jar ]; then
+    if [ ! -e uniquedevices-procs.jar ] || [ ! -e uniquedevices-client.jar ]; then
         jars;
     fi
 }
 
 # run the voltdb server locally
 function server() {
-    # run the server
     echo "Starting the VoltDB server."
     echo "To perform this action manually, use the command line: "
     echo
-    echo "voltdb create -l $LICENSE -H $HOST"
+    echo "voltdb create -d deployment.xml -l $LICENSE -H $HOST"
     echo
-    voltdb create -l $LICENSE -H $HOST
+    voltdb create -d deployment.xml -l $LICENSE -H $HOST
 }
 
-# load schema
+# load schema and procedures
 function init() {
     jars-ifneeded
     sqlcmd < ddl.sql
 }
 
-# Use this target for argument help
-function client-help() {
+function nohup_server() {
     jars-ifneeded
-    java -classpath $CLIENTCLASSPATH ddlwindowing.WindowingApp --help
+    # run the server
+    nohup $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST > nohup.log 2>&1 &
+    sqlcmd < ddl.sql
 }
 
-## USAGE FOR CLIENT TARGET ##
-# usage: ddlwindowing.WindowingApp
-#     --displayinterval <arg>   Interval for performance feedback, in
-#                               seconds.
-#     --duration <arg>          Duration, in seconds.
-#                               history target.
-#     --password <arg>          Password for connection.
-#     --ratelimit <arg>         Maximum TPS rate for inserts.
-#     --servers <arg>           Comma separated list of the form
-#                               server[:port] to connect to.
-#     --user <arg>              User name for connection.
+# run the voltdb server locally
+function rejoin() {
+    # run the server
+    voltdb rejoin -H $HOST -d deployment.xml -l $LICENSE
+}
 
+# run the client that drives the example
 function client() {
     jars-ifneeded
-    # Note that in the command below, maxrows and historyseconds can't both be non-zero.
     java -classpath $CLIENTCLASSPATH -Dlog4j.configuration=file://$LOG4J \
-        ddlwindowing.WindowingApp \
+        uniquedevices.UniqueDevicesClient \
         --displayinterval=5 \
         --duration=120 \
         --servers=localhost:21212 \
-        --ratelimit=20000
+        --appcount=100
+}
+
+# Asynchronous benchmark sample
+# Use this target for argument help
+function client-help() {
+    jars-ifneeded
+    java -classpath $CLIENTCLASSPATH uniquedevices.UniqueDevicesClient --help
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|cleanall|jars|server|init|client|client-help}"
+    echo "Usage: ./run.sh {clean|server|init|client|async-benchmark|aysnc-benchmark-help|...}"
+    echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark|jdbc-benchmark-help}"
 }
 
 # Run the target passed as the first arg on the command line
