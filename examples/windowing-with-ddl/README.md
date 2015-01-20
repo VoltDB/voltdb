@@ -61,7 +61,7 @@ Rows are deleted automatically by a trigger defined in the LIMIT PARTITION ROWS 
       val BIGINT NOT NULL,
       update_ts TIMESTAMP NOT NULL,
       CONSTRAINT update_ts_uuid_unique UNIQUE (update_ts, uuid),
-      CONSTRAINT row_limit LIMIT PARTITION ROWS 165000
+      CONSTRAINT row_limit LIMIT PARTITION ROWS 82500
         EXECUTE (DELETE FROM timedata
                  WHERE update_ts
                        < TO_TIMESTAMP(SECOND, SINCE_EPOCH(SECOND, NOW) - 30)
@@ -69,13 +69,13 @@ Rows are deleted automatically by a trigger defined in the LIMIT PARTITION ROWS 
     );
     PARTITION TABLE timedata ON COLUMN uuid;
 
-The constraint caps each partition of the table to 165000 rows, and also says to execute a DELETE statement if an insert would cause the table to exceed the cap.  In this case, the DELETE statement says to get rid of the oldest rows that are older than 30 seconds, but not more than 1,500 rows at one go.  Being able to define a DELETE statement that helps to enforce a LIMIT PARTITON ROWS constraint is a new feature in version 5.0.
+The constraint caps each partition of the table to 82,500 rows, and also says to execute a DELETE statement if an insert would cause the table to exceed the cap.  In this case, the DELETE statement says to get rid of the oldest rows that are older than 30 seconds, but not more than 1,500 rows at one go.  Being able to define a DELETE statement that helps to enforce a LIMIT PARTITON ROWS constraint is a new feature in version 5.0.
 
-If the insertion rate is 20k rows per second, then 600k rows are produced in 30 seconds.  A cluster one host and 4 sites per host would need to store about 150k rows per partition.  We allow a little bit of leeway to ensure that we never fail to clear out space for new tuples and cap each partition of the table at 165,000 rows.  These settings (insertion rate of 20k per second and a 4-site configuration) are the default for this application.
+If the insertion rate is 20k rows per second, then 600k rows are produced in 30 seconds.  A cluster with one host and 8 sites per host would need to store about 75k rows per partition.  We allow a little bit of leeway to ensure that we never fail to clear out space for new tuples and cap each partition of the table at 82,500 rows.  These settings (insertion rate of 20k per second and an 8-site configuration) are the default for this application.
 
-It's important to note that the DELETE statement triggered by a LIMIT PARTITION ROWS CONSTRAINT is executed within the context of a single partition.  Any individual invocation of the statement deletes the oldest rows on *one* partition only.  But since rows are being inserted at a high rate, and we expect the hashing function to distribute the rows evenly across all partitions, the net effect of the DELETE statement is to age out old rows in the table as a whole.
+It's important to note that the DELETE statement triggered by a LIMIT PARTITION ROWS constraint is executed within the context of a single partition.  Any individual invocation of the statement deletes the oldest rows on *one* partition only.  But since rows are being inserted at a high rate, and we expect the hashing function to distribute the rows evenly across all partitions, the net effect of the DELETE statement is to age out old rows in the table as a whole.
 
-The DELETE statement makes use of an ORDER BY and LIMIT clause, which is also newly supported in version 5.0. In order to support VoltDB features like replication and command log replay, any data manipulation must be executed deterministically, such that the effect is identical across multiple executions of the statement.  Therefore, it's a requirement of DELETE with ORDER BY and LIMIT that the ORDER BY clause defines a unique ordering.  
+The DELETE statement makes use of an ORDER BY and LIMIT clause, which is also newly supported in version 5.0. In order to support VoltDB features like replication and command log replay, any data manipulation must be executed deterministically, such that the effect is identical across multiple executions of the statement.  Therefore, it's a requirement of DELETE with ORDER BY and LIMIT that the ORDER BY clause defines a unique ordering.
 
 To address this requirement in this example, we've defined a UNIQUE constraint on `update_ts` and `uuid`.  The UNIQUE constraint is implemented as a tree index under the hood and achieves two things: it ensures that the DELETE is deterministic, and also provides an efficient way to evaluate the WHERE and ORDER BY of the DELETE without resorting to doing a sequential scan and sorting all of the rows.
 
