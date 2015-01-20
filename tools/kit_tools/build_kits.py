@@ -175,14 +175,16 @@ if len(sys.argv) == 3:
     if voltdbTreeish != proTreeish:
         oneOff = True     #force oneoff when not same tag/branch
 
+build_args=""
+distVersion=""
+
 try:
     build_args = os.environ['VOLTDB_BUILD_ARGS']
     if 'dist.version' in build_args:
         distVersion = re.search('dist.version=(\S+)\s+', build_args).group(1)
         print "Found dist.version in VOLTDB_BUILD_ARGS. Setting version to " + distVersion
 except:
-    build_args=""
-    distVersion = ""
+    pass
 
 print "Building with pro: %s and voltdb: %s" % (proTreeish, voltdbTreeish)
 
