@@ -1,15 +1,15 @@
 Unique Devices application
 ===========================
 
-This example application solves a specific problem. Assume you offer a service to mobile app developers. Every time someone starts a mobile app, a message is sent to your service containing the application identifier and a unique id representing the device. Your service gives them a precise estimate of how many unique devices have used their app for any given day.
+This example application solves a specific problem. Assume you offer a service to mobile app developers. Every time someone starts a mobile app, a message is sent to your service containing the application identifier and a unique id representing the device. Your service gives developers a bounded estimate of how many unique devices have used their app on any given day.
 
-This is based on a presentation that Ed Solovey of Twitter (formerly Crashlytics) has given several talks on their use of the Lambda Architecture for their service, including a [20 minute presentation](http://youtu.be/56wy_mGEnzQ) from October 2014 at the Boston Facebook @Scale Conference. He essentially describes this problem and how they solved it at a scale of 800,000 messages per second using the [Lambda Architecture](http://en.wikipedia.org/wiki/Lambda_architecture).
+This example app was developed in response to a presentation that Ed Solovey of Twitter (formerly Crashlytics) has given several times, including a [20 minute presentation](http://youtu.be/56wy_mGEnzQ) from October 2014 at the Boston Facebook @Scale Conference. The presentation describes their use of the [Lambda Architecture](http://en.wikipedia.org/wiki/Lambda_architecture) for their service. Solovey  describes this problem and how they solved it at a scale of 800,000 messages per second. 
 
-A key point of Ed's presentation and this sample app is that the volume of data is so large that counting unique devices is often impractical and a realistic approach is to use a cardinality estimation algorithm. In this case HyperLogLog is used (http://en.wikipedia.org/wiki/HyperLogLog). This example app shows that it's possible, and in fact, easy, to leverage a third party software library in VoltDB stored processing. In this case, an open source HLL library was sourced [here](https://github.com/addthis/stream-lib) and modified slightly, then directly used in VoltDB to processes binary blogs and estimate cardinality at a high rate.
+A key point of Ed's presentation and this sample app is that the volume of data is so large that counting unique devices is often impractical and a realistic approach is to use a cardinality estimation algorithm. In this case [HyperLogLog](http://en.wikipedia.org/wiki/HyperLogLog) is used. This example app shows that it's possible, and in fact, easy, to leverage a third party software library in VoltDB stored procedure code. In this example application, an open source HLL library was sourced [here](https://github.com/addthis/stream-lib) and modified slightly, then directly used in VoltDB to processes binary blobs and estimate cardinality at a high rate.
 
 Alternate Versions
 ----------
-The example can be run in 3 different modes by changing the name of the procedure called by the client to one of three provided choices:
+The example can be run in three different modes by changing the name of the procedure called by the client to one of three provided choices:
 
 * **CountDeviceEstimate** uses HyperLogLog to provide estimate values for the number of unique devices per app.
 * **CountDeviceExact** uses traditional indexes to exactly count unique devices per app. It is slower and requires much more space when the number of unique devices is large.
@@ -19,15 +19,15 @@ To switch between versions, change the source of AsyncBenchmark.java around line
 
 Benefits of ACID Consistency
 ----------
-In the default mode, where the app is using HyperLogLog to estimate counts, the system uses VoltDB's strong consistency to transacitonally store the integer estimate value in the table, along with the blob representing the HLL data structure. This model of transactionally reading, processing and updating is something VoltDB excells at. Now, since the estimate value is always 100% current and easily accessible via SQL queries, using the data is easier, and the complexity of the HLL algorithm is limited to a single piece of stored logic. In fact, whether the processing is using HLL, exact counts or a hybrid mode can be abstracted away from any clients consuming the data.
+In the default mode, where the app is using HyperLogLog to estimate counts, the system uses VoltDB's strong consistency to transacitonally store the integer estimate value in the table, along with the blob representing the HLL data structure. This model of transactionally reading, processing and updating is something VoltDB excels at. Because the estimate value is always 100% current and easily accessible via SQL queries, using the data is easier, and the complexity of the HLL algorithm is limited to a single piece of stored logic. In fact, whether the processing is using HLL, exact counts or a hybrid mode can be abstracted away from any clients consuming the data.
 
 ACID consistency is also key to the simplicity of the hybrid estimate code. Without a transactional handoff between the exact count and the estimated values, it's much harder to claim the exact values are actually exact under the conditions promised.
 
-Finally, it is not a difficult exercise to add a history table to this example and keep daily history for each app in VoltDB. One would need to add some logic to the core processing to check for date rollover since the last call, then to store the current estimates in the history table, then reset the new day's data to zero. With ACID consistency, the code to do this is a handful of if-statements, a huge win over less consistent systems. Now this could replace the batch layer of a basic Lambda Architecture implementation.
+Finally, it is not a difficult exercise to add a history table to this example and keep daily history for each app in VoltDB. One would need to add some logic to the core processing to check for date rollover since the last call, then to store the current estimates in the history table, then reset the new day's data to zero. With ACID consistency, the code to do this is a handful of if-statements, a huge win over less consistent systems. This could replace the batch layer of a basic Lambda Architecture implementation.
 
 Quickstart
 -----------
-VoltDB Examples come with a run.sh script that sets up some environment and saves some of the typing needed to work with Java clients. It should be fairly readable to show what is precisely being run to accomplish a given task.
+VoltDB Examples come with a run.sh script that sets up the environment and saves some of the typing needed to work with Java clients. It should be fairly readable to show what, precisely, is being run to accomplish a given task.
 
 1. Make sure "bin" inside the VoltDB kit is in your path.
 2. Type "voltdb create" to start an empty, single-node VoltDB server.
