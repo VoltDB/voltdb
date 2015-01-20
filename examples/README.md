@@ -10,6 +10,12 @@ The following projects are included in the examples directory:
   This example shows how to use flexible schema and JSON within
   a VoltDB application.
 
+### uniquedevices ###
+  This example counts unique device ids as they stream into VoltDB. It
+  demonstrates VoltDB's stream processing power and the use of external
+  libraries in Java stored procedures. It is loosely based on a real problem
+  previously solved using the Lambda architecture.
+
 ### voltkv ###
   This directory contains the sources for the "Key-Value" implementation
   in VoltDB.
@@ -19,8 +25,9 @@ The following projects are included in the examples directory:
   where callers are allowed a limited number of votes.
 
 ### windowing ###
-
-This example shows an application that takes in time-series data, runs analytic queries over several time-windows, and deletes older data as it either ages out or passes a rowcount threshold.
+  This example shows an application that takes in time-series data,
+  runs analytic queries over several time-windows, and deletes older
+  data as it either ages out or passes a rowcount threshold.
 
 Getting Started
 --------------------------
