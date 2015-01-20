@@ -143,7 +143,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     // default procs that are auto-generated and whose plans might not be
     // loaded everywhere. Also used for @LoadMultipartitionTable because it
     // leverages the default procs' plan.
-    String m_procNameToLoad = null;
+    byte[] m_procNameToLoad = null;
 
     // context for long running fragment status log messages
     byte[] m_procedureName = null;
@@ -357,11 +357,25 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     }
 
     public void setProcNameToLoad(String procNameToLoad) {
+        if (procNameToLoad != null) {
+            m_procNameToLoad = procNameToLoad.getBytes(Charsets.UTF_8);
+        }
+        else {
+            m_procNameToLoad = null;
+        }
+    }
+
+    public void setProcNameToLoad(byte[] procNameToLoad) {
         m_procNameToLoad = procNameToLoad;
     }
 
     public String getProcNameToLoad() {
-        return m_procNameToLoad;
+        if (m_procNameToLoad != null) {
+            return new String(m_procNameToLoad, Charsets.UTF_8);
+        }
+        else {
+            return null;
+        }
     }
 
     public boolean isFinalTask() {
@@ -544,7 +558,12 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         int msgsize = super.getSerializedSize();
 
         // Fixed header
-        msgsize += 2 + 2 + 1 + 1 + 1 + 1 + 1;
+        msgsize += 2 + 2 + 1 + 1 + 1 + 1 + 1 + 2;
+
+        // procname to load str if any
+        if (m_procNameToLoad != null) {
+            msgsize += m_procNameToLoad.length;
+        }
 
         // Fragment ID block (20 bytes per sha1-hash)
         msgsize += 20 * m_items.size();
@@ -657,9 +676,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         buf.put(nOutputDepIds > 0 ? (byte) 1 : (byte) 0);
         buf.put(nInputDepIds  > 0 ? (byte) 1 : (byte) 0);
         if (m_procNameToLoad != null) {
-            byte[] procNameToLoadBytes = m_procNameToLoad.getBytes(Charsets.UTF_8);
-            buf.putShort((short) procNameToLoadBytes.length);
-            buf.put(procNameToLoadBytes);
+            buf.putShort((short) m_procNameToLoad.length);
+            buf.put(m_procNameToLoad);
         }
         else {
             buf.putShort((short) -1);
@@ -772,9 +790,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         boolean haveInputDependencies = buf.get() != 0;
         short procNameToLoadBytesLen = buf.getShort();
         if (procNameToLoadBytesLen >= 0) {
-            byte[] procNameToLoadBytes = new byte[procNameToLoadBytesLen];
-            buf.get(procNameToLoadBytes);
-            m_procNameToLoad = new String(procNameToLoadBytes, Charsets.UTF_8);
+            m_procNameToLoad = new byte[procNameToLoadBytesLen];
+            buf.get(m_procNameToLoad);
         }
 
         m_items = new ArrayList<FragmentData>(fragCount);

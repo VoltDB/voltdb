@@ -63,6 +63,8 @@ import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 
+import com.google_voltpatches.common.base.Charsets;
+
 public class ProcedureRunner {
 
     private static final VoltLogger log = new VoltLogger("HOST");
@@ -91,7 +93,8 @@ public class ProcedureRunner {
     // default procs that are auto-generated and whose plans might not be
     // loaded everywhere. Also used for @LoadMultipartitionTable because it
     // leverages the default procs' plan.
-    String m_procNameToLoadForFragmentTasks = null;
+    // UTF-8 encoded string bytes
+    byte[] m_procNameToLoadForFragmentTasks = null;
 
     // reflected info
     //
@@ -529,7 +532,12 @@ public class ProcedureRunner {
     }
 
     public void setProcNameToLoadForFragmentTasks(String procName) {
-        m_procNameToLoadForFragmentTasks = procName;
+        if (procName != null) {
+            m_procNameToLoadForFragmentTasks = procName.getBytes(Charsets.UTF_8);
+        }
+        else {
+            m_procNameToLoadForFragmentTasks = null;
+        }
     }
 
     /*
@@ -1258,7 +1266,7 @@ public class ProcedureRunner {
                   long siteId,
                   boolean finalTask,
                   String procedureName,
-                  String procToLoad) {
+                  byte[] procToLoad) {
            m_batchSize = batchSize;
            m_txnState = txnState;
 

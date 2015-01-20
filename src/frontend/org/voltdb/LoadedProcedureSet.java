@@ -241,7 +241,7 @@ public class LoadedProcedureSet {
                 pr = m_runnerFactory.create(voltProc, newCatProc, m_csp);
                 // this will ensure any created fragment tasks know to load the plans
                 // for this plan-on-the-fly procedure
-                pr.m_procNameToLoadForFragmentTasks = catProc.getTypeName();
+                pr.setProcNameToLoadForFragmentTasks(catProc.getTypeName());
                 m_defaultProcCache.put(procName, pr);
             }
         }
