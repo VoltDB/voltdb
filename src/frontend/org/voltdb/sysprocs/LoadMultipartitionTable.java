@@ -164,13 +164,15 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
         int columnCount = table.getColumnCount();
 
         // find the insert statement for this table
-        String insertProcName = String.format("%s.insert", tableName);
+        String insertProcName = String.format("%s.insert", tableName.toUpperCase());
         Procedure proc = ctx.ensureDefaultProcLoaded(insertProcName);
         if (proc == null) {
             throw new VoltAbortException(
                     String.format("Unable to locate auto-generated CRUD insert statement for table %s",
                             tableName));
         }
+        // ensure MP fragment tasks load the plan for the table loading procedure
+        m_runner.setProcNameToLoadForFragmentTasks(insertProcName);
 
         Statement catStmt = proc.getStatements().get(VoltDB.ANON_STMT_NAME);
         if (catStmt == null) {
