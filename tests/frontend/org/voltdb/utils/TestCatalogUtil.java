@@ -59,7 +59,7 @@ public class TestCatalogUtil extends TestCase {
     protected void setUp() throws Exception {
         catalog = TPCCProjectBuilder.createTPCCSchemaCatalog();
         assertNotNull(catalog);
-        catalog_db = catalog.getClusters().get("cluster").getDatabases().get("database");
+        catalog_db = CatalogUtil.getDatabase(catalog);
         assertNotNull(catalog_db);
     }
 
@@ -167,19 +167,19 @@ public class TestCatalogUtil extends TestCase {
         final String tmpDef = MiscUtils.writeStringToTempFilePath(def);
         final String tmpBoom = MiscUtils.writeStringToTempFilePath(boom);
 
-        String msg = CatalogUtil.compileDeployment(catalog, tmpDep, false);
+        String msg = CatalogUtil.compileDeploymentForTest(catalog, tmpDep);
 
         assertEquals(30, catalog.getClusters().get("cluster").getHeartbeattimeout());
 
         catalog = new Catalog();
         Cluster cluster = catalog.getClusters().add("cluster");
         cluster.getDatabases().add("database");
-        msg = CatalogUtil.compileDeployment(catalog, tmpDef, false);
+        msg = CatalogUtil.compileDeploymentForTest(catalog, tmpDef);
         assertEquals(org.voltcore.common.Constants.DEFAULT_HEARTBEAT_TIMEOUT_SECONDS,
                 catalog.getClusters().get("cluster").getHeartbeattimeout());
 
         // This returns -1 on schema violation
-        msg = CatalogUtil.compileDeployment(catalog, tmpBoom, false);
+        msg = CatalogUtil.compileDeploymentForTest(catalog, tmpBoom);
         assertTrue(msg != null);
         assertTrue(msg.contains("Error parsing deployment file"));
     }
@@ -203,13 +203,13 @@ public class TestCatalogUtil extends TestCase {
             "</deployment>";
 
         final String tmpDepOff = MiscUtils.writeStringToTempFilePath(depOff);
-        CatalogUtil.compileDeployment(catalog, tmpDepOff, false);
+        CatalogUtil.compileDeploymentForTest(catalog, tmpDepOff);
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
         assertFalse(db.getSnapshotschedule().get("default").getEnabled());
 
         setUp();
         final String tmpDepOn = MiscUtils.writeStringToTempFilePath(depOn);
-        CatalogUtil.compileDeployment(catalog, tmpDepOn, false);
+        CatalogUtil.compileDeploymentForTest(catalog, tmpDepOn);
         db = catalog.getClusters().get("cluster").getDatabases().get("database");
         assertFalse(db.getSnapshotschedule().isEmpty());
         assertTrue(db.getSnapshotschedule().get("default").getEnabled());
@@ -249,19 +249,19 @@ public class TestCatalogUtil extends TestCase {
             "</deployment>";
 
         final String tmpSecOff = MiscUtils.writeStringToTempFilePath(secOff);
-        CatalogUtil.compileDeployment(catalog, tmpSecOff, false);
+        CatalogUtil.compileDeploymentForTest(catalog, tmpSecOff);
         Cluster cluster =  catalog.getClusters().get("cluster");
         assertFalse(cluster.getSecurityenabled());
 
         setUp();
         final String tmpSecOnWithNoAdmin = MiscUtils.writeStringToTempFilePath(secOnWithNoAdmin);
-        String result = CatalogUtil.compileDeployment(catalog, tmpSecOnWithNoAdmin, false);
+        String result = CatalogUtil.compileDeploymentForTest(catalog, tmpSecOnWithNoAdmin);
         assertTrue(result != null);
         assertTrue(result.contains("Cannot enable security without defining"));
 
         setUp();
         final String tmpSecOn = MiscUtils.writeStringToTempFilePath(secOn);
-        CatalogUtil.compileDeployment(catalog, tmpSecOn, false);
+        CatalogUtil.compileDeploymentForTest(catalog, tmpSecOn);
         cluster =  catalog.getClusters().get("cluster");
         assertTrue(cluster.getSecurityenabled());
     }
@@ -291,7 +291,7 @@ public class TestCatalogUtil extends TestCase {
             "</deployment>";
 
         final String tmpSecOff = MiscUtils.writeStringToTempFilePath(secOff);
-        CatalogUtil.compileDeployment(catalog, tmpSecOff, false);
+        CatalogUtil.compileDeploymentForTest(catalog, tmpSecOff);
         Cluster cluster =  catalog.getClusters().get("cluster");
         Database db = cluster.getDatabases().get("database");
         assertTrue(cluster.getSecurityenabled());
@@ -299,7 +299,7 @@ public class TestCatalogUtil extends TestCase {
 
         setUp();
         final String tmpSecOn = MiscUtils.writeStringToTempFilePath(secOn);
-        CatalogUtil.compileDeployment(catalog, tmpSecOn, false);
+        CatalogUtil.compileDeploymentForTest(catalog, tmpSecOn);
         cluster =  catalog.getClusters().get("cluster");
         db = cluster.getDatabases().get("database");
         assertTrue(cluster.getSecurityenabled());
@@ -330,7 +330,7 @@ public class TestCatalogUtil extends TestCase {
         catalog_db.getGroups().add("latre");
 
         final String tmpRole = MiscUtils.writeStringToTempFilePath(depRole);
-        CatalogUtil.compileDeployment(catalog, tmpRole, false);
+        CatalogUtil.compileDeploymentForTest(catalog, tmpRole);
         Database db = catalog.getClusters().get("cluster")
                 .getDatabases().get("database");
 
@@ -371,7 +371,7 @@ public class TestCatalogUtil extends TestCase {
 
         final String tmpRole = MiscUtils.writeStringToTempFilePath(depRole);
 
-        CatalogUtil.compileDeployment(catalog, tmpRole, false);
+        CatalogUtil.compileDeploymentForTest(catalog, tmpRole);
 
         Database db = catalog.getClusters().get("cluster")
                 .getDatabases().get("database");
@@ -409,14 +409,14 @@ public class TestCatalogUtil extends TestCase {
             "</deployment>";
 
         final String tmpDepOff = MiscUtils.writeStringToTempFilePath(depOff);
-        String msg = CatalogUtil.compileDeployment(catalog, tmpDepOff, false);
+        String msg = CatalogUtil.compileDeploymentForTest(catalog, tmpDepOff);
         assertTrue(msg == null);
         Systemsettings sysset = catalog.getClusters().get("cluster").getDeployment().get("deployment").getSystemsettings().get("systemsettings");
         assertEquals(100, sysset.getTemptablemaxsize());
 
         setUp();
         final String tmpDepOn = MiscUtils.writeStringToTempFilePath(depOn);
-        msg = CatalogUtil.compileDeployment(catalog, tmpDepOn, false);
+        msg = CatalogUtil.compileDeploymentForTest(catalog, tmpDepOn);
         assertTrue(msg == null);
         sysset = catalog.getClusters().get("cluster").getDeployment().get("deployment").getSystemsettings().get("systemsettings");
         assertEquals(200, sysset.getTemptablemaxsize());
@@ -444,14 +444,14 @@ public class TestCatalogUtil extends TestCase {
             "</deployment>";
 
         final String tmpDepOff = MiscUtils.writeStringToTempFilePath(depOff);
-        String msg = CatalogUtil.compileDeployment(catalog, tmpDepOff, false);
+        String msg = CatalogUtil.compileDeploymentForTest(catalog, tmpDepOff);
         assertTrue(msg == null);
         Systemsettings sysset = catalog.getClusters().get("cluster").getDeployment().get("deployment").getSystemsettings().get("systemsettings");
         assertEquals(0, sysset.getQuerytimeout());
 
         setUp();
         final String tmpDepOn = MiscUtils.writeStringToTempFilePath(depOn);
-        msg = CatalogUtil.compileDeployment(catalog, tmpDepOn, false);
+        msg = CatalogUtil.compileDeploymentForTest(catalog, tmpDepOn);
         assertTrue(msg == null);
         sysset = catalog.getClusters().get("cluster").getDeployment().get("deployment").getSystemsettings().get("systemsettings");
         assertEquals(200, sysset.getQuerytimeout());
@@ -488,7 +488,7 @@ public class TestCatalogUtil extends TestCase {
             "</deployment>";
 
         final String tmpDeploy = MiscUtils.writeStringToTempFilePath(deploy);
-        CatalogUtil.compileDeployment(catalog, tmpDeploy, false);
+        CatalogUtil.compileDeploymentForTest(catalog, tmpDeploy);
 
         File snapdir = new File(voltdbroot, snappath);
         assertTrue("snapshot directory: " + snapdir.getAbsolutePath() + " does not exist",
@@ -534,7 +534,7 @@ public class TestCatalogUtil extends TestCase {
 
         String depPath = MiscUtils.writeStringToTempFilePath(deploymentContent);
 
-        CatalogUtil.compileDeployment(catalog, depPath, false);
+        CatalogUtil.compileDeploymentForTest(catalog, depPath);
 
         String commands = catalog.serialize();
         System.out.println(commands);
@@ -584,7 +584,7 @@ public class TestCatalogUtil extends TestCase {
             "</deployment>";
 
         final String tmpNoElement = MiscUtils.writeStringToTempFilePath(noElement);
-        String msg = CatalogUtil.compileDeployment(catalog, tmpNoElement, false);
+        String msg = CatalogUtil.compileDeploymentForTest(catalog, tmpNoElement);
         assertTrue("Deployment file failed to parse: " + msg, msg == null);
         Cluster cluster = catalog.getClusters().get("cluster");
         assertTrue(cluster.getNetworkpartition());
@@ -592,7 +592,7 @@ public class TestCatalogUtil extends TestCase {
 
         setUp();
         final String tmpEnabledDefault = MiscUtils.writeStringToTempFilePath(ppdEnabledDefaultPrefix);
-        msg = CatalogUtil.compileDeployment(catalog, tmpEnabledDefault, false);
+        msg = CatalogUtil.compileDeploymentForTest(catalog, tmpEnabledDefault);
         assertTrue("Deployment file failed to parse: " + msg, msg == null);
         cluster = catalog.getClusters().get("cluster");
         assertTrue(cluster.getNetworkpartition());
@@ -600,7 +600,7 @@ public class TestCatalogUtil extends TestCase {
 
         setUp();
         final String tmpEnabledPrefix = MiscUtils.writeStringToTempFilePath(ppdEnabledWithPrefix);
-        msg = CatalogUtil.compileDeployment(catalog, tmpEnabledPrefix, false);
+        msg = CatalogUtil.compileDeploymentForTest(catalog, tmpEnabledPrefix);
         assertTrue("Deployment file failed to parse: " + msg, msg == null);
         cluster = catalog.getClusters().get("cluster");
         assertTrue(cluster.getNetworkpartition());
@@ -608,7 +608,7 @@ public class TestCatalogUtil extends TestCase {
 
         setUp();
         final String tmpDisabled = MiscUtils.writeStringToTempFilePath(ppdDisabledNoPrefix);
-        msg = CatalogUtil.compileDeployment(catalog, tmpDisabled, false);
+        msg = CatalogUtil.compileDeploymentForTest(catalog, tmpDisabled);
         assertTrue("Deployment file failed to parse: " + msg, msg == null);
         cluster = catalog.getClusters().get("cluster");
         assertFalse(cluster.getNetworkpartition());
@@ -690,7 +690,7 @@ public class TestCatalogUtil extends TestCase {
         VoltCompiler compiler = new VoltCompiler();
         Catalog cat = compiler.compileCatalogFromDDL(tmpDdl);
 
-        String msg = CatalogUtil.compileDeployment(cat, bad_deployment, false);
+        String msg = CatalogUtil.compileDeployment(cat, bad_deployment);
         assertTrue("Deployment file failed to parse: " + msg, msg == null);
 
         Database db = cat.getClusters().get("cluster").getDatabases().get("database");
@@ -704,7 +704,7 @@ public class TestCatalogUtil extends TestCase {
         DeploymentType good_deployment = CatalogUtil.getDeployment(tmpGood);
 
         Catalog cat2 = compiler.compileCatalogFromDDL(tmpDdl);
-        msg = CatalogUtil.compileDeployment(cat2, good_deployment, false);
+        msg = CatalogUtil.compileDeployment(cat2, good_deployment);
         assertTrue("Deployment file failed to parse: " + msg, msg == null);
 
         db = cat2.getClusters().get("cluster").getDatabases().get("database");
@@ -723,7 +723,7 @@ public class TestCatalogUtil extends TestCase {
         DeploymentType builtin_deployment = CatalogUtil.getDeployment(tmpBuiltin);
 
         Catalog cat3 = compiler.compileCatalogFromDDL(tmpDdl);
-        msg = CatalogUtil.compileDeployment(cat3, builtin_deployment, false);
+        msg = CatalogUtil.compileDeployment(cat3, builtin_deployment);
         assertTrue("Deployment file failed to parse: " + msg, msg == null);
 
         db = cat3.getClusters().get("cluster").getDatabases().get("database");
@@ -740,7 +740,7 @@ public class TestCatalogUtil extends TestCase {
         DeploymentType builtin_kafkadeployment = CatalogUtil.getDeployment(tmpKafkaBuiltin);
 
         Catalog cat4 = compiler.compileCatalogFromDDL(tmpDdl);
-        msg = CatalogUtil.compileDeployment(cat4, builtin_kafkadeployment, false);
+        msg = CatalogUtil.compileDeployment(cat4, builtin_kafkadeployment);
         assertTrue("Deployment file failed to parse: " + msg, msg == null);
 
         db = cat4.getClusters().get("cluster").getDatabases().get("database");
@@ -756,7 +756,7 @@ public class TestCatalogUtil extends TestCase {
         final FileInputStream tmpRabbitMQBuiltin = MiscUtils.writeStringToTempFileInputStream(withBuiltinRabbitMQExport);
         DeploymentType builtin_rabbitmqdeployment = CatalogUtil.getDeployment(tmpRabbitMQBuiltin);
         Catalog cat5 = compiler.compileCatalogFromDDL(tmpDdl);
-        msg = CatalogUtil.compileDeployment(cat5, builtin_rabbitmqdeployment, false);
+        msg = CatalogUtil.compileDeployment(cat5, builtin_rabbitmqdeployment);
         assertTrue("Deployment file failed to parse: " + msg, msg == null);
         db = cat5.getClusters().get("cluster").getDatabases().get("database");
         catconn = db.getConnectors().get("0");
@@ -806,19 +806,19 @@ public class TestCatalogUtil extends TestCase {
             "</deployment>";
 
         final String tmpDefSchema = MiscUtils.writeStringToTempFilePath(defSchema);
-        CatalogUtil.compileDeployment(catalog, tmpDefSchema, false);
+        CatalogUtil.compileDeploymentForTest(catalog, tmpDefSchema);
         Cluster cluster =  catalog.getClusters().get("cluster");
         assertTrue(cluster.getUseddlschema());
 
         setUp();
         final String tmpCatalogSchema = MiscUtils.writeStringToTempFilePath(catalogSchema);
-        CatalogUtil.compileDeployment(catalog, tmpCatalogSchema, false);
+        CatalogUtil.compileDeploymentForTest(catalog, tmpCatalogSchema);
         cluster =  catalog.getClusters().get("cluster");
         assertFalse(cluster.getUseddlschema());
 
         setUp();
         final String tmpAdhocSchema = MiscUtils.writeStringToTempFilePath(adhocSchema);
-        CatalogUtil.compileDeployment(catalog, tmpAdhocSchema, false);
+        CatalogUtil.compileDeploymentForTest(catalog, tmpAdhocSchema);
         cluster =  catalog.getClusters().get("cluster");
         assertTrue(cluster.getUseddlschema());
     }

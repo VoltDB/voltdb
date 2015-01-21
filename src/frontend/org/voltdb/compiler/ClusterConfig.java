@@ -106,10 +106,10 @@ public class ClusterConfig
         }
     }
 
-    public ClusterConfig(int hostCount, int sitesPerHost, int replicationFactor)
+    public ClusterConfig(int sitesPerHost, int hostCount, int replicationFactor)
     {
-        m_hostCount = hostCount;
         m_sitesPerHost = sitesPerHost;
+        m_hostCount = hostCount;
         m_replicationFactor = replicationFactor;
         m_errorMsg = "Config is unvalidated";
     }
@@ -119,8 +119,8 @@ public class ClusterConfig
     // this all magically works.  If you change that fact, good luck Chuck.
     public ClusterConfig(JSONObject topo) throws JSONException
     {
-        m_hostCount = topo.getInt("hostcount");
         m_sitesPerHost = topo.getInt("sites_per_host");
+        m_hostCount = topo.getInt("hostcount");
         m_replicationFactor = topo.getInt("kfactor");
         m_errorMsg = "Config is unvalidated";
     }

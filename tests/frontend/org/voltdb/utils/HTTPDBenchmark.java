@@ -42,12 +42,12 @@ import org.eclipse.jetty.server.nio.SelectChannelConnector;
 import org.voltdb.ParameterSet;
 import org.voltdb.ServerThread;
 import org.voltdb.TestJSONInterface;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
 public class HTTPDBenchmark extends TestCase {
 
@@ -220,34 +220,25 @@ public class HTTPDBenchmark extends TestCase {
         }
     }
 
-
-
-
-
-
-
-
-
     ServerThread startup() throws Exception {
-        String simpleSchema =
-            "create table dummy (" +
-            "sval1 varchar(100) not null, " +
-            "sval2 varchar(100) default 'foo', " +
-            "sval3 varchar(100) default 'bar', " +
-            "PRIMARY KEY(sval1));";
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(simpleSchema);
-        builder.addPartitionInfo("dummy", "sval1");
-        builder.addStmtProcedure("Insert", "insert into dummy values (?,?,?);");
-        builder.addStmtProcedure("Select", "select * from dummy;");
-        builder.setHTTPDPort(8095);
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("jsonperf.jar"), 1, 1, 0);
-        assert(success);
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("jsonperf.jar");
-        config.m_pathToDeployment = builder.getPathToDeployment();
+        CatalogBuilder cb = new CatalogBuilder(
+                "create table dummy (" +
+                        "sval1 varchar(100) not null, " +
+                        "sval2 varchar(100) default 'foo', " +
+                        "sval3 varchar(100) default 'bar', " +
+                        "PRIMARY KEY(sval1));\n" +
+                "partition table dummy on column sval1;\n")
+        .addStmtProcedure("Insert", "insert into dummy values (?,?,?);")
+        .addStmtProcedure("Select", "select * from dummy;")
+        ;
+        DeploymentBuilder db = new DeploymentBuilder(1)
+        .setHTTPDPort(8095);
+        ;
+        Configuration config = Configuration.compile(getClass().getSimpleName(), cb, db);
+        if (config == null) {
+            System.err.println("Configuration failed to compile.");
+            System.exit(-1);
+        }
         ServerThread server = new ServerThread(config);
         server.start();
         server.waitForInitialization();

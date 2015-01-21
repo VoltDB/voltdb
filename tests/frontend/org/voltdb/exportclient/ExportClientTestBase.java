@@ -23,14 +23,16 @@
 
 package org.voltdb.exportclient;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+
+import junit.framework.TestCase;
+
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.export.AdvertisedDataSource;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-
-public class ExportClientTestBase {
+public class ExportClientTestBase extends TestCase {
     static final String[] COLUMN_NAMES = {"tid", "ts", "sq", "pid", "site", "op",
             "tinyint", "smallint", "integer", "bigint", "float", "timestamp", "string", "decimal"};
 

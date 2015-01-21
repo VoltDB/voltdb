@@ -827,62 +827,53 @@ public class VoltCompiler {
      */
     private DatabaseType getProjectDatabase(final VoltCompilerReader projectReader)
     {
-        DatabaseType database = null;
-        m_currentFilename = (projectReader != null ? projectReader.getName() : "null");
-        if (projectReader != null) {
-            try {
-                JAXBContext jc = JAXBContext.newInstance("org.voltdb.compiler.projectfile");
-                // This schema shot the sheriff.
-                SchemaFactory sf = SchemaFactory.newInstance(
-                  javax.xml.XMLConstants.W3C_XML_SCHEMA_NS_URI);
-                Schema schema = sf.newSchema(this.getClass().getResource("ProjectFileSchema.xsd"));
-                Unmarshaller unmarshaller = jc.createUnmarshaller();
-                // But did not shoot unmarshaller!
-                unmarshaller.setSchema(schema);
-                @SuppressWarnings("unchecked")
-                JAXBElement<ProjectType> result = (JAXBElement<ProjectType>) unmarshaller.unmarshal(projectReader);
-                ProjectType project = result.getValue();
-                database = project.getDatabase();
+        assert(projectReader != null);
+        m_currentFilename = projectReader.getName();
+        try {
+            JAXBContext jc = JAXBContext.newInstance("org.voltdb.compiler.projectfile");
+            SchemaFactory sf = SchemaFactory.newInstance(javax.xml.XMLConstants.W3C_XML_SCHEMA_NS_URI);
+            Schema schema = sf.newSchema(this.getClass().getResource("ProjectFileSchema.xsd"));
+            Unmarshaller unmarshaller = jc.createUnmarshaller();
+            unmarshaller.setSchema(schema);
+            @SuppressWarnings("unchecked")
+            JAXBElement<ProjectType> result = (JAXBElement<ProjectType>) unmarshaller.unmarshal(projectReader);
+            ProjectType project = result.getValue();
+            return project.getDatabase();
+        }
+        catch (JAXBException e) {
+            // Convert some linked exceptions to more friendly errors.
+            if (e.getLinkedException() instanceof java.io.FileNotFoundException) {
+                addErr(e.getLinkedException().getMessage());
+                compilerLog.error(e.getLinkedException().getMessage());
             }
-            catch (JAXBException e) {
-                // Convert some linked exceptions to more friendly errors.
-                if (e.getLinkedException() instanceof java.io.FileNotFoundException) {
-                    addErr(e.getLinkedException().getMessage());
-                    compilerLog.error(e.getLinkedException().getMessage());
+            else {
+                DeprecatedProjectElement deprecated = DeprecatedProjectElement.valueOf(e);
+                if(deprecated != null) {
+                    addErr("Found deprecated XML element \"" + deprecated.name() + "\" in project.xml file, "
+                            + deprecated.getSuggestion());
+                    addErr("Error schema validating project.xml file. " + e.getLinkedException().getMessage());
+                    compilerLog.error("Found deprecated XML element \"" + deprecated.name() + "\" in project.xml file");
+                    compilerLog.error(e.getMessage());
+                    compilerLog.error(projectReader.getPath());
+                }
+                else if (e.getLinkedException() instanceof org.xml.sax.SAXParseException) {
+                    addErr("Error schema validating project.xml file. " + e.getLinkedException().getMessage());
+                    compilerLog.error("Error schema validating project.xml file: " + e.getLinkedException().getMessage());
+                    compilerLog.error(e.getMessage());
+                    compilerLog.error(projectReader.getPath());
                 }
                 else {
-                    DeprecatedProjectElement deprecated = DeprecatedProjectElement.valueOf(e);
-                    if( deprecated != null) {
-                        addErr("Found deprecated XML element \"" + deprecated.name() + "\" in project.xml file, "
-                                + deprecated.getSuggestion());
-                        addErr("Error schema validating project.xml file. " + e.getLinkedException().getMessage());
-                        compilerLog.error("Found deprecated XML element \"" + deprecated.name() + "\" in project.xml file");
-                        compilerLog.error(e.getMessage());
-                        compilerLog.error(projectReader.getPath());
-                    }
-                    else if (e.getLinkedException() instanceof org.xml.sax.SAXParseException) {
-                        addErr("Error schema validating project.xml file. " + e.getLinkedException().getMessage());
-                        compilerLog.error("Error schema validating project.xml file: " + e.getLinkedException().getMessage());
-                        compilerLog.error(e.getMessage());
-                        compilerLog.error(projectReader.getPath());
-                    }
-                    else {
-                        throw new RuntimeException(e);
-                    }
+                    throw new RuntimeException(e);
                 }
             }
-            catch (SAXException e) {
-                addErr("Error schema validating project.xml file. " + e.getMessage());
-                compilerLog.error("Error schema validating project.xml file. " + e.getMessage());
-            }
         }
-        else {
-            // No project.xml - create a stub object.
-            database = new DatabaseType();
+        catch (SAXException e) {
+            addErr("Error schema validating project.xml file. " + e.getMessage());
+            compilerLog.error("Error schema validating project.xml file. " + e.getMessage());
         }
-
-        return database;
+        return null;
     }
+
 
     /**
      * Internal method for compiling the catalog.
@@ -938,6 +929,7 @@ public class VoltCompiler {
             final List<VoltCompilerReader> ddlReaderList,
             final InMemoryJarfile jarOutput)
     {
+        assert(database != null);
         // Compiler instance is reusable. Clear the cache.
         cachedAddedClasses.clear();
 
@@ -1046,7 +1038,6 @@ public class VoltCompiler {
         } catch (final VoltCompilerException e) {
             return null;
         }
-        assert(m_catalog != null);
 
         // add epoch info to catalog
         final int epoch = (int)(TransactionIdManager.getEpoch() / 1000);
@@ -1073,7 +1064,7 @@ public class VoltCompiler {
     }
 
     public Database getCatalogDatabase() {
-        return m_catalog.getClusters().get("cluster").getDatabases().get("database");
+        return CatalogUtil.getDatabase(m_catalog);
     }
 
     private Database initCatalogDatabase() {
@@ -2169,7 +2160,7 @@ public class VoltCompiler {
         boolean success = false;
         if (args.length > 0 && args[0].toLowerCase().endsWith(".jar")) {
             // The first argument is *.jar for the new syntax.
-            if (args.length >= 2) {
+            if (args.length > 1) {
                 // Check for accidental .jar or .xml files specified for argument 2
                 // to catch accidental incomplete use of the legacy syntax.
                 if (args[1].toLowerCase().endsWith(".xml") || args[1].toLowerCase().endsWith(".jar")) {

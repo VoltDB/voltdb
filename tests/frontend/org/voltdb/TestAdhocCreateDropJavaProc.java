@@ -23,42 +23,29 @@
 
 package org.voltdb;
 
-import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb.compiler.VoltCompiler;
-import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.InMemoryJarfile;
-import org.voltdb.utils.MiscUtils;
 
 public class TestAdhocCreateDropJavaProc extends AdhocDDLTestBase {
-
-    static Class<?>[] PROC_CLASSES = { org.voltdb_testprocs.updateclasses.testImportProc.class,
-        org.voltdb_testprocs.updateclasses.testCreateProcFromClassProc.class,
-        org.voltdb_testprocs.updateclasses.InnerClassesTestProc.class };
-
-    static Class<?>[] EXTRA_CLASSES = { org.voltdb_testprocs.updateclasses.NoMeaningClass.class };
 
     public void testBasic() throws Exception
     {
         System.out.println("\n\n-----\n testBasic \n-----\n\n");
-
-        String pathToCatalog = Configuration.getPathToCatalogForTest("updateclasses.jar");
-        String pathToDeployment = Configuration.getPathToCatalogForTest("updateclasses.xml");
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("-- Don't care");
-        builder.setUseDDLSchema(true);
-        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
-        assertTrue("Schema compilation failed", success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+        DeploymentBuilder db = new DeploymentBuilder(2)
+        .setUseAdHocDDL(true)
+        ;
+        LocalCluster cluster = LocalCluster.configure(getClass().getSimpleName(), "", db);
+        assertNotNull("LocalCluster failed to compile", cluster);
+        cluster.bypassInProcessServerThread();
+        cluster.startUp();
+        assertNotNull("LocalCluster failed to compile", cluster);
 
         try {
-            LocalCluster cluster = new LocalCluster("updateclasses.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-            cluster.compile(builder);
-            cluster.setHasLocalServer(false);
-            cluster.startUp();
             m_client = ClientFactory.createClient();
             m_client.createConnection(cluster.getListenerAddress(0));
 
@@ -170,21 +157,17 @@ public class TestAdhocCreateDropJavaProc extends AdhocDDLTestBase {
     {
         System.out.println("\n\n-----\n testCreateUsingExistingImport \n-----\n\n");
 
-        String pathToCatalog = Configuration.getPathToCatalogForTest("updateclasses.jar");
-        String pathToDeployment = Configuration.getPathToCatalogForTest("updateclasses.xml");
-        VoltProjectBuilder builder = new VoltProjectBuilder();
         // Start off with the dependency imported
-        builder.addLiteralSchema("import class org.voltdb_testprocs.updateclasses.NoMeaningClass;");
-        builder.setUseDDLSchema(true);
-        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
-        assertTrue("Schema compilation failed", success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+        String literalSchema = "import class org.voltdb_testprocs.updateclasses.NoMeaningClass;";
+        DeploymentBuilder db = new DeploymentBuilder(2)
+        .setUseAdHocDDL(true)
+        ;
+        LocalCluster cluster = LocalCluster.configure(getClass().getSimpleName(), literalSchema, db);
+        assertNotNull("LocalCluster failed to compile", cluster);
+        cluster.bypassInProcessServerThread();
+        cluster.startUp();
 
         try {
-            LocalCluster cluster = new LocalCluster("updateclasses.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-            cluster.compile(builder);
-            cluster.setHasLocalServer(false);
-            cluster.startUp();
             m_client = ClientFactory.createClient();
             m_client.createConnection(cluster.getListenerAddress(0));
 

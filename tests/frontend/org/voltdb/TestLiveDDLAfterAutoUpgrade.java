@@ -28,8 +28,8 @@ import java.io.File;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.CatalogUpgradeTools;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb.compiler.VoltCompiler;
-import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
@@ -38,26 +38,24 @@ public class TestLiveDDLAfterAutoUpgrade extends AdhocDDLTestBase {
 
     public void testEng7357() throws Exception
     {
-        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
-        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(
+        String ddl =
                 "create table FOO (" +
                 "ID integer not null," +
                 "VAL bigint, " +
                 "constraint pk_tree primary key (ID)" +
-                ");\n"
-                );
-        builder.addPartitionInfo("FOO", "ID");
-        builder.setUseDDLSchema(true);
-        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
-        assertTrue("Schema compilation failed", success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+                ");\n" +
+                "partition table FOO on column ID;\n" +
+                "";
+        DeploymentBuilder db = new DeploymentBuilder(2)
+        .setUseAdHocDDL(true);
+        ;
+        Configuration config = Configuration.compile(getClass().getSimpleName(), ddl, db);
+        assertNotNull("Configuration failed to compile", config);
 
         // Mutate the catalog to look old-school.  Revert version to 4.2.0.1
         // and move the autogen DDL to some other name.
-        CatalogUpgradeTools.dorkDowngradeVersion(pathToCatalog, pathToCatalog, "4.2.0.1 voltdb-4.2.0.1");
+        CatalogUpgradeTools.dorkDowngradeVersion(config, "4.2.0.1 voltdb-4.2.0.1");
+        String pathToCatalog = config.m_pathToCatalog;
         File catFile = new File(pathToCatalog);
         InMemoryJarfile jarfile = CatalogUtil.loadInMemoryJarFile(MiscUtils.fileToBytes(catFile));
         byte[] sql = jarfile.get(VoltCompiler.AUTOGEN_DDL_FILE_NAME);
@@ -65,10 +63,6 @@ public class TestLiveDDLAfterAutoUpgrade extends AdhocDDLTestBase {
         jarfile.put("oldschool.sql", sql);
         catFile.delete();
         jarfile.writeToFile(catFile);
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = pathToCatalog;
-        config.m_pathToDeployment = pathToDeployment;
 
         try {
             startSystem(config);

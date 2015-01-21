@@ -26,15 +26,17 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 
 import junit.framework.Test;
+import junit.framework.TestCase;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.compiler.CatalogBuilder;
 import org.voltdb.compiler.CatalogBuilder.ProcedureInfo;
 import org.voltdb.compiler.CatalogBuilder.RoleInfo;
+import org.voltdb.compiler.DeploymentBuilder;
 import org.voltdb.compiler.DeploymentBuilder.UserInfo;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.securityprocs.DoNothing1;
@@ -42,13 +44,7 @@ import org.voltdb_testprocs.regressionsuites.securityprocs.DoNothing2;
 import org.voltdb_testprocs.regressionsuites.securityprocs.DoNothing3;
 
 public class TestSecuritySuite extends RegressionSuite {
-
-    // procedures used by these tests
-    static final Class<?>[] PROCEDURES = {
-        DoNothing1.class,
-        DoNothing2.class,
-        DoNothing3.class
-    };
+    private static final Class<? extends TestCase> TESTCASECLASS = TestSecuritySuite.class;
 
     public TestSecuritySuite(String name) {
         super(name);
@@ -384,17 +380,28 @@ public class TestSecuritySuite extends RegressionSuite {
      * @return The TestSuite containing all the tests to be run.
      */
     static public Test suite() {
-        VoltServerConfig config = null;
+        RoleInfo group1 = new RoleInfo("Group1", false, false, false, false, false, false);
+        RoleInfo group2 = new RoleInfo("Group2", true, false, false, false, false, false);
 
-        // the suite made here will all be using the tests from this class
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestSecuritySuite.class);
-
-        // build up a project builder for the workload
-        TPCCProjectBuilder project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
+        CatalogBuilder cb = TPCCProjectBuilder.catalogBuilderNoProcs()
+        .addProcedures(
+                new ProcedureInfo(DoNothing1.class),
+                new ProcedureInfo(DoNothing2.class, group1),
+                new ProcedureInfo(DoNothing3.class, group1, group2)
+                )
+        .addRoles(
+                group1,
+                group2,
+                new RoleInfo("Group3", true, false, false, false, false, false),
+                new RoleInfo("GroupWithDefaultUserPerm", true, false, false, false, false, true),
+                new RoleInfo("GroupWithAllProcPerm", false, false, false, false, false, true),
+                new RoleInfo("GroupWithDefaultProcPerm", false, false, false, true, false, false),
+                new RoleInfo("GroupWithoutDefaultProcPerm", false, false, false, false, false, false),
+                new RoleInfo("GroupWithDefaultProcReadPerm", false, false, false, false, true, false))
+        ;
         // suite defines its own ADMINISTRATOR user
-        project.depBuilder().setSecurityEnabled(true, false)
+        DeploymentBuilder db = new DeploymentBuilder()
+        .setSecurityEnabled(true, false)
         .addUsers(
                 new UserInfo("user1", "password", "grouP1"),
                 new UserInfo("user2", "password", "grouP2"),
@@ -404,44 +411,19 @@ public class TestSecuritySuite extends RegressionSuite {
                 new UserInfo("userWithAllProc", "password", "GroupWithAllProcPerm"),
                 new UserInfo("userWithDefaultProcPerm", "password", "groupWithDefaultProcPerm"),
                 new UserInfo("userWithoutDefaultProcPerm", "password", "groupWiThoutDefaultProcPerm"),
-                new UserInfo("userWithDefaultProcReadPerm", "password", "groupWiThDefaultProcReadPerm"));
-
+                new UserInfo("userWithDefaultProcReadPerm", "password", "groupWiThDefaultProcReadPerm"))
+        ;
         // export disabled in community
         if (MiscUtils.isPro()) {
-            project.depBuilder().addExport(true /*enabled*/, null, null);
+            db.addExport(true /*enabled*/, null, null);
         }
-
-        project.catBuilder().addProcedures(
-                new ProcedureInfo(PROCEDURES[0]),
-                new ProcedureInfo(PROCEDURES[1], "group1"),
-                new ProcedureInfo(PROCEDURES[2], "group1", "group2")
-                )
-
-        .addRoles(
-                new RoleInfo("Group1", false, false, false, false, false, false),
-                new RoleInfo("Group2", true, false, false, false, false, false),
-                new RoleInfo("Group3", true, false, false, false, false, false),
-                new RoleInfo("GroupWithDefaultUserPerm", true, false, false, false, false, true),
-                new RoleInfo("GroupWithAllProcPerm", false, false, false, false, false, true),
-                new RoleInfo("GroupWithDefaultProcPerm", false, false, false, true, false, false),
-                new RoleInfo("GroupWithoutDefaultProcPerm", false, false, false, false, false, false),
-                new RoleInfo("GroupWithDefaultProcReadPerm", false, false, false, false, true, false));
 
         /////////////////////////////////////////////////////////////
         // CONFIG #1: 1 Local Site/Partitions running on JNI backend
         /////////////////////////////////////////////////////////////
-
-        // get a server config for the native backend with one sites/partitions
-        config = new LocalCluster("security-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-
-        // build the jarfile
-        assertTrue(config.compile(project));
-
-        // add this config to the set of tests to run
-        builder.addServerConfig(config);
-
-        // Not testing a cluster and assuming security shouldn't be affected by this
-        return builder;
+        LocalCluster cluster = LocalCluster.configure(TESTCASECLASS.getSimpleName(), cb, db);
+        assertNotNull("LocalCluster compile failed", cluster);
+        return new MultiConfigSuiteBuilder(TESTCASECLASS, cluster);
     }
 
     public static void main(String args[]) {

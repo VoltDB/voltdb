@@ -31,7 +31,7 @@ import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 
 /**
- * <code>DataInputStream</code> subclass to read objects that implement
+ * <code>DataInput</code> subclass to read objects that implement
  * the FastSerializable interface.
  *
  */

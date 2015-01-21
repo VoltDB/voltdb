@@ -25,17 +25,18 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
-import org.voltdb.BackendTarget;
+import junit.framework.TestCase;
+
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
 
 public class TestIndexOverflowSuite extends RegressionSuite {
-
-    void callWithExpectedRowCount(Client client, String procName, int rowCount, Object... params) throws NoConnectionsException, IOException, ProcCallException {
+    void callWithExpectedRowCount(Client client, String procName, int rowCount, Object... params)
+            throws NoConnectionsException, IOException, ProcCallException {
         ClientResponse cr = client.callProcedure(procName, params);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         assertEquals(1, cr.getResults().length);
@@ -102,13 +103,9 @@ public class TestIndexOverflowSuite extends RegressionSuite {
     }
 
     static public junit.framework.Test suite() {
-
-        VoltServerConfig config = null;
-        MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestIndexOverflowSuite.class);
-
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        project.catBuilder().addSchema(TestIndexOverflowSuite.class.getResource("indexoverflowsuite-ddl.sql"))
+        final Class<? extends TestCase> TESTCASECLASS = TestIndexOverflowSuite.class;
+        CatalogBuilder cb = new CatalogBuilder()
+        .addSchema(TESTCASECLASS.getResource("indexoverflowsuite-ddl.sql"))
         .addPartitionInfo("P1", "ID")
         .addStmtProcedure("BasicEQParam",           "select * from P1 where ID = ?")
         .addStmtProcedure("BasicGTParam",           "select * from P1 where ID > ?")
@@ -135,12 +132,8 @@ public class TestIndexOverflowSuite extends RegressionSuite {
         .addStmtProcedure("JoinWithOrderOverflow",  "select * from P1, R1 where P1.ID = R1.ID and P1.TINY >= 200")
         .addStmtProcedure("JoinWithOrderUnderflow", "select * from P1, R1 where P1.ID = R1.ID and P1.TINY >= -200")
         ;
-
-        // JNI
-        config = new LocalCluster("testindexes-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        assertTrue(config.compile(project));
-        builder.addServerConfig(config);
-
-        return builder;
+        LocalCluster cluster = LocalCluster.configure(TESTCASECLASS.getSimpleName(), cb, 1);
+        assertNotNull("LocalCluster compile failed", cluster);
+        return new MultiConfigSuiteBuilder(TESTCASECLASS, cluster);
     }
 }

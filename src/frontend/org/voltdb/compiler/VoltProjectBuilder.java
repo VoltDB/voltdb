@@ -20,11 +20,8 @@ package org.voltdb.compiler;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
-import java.util.ArrayList;
 import java.util.List;
 
-import org.voltdb.catalog.Catalog;
-import org.voltdb.compiler.CatalogBuilder.ProcedureInfo;
 import org.voltdb.compiler.CatalogBuilder.RoleInfo;
 import org.voltdb.compiler.DeploymentBuilder.UserInfo;
 
@@ -60,10 +57,6 @@ public class VoltProjectBuilder {
         m_db.setDeadHostTimeout(deadHostTimeout);
     }
 
-    public void setUseDDLSchema(boolean useIt) {
-        m_db.setUseDDLSchema(useIt);
-    }
-
     public void configureLogging(String internalSnapshotPath, String commandLogPath, Boolean commandLogSync,
             boolean commandLogEnabled, Integer fsyncInterval, Integer maxTxnsBeforeFsync, Integer logSize) {
         m_db.configureLogging(internalSnapshotPath, commandLogPath, commandLogSync, commandLogEnabled, fsyncInterval, maxTxnsBeforeFsync, logSize);
@@ -93,10 +86,6 @@ public class VoltProjectBuilder {
         m_cb.addStmtProcedure(name, sql);
     }
 
-    public void addStmtProcedure(String name, String sql, String partitionInfo) {
-        m_cb.addStmtProcedure(name, sql, partitionInfo);
-    }
-
     public void addProcedures(final Class<?>... procedures) {
         m_cb.addProcedures(procedures);
     }
@@ -104,25 +93,6 @@ public class VoltProjectBuilder {
     /*
      * List of roles permitted to invoke the procedure
      */
-    public void addProcedures(final ProcedureInfo... procedures) {
-        final ArrayList<ProcedureInfo> procArray = new ArrayList<ProcedureInfo>();
-        for (final ProcedureInfo procedure : procedures)
-            procArray.add(procedure);
-        addProcedures(procArray);
-    }
-
-    public void addProcedures(final Iterable<ProcedureInfo> procedures) {
-        m_cb.addProcedures(procedures);
-    }
-
-    public void addSupplementalClasses(final Class<?>... supplementals) {
-        m_cb.addSupplementalClasses(supplementals);
-    }
-
-    public void addSupplementalClasses(final Iterable<Class<?>> supplementals) {
-        m_cb.addSupplementalClasses(supplementals);
-    }
-
     public void addPartitionInfo(final String tableName, final String partitionColumnName) {
         m_cb.addPartitionInfo(tableName, partitionColumnName);
     }
@@ -152,69 +122,11 @@ public class VoltProjectBuilder {
         m_db.setMaxTempTableMemory(max);
     }
 
-    public boolean compile(final String jarPath) {
-        if (compileToCatalog(jarPath) == null) {
-            return false;
-        }
-        m_pathToDeployment = compileToDeployment(1, 1, 0);
-        return true;
-    }
-
-    public boolean compile(final String jarPath,
-            final int sitesPerHost,
-            final int replication) {
-        if (compileToCatalog(jarPath) == null) {
-            return false;
-        }
-        m_pathToDeployment = compileToDeployment(sitesPerHost, 1, replication);
-        return true;
-    }
-
-    public boolean compile(final String jarPath,
-            final int sitesPerHost,
-            final int hostCount,
-            final int replication) {
-        if (compileToCatalog(jarPath) == null) {
-            return false;
-        }
-        m_pathToDeployment = compileToDeployment(sitesPerHost, hostCount, replication);
-        return true;
-    }
-
-    public Catalog compileToCatalogAndSaveDeployment(final String jarPath,
-            final int sitesPerHost,
-            final int hostCount,
-            final int replication) {
-        Catalog catalog = compileToCatalog(jarPath);
-        if (catalog == null) {
-            return null;
-        }
-        m_pathToDeployment = compileToDeployment(sitesPerHost, hostCount, replication);
-        return catalog;
-    }
-
     public VoltProjectBuilder setVoltRoot(String voltRoot) {
         if (voltRoot != null) {
             m_db.setVoltRoot(voltRoot);
         }
         return this;
-    }
-
-    public Catalog compileToCatalog(final String jarPath) {
-        assert(jarPath != null);
-        VoltCompiler compiler = new VoltCompiler();
-        if (m_cb.compile(compiler, jarPath)) {
-            return compiler.getCatalog();
-        } else {
-            return null;
-        }
-    }
-
-    public String compileToDeployment(int sitesPerHost, int hostCount, int replication) {
-        assert(hostCount >= 1);
-        assert(sitesPerHost >= 1);
-        m_db.resetFromVPB(sitesPerHost, hostCount, replication);
-        return m_db.writeXMLToTempFile();
     }
 
     public void setDeploymentPath(String deploymentPath) {

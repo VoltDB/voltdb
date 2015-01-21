@@ -29,8 +29,8 @@ import java.io.IOException;
 import junit.framework.TestCase;
 
 import org.voltdb.VoltDB;
+import org.voltdb.VoltDB.Configuration;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
-import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.MiscUtils;
 
@@ -41,18 +41,12 @@ public class TestCatalogVersionUpgrade extends TestCase {
 
     public void testCatalogAutoUpgrade() throws Exception
     {
-        TPCCProjectBuilder project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
-        project.addDefaultProcedures();
-
-        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
-        String jarName = "compile-deployment.jar";
-        String catalogJar = testDir + File.separator + jarName;
-        assertTrue("Project failed to compile", project.compile(catalogJar));
-
+        CatalogBuilder cb = TPCCProjectBuilder.defaultCatalogBuilder();
+        File catalogJar = File.createTempFile("TestCatalogVersionUpgrade", ".jar");
+        String catalogPath = catalogJar.getAbsolutePath();
+        assert(cb.compile(catalogPath));
         // Load the catalog to an in-memory jar and tweak the version.
-        byte[] bytes = MiscUtils.fileToBytes(new File(catalogJar));
+        byte[] bytes = MiscUtils.fileToBytes(catalogJar);
         InMemoryJarfile memCatalog = CatalogUpgradeTools.loadCatalog(bytes, false);
         CatalogUpgradeTools.dorkVersion(memCatalog);
 
@@ -71,18 +65,12 @@ public class TestCatalogVersionUpgrade extends TestCase {
 
     public void testCatalogAutoUpgradeFail() throws Exception
     {
-        TPCCProjectBuilder project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
-        project.addDefaultProcedures();
-
-        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
-        String jarName = "compile-deployment.jar";
-        String catalogJar = testDir + File.separator + jarName;
-        assertTrue("Project failed to compile", project.compile(catalogJar));
-
-        // Load the catalog to an in-memory jar and tweak the version to make it incompatible.
-        byte[] bytes = MiscUtils.fileToBytes(new File(catalogJar));
+        CatalogBuilder cb = TPCCProjectBuilder.defaultCatalogBuilder();
+        File catalogJar = File.createTempFile("TestCatalogVersionUpgrade", ".jar");
+        String catalogPath = catalogJar.getAbsolutePath();
+        assert(cb.compile(catalogPath));
+        // Load the catalog to an in-memory jar and tweak the version.
+        byte[] bytes = MiscUtils.fileToBytes(catalogJar);
         InMemoryJarfile memCatalog = CatalogUpgradeTools.loadCatalog(bytes, false);
         CatalogUpgradeTools.dorkVersion(memCatalog);
         // Squizzle creation is no longer supported.
@@ -102,18 +90,12 @@ public class TestCatalogVersionUpgrade extends TestCase {
 
     public void testAutoUpgradeWithGroovyProc() throws Exception
     {
-        TPCCProjectBuilder project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
-        project.addDefaultProcedures();
-
-        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
-        String jarName = "compile-deployment.jar";
-        String catalogJar = testDir + File.separator + jarName;
-        assertTrue("Project failed to compile", project.compile(catalogJar));
-
+        CatalogBuilder cb = TPCCProjectBuilder.defaultCatalogBuilder();
+        File catalogJar = File.createTempFile("TestCatalogVersionUpgrade", ".jar");
+        String catalogPath = catalogJar.getAbsolutePath();
+        assert(cb.compile(catalogPath));
+        byte[] bytes = MiscUtils.fileToBytes(catalogJar);
         // Load the catalog to an in-memory jar and tweak the version.
-        byte[] bytes = MiscUtils.fileToBytes(new File(catalogJar));
         InMemoryJarfile memCatalog = CatalogUpgradeTools.loadCatalog(bytes, false);
         CatalogUpgradeTools.dorkVersion(memCatalog);
         CatalogUpgradeTools.dorkDDL(memCatalog,
@@ -134,7 +116,7 @@ public class TestCatalogVersionUpgrade extends TestCase {
 
         // Make sure the jar file is present.
         String jarName2 = String.format("catalog-%s.jar", serverVersion);
-        File jar2 = new File(VoltDB.Configuration.getPathToCatalogForTest(jarName2));
+        File jar2 = new File(Configuration.getPathToCatalogForTest(jarName2));
         assertTrue(jar2.exists());
     }
 }

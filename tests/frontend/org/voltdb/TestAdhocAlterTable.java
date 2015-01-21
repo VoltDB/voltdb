@@ -25,34 +25,20 @@ package org.voltdb;
 
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.utils.MiscUtils;
 
 public class TestAdhocAlterTable extends AdhocDDLTestBase {
 
     public void testAlterAddColumn() throws Exception
     {
-        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
-        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(
+        Configuration config = configurationForTest(
                 "create table FOO (" +
                 "ID integer not null," +
                 "VAL bigint, " +
                 "constraint pk_tree primary key (ID)" +
-                ");\n"
-                );
-        builder.addPartitionInfo("FOO", "ID");
-        builder.setUseDDLSchema(true);
-        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
-        assertTrue("Schema compilation failed", success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = pathToCatalog;
-        config.m_pathToDeployment = pathToDeployment;
-
+                ");\n" +
+                "PARTITION TABLE FOO ON COLUMN ID;\n" +
+                "",
+                2);
         try {
             startSystem(config);
 
@@ -132,11 +118,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
 
     public void testAlterDropColumn() throws Exception
     {
-        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
-        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(
+        Configuration config = configurationForTest(
                 "create table FOO (" +
                 "PKCOL integer not null," +
                 "DROPME bigint, " +
@@ -158,17 +140,9 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
                 "PKCOL1 integer not null, " +
                 "PKCOL2 integer not null, " +
                 "constraint pk_tree2 primary key (PKCOL1, PKCOL2)" +
-                ");\n"
-                );
-        builder.setUseDDLSchema(true);
-        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
-        assertTrue("Schema compilation failed", success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = pathToCatalog;
-        config.m_pathToDeployment = pathToDeployment;
-
+                ");\n" +
+                "",
+                2);
         try {
             startSystem(config);
 
@@ -322,27 +296,15 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
     public void testAlterColumnOther() throws Exception
     {
         System.out.println("----------------\n\n TestAlterColumnOther \n\n--------------");
-        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
-        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(
+        Configuration config = configurationForTest(
                 "create table FOO (" +
                 "ID integer not null," +
                 "VAL varchar(50), " +
                 "constraint PK_TREE primary key (ID)" +
-                ");\n"
-                );
-        builder.addPartitionInfo("FOO", "ID");
-        builder.setUseDDLSchema(true);
-        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
-        assertTrue("Schema compilation failed", success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = pathToCatalog;
-        config.m_pathToDeployment = pathToDeployment;
-
+                ");\n" +
+                "PARTITION TABLE FOO ON COLUMN ID;\n" +
+                "",
+                2);
         try {
             startSystem(config);
 
@@ -497,33 +459,21 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
 
     public void testAlterRename() throws Exception
     {
-        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
-        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(
+        Configuration config = configurationForTest(
                 "create table FOO (" +
                 "ID integer not null," +
                 "VAL varchar(50), " +
                 "constraint PK_TREE primary key (ID)" +
                 ");\n" +
+                "PARTITION TABLE FOO ON COLUMN ID;\n" +
                 "create table EMPTYFOO (" +
                 "ID integer not null," +
                 "VAL varchar(50), " +
                 "constraint PK_TREE2 primary key (ID)" +
-                ");\n"
-                );
-        builder.addPartitionInfo("FOO", "ID");
-        builder.addPartitionInfo("EMPTYFOO", "ID");
-        builder.setUseDDLSchema(true);
-        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
-        assertTrue("Schema compilation failed", success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = pathToCatalog;
-        config.m_pathToDeployment = pathToDeployment;
-
+                ");\n" +
+                "PARTITION TABLE EMPTYFOO ON COLUMN ID;\n" +
+                "",
+                2);
         try {
             startSystem(config);
             // write a couple rows to FOO so it's not empty
@@ -572,27 +522,15 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
 
     public void testAlterLimitPartitionRows() throws Exception
     {
-        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
-        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(
+        Configuration config = configurationForTest(
                 "create table FOO (" +
                 "ID integer not null," +
                 "VAL varchar(50), " +
                 "constraint PK_TREE primary key (ID)" +
-                ");\n"
-                );
-        builder.addPartitionInfo("FOO", "ID");
-        builder.setUseDDLSchema(true);
-        boolean success = builder.compile(pathToCatalog, 1, 1, 0);
-        assertTrue("Schema compilation failed", success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = pathToCatalog;
-        config.m_pathToDeployment = pathToDeployment;
-
+                ");\n" +
+                "PARTITION TABLE FOO ON COLUMN ID;\n" +
+                "",
+                1);
         try {
             startSystem(config);
             VoltTable results = m_client.callProcedure("@Statistics", "TABLE", 0).getResults()[0];
@@ -642,33 +580,21 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
 
     public void testAlterPartitionColumn() throws Exception
     {
-        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
-        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(
+        Configuration config = configurationForTest(
                 "create table FOO (" +
                 "ID integer not null," +
                 "VAL varchar(50) not null, " +
                 "VAL2 bigint" +
                 ");\n" +
+                "PARTITION TABLE FOO ON COLUMN ID;\n" +
                 "create table EMPTYFOO (" +
                 "ID integer not null," +
                 "VAL varchar(50) not null, " +
                 "VAL2 bigint" +
-                ");\n"
-                );
-        builder.addPartitionInfo("FOO", "ID");
-        builder.addPartitionInfo("EMPTYFOO", "ID");
-        builder.setUseDDLSchema(true);
-        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
-        assertTrue("Schema compilation failed", success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = pathToCatalog;
-        config.m_pathToDeployment = pathToDeployment;
-
+                ");\n" +
+                "PARTITION TABLE EMPTYFOO ON COLUMN ID;\n" +
+                "",
+                2);
         try {
             startSystem(config);
             // write a couple rows to FOO so it's not empty
@@ -805,19 +731,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
 
     public void testAlterConstraintAssumeUnique() throws Exception
     {
-        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
-        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("-- dont care");
-        builder.setUseDDLSchema(true);
-        boolean success = builder.compile(pathToCatalog, 1, 1, 0);
-        assertTrue("Schema compilation failed", success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = pathToCatalog;
-        config.m_pathToDeployment = pathToDeployment;
+        Configuration config = configurationForTest("", 2);
         try {
             startSystem(config);
             m_client.callProcedure("@AdHoc",
@@ -854,27 +768,15 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
 
     public void testAddNotNullColumnToEmptyTable() throws Exception
     {
-        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
-        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(
+        Configuration config = configurationForTest(
                 "create table FOO (" +
                 "ID integer not null," +
                 "VAL bigint, " +
                 "constraint pk_tree primary key (ID)" +
-                ");\n"
-                );
-        builder.addPartitionInfo("FOO", "ID");
-        builder.setUseDDLSchema(true);
-        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
-        assertTrue("Schema compilation failed", success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = pathToCatalog;
-        config.m_pathToDeployment = pathToDeployment;
-
+                ");\n" +
+                "PARTITION TABLE FOO ON COLUMN ID;\n" +
+                "",
+                2);
         try {
             startSystem(config);
 
@@ -896,42 +798,33 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
 
     public void testAddNotNullColumnToNonEmptyTable() throws Exception
     {
-        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
-        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(
+        Configuration config = configurationForTest(
                 "create table FOO (" +
                 "ID integer not null," +
                 "VAL bigint, " +
                 "constraint pk_tree primary key (ID)" +
-                ");\n"
-                );
-        builder.addPartitionInfo("FOO", "ID");
-        builder.setUseDDLSchema(true);
-        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
-        assertTrue("Schema compilation failed", success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = pathToCatalog;
-        config.m_pathToDeployment = pathToDeployment;
-
+                ");\n" +
+                "PARTITION TABLE FOO ON COLUMN ID;\n" +
+                "",
+                2);
         try {
             startSystem(config);
 
             // Adding NOT NULL column without a default fails for a non-empty table.
             m_client.callProcedure("FOO.insert", 0, 0);
             boolean threw = false;
+            String expected = "is not empty";
             try {
                 m_client.callProcedure("@AdHoc",
                         "alter table FOO add column NEWCOL varchar(50) not null;");
             }
             catch (ProcCallException pce) {
-                assertTrue("Expected \"is not empty\" error.", pce.getMessage().contains("is not empty"));
+                if ( ! pce.getMessage().contains(expected)) {
+                    fail("Expected \"" + expected + "\" error but got:\n" + pce.getMessage());
+                }
                 threw = true;
             }
-            assertTrue(threw);
+            assertTrue("Expected error about \"" + expected + "\" but call succeeded", threw);
 
             // Adding NOT NULL column with a default succeeds for a non-empty table.
             try {
@@ -955,20 +848,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
     public void testAlterTableENG7242NoExpressions() throws Exception
     {
         System.out.println("----------------\n\n TestAlterTableENG7242 \n\n--------------");
-        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
-        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("-- dont care");
-        builder.setUseDDLSchema(true);
-        boolean success = builder.compile(pathToCatalog, 1, 1, 0);
-        assertTrue("Schema compilation failed", success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = pathToCatalog;
-        config.m_pathToDeployment = pathToDeployment;
-
+        Configuration config = configurationForTest("", 1);
         try {
             startSystem(config);
             m_client.callProcedure("@AdHoc",
@@ -1044,19 +924,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
     public void testAlterTableENG7304ENG7305() throws Exception
     {
         System.out.println("----------------\n\n TestAlterTableENG7304ENG7305 \n\n--------------");
-        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
-        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("-- dont care");
-        builder.setUseDDLSchema(true);
-        boolean success = builder.compile(pathToCatalog, 1, 1, 0);
-        assertTrue("Schema compilation failed", success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = pathToCatalog;
-        config.m_pathToDeployment = pathToDeployment;
+        Configuration config = configurationForTest("", 1);
         try {
             startSystem(config);
             m_client.callProcedure("@AdHoc",

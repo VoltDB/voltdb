@@ -27,7 +27,7 @@ import java.io.File;
 import java.net.URL;
 
 import org.voltcore.utils.InstanceId;
-import org.voltdb.utils.MiscUtils;
+import org.voltdb.VoltDB.Configuration;
 
 /**
  * Wraps VoltDB in a Thread
@@ -36,7 +36,7 @@ public class ServerThread extends Thread {
     VoltDB.Configuration m_config;
     boolean initialized = false;
 
-    public ServerThread(VoltDB.Configuration config) {
+    public ServerThread(Configuration config) {
         m_config = config;
         m_config.m_pathToLicense = getTestLicensePath();
         if (m_config.m_leader == null) {
@@ -46,84 +46,12 @@ public class ServerThread extends Thread {
         if (!m_config.validate()) {
             System.exit(-1);
         }
-
         // Disable loading the EE if running against HSQL.
         m_config.m_noLoadLibVOLTDB = m_config.m_backend == BackendTarget.HSQLDB_BACKEND;
-
         setName("ServerThread");
     }
 
-    public ServerThread(String pathToCatalog, BackendTarget target) {
-        m_config = new VoltDB.Configuration();
-        m_config.m_pathToCatalog = pathToCatalog;
-        m_config.m_backend = target;
-        m_config.m_pathToLicense = getTestLicensePath();
-        m_config.m_leader = "";
-        VoltDB.instance().setMode(OperationMode.INITIALIZING);
-
-
-        // Disable loading the EE if running against HSQL.
-        m_config.m_noLoadLibVOLTDB = m_config.m_backend == BackendTarget.HSQLDB_BACKEND;
-
-        setName("ServerThread");
-    }
-
-    public ServerThread(String pathToCatalog, String pathToDeployment, BackendTarget target) {
-        m_config = new VoltDB.Configuration();
-        m_config.m_pathToCatalog = pathToCatalog;
-        m_config.m_pathToDeployment = pathToDeployment;
-        m_config.m_backend = target;
-        m_config.m_pathToLicense = getTestLicensePath();
-        m_config.m_leader = "";
-        VoltDB.instance().setMode(OperationMode.INITIALIZING);
-
-
-        // Disable loading the EE if running against HSQL.
-        m_config.m_noLoadLibVOLTDB = m_config.m_backend == BackendTarget.HSQLDB_BACKEND;
-
-        if (!m_config.validate()) {
-            System.exit(-1);
-        }
-
-        setName("ServerThread");
-    }
-
-    public ServerThread(String pathToCatalog,
-            String pathToDeployment,
-            int internalPort,
-            int zkPort,
-            BackendTarget target) {
-        this(pathToCatalog, pathToDeployment, VoltDB.DEFAULT_INTERNAL_PORT, internalPort, zkPort, target);
-    }
-
-    public ServerThread(String pathToCatalog,
-                        String pathToDeployment,
-                        int leaderPort,
-                        int internalPort,
-                        int zkPort,
-                        BackendTarget target)
-    {
-        m_config = new VoltDB.Configuration();
-        m_config.m_pathToCatalog = pathToCatalog;
-        m_config.m_pathToDeployment = pathToDeployment;
-        m_config.m_backend = target;
-        m_config.m_pathToLicense = getTestLicensePath();
-        m_config.m_leader = MiscUtils.getHostnameColonPortString("localhost", leaderPort);
-        m_config.m_internalPort = internalPort;
-        m_config.m_zkInterface = "127.0.0.1:" + zkPort;
-        VoltDB.instance().setMode(OperationMode.INITIALIZING);
-
-        // Disable loading the EE if running against HSQL.
-        m_config.m_noLoadLibVOLTDB = m_config.m_backend == BackendTarget.HSQLDB_BACKEND;
-
-        if (!m_config.validate()) {
-            System.exit(-1);
-        }
-
-        setName("ServerThread");
-    }
-
-    @Override
+   @Override
     public void run() {
         VoltDB.initialize(m_config);
         VoltDB.instance().run();

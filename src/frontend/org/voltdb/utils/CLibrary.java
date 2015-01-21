@@ -17,10 +17,8 @@
 package org.voltdb.utils;
 
 import org.voltcore.logging.VoltLogger;
-import com.sun.jna.Native;
-import sun.misc.SharedSecrets;
 
-import java.io.FileDescriptor;
+import com.sun.jna.Native;
 
 public class CLibrary {
     private static final VoltLogger hostLog = new VoltLogger("HOST");

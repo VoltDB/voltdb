@@ -26,41 +26,28 @@ package org.voltdb;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.utils.MiscUtils;
 
 public class TestAdhocDropTable extends AdhocDDLTestBase {
 
     public void testDropTableBasic() throws Exception {
+        Configuration config = configurationForTest(
+                "create table BLAH (" +
+                "ID int default 0 not null, " +
+                "VAL varchar(32) default null," +
+                "PRIMARY KEY(ID));\n" +
+                "partition table BLAH on column ID;\n" +
 
-        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
-        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(
-            "create table BLAH (" +
-            "ID int default 0 not null, " +
-            "VAL varchar(32) default null," +
-            "PRIMARY KEY(ID));\n" +
-            "create table DROPME (" +
-            "ID int default 0 not null, " +
-            "VAL varchar(32) default null," +
-            "PRIMARY KEY(ID))\n;" +
-            "create table DROPME_R (" +
-            "ID int default 0 not null, " +
-            "VAL varchar(32) default null," +
-            "PRIMARY KEY(ID));");
-        builder.addPartitionInfo("BLAH", "ID");
-        builder.addPartitionInfo("DROPME", "ID");
-        builder.setUseDDLSchema(true);
-        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
-        assertTrue("Schema compilation failed", success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = pathToCatalog;
-        config.m_pathToDeployment = pathToDeployment;
-
+                "create table DROPME (" +
+                "ID int default 0 not null, " +
+                "VAL varchar(32) default null," +
+                "PRIMARY KEY(ID))\n;" +
+                "create table DROPME_R (" +
+                "ID int default 0 not null, " +
+                "VAL varchar(32) default null," +
+                "PRIMARY KEY(ID));\n" +
+                "partition table DROPME on column ID;\n" +
+                "",
+                2);
         try {
             startSystem(config);
             // Check basic drop of partitioned table that should work.
@@ -78,7 +65,7 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
                 m_client.callProcedure("@AdHoc", "drop table DROPME;");
             }
             catch (ProcCallException pce) {
-                fail("drop table should have succeeded");
+                fail("drop table should have succeeded but got: " + pce);
             }
             resp = m_client.callProcedure("@SystemCatalog", "TABLES");
             System.out.println(resp.getResults()[0]);
@@ -97,7 +84,7 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
                 m_client.callProcedure("@AdHoc", "drop table DROPME_R;");
             }
             catch (ProcCallException pce) {
-                fail("drop table should have succeeded");
+                fail("drop table should have succeeded but got: " + pce);
             }
             resp = m_client.callProcedure("@SystemCatalog", "TABLES");
             System.out.println(resp.getResults()[0]);
@@ -134,7 +121,7 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
                 m_client.callProcedure("@AdHoc", "drop table BLAH;");
             }
             catch (ProcCallException pce) {
-                fail("drop table should have succeeded");
+                fail("drop table should have succeeded but got: " + pce);
             }
             resp = m_client.callProcedure("@SystemCatalog", "TABLES");
             System.out.println(resp.getResults()[0]);
@@ -151,16 +138,13 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
     }
 
     public void testDropTableWithIndexesAndProcedures() throws Exception {
-
-        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocddl.jar");
-        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocddl.xml");
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(
+        Configuration config = configurationForTest(
             "create table BLAH (" +
             "ID int default 0 not null, " +
             "VAL varchar(32) default null," +
             "PRIMARY KEY(ID));\n" +
+            "partition table BLAH on column ID;\n" +
+
             "create table VIEWBASE (" +
             "ID int default 0 not null, " +
             "VAL varchar(32) default null," +
@@ -169,20 +153,14 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
             "ID int default 0 not null, " +
             "VAL varchar(32) default null," +
             "PRIMARY KEY(ID));\n" +
-            "create assumeunique index pkey_idx on DROPME(VAL);\n" +
-            "create view BLAT (VAL, TOTAL) as select VAL, COUNT(*) from VIEWBASE group by VAL;\n"
-            );
-        builder.addPartitionInfo("BLAH", "ID");
-        builder.addPartitionInfo("DROPME", "ID");
-        builder.addStmtProcedure("BLERG", "select * from BLAH where ID = ?");
-        builder.setUseDDLSchema(true);
-        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
-        assertTrue("Schema compilation failed", success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+            "partition table DROPME on column ID;\n" +
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = pathToCatalog;
-        config.m_pathToDeployment = pathToDeployment;
+            "create assumeunique index pkey_idx on DROPME(VAL);\n" +
+            "create view BLAT (VAL, TOTAL) as select VAL, COUNT(*) from VIEWBASE group by VAL;\n" +
+
+            "create procedure BLERG as select * from BLAH where ID = ?;\n" +
+            "",
+            1);
 
         try {
             startSystem(config);
@@ -197,7 +175,7 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
                 m_client.callProcedure("@AdHoc", "drop table DROPME;");
             }
             catch (ProcCallException pce) {
-                fail("drop table should have succeeded");
+                fail("drop table should have succeeded but got error:" + pce);
             }
             resp = m_client.callProcedure("@SystemCatalog", "TABLES");
             System.out.println(resp.getResults()[0]);
@@ -242,7 +220,7 @@ public class TestAdhocDropTable extends AdhocDDLTestBase {
                 m_client.callProcedure("@AdHoc", "drop table VIEWBASE cascade;");
             }
             catch (ProcCallException pce) {
-                fail("Should be able to drop table and view with cascade");
+                fail("Should be able to drop table and view with cascade but got: " + pce);
             }
             resp = m_client.callProcedure("@SystemCatalog", "TABLES");
             System.out.println(resp.getResults()[0]);

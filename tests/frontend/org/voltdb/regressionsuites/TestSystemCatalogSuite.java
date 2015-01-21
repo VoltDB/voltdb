@@ -31,15 +31,14 @@ import java.sql.SQLException;
 
 import junit.framework.Test;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
 public class TestSystemCatalogSuite extends RegressionSuite {
-
     public TestSystemCatalogSuite(String name) {
         super(name);
     }
@@ -183,21 +182,15 @@ public class TestSystemCatalogSuite extends RegressionSuite {
     //
     static public Test suite() throws IOException
     {
-        MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestSystemCatalogSuite.class);
-
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addLiteralSchema("CREATE TABLE T(A1 INTEGER NOT NULL, A2 INTEGER, PRIMARY KEY(A1));" +
-                                 "CREATE VIEW V(A1, S) AS SELECT A1, COUNT(*) FROM T GROUP BY A1;");
-        project.addPartitionInfo("T", "A1");
-        project.addStmtProcedure("InsertA", "INSERT INTO T VALUES(?,?);", "T.A1: 0");
-
-        LocalCluster lcconfig = new LocalCluster("getclusterinfo-cluster.jar", 2, 2, 1,
-                                               BackendTarget.NATIVE_EE_JNI);
-        lcconfig.compile(project);
-        builder.addServerConfig(lcconfig);
-
-        return builder;
+        CatalogBuilder cb = new CatalogBuilder(
+                "CREATE TABLE T(A1 INTEGER NOT NULL, A2 INTEGER, PRIMARY KEY(A1));\n" +
+                "PARTITION TABLE T ON COLUMN A1;\n" +
+                "CREATE VIEW V(A1, S) AS SELECT A1, COUNT(*) FROM T GROUP BY A1;\n" +
+                "")
+        .addStmtProcedure("InsertA", "INSERT INTO T VALUES(?,?);", "T.A1", 0)
+        ;
+        return multiClusterSuiteBuilder(TestSystemCatalogSuite.class, cb,
+                new DeploymentBuilder(2, 2, 1));
     }
 }
 

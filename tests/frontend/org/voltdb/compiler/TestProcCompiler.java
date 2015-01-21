@@ -33,32 +33,27 @@ import org.voltdb.VoltDB.Configuration;
 public class TestProcCompiler extends TestCase {
 
     public void testIndexOnConstant() throws Exception {
-        String simpleSchema =
-            "create table indexed_replicated_blah (" +
-            "ival smallint default 0 not null, " +
-            "sval varchar(255) not null, " +
-            "PRIMARY KEY(ival)" +
-            ");" +
-            "";
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
         ByteArrayOutputStream capturer = new ByteArrayOutputStream();
         PrintStream capturing = new PrintStream(capturer);
-        builder.setCompilerDebugPrintStream(capturing);
-        builder.addLiteralSchema(simpleSchema);
+        CatalogBuilder cb = new CatalogBuilder(
+                "create table indexed_replicated_blah (" +
+                        "ival smallint default 0 not null, " +
+                        "sval varchar(255) not null, " +
+                        "PRIMARY KEY(ival)" +
+                        ");" +
+                "")
         // Note: indexed_replicated_blah is left as a replicated table.
 
         // Test for index use on a constant equality using inequality queries as "control" cases.
-        builder.addStmtProcedure("StmtIndexOnConstant",
-                                 "select * from indexed_replicated_blah where ival = 1", null);
-        builder.addStmtProcedure("StmtScanOnConstant",
-                                 "select * from indexed_replicated_blah where ival <> 1", null);
-        builder.addStmtProcedure("StmtScanOnConstant2",
-                                 "select * from indexed_replicated_blah where ival <> 0", null);
+        .addStmtProcedure("StmtIndexOnConstant",
+                "select * from indexed_replicated_blah where ival = 1")
+        .addStmtProcedure("StmtScanOnConstant",
+                "select * from indexed_replicated_blah where ival <> 1")
+        .addStmtProcedure("StmtScanOnConstant2",
+                "select * from indexed_replicated_blah where ival <> 0")
+        .setCompilerDebugPrintStream(capturing);
 
-
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("index_on_constant.jar"));
-        assert(success);
+        assertTrue(cb.compile(Configuration.getPathToCatalogForTest("index_on_constant.jar")));
         String captured = capturer.toString("UTF-8");
         System.out.println(captured);
         String[] lines = captured.split("\n");

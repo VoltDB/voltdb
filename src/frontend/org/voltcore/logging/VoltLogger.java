@@ -17,14 +17,15 @@
 
 package org.voltcore.logging;
 
-import com.google_voltpatches.common.base.Throwables;
-import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.ShutdownHooks;
-
 import java.io.StringWriter;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.concurrent.ExecutorService;
+
+import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.ShutdownHooks;
+
+import com.google_voltpatches.common.base.Throwables;
 
 /**
  * Class that implements the core functionality of a Log4j logger

@@ -36,40 +36,40 @@ public class TestVoltCompilerErrorMsgs extends TestCase {
     private void statementTest(String feature, boolean expectError, boolean testStmtIsDdl, String... statements)
         throws Exception
     {
-        String simpleSchema =
-            "create table blah (" +
-            "ival bigint default 0 not null, " +
-            "sval varchar(255) not null" +
-            ");" +
-            "create table indexed_blah (" +
-            "ival bigint default 0 not null, " +
-            "sval varchar(255) not null, " +
-            "PRIMARY KEY(ival)" +
-            ");" +
-            "create table partitioned_blah (" +
-            "ival bigint default 0 not null, " +
-            "sval varchar(255) not null" +
-            ");" +
-            "partition table partitioned_blah on column sval;" +
-            "";
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-
         ByteArrayOutputStream capturer = new ByteArrayOutputStream();
         PrintStream capturing = new PrintStream(capturer);
-        builder.setCompilerDebugPrintStream(capturing);
+        CatalogBuilder cb = new CatalogBuilder(
+                "create table blah (" +
+                "ival bigint default 0 not null, " +
+                "sval varchar(255) not null" +
+                ");" +
 
-        builder.addLiteralSchema(simpleSchema);
+                "create table indexed_blah (" +
+                "ival bigint default 0 not null, " +
+                "sval varchar(255) not null, " +
+                "PRIMARY KEY(ival)" +
+                ");" +
 
-        for (String statement : statements) {
-            if (testStmtIsDdl) {
-                builder.addLiteralSchema(statement);
-            } else {
-                builder.addStmtProcedure(feature, statement);
+                "create table partitioned_blah (" +
+                "ival bigint default 0 not null, " +
+                "sval varchar(255) not null" +
+                ");" +
+                "partition table partitioned_blah on column sval;" +
+                "")
+        .setCompilerDebugPrintStream(capturing);
+
+        if (testStmtIsDdl) {
+            for (String statement : statements) {
+                cb.addLiteralSchema(statement);
+            }
+        }
+        else {
+            for (String statement : statements) {
+                cb.addStmtProcedure(feature, statement);
             }
         }
 
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("errors.jar"));
+        boolean success = cb.compile(Configuration.getPathToCatalogForTest("errors.jar"));
         String captured = capturer.toString("UTF-8");
         String[] lines = captured.split("\n");
 

@@ -84,6 +84,10 @@ import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.VoltCompiler;
+import org.voltdb.compiler.deploymentfile.AdminModeType;
+import org.voltdb.compiler.deploymentfile.HeartbeatType;
+import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
+import org.voltdb.compiler.deploymentfile.ReplicationType;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
 import org.voltdb.compiler.deploymentfile.CommandLogType.Frequency;
@@ -113,10 +117,7 @@ import com.google_voltpatches.common.base.Charsets;
 import java.io.StringWriter;
 import javax.xml.bind.Marshaller;
 import javax.xml.namespace.QName;
-import org.voltdb.compiler.deploymentfile.AdminModeType;
-import org.voltdb.compiler.deploymentfile.HeartbeatType;
-import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
-import org.voltdb.compiler.deploymentfile.ReplicationType;
+
 import org.xml.sax.SAXException;
 
 /**
@@ -177,6 +178,27 @@ public abstract class CatalogUtil {
         byte[] serializedCatalogBytes = jarfile.get(CatalogUtil.CATALOG_FILENAME);
         String serializedCatalog = new String(serializedCatalogBytes, Constants.UTF8ENCODING);
         return serializedCatalog;
+    }
+
+    /**
+     * @param bytes
+     * @return
+     * @throws IOException
+     */
+    public static Catalog deserializeCatalogFromJarFileBytes(byte[] bytes) throws IOException {
+        InMemoryJarfile imjf = loadAndUpgradeCatalogFromJar(bytes).getFirst();
+        return deserializeCatalogFromInMemoryJarfile(imjf);
+    }
+
+    public static Catalog deserializeCatalogFromInMemoryJarfile(InMemoryJarfile loadResults) {
+        String serializedCatalog = getSerializedCatalogStringFromJar(loadResults);
+        /* N.B. node recovery requires discovering the current catalog version. */
+        if (serializedCatalog.length() == 0) {
+            return null;
+        }
+        Catalog catalog = new Catalog();
+        catalog.execute(serializedCatalog);
+        return catalog;
     }
 
     /**
@@ -459,39 +481,34 @@ public abstract class CatalogUtil {
         return true;
     }
 
-    public static String compileDeployment(Catalog catalog, String deploymentURL,
-            boolean isPlaceHolderCatalog)
+    public static String compileDeploymentForTest(Catalog catalog, String deploymentURL)
     {
         DeploymentType deployment = CatalogUtil.parseDeployment(deploymentURL);
         if (deployment == null) {
             return "Error parsing deployment file: " + deploymentURL;
         }
-        return compileDeployment(catalog, deployment, isPlaceHolderCatalog);
+        return compileDeployment(catalog, deployment);
     }
 
-    public static String compileDeploymentString(Catalog catalog, String deploymentString,
-            boolean isPlaceHolderCatalog)
+    public static String compileDeploymentForTestNoUsersOrExport(Catalog catalog, String deploymentURL)
     {
-        DeploymentType deployment = CatalogUtil.parseDeploymentFromString(deploymentString);
+        DeploymentType deployment = CatalogUtil.parseDeployment(deploymentURL);
         if (deployment == null) {
-            return "Error parsing deployment string";
+            return "Error parsing deployment file: " + deploymentURL;
         }
-        return compileDeployment(catalog, deployment, isPlaceHolderCatalog);
+        return compileDeploymentNoUsersOrExport(catalog, deployment);
     }
 
     /**
-     * Parse the deployment.xml file and add its data into the catalog.
+     * Add preliminary deployment data into the catalog but not (yet) the user or export data
+     * to avoid false alarms for place-holder catalogs.
      * @param catalog Catalog to be updated.
      * @param deployment Parsed representation of the deployment.xml file.
-     * @param isPlaceHolderCatalog if the catalog is isPlaceHolderCatalog and we are verifying only deployment xml.
      * @return String containing any errors parsing/validating the deployment. NULL on success.
      */
-    public static String compileDeployment(Catalog catalog,
-            DeploymentType deployment,
-            boolean isPlaceHolderCatalog)
+    public static String compileDeploymentNoUsersOrExport(Catalog catalog, DeploymentType deployment)
     {
         String errmsg = null;
-
         try {
             validateDeployment(catalog, deployment);
 
@@ -502,7 +519,7 @@ public abstract class CatalogUtil {
             setClusterInfo(catalog, deployment);
 
             //Set the snapshot schedule
-            setSnapshotInfo( catalog, deployment.getSnapshot());
+            setSnapshotInfo(catalog, deployment.getSnapshot());
 
             //Set enable security
             setSecurityEnabled(catalog, deployment.getSecurity());
@@ -514,21 +531,11 @@ public abstract class CatalogUtil {
             // file are handled.
             setPathsInfo(catalog, deployment.getPaths());
 
-            // set the users info
-            // We'll skip this when building the dummy catalog on startup
-            // so that we don't spew misleading user/role warnings
-            if (!isPlaceHolderCatalog) {
-                setUsersInfo(catalog, deployment.getUsers());
-            }
-
             // set the HTTPD info
             setHTTPDInfo(catalog, deployment.getHttpd());
 
-            if (!isPlaceHolderCatalog) {
-                setExportInfo(catalog, deployment.getExport());
-            }
-
-            setCommandLogInfo( catalog, deployment.getCommandlog());
+            setCommandLogInfo(catalog, deployment.getCommandlog());
+            return null;
         }
         catch (Exception e) {
             // Anything that goes wrong anywhere in trying to handle the deployment file
@@ -538,8 +545,34 @@ public abstract class CatalogUtil {
             hostLog.error(errmsg);
             return errmsg;
         }
+    }
 
-        return null;
+    /**
+     * Add deployment data into the catalog.
+     * @param catalog Catalog to be updated.
+     * @param deployment Parsed representation of the deployment.xml file.
+     * @param isPlaceHolderCatalog if the catalog is isPlaceHolderCatalog and we are verifying only deployment xml.
+     * @return String containing any errors parsing/validating the deployment. NULL on success.
+     */
+    public static String compileDeployment(Catalog catalog, DeploymentType deployment)
+    {
+        String errmsg = compileDeploymentNoUsersOrExport(catalog, deployment);
+        try {
+            if (errmsg == null) {
+                setUsersInfo(catalog, deployment.getUsers());
+                setExportInfo(catalog, deployment.getExport());
+            }
+            setCommandLogInfo(catalog, deployment.getCommandlog());
+            return null;
+        }
+        catch (Exception e) {
+            // Anything that goes wrong anywhere in trying to handle the deployment file
+            // should return an error, and let the caller decide what to do (crash or not, for
+            // example)
+            errmsg = "Error validating deployment configuration: " + e.getMessage();
+            hostLog.error(errmsg);
+            return errmsg;
+        }
     }
 
     /*
@@ -842,11 +875,11 @@ public abstract class CatalogUtil {
      */
     private static void setClusterInfo(Catalog catalog, DeploymentType deployment) {
         ClusterType cluster = deployment.getCluster();
-        int hostCount = cluster.getHostcount();
         int sitesPerHost = cluster.getSitesperhost();
+        int hostCount = cluster.getHostcount();
         int kFactor = cluster.getKfactor();
 
-        ClusterConfig config = new ClusterConfig(hostCount, sitesPerHost, kFactor);
+        ClusterConfig config = new ClusterConfig(sitesPerHost, hostCount, kFactor);
 
         if (!config.validate()) {
             throw new RuntimeException(config.getErrorMsg());
@@ -854,8 +887,8 @@ public abstract class CatalogUtil {
             Cluster catCluster = catalog.getClusters().get("cluster");
             // copy the deployment info that is currently not recorded anywhere else
             Deployment catDeploy = catCluster.getDeployment().get("deployment");
-            catDeploy.setHostcount(hostCount);
             catDeploy.setSitesperhost(sitesPerHost);
+            catDeploy.setHostcount(hostCount);
             catDeploy.setKfactor(kFactor);
             // copy partition detection configuration from xml to catalog
             String defaultPPDPrefix = "partition_detection";
@@ -944,7 +977,7 @@ public abstract class CatalogUtil {
 
         boolean adminstate = exportType.isEnabled();
 
-        Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
+        Database db = getDatabase(catalog);
         org.voltdb.catalog.Connector catconn = db.getConnectors().get("0");
         if (catconn == null) {
             if (adminstate) {
@@ -1049,7 +1082,7 @@ public abstract class CatalogUtil {
      * @param snapshot A reference to the <snapshot> element of the deployment.xml file.
      */
     private static void setSnapshotInfo(Catalog catalog, SnapshotType snapshotSettings) {
-        Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
+        Database db = getDatabase(catalog);
         SnapshotSchedule schedule = db.getSnapshotschedule().add("default");
         schedule.setEnabled(snapshotSettings.isEnabled());
         String frequency = snapshotSettings.getFrequency();
@@ -1127,7 +1160,7 @@ public abstract class CatalogUtil {
         commandLogSnapshotPath = getCommandLogSnapshot(paths.getCommandlogsnapshot(), voltDbRoot);
 
         //Set the volt root in the catalog
-        catalog.getClusters().get("cluster").setVoltroot(voltDbRoot.getPath());
+        cluster.setVoltroot(voltDbRoot.getPath());
 
         //Set the auto-snapshot schedule path if there are auto-snapshots
         SnapshotSchedule schedule = cluster.getDatabases().
@@ -1294,7 +1327,7 @@ public abstract class CatalogUtil {
         // in project.xml). However, it must always be named "database", so
         // I've temporarily hardcoded it here until a more robust solution is
         // available.
-        Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
+        Database db = getDatabase(catalog);
 
         SecureRandom sr = new SecureRandom();
         for (UsersType.User user : users.getUser()) {
@@ -1770,6 +1803,16 @@ public abstract class CatalogUtil {
             return null;
         }
         return emptyJarFile;
+    }
+
+    /**
+     * Convenience method to navigate to the well-known route to the database (schema)
+     * from the root of the catalog tree.
+     * @param catalog
+     * @return
+     */
+    public static Database getDatabase(Catalog catalog) {
+        return catalog.getClusters().get("cluster").getDatabases().get("database");
     }
 
 }

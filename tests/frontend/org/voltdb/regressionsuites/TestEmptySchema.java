@@ -26,24 +26,17 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 
 import junit.framework.Test;
+import junit.framework.TestCase;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
-import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestEmptySchema extends RegressionSuite
 {
     public TestEmptySchema(String name) {
         super(name);
-    }
-
-    static VoltProjectBuilder getBuilderForTest() throws IOException {
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("");
-        return builder;
     }
 
     public void testEmptySchema() throws Exception {
@@ -98,20 +91,11 @@ public class TestEmptySchema extends RegressionSuite
         validateSchema(results[0], expectedTable);
     }
 
+    static final Class<? extends TestCase> TESTCASECLASS = TestEmptySchema.class;
+
     static public Test suite() throws IOException {
-        // the suite made here will all be using the tests from this class
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestEmptySchema.class);
-
-        // build up a project builder for the workload
-        VoltProjectBuilder project = getBuilderForTest();
-        boolean success;
-        LocalCluster config = new LocalCluster("decimal-default.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
-
-        // add this config to the set of tests to run
-        builder.addServerConfig(config);
-
-        return builder;
+        LocalCluster cluster = LocalCluster.configure(TESTCASECLASS.getSimpleName(), "", 2);
+        assertNotNull("LocalCluster compile failed", cluster);
+        return new MultiConfigSuiteBuilder(TESTCASECLASS, cluster);
     }
 }

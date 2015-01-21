@@ -52,6 +52,8 @@ package org.voltdb;
 
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
 public class TPCCServer {
     public static void main(String[] args) throws InterruptedException {
@@ -74,12 +76,16 @@ public class TPCCServer {
         }
 
         if (doCompile) {
-            TPCCProjectBuilder project = TPCCProjectBuilder.defaultBuilder();
-            project.setCompilerDebugPrintStream(System.out);
-            if(!project.compile(config.m_pathToCatalog, partitions, 0)) {
+            CatalogBuilder cb = TPCCProjectBuilder.defaultCatalogBuilder()
+            .setCompilerDebugPrintStream(System.out)
+            ;
+            if( ! cb.compile(config.m_pathToCatalog)) {
                 System.out.println("Compilation failed");
                 System.exit(-1);
             }
+
+            config.m_pathToDeployment = Configuration.getPathToCatalogForTest("tpcc.xml");
+            new DeploymentBuilder(partitions).writeXMLToFile(config.m_pathToDeployment);
         }
 
         VoltDB.initialize(config);

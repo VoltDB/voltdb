@@ -28,13 +28,12 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
 /*
  * Functional tests of the statements compiled in the test suite
@@ -42,8 +41,7 @@ import org.voltdb.compiler.VoltProjectBuilder;
  */
 
 public class TestGroupByComplexSuite extends RegressionSuite {
-
-    private final static String [] tbs = {"R1","P1","P2","P3"};
+    private static final String [] tbs = {"R1","P1","P2","P3"};
 
     private void loadData(boolean extra) throws IOException, ProcCallException {
         Client client = this.getClient();
@@ -1152,23 +1150,7 @@ public class TestGroupByComplexSuite extends RegressionSuite {
     }
 
     static public junit.framework.Test suite() {
-        VoltServerConfig config = null;
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(
-                TestGroupByComplexSuite.class);
-
-        String addProcs = "";
-        for (String tb: tbs) {
-            addProcs += "CREATE PROCEDURE " + tb + "_GroupbyAlias1 AS "
-                    + " SELECT (dept+?) as tag, count(wage) from " + tb
-                    + " GROUP BY tag ORDER BY tag;";
-
-            addProcs += "CREATE PROCEDURE " + tb + "_GroupbyAlias2 AS "
-                    + " SELECT abs(dept+?) as tag, count(wage)+1 from " + tb
-                    + " GROUP BY tag ORDER BY tag;";
-        }
-
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        final String literalSchema =
+        String literalSchema =
                 "CREATE TABLE R1 ( " +
                 "ID INTEGER DEFAULT 0 NOT NULL, " +
                 "WAGE INTEGER, " +
@@ -1205,31 +1187,21 @@ public class TestGroupByComplexSuite extends RegressionSuite {
                 "STATE VARCHAR(2), " +
                 "PRIMARY KEY (ID) );" +
 
-                addProcs
-                ;
-        try {
-            project.addLiteralSchema(literalSchema);
-        } catch (IOException e) {
-            assertFalse(true);
+                "";
+        StringBuilder schemaBuilder = new StringBuilder(literalSchema);
+        for (String tb: tbs) {
+            schemaBuilder.append(
+                    "\nCREATE PROCEDURE " + tb +
+                    "_GroupbyAlias1 AS SELECT (dept+?) as tag, count(wage) from " + tb +
+                    " GROUP BY tag ORDER BY tag;" +
+                    "\nCREATE PROCEDURE " + tb +
+                    "_GroupbyAlias2 AS SELECT abs(dept+?) as tag, count(wage)+1 from " + tb +
+                    " GROUP BY tag ORDER BY tag;");
         }
-        boolean success;
-
-        config = new LocalCluster("groupByComplex-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-
-        config = new LocalCluster("groupByComplex-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-
-        // Cluster
-        config = new LocalCluster("groupByComplex-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-
-        return builder;
+        literalSchema = schemaBuilder.toString();
+        return multiClusterSuiteBuilder(TestGroupByComplexSuite.class, literalSchema,
+                new DeploymentBuilder(),
+                DeploymentBuilder.forHSQLBackend(),
+                new DeploymentBuilder(2, 3, 1));
     }
 }

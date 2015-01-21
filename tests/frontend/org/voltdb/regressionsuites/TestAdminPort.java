@@ -23,89 +23,18 @@
 
 package org.voltdb.regressionsuites;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
-import java.security.SecureRandom;
-
-import static junit.framework.Assert.fail;
-import junit.framework.TestCase;
-
-import org.voltdb.BackendTarget;
-import org.voltdb.compiler.VoltProjectBuilder;
-
-public class TestAdminPort extends TestCase {
-
-    PortListener ncprocess;
-    PipeToFile pf;
-    int rport;
-
+public class TestAdminPort extends PortTest {
     public TestAdminPort(String name) {
         super(name);
     }
 
-    /**
-     * JUnit special method called to setup the test. This instance will start
-     * the VoltDB server using the VoltServerConfig instance provided.
-     */
     @Override
-    public void setUp() throws Exception {
-        rport = SecureRandom.getInstance("SHA1PRNG").nextInt(2000) + 22000;
-        System.out.println("Random Admin port is: " + rport);
-        ncprocess = new PortListener(rport);
-        try {
-            //Build the catalog
-            VoltProjectBuilder builder = new VoltProjectBuilder();
-            builder.addLiteralSchema("");
-            String catalogJar = "dummy.jar";
-
-            LocalCluster config = new LocalCluster(catalogJar, 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-
-            config.portGenerator.enablePortProvider();
-            config.portGenerator.pprovider.setAdmin(rport);
-            config.setHasLocalServer(false);
-            //We expect it to crash
-            config.setExpectedToCrash(true);
-
-            boolean success = config.compile(builder);
-            assertTrue(success);
-
-            config.startUp();
-            pf = config.m_pipes.get(0);
-            Thread.currentThread().sleep(10000);
-        } catch (IOException ex) {
-            fail(ex.getMessage());
-        } finally {
-        }
+    protected void customizeConfig(LocalCluster config, int rport) {
+        config.portGenerator.pprovider.setAdmin(rport);
     }
 
-    /**
-     * JUnit special method called to shutdown the test. This instance will
-     * stop the VoltDB server using the VoltServerConfig instance provided.
-     */
-    @Override
-    public void tearDown() throws Exception {
-        if (ncprocess != null) {
-            ncprocess.close();
-        }
-    }
-
-    /*
-     *
-     */
     public void testAdminPort() throws Exception {
-        BufferedReader bi = new BufferedReader(new FileReader(new File(pf.m_filename)));
-        String line;
-        boolean failed = true;
-        final CharSequence cs = "Client interface failed to bind to Admin port";
-        while ((line = bi.readLine()) != null) {
-            System.out.println(line);
-            if (line.contains(cs)) {
-                failed = false;
-                break;
-            }
-        }
-        assertFalse(failed);
+        final CharSequence pattern = "Client interface failed to bind to Admin port";
+        checkPort(pattern);
     }
 }

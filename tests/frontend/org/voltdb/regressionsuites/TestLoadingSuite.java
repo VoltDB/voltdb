@@ -23,11 +23,8 @@
 
 package org.voltdb.regressionsuites;
 
-import java.io.IOException;
-
 import junit.framework.Test;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -35,7 +32,8 @@ import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.CatalogBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
 public class TestLoadingSuite extends RegressionSuite {
 
@@ -158,68 +156,35 @@ public class TestLoadingSuite extends RegressionSuite {
      * one and two partition configurations, as well as on the hsql backend.
      *
      * @return The TestSuite containing all the tests to be run.
-     * @throws IOException
      */
-    static public Test suite() throws IOException {
-        // the suite made here will all be using the tests from this class
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestLoadingSuite.class);
-
-        String schema = "CREATE TABLE REPLICATED (\n" +
-                        "  ival INTEGER DEFAULT '0' NOT NULL,\n" +
-                        "  pval INTEGER DEFAULT '0' NOT NULL,\n" +
-                        "  bval TINYINT DEFAULT '0' NOT NULL,\n" +
-                        "  sval VARCHAR(60) DEFAULT '0' NOT NULL,\n" +
-                        "  dval FLOAT DEFAULT '0' NOT NULL,\n" +
-                        "  PRIMARY KEY (ival)\n" +
-                        ");\n" +
-                        "CREATE TABLE PARTITIONED (\n" +
-                        "  ival INTEGER DEFAULT '0' NOT NULL,\n" +
-                        "  pval INTEGER DEFAULT '0' NOT NULL,\n" +
-                        "  bval TINYINT DEFAULT '0' NOT NULL,\n" +
-                        "  sval VARCHAR(60) DEFAULT '0' NOT NULL,\n" +
-                        "  dval FLOAT DEFAULT '0' NOT NULL,\n" +
-                        "  PRIMARY KEY (ival,pval)\n" +
-                        ");\n";
-
-        // build up a project builder for the workload
-        VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addLiteralSchema(schema);
-        project.addPartitionInfo("PARTITIONED", "pval");
-        project.addStmtProcedure("dummy", "select * from REPLICATED;");
-        boolean success;
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #1: 2 Local Site/Partitions running on JNI backend
-        /////////////////////////////////////////////////////////////
-
-        // get a server config for the native backend with two sites/partitions
-        VoltServerConfig config = new LocalCluster("loading-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-
-        // build the jarfile (note the reuse of the TPCC project)
-        success = config.compile(project);
-        assert(success);
-
-        // add this config to the set of tests to run
-        builder.addServerConfig(config);
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #2: HSQLDB
-        /////////////////////////////////////////////////////////////
-
-        config = new LocalCluster("loading-hsqldb.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        success = config.compile(project);
-        assert(success);
-        builder.addServerConfig(config);
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #3: Local Cluster (of processes)
-        /////////////////////////////////////////////////////////////
-
-        config = new LocalCluster("loading-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assert(success);
-        builder.addServerConfig(config);
-
-        return builder;
+    static public Test suite() {
+        CatalogBuilder cb = new CatalogBuilder(
+                "CREATE TABLE REPLICATED (\n" +
+                "  ival INTEGER DEFAULT '0' NOT NULL,\n" +
+                "  pval INTEGER DEFAULT '0' NOT NULL,\n" +
+                "  bval TINYINT DEFAULT '0' NOT NULL,\n" +
+                "  sval VARCHAR(60) DEFAULT '0' NOT NULL,\n" +
+                "  dval FLOAT DEFAULT '0' NOT NULL,\n" +
+                "  PRIMARY KEY (ival)\n" +
+                ");\n" +
+                "CREATE TABLE PARTITIONED (\n" +
+                "  ival INTEGER DEFAULT '0' NOT NULL,\n" +
+                "  pval INTEGER DEFAULT '0' NOT NULL,\n" +
+                "  bval TINYINT DEFAULT '0' NOT NULL,\n" +
+                "  sval VARCHAR(60) DEFAULT '0' NOT NULL,\n" +
+                "  dval FLOAT DEFAULT '0' NOT NULL,\n" +
+                "  PRIMARY KEY (ival,pval)\n" +
+                ");\n" +
+                "PARTITION TABLE PARTITIONED ON COLUMN pval;\n" +
+                "")
+        .addStmtProcedure("dummy", "select * from REPLICATED;")
+        ;
+        return multiClusterSuiteBuilder(TestLoadingSuite.class, cb,
+                // CONFIG #1: 2 Local Site/Partitions running on JNI backend
+                new DeploymentBuilder(2),
+                // CONFIG #2: HSQLDB
+                DeploymentBuilder.forHSQLBackend(),
+                // CONFIG #3: Local Cluster (of processes)
+                new DeploymentBuilder(2, 3, 1));
     }
 }

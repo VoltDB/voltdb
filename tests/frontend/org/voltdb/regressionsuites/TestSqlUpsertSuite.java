@@ -25,18 +25,17 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
-import org.voltdb.BackendTarget;
+import junit.framework.TestCase;
+
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.compiler.DeploymentBuilder;
 
 /**
  * Junit tests for UPSERT
  */
-
 public class TestSqlUpsertSuite extends RegressionSuite {
-
     public void testUpsertProcedure() throws IOException, ProcCallException
     {
         Client client = getClient();
@@ -201,12 +200,9 @@ public class TestSqlUpsertSuite extends RegressionSuite {
         super(name);
     }
 
-    static public junit.framework.Test suite() {
+    static final Class<? extends TestCase> TESTCASECLASS = TestSqlUpsertSuite.class;
 
-        VoltServerConfig config = null;
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(
-                TestSqlUpsertSuite.class);
-        VoltProjectBuilder project = new VoltProjectBuilder();
+    static public junit.framework.Test suite() {
         final String literalSchema =
                 "CREATE TABLE R1 ( " +
                 "ID INTEGER DEFAULT 0 NOT NULL, " +
@@ -271,27 +267,14 @@ public class TestSqlUpsertSuite extends RegressionSuite {
                 "PARTITION TABLE UP3 ON COLUMN ID;" +
                 "EXPORT TABLE UP3;" +
 
-                ""
-                ;
-        try {
-            project.addLiteralSchema(literalSchema);
-        } catch (IOException e) {
-            assertFalse(true);
-        }
-        boolean success;
-        config = new LocalCluster("sqlupsert-onesite.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assert(success);
-        builder.addServerConfig(config);
-
-        //*/ Cluster
-        config = new LocalCluster("sqlupsert-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assert(success);
-        builder.addServerConfig(config);
-        //*/
-
-        return builder;
+                "";
+        return multiClusterSuiteBuilder(TestSqlUpsertSuite.class, literalSchema,
+                // two-site testing -- no multi-host cluster tests needed for SQL behavior tests.
+                new DeploymentBuilder(2),
+                // We never taught HSQL how to upsert.
+                // DeploymentBuilder.forHSQLBackend(),
+                // multi-host cluster testing with replication
+                new DeploymentBuilder(2, 3, 1));
     }
 
 }

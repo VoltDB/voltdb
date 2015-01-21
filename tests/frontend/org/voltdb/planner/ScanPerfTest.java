@@ -29,8 +29,6 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import junit.framework.TestCase;
 
-import org.voltdb.BackendTarget;
-import org.voltdb.ReplicationRole;
 import org.voltdb.SQLStmt;
 import org.voltdb.TableHelper;
 import org.voltdb.VoltProcedure;
@@ -42,7 +40,6 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
-import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.MiscUtils;
 
@@ -130,34 +127,28 @@ public class ScanPerfTest extends TestCase {
     }
 
     public void testHaltLiveRejoinOnOverflow() throws Exception {
-
-        LocalCluster cluster = null;
-        Client client = null;
-
         VoltTable pTable = TableHelper.quickTable("P (ID:BIGINT-N, VALUE:BIGINT-N) PK(ID)");
 
         // build and compile a catalog
         System.out.println("Compiling catalog.");
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(TableHelper.ddlForTable(pTable));
-        builder.addLiteralSchema("PARTITION TABLE P ON COLUMN ID;\n" +
+        String ddlText = TableHelper.ddlForTable(pTable) +
+                "PARTITION TABLE P ON COLUMN ID;\n" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.planner.ScanPerfTest$ScanTable;\n" +
-                "PARTITION PROCEDURE ScanPerfTest$ScanTable ON TABLE P COLUMN ID;\n");
-        cluster = new LocalCluster("scanperf.jar", 8, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        //cluster.setMaxHeap(10);
-        boolean success = cluster.compile(builder);
-        assertTrue(success);
-
-        //fail();
+                "PARTITION PROCEDURE ScanPerfTest$ScanTable ON TABLE P COLUMN ID;\n" +
+                "";
+        int siteCount = 8;
+        LocalCluster cluster = LocalCluster.configure(getClass().getSimpleName(), ddlText, siteCount);
+        assertNotNull("LocalCluster failed to compile", cluster);
 
         System.out.println("Starting cluster.");
-        cluster.setHasLocalServer(false);
-        cluster.overrideAnyRequestForValgrind();
-        cluster.startUp(true, ReplicationRole.NONE);
+        cluster.overrideAnyRequestForValgrind()
+        .bypassInProcessServerThread()
+        ;
+        cluster.startUp();
 
         System.out.println("Getting client connected.");
         ClientConfig clientConfig = new ClientConfig();
-        client = ClientFactory.createClient(clientConfig);
+        Client client = ClientFactory.createClient(clientConfig);
         for (String address : cluster.getListenerAddresses()) {
             client.createConnection(address);
         }

@@ -28,6 +28,7 @@ import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogDiffEngine;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
+import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.InMemoryJarfile;
@@ -143,15 +144,8 @@ public class AsyncCompilerAgentHelper
                 retval.errorMsg = ioe.getMessage();
                 return retval;
             }
-            String newCatalogCommands =
-                CatalogUtil.getSerializedCatalogStringFromJar(loadResults.getFirst());
             retval.upgradedFromVersion = loadResults.getSecond();
-            if (newCatalogCommands == null) {
-                retval.errorMsg = "Unable to read from catalog bytes";
-                return retval;
-            }
-            Catalog newCatalog = new Catalog();
-            newCatalog.execute(newCatalogCommands);
+            Catalog newCatalog = CatalogUtil.deserializeCatalogFromInMemoryJarfile(loadResults.getFirst());
 
             // Retrieve the original deployment string, if necessary
             if (deploymentString == null) {
@@ -167,8 +161,13 @@ public class AsyncCompilerAgentHelper
                 }
             }
 
-            String result =
-                CatalogUtil.compileDeploymentString(newCatalog, deploymentString, false);
+            DeploymentType deployment = CatalogUtil.parseDeploymentFromString(deploymentString);
+            if (deployment == null) {
+                retval.errorMsg =
+                        "Unable to update deployment configuration: Error parsing deployment string";
+                return retval;
+            }
+            String result = CatalogUtil.compileDeployment(newCatalog, deployment);
             if (result != null) {
                 retval.errorMsg = "Unable to update deployment configuration: " + result;
                 return retval;
