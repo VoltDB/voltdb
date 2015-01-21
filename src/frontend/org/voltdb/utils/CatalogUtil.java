@@ -121,6 +121,7 @@ import org.voltdb.compiler.deploymentfile.AdminModeType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.ReplicationType;
+import org.voltdb.export.ExportManager;
 import org.xml.sax.SAXException;
 
 /**
@@ -1034,7 +1035,7 @@ public abstract class CatalogUtil {
             }
 
             // on-server export always uses the guest processor
-            String connector = "org.voltdb.export.processors.GuestProcessor";
+            String connector = ExportManager.DEFAULT_LOADER_CLASS;
             catconn.setLoaderclass(connector);
             catconn.setEnabled(connectorEnabled);
 

@@ -115,8 +115,8 @@ public class ExportManager
     private final int m_hostId;
 
     // this used to be flexible, but no longer - now m_loaderClass is just null or default value
-    private static final String DEFAULT_LOADER_CLASS = "org.voltdb.export.processors.GuestProcessor";
-    private String m_loaderClass = null;
+    public static final String DEFAULT_LOADER_CLASS = "org.voltdb.export.processors.GuestProcessor";
+    private final String m_loaderClass = DEFAULT_LOADER_CLASS;
 
     private volatile Map<String, Pair<Properties, Set<String>>> m_processorConfig = new HashMap<>();
 
@@ -356,7 +356,6 @@ public class ExportManager
         updateProcessorConfig(connectors);
 
         exportLog.info(String.format("Export is enabled and can overflow to %s.", cluster.getExportoverflow()));
-        m_loaderClass = DEFAULT_LOADER_CLASS;
     }
 
     private synchronized void createInitialExportProcessor(
@@ -517,6 +516,12 @@ public class ExportManager
                 while (connPropIt.hasNext()) {
                     ConnectorProperty prop = connPropIt.next();
                     properties.put(prop.getName(), prop.getValue().trim());
+                    if (!prop.getName().toLowerCase().contains("password")) {
+                        properties.put(prop.getName(), prop.getValue().trim());
+                    } else {
+                        //Dont trim passwords
+                        properties.put(prop.getName(), prop.getValue());
+                    }
                 }
             }
 
@@ -535,11 +540,8 @@ public class ExportManager
 
         updateProcessorConfig(connectors);
         if (m_processorConfig.size() == 0) {
-            m_loaderClass = null;
             return;
         }
-
-        m_loaderClass = DEFAULT_LOADER_CLASS;
 
         File exportOverflowDirectory = new File(catalogContext.cluster.getExportoverflow());
 
@@ -572,7 +574,6 @@ public class ExportManager
             proc.shutdown();
         }
         m_generations.clear();
-        m_loaderClass = null;
     }
 
     public static long getQueuedExportBytes(int partitionId, String signature) {
