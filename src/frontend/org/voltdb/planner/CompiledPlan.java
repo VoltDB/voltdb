@@ -80,8 +80,6 @@ public class CompiledPlan {
      */
     public boolean replicatedTableDML = false;
 
-    public String[] touchedTables = null;
-
     /** Does the statement write? */
     private boolean m_readOnly = false;
 

@@ -2416,7 +2416,14 @@ public class VoltCompiler {
         }
 
         // check that no underlying tables have been modified since the proc had been compiled
-        String tablesTouched[] = candidate.getTablestouched().split(",");
+        String[] tablesTouched = candidate.getTablesread().split(",");
+        for (String tableName : tablesTouched) {
+            if (m_dirtyTables.contains(tableName.toLowerCase())) {
+                ++m_stmtCacheMisses;
+                return null;
+            }
+        }
+        tablesTouched = candidate.getTablesupdated().split(",");
         for (String tableName : tablesTouched) {
             if (m_dirtyTables.contains(tableName.toLowerCase())) {
                 ++m_stmtCacheMisses;
