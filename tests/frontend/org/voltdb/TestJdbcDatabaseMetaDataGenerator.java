@@ -75,7 +75,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         VoltCompiler c = compileForDDLTest2(schema);
         System.out.println(c.getCatalog().serialize());
         JdbcDatabaseMetaDataGenerator dut =
-            new JdbcDatabaseMetaDataGenerator(c.getCatalog(), new InMemoryJarfile(testout_jar));
+            new JdbcDatabaseMetaDataGenerator(c.getCatalog(), null, new InMemoryJarfile(testout_jar));
         VoltTable tables = dut.getMetaData("tables");
         System.out.println(tables);
         assertEquals(10, tables.getColumnCount());
@@ -311,7 +311,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         VoltCompiler c = compileForDDLTest2(schema);
         System.out.println(c.getCatalog().serialize());
         JdbcDatabaseMetaDataGenerator dut =
-            new JdbcDatabaseMetaDataGenerator(c.getCatalog(), new InMemoryJarfile(testout_jar));
+            new JdbcDatabaseMetaDataGenerator(c.getCatalog(), null, new InMemoryJarfile(testout_jar));
         VoltTable columns = dut.getMetaData("ColUmns");
         System.out.println(columns);
         assertEquals(23, columns.getColumnCount());
@@ -335,7 +335,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         VoltCompiler c = compileForDDLTest2(schema);
         System.out.println(c.getCatalog().serialize());
         JdbcDatabaseMetaDataGenerator dut =
-            new JdbcDatabaseMetaDataGenerator(c.getCatalog(), new InMemoryJarfile(testout_jar));
+            new JdbcDatabaseMetaDataGenerator(c.getCatalog(), null, new InMemoryJarfile(testout_jar));
         VoltTable indexes = dut.getMetaData("IndexInfo");
         System.out.println(indexes);
         assertEquals(13, indexes.getColumnCount());
@@ -407,7 +407,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
         VoltCompiler c = compileForDDLTest2(schema);
         System.out.println(c.getCatalog().serialize());
         JdbcDatabaseMetaDataGenerator dut =
-            new JdbcDatabaseMetaDataGenerator(c.getCatalog(), new InMemoryJarfile(testout_jar));
+            new JdbcDatabaseMetaDataGenerator(c.getCatalog(), null, new InMemoryJarfile(testout_jar));
         VoltTable pkeys = dut.getMetaData("PrimaryKeys");
         System.out.println(pkeys);
         assertEquals(6, pkeys.getColumnCount());
@@ -441,8 +441,9 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
 
         VoltCompiler c = compileForDDLTest2(schema);
         System.out.println(c.getCatalog().serialize());
+        DefaultProcedureManager defaultProcs = new DefaultProcedureManager(c.getCatalogDatabase());
         JdbcDatabaseMetaDataGenerator dut =
-            new JdbcDatabaseMetaDataGenerator(c.getCatalog(), new InMemoryJarfile(testout_jar));
+            new JdbcDatabaseMetaDataGenerator(c.getCatalog(), defaultProcs, new InMemoryJarfile(testout_jar));
         VoltTable params = dut.getMetaData("ProcedureColumns");
         System.out.println(params);
         assertEquals(20, params.getColumnCount());
@@ -474,7 +475,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
 
         VoltCompiler c = compileForDDLTest2(schema);
         JdbcDatabaseMetaDataGenerator dut =
-            new JdbcDatabaseMetaDataGenerator(c.getCatalog(), new InMemoryJarfile(testout_jar));
+            new JdbcDatabaseMetaDataGenerator(c.getCatalog(), null, new InMemoryJarfile(testout_jar));
         VoltTable typeInfo = dut.getMetaData("typEINfo");
         System.out.println(typeInfo);
         // just do some minor sanity checks on size of table and that it contains the types
@@ -509,7 +510,7 @@ public class TestJdbcDatabaseMetaDataGenerator extends TestCase
 
         VoltCompiler c = compileForDDLTest2(schema);
         JdbcDatabaseMetaDataGenerator dut =
-            new JdbcDatabaseMetaDataGenerator(c.getCatalog(), new InMemoryJarfile(testout_jar));
+            new JdbcDatabaseMetaDataGenerator(c.getCatalog(), null, new InMemoryJarfile(testout_jar));
         VoltTable classes = dut.getMetaData("classes");
         System.out.println(classes);
         assertTrue(VoltTableTestHelpers.moveToMatchingRow(classes, "CLASS_NAME", "org.voltdb_testprocs.fullddlfeatures.testImportProc"));

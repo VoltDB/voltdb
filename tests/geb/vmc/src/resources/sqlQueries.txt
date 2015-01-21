@@ -157,21 +157,45 @@
 #//DDL (positive tests)
 #/////////
 #
-# Table "ddl_table" is created here and dropped and recreated for subsequent tests
-# It's finally dropped below
-{"testName":"DdlCreateTable","sqlCmd":"create table ddl_table (i integer)","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
-{"testName":"DdlAlterTableDropColumn","sqlCmd":"drop table ddl_table;\ncreate table ddl_table (i integer, j tinyint);\nalter table ddl_table drop column j;","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
-{"testName":"DdlAlterTableAlterColumn","sqlCmd":"drop table ddl_table;\ncreate table ddl_table (i integer, j tinyint);\nalter table ddl_table alter column j float default 3.4","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+# Table "ddl_table" is created here and dropped and recreated for subsequent tests.
+# It's finally dropped below (last test).
+{"testName":"DdlCreateTable","sqlCmd":"Create table ddl_table (i integer)","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+{"testName":"DdlAlterTableDropColumn","sqlCmd":"DROP table ddl_table if exists;\nCreate table ddl_table (i integer, j tinyint);\nAlter table ddl_table drop column j;","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+{"testName":"DdlAlterTableAlterColumn","sqlCmd":"DROP table ddl_table if exists;\nCreate table ddl_table (i integer, j tinyint);\nAlter table ddl_table alter column j float default 3.4","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+#
+# Create view tests:
+{"testName":"DdlCreateTableForViews","sqlCmd":"DROP table ddl_table if exists; Create table ddl_table (i integer, j integer);","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+{"testName":"DdlCreateView1","sqlCmd":"Create view view1 (gb, ct) as select i, count(*) from ddl_table group by i","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+{"testName":"DdlCreateView2","sqlCmd":"Create view view2 \n (gb,\n ct\n) \nas \nselect i, count(*) from ddl_table group by i","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+{"testName":"DdlCreateView3","sqlCmd":"Create view view3a (gb, ct) as select i, count(*) from ddl_table group by i;\nCreate view view3b (gb, ct) as select i, count(*) from ddl_table group by i;","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+# Worse case testing for new line character:
+{"testName":"DdlCreateView_required","sqlCmd":"Create\nview\nview_required(gb,ct)\nas\nselect\ni,count(*)\nfrom\nddl_table\ngroup\nby\ni","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+{"testName":"DdlCreateView_allowed","sqlCmd":"Create\nview\nview_allowed\n(gb\n,\nct\n)\nas\nselect\ni\n,\ncount(*)\nfrom\nddl_table\ngroup\nby\ni\n","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+# Drop the views created above (to test Drop View, and so test is repeatable):
+{"testName":"DdlDropView1","sqlCmd":"DROP view view1;","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+{"testName":"DdlDropViews","sqlCmd":"DROP view view2 if exists;\nDROP view view3a if exists;\nDROP view view3b if exists;\nDROP view view_required if exists;\nDROP view view_allowed if exists;","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+#
+# Create procedure tests: (there are other queries not tested here: update, truncate, upsert)
+{"testName":"DdlCreateTableForProcedures","sqlCmd":"DROP table ddl_table if exists;\nCreate table ddl_table (i integer, j integer);","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+{"testName":"DdlCreateProcedure1","sqlCmd":"Create procedure p1 as\n  insert into ddl_table values(1, 1);","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+{"testName":"DdlCreateProcedure2","sqlCmd":"Create procedure p2a as\n  select i \nfrom ddl_table;\nCreate procedure p2b as\n delete from ddl_table;","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+{"testName":"DdlCreateProcedure3","sqlCmd":"Create procedure p3 as\n  ( select i, j-1 from ddl_table ) union (select i, j+1 from ddl_table);","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+# Identical procedure, with lots of new line characters:
+{"testName":"DdlCreateProcedure4","sqlCmd":"Create procedure\np4\n as\n ( \nselect i, j-1 from ddl_table )\nunion \n(select i, j+1 from ddl_table);","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+# Drop the procedures created above (to test Drop Procedure, and so test is repeatable):
+{"testName":"DdlDropProcedure1","sqlCmd":"DROP procedure p1;\n","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
+{"testName":"DdlDropProcedures","sqlCmd":"DROP procedure p2a if exists;\nDROP procedure p2b if exists;\nDROP procedure p3 if exists;\nDROP procedure p4 if exists;","response":{"result":{"status":["0"]},"status":"SUCCESS"}}
 #
 #
 #/////////
 #//DDL (negative tests)
 #/////////
 #
-# semicolons MUST appear between ALTER TABLE statements; studio will
-# not insert them, hence the following cause parse errors.
-{"testName":"DdlAlterTableDropDrop","sqlCmd":"drop table ddl_table;\ncreate table ddl_table (i integer, j tinyint, k bigint);\nalter table ddl_table drop column j alter table ddl_table drop column k","response":{"result":"ERROR","status":"FAILURE"}}
-{"testName":"DdlAlterTableAddAdd","sqlCmd":"drop table ddl_table;\ncreate table ddl_table (i integer);\nalter table ddl_table add column j bigint alter table ddl_table add column k tinyint","response":{"result":"ERROR","status":"FAILURE"}}
+# Semicolons MUST appear between ALTER TABLE statements; VMC will not insert them, hence the following cause parse errors.
+{"testName":"DdlAlterTableDropDrop","sqlCmd":"drop table ddl_table if exists;\nCreate table ddl_table (i integer, j tinyint, k bigint);\nAlter table ddl_table drop column j alter table ddl_table drop column k","response":{"result":"ERROR","status":"FAILURE"}}
+{"testName":"DdlAlterTableAddAdd","sqlCmd":"drop table ddl_table if exists;\nCreate table ddl_table (i integer);\nAlter table ddl_table add column j bigint alter table ddl_table add column k tinyint","response":{"result":"ERROR","status":"FAILURE"}}
+# try to create a view from an undefined table
+{"testName":"DdlCreateViewInvalid","sqlCmd":"create view ddl_no_table_view (gb, ct) as select i, count(*) from ddl_no_table_exists group by i","response":{"result":"ERROR","status":"FAILURE"}}
 #
-# Finally, drop ddl_table so test is repeatable.
+# Finally, drop ddl_table, so test is repeatable.
 {"testName":"DdlDropTable","sqlCmd":"drop table ddl_table","response":{"result":{"status":["0"]},"status":"SUCCESS"}}

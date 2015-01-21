@@ -25,6 +25,7 @@ import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.SystemProcedureExecutionContext;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -163,16 +164,17 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
         int columnCount = table.getColumnCount();
 
         // find the insert statement for this table
-        String insertProcName = String.format("%s.insert", tableName);
-        Procedure proc = ctx.getDatabase().getProcedures().get(insertProcName);
+        String insertProcName = String.format("%s.insert", tableName.toUpperCase());
+        Procedure proc = ctx.ensureDefaultProcLoaded(insertProcName);
         if (proc == null) {
             throw new VoltAbortException(
                     String.format("Unable to locate auto-generated CRUD insert statement for table %s",
                             tableName));
         }
+        // ensure MP fragment tasks load the plan for the table loading procedure
+        m_runner.setProcNameToLoadForFragmentTasks(insertProcName);
 
-        // statements of all single-statement procs are named "sql"
-        Statement catStmt = proc.getStatements().get("sql");
+        Statement catStmt = proc.getStatements().get(VoltDB.ANON_STMT_NAME);
         if (catStmt == null) {
             throw new VoltAbortException(
                     String.format("Unable to find SQL statement for found table %s: BAD",

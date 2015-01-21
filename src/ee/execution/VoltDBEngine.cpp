@@ -1015,13 +1015,13 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
                 char msg[512];
                 snprintf(msg, sizeof(msg), "Table %s has changed schema and will be rebuilt.",
                          catalogTable->name().c_str());
-                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
+                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_DEBUG, msg);
 
                 tcd->processSchemaChanges(*m_database, *catalogTable, m_delegatesByName);
 
                 snprintf(msg, sizeof(msg), "Table %s was successfully rebuilt with new schema.",
                          catalogTable->name().c_str());
-                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_INFO, msg);
+                LogManager::getThreadLogger(LOGGERID_HOST)->log(LOGLEVEL_DEBUG, msg);
 
                 // don't continue on to modify/add/remove indexes, because the
                 // call above should rebuild them all anyway
@@ -1875,7 +1875,7 @@ void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
 }
 
 int VoltDBEngine::executePurgeFragment(PersistentTable* table) {
-    ExecutorVector *pev = table->getPurgeExecutorVector();
+    boost::shared_ptr<ExecutorVector> pev = table->getPurgeExecutorVector();
 
     // Push a new frame onto the stack for this executor vector
     // to report its tuples modified.  We don't want to actually

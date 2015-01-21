@@ -162,7 +162,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             boolean threw = false;
             try {
                 m_client.callProcedure("@AdHoc",
-                        "alter table FOO drop column DROPME;");
+                        "alter table FOO drop column DROPME; --commentfortesting");
             }
             catch (ProcCallException pce) {
                 threw = true;
@@ -208,7 +208,7 @@ public class TestAdhocAlterTable extends AdhocDDLTestBase {
             assertTrue(findTableInSystemCatalogResults("FOOVIEW"));
             try {
                 m_client.callProcedure("@AdHoc",
-                        "alter table FOO drop column VIEWCOL cascade;");
+                        "alter table FOO drop column VIEWCOL cascade; --comment messes up cascade?");
             }
             catch (ProcCallException pce) {
                 fail("Dropping a column should drop a view with cascade");

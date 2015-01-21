@@ -26,7 +26,6 @@ import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogDiffEngine;
-import org.voltdb.common.Constants;
 import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.utils.CatalogUtil;
@@ -106,7 +105,7 @@ public class AsyncCompilerAgentHelper
                 // newCatalogBytes and deploymentString should be null.
                 // work.adhocDDLStmts should be applied to the current catalog
                 try {
-                    newCatalogBytes = addDDLToCatalog(context.getCatalogJarBytes(),
+                    newCatalogBytes = addDDLToCatalog(context.catalog, context.getCatalogJarBytes(),
                             work.adhocDDLStmts);
                 }
                 catch (IOException ioe) {
@@ -211,36 +210,25 @@ public class AsyncCompilerAgentHelper
      * Append the supplied adhoc DDL to the current catalog's DDL and recompile the
      * jarfile
      */
-    private byte[] addDDLToCatalog(byte[] oldCatalogBytes, String[] adhocDDLStmts)
+    private byte[] addDDLToCatalog(Catalog oldCatalog, byte[] oldCatalogBytes, String[] adhocDDLStmts)
     throws IOException
     {
         VoltCompilerReader ddlReader = null;
         try {
             InMemoryJarfile jarfile = CatalogUtil.loadInMemoryJarFile(oldCatalogBytes);
-            // Yoink the current cluster catalog's canonical DDL and append the supplied
-            // adhoc DDL to it.
-            String oldDDL = new String(jarfile.get(VoltCompiler.AUTOGEN_DDL_FILE_NAME),
-                    Constants.UTF8ENCODING);
+
             StringBuilder sb = new StringBuilder();
-            compilerLog.trace("OLD DDL: " + oldDDL);
-            sb.append(oldDDL);
-            sb.append("\n");
             compilerLog.info("Applying the following DDL to cluster:");
             for (String stmt : adhocDDLStmts) {
                 compilerLog.info("\t" + stmt);
                 sb.append(stmt);
                 sb.append(";\n");
             }
-            compilerLog.trace("Adhoc-modified DDL:\n" + sb.toString());
-            // Put the new DDL back into the InMemoryJarfile we built because that's
-            // the artifact the compiler is expecting to work on.  This allows us to preserve any
-            // stored procedure classes and the class loader that came with the catalog
-            // before we appended to it.
-            ddlReader =
-                new VoltCompilerStringReader(VoltCompiler.AUTOGEN_DDL_FILE_NAME, sb.toString());
-            ddlReader.putInJar(jarfile, VoltCompiler.AUTOGEN_DDL_FILE_NAME);
+            String newDDL = sb.toString();
+            compilerLog.trace("Adhoc-modified DDL:\n" + newDDL);
+
             VoltCompiler compiler = new VoltCompiler();
-            compiler.compileInMemoryJarfile(jarfile);
+            compiler.compileInMemoryJarfileWithNewDDL(jarfile, newDDL, oldCatalog);
             return jarfile.getFullJarBytes();
         }
         finally {

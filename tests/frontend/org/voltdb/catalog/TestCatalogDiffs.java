@@ -145,7 +145,6 @@ public class TestCatalogDiffs extends TestCase {
     private static void verifyDiffIfEmptyTable(Catalog catOriginal,Catalog catUpdated)
     {
         CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, catUpdated);
-        //*/ enable for debug */ String originalSerialized = catOriginal.serialize();
         catOriginal.execute(diff.commands());
         String updatedOriginalSerialized = catOriginal.serialize();
         assertTrue(diff.supported());

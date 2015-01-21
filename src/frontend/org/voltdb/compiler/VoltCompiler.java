@@ -27,16 +27,14 @@ import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.regex.Matcher;
@@ -68,7 +66,6 @@ import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
-import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.FilteredCatalogDiffEngine;
 import org.voltdb.catalog.Index;
@@ -92,7 +89,6 @@ import org.voltdb.compilereport.ReportMaker;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.StatementPartitioning;
-import org.voltdb.types.ConstraintType;
 import org.voltdb.utils.CatalogSchemaTools;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
@@ -121,6 +117,13 @@ public class VoltCompiler {
 
     // was this voltcompiler instantiated in a main(), or as part of VoltDB
     private final boolean m_standaloneCompiler;
+
+    // tables that change between the previous compile and this one
+    // used for Live-DDL caching of plans
+    private Set<String> m_dirtyTables = new TreeSet<>();
+    // A collection of statements from the previous catalog
+    // used for Live-DDL caching of plans
+    private Map<String, Statement> m_previousCatalogStmts = new HashMap<>();
 
     // feedback by filename
     ArrayList<Feedback> m_infos = new ArrayList<Feedback>();
@@ -545,6 +548,8 @@ public class VoltCompiler {
     private boolean compileWithProjectInternalToFile(
             final VoltCompilerReader projectReader,
             final String jarOutputPath,
+            final VoltCompilerReader cannonicalDDLIfAny,
+            final Catalog previousCatalogIfAny,
             final List<VoltCompilerReader> ddlReaderList,
             final InMemoryJarfile jarOutputRet)
     {
@@ -553,7 +558,7 @@ public class VoltCompiler {
             return false;
         }
 
-        InMemoryJarfile jarOutput = compileInternalWithProject(projectReader, ddlReaderList, jarOutputRet);
+        InMemoryJarfile jarOutput = compileInternalWithProject(projectReader, cannonicalDDLIfAny, previousCatalogIfAny, ddlReaderList, jarOutputRet);
         if (jarOutput == null) {
             return false;
         }
@@ -615,6 +620,8 @@ public class VoltCompiler {
      * return value will be the same object, not a copy.
      */
     private InMemoryJarfile compileInternal(
+            final VoltCompilerReader cannonicalDDLIfAny,
+            final Catalog previousCatalogIfAny,
             final List<VoltCompilerReader> ddlReaderList,
             final InMemoryJarfile jarOutputRet)
     {
@@ -813,11 +820,34 @@ public class VoltCompiler {
     public Catalog compileCatalogFromDDL(final String... ddlFilePaths)
             throws VoltCompilerException
     {
-        // No project.xml - create a stub object.
         m_currentFilename = "null";
         List<VoltCompilerReader> ddlReaderList = DDLPathsToReaderList(ddlFilePaths);
         InMemoryJarfile jarOutput = new InMemoryJarfile();
         return compileCatalogInternal(ddlReaderList, jarOutput);
+    }
+
+    /**
+     * Compile from project file (without explicit DDL file paths).
+     * @param projectFileURL  project file URL/path
+     * @return  compiled catalog
+     * @throws VoltCompilerException
+     */
+    public Catalog compileCatalogFromProject(final String projectFileURL)
+            throws VoltCompilerException
+    {
+        VoltCompilerReader projectReader = null;
+        try {
+            projectReader = new VoltCompilerFileReader(projectFileURL);
+        }
+        catch (IOException e) {
+            throw new VoltCompilerException(String.format(
+                    "Unable to create project reader for \"%s\": %s",
+                    projectFileURL, e.getMessage()));
+        }
+        DatabaseType database = getProjectDatabase(projectReader);
+        InMemoryJarfile jarOutput = new InMemoryJarfile();
+        // Provide an empty DDL reader list.
+        return compileCatalogInternal(database, null, null, DDLPathsToReaderList(), jarOutput);
     }
 
     /**
@@ -926,6 +956,8 @@ public class VoltCompiler {
      */
     private Catalog compileCatalogInternalWithProject(
             final DatabaseType database,
+            final VoltCompilerReader cannonicalDDLIfAny,
+            final Catalog previousCatalogIfAny,
             final List<VoltCompilerReader> ddlReaderList,
             final InMemoryJarfile jarOutput)
     {
@@ -966,55 +998,15 @@ public class VoltCompiler {
                 }
             }
 
-            // groups/group (alias for roles/role).
-            if (database.getGroups() != null) {
-                for (GroupsType.Group group : database.getGroups().getGroup()) {
-                    org.voltdb.catalog.Group catGroup = db.getGroups().add(group.getName());
-                    catGroup.setSql(group.isAdhoc());
-                    catGroup.setSqlread(catGroup.getSql());
-                    catGroup.setDefaultproc(group.isDefaultproc() || catGroup.getSql());
-                    catGroup.setDefaultprocread(
-                            group.isDefaultprocread() ||
-                            catGroup.getDefaultproc() ||
-                            catGroup.getSqlread());
-
-                    if (group.isSysproc()) {
-                        catGroup.setAdmin(true);
-                        catGroup.setSql(true);
-                        catGroup.setSqlread(true);
-                        catGroup.setDefaultproc(true);
-                        catGroup.setDefaultprocread(true);
-                    }
+            // shutdown and make a new hsqldb
+            try {
+                Database previousDBIfAny = null;
+                if (previousCatalogIfAny != null) {
+                    previousDBIfAny = previousCatalogIfAny.getClusters().get("cluster").getDatabases().get("database");
                 }
-            }
-
-            // roles/role (alias for groups/group).
-            if (database.getRoles() != null) {
-                for (RolesType.Role role : database.getRoles().getRole()) {
-                    org.voltdb.catalog.Group catGroup = db.getGroups().add(role.getName());
-                    catGroup.setSql(role.isAdhoc());
-                    catGroup.setSqlread(catGroup.getSql());
-                    catGroup.setDefaultproc(role.isDefaultproc() || catGroup.getSql());
-                    catGroup.setDefaultprocread(
-                            role.isDefaultprocread() ||
-                            catGroup.getDefaultproc() ||
-                            catGroup.getSqlread());
-
-                    if (role.isSysproc()) {
-                        catGroup.setAdmin(true);
-                        catGroup.setSql(true);
-                        catGroup.setSqlread(true);
-                        catGroup.setDefaultproc(true);
-                        catGroup.setDefaultprocread(true);
-                    }
-                }
-            }
-
-            // procedures/procedure
-            if (database.getProcedures() != null) {
-                for (ProceduresType.Procedure proc : database.getProcedures().getProcedure()) {
-                    voltDdlTracker.add(getProcedure(proc));
-                }
+                compileDatabaseNode(database, cannonicalDDLIfAny, previousDBIfAny, ddlReaderList, jarOutput);
+            } catch (final VoltCompilerException e) {
+                return null;
             }
 
             // classdependencies/classdependency
@@ -1121,9 +1113,113 @@ public class VoltCompiler {
         List<VoltCompilerReader> ddlReaderList = DDLPathsToReaderList(ddlFilePaths);
         final VoltDDLElementTracker voltDdlTracker = new VoltDDLElementTracker(this);
         InMemoryJarfile jarOutput = new InMemoryJarfile();
-        compileDatabase(db, hsql, voltDdlTracker, ddlReaderList, null, null, whichProcs, jarOutput);
+        compileDatabase(db, hsql, voltDdlTracker, null, null, ddlReaderList, null, null, whichProcs, jarOutput);
 
         return m_catalog;
+    }
+
+    /**
+     * Load a ddl file with full support for VoltDB extensions (partitioning, procedures,
+     * export), AND full support for input via a project xml file's "database" node.
+     * @param database catalog-related info parsed from a project file
+     * @param ddlReaderList Reader objects for ddl files.
+     * @param jarOutput The in-memory jar to populate or null if the caller doesn't provide one.
+     * @throws VoltCompilerException
+     */
+    private void compileDatabaseNode(
+            final DatabaseType database,
+            VoltCompilerReader cannonicalDDLIfAny,
+            Database previousDBIfAny,
+            final List<VoltCompilerReader> ddlReaderList,
+            final InMemoryJarfile jarOutput)
+                    throws VoltCompilerException
+    {
+        final ArrayList<Class<?>> classDependencies = new ArrayList<Class<?>>();
+        final VoltDDLElementTracker voltDdlTracker = new VoltDDLElementTracker(this);
+
+        Database db = initCatalogDatabase();
+
+        // schemas/schema
+        if (database.getSchemas() != null) {
+            for (SchemasType.Schema schema : database.getSchemas().getSchema()) {
+                compilerLog.l7dlog( Level.INFO, LogKeys.compiler_VoltCompiler_CatalogPath.name(),
+                                    new Object[] {schema.getPath()}, null);
+                // Prefer to use the in-memory copy.
+                // All ddl.sql is placed in the jar root folder.
+                File schemaFile = new File(schema.getPath());
+                String schemaName = schemaFile.getName();
+                if (jarOutput != null && jarOutput.containsKey(schemaName)) {
+                    ddlReaderList.add(new VoltCompilerJarFileReader(jarOutput, schemaName));
+                }
+                else {
+                    ddlReaderList.add(createDDLFileReader(schema.getPath()));
+                }
+            }
+        }
+
+        // groups/group (alias for roles/role).
+        if (database.getGroups() != null) {
+            for (GroupsType.Group group : database.getGroups().getGroup()) {
+                org.voltdb.catalog.Group catGroup = db.getGroups().add(group.getName());
+                catGroup.setSql(group.isAdhoc());
+                catGroup.setSqlread(catGroup.getSql());
+                catGroup.setDefaultproc(group.isDefaultproc() || catGroup.getSql());
+                catGroup.setDefaultprocread(group.isDefaultprocread() || catGroup.getDefaultproc() || catGroup.getSqlread());
+
+                if (group.isSysproc()) {
+                    catGroup.setAdmin(true);
+                    catGroup.setSql(true);
+                    catGroup.setSqlread(true);
+                    catGroup.setDefaultproc(true);
+                    catGroup.setDefaultprocread(true);
+                }
+            }
+        }
+
+        // roles/role (alias for groups/group).
+        if (database.getRoles() != null) {
+            for (RolesType.Role role : database.getRoles().getRole()) {
+                org.voltdb.catalog.Group catGroup = db.getGroups().add(role.getName());
+                catGroup.setSql(role.isAdhoc());
+                catGroup.setSqlread(catGroup.getSql());
+                catGroup.setDefaultproc(role.isDefaultproc() || catGroup.getSql());
+                catGroup.setDefaultprocread(role.isDefaultprocread() || catGroup.getDefaultproc() || catGroup.getSqlread());
+
+                if (role.isSysproc()) {
+                    catGroup.setAdmin(true);
+                    catGroup.setSql(true);
+                    catGroup.setSqlread(true);
+                    catGroup.setDefaultproc(true);
+                    catGroup.setDefaultprocread(true);
+                }
+            }
+        }
+
+        // procedures/procedure
+        if (database.getProcedures() != null) {
+            for (ProceduresType.Procedure proc : database.getProcedures().getProcedure()) {
+                voltDdlTracker.add(getProcedure(proc));
+            }
+        }
+
+        // classdependencies/classdependency
+        if (database.getClassdependencies() != null) {
+            for (Classdependency dep : database.getClassdependencies().getClassdependency()) {
+                classDependencies.add(getClassDependency(dep));
+            }
+        }
+
+        // partitions/table
+        if (database.getPartitions() != null) {
+            for (PartitionsType.Partition table : database.getPartitions().getPartition()) {
+                voltDdlTracker.addPartition(table.getTable(), table.getColumn());
+            }
+        }
+
+        // shutdown and make a new hsqldb
+        HSQLInterface hsql = HSQLInterface.loadHsqldb();
+        compileDatabase(db, hsql, voltDdlTracker, cannonicalDDLIfAny, previousDBIfAny, ddlReaderList, database.getExport(), classDependencies,
+                        DdlProceduresToLoad.ALL_DDL_PROCEDURES, jarOutput);
     }
 
     /**
@@ -1142,6 +1238,8 @@ public class VoltCompiler {
             Database db,
             HSQLInterface hsql,
             VoltDDLElementTracker voltDdlTracker,
+            VoltCompilerReader cannonicalDDLIfAny,
+            Database previousDBIfAny,
             List<VoltCompilerReader> schemaReaders,
             ExportType export,
             Collection<Class<?>> classDependencies,
@@ -1153,6 +1251,15 @@ public class VoltCompiler {
         // DDLCompiler also provides partition descriptors for DDL PARTITION
         // and REPLICATE statements.
         final DDLCompiler ddlcompiler = new DDLCompiler(this, hsql, voltDdlTracker, m_classLoader);
+
+        if (cannonicalDDLIfAny != null) {
+            // add the file object's path to the list of files for the jar
+            m_ddlFilePaths.put(cannonicalDDLIfAny.getName(), cannonicalDDLIfAny.getPath());
+
+            ddlcompiler.loadSchema(cannonicalDDLIfAny, db, whichProcs);
+        }
+
+        m_dirtyTables.clear();
 
         for (final VoltCompilerReader schemaReader : schemaReaders) {
             // add the file object's path to the list of files for the jar
@@ -1243,7 +1350,11 @@ public class VoltCompiler {
 
         if (whichProcs != DdlProceduresToLoad.NO_DDL_PROCEDURES) {
             Collection<ProcedureDescriptor> allProcs = voltDdlTracker.getProcedureDescriptors();
-            compileProcedures(db, hsql, allProcs, classDependencies, whichProcs, jarOutput);
+            CatalogMap<Procedure> previousProcsIfAny = null;
+            if (previousDBIfAny != null) {
+                previousProcsIfAny = previousDBIfAny.getProcedures();
+            }
+            compileProcedures(db, hsql, allProcs, classDependencies, whichProcs, previousProcsIfAny, jarOutput);
         }
 
         // add extra classes from the DDL
@@ -1394,8 +1505,19 @@ public class VoltCompiler {
                                    Collection<ProcedureDescriptor> allProcs,
                                    Collection<Class<?>> classDependencies,
                                    DdlProceduresToLoad whichProcs,
+                                   CatalogMap<Procedure> prevProcsIfAny,
                                    InMemoryJarfile jarOutput) throws VoltCompilerException
     {
+        // build a cache of previous SQL stmts
+        m_previousCatalogStmts.clear();
+        if (prevProcsIfAny != null) {
+            for (Procedure prevProc : prevProcsIfAny) {
+                for (Statement prevStmt : prevProc.getStatements()) {
+                    addStatementToCache(prevStmt);
+                }
+            }
+        }
+
         // Ignore class dependencies if ignoring java stored procs.
         // This extra qualification anticipates some (undesirable) overlap between planner
         // testing and additional library code in the catalog jar file.
@@ -1409,11 +1531,8 @@ public class VoltCompiler {
                 addClassToJar(jarOutput, classDependency);
             }
         }
-        // Generate the auto-CRUD procedure descriptors. This creates
-        // procedure descriptors to insert, delete, select and update
-        // tables, with some caveats. (See ENG-1601).
-        final List<ProcedureDescriptor> procedures = generateCrud();
 
+        final List<ProcedureDescriptor> procedures = new ArrayList<>();
         procedures.addAll(allProcs);
 
         // Actually parse and handle all the Procedures
@@ -1438,6 +1557,9 @@ public class VoltCompiler {
         }
         // done handling files
         m_currentFilename = null;
+
+        // allow gc to reclaim any cache memory here
+        m_previousCatalogStmts.clear();
     }
 
     private void setGroupedTablePartitionColumn(MaterializedViewInfo mvi, Column partitionColumn)
@@ -1492,468 +1614,6 @@ public class VoltCompiler {
             return;
         }
         m_capturedDiagnosticDetail.add(json);
-    }
-
-    /**
-     * Create INSERT, UPDATE, DELETE and SELECT procedure descriptors for all partitioned,
-     * non-export tables with primary keys that include the partitioning column.
-     *
-     * @param catalog
-     * @return a list of new procedure descriptors
-     */
-    private List<ProcedureDescriptor> generateCrud() {
-        final LinkedList<ProcedureDescriptor> crudprocs = new LinkedList<ProcedureDescriptor>();
-
-        final Database db = getCatalogDatabase();
-        for (Table table : db.getTables()) {
-            if (CatalogUtil.isTableExportOnly(db, table)) {
-                compilerLog.debug("Skipping creation of CRUD procedures for export-only table " +
-                        table.getTypeName());
-                continue;
-            }
-
-            if (table.getMaterializer() != null) {
-                compilerLog.debug("Skipping creation of CRUD procedures for view " +
-                        table.getTypeName());
-                continue;
-            }
-
-            // select/delete/update crud requires pkey. Pkeys are stored as constraints.
-            final CatalogMap<Constraint> constraints = table.getConstraints();
-            final Iterator<Constraint> it = constraints.iterator();
-            Constraint pkey = null;
-            while (it.hasNext()) {
-                Constraint constraint = it.next();
-                if (constraint.getType() == ConstraintType.PRIMARY_KEY.getValue()) {
-                    pkey = constraint;
-                    break;
-                }
-            }
-
-            if (table.getIsreplicated()) {
-                if (pkey != null) {
-                    compilerLog.debug("Creating multi-partition insert/delete/update procedures for replicated table " +
-                            table.getTypeName());
-                    crudprocs.add(generateCrudReplicatedInsert(table));
-                    crudprocs.add(generateCrudReplicatedDelete(table, pkey));
-                    crudprocs.add(generateCrudReplicatedUpdate(table, pkey));
-                    crudprocs.add(generateCrudReplicatedUpsert(table, pkey));
-                }
-                else {
-                    compilerLog.debug("Creating multi-partition insert procedures for replicated table " +
-                            table.getTypeName());
-                    crudprocs.add(generateCrudReplicatedInsert(table));
-                }
-                continue;
-            }
-
-            // get the partition column
-            final Column partitioncolumn = table.getPartitioncolumn();
-
-            // all partitioned tables get insert crud procs
-            crudprocs.add(generateCrudInsert(table, partitioncolumn));
-
-            if (pkey == null) {
-                compilerLog.debug("Skipping creation of CRUD select/delete/update for partitioned table " +
-                        table.getTypeName() + " because no primary key is declared.");
-                continue;
-            }
-
-            // Primary key must include the partition column for the table
-            // for select/delete/update
-            boolean pkeyHasPartitionColumn = false;
-            CatalogMap<ColumnRef> pkeycols = pkey.getIndex().getColumns();
-            Iterator<ColumnRef> pkeycolsit = pkeycols.iterator();
-            while (pkeycolsit.hasNext()) {
-                ColumnRef colref = pkeycolsit.next();
-                if (colref.getColumn().equals(partitioncolumn)) {
-                    pkeyHasPartitionColumn = true;
-                    break;
-                }
-            }
-
-            if (!pkeyHasPartitionColumn) {
-                compilerLog.debug("Skipping creation of CRUD select/delete/update for partitioned table " +
-                        table.getTypeName() + " because primary key does not include the partitioning column.");
-                continue;
-            }
-
-            // select, delete and updarte here (insert generated above)
-            crudprocs.add(generateCrudSelect(table, partitioncolumn, pkey));
-            crudprocs.add(generateCrudDelete(table, partitioncolumn, pkey));
-            crudprocs.add(generateCrudUpdate(table, partitioncolumn, pkey));
-            crudprocs.add(generateCrudUpsert(table, partitioncolumn));
-        }
-
-        return crudprocs;
-    }
-
-    /** Helper to sort table columns by table column order */
-    private static class TableColumnComparator implements Comparator<Column> {
-        public TableColumnComparator() {
-        }
-
-        @Override
-        public int compare(Column o1, Column o2) {
-            return o1.getIndex() - o2.getIndex();
-        }
-    }
-
-    /** Helper to sort index columnrefs by index column order */
-    private static class ColumnRefComparator implements Comparator<ColumnRef> {
-        public ColumnRefComparator() {
-        }
-
-        @Override
-        public int compare(ColumnRef o1, ColumnRef o2) {
-            return o1.getIndex() - o2.getIndex();
-        }
-    }
-
-    /**
-     * Helper to generate a WHERE pkey_col1 = ?, pkey_col2 = ? ...; clause.
-     * @param partitioncolumn partitioning column for the table
-     * @param pkey constraint from the catalog
-     * @param paramoffset 0-based counter of parameters in the full sql statement so far
-     * @param sb string buffer accumulating the sql statement
-     * @return offset in the index of the partition column
-     */
-    private int generateCrudPKeyWhereClause(Column partitioncolumn,
-            Constraint pkey, StringBuilder sb)
-    {
-        // Sort the catalog index columns by index column order.
-        ArrayList<ColumnRef> indexColumns = new ArrayList<ColumnRef>(pkey.getIndex().getColumns().size());
-        for (ColumnRef c : pkey.getIndex().getColumns()) {
-            indexColumns.add(c);
-        }
-        Collections.sort(indexColumns, new ColumnRefComparator());
-
-        boolean first = true;
-        int partitionOffset = -1;
-
-        sb.append(" WHERE ");
-        for (ColumnRef pkc : indexColumns) {
-            if (!first) sb.append(" AND ");
-            first = false;
-            sb.append("(" + pkc.getColumn().getName() + " = ?" + ")");
-            if (pkc.getColumn() == partitioncolumn) {
-                partitionOffset = pkc.getIndex();
-            }
-        }
-        sb.append(";");
-        return partitionOffset;
-
-    }
-
-    /**
-     * Helper to generate a full col1 = ?, col2 = ?... clause.
-     * @param table
-     * @param sb
-     */
-    private void generateCrudExpressionColumns(Table table, StringBuilder sb) {
-        boolean first = true;
-
-        // Sort the catalog table columns by column order.
-        ArrayList<Column> tableColumns = new ArrayList<Column>(table.getColumns().size());
-        for (Column c : table.getColumns()) {
-            tableColumns.add(c);
-        }
-        Collections.sort(tableColumns, new TableColumnComparator());
-
-        for (Column c : tableColumns) {
-            if (!first) sb.append(", ");
-            first = false;
-            sb.append(c.getName() + " = ?");
-        }
-    }
-
-    /**
-     * Helper to generate a full col1, col2, col3 list.
-     */
-    private void generateCrudColumnList(Table table, StringBuilder sb) {
-        boolean first = true;
-        sb.append("(");
-
-        // Sort the catalog table columns by column order.
-        ArrayList<Column> tableColumns = new ArrayList<Column>(table.getColumns().size());
-        for (Column c : table.getColumns()) {
-            tableColumns.add(c);
-        }
-        Collections.sort(tableColumns, new TableColumnComparator());
-
-        // Output the SQL column list.
-        for (Column c : tableColumns) {
-            assert (c.getIndex() >= 0);  // mostly mask unused 'c'.
-            if (!first) sb.append(", ");
-            first = false;
-            sb.append("?");
-        }
-        sb.append(")");
-    }
-
-    /**
-     * Create a statement like:
-     *  "delete from <table> where {<pkey-column =?>...}"
-     */
-    private ProcedureDescriptor generateCrudDelete(Table table,
-            Column partitioncolumn, Constraint pkey)
-    {
-        StringBuilder sb = new StringBuilder();
-        sb.append("DELETE FROM " + table.getTypeName());
-
-        int partitionOffset =
-            generateCrudPKeyWhereClause(partitioncolumn, pkey, sb);
-
-        String partitioninfo =
-            table.getTypeName() + "." + partitioncolumn.getName() + ":" + partitionOffset;
-
-        ProcedureDescriptor pd =
-            new ProcedureDescriptor(
-                    new ArrayList<String>(),  // groups
-                    table.getTypeName() + ".delete",        // className
-                    sb.toString(),            // singleStmt
-                    null,                     // joinOrder
-                    partitioninfo,            // table.column:offset
-                    true,                     // builtin statement
-                    null,                     // language type for embedded scripts
-                    null,                     // script implementation
-                    null);                    // code block script class
-
-        return pd;
-    }
-
-    /**
-     * Create a statement like:
-     * "update <table> set {<each-column = ?>...} where {<pkey-column = ?>...}
-     */
-    private ProcedureDescriptor generateCrudUpdate(Table table,
-            Column partitioncolumn, Constraint pkey)
-    {
-        StringBuilder sb = new StringBuilder();
-        sb.append("UPDATE " + table.getTypeName() + " SET ");
-
-        generateCrudExpressionColumns(table, sb);
-        generateCrudPKeyWhereClause(partitioncolumn, pkey, sb);
-
-        String partitioninfo =
-            table.getTypeName() + "." + partitioncolumn.getName() + ":" + partitioncolumn.getIndex();
-
-        ProcedureDescriptor pd =
-            new ProcedureDescriptor(
-                    new ArrayList<String>(),  // groups
-                    table.getTypeName() + ".update",        // className
-                    sb.toString(),            // singleStmt
-                    null,                     // joinOrder
-                    partitioninfo,            // table.column:offset
-                    true,                     // builtin statement
-                    null,                     // language type for embedded scripts
-                    null,                     // script implementation
-                    null);                    // code block script class
-
-        return pd;
-    }
-
-    /**
-     * Create a statement like:
-     *  "insert into <table> values (?, ?, ...);"
-     */
-    private ProcedureDescriptor generateCrudInsert(Table table,
-            Column partitioncolumn)
-    {
-        StringBuilder sb = new StringBuilder();
-        sb.append("INSERT INTO " + table.getTypeName() + " VALUES ");
-
-        generateCrudColumnList(table, sb);
-        sb.append(";");
-
-        String partitioninfo =
-            table.getTypeName() + "." + partitioncolumn.getName() + ":" + partitioncolumn.getIndex();
-
-        ProcedureDescriptor pd =
-            new ProcedureDescriptor(
-                    new ArrayList<String>(),  // groups
-                    table.getTypeName() + ".insert",        // className
-                    sb.toString(),            // singleStmt
-                    null,                     // joinOrder
-                    partitioninfo,            // table.column:offset
-                    true,                     // builtin statement
-                    null,                     // language type for embedded scripts
-                    null,                     // script implementation
-                    null);                    // code block script class
-
-        return pd;
-    }
-
-    /**
-     * Create a statement like:
-     * Hack simple case of implementation SQL MERGE
-     *  "upsert into <table> values (?, ?, ...);"
-     */
-    private ProcedureDescriptor generateCrudUpsert(Table table,
-            Column partitioncolumn)
-    {
-        StringBuilder sb = new StringBuilder();
-        sb.append("UPSERT INTO " + table.getTypeName() + " VALUES ");
-
-        generateCrudColumnList(table, sb);
-        sb.append(";");
-
-        String partitioninfo =
-            table.getTypeName() + "." + partitioncolumn.getName() + ":" + partitioncolumn.getIndex();
-
-        ProcedureDescriptor pd =
-                new ProcedureDescriptor(
-                        new ArrayList<String>(),  // groups
-                        table.getTypeName() + ".upsert",        // className
-                        sb.toString(),            // singleStmt
-                        null,                     // joinOrder
-                        partitioninfo,            // table.column:offset
-                        true,                     // builtin statement
-                        null,                     // language type for embedded scripts
-                        null,                     // script implementation
-                        null);                    // code block script class
-
-            return pd;
-    }
-
-    /**
-     * Create a statement like:
-     *  "insert into <table> values (?, ?, ...);"
-     *  for a replicated table.
-     */
-    private ProcedureDescriptor generateCrudReplicatedInsert(Table table) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("INSERT INTO " + table.getTypeName() + " VALUES ");
-
-        generateCrudColumnList(table, sb);
-        sb.append(";");
-
-        ProcedureDescriptor pd =
-            new ProcedureDescriptor(
-                    new ArrayList<String>(),  // groups
-                    table.getTypeName() + ".insert",        // className
-                    sb.toString(),            // singleStmt
-                    null,                     // joinOrder
-                    null,                     // table.column:offset
-                    true,                     // builtin statement
-                    null,                     // language type for embedded scripts
-                    null,                     // script implementation
-                    null);                    // code block script class
-
-        return pd;
-    }
-
-    /**
-     * Create a statement like:
-     *  "update <table> set {<each-column = ?>...} where {<pkey-column = ?>...}
-     *  for a replicated table.
-     */
-    private ProcedureDescriptor generateCrudReplicatedUpdate(Table table,
-            Constraint pkey)
-    {
-        StringBuilder sb = new StringBuilder();
-        sb.append("UPDATE " + table.getTypeName() + " SET ");
-
-        generateCrudExpressionColumns(table, sb);
-        generateCrudPKeyWhereClause(null, pkey, sb);
-
-        ProcedureDescriptor pd =
-            new ProcedureDescriptor(
-                    new ArrayList<String>(),  // groups
-                    table.getTypeName() + ".update",        // className
-                    sb.toString(),            // singleStmt
-                    null,                     // joinOrder
-                    null,                     // table.column:offset
-                    true,                     // builtin statement
-                    null,                     // language type for embedded scripts
-                    null,                     // script implementation
-                    null);                    // code block script class
-
-        return pd;
-    }
-
-    /**
-     * Create a statement like:
-     *  "delete from <table> where {<pkey-column =?>...}"
-     * for a replicated table.
-     */
-    private ProcedureDescriptor generateCrudReplicatedDelete(Table table,
-            Constraint pkey)
-    {
-        StringBuilder sb = new StringBuilder();
-        sb.append("DELETE FROM " + table.getTypeName());
-
-        generateCrudPKeyWhereClause(null, pkey, sb);
-
-        ProcedureDescriptor pd =
-            new ProcedureDescriptor(
-                    new ArrayList<String>(),  // groups
-                    table.getTypeName() + ".delete",        // className
-                    sb.toString(),            // singleStmt
-                    null,                     // joinOrder
-                    null,                     // table.column:offset
-                    true,                     // builtin statement
-                    null,                     // language type for embedded scripts
-                    null,                     // script implementation
-                    null);                    // code block script class
-
-        return pd;
-    }
-
-    private ProcedureDescriptor generateCrudReplicatedUpsert(Table table,
-            Constraint pkey)
-    {
-        StringBuilder sb = new StringBuilder();
-        sb.append("UPSERT INTO " + table.getTypeName() + " VALUES ");
-
-        generateCrudColumnList(table, sb);
-        sb.append(";");
-
-        ProcedureDescriptor pd =
-                new ProcedureDescriptor(
-                        new ArrayList<String>(),  // groups
-                        table.getTypeName() + ".upsert",        // className
-                        sb.toString(),            // singleStmt
-                        null,                     // joinOrder
-                        null,                     // table.column:offset
-                        true,                     // builtin statement
-                        null,                     // language type for embedded scripts
-                        null,                     // script implementation
-                        null);                    // code block script class
-
-            return pd;
-    }
-
-
-    /**
-     * Create a statement like:
-     *  "select * from <table> where pkey_col1 = ?, pkey_col2 = ? ... ;"
-     */
-    private ProcedureDescriptor generateCrudSelect(Table table,
-            Column partitioncolumn, Constraint pkey)
-    {
-        StringBuilder sb = new StringBuilder();
-        sb.append("SELECT * FROM " + table.getTypeName());
-
-        int partitionOffset =
-            generateCrudPKeyWhereClause(partitioncolumn, pkey, sb);
-
-        String partitioninfo =
-            table.getTypeName() + "." + partitioncolumn.getName() + ":" + partitionOffset;
-
-        ProcedureDescriptor pd =
-            new ProcedureDescriptor(
-                    new ArrayList<String>(),  // groups
-                    table.getTypeName() + ".select",        // className
-                    sb.toString(),            // singleStmt
-                    null,                     // joinOrder
-                    partitioninfo,            // table.column:offset
-                    true,                     // builtin statement
-                    null,                     // language type for embedded scripts
-                    null,                     // script implementation
-                    null);                    // code block script class
-
-        return pd;
     }
 
     static void addDatabaseEstimatesInfo(final DatabaseEstimates estimates, final Database db) {
@@ -2593,6 +2253,68 @@ public class VoltCompiler {
      * @return the compiled catalog is contained in the provided jarfile.
      *
      */
+    public void compileInMemoryJarfileWithNewDDL(InMemoryJarfile jarfile, String newDDL, Catalog oldCatalog) throws IOException
+    {
+        String oldDDL = new String(jarfile.get(VoltCompiler.AUTOGEN_DDL_FILE_NAME),
+                Constants.UTF8ENCODING);
+        compilerLog.trace("OLD DDL: " + oldDDL);
+
+        VoltCompilerStringReader canonicalDDLReader = null;
+        VoltCompilerStringReader newDDLReader = null;
+
+        // Use the in-memory jarfile-provided class loader so that procedure
+        // classes can be found and copied to the new file that gets written.
+        ClassLoader originalClassLoader = m_classLoader;
+        try {
+            canonicalDDLReader = new VoltCompilerStringReader(VoltCompiler.AUTOGEN_DDL_FILE_NAME, oldDDL);
+            newDDLReader = new VoltCompilerStringReader("ADHOCDDL.sql", newDDL);
+
+            List<VoltCompilerReader> ddlList = new ArrayList<>();
+            ddlList.add(newDDLReader);
+
+            m_classLoader = jarfile.getLoader();
+            // Do the compilation work.
+            InMemoryJarfile jarOut = compileInternal(null, canonicalDDLReader, oldCatalog, ddlList, jarfile);
+            // Trim the compiler output to try to provide a concise failure
+            // explanation
+            if (jarOut != null) {
+                compilerLog.debug("Successfully recompiled InMemoryJarfile");
+            }
+            else {
+                String errString = "Adhoc DDL failed";
+                if (m_errors.size() > 0) {
+                    errString = m_errors.get(m_errors.size() - 1).getLogString();
+                }
+                int fronttrim = errString.indexOf("DDL Error");
+                if (fronttrim < 0) { fronttrim = 0; }
+                int endtrim = errString.indexOf(" in statement starting");
+                if (endtrim < 0) { endtrim = errString.length(); }
+                String trimmed = errString.substring(fronttrim, endtrim);
+                throw new IOException(trimmed);
+            }
+        }
+        finally {
+            // Restore the original class loader
+            m_classLoader = originalClassLoader;
+
+            if (canonicalDDLReader != null) {
+                try { canonicalDDLReader.close(); } catch (IOException ioe) {}
+            }
+            if (newDDLReader != null) {
+                try { newDDLReader.close(); } catch (IOException ioe) {}
+            }
+        }
+    }
+
+    /**
+     * Compile the provided jarfile.  Basically, treat the jarfile as a staging area
+     * for the artifacts to be included in the compile, and then compile it in place.
+     *
+     * *NOTE*: Does *NOT* work with project.xml jarfiles.
+     *
+     * @return the compiled catalog is contained in the provided jarfile.
+     *
+     */
     public void compileInMemoryJarfile(InMemoryJarfile jarfile) throws IOException
     {
         // Gather DDL files for recompilation
@@ -2715,20 +2437,47 @@ public class VoltCompiler {
                 success = compileInternalToFile(outputJarPath, ddlReaderList, outputJar);
             }
 
-            // Sanitize the *.sql files in the jarfile so that only the autogenerated
-            // canonical DDL file will be used for future compilations
-            // Bomb out if we failed to generate the canonical DDL
-            if (success) {
-                boolean foundCanonicalDDL = false;
-                Entry<String, byte[]> entry = outputJar.firstEntry();
-                while (entry != null) {
-                    String path = entry.getKey();
-                    if (path.toLowerCase().endsWith(".sql")) {
-                        if (!path.toLowerCase().equals(AUTOGEN_DDL_FILE_NAME)) {
-                            outputJar.remove(path);
-                        }
-                        else {
-                            foundCanonicalDDL = true;
+            // Use the in-memory jarfile-provided class loader so that procedure
+            // classes can be found and copied to the new file that gets written.
+            ClassLoader originalClassLoader = m_classLoader;
+
+            // Compile and save the file to voltdbroot. Assume it's a test environment if there
+            // is no catalog context available.
+            String jarName = String.format("catalog-%s.jar", versionFromVoltDB);
+            String textName = String.format("catalog-%s.out", versionFromVoltDB);
+            CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
+            final String outputJarPath = (catalogContext != null
+                    ? new File(catalogContext.cluster.getVoltroot(), jarName).getPath()
+                    : VoltDB.Configuration.getPathToCatalogForTest(jarName));
+            // Place the compiler output in a text file in the same folder.
+            final String outputTextPath = (catalogContext != null
+                    ? new File(catalogContext.cluster.getVoltroot(), textName).getPath()
+                    : VoltDB.Configuration.getPathToCatalogForTest(textName));
+            try {
+                m_classLoader = outputJar.getLoader();
+
+                consoleLog.info(String.format(
+                        "Version %s catalog will be automatically upgraded to version %s.",
+                        versionFromCatalog, versionFromVoltDB));
+
+                // Do the compilation work.
+                boolean success = compileInternalToFile(projectReader, outputJarPath, null, null, ddlReaderList, outputJar);
+
+                // Sanitize the *.sql files in the jarfile so that only the autogenerated
+                // canonical DDL file will be used for future compilations
+                // Bomb out if we failed to generate the canonical DDL
+                if (success) {
+                    boolean foundCanonicalDDL = false;
+                    Entry<String, byte[]> entry = outputJar.firstEntry();
+                    while (entry != null) {
+                        String path = entry.getKey();
+                        if (path.toLowerCase().endsWith(".sql")) {
+                            if (!path.toLowerCase().equals(AUTOGEN_DDL_FILE_NAME)) {
+                                outputJar.remove(path);
+                            }
+                            else {
+                                foundCanonicalDDL = true;
+                            }
                         }
                     }
                     entry = outputJar.higherEntry(entry.getKey());
@@ -2802,5 +2551,77 @@ public class VoltCompiler {
 
     public static VoltCompiler standAloneCompilerForTest() {
         return new VoltCompiler(true);
+    }
+
+    /**
+     * Note that a table changed in order to invalidate potential cached
+     * statements that reference the changed table.
+     */
+    void markTableAsDirty(String tableName) {
+        m_dirtyTables.add(tableName.toLowerCase());
+    }
+
+    /**
+     * Key prefix includes attributes that make a cached statement usable if they match
+     *
+     * For example, if the SQL is the same, but the partitioning isn't, then the statements
+     * aren't actually interchangeable.
+     */
+    String getKeyPrefix(StatementPartitioning partitioning, DeterminismMode detMode, String joinOrder) {
+        // no caching for inferred yet
+        if (partitioning.isInferred()) {
+            return null;
+        }
+
+        String joinOrderPrefix = "#";
+        if (joinOrder != null) {
+            joinOrderPrefix += joinOrder;
+        }
+
+        boolean partitioned = partitioning.wasSpecifiedAsSingle();
+
+        return joinOrderPrefix + String.valueOf(detMode.toChar()) + (partitioned ? "P#" : "R#");
+    }
+
+    void addStatementToCache(Statement stmt) {
+        String key = stmt.getCachekeyprefix() + stmt.getSqltext();
+        m_previousCatalogStmts.put(key, stmt);
+    }
+
+    // track hits and misses for debugging
+    static long m_stmtCacheHits = 0;
+    static long m_stmtCacheMisses = 0;
+
+    /** Look for a match from the previous catalog that matches the key + sql */
+    Statement getCachedStatement(String keyPrefix, String sql) {
+        String key = keyPrefix + sql;
+
+        Statement candidate = m_previousCatalogStmts.get(key);
+        if (candidate == null) {
+            ++m_stmtCacheMisses;
+            return null;
+        }
+
+        // check that no underlying tables have been modified since the proc had been compiled
+        String tablesTouched[] = candidate.getTablestouched().split(",");
+        for (String tableName : tablesTouched) {
+            if (m_dirtyTables.contains(tableName.toLowerCase())) {
+                ++m_stmtCacheMisses;
+                return null;
+            }
+        }
+
+        ++m_stmtCacheHits;
+        // easy debugging stmt
+        //printStmtCacheStats();
+        return candidate;
+    }
+
+    @SuppressWarnings("unused")
+    private void printStmtCacheStats() {
+        System.out.printf("Hits: %d, Misses %d, Percent %.2f\n",
+                m_stmtCacheHits, m_stmtCacheMisses,
+                (m_stmtCacheHits * 100.0) / (m_stmtCacheHits + m_stmtCacheMisses));
+        System.out.flush();
     }
 }

@@ -41,6 +41,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Scanner;
 import java.util.TimeZone;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
@@ -1071,7 +1072,7 @@ public class SQLCommand
                     if (objectParams[1] != null) {
                         depfile = new File((String)objectParams[1]);
                     }
-                    printResponse(VoltDB.updateApplicationCatalog(catfile, depfile));
+                    printDdlResponse(VoltDB.updateApplicationCatalog(catfile, depfile));
 
                     // Need to update the stored procedures after a catalog change (could have added/removed SPs!).  ENG-3726
                     loadStoredProcedures(Procedures, Classlist);
@@ -1081,7 +1082,7 @@ public class SQLCommand
                     if (objectParams[0] != null) {
                         jarfile = new File((String)objectParams[0]);
                     }
-                    printResponse(VoltDB.updateClasses(jarfile, (String)objectParams[1]));
+                    printDdlResponse(VoltDB.updateClasses(jarfile, (String)objectParams[1]));
                     // Need to reload the procedures and classes
                     loadStoredProcedures(Procedures, Classlist);
                 }
@@ -1111,10 +1112,13 @@ public class SQLCommand
             }
             else { // All other commands get forwarded to @AdHoc
                 query = StripCRLF.matcher(query).replaceAll(" ");
-                printResponse(VoltDB.callProcedure("@AdHoc", query));
                 // if the query was DDL, reload the stored procedures.
                 if (SQLLexer.extractDDLToken(query) != null) {
+                    printDdlResponse(VoltDB.callProcedure("@AdHoc", query));
                     loadStoredProcedures(Procedures, Classlist);
+                }
+                else {
+                    printResponse(VoltDB.callProcedure("@AdHoc", query));
                 }
             }
         } catch(Exception exc) {
@@ -1195,10 +1199,19 @@ public class SQLCommand
                 rowCount = t.fetchRow(0).getLong(0);
             }
             if (m_outputShowMetadata) {
-                System.out.printf("\n\n(Returned %d rows in %.2fs)\n",
+                System.out.printf("(Returned %d rows in %.2fs)\n",
                         rowCount, elapsedTime / 1000000000.0);
             }
         }
+    }
+
+    private static void printDdlResponse(ClientResponse response) throws Exception {
+        if (response.getStatus() != ClientResponse.SUCCESS) {
+            throw new Exception("Execution Error: " + response.getStatusString());
+        }
+        //TODO: In the future, if/when we change the prompt when waiting for the remainder of an unfinished command,
+        // successful DDL commands may just silently return to a normal prompt without this verbose feedback.
+        System.out.println("Command succeeded.");
     }
 
     // VoltDB connection support
@@ -1332,6 +1345,7 @@ public class SQLCommand
         + "  Causes the utility to stop immediately or continue after detecting an error.\n"
         + "  In interactive mode, a value of \"true\" discards any unprocessed input\n"
         + "  and returns to the command prompt.\n"
+        + "\n"
         + "[--debug]\n"
         + "  Causes the utility to print out stack traces for all exceptions.\n"
         );
@@ -1490,6 +1504,16 @@ public class SQLCommand
     private static InputStream in = null;
     private static OutputStream out = null;
 
+
+    private static String extractArgInput(String arg) {
+        // the input arguments has "=" character when this function is called
+        String[] splitStrings = arg.split("=", 2);
+        if (splitStrings[1].isEmpty()) {
+            printUsage("Missing input value for " + splitStrings[0]);
+        }
+        return splitStrings[1];
+    }
+
     // Application entry point
     public static void main(String args[])
     {
@@ -1501,20 +1525,21 @@ public class SQLCommand
         String password = "";
         String kerberos = "";
         List<String> queries = null;
+        String ddlFile = "";
 
         // Parse out parameters
         for (int i = 0; i < args.length; i++) {
             String arg = args[i];
             if (arg.startsWith("--servers=")) {
-                serverList = arg.split("=")[1];
+                serverList = extractArgInput(arg);
             } else if (arg.startsWith("--port=")) {
-                port = Integer.valueOf(arg.split("=")[1]);
+                port = Integer.valueOf(extractArgInput(arg));
             } else if (arg.startsWith("--user=")) {
-                user = arg.split("=")[1];
+                user = extractArgInput(arg);
             } else if (arg.startsWith("--password=")) {
-                password = arg.split("=")[1];
+                password = extractArgInput(arg);
             } else if (arg.startsWith("--kerberos=")) {
-                kerberos = arg.split("=")[1];
+                kerberos = extractArgInput(arg);
             } else if (arg.startsWith("--kerberos")) {
                 kerberos = "VoltDBClient";
             } else if (arg.startsWith("--query=")) {
@@ -1529,7 +1554,7 @@ public class SQLCommand
                 }
             }
             else if (arg.startsWith("--output-format=")) {
-                String formatName = arg.split("=")[1].toLowerCase();
+                String formatName = extractArgInput(arg).toLowerCase();
                 if (formatName.equals("fixed")) {
                     m_outputFormatter = new SQLCommandOutputFormatterDefault();
                 }
@@ -1550,7 +1575,7 @@ public class SQLCommand
                 m_debug = true;
             }
             else if (arg.startsWith("--stop-on-error=")) {
-                String optionName = arg.split("=")[1].toLowerCase();
+                String optionName = extractArgInput(arg).toLowerCase();
                 if (optionName.equals("true")) {
                     m_stopOnError = true;
                 }
@@ -1559,6 +1584,14 @@ public class SQLCommand
                 }
                 else {
                     printUsage("Invalid value for --stop-on-error");
+                }
+            }
+            else if (arg.startsWith("--ddl-file=")) {
+                String ddlFilePath = extractArgInput(arg);
+                try {
+                    ddlFile = new Scanner(new File(ddlFilePath)).useDelimiter("\\Z").next();
+                } catch (FileNotFoundException e) {
+                    printUsage("DDL file not found at path:" + ddlFilePath);
                 }
             }
             else if (arg.equals("--help")) {
@@ -1599,6 +1632,13 @@ public class SQLCommand
         }
 
         try {
+            if (! ddlFile.equals("")) {
+                // fast DDL Loader mode
+                // System.out.println("fast DDL Loader mode with DDL input:\n" + ddlFile);
+                VoltDB.callProcedure("@AdHoc", ddlFile);
+                System.exit(m_exitCode);
+            }
+
             // Load system procedures
             loadSystemProcedures();
 

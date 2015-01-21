@@ -519,9 +519,11 @@ DISTRIBUTION
 
 	<!-- build the jars for the clients -->
 	<exec dir='examples/voter' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
-	<!--<exec dir='examples/voltkv' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
+	<exec dir='examples/voltkv' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
 	<exec dir='examples/windowing' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
-	<exec dir='examples/json' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>-->
+	<exec dir='examples/windowing-with-ddl' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
+	<exec dir='examples/json-sessions' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
+	<exec dir='examples/uniquedevices' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
 
     <!-- populate the stuff not handled by dist_internal_core -->
     <copy todir="${dist.dir}/">
@@ -607,6 +609,10 @@ DISTRIBUTION
             <include name="examples/voltcache/run.sh"/>
             <include name="examples/voltkv/run.sh"/>
             <include name="examples/voter/run.sh"/>
+            <include name="examples/json-sessions/run.sh"/>
+            <include name="examples/windowing/run.sh"/>
+            <include name="examples/windowing-with-ddl/run.sh"/>
+            <include name="examples/uniquedevices/run.sh"/>
             <include name="bin/sqlcmd"/>
         </fileset>
     </chmod>
@@ -713,6 +719,8 @@ CLEANING
   <exec dir='examples/voter' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/json-sessions' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/windowing' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
+  <exec dir='examples/windowing-with-ddl' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
+  <exec dir='examples/uniquedevices' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/voltkv' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='doc/tutorials/auction' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
   <exec dir='doc/tutorials/helloworld' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>  <exec dir='.' executable='/bin/sh'>
@@ -1836,6 +1844,10 @@ TEST CASES
     <samplecheck app="json-sessions" />
     <echo>checking windowing</echo>
     <samplecheck app="windowing" />
+    <echo>checking windowing-with-ddl</echo>
+    <samplecheck app="windowing-with-ddl" />
+    <echo>checking uniquedevices</echo>
+    <samplecheck app="uniquedevices" />
 </target>
 
 <target name='sqlcoverage' depends="ee,compile"
