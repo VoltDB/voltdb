@@ -32,35 +32,40 @@ DATAFILES="src/com/auctionexample/datafiles/"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar voltdbroot voltdbroot
+    rm -rf debugoutput $APPNAME-*.jar voltdbroot log csvloader_*.*
 }
 
-# compile the source code for procedures and the client
-function srccompile() {
-    mkdir -p obj/com/auctionexample/datafiles
-    cp src/com/auctionexample/datafiles/*.txt obj/com/auctionexample/datafiles/
-    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH -d obj \
-        src/com/auctionexample/*.java \
+function jars() {
+    # compile java source
+    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH \
+        src/com/auctionexample/*.java
+    javac -target 1.7 -source 1.7 -classpath $APPCLASSPATH \
         procedures/com/auctionexample/*.java \
         procedures/com/auctionexample/debug/*.java
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
+    # build procedure and client jars
+    jar cf $APPNAME-procs.jar -C procedures com
+    jar cf $APPNAME-client.jar -C src com
+    # remove compiled .class files
+    rm -rf procedures/com/auctionexample/*.class procedures/com/auctionexample/debug/*.class src/com/auctionexample/*.class
 }
 
-# build an application catalog
-function catalog() {
-    srccompile
-    $VOLTDB compile --classpath obj -o $APPNAME.jar auction-ddl.sql
-    # stop if compilation fails
-    if [ $? != 0 ]; then exit; fi
+# compile the procedure and client jarfiles if they don't exist
+function jars-ifneeded() {
+    if [ ! -e $APPNAME-procs.jar ] || [ ! -e $APPNAME-client.jar ]; then
+        jars;
+    fi
 }
 
 # run the voltdb server locally
 function server() {
-    # if a catalog doesn't exist, build one
-    if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    $VOLTDB create -d deployment.xml -l $LICENSE -H localhost $APPNAME.jar
+    $VOLTDB create -d deployment.xml -l $LICENSE -H localhost
+}
+
+# load schema and procedures
+function init() {
+    jars-ifneeded
+    $VOLTDB_BIN/sqlcmd < auction-ddl.sql
 }
 
 # run the client that drives the example
@@ -78,12 +83,12 @@ function client() {
                         -p InsertIntoUser \
                         --user program \
                         --password pass
-    srccompile
-    java -classpath obj:$APPCLASSPATH com.auctionexample.Client
+    jars-ifneeded
+    java -classpath $APPCLASSPATH:$APPNAME-client.jar com.auctionexample.Client
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|catalog|client|server}"
+    echo "Usage: ./run.sh {clean|init|client|server}"
 }
 
 # Run the target passed as the first arg on the command line
