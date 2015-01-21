@@ -76,22 +76,22 @@ CREATE PROCEDURE MaxValue AS
 -- It's just here to provide a place for the parameter
 -- used to partition the procedure, so it can be called
 -- in the "run everywhere" pattern.
-CREATE PROCEDURE AgeOfOldest AS
+CREATE PROCEDURE AgeOfOldest
+  PARTITION ON TABLE timedata COLUMN uuid
+AS
   SELECT SINCE_EPOCH(MILLISECOND, NOW)
          - SINCE_EPOCH(MILLISECOND, update_ts) AS age_ms
   FROM timedata
   WHERE uuid IS NOT NULL OR uuid = ?
   ORDER BY update_ts LIMIT 1;
 
--- Tell VoltDB to use the value of UUID to partition the procedure.
-PARTITION PROCEDURE AgeOfOldest ON TABLE timedata COLUMN uuid;
-
 -- A procedure that finds the age of the youngest tuple
 -- in a partition, similar to the procedure above.
-CREATE PROCEDURE AgeOfYoungest AS
+CREATE PROCEDURE AgeOfYoungest
+  PARTITION ON TABLE timedata COLUMN uuid
+AS
   SELECT SINCE_EPOCH(MILLISECOND, NOW)
          - SINCE_EPOCH(MILLISECOND, update_ts) AS age_ms
   FROM timedata
   WHERE uuid IS NOT NULL OR uuid = ?
   ORDER BY update_ts DESC LIMIT 1;
-PARTITION PROCEDURE AgeOfYoungest ON TABLE timedata COLUMN uuid;
