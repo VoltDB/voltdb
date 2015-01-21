@@ -62,6 +62,8 @@ class TableCatalogDelegate : public CatalogDelegate {
     // table specific
     int init(catalog::Database const &catalogDatabase,
              catalog::Table const &catalogTable);
+    void evaluateExport(catalog::Database const &catalogDatabase,
+             catalog::Table const &catalogTable);
 
     void processSchemaChanges(catalog::Database const &catalogDatabase,
                              catalog::Table const &catalogTable,

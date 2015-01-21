@@ -979,7 +979,6 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
             //////////////////////////////////////////////
 
             Table *table = tcd->getTable();
-
             PersistentTable *persistenttable = dynamic_cast<PersistentTable*>(table);
             /*
              * Instruct the table that was not added but is being retained to flush
@@ -990,6 +989,12 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
             if ( ! persistenttable) {
                 StreamedTable *streamedtable = dynamic_cast<StreamedTable*>(table);
                 assert(streamedtable);
+                //Evaluate export enabled or not if enabled hook up streamer
+                tcd->evaluateExport(*m_database, *catalogTable);
+                if (tcd->exportEnabled() && streamedtable->enableStream()) {
+                    m_exportingTables[catalogTable->signature()] = table;
+                }
+                //Set signature and generation after stream is created.
                 streamedtable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
                 // note, this is the end of the line for export tables for now,
                 // don't allow them to change schema yet
