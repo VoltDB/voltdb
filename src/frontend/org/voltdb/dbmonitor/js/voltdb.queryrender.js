@@ -34,9 +34,12 @@
             // The intent is to avoid writing another full sql parser, here.
             // Any statement keyword that does not get listed here simply requires an explicit semicolon before
             // it to mark the end of the preceding statement.
+            // Note on            (?!\s+on) :
+            // This subpattern consumes no input itself but ensures that the next
+            // character is not 'on'.
             MatchStatementStarts =
-                /\s((?:(?:\s\()*select)|insert|update|upsert|delete|truncate|create|partition|exec|execute|explain|explainproc)\s/gim,
-            //     ($1----------------------------------------------------------------------------------------------------------)
+                /\s((?:(?:\s\()*select)|insert|update|upsert|delete|truncate|create|partition(?!\s+on)|exec|execute|explain|explainproc)\s/gim,
+            //     ($1--------------------------------------------------------------------------------------------------------------------)
             GenerateSplitStatements = ';$1 ',
             // Stored procedure parameters can be separated by commas or whitespace.
             // Multiple commas like "execute proc a,,b" are merged into one separator because that's easy.
