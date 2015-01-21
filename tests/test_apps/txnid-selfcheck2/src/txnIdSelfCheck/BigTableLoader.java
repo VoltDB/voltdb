@@ -135,15 +135,15 @@ public class BigTableLoader extends BenchmarkThread {
                     // try to insert batchSize random rows
                     for (int i = 0; i < batchSize; i++) {
                         long p = Math.abs((long)(r.nextGaussian() * this.partitionCount));
-                        try {
-                            
+                        /* XXX/PSR byass rate limiting for initial loading
+                        try { 
                            m_permits.acquire();
                         } catch (InterruptedException e) {
                             if (!m_shouldContinue.get()) {
                                 return;
                             }
                             log.error("BigTableLoader thread interrupted while waiting for permit. " + e.getMessage());
-                        }
+                        }*/
                         insertsTried++;
                         client.callProcedure(new InsertCallback(latch, rowCount), tableName.toUpperCase() + "TableInsert", p, data);
                     }
