@@ -18,7 +18,7 @@
 import sys
 import cmd
 import socket
-import os.path
+from os import path, getenv
 from datetime import datetime
 from voltdbclient import *
 
@@ -243,7 +243,8 @@ Get the statistics:
         self.safe_print("Take a snapshot:")
         self.safe_print("\tsnapshotsave directory nonce blocking")
         self.safe_print("or")
-        self.safe_print('\tsnapshotsave {uripath:"file:///tmp",nonce:"mydb",block:true,format:"csv"}')
+        self.safe_print('\tsnapshotsave {uripath:"file://%s",nonce:"mydb",block:true,format:"csv"}' % \
+                            (os.getenv("APPRUNNER_TMP") or "/tmp"))
 
     def do_snapshotscan(self, command):
         if self.fs == None:
