@@ -50,12 +50,12 @@ CREATE PROCEDURE PARTITION ON TABLE timedata COLUMN uuid FROM CLASS windowing.In
 -- 150k rows. In this case, it needs to scan 1 row per second times the number of
 -- partitions, or 40 rows. That's a tremendous advantage of pre-aggregating the
 -- table sums and counts by second.
-CREATE PROCEDURE windowing.Average AS
+CREATE PROCEDURE Average AS
     SELECT SUM(sum_values) / SUM(count_values)
     FROM agg_by_second
     WHERE second_ts >= TO_TIMESTAMP(SECOND, SINCE_EPOCH(SECOND, NOW) - ?);
 
 -- Find the maximum value across all rows and partitions.
-CREATE PROCEDURE windowing.MaxValue AS
+CREATE PROCEDURE MaxValue AS
     SELECT MAX(val)
     FROM timedata;
