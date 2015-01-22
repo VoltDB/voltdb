@@ -142,9 +142,10 @@ public class SnapshotUtil {
         List<Table> tables,
         int hostId,
         Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+        Map<Integer, Long> drSequenceNumbers,
         Map<Integer, Long> partitionTransactionIds,
         Map<Integer, Long> partitionUniqueIds,
-        Map<Integer, Map<Integer, Long>> remoteDCLastUniqueIds,
+        Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds,
         InstanceId instanceId,
         long timestamp,
         int newPartitionCount)
@@ -208,15 +209,25 @@ public class SnapshotUtil {
                 stringer.key("catalogCRC").value(catalogCRC);
                 stringer.key("instanceId").value(instanceId.serializeToJSONObject());
 
-                stringer.key("remoteDCLastUniqueIds");
+                stringer.key("remoteDCLastIds");
                 stringer.object();
-                for (Map.Entry<Integer, Map<Integer, Long>> e : remoteDCLastUniqueIds.entrySet()) {
+                for (Map.Entry<Integer, Map<Integer, Pair<Long, Long>>> e : remoteDCLastIds.entrySet()) {
                     stringer.key(e.getKey().toString());
                     stringer.object();
-                    for (Map.Entry<Integer, Long> e2 : e.getValue().entrySet()) {
-                        stringer.key(e2.getKey().toString()).value(e2.getValue());
+                    for (Map.Entry<Integer, Pair<Long, Long>> e2 : e.getValue().entrySet()) {
+                        stringer.key(e2.getKey().toString());
+                        stringer.object();
+                        stringer.key("drId").value(e2.getValue().getFirst());
+                        stringer.key("uniqueId").value(e2.getValue().getSecond());
+                        stringer.endObject();
                     }
                     stringer.endObject();
+                }
+                stringer.endObject();
+                stringer.key("drSequenceNumbers");
+                stringer.object();
+                for (Map.Entry<Integer, Long> e : drSequenceNumbers.entrySet()) {
+                    stringer.key(e.getKey().toString()).value(e.getValue());
                 }
                 stringer.endObject();
                 stringer.endObject();

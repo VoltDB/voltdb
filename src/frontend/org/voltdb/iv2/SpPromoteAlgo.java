@@ -44,6 +44,7 @@ public class SpPromoteAlgo implements RepairAlgo
     private final List<Long> m_survivors;
     private long m_maxSeenTxnId;
     private long m_maxSeenUniqueId;
+    private long m_maxSeenBinaryLogSequenceNumber;
     private long m_maxSeenBinaryLogUniqueId;
 
     // Each Term can process at most one promotion; if promotion fails, make
@@ -120,6 +121,7 @@ public class SpPromoteAlgo implements RepairAlgo
         m_whoami = whoami;
         m_maxSeenTxnId = TxnEgo.makeZero(partitionId).getTxnId();
         m_maxSeenUniqueId = UniqueIdGenerator.makeZero(partitionId);
+        m_maxSeenBinaryLogSequenceNumber = Long.MIN_VALUE;
         m_maxSeenBinaryLogUniqueId = Long.MIN_VALUE;
     }
 
@@ -181,6 +183,7 @@ public class SpPromoteAlgo implements RepairAlgo
             if (response.getUniqueId() != Long.MIN_VALUE) {
                 m_maxSeenUniqueId = Math.max(m_maxSeenUniqueId, response.getUniqueId());
             }
+            m_maxSeenBinaryLogSequenceNumber = Math.max(m_maxSeenBinaryLogSequenceNumber, response.getBinaryLogSequenceNumber());
             m_maxSeenBinaryLogUniqueId = Math.max(m_maxSeenBinaryLogUniqueId, response.getBinaryLogUniqueId());
 
             if (response.getPayload() != null) {
@@ -249,6 +252,7 @@ public class SpPromoteAlgo implements RepairAlgo
         m_promotionResult.set(new RepairResult(
                 m_maxSeenTxnId,
                 m_maxSeenUniqueId,
+                m_maxSeenBinaryLogSequenceNumber,
                 m_maxSeenBinaryLogUniqueId));
     }
 }

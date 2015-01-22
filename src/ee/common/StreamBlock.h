@@ -42,10 +42,11 @@ namespace voltdb
               m_startSpHandle(std::numeric_limits<int64_t>::max()),
               m_lastSpHandle(std::numeric_limits<int64_t>::max()),
               m_lastCommittedSpHandle(std::numeric_limits<int64_t>::max()),
-              m_startSpUniqueId(std::numeric_limits<int64_t>::max()),
-              m_lastSpUniqueId(std::numeric_limits<int64_t>::max()),
               m_lastDRBeginTxnOffset(0),
               m_hasDRBeginTxn(false),
+              m_startDRSequenceNumber(std::numeric_limits<int64_t>::max()),
+              m_lastDRSequenceNumber(std::numeric_limits<int64_t>::max()),
+              m_lastUniqueId(std::numeric_limits<int64_t>::max()),
               m_type(voltdb::NORMAL_STREAM_BLOCK)
         {
         }
@@ -56,10 +57,11 @@ namespace voltdb
               m_startSpHandle(std::numeric_limits<int64_t>::max()),
               m_lastSpHandle(std::numeric_limits<int64_t>::max()),
               m_lastCommittedSpHandle(std::numeric_limits<int64_t>::max()),
-              m_startSpUniqueId(other->m_startSpUniqueId),
-              m_lastSpUniqueId(other->m_lastSpUniqueId),
               m_lastDRBeginTxnOffset(other->m_lastDRBeginTxnOffset),
               m_hasDRBeginTxn(other->m_hasDRBeginTxn),
+              m_startDRSequenceNumber(other->m_startDRSequenceNumber),
+              m_lastDRSequenceNumber(other->m_lastDRSequenceNumber),
+              m_lastUniqueId(other->m_lastUniqueId),
               m_type(other->m_type)
         {
         }
@@ -104,22 +106,6 @@ namespace voltdb
             return m_capacity - m_offset;
         }
 
-        int64_t startSpUniqueId() {
-            return m_startSpUniqueId;
-        }
-
-        void startSpUniqueId(int64_t spUniqueId) {
-            m_startSpUniqueId = std::min(spUniqueId, m_startSpUniqueId);
-        }
-
-        int64_t lastSpUniqueId() {
-            return m_lastSpUniqueId;
-        }
-
-        void lastSpUniqueId(int64_t spUniqueId) {
-            m_lastSpUniqueId = spUniqueId;
-        }
-
         /**
          * Number of maximum bytes stored in the buffer
          */
@@ -129,6 +115,27 @@ namespace voltdb
 
         size_t lastDRBeginTxnOffset() const {
             return m_lastDRBeginTxnOffset;
+        }
+
+        int64_t startDRSequenceNumber() const {
+            return m_startDRSequenceNumber;
+        }
+
+        void startDRSequenceNumber(int64_t startDRSequenceNumber) {
+            m_startDRSequenceNumber = std::min(startDRSequenceNumber, m_startDRSequenceNumber);
+        }
+
+        int64_t lastDRSequenceNumber() const {
+            return m_lastDRSequenceNumber;
+        }
+
+        int64_t lastUniqueId() const {
+            return m_lastUniqueId;
+        }
+
+        void recordCompletedTxnForDR(int64_t lastDRSequenceNumber, int64_t lastUniqueId) {
+            m_lastDRSequenceNumber = lastDRSequenceNumber;
+            m_lastUniqueId = lastUniqueId;
         }
 
         StreamBlockType type() const {
@@ -184,10 +191,11 @@ namespace voltdb
         int64_t m_startSpHandle;
         int64_t m_lastSpHandle;
         int64_t m_lastCommittedSpHandle;
-        int64_t m_startSpUniqueId;
-        int64_t m_lastSpUniqueId;
         size_t m_lastDRBeginTxnOffset;  // keep record of DR begin txn to avoid txn span multiple buffers
         bool m_hasDRBeginTxn;    // only used for DR Buffer
+        int64_t m_startDRSequenceNumber;
+        int64_t m_lastDRSequenceNumber;
+        int64_t m_lastUniqueId;
         StreamBlockType m_type;
 
         friend class TupleStreamBase;

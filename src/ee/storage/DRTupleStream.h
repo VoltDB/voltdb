@@ -60,7 +60,6 @@ public:
                        int64_t txnId,
                        int64_t spHandle,
                        int64_t uniqueId,
-                       int64_t spUniqueId,
                        TableTuple &tuple,
                        DRRecordType type);
 
@@ -69,13 +68,12 @@ public:
                        std::string tableName,
                        int64_t txnId,
                        int64_t spHandle,
-                       int64_t uniqueId,
-                       int64_t spUniqueId);
+                       int64_t uniqueId);
 
     size_t computeOffsets(TableTuple &tuple,size_t *rowHeaderSz);
 
-    void beginTransaction(int64_t uniqueId, int64_t spUniqueId);
-    void endTransaction(int64_t spUniqueId);
+    void beginTransaction(int64_t uniqueId, int64_t sequenceNumber);
+    void endTransaction(int64_t uniqueId, int64_t sequenceNumber);
 
     bool checkOpenTransaction(StreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso);
 
@@ -95,7 +93,6 @@ public:
                            int64_t txnId,
                            int64_t spHandle,
                            int64_t uniqueId,
-                           int64_t spUniqueId,
                            TableTuple &tuple,
                            DRRecordType type) {
         return 0;
@@ -110,8 +107,7 @@ public:
                        std::string tableName,
                        int64_t txnId,
                        int64_t spHandle,
-                       int64_t uniqueId,
-                       int64_t spUniqueId) {
+                       int64_t uniqueId) {
         return 0;
     }
 };

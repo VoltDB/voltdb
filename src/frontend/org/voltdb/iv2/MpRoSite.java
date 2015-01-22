@@ -416,6 +416,18 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
+    public long getDRSequenceNumber()
+    {
+        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+    }
+
+    @Override
+    public void setDRSequenceNumber(long sequenceNumber)
+    {
+        throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
+    }
+
+    @Override
     public void toggleProfiler(int toggle)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");

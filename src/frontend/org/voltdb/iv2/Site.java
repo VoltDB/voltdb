@@ -742,9 +742,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             Deque<SnapshotTableTask> tasks,
             long txnId,
             Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers,
-            Map<Integer, Map<Integer, Long>> remoteDCLastUniqueIds) {
+            Map<Integer, Long> drSequenceNumbers,
+            Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds) {
         m_snapshotter.initiateSnapshots(m_sysprocContext, format, tasks, txnId,
-                                        exportSequenceNumbers, remoteDCLastUniqueIds);
+                                        exportSequenceNumbers, drSequenceNumbers,
+                                        remoteDCLastIds);
     }
 
     /*
@@ -918,6 +920,20 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public long[] getUSOForExportTable(String signature)
     {
         return m_ee.getUSOForExportTable(signature);
+    }
+
+    @Override
+    public long getDRSequenceNumber()
+    {
+        ByteBuffer resultBuffer = ByteBuffer.wrap(m_ee.executeTask(TaskType.GET_DR_SEQUENCE_NUMBER, null));
+        return resultBuffer.getLong();
+    }
+
+    @Override
+    public void setDRSequenceNumber(long sequenceNumber) {
+        ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(8);
+        paramBuffer.putLong(sequenceNumber);
+        m_ee.executeTask(TaskType.SET_DR_SEQUENCE_NUMBER, paramBuffer);
     }
 
     @Override

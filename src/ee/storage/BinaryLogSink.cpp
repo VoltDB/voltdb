@@ -36,7 +36,7 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
     ReferenceSerializeInputLE taskInfo(taskParams + 4, ntohl(*reinterpret_cast<const int32_t*>(taskParams)));
 
     int64_t __attribute__ ((unused)) uniqueId = 0;
-    int64_t __attribute__ ((unused)) spUniqueId = 0;
+    int64_t __attribute__ ((unused)) sequenceNumber = 0;
     while (taskInfo.hasRemaining()) {
         pool->purge();
         const char* recordStart = taskInfo.getRawPointer();
@@ -84,13 +84,13 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
         }
         case DR_RECORD_BEGIN_TXN: {
             uniqueId = taskInfo.readLong();
-            spUniqueId = taskInfo.readLong();
+            sequenceNumber = taskInfo.readLong();
             checksum = taskInfo.readInt();
             validateChecksum(checksum, recordStart, taskInfo.getRawPointer());
             break;
         }
         case DR_RECORD_END_TXN: {
-            spUniqueId = taskInfo.readLong();
+            sequenceNumber = taskInfo.readLong();
             checksum = taskInfo.readInt();
             validateChecksum(checksum, recordStart, taskInfo.getRawPointer());
             break;

@@ -71,10 +71,11 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
             String file_path, String file_nonce,
             long txnId, Map<Integer, Long> partitionTransactionIds,
             Map<Integer, Long> partitionUniqueIds,
-            Map<Integer, Map<Integer, Long>> remoteDCLastUniqueIds,
+            Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds,
             JSONObject jsData, SystemProcedureExecutionContext context,
             final VoltTable result,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+            Map<Integer, Long> drSequenceNumbers,
             SiteTracker tracker,
             HashinatorSnapshotData hashinatorData,
             long timestamp)
@@ -161,8 +162,8 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
 
         // All IO work will be deferred and be run on the dedicated snapshot IO thread
         return createDeferredSetup(file_path, file_nonce, txnId, partitionTransactionIds, partitionUniqueIds,
-                remoteDCLastUniqueIds, context,
-                exportSequenceNumbers, timestamp, numTables, snapshotRecord,
+                remoteDCLastIds, context,
+                exportSequenceNumbers, drSequenceNumbers, timestamp, numTables, snapshotRecord,
                 partitionedSnapshotTasks, replicatedSnapshotTasks);
     }
 
@@ -171,9 +172,10 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
                                                   final long txnId,
                                                   final Map<Integer, Long> partitionTransactionIds,
                                                   final Map<Integer, Long> partitionUniqueIds,
-                                                  final Map<Integer, Map<Integer, Long>> remoteDCLastUniqueIds,
+                                                  final Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds,
                                                   final SystemProcedureExecutionContext context,
                                                   final Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+                                                  final Map<Integer, Long> drSequenceNumbers,
                                                   final long timestamp,
                                                   final AtomicInteger numTables,
                                                   final SnapshotRegistry.Snapshot snapshotRecord,
@@ -185,7 +187,7 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
             public Boolean call() throws Exception
             {
                 NativeSnapshotWritePlan.createFileBasedCompletionTasks(file_path, file_nonce,
-                        txnId, partitionTransactionIds, partitionUniqueIds, remoteDCLastUniqueIds, context, exportSequenceNumbers, null, timestamp,
+                        txnId, partitionTransactionIds, partitionUniqueIds, remoteDCLastIds, context, exportSequenceNumbers, drSequenceNumbers, null, timestamp,
                         context.getNumberOfPartitions());
 
                 for (SnapshotTableTask task : replicatedSnapshotTasks) {

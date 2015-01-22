@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
+import org.voltcore.utils.Pair;
 import org.voltdb.iv2.UniqueIdGenerator;
 
 
@@ -38,14 +39,16 @@ public interface ConsumerDRGateway extends Promotable {
 
     public abstract void shutdown(boolean blocking) throws InterruptedException;
 
-    public abstract void promotePartition(int partitionId, long maxUniqueId);
+    public abstract void promotePartition(int partitionId, long maxDRId, long maxUniqueId);
 
-    public abstract void notifyOfLastAppliedSpUniqueId(int dataCenter, long spUniqueId);
+    public abstract void notifyOfLastAppliedBinaryLog(long endDRId, long endUniqueId);
 
-    public abstract Map<Integer, Map<Integer, Long>> getLastReceivedUniqueIds();
+    public abstract void assertSequencing(int partitionId, long drId);
+
+    public abstract Map<Integer, Map<Integer, Pair<Long, Long>>> getLastReceivedBinaryLogIds();
 
     public static class DummyConsumerDRGateway implements ConsumerDRGateway {
-        Map<Integer, Map<Integer, Long>> ids = new HashMap<Integer, Map<Integer, Long>>();
+        Map<Integer, Map<Integer, Pair<Long, Long>>> ids = new HashMap<Integer, Map<Integer, Pair<Long, Long>>>();
 
         @Override
         public void initialize(boolean resumeReplication) {}
@@ -64,18 +67,22 @@ public interface ConsumerDRGateway extends Promotable {
         public void shutdown(boolean blocking) {}
 
         @Override
-        public void promotePartition(int partitionId, long maxUniqueId) {}
+        public void promotePartition(int partitionId, long maxDRId, long maxUniqueId) {}
 
         @Override
-        public void notifyOfLastAppliedSpUniqueId(int dataCenter, long spUniqueId) {
+        public void notifyOfLastAppliedBinaryLog(long endDRId, long endUniqueId) {
+            int dataCenter = (int)(endDRId >> 55);
             if (!ids.containsKey(dataCenter)) {
-                ids.put(dataCenter, new HashMap<Integer, Long>());
+                ids.put(dataCenter, new HashMap<Integer, Pair<Long, Long>>());
             }
-            ids.get(dataCenter).put(UniqueIdGenerator.getPartitionIdFromUniqueId(spUniqueId), spUniqueId);
+            int partitionId = UniqueIdGenerator.getPartitionIdFromUniqueId(endUniqueId);
+            ids.get(dataCenter).put(partitionId, Pair.of(endDRId, endUniqueId));
         };
 
         @Override
-        public Map<Integer, Map<Integer, Long>> getLastReceivedUniqueIds() { return ids; }
+        public void assertSequencing(int partitionId, long drId) {}
 
+        @Override
+        public Map<Integer, Map<Integer, Pair<Long, Long>>> getLastReceivedBinaryLogIds() { return ids; }
     }
 }

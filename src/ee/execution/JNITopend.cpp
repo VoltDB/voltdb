@@ -466,8 +466,9 @@ void JNITopend::pushDRBuffer(int32_t partitionId, StreamBlock *block) {
                 m_partitionDRGatewayClass,
                 m_pushDRBufferMID,
                 partitionId,
-                block->startSpUniqueId(),
-                block->lastSpUniqueId(),
+                block->startDRSequenceNumber(),
+                block->lastDRSequenceNumber(),
+                block->lastUniqueId(),
                 buffer);
         m_jniEnv->DeleteLocalRef(buffer);
     }

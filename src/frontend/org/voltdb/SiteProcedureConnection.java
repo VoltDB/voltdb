@@ -168,6 +168,10 @@ public interface SiteProcedureConnection {
 
     public long[] getUSOForExportTable(String signature);
 
+    public long getDRSequenceNumber();
+
+    public void setDRSequenceNumber(long sequenceNumber);
+
     public void toggleProfiler(int toggle);
 
     public void tick();

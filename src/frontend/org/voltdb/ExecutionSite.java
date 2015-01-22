@@ -971,7 +971,8 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             Deque<SnapshotTableTask> tasks,
             long txnId,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-            Map<Integer, Map<Integer, Long>> remoteDCUniqueIds) {
+            Map<Integer, Long> drSequenceNumbers,
+            Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCIds) {
     }
 
     /*
@@ -1296,6 +1297,15 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     {
         return ee.getUSOForExportTable(signature);
     }
+
+    @Override
+    public long getDRSequenceNumber()
+    {
+        throw new RuntimeException("ExecutionSite doesn't know how to do this");
+    }
+
+    @Override
+    public void setDRSequenceNumber(long sequenceNumber) {}
 
     @Override
     public void toggleProfiler(int toggle)

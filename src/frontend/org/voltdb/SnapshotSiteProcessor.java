@@ -59,6 +59,7 @@ import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.MiscUtils;
 
+import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ListMultimap;
 import com.google_voltpatches.common.collect.Lists;
 import com.google_voltpatches.common.collect.Maps;
@@ -117,6 +118,8 @@ public class SnapshotSiteProcessor {
     private static final Map<String, Map<Integer, Pair<Long, Long>>> m_exportSequenceNumbers =
         new HashMap<String, Map<Integer, Pair<Long, Long>>>();
 
+    private static final Map<Integer, Long> m_drSequenceNumbers = new HashMap<Integer, Long>();
+
     /**
      * This field is the same values as m_exportSequenceNumbers once they have been extracted
      * in SnapshotSaveAPI.createSetup and then passed back in to SSS.initiateSnapshots. The only
@@ -127,11 +130,16 @@ public class SnapshotSiteProcessor {
     private Map<String, Map<Integer, Pair<Long,Long>>> m_exportSequenceNumbersToLogOnCompletion;
 
     /**
+     * Same as m_exportSequenceNumbersToLogOnCompletion, but for m_drSequenceNumbers
+     */
+    private Map<Integer, Long> m_drSequenceNumbersToLogOnCompletion;
+
+    /**
      * Used to pass the last seen unique ids from remote datacenters into the snapshot
      * termination path so it can publish it to ZK where it is extracted by rejoining
      * nodes
      */
-    private Map<Integer, Map<Integer, Long>> m_remoteDCLastSeenUniqueIds;
+    private Map<Integer, Map<Integer, Pair<Long, Long>>> m_remoteDCLastSeenIds;
 
     /*
      * Do some random tasks that are deferred to the snapshot termination thread.
@@ -213,7 +221,7 @@ public class SnapshotSiteProcessor {
      * site that gets the setup permit will  use getExportSequenceNumbers to retrieve the full
      * set and reset the contents.
      */
-    public static void populateExportSequenceNumbersForExecutionSite(SystemProcedureExecutionContext context) {
+    public static void populateSequenceNumbersForExecutionSite(SystemProcedureExecutionContext context) {
         Database database = context.getDatabase();
         for (Table t : database.getTables()) {
             if (!CatalogUtil.isTableExportOnly(database, t))
@@ -233,12 +241,20 @@ public class SnapshotSiteProcessor {
                                 ackOffSetAndSequenceNumber[0],
                                 ackOffSetAndSequenceNumber[1]));
         }
+        long drSequenceNumber = context.getSiteProcedureConnection().getDRSequenceNumber();
+        m_drSequenceNumbers.put(context.getPartitionId(), drSequenceNumber);
     }
 
     public static Map<String, Map<Integer, Pair<Long, Long>>> getExportSequenceNumbers() {
         HashMap<String, Map<Integer, Pair<Long, Long>>> sequenceNumbers =
             new HashMap<String, Map<Integer, Pair<Long, Long>>>(m_exportSequenceNumbers);
         m_exportSequenceNumbers.clear();
+        return sequenceNumbers;
+    }
+
+    public static Map<Integer, Long> getDRSequenceNumbers() {
+        Map<Integer, Long> sequenceNumbers = ImmutableMap.copyOf(m_drSequenceNumbers);
+        m_drSequenceNumbers.clear();
         return sequenceNumbers;
     }
 
@@ -377,7 +393,8 @@ public class SnapshotSiteProcessor {
             Deque<SnapshotTableTask> tasks,
             long txnId,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-            Map<Integer, Map<Integer, Long>> remoteDCLastUniqueIds)
+            Map<Integer, Long> drSequenceNumbers,
+            Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds)
     {
         ExecutionSitesCurrentlySnapshotting.add(this);
         final long now = System.currentTimeMillis();
@@ -388,7 +405,8 @@ public class SnapshotSiteProcessor {
         m_streamers = Maps.newHashMap();
         m_snapshotTargetTerminators = new ArrayList<Thread>();
         m_exportSequenceNumbersToLogOnCompletion = exportSequenceNumbers;
-        m_remoteDCLastSeenUniqueIds = remoteDCLastUniqueIds;
+        m_drSequenceNumbersToLogOnCompletion = drSequenceNumbers;
+        m_remoteDCLastSeenIds = remoteDCLastIds;
 
         // Table doesn't implement hashCode(), so use the table ID as key
         for (Map.Entry<Integer, byte[]> tablePredicates : makeTablesAndPredicatesToSnapshot(tasks).entrySet()) {
@@ -659,10 +677,12 @@ public class SnapshotSiteProcessor {
                 final long txnId = m_lastSnapshotTxnId;
                 final Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers =
                         m_exportSequenceNumbersToLogOnCompletion;
-                final Map<Integer, Map<Integer, Long>> remoteDCLastUniqueIds =
-                        m_remoteDCLastSeenUniqueIds;
+                final Map<Integer, Long> drSequenceNumbers =
+                        m_drSequenceNumbersToLogOnCompletion;
+                final Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds =
+                        m_remoteDCLastSeenIds;
                 m_exportSequenceNumbersToLogOnCompletion = null;
-                m_remoteDCLastSeenUniqueIds = null;
+                m_remoteDCLastSeenIds = null;
                 final Thread terminatorThread =
                     new Thread("Snapshot terminator") {
                     @Override
@@ -735,7 +755,8 @@ public class SnapshotSiteProcessor {
                             logSnapshotCompleteToZK(txnId,
                                                     snapshotSucceeded,
                                                     exportSequenceNumbers,
-                                                    remoteDCLastUniqueIds);
+                                                    drSequenceNumbers,
+                                                    remoteDCLastIds);
                         }
                     }
                 };
@@ -760,7 +781,8 @@ public class SnapshotSiteProcessor {
             long txnId,
             boolean snapshotSuccess,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-            Map<Integer, Map<Integer, Long>> remoteDCLastUniqueIds) {
+            Map<Integer, Long> drSequenceNumbers,
+            Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds) {
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
 
         // Timeout after 10 minutes
@@ -799,7 +821,8 @@ public class SnapshotSiteProcessor {
                     jsonObj.put("isTruncation", false);
                 }
                 mergeExportSequenceNumbers(jsonObj, exportSequenceNumbers);
-                mergeDRLastUniqueIds(jsonObj, remoteDCLastUniqueIds);
+                mergeDRSequenceNumbers(jsonObj, drSequenceNumbers);
+                mergeDRLastIds(jsonObj, remoteDCLastIds);
                 zk.setData(snapshotPath, jsonObj.toString(4).getBytes("UTF-8"), stat.getVersion());
             } catch (KeeperException.BadVersionException e) {
                 continue;
@@ -889,43 +912,65 @@ public class SnapshotSiteProcessor {
         }
     }
 
+    private static void mergeDRSequenceNumbers(JSONObject jsonObj,
+            Map<Integer, Long> drSequenceNumbers) throws JSONException {
+        JSONObject sequenceNumberMap;
+        if (jsonObj.has("drSequenceNumbers")) {
+            sequenceNumberMap = jsonObj.getJSONObject("drSequenceNumbers");
+        } else {
+            sequenceNumberMap = new JSONObject();
+            jsonObj.put("drSequenceNumbers", sequenceNumberMap);
+        }
+
+        for (Map.Entry<Integer, Long> e : drSequenceNumbers.entrySet()) {
+            final String partitionId = e.getKey().toString();
+            final Long partitionSequenceNumber = e.getValue();
+            long existingSequenceNumber = sequenceNumberMap.optLong(partitionId, Long.MIN_VALUE);
+            sequenceNumberMap.put(partitionId, Math.max(existingSequenceNumber, partitionSequenceNumber));
+        }
+    }
+
     /*
      * When recording snapshot completion we also record DR remote DC unique ids
      * as JSON. Need to merge our unique ids with existing numbers
      * since multiple replicas will submit the unique ids
      */
-    private static void mergeDRLastUniqueIds(JSONObject jsonObj,
-            Map<Integer, Map<Integer, Long>> remoteDCLastUniqueId) throws JSONException {
-        //Unique ids for remote partitions indexed by remote datacenter id, each DC has a full partition set
-        JSONObject dcUniqueIdMap;
-        if (jsonObj.has("remoteDCUniqueIds")) {
-            dcUniqueIdMap = jsonObj.getJSONObject("remoteDCUniqueIds");
+    private static void mergeDRLastIds(JSONObject jsonObj,
+            Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastId) throws JSONException {
+        //DR ids/unique ids for remote partitions indexed by remote datacenter id,
+        //each DC has a full partition set
+        JSONObject dcIdMap;
+        if (jsonObj.has("remoteDCIds")) {
+            dcIdMap = jsonObj.getJSONObject("remoteDCIds");
         } else {
-            dcUniqueIdMap = new JSONObject();
-            jsonObj.put("remoteDCUniqueIds", dcUniqueIdMap);
+            dcIdMap = new JSONObject();
+            jsonObj.put("remoteDCds", dcIdMap);
         }
 
-        for (Map.Entry<Integer, Map<Integer, Long>> dcEntry : remoteDCLastUniqueId.entrySet()) {
-            //Last seen unique ids for a specific data center
-            JSONObject lastSeenUniqueIds;
+        for (Map.Entry<Integer, Map<Integer, Pair<Long, Long>>> dcEntry : remoteDCLastId.entrySet()) {
+            //Last seen ids for a specific data center
+            JSONObject lastSeenIds;
             final String dcKeyString = dcEntry.getKey().toString();
-            if (dcUniqueIdMap.has(dcKeyString)) {
-                lastSeenUniqueIds = dcUniqueIdMap.getJSONObject(dcKeyString);
+            if (dcIdMap.has(dcKeyString)) {
+                lastSeenIds = dcIdMap.getJSONObject(dcKeyString);
             } else {
-                lastSeenUniqueIds = new JSONObject();
-                dcUniqueIdMap.put(dcKeyString, lastSeenUniqueIds);
+                lastSeenIds = new JSONObject();
+                dcIdMap.put(dcKeyString, lastSeenIds);
             }
 
-            for (Map.Entry<Integer, Long> partitionEntry : dcEntry.getValue().entrySet()) {
-                final Integer partitionId = partitionEntry.getKey();
-                final String partitionIdString = partitionId.toString();
-                final Long lastSeenUniqueIdLong = partitionEntry.getValue();
-
-                if (lastSeenUniqueIds.has(partitionIdString)) {
-                    long existingEntry = lastSeenUniqueIds.getLong(partitionIdString);
-                    lastSeenUniqueIds.put(partitionIdString, Math.max(existingEntry, lastSeenUniqueIdLong));
-                } else {
-                    lastSeenUniqueIds.put(partitionIdString, lastSeenUniqueIdLong.longValue());
+            for (Map.Entry<Integer, Pair<Long, Long>> partitionEntry : dcEntry.getValue().entrySet()) {
+                final String partitionIdString = partitionEntry.getKey().toString();
+                final Long lastSeenDRIdLong = partitionEntry.getValue().getFirst();
+                final Long lastSeenUniqueIdLong = partitionEntry.getValue().getSecond();
+                long existingDRId = Long.MIN_VALUE;
+                if (lastSeenIds.has(partitionIdString)) {
+                    existingDRId = lastSeenIds.getJSONObject(partitionIdString).getLong("drId");
+                }
+                if (lastSeenDRIdLong > existingDRId) {
+                    JSONObject ids = new JSONObject();
+                    ids.put("drId", lastSeenDRIdLong);
+                    ids.put("uniqueId", lastSeenUniqueIdLong);
+                    lastSeenIds.put(partitionIdString, ids);
                 }
             }
         }
