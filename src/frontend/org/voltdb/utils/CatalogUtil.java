@@ -36,7 +36,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
-import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
@@ -663,26 +662,23 @@ public abstract class CatalogUtil {
             DeploymentType deployment = result.getValue();
             // move any deprecated standalone export elements to the group
             ExportType export = deployment.getExport();
-            if (export != null && export.getTarget() != null) {
-                ExportConfigurationType exportConfig;
-                if (export.getConfiguration() == null || export.getConfiguration().isEmpty()) {
-                    exportConfig = new ExportConfigurationType();
-                }
-                else if (export.getConfiguration().size() != 1) {
-                    throw new RuntimeException("Invalid schema, cannot use deprecated export syntax with multiple configuration tags.");
-                }
-                else {
-                    exportConfig = export.getConfiguration().get(0);
-                }
+            if (export != null && export.getConfiguration().size() == 1 &&
+                    (export.isEnabled() != null || export.getTarget() != null || export.getExportconnectorclass() != null)) {
                 hostLog.warn("Deprecated export syntax, replacing configuration tag attributes with export tag attributes.");
-                exportConfig.setEnabled(export.isEnabled());
-                exportConfig.setTarget(export.getTarget());
-                exportConfig.setExportconnectorclass(export.getExportconnectorclass());
-            }
-            else if (export != null && export.isEnabled() != null) {
-                for (ExportConfigurationType exportConfig : export.getConfiguration()) {
-                    exportConfig.setEnabled(exportConfig.isEnabled() && export.isEnabled());
+                ExportConfigurationType exportConfig = export.getConfiguration().get(0);
+                if (export.isEnabled() != null) {
+                    exportConfig.setEnabled(export.isEnabled());
                 }
+                if (export.getTarget() != null) {
+                    exportConfig.setTarget(export.getTarget());
+                }
+                if (export.getExportconnectorclass() != null) {
+                    exportConfig.setExportconnectorclass(export.getExportconnectorclass());
+                }
+            }
+            else if (export != null && export.getConfiguration().size() > 1 &&
+                    (export.isEnabled() != null || export.getTarget() != null || export.getExportconnectorclass() != null)) {
+                throw new RuntimeException("Invalid schema, cannot use deprecated export syntax with multiple configuration tags.");
             }
 
             populateDefaultDeployment(deployment);
