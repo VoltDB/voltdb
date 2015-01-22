@@ -114,6 +114,7 @@ import org.voltdb.types.ConstraintType;
 import org.xml.sax.SAXException;
 
 import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.collect.ImmutableSortedSet;
 
 import org.voltdb.export.ExportManager;
 
@@ -360,23 +361,23 @@ public abstract class CatalogUtil {
     }
 
     public static NavigableSet<Table> getExportTables(Database db) {
-        NavigableSet<Table> exportTables = new TreeSet<>();
+        ImmutableSortedSet.Builder<Table> exportTables = ImmutableSortedSet.naturalOrder();
         for (Connector connector : db.getConnectors()) {
             for (ConnectorTableInfo tinfo : connector.getTableinfo()) {
                 exportTables.add(tinfo.getTable());
             }
         }
-        return exportTables;
+        return exportTables.build();
     }
 
     public static NavigableSet<String> getExportTableNames(Database db) {
-        NavigableSet<String> exportTables = new TreeSet<>();
+        ImmutableSortedSet.Builder<String> exportTables = ImmutableSortedSet.naturalOrder();
         for (Connector connector : db.getConnectors()) {
             for (ConnectorTableInfo tinfo : connector.getTableinfo()) {
                 exportTables.add(tinfo.getTable().getTypeName());
             }
         }
-        return exportTables;
+        return exportTables.build();
     }
 
     /**
