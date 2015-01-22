@@ -1,11 +1,16 @@
 package exportbenchmark;
 
+import java.util.Properties;
 import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportDecoderBase;
-import org.voltdb.exportclient.ExportDecoderBase.RestartBlockException;
 import org.voltdb.export.AdvertisedDataSource;
 
 public class DummyExporter extends ExportClientBase {
+    
+    @Override
+    public void configure(Properties config) throws Exception {
+        // We have no properties to configure at this point
+    }
     
     static class PrinterExportDecoder extends ExportDecoderBase {
         PrinterExportDecoder(AdvertisedDataSource source) {
