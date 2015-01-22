@@ -2,12 +2,25 @@
 
 APPNAME="helloworld"
 
+#set -o nounset #exit if an unset variable is used
+set -o errexit #exit on any single command fail
+
 # find voltdb binaries in either installation or distribution directory.
 if [ -n "$(which voltdb 2> /dev/null)" ]; then
     VOLTDB_BIN=$(dirname "$(which voltdb)")
 else
-    VOLTDB_BIN="$(pwd)/../../../bin"
+    VOLTDB_BIN="$(dirname $(dirname $(dirname $(pwd))))/bin"
+    echo "The VoltDB scripts are not in your PATH."
+    echo "For ease of use, add the VoltDB bin directory: "
+    echo
+    echo $VOLTDB_BIN
+    echo
+    echo "to your PATH."
+    echo
 fi
+# move voltdb commands into path for this script
+PATH=$VOLTDB_BIN:$PATH
+
 # installation layout has all libraries in $VOLTDB_ROOT/lib/voltdb
 if [ -d "$VOLTDB_BIN/../lib/voltdb" ]; then
     VOLTDB_BASE=$(dirname "$VOLTDB_BIN")
@@ -15,8 +28,9 @@ if [ -d "$VOLTDB_BIN/../lib/voltdb" ]; then
     VOLTDB_VOLTDB="$VOLTDB_LIB"
 # distribution layout has libraries in separate lib and voltdb directories
 else
-    VOLTDB_LIB="`pwd`/../../../lib"
-    VOLTDB_VOLTDB="`pwd`/../../../voltdb"
+    VOLTDB_BASE=$(dirname "$VOLTDB_BIN")
+    VOLTDB_LIB="$VOLTDB_BASE/lib"
+    VOLTDB_VOLTDB="$VOLTDB_BASE/voltdb"
 fi
 
 APPCLASSPATH=$CLASSPATH:$({ \
