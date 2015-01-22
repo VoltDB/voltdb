@@ -808,6 +808,23 @@ public class TestCatalogUtil extends TestCase {
                 + "        </configuration>"
                 + "    </export>"
                 + "</deployment>";
+        final String withBadMixedSyntax =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <export enabled='true' target='file'>"
+                + "        <configuration group='foo' enabled='true' target='custom' exportconnectorclass=\"org.voltdb.exportclient.NoOpTestExportClient\" >"
+                + "            <property name=\"foo\">false</property>"
+                + "            <property name=\"type\">CSV</property>"
+                + "            <property name=\"with-schema\">false</property>"
+                + "        </configuration>"
+                + "        <configuration group='bar' enabled='true' target='file'>"
+                + "            <property name=\"foo\">false</property>"
+                + "            <property name=\"type\">CSV</property>"
+                + "            <property name=\"with-schema\">false</property>"
+                + "        </configuration>"
+                + "    </export>"
+                + "</deployment>";
         final String withUnusedConnector =
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
@@ -824,6 +841,23 @@ public class TestCatalogUtil extends TestCase {
                 + "            <property name=\"with-schema\">false</property>"
                 + "        </configuration>"
                 + "        <configuration group='unused' enabled='true' target='file'>"
+                + "            <property name=\"foo\">false</property>"
+                + "            <property name=\"type\">CSV</property>"
+                + "            <property name=\"with-schema\">false</property>"
+                + "        </configuration>"
+                + "    </export>"
+                + "</deployment>";
+        final String withDisabledExport =
+                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+                + "<deployment>"
+                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
+                + "    <export enabled='false'>"
+                + "        <configuration group='foo' enabled='true' target='custom' exportconnectorclass=\"org.voltdb.exportclient.NoOpTestExportClient\" >"
+                + "            <property name=\"foo\">false</property>"
+                + "            <property name=\"type\">CSV</property>"
+                + "            <property name=\"with-schema\">false</property>"
+                + "        </configuration>"
+                + "        <configuration group='bar' enabled='true' target='file'>"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
@@ -881,6 +915,15 @@ public class TestCatalogUtil extends TestCase {
             assertTrue(msg.contains("Multiple connectors can not be assigned to single export group:"));
         }
 
+        //This is a bad deployment that uses both the old and new syntax
+        final File tmpBadSyntax = VoltProjectBuilder.writeStringToTempFile(withBadMixedSyntax);
+        try{
+            DeploymentType bad_syntax_deployment = CatalogUtil.getDeployment(new FileInputStream(tmpBadSyntax));
+            fail("Should not accept a deployment file that uses both old and new syntaxes.");
+        } catch (RuntimeException e) {
+            assertTrue(e.getMessage().contains("Invalid schema, cannot use deprecated export syntax with multiple configuration tags."));
+        }
+
         // This is to test that unused connectors are ignored
         final File tmpUnused = VoltProjectBuilder.writeStringToTempFile(withUnusedConnector);
         DeploymentType unused_deployment = CatalogUtil.getDeployment(new FileInputStream(tmpUnused));
@@ -893,15 +936,33 @@ public class TestCatalogUtil extends TestCase {
         org.voltdb.catalog.Connector catconn = db.getConnectors().get("unused");
         assertNull(catconn);
 
+        // This is to test that export false will disable every other connector
+        final File tmpDisabled = VoltProjectBuilder.writeStringToTempFile(withDisabledExport);
+        DeploymentType disabled_export_deployment = CatalogUtil.getDeployment(new FileInputStream(tmpDisabled));
+
+        Catalog cat4 = compiler.compileCatalogFromDDL(x);
+        msg = CatalogUtil.compileDeployment(cat4, disabled_export_deployment, false);
+        assertTrue("Deployment file failed to parse: " + msg, msg == null);
+
+        db = cat4.getClusters().get("cluster").getDatabases().get("database");
+
+        catconn = db.getConnectors().get("foo");
+        assertNotNull(catconn);
+        assertFalse(disabled_export_deployment.getExport().getConfiguration().get(0).isEnabled());
+
+        catconn = db.getConnectors().get("bar");
+        assertNotNull(catconn);
+        assertFalse(disabled_export_deployment.getExport().getConfiguration().get(1).isEnabled());
+
         //This is a good deployment with custom class that can be found
         final File tmpGood = VoltProjectBuilder.writeStringToTempFile(withGoodExport);
         DeploymentType good_deployment = CatalogUtil.getDeployment(new FileInputStream(tmpGood));
 
-        Catalog cat4 = compiler.compileCatalogFromDDL(x);
-        msg = CatalogUtil.compileDeployment(cat4, good_deployment, false);
+        Catalog cat5 = compiler.compileCatalogFromDDL(x);
+        msg = CatalogUtil.compileDeployment(cat5, good_deployment, false);
         assertTrue("Deployment file failed to parse: " + msg, msg == null);
 
-        db = cat4.getClusters().get("cluster").getDatabases().get("database");
+        db = cat5.getClusters().get("cluster").getDatabases().get("database");
 
         catconn = db.getConnectors().get("foo");
         assertNotNull(catconn);

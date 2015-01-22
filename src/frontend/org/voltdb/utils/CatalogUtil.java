@@ -674,12 +674,21 @@ public abstract class CatalogUtil {
                 if (export.getConfiguration() == null || export.getConfiguration().isEmpty()) {
                     exportConfig = new ExportConfigurationType();
                 }
+                else if (export.getConfiguration().size() != 1) {
+                    throw new RuntimeException("Invalid schema, cannot use deprecated export syntax with multiple configuration tags.");
+                }
                 else {
                     exportConfig = export.getConfiguration().get(0);
                 }
+                hostLog.warn("Deprecated export syntax, replacing configuration tag attributes with export tag attributes.");
                 exportConfig.setEnabled(export.isEnabled());
                 exportConfig.setTarget(export.getTarget());
                 exportConfig.setExportconnectorclass(export.getExportconnectorclass());
+            }
+            else if (export != null && export.isEnabled() != null) {
+                for (ExportConfigurationType exportConfig : export.getConfiguration()) {
+                    exportConfig.setEnabled(exportConfig.isEnabled() && export.isEnabled());
+                }
             }
 
             populateDefaultDeployment(deployment);
