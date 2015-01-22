@@ -38,7 +38,6 @@ APPCLASSPATH=$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_LIB"/*.jar; \
     \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
 } 2> /dev/null | paste -sd ':' - )
-VOLTDB="$VOLTDB_BIN/voltdb"
 LOG4J="$VOLTDB_VOLTDB/log4j.xml"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
 
@@ -66,13 +65,13 @@ function jars-ifneeded() {
 # run the voltdb server locally
 function server() {
     # run the server
-    $VOLTDB create -d deployment.xml -l $LICENSE -H localhost
+    voltdb create -d deployment.xml -l $LICENSE -H localhost
 }
 
 # load schema and procedures
 function init() {
     jars-ifneeded
-    $VOLTDB_BIN/sqlcmd < helloworld.sql
+    sqlcmd < helloworld.sql
 }
 
 # run the client that drives the example

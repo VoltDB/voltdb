@@ -38,9 +38,7 @@ APPCLASSPATH=$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_LIB"/*.jar; \
     \ls -1 "$VOLTDB_LIB"/extension/*.jar; \
 } 2> /dev/null | paste -sd ':' - )
-VOLTDB="$VOLTDB_BIN/voltdb"
 LICENSE="$VOLTDB_VOLTDB/license.xml"
-CSVLOADER="$VOLTDB_BIN/csvloader"
 
 DATAFILES="src/com/auctionexample/datafiles/"
 
@@ -75,27 +73,27 @@ function jars-ifneeded() {
 # run the voltdb server locally
 function server() {
     # run the server
-    $VOLTDB create -d deployment.xml -l $LICENSE -H localhost
+    voltdb create -d deployment.xml -l $LICENSE -H localhost
 }
 
 # load schema and procedures
 function init() {
     jars-ifneeded
-    $VOLTDB_BIN/sqlcmd < auction-ddl.sql
+    sqlcmd < auction-ddl.sql
 }
 
 # run the client that drives the example
 function client() {
     # load the csv files
-    $CSVLOADER -f $DATAFILES/items.txt \
+    csvloader -f $DATAFILES/items.txt \
             -p InsertIntoItemAndBid \
                 --user program \
                 --password pass
-    $CSVLOADER -f $DATAFILES/categories.txt \
+    csvloader -f $DATAFILES/categories.txt \
                         -p InsertIntoCategory \
                         --user program \
                         --password pass
-    $CSVLOADER -f $DATAFILES/users.txt \
+    csvloader -f $DATAFILES/users.txt \
                         -p InsertIntoUser \
                         --user program \
                         --password pass
