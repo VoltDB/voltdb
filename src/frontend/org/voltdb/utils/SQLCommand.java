@@ -49,7 +49,6 @@ import java.util.regex.Pattern;
 
 import jline.console.CursorBuffer;
 import jline.console.KeyMap;
-import jline.console.completer.Completer;
 import jline.console.history.FileHistory;
 
 import org.voltdb.VoltTable;
@@ -324,34 +323,6 @@ public class SQLCommand
             new SingleArgumentCommandParser("remove classes", "class selector");
     private static final Pattern ClassSelectorToken = Pattern.compile(
             "^[\\w*.$]+$", Pattern.CASE_INSENSITIVE);
-
-    /**
-     * The list of recognized basic tab-complete-able SQL command prefixes.
-     * Comparisons are done in uppercase.
-     */
-    static final String[] m_commandPrefixes = new String[] {
-        "DELETE",
-        "EXEC",
-        "EXIT",
-        "EXPLAIN",
-        "EXPLAINPROC",
-        "FILE",
-        "GO",
-        "HELP",
-        "INSERT",
-        "LIST PROCEDURES",
-        "LIST TABLES",
-        "LIST CLASSES",
-        "LOAD CLASSES",
-        "REMOVE CLASSES",
-        "SHOW PROCEDURES",
-        "SHOW TABLES",
-        "SHOW CLASSES",
-        "QUIT",
-        "RECALL",
-        "SELECT",
-        "UPDATE",
-    };
 
     /// The main loop for interactive mode.
     public static void interactWithTheUser() throws Exception
@@ -1491,10 +1462,6 @@ public class SQLCommand
             lineInputReader = new SQLConsoleReader(in, out);
 
             lineInputReader.setBellEnabled(false);
-
-            // Provide a custom completer.
-            Completer completer = new SQLCompleter(m_commandPrefixes);
-            lineInputReader.addCompleter(completer);
 
             // Maintain persistent history in ~/.sqlcmd_history.
             historyFile = new FileHistory(new File(System.getProperty("user.home"), ".sqlcmd_history"));
