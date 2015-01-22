@@ -50,20 +50,21 @@ public class PlannerTool {
     final Database m_database;
     final Cluster m_cluster;
     final HSQLInterface m_hsql;
-    final int m_catalogVersion;
+    final byte[] m_catalogHash;
     final AdHocCompilerCache m_cache;
     static PlannerStatsCollector m_plannerStats;
 
     public static final int AD_HOC_JOINED_TABLE_LIMIT = 5;
 
-    public PlannerTool(final Cluster cluster, final Database database, int catalogVersion) {
+    public PlannerTool(final Cluster cluster, final Database database, byte[] catalogHash)
+    {
         assert(cluster != null);
         assert(database != null);
 
         m_database = database;
         m_cluster = cluster;
-        m_catalogVersion = catalogVersion;
-        m_cache = AdHocCompilerCache.getCacheForCatalogVersion(catalogVersion);
+        m_catalogHash = catalogHash;
+        m_cache = AdHocCompilerCache.getCacheForCatalogHash(catalogHash);
 
         // LOAD HSQL
         m_hsql = HSQLInterface.loadHsqldb();
@@ -229,7 +230,7 @@ public class PlannerTool {
             //////////////////////
             // OUTPUT THE RESULT
             //////////////////////
-            CorePlan core = new CorePlan(plan, m_catalogVersion);
+            CorePlan core = new CorePlan(plan, m_catalogHash);
             AdHocPlannedStatement ahps = new AdHocPlannedStatement(plan, core);
 
             if (partitioning.isInferred()) {
