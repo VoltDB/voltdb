@@ -135,7 +135,7 @@ public class CatalogContext {
         m_defaultProcs = new DefaultProcedureManager(database);
 
         m_jdbc = new JdbcDatabaseMetaDataGenerator(catalog, m_defaultProcs, m_jarfile);
-        m_ptool = new PlannerTool(cluster, database, version);
+        m_ptool = new PlannerTool(cluster, database, version, getCatalogHash());
         catalogVersion = version;
 
         if (procedures != null) {

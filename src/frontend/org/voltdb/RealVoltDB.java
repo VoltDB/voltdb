@@ -1447,7 +1447,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                             TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId(), //txnid
                             0, //timestamp
                             catalog,
-                            null,
+                            new byte[10],
                             deploymentBytes,
                             0,
                             -1);

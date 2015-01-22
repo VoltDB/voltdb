@@ -57,6 +57,9 @@ public class CorePlan {
     /** Which version of the catalog is this plan good for? */
     public final int catalogVersion;
 
+    /** What SHA-1 hash of the catalog is this plan good for? */
+    public final byte[] catalogHash;
+
     /** What are the types of the paramters this plan accepts? */
     public final VoltType[] parameterTypes;
 
@@ -73,8 +76,9 @@ public class CorePlan {
      *
      * @param plan The output from the QueryPlanner.
      * @param catalogVersion The version of the catalog this plan was generated against.
+     * @param catalogHash  The sha-1 hash of the catalog this plan was generated against.
      */
-    public CorePlan(CompiledPlan plan, int catalogVersion) {
+    public CorePlan(CompiledPlan plan, int catalogVersion, byte[] catalogHash) {
         aggregatorFragment = CompiledPlan.bytesForPlan(plan.rootPlanGraph);
         collectorFragment = CompiledPlan.bytesForPlan(plan.subPlanGraph);
 
@@ -99,6 +103,7 @@ public class CorePlan {
 
         isReplicatedTableDML = plan.replicatedTableDML;
         this.catalogVersion = catalogVersion;
+        this.catalogHash = catalogHash;
         parameterTypes = plan.parameterTypes();
         readOnly = plan.getReadOnly();
     }
@@ -120,7 +125,9 @@ public class CorePlan {
                     boolean isReplicatedTableDML,
                     boolean isReadOnly,
                     VoltType[] paramTypes,
-                    int catalogVersion) {
+                    int catalogVersion,
+                    byte[] catalogHash)
+    {
         this.aggregatorFragment = aggregatorFragment;
         this.collectorFragment = collectorFragment;
         this.aggregatorHash = aggregatorHash;
@@ -129,6 +136,7 @@ public class CorePlan {
         this.readOnly = isReadOnly;
         this.parameterTypes = paramTypes;
         this.catalogVersion = catalogVersion;
+        this.catalogHash = catalogHash;
     }
 
     @Override
@@ -155,6 +163,7 @@ public class CorePlan {
         }
         size += 3; // booleans
         size += 4; // catalog version
+        size += 20;  // catalog hash SHA-1 is 20b
 
         size += 2; // params count
         size += parameterTypes.length;
@@ -180,8 +189,9 @@ public class CorePlan {
         buf.put((byte) (isReplicatedTableDML ? 1 : 0));
         buf.put((byte) (readOnly ? 1 : 0));
 
-        // catalog version
+        // catalog version and hash
         buf.putInt(catalogVersion);
+        buf.put(catalogHash);
 
         // param types
         buf.putShort((short) parameterTypes.length);
@@ -212,6 +222,8 @@ public class CorePlan {
 
         // catalog version
         int catalogVersion = buf.getInt();
+        byte[] catalogHash = new byte[20];  // Catalog sha-1 hash is 20b
+        buf.get(catalogHash);
 
         // param types
         short paramCount = buf.getShort();
@@ -228,7 +240,8 @@ public class CorePlan {
                 isReplicatedTableDML,
                 isReadOnly,
                 paramTypes,
-                catalogVersion);
+                catalogVersion,
+                catalogHash);
     }
 
     /* (non-Javadoc)
@@ -261,6 +274,9 @@ public class CorePlan {
         if (catalogVersion != other.catalogVersion) {
             return false;
         }
+        if (!Arrays.equals(catalogHash, other.catalogHash)) {
+            return false;
+        }
         if (partitioningParamIndex != other.partitioningParamIndex) {
             return false;
         }
@@ -291,11 +307,9 @@ public class CorePlan {
     }
 
     public VoltType getPartitioningParamType() {
-        // TODO Auto-generated method stub
         if (partitioningParamIndex < 0 || partitioningParamIndex >= parameterTypes.length) {
             return VoltType.NULL;
         }
         return parameterTypes[partitioningParamIndex];
     }
-
 }
