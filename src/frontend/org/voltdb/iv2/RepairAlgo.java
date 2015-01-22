@@ -50,11 +50,13 @@ public interface RepairAlgo
     {
         public final long m_txnId;
         public final long m_uniqueId;
+        public final long m_binaryLogSequenceNumber;
         public final long m_binaryLogUniqueId;
 
-        RepairResult(long txnId, long uniqueId, long binaryLogUniqueId) {
+        RepairResult(long txnId, long uniqueId, long binaryLogSequenceNumber, long binaryLogUniqueId) {
             m_txnId = txnId;
             m_uniqueId = uniqueId;
+            m_binaryLogSequenceNumber = binaryLogSequenceNumber;
             m_binaryLogUniqueId = binaryLogUniqueId;
         }
     }

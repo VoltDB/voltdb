@@ -1872,6 +1872,15 @@ void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
         m_binaryLogSink.apply(taskParams, m_tablesBySignatureHash, &m_stringPool, this);
         break;
     }
+    case TASK_TYPE_GET_DR_SEQUENCE_NUMBER:
+        m_resultOutput.writeLong(m_drStream.m_committedSequenceNumber);
+        break;
+    case TASK_TYPE_SET_DR_SEQUENCE_NUMBER: {
+    	ReferenceSerializeInputBE taskInfo(taskParams, std::numeric_limits<std::size_t>::max());
+        m_drStream.m_openSequenceNumber = taskInfo.readLong();
+        m_drStream.m_committedSequenceNumber = m_drStream.m_openSequenceNumber;
+        break;
+    }
     default:
         throwFatalException("Unknown task type %d", taskType);
     }
