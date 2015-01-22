@@ -254,3 +254,14 @@ FROM transaction
 GROUP BY acc_no, vendor_id;
 -- End tables for ENG-7041   --
 -- ************************* --
+
+-- ************************* --
+-- Table for ENG-7349        --
+create table sm_idx_tbl(
+       ti1 tinyint,
+       ti2 tinyint,
+       bi bigint
+);
+create index sm_idx on sm_idx_tbl(ti1, ti2);
+-- End table for ENG-7349    --
+-- ************************* --
