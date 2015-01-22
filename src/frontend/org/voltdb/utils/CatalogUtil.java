@@ -664,7 +664,6 @@ public abstract class CatalogUtil {
             ExportType export = deployment.getExport();
             if (export != null && export.getConfiguration().size() == 1 &&
                     (export.isEnabled() != null || export.getTarget() != null || export.getExportconnectorclass() != null)) {
-                hostLog.warn("Deprecated export syntax, replacing configuration tag attributes with export tag attributes.");
                 ExportConfigurationType exportConfig = export.getConfiguration().get(0);
                 if (export.isEnabled() != null) {
                     exportConfig.setEnabled(export.isEnabled());
@@ -678,7 +677,8 @@ public abstract class CatalogUtil {
             }
             else if (export != null && export.getConfiguration().size() > 1 &&
                     (export.isEnabled() != null || export.getTarget() != null || export.getExportconnectorclass() != null)) {
-                throw new RuntimeException("Invalid schema, cannot use deprecated export syntax with multiple configuration tags.");
+                hostLog.error("Invalid schema, cannot use deprecated export syntax with multiple configuration tags.");
+                return null;
             }
 
             populateDefaultDeployment(deployment);
