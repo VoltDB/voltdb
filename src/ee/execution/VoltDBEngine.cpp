@@ -992,10 +992,10 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
                 //Evaluate export enabled or not if enabled hook up streamer
                 tcd->evaluateExport(*m_database, *catalogTable);
                 if (tcd->exportEnabled() && streamedtable->enableStream()) {
+                    //Set signature and generation after stream is created.
+                    streamedtable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
                     m_exportingTables[catalogTable->signature()] = table;
                 }
-                //Set signature and generation after stream is created.
-                streamedtable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
                 // note, this is the end of the line for export tables for now,
                 // don't allow them to change schema yet
                 continue;
