@@ -61,6 +61,7 @@ public class CatalogContext {
     public final CatalogMap<Table> tables;
     public final AuthSystem authSystem;
     public final int catalogVersion;
+    private final byte[] catalogHash;
     private final long catalogCRC;
     private final byte[] deploymentBytes;
     public final byte[] deploymentHash;
@@ -106,6 +107,7 @@ public class CatalogContext {
 
         //m_path = pathToCatalogJar;
         long tempCRC = 0;
+        assert(catalogBytes != null);
         if (catalogBytes != null) {
             try {
                 m_jarfile = new InMemoryJarfile(catalogBytes);
@@ -135,6 +137,7 @@ public class CatalogContext {
         m_defaultProcs = new DefaultProcedureManager(database);
 
         m_jdbc = new JdbcDatabaseMetaDataGenerator(catalog, m_defaultProcs, m_jarfile);
+        this.catalogHash = CatalogUtil.makeCatalogOrDeploymentHash(catalogBytes);
         m_ptool = new PlannerTool(cluster, database, version, getCatalogHash());
         catalogVersion = version;
 
@@ -345,13 +348,6 @@ public class CatalogContext {
 
     public byte[] getCatalogHash()
     {
-        byte[] catalogHash = null;
-        try {
-            // IZZY: memoize the catalog hash in the catalog context sometime, maybe
-            catalogHash = CatalogUtil.makeCatalogOrDeploymentHash(getCatalogJarBytes());
-        } catch (IOException ioe) {
-            // Should never happen
-        }
         return catalogHash;
     }
 }

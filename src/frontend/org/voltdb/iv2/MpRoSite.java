@@ -150,7 +150,7 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
         @Override
         public byte[] getCatalogHash() {
-            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
+            return m_context.getCatalogHash();
         }
 
         @Override

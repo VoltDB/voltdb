@@ -58,7 +58,7 @@ public class CorePlan {
     public final int catalogVersion;
 
     /** What SHA-1 hash of the catalog is this plan good for? */
-    public final byte[] catalogHash;
+    private final byte[] catalogHash;
 
     /** What are the types of the paramters this plan accepts? */
     public final VoltType[] parameterTypes;
@@ -311,5 +311,9 @@ public class CorePlan {
             return VoltType.NULL;
         }
         return parameterTypes[partitioningParamIndex];
+    }
+
+    public boolean wasPlannedAgainstHash(byte[] catalogHash) {
+        return Arrays.equals(catalogHash, this.catalogHash);
     }
 }
