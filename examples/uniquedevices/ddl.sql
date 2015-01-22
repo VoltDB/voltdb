@@ -38,8 +38,8 @@ PARTITION PROCEDURE CountDeviceExact ON TABLE estimates COLUMN appid;
 CREATE PROCEDURE FROM CLASS uniquedevices.CountDeviceHybrid;
 PARTITION PROCEDURE CountDeviceHybrid ON TABLE estimates COLUMN appid;
 
-CREATE PROCEDURE uniquedevices.GetCardEstForApp AS
+CREATE PROCEDURE GetCardEstForApp AS
     SELECT devicecount FROM estimates WHERE appid = ?;
 PARTITION PROCEDURE GetCardEstForApp ON TABLE estimates COLUMN appid;
-CREATE PROCEDURE uniquedevices.TopApps AS
+CREATE PROCEDURE TopApps AS
     SELECT appid, devicecount FROM estimates ORDER BY devicecount DESC LIMIT 10;

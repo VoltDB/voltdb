@@ -524,6 +524,11 @@ DISTRIBUTION
 	<exec dir='examples/json-sessions' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
 	<exec dir='examples/uniquedevices' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
 
+    <!-- build the jars for the tutorials -->
+	<exec dir='doc/tutorials/helloworld' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
+	<exec dir='doc/tutorials/helloworldrevisited' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
+	<exec dir='doc/tutorials/auction' executable='/usr/bin/env'><arg line="bash run.sh jars"/></exec>
+
     <!-- populate the stuff not handled by dist_internal_core -->
     <copy todir="${dist.dir}/">
         <fileset dir="." defaultexcludes="yes">
@@ -722,6 +727,7 @@ CLEANING
   <exec dir='examples/uniquedevices' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='examples/voltkv' executable='/usr/bin/env'><arg line="bash run.sh cleanall"/></exec>
   <exec dir='doc/tutorials/auction' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
+  <exec dir='doc/tutorials/helloworldrevisited' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
   <exec dir='doc/tutorials/helloworld' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>  <exec dir='.' executable='/bin/sh'>
     <arg line="-c 'rm -rf obj/*'"/>
   </exec>
