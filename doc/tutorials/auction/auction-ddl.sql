@@ -67,6 +67,8 @@ CREATE TABLE BID_EXPORT (
 
 PARTITION TABLE BID_EXPORT ON COLUMN ITEMID;
 
+LOAD CLASSES auction-procs.jar;
+
 CREATE PROCEDURE FROM CLASS com.auctionexample.InsertIntoCategory;
 CREATE PROCEDURE FROM CLASS com.auctionexample.InsertIntoUser;
 CREATE PROCEDURE FROM CLASS com.auctionexample.InsertIntoItemAndBid;
