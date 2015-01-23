@@ -39,7 +39,7 @@ HOST="localhost"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar voltdbroot statement-plans catalog-report.html log
+    rm -rf obj debugoutput $APPNAME.jar voltdbroot statement-plans catalog-report.html log "$VOLTDB_LIB/NoOpExporter.jar"
 }
 
 # compile the source code for procedures and the client
