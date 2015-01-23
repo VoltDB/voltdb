@@ -1341,6 +1341,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     public void setRejoinComplete(
             JoinProducerBase.JoinCompletionAction ignored,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+            Map<Integer, Long> drSequenceNumbers,
             boolean requireExistingSequenceNumbers) {
         throw new RuntimeException("setRejoinComplete is an IV2-only interface.");
     }

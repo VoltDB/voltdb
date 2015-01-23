@@ -316,6 +316,7 @@ public class RejoinProducer extends JoinProducerBase {
                 }
                 SnapshotCompletionEvent event = null;
                 Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers = null;
+                Map<Integer, Long> drSequenceNumbers = null;
                 try {
                     event = m_snapshotCompletionMonitor.get();
                     if (!m_schemaHasNoTables) {
@@ -323,6 +324,8 @@ public class RejoinProducer extends JoinProducerBase {
                         exportSequenceNumbers = event.exportSequenceNumbers;
                         m_completionAction.setSnapshotTxnId(event.multipartTxnId);
                     }
+
+                    drSequenceNumbers = event.drSequenceNumbers;
 
                     for (Map.Entry<Integer, Pair<Long, Long>> e : event.remoteDCLastIds.get(0).entrySet()) {
                         VoltDB.instance().getConsumerDRGateway().notifyOfLastAppliedBinaryLog(e.getValue().getFirst(), e.getValue().getSecond());
@@ -348,6 +351,7 @@ public class RejoinProducer extends JoinProducerBase {
                 setJoinComplete(
                         siteConnection,
                         exportSequenceNumbers,
+                        drSequenceNumbers,
                         true /* requireExistingSequenceNumbers */);
             }
         };

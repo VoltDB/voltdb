@@ -164,6 +164,7 @@ public interface SiteProcedureConnection {
     public void setRejoinComplete(
             JoinProducerBase.JoinCompletionAction action,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+            Map<Integer, Long> drSequenceNumbers,
             boolean requireExistingSequenceNumbers);
 
     public long[] getUSOForExportTable(String signature);
