@@ -46,14 +46,6 @@ public class ExportBenchmark {
     
     private Client client;
     
-    static class ExportBenchmarkCallback implements BulkLoaderFailureCallBack {
-        @Override
-        public void failureCallback(Object rowHandle, Object[] fieldList, ClientResponse response) {
-            System.err.println("Log insertion into VoltDB failed:");
-            System.err.println(response.getStatusString());
-        }
-    }
-    
     /**
      * Creates a new instance of the test to be run.
      * Establishes a client connection to a voltdb server, which should already be running
@@ -72,10 +64,8 @@ public class ExportBenchmark {
         System.out.println("Test initialization");
         
         // Server connection
-        VoltBulkLoader bulkLoader = null;
         try {
             client.createConnection("localhost");
-            bulkLoader = client.getNewBulkLoader("valuesToExport", 50, new ExportBenchmarkCallback());
         }
         catch (Exception e) {
             System.err.printf("Connection to VoltDB failed\n" + e.getMessage());
@@ -88,11 +78,11 @@ public class ExportBenchmark {
         long startTime = System.nanoTime();
         try {
             System.out.println("Inserting objects");
-            Object rowHandle = null;
+            String sql = "";
             for (int i = 0; i < 1000000; i++) {
-                bulkLoader.insertRow(rowHandle, i, 42);
+                sql = "INSERT INTO valuesToExport VALUES (" + i + ", " + 42 + ");";
+                client.callProcedure("@AdHoc", sql);
             }
-            bulkLoader.drain();
             System.out.println("Object insertion complete");
         } catch (Exception e) {
             System.err.println("Couldn't insert into VoltDB\n" + e.getMessage());
