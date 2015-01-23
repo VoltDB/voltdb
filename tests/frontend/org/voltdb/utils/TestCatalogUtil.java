@@ -902,7 +902,7 @@ public class TestCatalogUtil extends TestCase {
         final File tmpBadSyntax = VoltProjectBuilder.writeStringToTempFile(withBadMixedSyntax);
         try{
             DeploymentType bad_syntax_deployment = CatalogUtil.getDeployment(new FileInputStream(tmpBadSyntax));
-            fail("Should not accept a deployment file that uses both old and new syntaxes.");
+            assertNull(bad_syntax_deployment);
         } catch (RuntimeException e) {
             assertTrue(e.getMessage().contains("Invalid schema, cannot use deprecated export syntax with multiple configuration tags."));
         }
