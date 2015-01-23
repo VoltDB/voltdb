@@ -1901,6 +1901,7 @@ void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
         break;
     }
     case TASK_TYPE_GET_DR_SEQUENCE_NUMBER:
+    	m_resultOutput.writeInt(static_cast<int32_t>(sizeof(int64_t)));
         m_resultOutput.writeLong(m_drStream.m_committedSequenceNumber);
         break;
     case TASK_TYPE_SET_DR_SEQUENCE_NUMBER: {

@@ -201,7 +201,7 @@ public class SnapshotCompletionMonitor {
             Iterator<String> partitionKeys = drSequenceJSON.keys();
             while (partitionKeys.hasNext()) {
                 String partitionIdString = partitionKeys.next();
-                drSequenceNumbers.put(Integer.valueOf(partitionIdString), drSequenceJSON.getLong("drSequenceNumbers"));
+                drSequenceNumbers.put(Integer.valueOf(partitionIdString), drSequenceJSON.getLong(partitionIdString));
             }
 
             Map<Integer, Long> partitionTxnIdsMap = ImmutableMap.of();
@@ -218,7 +218,7 @@ public class SnapshotCompletionMonitor {
              * data
              */
             Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds = new HashMap<>();
-            final JSONObject remoteDCLastIdsObj = jsonObj.getJSONObject("remoteDCIds");
+            final JSONObject remoteDCLastIdsObj = jsonObj.getJSONObject("remoteDCLastIds");
             final Iterator<String> dcIdIter = remoteDCLastIdsObj.keys();
             while (dcIdIter.hasNext()) {
                 final String dcIdKey = dcIdIter.next();

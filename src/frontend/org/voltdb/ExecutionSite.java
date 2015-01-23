@@ -972,7 +972,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             long txnId,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
             Map<Integer, Long> drSequenceNumbers,
-            Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCIds) {
+            Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds) {
     }
 
     /*

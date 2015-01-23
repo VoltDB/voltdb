@@ -940,11 +940,11 @@ public class SnapshotSiteProcessor {
         //DR ids/unique ids for remote partitions indexed by remote datacenter id,
         //each DC has a full partition set
         JSONObject dcIdMap;
-        if (jsonObj.has("remoteDCIds")) {
-            dcIdMap = jsonObj.getJSONObject("remoteDCIds");
+        if (jsonObj.has("remoteDCLastIds")) {
+            dcIdMap = jsonObj.getJSONObject("remoteDCLastIds");
         } else {
             dcIdMap = new JSONObject();
-            jsonObj.put("remoteDCds", dcIdMap);
+            jsonObj.put("remoteDCLastIds", dcIdMap);
         }
 
         for (Map.Entry<Integer, Map<Integer, Pair<Long, Long>>> dcEntry : remoteDCLastId.entrySet()) {
