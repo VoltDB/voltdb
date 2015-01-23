@@ -104,7 +104,7 @@ public class ExportBenchmark {
             while (true) {
                 VoltTable results = client.callProcedure("@Statistics", "TABLE", 0).getResults()[0];
                 results.advanceRow();
-                if (results.getLong("TUPLE_COUNT") == 1000000) {
+                if (results.getLong("TUPLE_ALLOCATED_MEMORY") == 0) {
                     break;
                 }
                 Thread.sleep(100);
