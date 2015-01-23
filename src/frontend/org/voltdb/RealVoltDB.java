@@ -1966,7 +1966,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 m_latencyStats = null;
                 m_latencyHistogramStats = null;
 
-                AdHocCompilerCache.clearVersionCache();
+                AdHocCompilerCache.clearHashCache();
                 org.voltdb.iv2.InitiatorMailbox.m_allInitiatorMailboxes.clear();
 
                 // probably unnecessary
