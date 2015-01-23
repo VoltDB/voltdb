@@ -55,7 +55,7 @@ public class ExportBenchmark {
         try {
             System.out.println("Inserting objects");
             Object rowHandle = null;
-            for (int i = 0; i < 3; i++) {
+            for (int i = 0; i < 1000000; i++) {
                 bulkLoader.insertRow(rowHandle, i, 42);
             }
             bulkLoader.drain();
