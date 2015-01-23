@@ -134,7 +134,6 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
                 false,
                 true,
                 paramTypes,
-                0,
                 catalogHash);
         AdHocPlannedStatement s = new AdHocPlannedStatement(sql.getBytes(Constants.UTF8ENCODING),
                 core,

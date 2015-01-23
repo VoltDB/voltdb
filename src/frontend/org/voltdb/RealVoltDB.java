@@ -1449,8 +1449,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                             catalog,
                             new byte[10],
                             deploymentBytes,
-                            0,
-                            -1);
+                            0);
 
             return deployment.getCluster().getHostcount();
         } catch (Exception e) {

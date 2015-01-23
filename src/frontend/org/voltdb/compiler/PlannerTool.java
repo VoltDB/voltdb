@@ -232,7 +232,7 @@ public class PlannerTool {
             //////////////////////
             // OUTPUT THE RESULT
             //////////////////////
-            CorePlan core = new CorePlan(plan, m_catalogVersion, m_catalogHash);
+            CorePlan core = new CorePlan(plan, m_catalogHash);
             AdHocPlannedStatement ahps = new AdHocPlannedStatement(plan, core);
 
             if (partitioning.isInferred()) {
