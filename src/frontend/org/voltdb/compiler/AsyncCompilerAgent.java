@@ -34,6 +34,7 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
+import org.voltdb.ClientInterface.ExplainMode;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.messaging.LocalMailbox;
@@ -270,7 +271,7 @@ public class AsyncCompilerAgent {
         work.completionHandler.onCompletion(result);
     }
 
-    AdHocPlannedStmtBatch compileAdHocPlan(AdHocPlannerWork work) {
+    AsyncCompilerResult compileAdHocPlan(AdHocPlannerWork work) {
 
         // record the catalog version the query is planned against to
         // catch races vs. updateApplicationCatalog.
@@ -319,6 +320,21 @@ public class AsyncCompilerAgent {
         if (!errorMsgs.isEmpty()) {
             errorSummary = StringUtils.join(errorMsgs, "\n");
         }
+
+        // check the parameters count
+        if (work.explainMode == ExplainMode.NONE && work.userParamSet != null) {
+            int totalQuestionMarkParameters = 0;
+            for (AdHocPlannedStatement result: stmts) {
+                totalQuestionMarkParameters += result.getQuestionMarkParameterCount();
+            }
+            if (totalQuestionMarkParameters != work.userParamSet.length) {
+                return AsyncCompilerResult.makeErrorResult(work,
+                        String.format("\nIncorrect number of parameters passed: expected %d, passed %d",
+                                totalQuestionMarkParameters, work.userParamSet.length));
+            }
+
+        }
+
         AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(work,
                                                                            stmts,
                                                                            partitionParamIndex,

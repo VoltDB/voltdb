@@ -68,6 +68,8 @@ public class CorePlan {
     private int partitioningParamIndex = -1;
     private Object partitioningParamValue = null;
 
+    private int m_questionMarkParameterCount = 0;
+
     /**
      * Constructor from QueryPlanner output.
      *
@@ -101,6 +103,7 @@ public class CorePlan {
         this.catalogVersion = catalogVersion;
         parameterTypes = plan.parameterTypes();
         readOnly = plan.getReadOnly();
+        m_questionMarkParameterCount = plan.getQuestionMarkParameterCount();
     }
 
     /***
@@ -296,6 +299,10 @@ public class CorePlan {
             return VoltType.NULL;
         }
         return parameterTypes[partitioningParamIndex];
+    }
+
+    public int getQuestionMarkParameterCount() {
+        return m_questionMarkParameterCount;
     }
 
 }
