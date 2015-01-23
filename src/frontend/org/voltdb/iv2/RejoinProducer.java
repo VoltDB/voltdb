@@ -328,7 +328,8 @@ public class RejoinProducer extends JoinProducerBase {
                     drSequenceNumbers = event.drSequenceNumbers;
 
                     for (Map.Entry<Integer, Pair<Long, Long>> e : event.remoteDCLastIds.get(0).entrySet()) {
-                        VoltDB.instance().getConsumerDRGateway().notifyOfLastAppliedBinaryLog(e.getValue().getFirst(), e.getValue().getSecond());
+                        VoltDB.instance().getConsumerDRGateway().notifyOfLastAppliedBinaryLog(
+                                e.getKey(), e.getValue().getFirst(), e.getValue().getSecond());
                     }
 
                     REJOINLOG.debug(m_whoami + " monitor completed. Sending SNAPSHOT_FINISHED "

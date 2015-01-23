@@ -23,7 +23,6 @@ import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.voltcore.utils.Pair;
-import org.voltdb.iv2.UniqueIdGenerator;
 
 
 // Interface through which the outside world can interact with the consumer side
@@ -41,7 +40,7 @@ public interface ConsumerDRGateway extends Promotable {
 
     public abstract void promotePartition(int partitionId, long maxDRId, long maxUniqueId);
 
-    public abstract void notifyOfLastAppliedBinaryLog(long endDRId, long endUniqueId);
+    public abstract void notifyOfLastAppliedBinaryLog(int partitionId, long endDRId, long endUniqueId);
 
     public abstract void assertSequencing(int partitionId, long drId);
 
@@ -70,12 +69,11 @@ public interface ConsumerDRGateway extends Promotable {
         public void promotePartition(int partitionId, long maxDRId, long maxUniqueId) {}
 
         @Override
-        public void notifyOfLastAppliedBinaryLog(long endDRId, long endUniqueId) {
+        public void notifyOfLastAppliedBinaryLog(int partitionId, long endDRId, long endUniqueId) {
             int dataCenter = (int)(endDRId >> 55);
             if (!ids.containsKey(dataCenter)) {
                 ids.put(dataCenter, new HashMap<Integer, Pair<Long, Long>>());
             }
-            int partitionId = UniqueIdGenerator.getPartitionIdFromUniqueId(endUniqueId);
             ids.get(dataCenter).put(partitionId, Pair.of(endDRId, endUniqueId));
         };
 

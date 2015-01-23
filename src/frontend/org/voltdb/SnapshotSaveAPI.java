@@ -102,7 +102,7 @@ public class SnapshotSaveAPI
      * so that they can be retrieved by the SnapshotCompletionInterest code. Rejoin
      * needs to get these numbers to initialize the last received IDs
      */
-    private static Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCIds;
+    private static Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds;
 
     /**
      * The only public method: do all the work to start a snapshot.
@@ -165,7 +165,7 @@ public class SnapshotSaveAPI
                     }
                     exportSequenceNumbers = SnapshotSiteProcessor.getExportSequenceNumbers();
                     drSequenceNumbers = SnapshotSiteProcessor.getDRSequenceNumbers();
-                    remoteDCIds = VoltDB.instance().getConsumerDRGateway().getLastReceivedBinaryLogIds();
+                    remoteDCLastIds = VoltDB.instance().getConsumerDRGateway().getLastReceivedBinaryLogIds();
                     createSetupIv2(
                             file_path,
                             file_nonce,
@@ -173,7 +173,7 @@ public class SnapshotSaveAPI
                             multiPartTxnId,
                             partitionTransactionIds,
                             partitionUniqueIds,
-                            remoteDCIds,
+                            remoteDCLastIds,
                             data,
                             context,
                             result,
@@ -249,7 +249,7 @@ public class SnapshotSaveAPI
                                 multiPartTxnId,
                                 exportSequenceNumbers,
                                 drSequenceNumbers,
-                                remoteDCIds);
+                                remoteDCLastIds);
                     }
 
                     if (m_deferredSetupFuture != null && taskList != null) {
