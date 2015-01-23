@@ -49,9 +49,8 @@ function srccompile() {
         src/exportbenchmark/*.java 
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
-    (cd obj && jar cvf DummyExport.jar exportbenchmark/*)
+    (cd obj && jar cvf NoOpExport.jar exportbenchmark/*)
 
-#    if [ -e "$VOLTDB_VOLTDB/DummyExporter.class" ]; then
     cp ./obj/*.jar "$VOLTDB_LIB/"
 }
 
