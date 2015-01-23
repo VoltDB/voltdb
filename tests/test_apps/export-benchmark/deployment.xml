@@ -4,7 +4,7 @@
                 want to use it as a starting point for a custom configuration. -->
 <deployment>
    <cluster hostcount="1" />
-   <export enabled="true" target="custom" exportconnectorclass="exportbenchmark.NoOpExport">
+   <export enabled="true" target="custom" exportconnectorclass="exportbenchmark.NoOpExporter">
      <configuration>
      </configuration>
    </export>
