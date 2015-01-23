@@ -46,7 +46,7 @@ public class ExportBenchmark {
     
     private Client client;
     
-    static class VoltDBLog4JAppenderCallback implements BulkLoaderFailureCallBack {
+    static class ExportBenchmarkCallback implements BulkLoaderFailureCallBack {
         @Override
         public void failureCallback(Object rowHandle, Object[] fieldList, ClientResponse response) {
             System.err.println("Log insertion into VoltDB failed:");
@@ -75,7 +75,7 @@ public class ExportBenchmark {
         VoltBulkLoader bulkLoader = null;
         try {
             client.createConnection("localhost");
-            bulkLoader = client.getNewBulkLoader("valuesToExport", 50, new VoltDBLog4JAppenderCallback());
+            bulkLoader = client.getNewBulkLoader("valuesToExport", 50, new ExportBenchmarkCallback());
         }
         catch (Exception e) {
             System.err.printf("Connection to VoltDB failed\n" + e.getMessage());
