@@ -54,9 +54,6 @@ public class CorePlan {
     /** Does the statement write? */
     public final boolean readOnly;
 
-    /** Which version of the catalog is this plan good for? */
-    public final int catalogVersion;
-
     /** What SHA-1 hash of the catalog is this plan good for? */
     private final byte[] catalogHash;
 
@@ -75,10 +72,9 @@ public class CorePlan {
      * Constructor from QueryPlanner output.
      *
      * @param plan The output from the QueryPlanner.
-     * @param catalogVersion The version of the catalog this plan was generated against.
      * @param catalogHash  The sha-1 hash of the catalog this plan was generated against.
      */
-    public CorePlan(CompiledPlan plan, int catalogVersion, byte[] catalogHash) {
+    public CorePlan(CompiledPlan plan, byte[] catalogHash) {
         aggregatorFragment = CompiledPlan.bytesForPlan(plan.rootPlanGraph);
         collectorFragment = CompiledPlan.bytesForPlan(plan.subPlanGraph);
 
@@ -102,7 +98,6 @@ public class CorePlan {
         }
 
         isReplicatedTableDML = plan.replicatedTableDML;
-        this.catalogVersion = catalogVersion;
         this.catalogHash = catalogHash;
         parameterTypes = plan.parameterTypes();
         readOnly = plan.getReadOnly();
@@ -116,7 +111,7 @@ public class CorePlan {
      * @param isReplicatedTableDML      replication flag
      * @param isReadOnly                does it write
      * @param paramTypes                parameter type array
-     * @param catalogVersion            catalog version
+     * @param catalogHash               SHA-1 hash of catalog
      */
     public CorePlan(byte[] aggregatorFragment,
                     byte[] collectorFragment,
@@ -125,7 +120,6 @@ public class CorePlan {
                     boolean isReplicatedTableDML,
                     boolean isReadOnly,
                     VoltType[] paramTypes,
-                    int catalogVersion,
                     byte[] catalogHash)
     {
         this.aggregatorFragment = aggregatorFragment;
@@ -135,7 +129,6 @@ public class CorePlan {
         this.isReplicatedTableDML = isReplicatedTableDML;
         this.readOnly = isReadOnly;
         this.parameterTypes = paramTypes;
-        this.catalogVersion = catalogVersion;
         this.catalogHash = catalogHash;
     }
 
@@ -161,8 +154,7 @@ public class CorePlan {
         else {
             size += 4;
         }
-        size += 3; // booleans
-        size += 4; // catalog version
+        size += 2; // booleans
         size += 20;  // catalog hash SHA-1 is 20b
 
         size += 2; // params count
@@ -189,8 +181,7 @@ public class CorePlan {
         buf.put((byte) (isReplicatedTableDML ? 1 : 0));
         buf.put((byte) (readOnly ? 1 : 0));
 
-        // catalog version and hash
-        buf.putInt(catalogVersion);
+        // catalog hash
         buf.put(catalogHash);
 
         // param types
@@ -220,8 +211,7 @@ public class CorePlan {
         boolean isReplicatedTableDML = buf.get() == 1;
         boolean isReadOnly = buf.get() == 1;
 
-        // catalog version
-        int catalogVersion = buf.getInt();
+        // catalog hash
         byte[] catalogHash = new byte[20];  // Catalog sha-1 hash is 20b
         buf.get(catalogHash);
 
@@ -240,7 +230,6 @@ public class CorePlan {
                 isReplicatedTableDML,
                 isReadOnly,
                 paramTypes,
-                catalogVersion,
                 catalogHash);
     }
 
@@ -269,9 +258,6 @@ public class CorePlan {
             return false;
         }
         if (readOnly != other.readOnly) {
-            return false;
-        }
-        if (catalogVersion != other.catalogVersion) {
             return false;
         }
         if (!Arrays.equals(catalogHash, other.catalogHash)) {
