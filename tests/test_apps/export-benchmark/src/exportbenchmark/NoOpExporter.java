@@ -46,8 +46,8 @@ public class NoOpExporter extends ExportClientBase {
         // We have no properties to configure at this point
     }
     
-    static class PrinterExportDecoder extends ExportDecoderBase {
-        PrinterExportDecoder(AdvertisedDataSource source) {
+    static class NoOpExportDecoder extends ExportDecoderBase {
+        NoOpExportDecoder(AdvertisedDataSource source) {
             super(source);
         }
         
@@ -66,6 +66,6 @@ public class NoOpExporter extends ExportClientBase {
 
     @Override
     public ExportDecoderBase constructExportDecoder(AdvertisedDataSource source) {
-        return new PrinterExportDecoder(source);
+        return new NoOpExportDecoder(source);
     }
 }
