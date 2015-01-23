@@ -157,7 +157,7 @@ public class TestPlannerTool extends TestCase {
         c.execute(serializedCatalog);
         CatalogContext context = new CatalogContext(0, 0, c, bytes, new byte[] {}, 0);
 
-        m_pt = new PlannerTool(context.cluster, context.database, 0, context.getCatalogHash());
+        m_pt = new PlannerTool(context.cluster, context.database, context.getCatalogHash());
 
         // Bad DDL would kill the planner before it starts and this query
         // would return a Stream Closed error
