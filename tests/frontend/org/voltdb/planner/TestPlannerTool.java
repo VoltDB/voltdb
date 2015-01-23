@@ -62,7 +62,7 @@ public class TestPlannerTool extends TestCase {
         catalog.execute(serializedCatalog);
         CatalogContext context = new CatalogContext(0, 0, catalog, bytes, new byte[] {}, 0);
 
-        m_pt = new PlannerTool(context.cluster, context.database, 0, context.getCatalogHash());
+        m_pt = new PlannerTool(context.cluster, context.database, context.getCatalogHash());
 
         AdHocPlannedStatement result = null;
         result = m_pt.planSqlForTest("select * from warehouse;");
