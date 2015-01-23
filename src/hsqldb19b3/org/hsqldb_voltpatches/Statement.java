@@ -212,7 +212,8 @@ public abstract class Statement {
     VoltXMLElement voltGetStatementXML(Session session)
     throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
     {
-        throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException("a DDL statement is not allowed in this context");
+        throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
+                "this type of sql statement is not supported or is not not allowed in this context");
     }
     /**********************************************************************/
 }

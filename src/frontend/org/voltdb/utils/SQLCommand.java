@@ -740,11 +740,16 @@ public class SQLCommand
                     // Get the line(s) from the file(s) to queue as regular database commands
                     // or get back a null if in the recursive call, stopOrContinue decided to continue.
                     line = readScriptFile(fileMatcher.group(1));
-                    if (m_returningToPromptAfterError) {
-                        // The recursive readScriptFile stopped because of an error.
-                        // Escape to the outermost readScriptFile caller so it can exit or
-                        // return to the interactive prompt.
-                        return null;
+                    if (line == null) {
+                        if (m_returningToPromptAfterError) {
+                            // The recursive readScriptFile stopped because of an error.
+                            // Escape to the outermost readScriptFile caller so it can exit or
+                            // return to the interactive prompt.
+                            return null;
+                        }
+                        // Continue after a bad nested file command by processing the next line
+                        // in the current file.
+                        continue;
                     }
                 }
 
