@@ -49,7 +49,6 @@ import java.util.regex.Pattern;
 
 import jline.console.CursorBuffer;
 import jline.console.KeyMap;
-import jline.console.completer.Completer;
 import jline.console.history.FileHistory;
 
 import org.voltdb.VoltTable;
@@ -82,140 +81,6 @@ public class SQLCommand
     private static final Pattern EscapedSingleQuote = Pattern.compile("''", Pattern.MULTILINE);
     private static final Pattern SingleLineComments = Pattern.compile("^\\s*(\\/\\/|--).*$", Pattern.MULTILINE);
     private static final Pattern Extract = Pattern.compile("'[^']*'", Pattern.MULTILINE);
-    private static final Pattern AutoSplit = Pattern.compile("(\\s|((\\(\\s*)+))(alter|create|drop|select|insert|update|upsert|delete|truncate|exec|execute|explain|explainproc)\\s", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
-    private static final Pattern SetOp = Pattern.compile("(\\s|\\))\\s*(union|except|intersect)(\\s\\s*all)?((\\s*\\({0,1}\\s*)*)select", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
-    private static final Pattern Subquery =
-            Pattern.compile("(\\s*)(,|(?:\\s(?:from|in|exists|join)))((\\s*\\(\\s*)*)select",
-                            Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
-
-    private static final String quotedIdPattern = "\"(?:[^\"]|\"\")+\""; // double-quoted ID, " escaped with ""
-                                                                   // question: is 0-length name allowed?
-    private static final String unquotedIdPattern = "[a-z][a-z0-9_]*";
-    private static final String idPattern = "(?:" + unquotedIdPattern + "|" + quotedIdPattern + ")";
-
-    // This pattern consumes no input itself but ensures that the next
-    // character is either whitespace or a double quote. This is handy
-    // when a keyword is followed by an identifier:
-    //   INSERT INTO"Foo"SELECT ...
-    // HSQL doesn't require whitespace between keywords and quoted
-    // identifiers.
-    private static String followedBySpaceOrQuote = "(?=\"|\\s)";
-
-    // Ugh, these are all fragile.
-    private static final Pattern CreateView =
-        Pattern.compile(
-                "(\\s*)" + // 0 or more spaces
-                "(" + // start group 2
-                "create\\s+view" + // 'create view'
-                "\\s+" + // 1 or more spaces
-                "((?!create\\s+(view|procedure)).)*" + // any string that doesn't contain 'create view'
-                                                       // or 'create procedure' again
-                "\\s+" + // 1 or more spaces
-                "as" +
-                "\\s+" + // 1 or more spaces
-                ")" + // end group 2
-                "select",
-                Pattern.MULTILINE + Pattern.CASE_INSENSITIVE + Pattern.DOTALL);
-    private static final Pattern CreateProcedureSelect =
-        Pattern.compile(
-                "(\\s*)" + // 0 or more spaces
-                "(" + // start group 2
-                "create\\s+procedure" + // 'create procedure'
-                "\\s+" + // 1 or more spaces
-                "((?!create\\s+(view|procedure)).)*" + // any string that doesn't contain 'create view'
-                                                       // or 'create procedure' again
-                "\\s+" + // 1 or more spaces
-                "as" +
-                "\\s+" + // 1 or more spaces
-                ")" + // end group 2
-                "select",
-                Pattern.MULTILINE + Pattern.CASE_INSENSITIVE + Pattern.DOTALL);
-    private static final Pattern CreateProcedureInsert =
-        Pattern.compile(
-                "(\\s*)" + // 0 or more spaces
-                "(" + // start group 2
-                "create\\s+procedure" + // 'create procedure'
-                "\\s+" + // 1 or more spaces
-                "((?!create\\s+(view|procedure)).)*" + // any string that doesn't contain 'create view'
-                                                       // or 'create procedure' again
-                "\\s+" + // 1 or more spaces
-                "as" +
-                "\\s+" + // 1 or more spaces
-                ")" + // end group 2
-                "insert",
-                Pattern.MULTILINE + Pattern.CASE_INSENSITIVE + Pattern.DOTALL);
-    private static final Pattern CreateProcedureUpdate =
-        Pattern.compile(
-                "(\\s*)" + // 0 or more spaces
-                "(" + // start group 2
-                "create\\s+procedure" + // 'create procedure'
-                "\\s+" + // 1 or more spaces
-                "((?!create\\s+(view|procedure)).)*" + // any string that doesn't contain 'create view'
-                                                       // or 'create procedure' again
-                "\\s+" + // 1 or more spaces
-                "as" +
-                "\\s+" + // 1 or more spaces
-                ")" + // end group 2
-                "update",
-                Pattern.MULTILINE + Pattern.CASE_INSENSITIVE + Pattern.DOTALL);
-    private static final Pattern CreateProcedureDelete =
-        Pattern.compile(
-                "(\\s*)" + // 0 or more spaces
-                "(" + // start group 2
-                "create\\s+procedure" + // 'create procedure'
-                "\\s+" + // 1 or more spaces
-                "((?!create\\s+(view|procedure)).)*" + // any string that doesn't contain 'create view'
-                                                       // or 'create procedure' again
-                "\\s+" + // 1 or more spaces
-                "as" +
-                "\\s+" + // 1 or more spaces
-                ")" + // end group 2
-                "delete",
-                Pattern.MULTILINE + Pattern.CASE_INSENSITIVE + Pattern.DOTALL);
-
-    // For HSQL's purposes, the optional column list that may appear
-    // in an INSERT statement is recognized as:
-    // - a left parenthesis
-    // - 1 or more of the following items:
-    //   - quoted identifiers (which may contain right parentheses)
-    //   - characters which are not double quotes or right parentheses
-    // - a right parenthesis
-    // This should recognize whatever may appear inside the column
-    // list, including quoted column names with embedded parentheses.
-    private static final String optionalColumnList = "(?:\\((?:" + quotedIdPattern + "|[^\")])+\\))?";
-    private static final Pattern InsertIntoSelect =
-            Pattern.compile(
-                    "(" +                  // start capturing group
-                    "\\s*" +               // leading whitespace
-                    "(?:insert|upsert)\\s+into" + followedBySpaceOrQuote + "\\s*" +
-                    idPattern + "\\s*" +   // <tablename>
-                    optionalColumnList +   // (column, "anotherColumn", ...)
-                    "[(\\s]*" +            // 0 or more spaces or left parentheses
-                    ")" +                  // end capturing group
-                    "select",
-                    Pattern.MULTILINE + Pattern.CASE_INSENSITIVE + Pattern.DOTALL);
-
-    // the common prefix for both ALTER TABLE <table> DROP
-    // and ALTER TABLE <table> ALTER
-    private static String alterTableCommonPrefix =
-            "\\s*alter\\s*table" + followedBySpaceOrQuote + "\\s*" +
-            idPattern + "\\s*";
-    private static final Pattern AlterTableAlter =
-            Pattern.compile(
-                    "(" + alterTableCommonPrefix + ")alter",
-                    Pattern.MULTILINE + Pattern.CASE_INSENSITIVE + Pattern.DOTALL);
-    private static final Pattern AlterTableDrop =
-            Pattern.compile(
-                    "(" + alterTableCommonPrefix + ")drop",
-                    Pattern.MULTILINE + Pattern.CASE_INSENSITIVE + Pattern.DOTALL);
-
-    private static final Pattern LimitPartitionRowsExecuteDelete =
-            Pattern.compile(
-                    "(" + // start capturing group
-                    "limit\\s+partition\\s+rows\\s+[0-9]+\\s+" +
-                    ")" + // end capturing group
-                    "execute\\s*\\(\\s*delete",
-                    Pattern.MULTILINE + Pattern.CASE_INSENSITIVE + Pattern.DOTALL);
 
     private static final Pattern AutoSplitParameters = Pattern.compile("[\\s,]+", Pattern.MULTILINE);
     /**
@@ -287,31 +152,6 @@ public class SQLCommand
             i++;
         }
 
-        /*
-         * Mark all SQL keywords that are part of another statement so they don't get auto-split
-         */
-        query = SetOp.matcher(query).replaceAll("$1$2$3$4SQL_PARSER_SAME_SELECT");
-        query = Subquery.matcher(query).replaceAll("$1$2$3SQL_PARSER_SAME_SELECT");
-        query = CreateView.matcher(query).replaceAll("$1$2SQL_PARSER_SAME_CREATEVIEW");
-        query = CreateProcedureSelect.matcher(query).replaceAll("$1$2SQL_PARSER_SAME_CREATESELECT");
-        query = CreateProcedureInsert.matcher(query).replaceAll("$1$2SQL_PARSER_SAME_CREATEINSERT");
-        query = CreateProcedureUpdate.matcher(query).replaceAll("$1$2SQL_PARSER_SAME_CREATEUPDATE");
-        query = CreateProcedureDelete.matcher(query).replaceAll("$1$2SQL_PARSER_SAME_CREATEDELETE");
-        query = InsertIntoSelect.matcher(query).replaceAll("$1SQL_PARSER_SAME_INSERTINTOSELECT");
-        query = AlterTableAlter.matcher(query).replaceAll("$1SQL_PARSER_SAME_ALTERTABLEALTER");
-        query = AlterTableDrop.matcher(query).replaceAll("$1SQL_PARSER_SAME_ALTERTABLEDROP");
-        query = LimitPartitionRowsExecuteDelete.matcher(query).replaceAll("$1SQL_PARSER_SAME_LIMITDELETE");
-        query = AutoSplit.matcher(query).replaceAll(";$2$4 "); // there be dragons here
-        query = query.replaceAll("SQL_PARSER_SAME_SELECT", "select");
-        query = query.replaceAll("SQL_PARSER_SAME_CREATEVIEW", "select");
-        query = query.replaceAll("SQL_PARSER_SAME_CREATESELECT", "select");
-        query = query.replaceAll("SQL_PARSER_SAME_CREATEINSERT", "insert");
-        query = query.replaceAll("SQL_PARSER_SAME_CREATEUPDATE", "update");
-        query = query.replaceAll("SQL_PARSER_SAME_CREATEDELETE", "delete");
-        query = query.replaceAll("SQL_PARSER_SAME_INSERTINTOSELECT", "select");
-        query = query.replaceAll("SQL_PARSER_SAME_ALTERTABLEALTER", "alter");
-        query = query.replaceAll("SQL_PARSER_SAME_ALTERTABLEDROP", "drop");
-        query = query.replaceAll("SQL_PARSER_SAME_LIMITDELETE", "execute (delete");
         String[] sqlFragments = query.split("\\s*;+\\s*");
 
         ArrayList<String> queries = new ArrayList<String>();
@@ -483,34 +323,6 @@ public class SQLCommand
             new SingleArgumentCommandParser("remove classes", "class selector");
     private static final Pattern ClassSelectorToken = Pattern.compile(
             "^[\\w*.$]+$", Pattern.CASE_INSENSITIVE);
-
-    /**
-     * The list of recognized basic tab-complete-able SQL command prefixes.
-     * Comparisons are done in uppercase.
-     */
-    static final String[] m_commandPrefixes = new String[] {
-        "DELETE",
-        "EXEC",
-        "EXIT",
-        "EXPLAIN",
-        "EXPLAINPROC",
-        "FILE",
-        "GO",
-        "HELP",
-        "INSERT",
-        "LIST PROCEDURES",
-        "LIST TABLES",
-        "LIST CLASSES",
-        "LOAD CLASSES",
-        "REMOVE CLASSES",
-        "SHOW PROCEDURES",
-        "SHOW TABLES",
-        "SHOW CLASSES",
-        "QUIT",
-        "RECALL",
-        "SELECT",
-        "UPDATE",
-    };
 
     /// The main loop for interactive mode.
     public static void interactWithTheUser() throws Exception
@@ -928,11 +740,16 @@ public class SQLCommand
                     // Get the line(s) from the file(s) to queue as regular database commands
                     // or get back a null if in the recursive call, stopOrContinue decided to continue.
                     line = readScriptFile(fileMatcher.group(1));
-                    if (m_returningToPromptAfterError) {
-                        // The recursive readScriptFile stopped because of an error.
-                        // Escape to the outermost readScriptFile caller so it can exit or
-                        // return to the interactive prompt.
-                        return null;
+                    if (line == null) {
+                        if (m_returningToPromptAfterError) {
+                            // The recursive readScriptFile stopped because of an error.
+                            // Escape to the outermost readScriptFile caller so it can exit or
+                            // return to the interactive prompt.
+                            return null;
+                        }
+                        // Continue after a bad nested file command by processing the next line
+                        // in the current file.
+                        continue;
                     }
                 }
 
@@ -1650,10 +1467,6 @@ public class SQLCommand
             lineInputReader = new SQLConsoleReader(in, out);
 
             lineInputReader.setBellEnabled(false);
-
-            // Provide a custom completer.
-            Completer completer = new SQLCompleter(m_commandPrefixes);
-            lineInputReader.addCompleter(completer);
 
             // Maintain persistent history in ~/.sqlcmd_history.
             historyFile = new FileHistory(new File(System.getProperty("user.home"), ".sqlcmd_history"));
