@@ -36,7 +36,7 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
     ReferenceSerializeInputLE taskInfo(taskParams + 4, ntohl(*reinterpret_cast<const int32_t*>(taskParams)));
 
     int64_t __attribute__ ((unused)) uniqueId = 0;
-    int64_t __attribute__ ((unused)) sequenceNumber = 0;
+    int64_t __attribute__ ((unused)) sequenceNumber = -1;
     while (taskInfo.hasRemaining()) {
         pool->purge();
         const char* recordStart = taskInfo.getRawPointer();
@@ -84,7 +84,12 @@ void BinaryLogSink::apply(const char *taskParams, boost::unordered_map<int64_t, 
         }
         case DR_RECORD_BEGIN_TXN: {
             uniqueId = taskInfo.readLong();
-            sequenceNumber = taskInfo.readLong();
+            int64_t tempSequenceNumber = taskInfo.readLong();
+            if (sequenceNumber >= 0 && tempSequenceNumber != sequenceNumber + 1) {
+                throwFatalException("Found sequencing gap inside a binary log segment. Expected %jd but found %jd",
+                                    (intmax_t)(sequenceNumber + 1), (intmax_t)tempSequenceNumber);
+            }
+            sequenceNumber = tempSequenceNumber;
             checksum = taskInfo.readInt();
             validateChecksum(checksum, recordStart, taskInfo.getRawPointer());
             break;

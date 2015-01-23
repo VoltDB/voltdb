@@ -335,7 +335,7 @@ int32_t DRTupleStream::getTestDRBuffer(char *outBytes) {
         int64_t lastUID = UniqueId::makeIdFromComponents(ii - 5, 0, 42);
         int64_t uid = UniqueId::makeIdFromComponents(ii, 0, 42);
         for (int zz = 0; zz < 5; zz++) {
-            stream.appendTuple(lastUID, tableHandle, uid, uid, uid, uid, tuple, DR_RECORD_INSERT );
+            stream.appendTuple(lastUID, tableHandle, uid, uid, uid, tuple, DR_RECORD_INSERT );
         }
         ii += 5;
     }
@@ -344,10 +344,10 @@ int32_t DRTupleStream::getTestDRBuffer(char *outBytes) {
 
     int64_t lastUID = UniqueId::makeIdFromComponents(99, 0, 42);
     int64_t uid = UniqueId::makeIdFromComponents(100, 0, 42);
-    stream.truncateTable(lastUID, tableHandle, "foobar", uid, uid, uid, uid);
+    stream.truncateTable(lastUID, tableHandle, "foobar", uid, uid, uid);
 
     int64_t committedUID = UniqueId::makeIdFromComponents(100, 0, 42);
-    stream.commit(committedUID, committedUID, committedUID, committedUID, committedUID, false, false);
+    stream.commit(committedUID, committedUID, committedUID, committedUID, false, false);
 
     const int32_t adjustedLength = stream.m_currBlock->rawLength() - MAGIC_HEADER_SPACE_FOR_JAVA;
     ::memcpy(outBytes, stream.m_currBlock->rawPtr() + MAGIC_HEADER_SPACE_FOR_JAVA, adjustedLength);
