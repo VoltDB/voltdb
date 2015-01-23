@@ -150,6 +150,8 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
         @Override
         public byte[] getCatalogHash() {
+            // AdHoc invocations need to be able to check the hash of the current catalog
+            // against the hash of the catalog they were planned against.
             return m_context.getCatalogHash();
         }
 
