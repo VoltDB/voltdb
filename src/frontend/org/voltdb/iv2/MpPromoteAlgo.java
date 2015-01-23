@@ -254,7 +254,7 @@ public class MpPromoteAlgo implements RepairAlgo
             m_mailbox.repairReplicasWith(m_survivors, repairMsg);
         }
 
-        m_promotionResult.set(new RepairResult(m_maxSeenTxnId, m_maxSeenUniqueId, Long.MIN_VALUE));
+        m_promotionResult.set(new RepairResult(m_maxSeenTxnId, m_maxSeenUniqueId, Long.MIN_VALUE, Long.MIN_VALUE));
     }
 
     //

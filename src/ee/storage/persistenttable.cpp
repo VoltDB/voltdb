@@ -316,8 +316,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
-        const int64_t currentSpUniqueId = ec->currentSpUniqueId();
-        drStream->truncateTable(lastCommittedSpHandle, m_signature, m_name, currentTxnId, currentSpHandle, currentUniqueId, currentSpUniqueId);
+        drStream->truncateTable(lastCommittedSpHandle, m_signature, m_name, currentTxnId, currentSpHandle, currentUniqueId);
     }
 
     UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
@@ -433,8 +432,7 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
-        const int64_t currentSpUniqueId = ec->currentSpUniqueId();
-        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, currentSpUniqueId, target, DR_RECORD_INSERT);
+        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_INSERT);
     }
 
     // this is skipped for inserts that are never expected to fail,
@@ -604,9 +602,8 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
-        const int64_t currentSpUniqueId = ec->currentSpUniqueId();
-        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, currentSpUniqueId, targetTupleToUpdate, DR_RECORD_DELETE);
-        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, currentSpUniqueId, sourceTupleWithNewValues, DR_RECORD_INSERT);
+        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, targetTupleToUpdate, DR_RECORD_DELETE);
+        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, sourceTupleWithNewValues, DR_RECORD_INSERT);
     }
 
     if (uq) {
@@ -732,8 +729,7 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
-        const int64_t currentSpUniqueId = ec->currentSpUniqueId();
-        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, currentSpUniqueId, target, DR_RECORD_DELETE);
+        drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_DELETE);
     }
 
     if (fallible) {

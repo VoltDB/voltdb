@@ -68,6 +68,7 @@ public class RepairLog
      *  ReplicaDRGateway on repair
      */
     private long m_maxSeenBinaryLogUniqueId = Long.MIN_VALUE;
+    private long m_maxSeenBinaryLogSequenceNumber = 0;
 
     // is this a partition leader?
     boolean m_isLeader = false;
@@ -170,8 +171,10 @@ public class RepairLog
                 m_maxSeenSpUniqueId = Math.max(m_maxSeenSpUniqueId, m.getSpUniqueId());
                 if ("@ApplyBinaryLogSP".equals(m.getStoredProcedureName())) {
                     StoredProcedureInvocation spi = m.getStoredProcedureInvocation();
-                    // params[3] is the end sp unique id from the original cluster
-                    m_maxSeenBinaryLogUniqueId = Math.max(m_maxSeenBinaryLogUniqueId, ((Number)spi.getParams().getParam(3)).longValue());
+                    // params[3] is the end sequence number from the original cluster
+                    Object[] params = spi.getParams().toArray();
+                    m_maxSeenBinaryLogSequenceNumber = Math.max(m_maxSeenBinaryLogSequenceNumber, ((Number)params[3]).longValue());
+                    m_maxSeenBinaryLogUniqueId = Math.max(m_maxSeenBinaryLogUniqueId, ((Number)params[4]).longValue());
                 }
             }
         } else if (msg instanceof FragmentTaskMessage) {
@@ -290,6 +293,7 @@ public class RepairLog
                         m_lastMpHandle,
                         TheHashinator.getCurrentVersionedConfigCooked(),
                         maxSeenUniqueId,
+                        m_maxSeenBinaryLogSequenceNumber,
                         m_maxSeenBinaryLogUniqueId);
         responses.add(hheader);
 

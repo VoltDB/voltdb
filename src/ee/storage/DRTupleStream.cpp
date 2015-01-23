@@ -60,9 +60,7 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
                                     std::string tableName,
                                     int64_t txnId,
                                     int64_t spHandle,
-                                    int64_t uniqueId,
-                                    int64_t spUniqueId) {
-    assert(UniqueId::pid(spUniqueId) == m_partitionId);
+                                    int64_t uniqueId) {
     assert(UniqueId::pid(spHandle) == m_partitionId);
     assert(UniqueId::pid(lastCommittedSpHandle) == m_partitionId);
     //Drop the row, don't move the USO
@@ -77,7 +75,7 @@ size_t DRTupleStream::truncateTable(int64_t lastCommittedSpHandle,
                 );
     }
 
-    commit(lastCommittedSpHandle, spHandle, txnId, uniqueId, spUniqueId, false, false);
+    commit(lastCommittedSpHandle, spHandle, txnId, uniqueId, false, false);
 
     if (!m_currBlock) {
         extendBufferChain(m_defaultCapacity);
@@ -125,11 +123,9 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
                                   int64_t txnId,
                                   int64_t spHandle,
                                   int64_t uniqueId,
-                                  int64_t spUniqueId,
                                   TableTuple &tuple,
                                   DRRecordType type)
 {
-    assert(UniqueId::pid(spUniqueId) == m_partitionId);
     assert(UniqueId::pid(spHandle) == m_partitionId);
     assert(UniqueId::pid(lastCommittedSpHandle) == m_partitionId);
     //Drop the row, don't move the USO
@@ -148,7 +144,7 @@ size_t DRTupleStream::appendTuple(int64_t lastCommittedSpHandle,
                 );
     }
 
-    commit(lastCommittedSpHandle, spHandle, txnId, uniqueId, spUniqueId, false, false);
+    commit(lastCommittedSpHandle, spHandle, txnId, uniqueId, false, false);
 
     // Compute the upper bound on bytes required to serialize tuple.
     // exportxxx: can memoize this calculation.
@@ -226,16 +222,10 @@ void DRTupleStream::pushExportBuffer(StreamBlock *block, bool sync, bool endOfSt
     if (sync) return;
 //    std::cout << "Pushing block with start " << block->startSpUniqueId() << " and end " << block->lastSpUniqueId() << std::endl;
 //    std::cout << "Pushing block with start " << (block->startSpUniqueId() & UniqueId::PARTITION_ID_MASK) << " and end " << (block->lastSpUniqueId() & UniqueId::PARTITION_ID_MASK) << std::endl;
-    if (UniqueId::pid(block->startSpUniqueId()) != m_partitionId) {
-        throwFatalException("oops");
-    }
-    if (UniqueId::pid(block->lastSpUniqueId()) != m_partitionId) {
-        throwFatalException("oops");
-    }
     ExecutorContext::getExecutorContext()->getTopend()->pushDRBuffer(m_partitionId, block);
 }
 
-void DRTupleStream::beginTransaction(int64_t uniqueId, int64_t spUniqueId) {
+void DRTupleStream::beginTransaction(int64_t uniqueId, int64_t sequenceNumber) {
 //    std::cout << "Beginning txn uniqueId " << uniqueId << " spUniqueId " << spUniqueId << std::endl;
 //    std::cout << "Beginning txn uniqueId " << (uniqueId & UniqueId::PARTITION_ID_MASK) << " spUniqueId " << (spUniqueId & UniqueId::PARTITION_ID_MASK) << std::endl;
     if (!m_currBlock) {
@@ -248,14 +238,14 @@ void DRTupleStream::beginTransaction(int64_t uniqueId, int64_t spUniqueId) {
          extendBufferChain(BEGIN_RECORD_SIZE);
      }
 
-     m_currBlock->startSpUniqueId(spUniqueId);
+     m_currBlock->startDRSequenceNumber(sequenceNumber);
 
      ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                               m_currBlock->remaining());
      io.writeByte(DR_VERSION);
      io.writeByte(static_cast<int8_t>(DR_RECORD_BEGIN_TXN));
      io.writeLong(uniqueId);
-     io.writeLong(spUniqueId);
+     io.writeLong(sequenceNumber);
      uint32_t crc = vdbcrc::crc32cInit();
      crc = vdbcrc::crc32c( crc, m_currBlock->mutableDataPtr(), BEGIN_RECORD_SIZE - 4);
      crc = vdbcrc::crc32cFinish(crc);
@@ -264,7 +254,7 @@ void DRTupleStream::beginTransaction(int64_t uniqueId, int64_t spUniqueId) {
      m_uso += io.position();
 }
 
-void DRTupleStream::endTransaction(int64_t spUniqueId) {
+void DRTupleStream::endTransaction(int64_t uniqueId, int64_t sequenceNumber) {
 //    std::cout << "Ending txn spUniqueId " << spUniqueId << std::endl;
     if (!m_currBlock) {
          extendBufferChain(m_defaultCapacity);
@@ -274,13 +264,13 @@ void DRTupleStream::endTransaction(int64_t spUniqueId) {
          extendBufferChain(END_RECORD_SIZE);
      }
 
-     m_currBlock->lastSpUniqueId(spUniqueId);
+     m_currBlock->recordCompletedTxnForDR(sequenceNumber, uniqueId);
 
      ExportSerializeOutput io(m_currBlock->mutableDataPtr(),
                               m_currBlock->remaining());
      io.writeByte(DR_VERSION);
      io.writeByte(static_cast<int8_t>(DR_RECORD_END_TXN));
-     io.writeLong(spUniqueId);
+     io.writeLong(sequenceNumber);
      uint32_t crc = vdbcrc::crc32cInit();
      crc = vdbcrc::crc32c( crc, m_currBlock->mutableDataPtr(), END_RECORD_SIZE - 4);
      crc = vdbcrc::crc32cFinish(crc);
@@ -345,7 +335,7 @@ int32_t DRTupleStream::getTestDRBuffer(char *outBytes) {
         int64_t lastUID = UniqueId::makeIdFromComponents(ii - 5, 0, 42);
         int64_t uid = UniqueId::makeIdFromComponents(ii, 0, 42);
         for (int zz = 0; zz < 5; zz++) {
-            stream.appendTuple(lastUID, tableHandle, uid, uid, uid, uid, tuple, DR_RECORD_INSERT );
+            stream.appendTuple(lastUID, tableHandle, uid, uid, uid, tuple, DR_RECORD_INSERT );
         }
         ii += 5;
     }
@@ -354,10 +344,10 @@ int32_t DRTupleStream::getTestDRBuffer(char *outBytes) {
 
     int64_t lastUID = UniqueId::makeIdFromComponents(99, 0, 42);
     int64_t uid = UniqueId::makeIdFromComponents(100, 0, 42);
-    stream.truncateTable(lastUID, tableHandle, "foobar", uid, uid, uid, uid);
+    stream.truncateTable(lastUID, tableHandle, "foobar", uid, uid, uid);
 
     int64_t committedUID = UniqueId::makeIdFromComponents(100, 0, 42);
-    stream.commit(committedUID, committedUID, committedUID, committedUID, committedUID, false, false);
+    stream.commit(committedUID, committedUID, committedUID, committedUID, false, false);
 
     const int32_t adjustedLength = stream.m_currBlock->rawLength() - MAGIC_HEADER_SPACE_FOR_JAVA;
     ::memcpy(outBytes, stream.m_currBlock->rawPtr() + MAGIC_HEADER_SPACE_FOR_JAVA, adjustedLength);

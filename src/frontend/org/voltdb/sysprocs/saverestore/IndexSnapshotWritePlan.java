@@ -50,11 +50,12 @@ public class IndexSnapshotWritePlan extends SnapshotWritePlan {
     public Callable<Boolean> createSetup(String file_path, String file_nonce, long txnId,
                                          Map<Integer, Long> partitionTransactionIds,
                                          Map<Integer, Long> partitionUniqueIds,
-                                         Map<Integer, Map<Integer, Long>> remoteDCLastUniqueIds,
+                                         Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds,
                                          JSONObject jsData,
                                          SystemProcedureExecutionContext context,
                                          VoltTable result,
                                          Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+                                         Map<Integer, Long> drSequenceNumbers,
                                          SiteTracker tracker,
                                          HashinatorSnapshotData hashinatorData,
                                          long timestamp)

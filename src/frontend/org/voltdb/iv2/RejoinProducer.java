@@ -24,7 +24,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
@@ -317,6 +316,7 @@ public class RejoinProducer extends JoinProducerBase {
                 }
                 SnapshotCompletionEvent event = null;
                 Map<String, Map<Integer, Pair<Long,Long>>> exportSequenceNumbers = null;
+                Map<Integer, Long> drSequenceNumbers = null;
                 try {
                     event = m_snapshotCompletionMonitor.get();
                     if (!m_schemaHasNoTables) {
@@ -325,9 +325,11 @@ public class RejoinProducer extends JoinProducerBase {
                         m_completionAction.setSnapshotTxnId(event.multipartTxnId);
                     }
 
-                    for (Map.Entry<Integer, Long> e : event.remoteDCLastUniqueIds.get(0).entrySet()) {
-                        SnapshotSaveAPI.m_lastAppliedUniqueId.put(e.getKey(), new AtomicLong(e.getValue()));
-                        VoltDB.instance().getConsumerDRGateway().notifyOfLastAppliedSpUniqueId(0, e.getValue());
+                    drSequenceNumbers = event.drSequenceNumbers;
+
+                    for (Map.Entry<Integer, Pair<Long, Long>> e : event.remoteDCLastIds.get(0).entrySet()) {
+                        VoltDB.instance().getConsumerDRGateway().notifyOfLastAppliedBinaryLog(
+                                e.getKey(), e.getValue().getFirst(), e.getValue().getSecond());
                     }
 
                     REJOINLOG.debug(m_whoami + " monitor completed. Sending SNAPSHOT_FINISHED "
@@ -350,6 +352,7 @@ public class RejoinProducer extends JoinProducerBase {
                 setJoinComplete(
                         siteConnection,
                         exportSequenceNumbers,
+                        drSequenceNumbers,
                         true /* requireExistingSequenceNumbers */);
             }
         };

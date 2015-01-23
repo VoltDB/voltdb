@@ -43,6 +43,8 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
      */
     private long m_uniqueId = Long.MIN_VALUE;
 
+    private long m_binaryLogSequenceNumber = Long.MIN_VALUE;
+
     /*
      * The largest seen original (master cluster) unique id
      * for a binary logging (DR) invocation
@@ -83,7 +85,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
     public Iv2RepairLogResponseMessage(long requestId, int ofTotal,
             long spHandle, long txnId,
             Pair<Long, byte[]> versionedHashinatorConfig,
-            long uniqueId, long binaryLogUniqueId)
+            long uniqueId, long binaryLogSequenceNumber, long binaryLogUniqueId)
     {
         super();
         m_requestId = requestId;
@@ -92,6 +94,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         m_handle = spHandle;
         m_txnId = txnId;
         m_uniqueId = uniqueId;
+        m_binaryLogSequenceNumber = binaryLogSequenceNumber;
         m_binaryLogUniqueId = binaryLogUniqueId;
         m_hashinatorVersion = versionedHashinatorConfig.getFirst();
         m_hashinatorConfig = versionedHashinatorConfig.getSecond();
@@ -123,6 +126,10 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
 
     public long getUniqueId() {
         return m_uniqueId;
+    }
+
+    public long getBinaryLogSequenceNumber() {
+        return m_binaryLogSequenceNumber;
     }
 
     public long getBinaryLogUniqueId() {

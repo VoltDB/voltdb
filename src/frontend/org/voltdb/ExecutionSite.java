@@ -971,7 +971,8 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
             Deque<SnapshotTableTask> tasks,
             long txnId,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-            Map<Integer, Map<Integer, Long>> remoteDCUniqueIds) {
+            Map<Integer, Long> drSequenceNumbers,
+            Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds) {
     }
 
     /*
@@ -1298,6 +1299,15 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     }
 
     @Override
+    public long getDRSequenceNumber()
+    {
+        throw new RuntimeException("ExecutionSite doesn't know how to do this");
+    }
+
+    @Override
+    public void setDRSequenceNumber(long sequenceNumber) {}
+
+    @Override
     public void toggleProfiler(int toggle)
     {
         ee.toggleProfiler(toggle);
@@ -1331,6 +1341,7 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     public void setRejoinComplete(
             JoinProducerBase.JoinCompletionAction ignored,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+            Map<Integer, Long> drSequenceNumbers,
             boolean requireExistingSequenceNumbers) {
         throw new RuntimeException("setRejoinComplete is an IV2-only interface.");
     }

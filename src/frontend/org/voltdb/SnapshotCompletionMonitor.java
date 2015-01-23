@@ -196,6 +196,14 @@ public class SnapshotCompletionMonitor {
             }
             exportSequenceNumbers = builder.build();
 
+            Map<Integer, Long> drSequenceNumbers = new HashMap<>();
+            JSONObject drSequenceJSON = jsonObj.getJSONObject("drSequenceNumbers");
+            Iterator<String> partitionKeys = drSequenceJSON.keys();
+            while (partitionKeys.hasNext()) {
+                String partitionIdString = partitionKeys.next();
+                drSequenceNumbers.put(Integer.valueOf(partitionIdString), drSequenceJSON.getLong(partitionIdString));
+            }
+
             Map<Integer, Long> partitionTxnIdsMap = ImmutableMap.of();
             synchronized (m_snapshotTxnIdsToPartitionTxnIds) {
                 Map<Integer, Long> partitionTxnIdsList = m_snapshotTxnIdsToPartitionTxnIds.get(txnId);
@@ -209,22 +217,25 @@ public class SnapshotCompletionMonitor {
              * be used by live rejoin to initialize a starting state for applying DR
              * data
              */
-            Map<Integer, Map<Integer, Long>> remoteDCLastUniqueIds = new HashMap<>();
-            final JSONObject remoteDCLastUniqueIdsObj = jsonObj.getJSONObject("remoteDCUniqueIds");
-            final Iterator<String> dcIdIter = remoteDCLastUniqueIdsObj.keys();
+            Map<Integer, Map<Integer, Pair<Long, Long>>> remoteDCLastIds = new HashMap<>();
+            final JSONObject remoteDCLastIdsObj = jsonObj.getJSONObject("remoteDCLastIds");
+            final Iterator<String> dcIdIter = remoteDCLastIdsObj.keys();
             while (dcIdIter.hasNext()) {
                 final String dcIdKey = dcIdIter.next();
 
-                final JSONObject dataCenterUniqueIds = remoteDCLastUniqueIdsObj.getJSONObject(dcIdKey);
+                final JSONObject dataCenterIds = remoteDCLastIdsObj.getJSONObject(dcIdKey);
 
-                final HashMap<Integer, Long> lastSeenIds = new HashMap<>();
+                final HashMap<Integer, Pair<Long, Long>> lastSeenIds = new HashMap<>();
 
-                final Iterator<String> partitionKeyIter = dataCenterUniqueIds.keys();
+                final Iterator<String> partitionKeyIter = dataCenterIds.keys();
                 while (partitionKeyIter.hasNext()) {
                     final String partitionIdString = partitionKeyIter.next();
-                    lastSeenIds.put(Integer.valueOf(partitionIdString), dataCenterUniqueIds.getLong(partitionIdString));
+                    JSONObject ids = dataCenterIds.getJSONObject(partitionIdString);
+                    long drId = ids.getLong("drId");
+                    long uniqueId = ids.getLong("uniqueId");
+                    lastSeenIds.put(Integer.valueOf(partitionIdString), Pair.of(drId, uniqueId));
                 }
-                remoteDCLastUniqueIds.put(Integer.valueOf(dcIdKey), Collections.unmodifiableMap(lastSeenIds));
+                remoteDCLastIds.put(Integer.valueOf(dcIdKey), Collections.unmodifiableMap(lastSeenIds));
             }
 
             Iterator<SnapshotCompletionInterest> iter = m_interests.iterator();
@@ -241,7 +252,8 @@ public class SnapshotCompletionMonitor {
                                 didSucceed,
                                 truncReqId,
                                 exportSequenceNumbers,
-                                Collections.unmodifiableMap(remoteDCLastUniqueIds)));
+                                Collections.unmodifiableMap(drSequenceNumbers),
+                                Collections.unmodifiableMap(remoteDCLastIds)));
                 } catch (Exception e) {
                     SNAP_LOG.warn("Exception while executing snapshot completion interest", e);
                 }
