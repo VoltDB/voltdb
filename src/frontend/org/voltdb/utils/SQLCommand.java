@@ -156,6 +156,7 @@ public class SQLCommand
 
         ArrayList<String> queries = new ArrayList<String>();
         for (String fragment : sqlFragments) {
+            fragment = SingleLineComments.matcher(fragment).replaceAll("");
             fragment = fragment.trim();
             if (fragment.isEmpty()) {
                 continue;
@@ -777,7 +778,6 @@ public class SQLCommand
     private static final Pattern ExplainCall = Pattern.compile("^explain ", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     // Match queries that start with "explainproc" (case insensitive).  We'll convert them to @ExplainProc invocations.
     private static final Pattern ExplainProcCall = Pattern.compile("^explainProc ", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
-    private static final Pattern StripCRLF = Pattern.compile("[\r\n]+", Pattern.MULTILINE);
     private static final SimpleDateFormat DateParser = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
     private static final Pattern Unquote = Pattern.compile("^'|'$", Pattern.MULTILINE);
 
@@ -913,7 +913,6 @@ public class SQLCommand
                 // This all could probably be done more elegantly via a group extracted
                 // from a more comprehensive regexp.
                 query = query.substring("explain ".length());
-                query = StripCRLF.matcher(query).replaceAll(" ");
                 printResponse(VoltDB.callProcedure("@Explain", query));
             }
             else if (ExplainProcCall.matcher(query).find()) {
@@ -922,13 +921,11 @@ public class SQLCommand
                 // This all could probably be done more elegantly via a group extracted
                 // from a more comprehensive regexp.
                 query = query.substring("explainProc ".length());
-                query = StripCRLF.matcher(query).replaceAll(" ");
                 // Clean up any extra spaces from between explainproc and the proc name.
                 query = query.trim();
                 printResponse(VoltDB.callProcedure("@ExplainProc", query));
             }
             else { // All other commands get forwarded to @AdHoc
-                query = StripCRLF.matcher(query).replaceAll(" ");
                 // if the query was DDL, reload the stored procedures.
                 if (SQLLexer.extractDDLToken(query) != null) {
                     printDdlResponse(VoltDB.callProcedure("@AdHoc", query));
