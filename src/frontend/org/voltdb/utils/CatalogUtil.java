@@ -34,6 +34,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -103,6 +104,7 @@ import org.voltdb.compiler.deploymentfile.SnapshotType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.export.ExportDataProcessor;
+import org.voltdb.export.ExportManager;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -924,33 +926,8 @@ public abstract class CatalogUtil {
         }
     }
 
-    /**
-     * Set deployment time settings for export
-     * @param catalog The catalog to be updated.
-     * @param exportsType A reference to the <exports> element of the deployment.xml file.
-     */
-    private static void setExportInfo(Catalog catalog, ExportType exportType) {
-        if (exportType == null) {
-            return;
-        }
-
-        boolean adminstate = exportType.isEnabled();
-
-        Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
-        org.voltdb.catalog.Connector catconn = db.getConnectors().get("0");
-        if (catconn == null) {
-            if (adminstate) {
-                hostLog.info("Export configuration enabled in deployment file however no export " +
-                        "tables are present in the project file. Export disabled.");
-            }
-            return;
-        }
-
+    private static Properties checkExportProcessorConfiguration(ExportType exportType) {
         // on-server export always uses the guest processor
-        String connector = "org.voltdb.export.processors.GuestProcessor";
-        catconn.setLoaderclass(connector);
-        catconn.setEnabled(adminstate);
-
         String exportClientClassName = null;
 
         switch(exportType.getTarget()) {
@@ -966,55 +943,115 @@ public abstract class CatalogUtil {
                     exportClientClassName = exportType.getExportconnectorclass();
                 }
                 catch (ClassNotFoundException ex) {
-                    hostLog.error(
+                    String msg =
                             "Custom Export failed to configure, failed to load " +
                             " export plugin class: " + exportType.getExportconnectorclass() +
-                            " Disabling export.");
-                exportType.setEnabled(false);
-                return;
+                            " Disabling export.";
+                    hostLog.error(msg);
+                    throw new DeploymentCheckException(msg);
             }
             break;
         }
 
-        // this is OK as the deployment file XML schema does not allow for
-        // export configuration property names that begin with underscores
+        Properties processorProperties = new Properties();
+
         if (exportClientClassName != null && exportClientClassName.trim().length() > 0) {
-            ConnectorProperty prop = catconn.getConfig().add(ExportDataProcessor.EXPORT_TO_TYPE);
-            prop.setName(ExportDataProcessor.EXPORT_TO_TYPE);
             //Override for tests
             String dexportClientClassName = System.getProperty(ExportDataProcessor.EXPORT_TO_TYPE, exportClientClassName);
-            prop.setValue(dexportClientClassName);
+            processorProperties.setProperty(ExportDataProcessor.EXPORT_TO_TYPE, dexportClientClassName);
         }
 
         ExportConfigurationType exportConfiguration = exportType.getConfiguration();
         if (exportConfiguration != null) {
-
             List<PropertyType> configProperties = exportConfiguration.getProperty();
             if (configProperties != null && ! configProperties.isEmpty()) {
 
                 for( PropertyType configProp: configProperties) {
-                    ConnectorProperty prop = catconn.getConfig().add(configProp.getName());
-                    prop.setName(configProp.getName());
-                    if (!configProp.getName().toLowerCase().contains("password")) {
-                        prop.setValue(configProp.getValue().trim());
+                    String key = configProp.getName();
+                    String value = configProp.getValue();
+                    if (!key.toLowerCase().contains("passw")) {
+                        processorProperties.setProperty(key, value.trim());
                     } else {
                         //Dont trim passwords
-                        prop.setValue(configProp.getValue());
+                        processorProperties.setProperty(key, value);
                     }
                 }
             }
         }
+
+        // Instantiate the Guest Processor
+        Class<?> processorClazz = null;
+        try {
+            processorClazz = Class.forName(ExportManager.PROCESSOR_CLASS);
+        } catch (ClassNotFoundException e) {
+            throw new DeploymentCheckException("Export is PRO version only feature");
+        }
+        ExportDataProcessor processor = null;
+        try {
+            processor = (ExportDataProcessor)processorClazz.newInstance();
+        } catch (InstantiationException | IllegalAccessException e) {
+            hostLog.error("Unable to instantiate export processor", e);
+            throw new DeploymentCheckException("Unable to instantiate export processor", e);
+        }
+        try {
+            processor.addLogger(hostLog);
+            processor.setProcessorConfig(processorProperties);
+            processor.shutdown();
+        } catch (Exception e) {
+            hostLog.error("Export processor failed its configuration check", e);
+            throw new DeploymentCheckException("Export processor failed its configuration check: " + e.getMessage(), e);
+        }
+
+        return processorProperties;
+    }
+    /**
+     * Set deployment time settings for export
+     * @param catalog The catalog to be updated.
+     * @param exportsType A reference to the <exports> element of the deployment.xml file.
+     */
+    private static void setExportInfo(Catalog catalog, ExportType exportType) {
+        if (exportType == null) {
+            return;
+        }
+
+        boolean isEnabled = exportType.isEnabled();
+
+        Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
+        org.voltdb.catalog.Connector catconn = db.getConnectors().get("0");
+        if (catconn == null) {
+            if (isEnabled) {
+                hostLog.info("Export configuration enabled in deployment file however no export " +
+                        "tables are present in the project file. Export disabled.");
+            }
+            return;
+        }
+
+        Properties processorProperties = checkExportProcessorConfiguration(exportType);
+        for (String name: processorProperties.stringPropertyNames()) {
+            ConnectorProperty prop = catconn.getConfig().add(name);
+            prop.setName(name);
+            prop.setValue(processorProperties.getProperty(name));
+        }
+
+        // on-server export always uses the guest processor
+        catconn.setLoaderclass(ExportManager.PROCESSOR_CLASS);
+        catconn.setEnabled(isEnabled);
+
         //Set class back in deployment for display
-        exportType.setExportconnectorclass(exportClientClassName);
-        if (!adminstate) {
+        exportType.setExportconnectorclass(
+                processorProperties.getProperty(ExportDataProcessor.EXPORT_TO_TYPE)
+                );
+
+        if (!isEnabled) {
             hostLog.info("Export configuration is present and is " +
                "configured to be disabled. Export will be disabled.");
         } else {
             hostLog.info("Export is configured and enabled with type=" + exportType.getTarget());
+            ExportConfigurationType exportConfiguration = exportType.getConfiguration();
             if (exportConfiguration != null && exportConfiguration.getProperty() != null) {
                 hostLog.info("Export configuration properties are: ");
                 for (PropertyType configProp : exportConfiguration.getProperty()) {
-                    if (!configProp.getName().toLowerCase().contains("password")) {
+                    if (!configProp.getName().toLowerCase().contains("passw")) {
                         hostLog.info("Export Configuration Property NAME=" + configProp.getName() + " VALUE=" + configProp.getValue());
                     }
                 }
@@ -1670,6 +1707,28 @@ public abstract class CatalogUtil {
             return null;
         }
         return emptyJarFile;
+    }
+
+    public static class DeploymentCheckException extends RuntimeException {
+
+        private static final long serialVersionUID = 6741313621335268608L;
+
+        public DeploymentCheckException() {
+            super();
+        }
+
+        public DeploymentCheckException(String message, Throwable cause) {
+            super(message, cause);
+        }
+
+        public DeploymentCheckException(String message) {
+            super(message);
+        }
+
+        public DeploymentCheckException(Throwable cause) {
+            super(cause);
+        }
+
     }
 
 }
