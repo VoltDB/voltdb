@@ -135,8 +135,8 @@ public class TestSqlCmdInterface
     public void testParseQuery8() {
         String raw = "SELECT * FROM table --UNION SELECT * FROM table2";
         ID = 8;
-        String expected = raw;
-        assertThis(raw, expected, 1, ID);
+        String expected = "SELECT * FROM table";
+        assertThis3(raw, expected, 1, ID);
     }
 
     // 9) To test 2 select statements with --union
@@ -147,8 +147,8 @@ public class TestSqlCmdInterface
     public void testParseQuery9() {
         String raw = "SELECT * FROM table --UNION --SELECT * FROM table2";
         ID = 9;
-        String expected = raw;
-        assertThis(raw, expected, 1, ID);
+        String expected = "SELECT * FROM table";
+        assertThis3(raw, expected, 1, ID);
     }
 
     // 10) To test 2 select statements with --
@@ -158,8 +158,8 @@ public class TestSqlCmdInterface
     public void testParseQuery10() {
         String raw = "SELECT * FROM table -- SELECT * FROM table2";
         ID = 10;
-        String expected = raw;
-        assertThis(raw, expected, 1, ID);
+        String expected = "SELECT * FROM table";
+        assertThis3(raw, expected, 1, ID);
 
     }
 
@@ -525,4 +525,19 @@ public class TestSqlCmdInterface
         err2 += "Actual queries: \n#" + parsedString + "#\n";
            assertFalse(msg+err2, cleanQryStr.equalsIgnoreCase(parsedString));
     }
+
+   // assert for inline comment query
+   private void assertThis3(String qryStr, String cleanQryStr, int numOfQry, int testID) {
+       List<String> parsed = SQLCommand.parseQuery(qryStr);
+       String msg = "\nTest ID: " + testID + ". ";
+       String err1 = "\nExpected # of queries: " + numOfQry + "\n";
+       err1 += "Actual # of queries: " + parsed.size() + "\n";
+       assertEquals(msg+err1, numOfQry, parsed.size());
+       String parsedString = Joiner.on(" ").join(parsed);
+       //String result = parsed.get(0);
+       String err2 = "\nExpected queries: \n#" + cleanQryStr + "#\n";
+       err2 += "Actual queries: \n#" + parsedString + "#\n";
+
+       assertTrue(msg+err2, cleanQryStr.equalsIgnoreCase(parsedString));
+   }
 }

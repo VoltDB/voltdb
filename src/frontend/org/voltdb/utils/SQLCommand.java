@@ -152,6 +152,23 @@ public class SQLCommand
             i++;
         }
 
+        int commentBegin = 0;
+        while ( (commentBegin = query.indexOf("--")) > 0) {
+            // stripe out inline dash dash comment
+            // this may have problem if the user has quoted data "--".
+            // Release note that SQLCMD does not support user quoted data dash dash.
+            String queriesBeforeInlineComment = query.substring(0, commentBegin);
+            String queriesAfterInlineComment = "\n";
+
+            int commentEnd = query.indexOf("\n", commentBegin);
+            if (commentEnd > commentBegin) {
+                queriesAfterInlineComment = query.substring(commentEnd);
+            }
+
+            // concat the new query
+            query = queriesBeforeInlineComment + queriesAfterInlineComment;
+        }
+
         String[] sqlFragments = query.split("\\s*;+\\s*");
 
         ArrayList<String> queries = new ArrayList<String>();
