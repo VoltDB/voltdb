@@ -995,7 +995,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
                     if (tcd->exportEnabled()) {
                         if (streamedtable->enableStream()) {
                             streamedtable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
-                            m_exportingTables[catalogTable->signature()] = table;                            
+                            m_exportingTables[catalogTable->signature()] = table;
                         } else {
                             streamedtable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
                         }
