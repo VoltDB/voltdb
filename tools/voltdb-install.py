@@ -292,7 +292,7 @@ Provides: %(provides)s
 Conflicts: %(conflicts)s
 Requires: libgcc >= 4.1.2, libstdc++ >= 4.1.2, python >= 2.6
 Requires: java >= 1:1.7.0
-Requires: java7-devel >= 1:1.7.0
+Requires: java-devel >= 1:1.7.0
 Summary: VoltDB is a blazingly fast in memory (IMDB) NewSQL database system.
 Prefix: %(prefix)s
 
