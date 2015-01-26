@@ -56,6 +56,8 @@ public class HTTPClientInterface {
     int m_timeout = 0;
     final String m_timeoutResponse;
 
+    public static int MAX_QUERY_PARAM_SIZE = 150000;
+
 
     public void setTimeout(int seconds) {
         m_timeout = seconds * 1000;
@@ -106,7 +108,7 @@ public class HTTPClientInterface {
 
     public void process(Request request, HttpServletResponse response) {
         AuthenticationResult authResult = null;
-
+        boolean suspended = false;
         Continuation continuation = ContinuationSupport.getContinuation(request);
         if (m_timeout > 0) {
             continuation.setTimeout(m_timeout);
@@ -140,7 +142,7 @@ public class HTTPClientInterface {
             jsonp = request.getParameter("jsonp");
             if (request.getMethod().equalsIgnoreCase("POST")) {
                 int queryParamSize = request.getContentLength();
-                if (queryParamSize > 150000) {
+                if (queryParamSize > MAX_QUERY_PARAM_SIZE) {
                     // We don't want to be building huge strings
                     throw new Exception("Query string too large: " + String.valueOf(request.getContentLength()));
                 }
@@ -175,7 +177,7 @@ public class HTTPClientInterface {
             }
 
             continuation.suspend(response);
-
+            suspended = true;
             JSONProcCallback cb = new JSONProcCallback(request, continuation, jsonp);
             boolean success;
             if (params != null) {
@@ -219,7 +221,9 @@ public class HTTPClientInterface {
             request.setHandled(true);
             try {
                 response.getWriter().print(msg);
-                continuation.complete();
+                if (suspended) {
+                    continuation.complete();
+                }
             } catch (IOException e1) {} // Ignore this as browser must have closed.
         } finally {
             releaseClient(authResult);
