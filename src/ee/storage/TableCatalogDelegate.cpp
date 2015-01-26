@@ -411,7 +411,7 @@ TableCatalogDelegate::init(catalog::Database const &catalogDatabase,
         return false; // mixing ints and booleans here :(
     }
 
-    evaluateExport(catalogDatabase, catalogTable);
+    m_exportEnabled = evaluateExport(catalogDatabase, catalogTable);
 
     // configure for stats tables
     int32_t databaseId = catalogDatabase.relativeIndex();
@@ -422,10 +422,10 @@ TableCatalogDelegate::init(catalog::Database const &catalogDatabase,
 }
 
 //After catalog is updated call this to ensure your export tables are connected correctly.
-void TableCatalogDelegate::evaluateExport(catalog::Database const &catalogDatabase,
+bool TableCatalogDelegate::evaluateExport(catalog::Database const &catalogDatabase,
                            catalog::Table const &catalogTable)
 {
-    m_exportEnabled = isExportEnabledForTable(catalogDatabase, catalogTable.relativeIndex());
+    return (isExportEnabledForTable(catalogDatabase, catalogTable.relativeIndex()));
 }
 
 

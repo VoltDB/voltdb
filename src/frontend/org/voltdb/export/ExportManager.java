@@ -581,7 +581,7 @@ public class ExportManager
         try {
             Map<Long, ExportGeneration> generations = instance.m_generations;
             if (generations.isEmpty()) {
-                assert(false);
+                //assert(false);
                 return -1;
             }
 
@@ -629,7 +629,8 @@ public class ExportManager
                  */
                 synchronized(instance) {
                     if (!instance.m_generationGhosts.contains(exportGeneration)) {
-                        assert(false);
+                        //assert(false);
+                        (new Exception()).printStackTrace();
                         exportLog.error("Could not a find an export generation " + exportGeneration +
                         ". Should be impossible. Discarding export data");
                     }

@@ -81,7 +81,7 @@ class StreamedTable : public Table {
 
     virtual void loadTuplesFrom(SerializeInputBE &serialize_in, Pool *stringPool = NULL);
     virtual void flushOldTuples(int64_t timeInMillis);
-    virtual void setSignatureAndGeneration(std::string signature, int64_t generation);
+    virtual void setSignatureAndGeneration(std::string signature, int64_t generation, bool push = true);
 
     virtual std::string tableType() const {
         return "StreamedTable";

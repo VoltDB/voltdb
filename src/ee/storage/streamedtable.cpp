@@ -151,9 +151,9 @@ void StreamedTable::flushOldTuples(int64_t timeInMillis)
 /**
  * Inform the tuple stream wrapper of the table's delegate id
  */
-void StreamedTable::setSignatureAndGeneration(std::string signature, int64_t generation) {
+void StreamedTable::setSignatureAndGeneration(std::string signature, int64_t generation, bool push) {
     if (m_wrapper) {
-        m_wrapper->setSignatureAndGeneration(signature, generation);
+        m_wrapper->setSignatureAndGeneration(signature, generation, push);
     }
 }
 
