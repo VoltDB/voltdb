@@ -80,6 +80,7 @@ public class SQLCommand
     // SQL Parsing
     private static final Pattern EscapedSingleQuote = Pattern.compile("''", Pattern.MULTILINE);
     private static final Pattern SingleLineComments = Pattern.compile("^\\s*(\\/\\/|--).*$", Pattern.MULTILINE);
+    private static final Pattern MidlineComments = Pattern.compile("(\\/\\/|--).*$", Pattern.MULTILINE);
     private static final Pattern Extract = Pattern.compile("'[^']*'", Pattern.MULTILINE);
 
     private static final Pattern AutoSplitParameters = Pattern.compile("[\\s,]+", Pattern.MULTILINE);
@@ -152,22 +153,10 @@ public class SQLCommand
             i++;
         }
 
-        int commentBegin = 0;
-        while ( (commentBegin = query.indexOf("--")) > 0) {
-            // stripe out inline dash dash comment
-            // this may have problem if the user has quoted data "--".
-            // Release note that SQLCMD does not support user quoted data dash dash.
-            String queriesBeforeInlineComment = query.substring(0, commentBegin);
-            String queriesAfterInlineComment = "\n";
-
-            int commentEnd = query.indexOf("\n", commentBegin);
-            if (commentEnd > commentBegin) {
-                queriesAfterInlineComment = query.substring(commentEnd);
-            }
-
-            // concat the new query
-            query = queriesBeforeInlineComment + queriesAfterInlineComment;
-        }
+        // strip out inline comments
+        // At the point, all the quoted strings have been pulled out of the code because they may contain semicolons
+        // and they will not be restored until after the split. So any user's quoted string will be safe here.
+        query = MidlineComments.matcher(query).replaceAll("");
 
         String[] sqlFragments = query.split("\\s*;+\\s*");
 

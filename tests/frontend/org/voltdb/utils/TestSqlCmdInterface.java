@@ -136,7 +136,7 @@ public class TestSqlCmdInterface
         String raw = "SELECT * FROM table --UNION SELECT * FROM table2";
         ID = 8;
         String expected = "SELECT * FROM table";
-        assertThis3(raw, expected, 1, ID);
+        assertThis(raw, expected, 1, ID);
     }
 
     // 9) To test 2 select statements with --union
@@ -148,7 +148,7 @@ public class TestSqlCmdInterface
         String raw = "SELECT * FROM table --UNION --SELECT * FROM table2";
         ID = 9;
         String expected = "SELECT * FROM table";
-        assertThis3(raw, expected, 1, ID);
+        assertThis(raw, expected, 1, ID);
     }
 
     // 10) To test 2 select statements with --
@@ -159,7 +159,7 @@ public class TestSqlCmdInterface
         String raw = "SELECT * FROM table -- SELECT * FROM table2";
         ID = 10;
         String expected = "SELECT * FROM table";
-        assertThis3(raw, expected, 1, ID);
+        assertThis(raw, expected, 1, ID);
 
     }
 
@@ -334,6 +334,36 @@ public class TestSqlCmdInterface
         assertThis(raw, qryFrmFile, numOfQueries, ID, blockCommentCount);
     }
 
+    @Test
+    public void testParseQuery22() {
+        ID = 22;
+        String raw = " select -- comment no semicolon\n"
+                + "* -- comment no semicolon\n"
+                + "from -- comment no semicolon\n"
+                + "table -- comment with semicolon;";
+
+        String expected = "select \n"
+                + "* \n"
+                + "from \n"
+                + "table";
+        assertThis(raw, expected, 1, ID);
+    }
+
+    @Test
+    public void testParseQuery23() {
+        ID = 22;
+        String raw = " select -- comment no semicolon\n"
+                + "* -- comment with this ; a semicolon inside\n"
+                + "from -- comment with this ; a semicolon inside\n"
+                + "table -- comment with semicolon;";
+
+        String expected = "select \n"
+                + "* \n"
+                + "from \n"
+                + "table";
+        assertThis(raw, expected, 1, ID);
+    }
+
     // To test parseQueryProcedureCallParameters()
     // To test a valid query: 'select * from dummy'
     @Test
@@ -486,9 +516,9 @@ public class TestSqlCmdInterface
         err1 += "Actual # of queries: " + parsed.size() + "\n";
         assertEquals(msg+err1, numOfQry + blockCommentCount, parsed.size());
         String parsedString = Joiner.on(" ").join(parsed);
-        //String result = parsed.get(0);
         String err2 = "\nExpected queries: \n#" + cleanQryStr + "#\n";
         err2 += "Actual queries: \n#" + parsedString + "#\n";
+
         if (blockCommentCount == 0) {
             // If there is sql comments in block(s), then skip the assertion below
             assertTrue(msg+err2, cleanQryStr.equalsIgnoreCase(parsedString));
@@ -525,19 +555,4 @@ public class TestSqlCmdInterface
         err2 += "Actual queries: \n#" + parsedString + "#\n";
            assertFalse(msg+err2, cleanQryStr.equalsIgnoreCase(parsedString));
     }
-
-   // assert for inline comment query
-   private void assertThis3(String qryStr, String cleanQryStr, int numOfQry, int testID) {
-       List<String> parsed = SQLCommand.parseQuery(qryStr);
-       String msg = "\nTest ID: " + testID + ". ";
-       String err1 = "\nExpected # of queries: " + numOfQry + "\n";
-       err1 += "Actual # of queries: " + parsed.size() + "\n";
-       assertEquals(msg+err1, numOfQry, parsed.size());
-       String parsedString = Joiner.on(" ").join(parsed);
-       //String result = parsed.get(0);
-       String err2 = "\nExpected queries: \n#" + cleanQryStr + "#\n";
-       err2 += "Actual queries: \n#" + parsedString + "#\n";
-
-       assertTrue(msg+err2, cleanQryStr.equalsIgnoreCase(parsedString));
-   }
 }
