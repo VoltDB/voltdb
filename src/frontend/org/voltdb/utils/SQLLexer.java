@@ -20,6 +20,8 @@ package org.voltdb.utils;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.lang3.StringUtils;
+import org.hsqldb_voltpatches.HSQLDDLInfo;
 import org.voltcore.logging.VoltLogger;
 
 public class SQLLexer
@@ -98,6 +100,133 @@ public class SQLLexer
             ddlToken = ddlMatcher.group(1).toLowerCase();
         }
         return ddlToken;
+    }
+
+    // Glean some basic info about DDL statements sent to HSQLDB
+    private static final Pattern HSQL_DDL_PREPROCESSOR = Pattern.compile(
+            "^\\s*" +  // start of line, 0 or more whitespace
+            "(create|drop|alter)" + // DDL commands we're looking for
+            "\\s+" + // one or more whitespace
+            "((assume)?unique\\s+)?" + // assume | unique for index parsing
+            "(table|view|index)" +
+            "\\s+" + // one or more whitespace
+            "([a-z][a-z0-9_]*)" + // table/view/index name symbol
+            "(\\s+on\\s+([a-z][a-z0-9_]*))?" + // on table/view second name
+            ".*$", // all the rest
+            Pattern.CASE_INSENSITIVE | Pattern.DOTALL
+            );
+
+    // does ddl the statement end with cascade or have if exists in the right place
+    private static final Pattern DDL_IFEXISTS_OR_CASCADE_CHECK = Pattern.compile(
+            "^.*?" + // start of line, then anything (greedy)
+            "(?<ie>\\s+if\\s+exists)?" + // may contain if exists preceded by whitespace
+            "(?<c>\\s+cascade)?" + // may contain cascade preceded by whitespace
+            "\\s*;?\\s*" + // then optional whitespace, a single optional semi, then ws
+            "$", // end of line
+            Pattern.CASE_INSENSITIVE | Pattern.DOTALL
+            );
+
+    /**
+     * Glean some basic info about DDL statements sent to HSQLDB
+     */
+    public static HSQLDDLInfo preprocessHSQLDDL(String ddl) {
+        ddl = stripComments(ddl);
+
+        Matcher matcher = HSQL_DDL_PREPROCESSOR.matcher(ddl);
+        if (matcher.find()) {
+            String verbString = matcher.group(1);
+            HSQLDDLInfo.Verb verb = HSQLDDLInfo.Verb.get(verbString);
+            if (verb == null) {
+                return null;
+            }
+
+            String nounString = matcher.group(4);
+            HSQLDDLInfo.Noun noun = HSQLDDLInfo.Noun.get(nounString);
+            if (noun == null) {
+                return null;
+            }
+
+            String name = matcher.group(5);
+            if (name == null) {
+                return null;
+            }
+
+            String secondName = matcher.group(7);
+            if (secondName != null) {
+                secondName = secondName.toLowerCase();
+            }
+
+            // cascade/if exists are interesting on alters and drops
+            boolean cascade = false;
+            boolean ifexists = false;
+            if (verb != HSQLDDLInfo.Verb.CREATE) {
+                matcher = DDL_IFEXISTS_OR_CASCADE_CHECK.matcher(ddl);
+                if (matcher.matches()) {
+                    ifexists = matcher.group("ie") != null;
+                    cascade = matcher.group("c") != null;
+                }
+            }
+
+            return new HSQLDDLInfo(verb, noun, name.toLowerCase(), secondName, cascade, ifexists);
+        }
+        return null;
+    }
+
+    /** Remove c-style comments globally and -- comments from the end of lines */
+    public static String stripComments(String ddl) {
+        ddl = removeCStyleComments(ddl);
+        StringBuilder sb = new StringBuilder();
+        String[] ddlLines = ddl.split("\n");
+        for (String ddlLine : ddlLines) {
+            sb.append(stripCommentFromLine(ddlLine)).append(' ');
+        }
+        return sb.toString();
+    }
+
+    private static final Pattern STRIP_CSTYLE_COMMENTS = Pattern.compile(
+            "/\\*(.|\\n)*?\\*/"
+            );
+
+    /** Remove c-style comments from a string aggressively */
+    public static String removeCStyleComments(String ddl) {
+        String[] parts = STRIP_CSTYLE_COMMENTS.split(ddl);
+        return StringUtils.join(parts);
+    }
+
+    /** Strip -- comments from the end of a single line */
+    public static String stripCommentFromLine(String ddlLine) {
+        boolean inQuote = false;
+        char quoteChar = ' '; // will be written before use
+        boolean lastCharWasDash = false;
+        int length = ddlLine.length();
+
+        for (int i = 0; i < length; i++) {
+            char c = ddlLine.charAt(i);
+            if (inQuote) {
+                if (quoteChar == c) {
+                    inQuote = false;
+                }
+            }
+            else {
+                if (c == '-') {
+                    if (lastCharWasDash) {
+                        return ddlLine.substring(0, i - 1);
+                    }
+                    else {
+                        lastCharWasDash = true;
+                    }
+                }
+                else {
+                    lastCharWasDash = false;
+                    if (c == '\"' || c == '\'') {
+                        inQuote = true;
+                        quoteChar = c;
+                    }
+                }
+            }
+        }
+
+        return ddlLine;
     }
 
     // Extracts the table name for DDL batch conflicting command checks.

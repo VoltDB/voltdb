@@ -512,7 +512,11 @@ function loadAdminPage() {
             var popup = $(this)[0];
            
             $("#btnLoginWarningOk").unbind("click");
-            $("#btnLoginWarningOk").on('click', function () {                
+            $("#btnLoginWarningOk").on('click', function () {
+                if ($.cookie("username") == undefined || $.cookie("username") == 'null') {
+                    location.reload(true);
+                }
+
                 if (VoltDbUI.CurrentTab == NavigationTabs.Admin) {
                     $("#navDbmonitor").click();
                 }

@@ -23,6 +23,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.StringWriter;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.ByteBuffer;
@@ -40,11 +41,14 @@ import java.util.TreeSet;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBElement;
 import javax.xml.bind.JAXBException;
+import javax.xml.bind.Marshaller;
 import javax.xml.bind.Unmarshaller;
+import javax.xml.namespace.QName;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
@@ -73,7 +77,6 @@ import org.voltdb.catalog.Group;
 import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.PlanFragment;
-import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Systemsettings;
@@ -81,39 +84,32 @@ import org.voltdb.catalog.Table;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.ClusterConfig;
 import org.voltdb.compiler.VoltCompiler;
+import org.voltdb.compiler.deploymentfile.AdminModeType;
 import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
 import org.voltdb.compiler.deploymentfile.CommandLogType.Frequency;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
 import org.voltdb.compiler.deploymentfile.ExportType;
+import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
+import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PropertyType;
+import org.voltdb.compiler.deploymentfile.ReplicationType;
 import org.voltdb.compiler.deploymentfile.SchemaType;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.UsersType;
-import org.voltdb.compilereport.IndexAnnotation;
-import org.voltdb.compilereport.ProcedureAnnotation;
-import org.voltdb.compilereport.StatementAnnotation;
-import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.ConstraintType;
+import org.xml.sax.SAXException;
 
 import com.google_voltpatches.common.base.Charsets;
-import java.io.StringWriter;
-import javax.xml.bind.Marshaller;
-import javax.xml.namespace.QName;
-import org.voltdb.compiler.deploymentfile.AdminModeType;
-import org.voltdb.compiler.deploymentfile.HeartbeatType;
-import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
-import org.voltdb.compiler.deploymentfile.ReplicationType;
-import org.xml.sax.SAXException;
 
 /**
  *
@@ -1551,16 +1547,20 @@ public abstract class CatalogUtil {
             bottomPlan.getTablesAndIndexes(tablesRead, indexes);
         }
 
-        String updated = null;
+        String updated = "";
         if ( ! stmt.getReadonly()) {
             updated = topPlan.getUpdatedTable();
             if (updated == null) {
                 updated = bottomPlan.getUpdatedTable();
             }
-            assert(updated != null);
+            assert(updated.length() > 0);
         }
 
         Set<String> readTableNames = tablesRead.keySet();
+        stmt.setTablesread(StringUtils.join(readTableNames, ","));
+        stmt.setTablesupdated(updated);
+
+        Set<String> tableDotIndexNames = new TreeSet<>();
 
         for (Table table : db.getTables()) {
             if (readTableNames.contains(table.getTypeName())) {
@@ -1568,113 +1568,17 @@ public abstract class CatalogUtil {
                 for (String indexName : indexes) {
                     Index index = table.getIndexes().get(indexName);
                     if (index != null) {
-                        updateIndexUsageAnnotation(index, stmt);
+                        tableDotIndexNames.add(table.getTypeName() + "." + index.getTypeName());
                     }
                 }
-                if (updated != null && updated.equals(table.getTypeName())) {
-                    // make useage only in either read or updated, not both
-                    updateTableUsageAnnotation(table, stmt, false);
-                    updated = null;
-                    continue;
-                }
-                updateTableUsageAnnotation(table, stmt, true);
-            }
-            else if (updated != null && updated.equals(table.getTypeName())) {
-                updateTableUsageAnnotation(table, stmt, false);
-                updated = null;
             }
         }
+
+        String indexString = StringUtils.join(tableDotIndexNames, ",");
+
+        stmt.setIndexesused(indexString);
 
         assert(tablesRead.size() == 0);
-        assert(updated == null);
-    }
-
-    private static void updateIndexUsageAnnotation(Index index, Statement stmt) {
-        // LIMIT EXECUTE DELETE statements are parented by tables,
-        // not stored procedures.
-        CatalogType parent = stmt.getParent();
-        if (!(parent instanceof Procedure))
-                return;
-
-        Procedure proc = (Procedure) parent;
-        // skip CRUD generated procs
-        if (proc.getDefaultproc()) {
-            return;
-        }
-
-        IndexAnnotation ia = (IndexAnnotation) index.getAnnotation();
-        if (ia == null) {
-            ia = new IndexAnnotation();
-            index.setAnnotation(ia);
-        }
-        ia.statementsThatUseThis.add(stmt);
-        ia.proceduresThatUseThis.add(proc);
-
-        ProcedureAnnotation pa = (ProcedureAnnotation) proc.getAnnotation();
-        if (pa == null) {
-            pa = new ProcedureAnnotation();
-            proc.setAnnotation(pa);
-        }
-        pa.indexesUsed.add(index);
-
-        StatementAnnotation sa = (StatementAnnotation) stmt.getAnnotation();
-        if (sa == null) {
-            sa = new StatementAnnotation();
-            stmt.setAnnotation(sa);
-        }
-        sa.indexesUsed.add(index);
-    }
-
-    private static void updateTableUsageAnnotation(Table table, Statement stmt, boolean read) {
-        if (!(stmt.getParent() instanceof Procedure)) {
-            // if parent of statement is not a procedure
-            // it could be a table with a LIMIT ROWS DELETE
-            return;
-        }
-
-        Procedure proc = (Procedure)stmt.getParent();
-        // skip CRUD generated procs
-        if (proc.getDefaultproc()) {
-            return;
-        }
-
-        TableAnnotation ta = (TableAnnotation) table.getAnnotation();
-        if (ta == null) {
-            ta = new TableAnnotation();
-            table.setAnnotation(ta);
-        }
-        if (read) {
-            ta.statementsThatReadThis.add(stmt);
-            ta.proceduresThatReadThis.add(proc);
-        }
-        else {
-            ta.statementsThatUpdateThis.add(stmt);
-            ta.proceduresThatUpdateThis.add(proc);
-        }
-
-        ProcedureAnnotation pa = (ProcedureAnnotation) proc.getAnnotation();
-        if (pa == null) {
-            pa = new ProcedureAnnotation();
-            proc.setAnnotation(pa);
-        }
-        if (read) {
-            pa.tablesRead.add(table);
-        }
-        else {
-            pa.tablesUpdated.add(table);
-        }
-
-        StatementAnnotation sa = (StatementAnnotation) stmt.getAnnotation();
-        if (sa == null) {
-            sa = new StatementAnnotation();
-            stmt.setAnnotation(sa);
-        }
-        if (read) {
-            sa.tablesRead.add(table);
-        }
-        else {
-            sa.tablesUpdated.add(table);
-        }
     }
 
     /**

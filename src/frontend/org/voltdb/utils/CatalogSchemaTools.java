@@ -17,6 +17,9 @@
 
 package org.voltdb.utils;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -57,6 +60,10 @@ import org.voltdb.types.ConstraintType;
 public abstract class CatalogSchemaTools {
 
     final static String spacer = "   ";
+
+    // Set to true to enable dumping to /tmp/canonical-<timestamp>.sql
+    // Make sure it's false before committing.
+    final static boolean dumpSchema = false;
 
     /**
      * Convert a Table catalog object into the proper SQL DDL, including all indexes,
@@ -386,17 +393,6 @@ public abstract class CatalogSchemaTools {
      */
     public static void toSchema(StringBuilder sb, Procedure proc)
     {
-        CatalogMap<GroupRef> roleList = proc.getAuthgroups();
-        String add;
-        String roleNames = new String();
-        if (roleList.size() > 0) {
-            add = "\n" + spacer + "ALLOW ";
-            for (GroupRef role : roleList) {
-                roleNames += add + role.getGroup().getTypeName();
-                add = ", ";
-            }
-        }
-
         // Groovy: hasJava (true), m_language ("GROOVY"), m_defaultproc (false)
         // CRUD: hasJava (false), m_language (""), m_defaultproc (true)
         // SQL: hasJava (false), m_language(""), m_defaultproc (false), m_statements.m_items."SQL"
@@ -404,41 +400,80 @@ public abstract class CatalogSchemaTools {
         if (proc.getDefaultproc()) {
             return;
         }
+
+        // Build the optional ALLOW clause.
+        CatalogMap<GroupRef> roleList = proc.getAuthgroups();
+        String add;
+        String allowClause = new String();
+        if (roleList.size() > 0) {
+            add = "\n" + spacer + "ALLOW ";
+            for (GroupRef role : roleList) {
+                allowClause += add + role.getGroup().getTypeName();
+                add = ", ";
+            }
+        }
+
+        // Build the optional PARTITION clause.
+        StringBuilder partitionClause = new StringBuilder();
         ProcedureAnnotation annot = (ProcedureAnnotation) proc.getAnnotation();
-        if (!proc.getHasjava()) {
-            // SQL Statement procedure
-            sb.append("CREATE PROCEDURE " + proc.getClassname() + roleNames + "\n" + spacer + "AS\n");
-            String sqlStmt = proc.getStatements().get("SQL").getSqltext();
-            if (sqlStmt.endsWith(";")) {
-                sb.append(spacer + sqlStmt + "\n");
+        if (proc.getSinglepartition()) {
+            if (annot != null && annot.classAnnotated) {
+                partitionClause.append("--Annotated Partitioning Takes Precedence Over DDL Procedure Partitioning Statement\n--");
             }
             else {
-                sb.append(spacer + sqlStmt + ";\n");
+                partitionClause.append("\n");
             }
+            partitionClause.append(spacer);
+            partitionClause.append(String.format(
+                    "PARTITION ON TABLE %s COLUMN %s",
+                    proc.getPartitiontable().getTypeName(),
+                    proc.getPartitioncolumn().getTypeName() ));
+            if (proc.getPartitionparameter() != 0) {
+                partitionClause.append(String.format(
+                        " PARAMETER %s",
+                        String.valueOf(proc.getPartitionparameter()) ));
+            }
+        }
+
+        // Build the appropriate CREATE PROCEDURE statement variant.
+        if (!proc.getHasjava()) {
+            // SQL Statement procedure
+            sb.append(String.format(
+                    "CREATE PROCEDURE %s%s%s\n%sAS\n%s%s",
+                    proc.getClassname(),
+                    allowClause,
+                    partitionClause.toString(),
+                    spacer,
+                    spacer,
+                    proc.getStatements().get("SQL").getSqltext().trim()));
         }
         else if (proc.getLanguage().equals("JAVA")) {
             // Java Class
-            sb.append("CREATE PROCEDURE " + roleNames + "\n" + spacer + "FROM CLASS " + proc.getClassname() + ";\n");
+            sb.append(String.format(
+                    "CREATE PROCEDURE %s%s\n%sFROM CLASS %s",
+                    allowClause,
+                    partitionClause.toString(),
+                    spacer,
+                    proc.getClassname()));
         }
         else {
             // Groovy procedure
-            sb.append("CREATE PROCEDURE " + proc.getClassname() + roleNames + "\n" + spacer + "AS ###");
-            sb.append(annot.scriptImpl + "### LANGUAGE GROOVY;\n");
+            sb.append(String.format(
+                    "CREATE PROCEDURE %s%s%s\n%sAS ###%s### LANGUAGE GROOVY",
+                    proc.getClassname(),
+                    allowClause,
+                    partitionClause.toString(),
+                    spacer,
+                    annot.scriptImpl));
         }
-        if (proc.getSinglepartition()) {
-            if (annot != null && annot.classAnnotated) {
-                sb.append("--Annotated Partitioning Takes Precedence Over DDL Procedure Partitioning Statement\n--");
-            }
-            sb.append("PARTITION PROCEDURE " + proc.getTypeName() + " ON TABLE " +
-                    proc.getPartitiontable().getTypeName() + " COLUMN " +
-                    proc.getPartitioncolumn().getTypeName() );
-            if (proc.getPartitionparameter() != 0)
-                sb.append(" PARAMETER " + String.valueOf(proc.getPartitionparameter()) );
-            sb.append(";\n\n");
+
+        // The SQL statement variant may have terminated the CREATE PROCEDURE statement.
+        if (!sb.toString().endsWith(";")) {
+            sb.append(";");
         }
-        else {
-            sb.append("\n");
-        }
+
+        // Give me some space man.
+        sb.append("\n\n");
     }
 
     /**
@@ -453,7 +488,6 @@ public abstract class CatalogSchemaTools {
         }
     }
 
-
     /**
      * Convert a catalog into a string containing all DDL statements.
      * @param String[] classNames
@@ -463,14 +497,14 @@ public abstract class CatalogSchemaTools {
     {
         StringBuilder sb = new StringBuilder();
 
-        //sb.append("-- This file was generated by VoltDB version ");
-        //sb.append(VoltDB.instance().getVersionString());
-        //SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss z");
-        //String time = sdf.format(System.currentTimeMillis());
-        //sb.append(" on: " + time + ".\n");
+        sb.append("-- This file was generated by VoltDB version ");
+        sb.append(VoltDB.instance().getVersionString());
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss z");
+        String time = sdf.format(System.currentTimeMillis());
+        sb.append(" on: " + time + ".\n");
 
-        //sb.append("-- This file represents the current database schema.\n");
-        //sb.append("-- Use this file as input to reproduce the current database structure in another database instance.\n");
+        sb.append("-- This file represents the current database schema.\n");
+        sb.append("-- Use this file as input to reproduce the current database structure in another database instance.\n");
 
         for (Cluster cluster : catalog.getClusters()) {
             for (Database db : cluster.getDatabases()) {
@@ -502,6 +536,18 @@ public abstract class CatalogSchemaTools {
                     toSchema(sb, proc);
                 }
                 sb.append("\n");
+            }
+        }
+
+        if (dumpSchema) {
+            String ts = new SimpleDateFormat("MMddHHmmssSSS").format(new Date());
+            File f = new File(String.format("/tmp/canonical-%s.sql", ts));
+            try {
+                FileWriter fw = new FileWriter(f);
+                fw.write(sb.toString());
+                fw.close();
+            } catch (IOException e) {
+                e.printStackTrace();
             }
         }
 
