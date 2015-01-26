@@ -109,6 +109,7 @@ import org.voltdb.security.AuthenticationRequest;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.SQLLexer;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Predicate;
@@ -1394,7 +1395,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     ClientResponseImpl dispatchExplainProcedure(StoredProcedureInvocation task, ClientInputHandler handler, Connection ccxn, AuthUser user) {
         ParameterSet params = task.getParams();
         //String procs = (String) params.toArray()[0];
-        List<String> procNames = MiscUtils.splitSQLStatements( (String)params.toArray()[0]);
+        List<String> procNames = SQLLexer.splitStatements( (String)params.toArray()[0]);
         int size = procNames.size();
         VoltTable[] vt = new VoltTable[ size ];
         for( int i=0; i<size; i++ ) {
@@ -1480,7 +1481,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private final void dispatchAdHocCommon(StoredProcedureInvocation task,
             ClientInputHandler handler, Connection ccxn, ExplainMode explainMode,
             String sql, Object[] userParams, Object[] userPartitionKey, AuthSystem.AuthUser user) {
-        List<String> sqlStatements = MiscUtils.splitSQLStatements(sql);
+        List<String> sqlStatements = SQLLexer.splitStatements(sql);
         String[] stmtsArray = sqlStatements.toArray(new String[sqlStatements.size()]);
 
         AdHocPlannerWork ahpw = new AdHocPlannerWork(

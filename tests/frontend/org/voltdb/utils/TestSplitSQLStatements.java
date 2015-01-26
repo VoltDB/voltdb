@@ -23,7 +23,7 @@
 
 package org.voltdb.utils;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 import java.util.List;
 
@@ -40,7 +40,7 @@ public class TestSplitSQLStatements {
     }
 
     private void checkSplitter(final String strIn, final String... strsCmp) {
-        final List<String> strsOut = MiscUtils.splitSQLStatements(strIn);
+        final List<String> strsOut = SQLLexer.splitStatements(strIn);
         assertEquals(strsCmp.length, strsOut.size());
         for (int i = 0; i < strsCmp.length; ++i) {
             assertEquals(strsCmp[i], strsOut.get(i));

@@ -130,7 +130,7 @@ public class TestSQLLexer {
                                      boolean ifexists,
                                      boolean cascade)
     {
-        HSQLDDLInfo info = SQLLexer.preprocessHSQLDDL(ddl);
+        HSQLDDLInfo info = HSQLLexer.preprocessHSQLDDL(ddl);
         assertNotNull(info);
         assertEquals(verb, info.verb);
         assertEquals(noun, info.noun);
@@ -141,7 +141,7 @@ public class TestSQLLexer {
     }
 
     void checkInvalidHSQLPreprocessing(String ddl) {
-        HSQLDDLInfo info = SQLLexer.preprocessHSQLDDL(ddl);
+        HSQLDDLInfo info = HSQLLexer.preprocessHSQLDDL(ddl);
         assertEquals(null, info);
     }
 
