@@ -938,9 +938,9 @@ public abstract class CatalogUtil {
             case HTTP: exportClientClassName = "org.voltdb.exportclient.HttpExportClient"; break;
             //Validate that we can load the class.
             case CUSTOM:
-                try {
-                    CatalogUtil.class.getClassLoader().loadClass(exportType.getExportconnectorclass());
-                    exportClientClassName = exportType.getExportconnectorclass();
+                exportClientClassName = exportType.getExportconnectorclass();
+                if (exportType.isEnabled()) try {
+                    CatalogUtil.class.getClassLoader().loadClass(exportClientClassName);
                 }
                 catch (ClassNotFoundException ex) {
                     String msg =
@@ -979,12 +979,16 @@ public abstract class CatalogUtil {
             }
         }
 
+        if (!exportType.isEnabled()) {
+            return processorProperties;
+        }
+
         // Instantiate the Guest Processor
         Class<?> processorClazz = null;
         try {
             processorClazz = Class.forName(ExportManager.PROCESSOR_CLASS);
         } catch (ClassNotFoundException e) {
-            throw new DeploymentCheckException("Export is PRO version only feature");
+            throw new DeploymentCheckException("Export is a PRO version only feature");
         }
         ExportDataProcessor processor = null;
         try {
