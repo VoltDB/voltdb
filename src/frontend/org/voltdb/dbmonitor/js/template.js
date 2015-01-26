@@ -415,4 +415,7 @@ function sizes_update_all() {
         sizes_update_row(nrow);
     }
     sizes_update_summary();
+    
+    //Update the table for sorting.
+    $("#sizetable").trigger("update");
 }
