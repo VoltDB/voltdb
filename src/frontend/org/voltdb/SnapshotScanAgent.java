@@ -243,8 +243,7 @@ public class SnapshotScanAgent extends OpsAgent
                                     f.getParent(),
                                     f.getName(),
                                     savefile.getTxnId(),
-                                    org.voltdb.TransactionIdManager.getTimestampFromTransactionId(
-                                        savefile.getTxnId()),
+                                    savefile.getTimestamp(),
                                     savefile.getTableName(),
                                     savefile.getCompleted() ? "TRUE" : "FALSE",
                                     f.length(),
