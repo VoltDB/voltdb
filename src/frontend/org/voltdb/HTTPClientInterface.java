@@ -56,8 +56,7 @@ public class HTTPClientInterface {
     int m_timeout = 0;
     final String m_timeoutResponse;
 
-    public static int MAX_QUERY_PARAM_SIZE = 150000;
-
+    public final static int MAX_QUERY_PARAM_SIZE = 2 * 1024 * 1024; // 2MB
 
     public void setTimeout(int seconds) {
         m_timeout = seconds * 1000;

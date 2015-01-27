@@ -1106,7 +1106,7 @@ public class TestJSONInterface extends TestCase {
             //create a large query string
             final StringBuilder b = new StringBuilder();
             b.append("Procedure=@Statistics&Parameters=[TABLE]&jsonpxx=");
-            for (int i = 0; i < 150000; i++) {
+            for (int i = 0; i < 450000; i++) {
                 b.append(i);
             }
             //call multiple times.
@@ -1132,7 +1132,6 @@ public class TestJSONInterface extends TestCase {
             assertEquals(ClientResponse.SUCCESS, response.status);
 
         } finally {
-            HTTPClientInterface.MAX_QUERY_PARAM_SIZE = 150000;
             if (server != null) {
                 server.shutdown();
                 server.join();
