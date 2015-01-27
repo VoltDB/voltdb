@@ -177,7 +177,11 @@ $(document).ready(function () {
             filter_reset: ".reset",
             filter_hideFilters: true
         },
-        cssChildRow: "tablesorter-childRow"
+        cssChildRow: "tablesorter-childRow",
+        textExtraction: function (elem) {
+            var $input = $("input[type=text]", elem);
+            return $input.val() || $(elem).text();
+        }
     });
 
     $('.tableL3').delegate('.togglex', 'click', function () {
