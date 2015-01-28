@@ -71,6 +71,10 @@ public class ExportManager
      */
     public static final String PROCESSOR_CLASS =
             "org.voltdb.export.processors.GuestProcessor";
+    /**
+     * This is property used for checking Export clients for validation only.
+     */
+    public final static String CONFIG_CHECK_ONLY = "__voltdb_config_check_only__";
 
     /**
      * Processors also log using this facility.

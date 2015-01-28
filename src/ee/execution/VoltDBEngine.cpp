@@ -989,16 +989,13 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
             if ( ! persistenttable) {
                 StreamedTable *streamedtable = dynamic_cast<StreamedTable*>(table);
                 assert(streamedtable);
+                streamedtable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
                 if (!tcd->exportEnabled()) {
                     //Evaluate export enabled or not if enabled hook up streamer
-                    tcd->evaluateExport(*m_database, *catalogTable);
-                    if (tcd->exportEnabled()) {
-                        if (streamedtable->enableStream()) {
-                            streamedtable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
-                            m_exportingTables[catalogTable->signature()] = table;
-                        } else {
-                            streamedtable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
-                        }
+                    if (tcd->evaluateExport(*m_database, *catalogTable) && streamedtable->enableStream()) {
+                        //Reset generation after stream wrapper is is created.
+                        streamedtable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
+                        m_exportingTables[catalogTable->signature()] = table;
                     }
                 }
                 // note, this is the end of the line for export tables for now,

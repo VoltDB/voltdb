@@ -118,6 +118,7 @@ import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import java.util.Properties;
 
 import org.voltdb.export.ExportManager;
+import org.voltdb.exportclient.ExportClientBase;
 
 /**
  *
@@ -1063,6 +1064,8 @@ public abstract class CatalogUtil {
         }
         try {
             processor.addLogger(hostLog);
+
+            processorProperties.put(ExportManager.CONFIG_CHECK_ONLY, "true");
             processor.checkProcessorConfig(processorProperties);
             processor.shutdown();
         } catch (Exception e) {
@@ -1070,6 +1073,7 @@ public abstract class CatalogUtil {
             throw new DeploymentCheckException("Export processor failed its configuration check: " + e.getMessage(), e);
         }
 
+        processorProperties.remove(ExportManager.CONFIG_CHECK_ONLY);
         return processorProperties;
     }
 

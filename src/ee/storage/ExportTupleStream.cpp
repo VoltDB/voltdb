@@ -45,23 +45,21 @@ ExportTupleStream::ExportTupleStream(CatalogId partitionId,
       m_signature(""), m_generation(0)
 {}
 
-void ExportTupleStream::setSignatureAndGeneration(std::string signature, int64_t generation, bool push) {
+void ExportTupleStream::setSignatureAndGeneration(std::string signature, int64_t generation) {
     assert(generation > m_generation);
     assert(signature == m_signature || m_signature == string(""));
 
     //The first time through this is catalog load and m_generation will be 0
     //Don't send the end of stream notice.
     if (generation != m_generation && m_generation > 0) {
-        if (push) {
-            //Notify that no more data is coming from this generation.
-            ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
-                    m_generation,
-                    m_partitionId,
-                    m_signature,
-                    NULL,
-                    false,
-                    true);
-        }
+        //Notify that no more data is coming from this generation.
+        ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
+                m_generation,
+                m_partitionId,
+                m_signature,
+                NULL,
+                false,
+                true);
         /*
          * With the new generational code the USO is reset to 0 for each
          * generation. The sequence number stored on the table outside the wrapper

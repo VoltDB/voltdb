@@ -320,7 +320,7 @@ class Table {
      * Inform the tuple stream wrapper of the table's signature and the timestamp
      * of the current export generation
      */
-    virtual void setSignatureAndGeneration(std::string signature, int64_t generation, bool push = true) {
+    virtual void setSignatureAndGeneration(std::string signature, int64_t generation) {
     }
 
     virtual bool isExport() {

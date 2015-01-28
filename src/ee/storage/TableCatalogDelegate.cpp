@@ -425,7 +425,8 @@ TableCatalogDelegate::init(catalog::Database const &catalogDatabase,
 bool TableCatalogDelegate::evaluateExport(catalog::Database const &catalogDatabase,
                            catalog::Table const &catalogTable)
 {
-    return (isExportEnabledForTable(catalogDatabase, catalogTable.relativeIndex()));
+    m_exportEnabled = isExportEnabledForTable(catalogDatabase, catalogTable.relativeIndex());
+    return m_exportEnabled;
 }
 
 
