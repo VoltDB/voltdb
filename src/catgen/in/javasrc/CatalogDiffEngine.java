@@ -592,8 +592,8 @@ public class CatalogDiffEngine {
         // Avoid over-generalization when describing limitations that are dependent on particular
         // cases of BEFORE and AFTER values by listing the offending values.
         String restrictionQualifier = "";
-        
-        if (suspect instanceof Cluster && field.equals("drClusterId") || 
+
+        if (suspect instanceof Cluster && field.equals("drClusterId") ||
                 suspect instanceof Cluster && field.equals("drProducerPort")) {
             // Don't allow changes to ClusterId or ProducerPort while not transitioning to or from Disabled
             if ((Boolean)prevType.getField("drProducerEnabled") && (Boolean)suspect.getField("drProducerEnabled")) {
