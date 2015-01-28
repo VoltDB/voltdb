@@ -61,6 +61,7 @@ import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.MiscUtils;
 
 public class TestVoltCompiler extends TestCase {
 
@@ -442,6 +443,8 @@ public class TestVoltCompiler extends TestCase {
 
     // test that Export configuration is insensitive to the case of the table name
     public void testExportTableCase() throws IOException {
+        if (!MiscUtils.isPro()) { return; } // not supported in community
+
         final VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(TestVoltCompiler.class.getResource("ExportTester-ddl.sql"));
         project.addStmtProcedure("Dummy", "insert into a values (?, ?, ?);",
