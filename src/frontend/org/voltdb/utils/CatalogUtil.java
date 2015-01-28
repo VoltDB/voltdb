@@ -115,6 +115,7 @@ import org.xml.sax.SAXException;
 
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
+import java.util.Properties;
 
 import org.voltdb.export.ExportManager;
 
@@ -983,6 +984,95 @@ public abstract class CatalogUtil {
         }
     }
 
+    private static Properties checkExportProcessorConfiguration(ExportConfigurationType exportConfiguration) {
+        // on-server export always uses the guest processor
+        String exportClientClassName = null;
+
+        switch(exportConfiguration.getTarget()) {
+            case FILE: exportClientClassName = "org.voltdb.exportclient.ExportToFileClient"; break;
+            case JDBC: exportClientClassName = "org.voltdb.exportclient.JDBCExportClient"; break;
+            case KAFKA: exportClientClassName = "org.voltdb.exportclient.KafkaExportClient"; break;
+            case RABBITMQ: exportClientClassName = "org.voltdb.exportclient.RabbitMQExportClient"; break;
+            case HTTP: exportClientClassName = "org.voltdb.exportclient.HttpExportClient"; break;
+            //Validate that we can load the class.
+            case CUSTOM:
+                exportClientClassName = exportConfiguration.getExportconnectorclass();
+                if (exportConfiguration.isEnabled()) {
+                    try {
+                        CatalogUtil.class.getClassLoader().loadClass(exportClientClassName);
+                    }
+                    catch (ClassNotFoundException ex) {
+                        String msg =
+                                "Custom Export failed to configure, failed to load" +
+                                " export plugin class: " + exportConfiguration.getExportconnectorclass() +
+                                " Disabling export.";
+                        hostLog.error(msg);
+                        throw new DeploymentCheckException(msg);
+                    }
+                }
+            break;
+        }
+
+        Properties processorProperties = new Properties();
+
+        if (exportClientClassName != null && exportClientClassName.trim().length() > 0) {
+            String dexportClientClassName = System.getProperty(ExportDataProcessor.EXPORT_TO_TYPE, exportClientClassName);
+            //Override for tests
+            if (dexportClientClassName != null && dexportClientClassName.trim().length() > 0 &&
+                    exportConfiguration.getTarget().equals(ServerExportEnum.CUSTOM)) {
+                processorProperties.setProperty(ExportDataProcessor.EXPORT_TO_TYPE, dexportClientClassName);
+            } else {
+                processorProperties.setProperty(ExportDataProcessor.EXPORT_TO_TYPE, exportClientClassName);
+            }
+        }
+
+        if (exportConfiguration != null) {
+            List<PropertyType> configProperties = exportConfiguration.getProperty();
+            if (configProperties != null && ! configProperties.isEmpty()) {
+
+                for( PropertyType configProp: configProperties) {
+                    String key = configProp.getName();
+                    String value = configProp.getValue();
+                    if (!key.toLowerCase().contains("passw")) {
+                        processorProperties.setProperty(key, value.trim());
+                    } else {
+                        //Dont trim passwords
+                        processorProperties.setProperty(key, value);
+                    }
+                }
+            }
+        }
+
+        if (!exportConfiguration.isEnabled()) {
+            return processorProperties;
+        }
+
+        // Instantiate the Guest Processor
+        Class<?> processorClazz = null;
+        try {
+            processorClazz = Class.forName(ExportManager.PROCESSOR_CLASS);
+        } catch (ClassNotFoundException e) {
+            throw new DeploymentCheckException("Export is a PRO version only feature");
+        }
+        ExportDataProcessor processor = null;
+        try {
+            processor = (ExportDataProcessor)processorClazz.newInstance();
+        } catch (InstantiationException | IllegalAccessException e) {
+            hostLog.error("Unable to instantiate export processor", e);
+            throw new DeploymentCheckException("Unable to instantiate export processor", e);
+        }
+        try {
+            processor.addLogger(hostLog);
+            processor.checkProcessorConfig(processorProperties);
+            processor.shutdown();
+        } catch (Exception e) {
+            hostLog.error("Export processor failed its configuration check", e);
+            throw new DeploymentCheckException("Export processor failed its configuration check: " + e.getMessage(), e);
+        }
+
+        return processorProperties;
+    }
+
     /**
      * Set deployment time settings for export
      * @param catalog The catalog to be updated.
@@ -1033,62 +1123,16 @@ public abstract class CatalogUtil {
                 }
                 continue;
             }
+            Properties processorProperties = checkExportProcessorConfiguration(exportConfiguration);
+            for (String name: processorProperties.stringPropertyNames()) {
+                ConnectorProperty prop = catconn.getConfig().add(name);
+                prop.setName(name);
+                prop.setValue(processorProperties.getProperty(name));
+            }
 
             // on-server export always uses the guest processor
-            String connector = ExportManager.DEFAULT_LOADER_CLASS;
-            catconn.setLoaderclass(connector);
+            catconn.setLoaderclass(ExportManager.PROCESSOR_CLASS);
             catconn.setEnabled(connectorEnabled);
-
-            String exportClientClassName = null;
-
-            switch(exportConfiguration.getTarget()) {
-                case FILE: exportClientClassName = "org.voltdb.exportclient.ExportToFileClient"; break;
-                case JDBC: exportClientClassName = "org.voltdb.exportclient.JDBCExportClient"; break;
-                case KAFKA: exportClientClassName = "org.voltdb.exportclient.KafkaExportClient"; break;
-                case RABBITMQ: exportClientClassName = "org.voltdb.exportclient.RabbitMQExportClient"; break;
-                case HTTP: exportClientClassName = "org.voltdb.exportclient.HttpExportClient"; break;
-                //Validate that we can load the class.
-                case CUSTOM:
-                    try {
-                        CatalogUtil.class.getClassLoader().loadClass(exportConfiguration.getExportconnectorclass());
-                        exportClientClassName = exportConfiguration.getExportconnectorclass();
-                    }
-                    catch (ClassNotFoundException ex) {
-                        throw new RuntimeException(
-                                "Custom Export failed to configure, failed to load " +
-                                "export plugin class: " + exportConfiguration.getExportconnectorclass());
-                    } break;
-            }
-
-            // this is OK as the deployment file XML schema does not allow for
-            // export configuration property names that begin with underscores
-            if (exportClientClassName != null && exportClientClassName.trim().length() > 0) {
-                ConnectorProperty prop = catconn.getConfig().add(ExportDataProcessor.EXPORT_TO_TYPE);
-                prop.setName(ExportDataProcessor.EXPORT_TO_TYPE);
-                //Override for tests
-                String dexportClientClassName = System.getProperty(ExportDataProcessor.EXPORT_TO_TYPE);
-                if (dexportClientClassName != null && dexportClientClassName.trim().length() > 0 &&
-                        exportConfiguration.getTarget().equals(ServerExportEnum.CUSTOM)) {
-                    prop.setValue(dexportClientClassName);
-                } else {
-                    prop.setValue(exportClientClassName);
-                }
-            }
-
-            List<PropertyType> configProperties = exportConfiguration.getProperty();
-            if (configProperties != null && ! configProperties.isEmpty()) {
-
-                for( PropertyType configProp: configProperties) {
-                    ConnectorProperty prop = catconn.getConfig().add(configProp.getName());
-                    prop.setName(configProp.getName());
-                    if (!configProp.getName().toLowerCase().contains("password")) {
-                        prop.setValue(configProp.getValue().trim());
-                    } else {
-                        //Dont trim passwords
-                        prop.setValue(configProp.getValue());
-                    }
-                }
-            }
 
             if (!connectorEnabled) {
                 if (defaultConnector) {
@@ -1772,4 +1816,27 @@ public abstract class CatalogUtil {
         }
         return emptyJarFile;
     }
+
+    public static class DeploymentCheckException extends RuntimeException {
+
+        private static final long serialVersionUID = 6741313621335268608L;
+
+        public DeploymentCheckException() {
+            super();
+        }
+
+        public DeploymentCheckException(String message, Throwable cause) {
+            super(message, cause);
+        }
+
+        public DeploymentCheckException(String message) {
+            super(message);
+        }
+
+        public DeploymentCheckException(Throwable cause) {
+            super(cause);
+        }
+
+    }
+
 }

@@ -40,22 +40,21 @@ public class CountDeviceHybrid extends VoltProcedure {
     final static SQLStmt exactCardinality = new SQLStmt("select count(*) from exact where appid = ?;");
     final static SQLStmt exactClear = new SQLStmt("delete from exact where appid = ?;");
 
-    public long run(long appId, long hashedDeviceId) throws IOException {
+    public VoltTable[] run(long appId, long hashedDeviceId) throws IOException {
 
-        long current = 0;
-        HyperLogLog hll = null;
-        byte[] hllBytes = null;
-
-        // get the HLL from the db or create one if needed
+        // get the HLL bytes and curret count from the db
         voltQueueSQL(estimatesSelect, EXPECT_ZERO_OR_ONE_ROW, appId);
         VoltTable estimatesTable = voltExecuteSQL()[0];
 
+        HyperLogLog hll = null;
+        long current = 0;
+        // if the row with the hyperloglog blob exists...
         if (estimatesTable.advanceRow()) {
-            estimatesTable.advanceRow();
             current = estimatesTable.getLong("devicecount");
-            hllBytes = estimatesTable.getVarbinary("hll");
+            byte[] hllBytes = estimatesTable.getVarbinary("hll");
             hll = HyperLogLog.fromBytes(hllBytes);
         }
+        // otherwise create a hyperloglog blob
         else {
             hll = new HyperLogLog(12);
         }
@@ -64,9 +63,10 @@ public class CountDeviceHybrid extends VoltProcedure {
         hll.offerHashed(hashedDeviceId);
 
         long newEstimate = current;
+        // exact mode
         if (current < MAX_EXACT_COUNT) {
             voltQueueSQL(exactUpsert, EXPECT_ZERO_OR_ONE_ROW, appId, hashedDeviceId);
-            voltQueueSQL(exactCardinality, EXPECT_ONE_ROW, appId);
+            voltQueueSQL(exactCardinality, EXPECT_SCALAR_LONG, appId);
             newEstimate = voltExecuteSQL()[1].asScalarLong();
 
             // clear the exact table for this appid once it's not needed
@@ -75,6 +75,7 @@ public class CountDeviceHybrid extends VoltProcedure {
                 voltExecuteSQL();
             }
         }
+        // estimate mode
         else if (hll.getDirty()) {
             newEstimate = Math.max(MAX_EXACT_COUNT, hll.cardinality());
         }
@@ -82,9 +83,8 @@ public class CountDeviceHybrid extends VoltProcedure {
         // if the estimates row needs updating, upsert it
         if ((newEstimate != current) || hll.getDirty()) {
             voltQueueSQL(estimatesUpsert, EXPECT_SCALAR_MATCH(1), appId, newEstimate, hll.toBytes());
-            voltExecuteSQL(true);
+            return voltExecuteSQL(true);
         }
-
-        return newEstimate;
+        return null;
     }
 }

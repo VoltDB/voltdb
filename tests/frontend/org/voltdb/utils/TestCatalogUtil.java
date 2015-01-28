@@ -655,6 +655,8 @@ public class TestCatalogUtil extends TestCase {
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
+                + "            <property name=\"nonce\">pre-fix</property>"
+                + "            <property name=\"outdir\">exportdata</property>"
                 + "        </configuration>"
                 + "    </export>"
                 + "</deployment>";
@@ -662,21 +664,9 @@ public class TestCatalogUtil extends TestCase {
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
-                + "    <export>"
-                + "        <configuration enabled='true' target='kafka'>"
-                + "            <property name=\"foo\">false</property>"
-                + "            <property name=\"type\">CSV</property>"
-                + "            <property name=\"with-schema\">false</property>"
-                + "        </configuration>"
-                + "    </export>"
-                + "</deployment>";
-        final String withBuiltinRabbitMQExport =
-                "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
-                + "<deployment>"
-                + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
-                + "    <export>"
-                + "        <configuration enabled='true' target='rabbitmq'>"
-                + "            <property name=\"foo\">false</property>"
+                + "    <export enabled='true' target='kafka'>"
+                + "        <configuration>"
+                + "            <property name=\"metadata.broker.list\">uno,due,tre</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
                 + "        </configuration>"
@@ -697,11 +687,7 @@ public class TestCatalogUtil extends TestCase {
         Catalog cat = compiler.compileCatalogFromDDL(x);
 
         String msg = CatalogUtil.compileDeployment(cat, bad_deployment, false);
-        if (msg == null) {
-            fail("Should not accept a deployment file containing a missing export connector class.");
-        } else {
-            assertTrue(msg.contains("Custom Export failed to configure, failed to load export plugin class:"));
-        }
+        assertTrue("compilation should have failed", msg.contains("Custom Export failed to configure"));
 
         //This is a good deployment with custom class that can be found
         final File tmpGood = VoltProjectBuilder.writeStringToTempFile(withGoodCustomExport);
@@ -755,20 +741,6 @@ public class TestCatalogUtil extends TestCase {
         assertEquals(builtin_kafkadeployment.getExport().getConfiguration().get(0).getTarget(), ServerExportEnum.KAFKA);
         prop = catconn.getConfig().get(ExportDataProcessor.EXPORT_TO_TYPE);
         assertEquals(prop.getValue(), "org.voltdb.exportclient.KafkaExportClient");
-
-        // Check RabbitMQ option
-        final File tmpRabbitMQBuiltin = VoltProjectBuilder.writeStringToTempFile(withBuiltinRabbitMQExport);
-        DeploymentType builtin_rabbitmqdeployment = CatalogUtil.getDeployment(new FileInputStream(tmpRabbitMQBuiltin));
-        Catalog cat5 = compiler.compileCatalogFromDDL(x);
-        msg = CatalogUtil.compileDeployment(cat5, builtin_rabbitmqdeployment, false);
-        assertTrue("Deployment file failed to parse: " + msg, msg == null);
-        db = cat5.getClusters().get("cluster").getDatabases().get("database");
-        catconn = db.getConnectors().get(Constants.DEFAULT_EXPORT_CONNECTOR_NAME);
-        assertNotNull(catconn);
-        assertTrue(builtin_rabbitmqdeployment.getExport().getConfiguration().get(0).isEnabled());
-        assertEquals(ServerExportEnum.RABBITMQ, builtin_rabbitmqdeployment.getExport().getConfiguration().get(0).getTarget());
-        prop = catconn.getConfig().get(ExportDataProcessor.EXPORT_TO_TYPE);
-        assertEquals("org.voltdb.exportclient.RabbitMQExportClient", prop.getValue());
     }
 
     public void testMultiExportClientSettings() throws Exception {
@@ -800,11 +772,15 @@ public class TestCatalogUtil extends TestCase {
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
+                + "            <property name=\"nonce\">nonce</property>"
+                + "            <property name=\"outdir\">/tmp</property>"
                 + "        </configuration>"
                 + "        <configuration group='foo' enabled='true' target='kafka'>"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
+                + "            <property name=\"nonce\">nonce</property>"
+                + "            <property name=\"outdir\">/tmp</property>"
                 + "        </configuration>"
                 + "    </export>"
                 + "</deployment>";
@@ -834,16 +810,22 @@ public class TestCatalogUtil extends TestCase {
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
+                + "            <property name=\"nonce\">nonce</property>"
+                + "            <property name=\"outdir\">/tmp</property>"
                 + "        </configuration>"
                 + "        <configuration group='bar' enabled='true' target='file'>"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
+                + "            <property name=\"nonce\">nonce</property>"
+                + "            <property name=\"outdir\">/tmp</property>"
                 + "        </configuration>"
                 + "        <configuration group='unused' enabled='true' target='file'>"
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
+                + "            <property name=\"nonce\">nonce</property>"
+                + "            <property name=\"outdir\">/tmp</property>"
                 + "        </configuration>"
                 + "    </export>"
                 + "</deployment>";
@@ -861,6 +843,8 @@ public class TestCatalogUtil extends TestCase {
                 + "            <property name=\"foo\">false</property>"
                 + "            <property name=\"type\">CSV</property>"
                 + "            <property name=\"with-schema\">false</property>"
+                + "            <property name=\"nonce\">nonce</property>"
+                + "            <property name=\"outdir\">/tmp</property>"
                 + "        </configuration>"
                 + "    </export>"
                 + "</deployment>";
@@ -959,7 +943,7 @@ public class TestCatalogUtil extends TestCase {
                 + "        </configuration>"
                 + "    </export>"
                 + "</deployment>";
-        final String withGoodFileExport =
+        final String withBadFileExport =
                 "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
                 + "<deployment>"
                 + "<cluster hostcount='3' kfactor='1' sitesperhost='2'/>"
@@ -992,10 +976,10 @@ public class TestCatalogUtil extends TestCase {
         assertEquals(good_deployment.getExport().getConfiguration().get(0).getTarget(), ServerExportEnum.CUSTOM);
 
         Catalog cat2 = compiler.compileCatalogFromDDL(x);
-        final File tmpFileGood = VoltProjectBuilder.writeStringToTempFile(withGoodFileExport);
+        final File tmpFileGood = VoltProjectBuilder.writeStringToTempFile(withBadFileExport);
         DeploymentType good_file_deployment = CatalogUtil.getDeployment(new FileInputStream(tmpFileGood));
         msg = CatalogUtil.compileDeployment(cat2, good_file_deployment, false);
-        assertTrue("Deployment file failed to parse: " + msg, msg == null);
+        assertTrue("compilation should have failed", msg.contains("ExportToFile: must provide a filename nonce"));
 
         assertTrue(good_file_deployment.getExport().getConfiguration().get(0).isEnabled());
         assertEquals(good_file_deployment.getExport().getConfiguration().get(0).getTarget(), ServerExportEnum.FILE);

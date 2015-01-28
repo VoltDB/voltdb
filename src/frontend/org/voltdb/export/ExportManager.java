@@ -66,6 +66,11 @@ import com.google_voltpatches.common.base.Throwables;
  */
 public class ExportManager
 {
+    /**
+     * the only supported processor class
+     */
+    public static final String PROCESSOR_CLASS =
+            "org.voltdb.export.processors.GuestProcessor";
 
     /**
      * Processors also log using this facility.
