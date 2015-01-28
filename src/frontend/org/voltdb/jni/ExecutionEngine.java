@@ -412,12 +412,37 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                         m_currMemoryInBytes,
                         m_peakMemoryInBytes);
 
-        // ENG-7610: array of SQL texts seems to get out of sync with the current
-        // batch index, so we need to do bounds checking here.
         if (m_sqlTexts != null
                 && m_currentBatchIndex >= 0
                 && m_currentBatchIndex < m_sqlTexts.length) {
             msg += "  Executing SQL statement is \"" + m_sqlTexts[m_currentBatchIndex] + "\".";
+        }
+        else if (m_sqlTexts == null) {
+            // Can this happen?
+            msg += "  SQL statement text is not available.";
+        }
+        else {
+            // For some reason, the current index in the batch isn't a valid
+            // index into the m_sqlTexts array.  We don't expect this to happen,
+            // but let's dump something useful if it does.  (See ENG-7610)
+            StringBuffer sb = new StringBuffer();
+            sb.append("  Unable to report specific SQL statement text for batch index "
+                    + m_currentBatchIndex + ".  ");
+            sb.append("It MAY be one of these " + m_sqlTexts.length + " items: ");
+            for (int i = 0; i < m_sqlTexts.length; ++i) {
+                if (m_sqlTexts[i] != null) {
+                    sb.append("\"" + m_sqlTexts[i] + "\"");
+                }
+                else {
+                    sb.append("[null]");
+                }
+
+                if (i != m_sqlTexts.length - 1) {
+                    sb.append(", ");
+                }
+            }
+
+            msg += sb.toString();
         }
 
         return msg;
