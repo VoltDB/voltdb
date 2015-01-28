@@ -327,9 +327,14 @@ public class AsyncCompilerAgent {
             for (AdHocPlannedStatement result: stmts) {
                 totalQuestionMarkParameters += result.getQuestionMarkParameterCount();
             }
+            if (work.sqlStatements.length > 1 && totalQuestionMarkParameters > 0) {
+                return AsyncCompilerResult.makeErrorResult(work,
+                        String.format("Not support for multiple AdHoc statements with parameters in one procedure call"));
+            }
+
             if (totalQuestionMarkParameters != work.userParamSet.length) {
                 return AsyncCompilerResult.makeErrorResult(work,
-                        String.format("\nIncorrect number of parameters passed: expected %d, passed %d",
+                        String.format("Incorrect number of parameters passed: expected %d, passed %d",
                                 totalQuestionMarkParameters, work.userParamSet.length));
             }
 
