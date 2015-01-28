@@ -89,10 +89,8 @@ public abstract class AdHocBase extends VoltSystemProcedure {
             return new VoltTable[]{};
         }
 
-        int currentCatalogVersion = ctx.getCatalogVersion();
-
         for (AdHocPlannedStatement statement : statements) {
-            if (currentCatalogVersion != statement.core.catalogVersion) {
+            if (!statement.core.wasPlannedAgainstHash(ctx.getCatalogHash())) {
                 String msg = String.format("AdHoc transaction %d wasn't planned " +
                         "against the current catalog version. Statement: %s",
                         getVoltPrivateRealTransactionIdDontUseMe(),

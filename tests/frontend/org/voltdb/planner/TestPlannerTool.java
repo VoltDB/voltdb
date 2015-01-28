@@ -60,9 +60,9 @@ public class TestPlannerTool extends TestCase {
         String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes).getFirst());
         Catalog catalog = new Catalog();
         catalog.execute(serializedCatalog);
-        CatalogContext context = new CatalogContext(0, 0, catalog, bytes, null, 0, 0);
+        CatalogContext context = new CatalogContext(0, 0, catalog, bytes, null, 0);
 
-        m_pt = new PlannerTool(context.cluster, context.database, 0);
+        m_pt = new PlannerTool(context.cluster, context.database, context.getCatalogHash());
 
         AdHocPlannedStatement result = null;
         result = m_pt.planSqlForTest("select * from warehouse;");
@@ -155,9 +155,9 @@ public class TestPlannerTool extends TestCase {
         assertNotNull(serializedCatalog);
         Catalog c = new Catalog();
         c.execute(serializedCatalog);
-        CatalogContext context = new CatalogContext(0, 0, c, bytes, null, 0, 0);
+        CatalogContext context = new CatalogContext(0, 0, c, bytes, null, 0);
 
-        m_pt = new PlannerTool(context.cluster, context.database, 0);
+        m_pt = new PlannerTool(context.cluster, context.database, context.getCatalogHash());
 
         // Bad DDL would kill the planner before it starts and this query
         // would return a Stream Closed error
