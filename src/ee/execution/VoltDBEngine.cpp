@@ -863,8 +863,8 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp )
             StreamedTable *streamedtable = dynamic_cast<StreamedTable*>(table);
             if (streamedtable) {
                 const std::string signature = tcd->signature();
-                m_exportingTables.erase(signature);
                 streamedtable->setSignatureAndGeneration(signature, timestamp);
+                m_exportingTables.erase(signature);
             }
         }
         delete delegate;

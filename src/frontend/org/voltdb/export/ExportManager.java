@@ -231,8 +231,12 @@ public class ExportManager
                     }
                     if (installNewProcessor) {
                         //If we installed new processor get old one to shutdown.
-                        oldProcessor = m_processor.getAndSet(newProcessor);
+                        exportLog.info("Last export table dropped processor will be removed: " + m_loaderClass);
+                        oldProcessor = m_processor.getAndSet(null);
                     }
+                } else {
+                    //We deleted last of the generation as we dropped the last export table.
+                    oldProcessor = m_processor.getAndSet(null);
                 }
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Error creating next export processor", true, e);
@@ -570,6 +574,7 @@ public class ExportManager
          * This occurs when export is turned on/off at runtime.
          */
         if (m_processor.get() == null) {
+            exportLog.info("First export table created processor will be initialized: " + m_loaderClass);
             createInitialExportProcessor(catalogContext, connectors, false, partitions, false);
         }
     }
