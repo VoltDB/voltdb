@@ -109,7 +109,8 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
 
     public static AdHocPlannedStmtBatch mockStatementBatch(long replySiteId, String sql,
             Object[] extractedValues, VoltType[] paramTypes,
-            Object[] userParams, int partitionParamIndex) {
+            Object[] userParams, int partitionParamIndex, byte[] catalogHash)
+    {
         // Mock up a dummy completion handler to satisfy the dummy work request.
         AsyncCompilerWorkCompletionHandler dummyHandler = new AsyncCompilerWorkCompletionHandler() {
 
@@ -132,7 +133,7 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
                 false,
                 true,
                 paramTypes,
-                0);
+                catalogHash);
         AdHocPlannedStatement s = new AdHocPlannedStatement(sql.getBytes(Constants.UTF8ENCODING),
                 core,
                 extractedValues == null ? ParameterSet.emptyParameterSet() :
