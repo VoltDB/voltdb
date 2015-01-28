@@ -375,7 +375,9 @@ VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
       m_logManager(logProxy),
       m_templateSingleLongTable(NULL),
       m_topend(topend),
-      m_executorContext(NULL)
+      m_executorContext(NULL),
+      m_drStream(NULL),
+      m_drReplicatedStream(NULL)
 {
 #ifdef LINUX
     // We ran into an issue where memory wasn't being returned to the
@@ -412,6 +414,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                          int32_t hostId,
                          string hostname,
                          int64_t tempTableMemoryLimit,
+                         bool createDrReplicatedStream,
                          int32_t compactionThreshold)
 {
     m_clusterIndex = clusterIndex;
@@ -451,6 +454,13 @@ VoltDBEngine::initialize(int32_t clusterIndex,
     m_templateSingleLongTable[38] = 1; // row count
     m_templateSingleLongTable[42] = 8; // row size
 
+    m_drStream = new DRTupleStream();
+    m_drStream->configure(partitionId);
+    if (createDrReplicatedStream) {
+        m_drReplicatedStream = new DRTupleStream();
+        m_drReplicatedStream->configure(16383);
+    }
+
     // required for catalog loading.
     m_executorContext = new ExecutorContext(siteId,
                                             m_partitionId,
@@ -461,8 +471,8 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                                             m_isELEnabled,
                                             hostname,
                                             hostId,
-                                            &m_drStream);
-    m_drStream.configure(partitionId);
+                                            m_drStream,
+                                            m_drReplicatedStream);
     return true;
 }
 
@@ -500,6 +510,9 @@ VoltDBEngine::~VoltDBEngine() {
     }
 
     delete m_executorContext;
+
+    delete m_drReplicatedStream;
+    delete m_drStream;
 }
 
 // ------------------------------------------------------------------
@@ -1433,7 +1446,10 @@ void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
     BOOST_FOREACH (TablePair table, m_exportingTables) {
         table.second->flushOldTuples(timeInMillis);
     }
-    m_drStream.periodicFlush(timeInMillis, lastCommittedSpHandle);
+    m_drStream->periodicFlush(timeInMillis, lastCommittedSpHandle);
+    if (m_drReplicatedStream) {
+        m_drReplicatedStream->periodicFlush(timeInMillis, lastCommittedSpHandle);
+    }
 }
 
 /** For now, bring the Export system to a steady state with no buffers with content */
@@ -1442,7 +1458,10 @@ void VoltDBEngine::quiesce(int64_t lastCommittedSpHandle) {
     BOOST_FOREACH (TablePair table, m_exportingTables) {
         table.second->flushOldTuples(-1L);
     }
-    m_drStream.periodicFlush(-1L, lastCommittedSpHandle);
+    m_drStream->periodicFlush(-1L, lastCommittedSpHandle);
+    if (m_drReplicatedStream) {
+        m_drReplicatedStream->periodicFlush(-1L, lastCommittedSpHandle);
+    }
 }
 
 string VoltDBEngine::debug(void) const
@@ -1874,7 +1893,10 @@ void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
         dispatchValidatePartitioningTask(taskParams);
         break;
     case TASK_TYPE_APPLY_BINARY_LOG: {
-        DRTupleStreamDisableGuard guard(&m_drStream);
+        DRTupleStreamDisableGuard guard(m_drStream);
+        if (m_drReplicatedStream) {
+            DRTupleStreamDisableGuard guardReplicated(m_drReplicatedStream);
+        }
         m_binaryLogSink.apply(taskParams, m_tablesBySignatureHash, &m_stringPool, this);
         break;
     }

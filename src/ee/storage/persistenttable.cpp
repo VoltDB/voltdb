@@ -309,14 +309,15 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
     engine->rebuildTableCollections();
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
-    DRTupleStream *drStream = ec->drStream();
-    size_t drMark = drStream->m_uso;
-    if (!m_isMaterialized && m_drEnabled) {
+    DRTupleStream *drStream = getDRTupleStream(ec);
+    size_t drMark = 0;
+    if (drStream && !m_isMaterialized && m_drEnabled) {
+        drMark = drStream->m_uso;
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
-        const int64_t currentSpUniqueId = ec->currentSpUniqueId();
+        const int64_t currentSpUniqueId = getSpUniqueId(ec);
         drStream->truncateTable(lastCommittedSpHandle, m_signature, m_name, currentTxnId, currentSpHandle, currentUniqueId, currentSpUniqueId);
     }
 
@@ -425,15 +426,16 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
     }
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
-    DRTupleStream *drStream = ec->drStream();
-    size_t drMark = drStream->m_uso;
-    if (!m_isMaterialized && m_drEnabled && shouldDRStream) {
+    DRTupleStream *drStream = getDRTupleStream(ec);
+    size_t drMark = 0;
+    if (drStream && !m_isMaterialized && m_drEnabled && shouldDRStream) {
+        drMark = drStream->m_uso;
         ExecutorContext *ec = ExecutorContext::getExecutorContext();
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
-        const int64_t currentSpUniqueId = ec->currentSpUniqueId();
+        const int64_t currentSpUniqueId = getSpUniqueId(ec);
         drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, currentSpUniqueId, target, DR_RECORD_INSERT);
     }
 
@@ -596,15 +598,16 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
     targetTupleToUpdate.copyForPersistentUpdate(sourceTupleWithNewValues, oldObjects, newObjects);
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
-    DRTupleStream *drStream = ec->drStream();
-    size_t drMark = drStream->m_uso;
-    if (!m_isMaterialized && m_drEnabled) {
+    DRTupleStream *drStream = getDRTupleStream(ec);
+    size_t drMark = 0;
+    if (drStream && !m_isMaterialized && m_drEnabled) {
+        drMark = drStream->m_uso;
         ExecutorContext *ec = ExecutorContext::getExecutorContext();
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
-        const int64_t currentSpUniqueId = ec->currentSpUniqueId();
+        const int64_t currentSpUniqueId = getSpUniqueId(ec);
         drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, currentSpUniqueId, targetTupleToUpdate, DR_RECORD_DELETE);
         drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, currentSpUniqueId, sourceTupleWithNewValues, DR_RECORD_INSERT);
     }
@@ -725,14 +728,15 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
     }
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
-    DRTupleStream *drStream = ec->drStream();
-    size_t drMark = drStream->m_uso;
-    if (!m_isMaterialized && m_drEnabled) {
+    DRTupleStream *drStream = getDRTupleStream(ec);
+    size_t drMark = 0;
+    if (drStream && !m_isMaterialized && m_drEnabled) {
+        drMark = drStream->m_uso;
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
         const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
-        const int64_t currentSpUniqueId = ec->currentSpUniqueId();
+        const int64_t currentSpUniqueId = getSpUniqueId(ec);
         drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, currentSpUniqueId, target, DR_RECORD_DELETE);
     }
 

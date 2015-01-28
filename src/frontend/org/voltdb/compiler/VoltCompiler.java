@@ -1157,15 +1157,8 @@ public class VoltCompiler {
         }
 
         // process DRed tables
-        List<String> drReplicated = new ArrayList<String>();
         for (Entry<String, String> drNode: voltDdlTracker.getDRedTables().entrySet()) {
-            compileDRTable(drNode, db, drReplicated);
-        }
-        if (!drReplicated.isEmpty()) {
-            throw new VoltCompilerException(
-                    "DR is not supported for replicated tables. " +
-                    "Please remove this option from the following tables: " +
-                    StringUtils.join(drReplicated, ','));
+            compileDRTable(drNode, db);
         }
 
         if (whichProcs != DdlProceduresToLoad.NO_DDL_PROCEDURES) {
@@ -2065,7 +2058,7 @@ public class VoltCompiler {
 
     }
 
-    void compileDRTable(final Entry<String, String> drNode, final Database db, final List<String> drReplicated)
+    void compileDRTable(final Entry<String, String> drNode, final Database db)
             throws VoltCompilerException
     {
         String tableName = drNode.getKey();
@@ -2074,13 +2067,15 @@ public class VoltCompiler {
         org.voltdb.catalog.Table tableref = db.getTables().getIgnoreCase(tableName);
         if (tableref == null) {
             throw new VoltCompilerException("While configuring dr, table " + tableName + " was not present in the catalog");
+        } else if (tableref.getMaterializer() != null) {
+            throw new VoltCompilerException("While configuring dr, table " + tableName + " is a materialized view." +
+                                            " DR does not support materialized view.");
         }
+
         if (action.equalsIgnoreCase("DISABLE")) {
             tableref.setIsdred(false);
-        } else if (!tableref.getIsreplicated()) {
-            tableref.setIsdred(true);
         } else {
-            drReplicated.add(tableName);
+            tableref.setIsdred(true);
         }
     }
 

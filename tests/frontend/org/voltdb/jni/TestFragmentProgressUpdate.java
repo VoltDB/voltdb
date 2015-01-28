@@ -408,7 +408,7 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new HashinatorConfig(HashinatorType.LEGACY,
                                      LegacyHashinator.getConfigureBytes(1),
                                      0,
-                                     0));
+                                     0), false);
     }
 
     @Override

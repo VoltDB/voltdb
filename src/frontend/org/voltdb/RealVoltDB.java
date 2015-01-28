@@ -791,6 +791,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
              * Configure and start all the IV2 sites
              */
             try {
+                boolean createMpDRGateway = true;
                 for (Initiator iv2init : m_iv2Initiators) {
                     iv2init.configure(
                             getBackendTargetType(),
@@ -804,7 +805,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                             m_commandLog,
                             m_nodeDRGateway,
                             m_consumerDRGateway,
+                            iv2init != m_MPI && createMpDRGateway, // first SPI gets it
                             m_config.m_executionCoreBindings.poll());
+
+                    if (iv2init != m_MPI) {
+                        createMpDRGateway = false;
+                    }
                 }
 
                 // LeaderAppointer startup blocks if the initiators are not initialized.

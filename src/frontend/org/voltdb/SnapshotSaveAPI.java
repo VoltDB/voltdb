@@ -132,7 +132,7 @@ public class SnapshotSaveAPI
      */
     public VoltTable startSnapshotting(
             final String file_path, final String file_nonce, final SnapshotFormat format, final byte block,
-            final long multiPartTxnId, final long partitionTxnId, final long partitionUniqueId, final long legacyPerPartitionTxnIds[],
+            final long multiPartTxnId, final long mpUniqueId, final long partitionTxnId, final long partitionUniqueId, final long legacyPerPartitionTxnIds[],
             final String data, final SystemProcedureExecutionContext context, final String hostname,
             final HashinatorSnapshotData hashinatorData,
             final long timestamp)
@@ -170,6 +170,7 @@ public class SnapshotSaveAPI
                     m_partitionLastSeenTransactionIds = new HashMap<Integer, Long>();
                     m_partitionLastSeenUniqueIds = new HashMap<Integer, Long>();
                     partitionTransactionIds.put(TxnEgo.getPartitionId(multiPartTxnId), multiPartTxnId);
+                    partitionUniqueIds.put(UniqueIdGenerator.getPartitionIdFromUniqueId(mpUniqueId), mpUniqueId);
 
 
                     /*

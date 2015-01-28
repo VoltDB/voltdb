@@ -3589,8 +3589,7 @@ public class TestVoltCompiler extends TestCase {
 
         String schema = "create table e1 (id integer not null, f1 varchar(16));\n" +
                         "create table e2 (id integer not null, f1 varchar(16));\n" +
-                        "partition table e1 on column id;\n" +
-                        "partition table e2 on column id;";
+                        "partition table e1 on column id;";
 
         db = goodDDLAgainstSimpleSchema(
                 schema,
@@ -3636,16 +3635,6 @@ public class TestVoltCompiler extends TestCase {
         badDDLAgainstSimpleSchema(".+Invalid DR TABLE statement.*",
                 "dr table table one;"
                 );
-    }
-
-    public void testDRReplicatedTable() throws Exception {
-        String moreSchema = "create table repl (key varchar(16), value varchar(128));";
-        badDDLAgainstSimpleSchema("DR is not supported for replicated tables.*",
-                moreSchema, "DR TABLE repl;");
-
-        Database db;
-        db = goodDDLAgainstSimpleSchema(moreSchema, "DR TABLE repl DISABLE;");
-        assertFalse(db.getTables().getIgnoreCase("repl").getIsdred());
     }
 
     public void testCompileFromDDL() throws IOException {

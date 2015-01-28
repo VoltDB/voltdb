@@ -64,10 +64,11 @@ public class RepairLog
 
     /*
      * Track the last master-cluster unique ID associated with an
-     *  @ApplyBinaryLogSP invocation so it can be provided to the
+     *  @ApplyBinaryLogSP and @ApplyBinaryLogMP invocation so it can be provided to the
      *  ReplicaDRGateway on repair
      */
-    private long m_maxSeenBinaryLogUniqueId = Long.MIN_VALUE;
+    private long m_maxSeenSpBinaryLogUniqueId = Long.MIN_VALUE;
+    private long m_maxSeenMpBinaryLogUniqueId = Long.MIN_VALUE;
 
     // is this a partition leader?
     boolean m_isLeader = false;
@@ -171,11 +172,11 @@ public class RepairLog
                 if ("@ApplyBinaryLogSP".equals(m.getStoredProcedureName())) {
                     StoredProcedureInvocation spi = m.getStoredProcedureInvocation();
                     // params[3] is the end sp unique id from the original cluster
-                    m_maxSeenBinaryLogUniqueId = Math.max(m_maxSeenBinaryLogUniqueId, ((Number)spi.getParams().getParam(3)).longValue());
+                    m_maxSeenSpBinaryLogUniqueId = Math.max(m_maxSeenSpBinaryLogUniqueId, ((Number)spi.getParams().getParam(3)).longValue());
                 }
             }
         } else if (msg instanceof FragmentTaskMessage) {
-            final TransactionInfoBaseMessage m = (TransactionInfoBaseMessage)msg;
+            final FragmentTaskMessage m = (FragmentTaskMessage) msg;
             if (!m.isReadOnly()) {
                 truncate(m.getTruncationHandle(), IS_MP);
                 // only log the first fragment of a procedure (and handle 1st case)
@@ -186,6 +187,13 @@ public class RepairLog
                 }
                 m_maxSeenMpUniqueId = Math.max(m_maxSeenMpUniqueId, m.getUniqueId());
                 m_maxSeenSpUniqueId = Math.max(m_maxSeenSpUniqueId, m.getSpUniqueId());
+
+                final Iv2InitiateTaskMessage initiateTask = m.getInitiateTask();
+                if (initiateTask != null && "@ApplyBinaryLogMP".equals(initiateTask.getStoredProcedureName())) {
+                    StoredProcedureInvocation spi = initiateTask.getStoredProcedureInvocation();
+                    // params[3] is the end sp unique id from the original cluster
+                    m_maxSeenMpBinaryLogUniqueId = Math.max(m_maxSeenMpBinaryLogUniqueId, ((Number)spi.getParams().getParam(3)).longValue());
+                }
             }
         }
         else if (msg instanceof CompleteTransactionMessage) {
@@ -266,9 +274,11 @@ public class RepairLog
         // All cases include the log of MP transactions
         items.addAll(m_logMP);
         long maxSeenUniqueId = m_maxSeenMpUniqueId;
+        long maxSeenBinaryLogUniqueId = m_maxSeenMpBinaryLogUniqueId;
         // SP repair requests also want the SP transactions
         if (!forMPI) {
             maxSeenUniqueId = m_maxSeenSpUniqueId;
+            maxSeenBinaryLogUniqueId = m_maxSeenSpBinaryLogUniqueId;
             items.addAll(m_logSP);
         }
 
@@ -290,7 +300,7 @@ public class RepairLog
                         m_lastMpHandle,
                         TheHashinator.getCurrentVersionedConfigCooked(),
                         maxSeenUniqueId,
-                        m_maxSeenBinaryLogUniqueId);
+                        maxSeenBinaryLogUniqueId);
         responses.add(hheader);
 
         int seq = responses.size();
