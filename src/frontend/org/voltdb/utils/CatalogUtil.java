@@ -118,7 +118,6 @@ import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import java.util.Properties;
 
 import org.voltdb.export.ExportManager;
-import org.voltdb.exportclient.ExportClientBase;
 
 /**
  *
