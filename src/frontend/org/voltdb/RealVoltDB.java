@@ -1350,7 +1350,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_catalogContext = new CatalogContext(
                             TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId(), //txnid
                             0, //timestamp
-                            catalog, null, deploymentHash, 0, -1);
+                            catalog, new byte[] {}, deploymentHash, 0);
 
             int numberOfNodes = m_deployment.getCluster().getHostcount();
             if (numberOfNodes <= 0) {
@@ -1858,7 +1858,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 m_initiatorStats = null;
                 m_latencyStats = null;
 
-                AdHocCompilerCache.clearVersionCache();
+                AdHocCompilerCache.clearHashCache();
                 org.voltdb.iv2.InitiatorMailbox.m_allInitiatorMailboxes.clear();
 
                 // probably unnecessary
