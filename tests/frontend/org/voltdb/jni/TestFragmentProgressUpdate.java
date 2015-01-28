@@ -50,8 +50,8 @@ import org.voltdb.utils.Encoder;
 
 public class TestFragmentProgressUpdate extends TestCase {
 
-    private long READ_ONLY_TOKEN = Long.MAX_VALUE;
-    private long WRITE_TOKEN = 0;
+    private final long READ_ONLY_TOKEN = Long.MAX_VALUE;
+    private final long WRITE_TOKEN = 0;
 
     public void testFragmentProgressUpdate() throws Exception {
         m_ee.loadCatalog( 0, m_catalog.serialize());
@@ -265,7 +265,42 @@ public class TestFragmentProgressUpdate extends TestCase {
         verifyLongRunningQueries(50, 0, "item_crazy_join", true);
     }
 
-    private void verifyLongRunningQueries(int scale, int timeout, String query, boolean readOnly) {
+    @SuppressWarnings("deprecation")
+    public void testProgressUpdateLogNoSqlStmt() throws Exception {
+        // Set the log duration to be very short, to ensure that a message will be logged.
+        m_ee.setInitialLogDurationForTest(1);
+
+        verifyLongRunningQueries(50, 0, "item_crazy_join", true, SqlTextExpectation.NO_STATEMENT);
+    }
+
+    @SuppressWarnings("deprecation")
+    public void testProgressUpdateLogSqlStmtList() throws Exception {
+        // Set the log duration to be very short, to ensure that a message will be logged.
+        m_ee.setInitialLogDurationForTest(1);
+
+        verifyLongRunningQueries(50, 0, "item_crazy_join", true, SqlTextExpectation.STATEMENT_LIST);
+    }
+
+    private enum SqlTextExpectation {
+            SQL_STATEMENT,
+            NO_STATEMENT,
+            STATEMENT_LIST
+    }
+
+    private void verifyLongRunningQueries(
+            int scale,
+            int timeout,
+            String query,
+            boolean readOnly) {
+        verifyLongRunningQueries(scale, timeout, query, readOnly, SqlTextExpectation.SQL_STATEMENT);
+    }
+
+    private void verifyLongRunningQueries(
+            int scale,
+            int timeout,
+            String query,
+            boolean readOnly,
+            SqlTextExpectation sqlTextExpectation) {
         m_tableSize = scale;
 
         m_ee.loadCatalog( 0, m_catalog.serialize());
@@ -302,12 +337,27 @@ public class TestFragmentProgressUpdate extends TestCase {
         m_ee.setTimeoutLatency(timeout);
 
         try {
+
+            String[] sqlTexts;
+
+            switch (sqlTextExpectation) {
+            case SQL_STATEMENT:
+                sqlTexts = new String[] { sqlText };
+                break;
+            case NO_STATEMENT:
+                sqlTexts = null;
+                break;
+            default:
+                assert (sqlTextExpectation == SqlTextExpectation.STATEMENT_LIST);
+                sqlTexts = new String[] {};
+            }
+
             m_ee.executePlanFragments(
                     1,
                     new long[] { CatalogUtil.getUniqueIdForFragment(frag) },
                     null,
                     new ParameterSet[] { params },
-                    new String[] { sqlText },
+                    sqlTexts,
                     3, 3, 2, 42,
                     readOnly ? READ_ONLY_TOKEN : WRITE_TOKEN);
             if (readOnly && timeout > 0) {
@@ -321,8 +371,20 @@ public class TestFragmentProgressUpdate extends TestCase {
             assertEquals(msg, ex.getMessage());
         }
 
-        verify(mockedLogger, atLeastOnce()).info(contains(
-            String.format("Executing SQL statement is \"%s\".", sqlText)));
+        String expectedSqlTextMsg;
+        switch (sqlTextExpectation) {
+        case SQL_STATEMENT:
+            expectedSqlTextMsg = String.format("Executing SQL statement is \"%s\".", sqlText);
+            break;
+        case NO_STATEMENT:
+            expectedSqlTextMsg = "SQL statement text is not available.";
+            break;
+        default:
+            assert (sqlTextExpectation == SqlTextExpectation.STATEMENT_LIST);
+            expectedSqlTextMsg = "Unable to report specific SQL statement text for batch index";
+        }
+
+        verify(mockedLogger, atLeastOnce()).info(contains(expectedSqlTextMsg));
     }
 
     public void testTimingoutQueries() throws Exception {
