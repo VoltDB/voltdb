@@ -411,7 +411,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                         CoreUtils.hsIdToString(m_siteId),
                         m_currMemoryInBytes,
                         m_peakMemoryInBytes);
-        if (m_sqlTexts != null) {
+
+        // ENG-7610: array of SQL texts seems to get out of sync with the current
+        // batch index, so we need to do bounds checking here.
+        if (m_sqlTexts != null
+                && m_currentBatchIndex >= 0
+                && m_currentBatchIndex < m_sqlTexts.length) {
             msg += "  Executing SQL statement is \"" + m_sqlTexts[m_currentBatchIndex] + "\".";
         }
 
