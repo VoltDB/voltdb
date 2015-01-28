@@ -334,7 +334,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         TIME_OUT_MILLIS = newLatency;
     }
 
-    public long fragmentProgressUpdate(int batchIndex,
+    public long fragmentProgressUpdate(int indexFromFragmentTask,
             String planNodeName,
             String lastAccessedTable,
             long lastAccessedTableSize,
@@ -355,7 +355,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         long latency = currentTime - m_startTime;
 
         if (m_readOnly && TIME_OUT_MILLIS > 0 && latency > TIME_OUT_MILLIS) {
-            String msg = getLongRunningQueriesMessage(latency, planNodeName, true);
+            String msg = getLongRunningQueriesMessage(indexFromFragmentTask, latency, planNodeName, true);
             log.info(msg);
 
             // timing out the long running queries
@@ -380,7 +380,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             // future callbacks per log entry, ideally so that one callback arrives just in time to log.
             return LONG_OP_THRESHOLD;
         }
-        String msg = getLongRunningQueriesMessage(latency, planNodeName, false);
+        String msg = getLongRunningQueriesMessage(indexFromFragmentTask, latency, planNodeName, false);
         log.info(msg);
 
         m_logDuration = (m_logDuration < 30000) ? (2 * m_logDuration) : 30000;
@@ -391,7 +391,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         return LONG_OP_THRESHOLD;
     }
 
-    private String getLongRunningQueriesMessage(long latency, String planNodeName, boolean timeout) {
+    private String getLongRunningQueriesMessage(int indexFromFragmentTask,
+            long latency, String planNodeName, boolean timeout) {
         String status = timeout ? "timed out at" : "taking a long time to execute -- at least";
         String msg = String.format(
                 "Procedure %s is %s " +
@@ -411,8 +412,38 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                         CoreUtils.hsIdToString(m_siteId),
                         m_currMemoryInBytes,
                         m_peakMemoryInBytes);
-        if (m_sqlTexts != null) {
-            msg += "  Executing SQL statement is \"" + m_sqlTexts[m_currentBatchIndex] + "\".";
+
+        if (m_sqlTexts != null
+                && indexFromFragmentTask >= 0
+                && indexFromFragmentTask < m_sqlTexts.length) {
+            msg += "  Executing SQL statement is \"" + m_sqlTexts[indexFromFragmentTask] + "\".";
+        }
+        else if (m_sqlTexts == null) {
+            // Can this happen?
+            msg += "  SQL statement text is not available.";
+        }
+        else {
+            // For some reason, the current index in the fragment task message isn't a valid
+            // index into the m_sqlTexts array.  We don't expect this to happen,
+            // but let's dump something useful if it does.  (See ENG-7610)
+            StringBuffer sb = new StringBuffer();
+            sb.append("  Unable to report specific SQL statement text for "
+                    + "fragment task message index " + indexFromFragmentTask + ".  ");
+            sb.append("It MAY be one of these " + m_sqlTexts.length + " items: ");
+            for (int i = 0; i < m_sqlTexts.length; ++i) {
+                if (m_sqlTexts[i] != null) {
+                    sb.append("\"" + m_sqlTexts[i] + "\"");
+                }
+                else {
+                    sb.append("[null]");
+                }
+
+                if (i != m_sqlTexts.length - 1) {
+                    sb.append(", ");
+                }
+            }
+
+            msg += sb.toString();
         }
 
         return msg;
