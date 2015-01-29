@@ -1,0 +1,417 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2015 VoltDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+package org.voltdb.parser;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.voltcore.logging.VoltLogger;
+
+/**
+ * Provides an API for performing various lexing operations on SQL/DML/DDL text.
+ * Ideally it shouldn't be doing "parsing", i.e. language-aware token processing.
+ * In reality the code is not split cleanly and lexing and parsing overlap a bit.
+ *
+ * Keep the regular expressions private and just expose methods needed for parsing.
+ *
+ * Avoid external dependencies since this is linked with the client.
+ */
+public class SQLLexer
+{
+    private static final VoltLogger COMPILER_LOG = new VoltLogger("COMPILER");
+
+    //========== Private Parsing Data ==========
+
+    // Match single-line comments
+    private static final Pattern PAT_SINGLE_LINE_COMMENT = Pattern.compile(
+            "^\\s*" + // start of line, 0 or more whitespace
+            "--" + // start of comment
+            ".*$"); // everything to end of line
+
+    // Simplest possible SQL DDL token lexer
+    private static final Pattern PAT_ANY_DDL_FIRST_TOKEN = Pattern.compile(
+            "^\\s*" +  // start of line, 0 or more whitespace
+            "(alter|create|drop|export|import|partition)" + // tokens we consider DDL
+            "\\s+", // one or more whitespace
+            Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL
+            );
+
+    // Pattern to crudely recognize all statements we understand.
+    private static final Pattern PAT_ALL_HANDLED_PREAMBLES = Pattern.compile(
+            "^\\s*" +  // start of line, 0 or more whitespace
+            "(alter|create|drop|export|partition)" + // DDL we're ready to handle
+            "\\s+" + // one or more whitespace
+            "(table|assumeunique|unique|index|view|procedure|role)" +
+            "\\s+" + // one or more whitespace
+            ".*$", // all the rest
+            Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL
+            );
+
+    // Don't accept these DDL tokens yet
+    private static final Pattern PAT_UNSUPPORTED_TOKENS = Pattern.compile(
+            "^\\s*" +  // start of line, 0 or more whitespace
+            "(import)" + // DDL we're not ready to handle
+            "\\s+" + // one or more whitespace
+            ".*$", // all the rest
+            Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL
+            );
+
+    // Also, don't accept RENAME for the tokens we do take yet
+    private static final Pattern PAT_UNSUPPORTED_RENAME_OPS = Pattern.compile(
+            "^\\s*" +  // start of line, 0 or more whitespace
+            "alter" + // DDL we're ready to handle
+            "\\s+" + // one or more whitespace
+            "(table|index)" + // but it's gotta be on tables or indexes
+            "\\s+" + // one or more whitespace
+            ".*" + // some stuff
+            "\\s+" + // one or more whitespace
+            "rename" + // VERBOTEN
+            "\\s+" + // one or more whitespace
+            "to" + // VERBOTEN, CONT'D
+            "\\s+" + // one or more whitespace
+            ".*$", // all the rest
+            Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL
+            );
+
+    // All handled patterns.
+    private static final Pattern[] PAT_WHITELISTS = {
+        PAT_ALL_HANDLED_PREAMBLES
+    };
+
+    // All rejected patterns.
+    private static final Pattern[] PAT_BLACKLISTS = {
+        PAT_UNSUPPORTED_TOKENS,
+        PAT_UNSUPPORTED_RENAME_OPS
+    };
+
+    // Extracts the table name for DDL batch conflicting command checks.
+    private static final Pattern PAT_CREATE_OR_DROP_TABLE_PREAMBLE = Pattern.compile(
+            "^\\s*" +  // start of line, 0 or more whitespace
+            "(create|drop)" + // DDL commands we're looking for
+            "\\s+" + // one or more whitespace
+            "table" +
+            "\\s+" + // one or more whitespace
+            "([a-z][a-z0-9_]*)" + // table name symbol
+            ".*$", // all the rest
+            Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL
+            );
+
+    private static final Pattern PAT_STRIP_CSTYLE_COMMENTS = Pattern.compile(
+            "/\\*(.|\\n)*?\\*/"
+            );
+
+    // Matches the start of a SELECT statement
+    private static final Pattern PAT_SELECT_STATEMENT_PREAMBLE = Pattern.compile(
+            "^select\\s.+", Pattern.CASE_INSENSITIVE);
+
+    //========== Public Data ==========
+
+    static final char   BLOCK_DELIMITER_CHAR = '#';
+    static final String BLOCK_DELIMITER = "###";
+
+    //========== Public Methods ==========
+
+    /**
+     * Check if a SQL string is a comment.
+     * @param sql  SQL string
+     * @return     true if it's a comment
+     */
+    public static boolean isComment(String sql)
+    {
+        Matcher commentMatcher = PAT_SINGLE_LINE_COMMENT.matcher(sql);
+        return commentMatcher.matches();
+    }
+
+    /**
+     * Test if character is block delimiter
+     * @param c  character to test
+     * @return   true if c is block delimiter
+     */
+    public static boolean isBlockDelimiter(char c)
+    {
+        return c == BLOCK_DELIMITER_CHAR;
+    }
+
+    /**
+     * Get the DDL token, if any, at the start of this statement.
+     * @return returns token, or null if it wasn't DDL
+     */
+    public static String extractDDLToken(String sql)
+    {
+        String ddlToken = null;
+        Matcher ddlMatcher = PAT_ANY_DDL_FIRST_TOKEN.matcher(sql);
+        if (ddlMatcher.find()) {
+            ddlToken = ddlMatcher.group(1).toLowerCase();
+        }
+        return ddlToken;
+    }
+
+    /** Remove c-style comments globally and -- comments from the end of lines */
+    public static String stripComments(String ddl) {
+        ddl = removeCStyleComments(ddl);
+        StringBuilder sb = new StringBuilder();
+        String[] ddlLines = ddl.split("\n");
+        for (String ddlLine : ddlLines) {
+            sb.append(stripCommentFromLine(ddlLine)).append(' ');
+        }
+        return sb.toString();
+    }
+
+    /** Strip -- comments from the end of a single line */
+    public static String stripCommentFromLine(String ddlLine) {
+        boolean inQuote = false;
+        char quoteChar = ' '; // will be written before use
+        boolean lastCharWasDash = false;
+        int length = ddlLine.length();
+
+        for (int i = 0; i < length; i++) {
+            char c = ddlLine.charAt(i);
+            if (inQuote) {
+                if (quoteChar == c) {
+                    inQuote = false;
+                }
+            }
+            else {
+                if (c == '-') {
+                    if (lastCharWasDash) {
+                        return ddlLine.substring(0, i - 1);
+                    }
+                    else {
+                        lastCharWasDash = true;
+                    }
+                }
+                else {
+                    lastCharWasDash = false;
+                    if (c == '\"' || c == '\'') {
+                        inQuote = true;
+                        quoteChar = c;
+                    }
+                }
+            }
+        }
+
+        return ddlLine;
+    }
+
+    /**
+     * Get the table name for a CREATE or DROP DDL statement.
+     * @return returns token, or null if the DDL isn't (CREATE|DROP) TABLE
+     */
+    public static String extractDDLTableName(String sql)
+    {
+        Matcher matcher = PAT_CREATE_OR_DROP_TABLE_PREAMBLE.matcher(sql);
+        if (matcher.find()) {
+            return matcher.group(2).toLowerCase();
+        }
+        return null;
+    }
+
+    // Naive filtering for stuff we haven't implemented yet.
+    // Hopefully this gets whittled away and eventually disappears.
+    public static boolean isPermitted(String sql)
+    {
+        boolean hadWLMatch = false;
+        for (Pattern wl : PAT_WHITELISTS) {
+            Matcher wlMatcher = wl.matcher(sql);
+            if (wlMatcher.matches()) {
+                hadWLMatch = true;
+            }
+        }
+
+        if (!hadWLMatch) {
+            COMPILER_LOG.info("Statement: " + sql + " , failed to match any whitelist");
+            return false;
+        }
+
+        for (Pattern bl : PAT_BLACKLISTS) {
+            Matcher blMatcher = bl.matcher(sql);
+            if (blMatcher.matches()) {
+                COMPILER_LOG.info("Statement: " + sql + " , failed blacklist: " + blMatcher.toString());
+                return false;
+            }
+        }
+
+        return hadWLMatch;
+    }
+
+    /**
+     * Split SQL statements on semi-colons with quoted string and comment support.
+     *
+     * Degenerate formats such as escape as the last character or unclosed strings are ignored and
+     * left to the SQL parser to complain about. This is a simple string splitter that errs on the
+     * side of not splitting.
+     *
+     * Regexes are avoided.
+     *
+     * Handle single and double quoted strings and backslash escapes. Backslashes escape a single
+     * character.
+     *
+     * Handle double-dash (single line) and C-style (muli-line) comments. Nested C-style comments
+     * are not supported.
+     *
+     * @param sql raw SQL text to split
+     * @return list of individual SQL statements
+     */
+    public static List<String> splitStatements(final String sql) {
+        List<String> statements = new ArrayList<String>();
+        // Use a character array for efficient character-at-a-time scanning.
+        char[] buf = sql.toCharArray();
+        // Set to null outside of quoted segments or the quote character inside them.
+        Character cQuote = null;
+        // Set to null outside of comments or to the string that ends the comment.
+        String sCommentEnd = null;
+        // Index to start of current statement.
+        int iStart = 0;
+        // Index to current character.
+        // IMPORTANT: The loop is structured in a way that requires all if/else/... blocks to bump
+        // iCur appropriately. Failure of a corner case to bump iCur will cause an infinite loop.
+        boolean statementIsComment = false;
+        boolean inStatement = false;
+        int iCur = 0;
+        while (iCur < buf.length) {
+            // Eat up whitespace outside of a statement
+            if (!inStatement) {
+                if (Character.isWhitespace(buf[iCur])) {
+                    iCur++;
+                    iStart = iCur;
+                }
+                else {
+                    inStatement = true;
+                }
+            }
+            else if (sCommentEnd != null) {
+                // Processing the interior of a comment. Check if at the comment or buffer end.
+                if (iCur >= buf.length - sCommentEnd.length()) {
+                    // Exit
+                    iCur = buf.length;
+                } else if (String.copyValueOf(buf, iCur, sCommentEnd.length()).equals(sCommentEnd)) {
+                    // Move past the comment end.
+                    iCur += sCommentEnd.length();
+                    sCommentEnd = null;
+                    // If the comment is the whole of the statement so far, terminate it
+                    if (statementIsComment) {
+                        String statement = String.copyValueOf(buf, iStart, iCur - iStart).trim();
+                        if (!statement.isEmpty()) {
+                            statements.add(statement);
+                        }
+                        iStart = iCur;
+                        statementIsComment = false;
+                        inStatement = false;
+                    }
+                } else {
+                    // Keep going inside the comment.
+                    iCur++;
+                }
+            } else if (cQuote != null) {
+                // Processing the interior of a quoted string.
+                if (buf[iCur] == '\\') {
+                    // Skip the '\' escape and the trailing single escaped character.
+                    // Doesn't matter if iCur is beyond the end, it won't be used in that case.
+                    iCur += 2;
+                } else if (buf[iCur] == cQuote) {
+                    // Look at the next character to distinguish a double escaped quote
+                    // from the end of the quoted string.
+                    iCur++;
+                    if (iCur < buf.length) {
+                        if (buf[iCur] != cQuote) {
+                            // Not a double escaped quote - end of quoted string.
+                            cQuote = null;
+                        } else {
+                            // Move past the double escaped quote.
+                            iCur++;
+                        }
+                    }
+                } else {
+                    // Move past an ordinary character.
+                    iCur++;
+                }
+            } else {
+                // Outside of a quoted string - watch for the next separator, quote or comment.
+                if (buf[iCur] == ';') {
+                    // Add terminated statement (if not empty after trimming).
+                    String statement = String.copyValueOf(buf, iStart, iCur - iStart).trim();
+                    if (!statement.isEmpty()) {
+                        statements.add(statement);
+                    }
+                    iStart = iCur + 1;
+                    iCur = iStart;
+                    inStatement = false;
+                } else if (buf[iCur] == '"' || buf[iCur] == '\'') {
+                    // Start of quoted string.
+                    cQuote = buf[iCur];
+                    iCur++;
+                } else if (iCur <= buf.length - 2) {
+                    // Comment (double-dash or C-style)?
+                    if (buf[iCur] == '-' && buf[iCur+1] == '-') {
+                        // One line double-dash comment start.
+                        sCommentEnd = "\n"; // Works for *IX (\n) and Windows (\r\n).
+                        if (iCur == iStart) {
+                            statementIsComment = true;
+                        }
+                        iCur += 2;
+                    } else if (buf[iCur] == '/' && buf[iCur+1] == '*') {
+                        // Multi-line C-style comment start.
+                        sCommentEnd = "*/";
+                        if (iCur == iStart) {
+                            statementIsComment = true;
+                        }
+                        iCur += 2;
+                    } else {
+                        // Not a comment start, move past this character.
+                        iCur++;
+                    }
+                } else {
+                    // Move past a non-quote/non-separator character.
+                    iCur++;
+                }
+            }
+        }
+        // Get the last statement, if any.
+        if (iStart < buf.length) {
+            String statement = String.copyValueOf(buf, iStart, iCur - iStart).trim();
+            if (!statement.isEmpty()) {
+                statements.add(statement);
+            }
+        }
+        return statements;
+    }
+
+    /**
+     * Check if a statement is a SELECT.
+     * @param statement  statement to check
+     * @return           true if it's a SELECT statement
+     */
+    public static boolean isSelect(String statement)
+    {
+        return PAT_SELECT_STATEMENT_PREAMBLE.matcher(statement).matches();
+    }
+
+    //========== Private Methods ==========
+
+    /** Remove c-style comments from a string aggressively */
+    private static String removeCStyleComments(String ddl) {
+        // Avoid Apache commons StringUtils.join() to minimize client dependencies.
+        StringBuilder sb = new StringBuilder();
+        for (String part : PAT_STRIP_CSTYLE_COMMENTS.split(ddl)) {
+            sb.append(part);
+        }
+        return sb.toString();
+    }
+}
