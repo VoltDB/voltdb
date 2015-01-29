@@ -155,7 +155,8 @@ public class ExportBenchmark {
             client.createConnection(host, port);
         }
         catch (Exception e) {
-            System.err.printf("Connection to VoltDB failed\n" + e.getMessage());
+            System.err.printf("Connection to VoltDB failed");
+            e.printStackTrace();
             System.exit(1);
         }
         System.out.println("Initialization complete");
@@ -172,7 +173,8 @@ public class ExportBenchmark {
             }
             System.out.println("Object insertion complete");
         } catch (Exception e) {
-            System.err.println("Couldn't insert into VoltDB\n" + e.getMessage());
+            System.err.println("Couldn't insert into VoltDB\n");
+            e.printStackTrace();
             System.exit(1);
         }
         
