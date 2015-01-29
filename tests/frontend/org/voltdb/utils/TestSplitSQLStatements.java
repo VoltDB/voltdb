@@ -29,6 +29,7 @@ import java.util.List;
 
 import org.junit.Before;
 import org.junit.Test;
+import org.voltdb.parser.SQLLexer;
 
 public class TestSplitSQLStatements {
 

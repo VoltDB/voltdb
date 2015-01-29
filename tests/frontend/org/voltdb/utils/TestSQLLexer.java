@@ -30,6 +30,8 @@ import static org.junit.Assert.assertTrue;
 
 import org.hsqldb_voltpatches.HSQLDDLInfo;
 import org.junit.Test;
+import org.voltdb.parser.HSQLLexer;
+import org.voltdb.parser.SQLLexer;
 
 public class TestSQLLexer {
 

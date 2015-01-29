@@ -34,9 +34,9 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.utils.JDBCParser;
-import org.voltdb.utils.JDBCParser.ParsedCall;
-import org.voltdb.utils.SQLLexer;
+import org.voltdb.parser.JDBCParser;
+import org.voltdb.parser.SQLLexer;
+import org.voltdb.parser.JDBCParser.ParsedCall;
 
 public class JDBC4Statement implements java.sql.Statement
 {

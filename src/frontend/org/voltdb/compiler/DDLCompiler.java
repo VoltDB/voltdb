@@ -68,6 +68,9 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.groovy.GroovyCodeBlockCompiler;
+import org.voltdb.parser.HSQLLexer;
+import org.voltdb.parser.SQLLexer;
+import org.voltdb.parser.SQLParser;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.ParsedColInfo;
 import org.voltdb.planner.ParsedSelectStmt;
@@ -80,10 +83,7 @@ import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogSchemaTools;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
-import org.voltdb.utils.HSQLLexer;
 import org.voltdb.utils.InMemoryJarfile;
-import org.voltdb.utils.SQLLexer;
-import org.voltdb.utils.SQLParser;
 import org.voltdb.utils.VoltTypeUtil;
 
 

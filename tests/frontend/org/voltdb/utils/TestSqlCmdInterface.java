@@ -44,7 +44,8 @@ import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
 import org.junit.Test;
-import org.voltdb.utils.SQLParser.ExecuteCallResults;
+import org.voltdb.parser.SQLParser;
+import org.voltdb.parser.SQLParser.ExecuteCallResults;
 
 import com.google_voltpatches.common.base.Joiner;
 

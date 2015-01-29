@@ -37,8 +37,8 @@ import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.messaging.LocalMailbox;
+import org.voltdb.parser.SQLLexer;
 import org.voltdb.planner.StatementPartitioning;
-import org.voltdb.utils.SQLLexer;
 
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 
