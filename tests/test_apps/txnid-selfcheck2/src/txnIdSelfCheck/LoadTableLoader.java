@@ -147,6 +147,7 @@ public class LoadTableLoader extends Thread {
                 // stop the loader
                 m_shouldContinue.set(false);
             }
+            Benchmark.txnCount.incrementAndGet();
         }
     }
 
@@ -177,6 +178,7 @@ public class LoadTableLoader extends Thread {
                 // stop the loader
                 m_shouldContinue.set(false);
             }
+            Benchmark.txnCount.incrementAndGet();
         }
     }
 
@@ -208,6 +210,7 @@ public class LoadTableLoader extends Thread {
                 // stop the loader
                 m_shouldContinue.set(false);
             }
+            Benchmark.txnCount.incrementAndGet();
             long cnt = clientResponse.getResults()[0].asScalarLong();
             if (cnt != expected_delete) {
                 log.error("LoadTableLoader ungracefully failed to delete: " + m_tableName + " count=" + cnt);

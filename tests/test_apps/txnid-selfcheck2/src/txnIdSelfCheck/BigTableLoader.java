@@ -107,6 +107,7 @@ public class BigTableLoader extends Thread {
                 log.error(((ClientResponseImpl) clientResponse).toJSONString());
             }
             else {
+                Benchmark.txnCount.incrementAndGet();
                 rowsLoaded++;
             }
             latch.countDown();

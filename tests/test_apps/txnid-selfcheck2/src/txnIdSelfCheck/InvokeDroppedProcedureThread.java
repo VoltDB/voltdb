@@ -62,6 +62,8 @@ public class InvokeDroppedProcedureThread extends Thread {
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
             txnsOutstanding.release();
+            if (clientResponse.getStatus() == ClientResponse.SUCCESS)
+                Benchmark.txnCount.incrementAndGet();
             //The procedure may be dropped so we don't really care, just want to test the server with dropped procedure invocations in flight
         }
     }

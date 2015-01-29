@@ -108,6 +108,7 @@ public class TruncateTableLoader extends Thread {
                 log.error(((ClientResponseImpl) clientResponse).toJSONString());
             }
             else {
+                Benchmark.txnCount.incrementAndGet();
                 rowsLoaded++;
             }
             latch.countDown();
@@ -194,6 +195,7 @@ public class TruncateTableLoader extends Thread {
                     log.error(((ClientResponseImpl) clientResponse).toJSONString());
                 }
                 else {
+                    Benchmark.txnCount.incrementAndGet();
                     nTruncates++;
                 }
                 shouldRollback = 0;
@@ -250,6 +252,8 @@ public class TruncateTableLoader extends Thread {
                     log.error("TruncateTableLoader ungracefully failed to scan-agg table " + tableName);
                     log.error(((ClientResponseImpl) clientResponse).toJSONString());
                 }
+                else
+                    Benchmark.txnCount.incrementAndGet();
                 shouldRollback = 0;
             }
             catch (ProcCallException e) {

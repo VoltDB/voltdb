@@ -129,6 +129,8 @@ public class AdHocMayhemThread extends Thread {
                 log.warn(((ClientResponseImpl)clientResponse).toJSONString());
                 m_needsBlock.set(true);
             }
+            else
+                Benchmark.txnCount.incrementAndGet();
         }
     }
 

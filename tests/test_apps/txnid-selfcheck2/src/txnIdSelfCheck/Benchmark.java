@@ -86,7 +86,7 @@ public class Benchmark {
     final AtomicBoolean shutdown = new AtomicBoolean(false);
 
     // for reporting and detecting progress
-    private final AtomicLong txnCount = new AtomicLong();
+    public static AtomicLong txnCount = new AtomicLong();
     private long txnCountAtLastCheck;
     private long lastProgressTimestamp = System.currentTimeMillis();
 

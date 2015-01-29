@@ -82,6 +82,7 @@ public class ReadThread extends Thread {
                 m_needsBlock.set(true);
                 return;
             }
+            Benchmark.txnCount.incrementAndGet();
             // validate the data
             try {
                 VoltTable data = clientResponse.getResults()[0];
