@@ -81,6 +81,12 @@ public class BigTableLoader extends Thread {
         this.interrupt();
     }
 
+    public int getPercentLoadComplete() {
+        Double d = ((double)rowsLoaded / targetCount) * 100.;
+        return d.intValue();
+
+    }
+
     class InsertCallback implements ProcedureCallback {
 
         CountDownLatch latch;

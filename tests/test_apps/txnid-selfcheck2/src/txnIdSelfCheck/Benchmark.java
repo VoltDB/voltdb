@@ -436,6 +436,14 @@ public class Benchmark {
         return partitionCount;
     }
 
+    private byte reportDeadThread(Thread th) {
+        log.error("Thread '" + th.getName() + "' is not alive");
+        return 1;
+    }
+    private byte reportDeadThread(Thread th, String msg) {
+        log.error("Thread '" + th.getName() + "' is not alive, " + msg);
+        return 1;
+    }
     /**
      * Core benchmark code.
      * Connect. Initialize. Run the loop. Cleanup. Print Results.
@@ -443,6 +451,7 @@ public class Benchmark {
      * @throws Exception if anything unexpected happens.
      */
     public void runBenchmark() throws Exception {
+        byte exitcode = 0;
         log.info(HORIZONTAL_RULE);
         log.info(" Setup & Initialization");
         log.info(HORIZONTAL_RULE);
@@ -495,8 +504,9 @@ public class Benchmark {
         BigTableLoader partitionedLoader = new BigTableLoader(client, "bigp",
                          (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, partitionCount);
         partitionedLoader.start();
+        BigTableLoader replicatedLoader = null;
         if (config.mpratio > 0.0) {
-            BigTableLoader replicatedLoader = new BigTableLoader(client, "bigr",
+            replicatedLoader = new BigTableLoader(client, "bigr",
                              (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits, partitionCount);
             replicatedLoader.start();
         }
@@ -529,8 +539,9 @@ public class Benchmark {
         TruncateTableLoader partitionedTruncater = new TruncateTableLoader(client, "trup",
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 50, permits, config.mpratio);
         partitionedTruncater.start();
+        TruncateTableLoader replicatedTruncater = null;
         if (config.mpratio > 0.0) {
-            TruncateTableLoader replicatedTruncater = new TruncateTableLoader(client, "trur",
+            replicatedTruncater = new TruncateTableLoader(client, "trur",
                     (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, config.fillerrowsize, 3, permits, config.mpratio);
             replicatedTruncater.start();
         }
@@ -538,8 +549,9 @@ public class Benchmark {
         LoadTableLoader plt = new LoadTableLoader(client, "loadp",
                 (config.partfillerrowmb * 1024 * 1024) / config.fillerrowsize, 50, permits, false, 0);
         plt.start();
+        LoadTableLoader rlt = null;
         if (config.mpratio > 0.0) {
-        LoadTableLoader rlt = new LoadTableLoader(client, "loadmp",
+        rlt = new LoadTableLoader(client, "loadmp",
                 (config.replfillerrowmb * 1024 * 1024) / config.fillerrowsize, 3, permits, true, -1);
         rlt.start();
         }
@@ -574,6 +586,40 @@ public class Benchmark {
         }
 
         log.info("Duration completed shutting down...");
+
+        // check if loaders are done or still working
+        int lpcc = partitionedLoader.getPercentLoadComplete();
+        if (! partitionedLoader.isAlive() && lpcc < 100) {
+            exitcode = reportDeadThread(partitionedLoader, " yet only " + Integer.toString(lpcc) + "% rows have been loaded");
+        } else
+            log.info(partitionedLoader + " was at " + lpcc + "% of rows loaded");
+        lpcc = replicatedLoader.getPercentLoadComplete();
+        if (! replicatedLoader.isAlive() && lpcc < 100) {
+            exitcode = reportDeadThread(replicatedLoader, " yet only " + Integer.toString(lpcc) + "% rows have been loaded");
+        } else
+            log.info(replicatedLoader + " was at " + lpcc + "% of rows loaded");
+        // check if all threads still alive
+        if (! partitionedTruncater.isAlive())
+            exitcode = reportDeadThread(partitionedTruncater);
+        if (! replicatedTruncater.isAlive())
+            exitcode = reportDeadThread(replicatedTruncater);
+        /* XXX if (! plt.isAlive())
+            exitcode = reportDeadThread(plt);
+        if (! rlt.isAlive())
+            exitcode = reportDeadThread(rlt);
+        */if (! readThread.isAlive())
+            exitcode = reportDeadThread(readThread);
+        if (! adHocMayhemThread.isAlive())
+            exitcode = reportDeadThread(adHocMayhemThread);
+        if (! idpt.isAlive())
+            exitcode = reportDeadThread(idpt);
+        if (! ddlt.isAlive())
+            exitcode = reportDeadThread(ddlt);
+        for (ClientThread ct : clientThreads) {
+            if (! ct.isAlive()) {
+                exitcode = reportDeadThread(ct);
+            }
+        }
 
         /* XXX/PSR
         replicatedLoader.shutdown();
@@ -619,7 +665,7 @@ public class Benchmark {
 
         log.info(HORIZONTAL_RULE);
         log.info("Benchmark Complete");
-        System.exit(0);
+        System.exit(exitcode);
     }
 
     /**
