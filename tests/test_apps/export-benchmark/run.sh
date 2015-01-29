@@ -133,7 +133,7 @@ function run_benchmark() {
     java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         exportbenchmark.ExportBenchmark \
         --count=$COUNT \
-        --servers=localhost \
+        --servers=localhost 
 }
 
 function help() {
