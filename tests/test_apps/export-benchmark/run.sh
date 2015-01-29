@@ -133,18 +133,7 @@ function run_benchmark() {
     java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         exportbenchmark.ExportBenchmark \
         --count=$COUNT \
-        --displayinterval=5 \
-        --duration=120 \
         --servers=localhost \
-        --poolsize=100000 \
-        --preload=true \
-        --getputratio=0.90 \
-        --keysize=32 \
-        --minvaluesize=1024 \
-        --maxvaluesize=1024 \
-        --usecompression=false \
-        --threads=40 \
-        --csvfile=periodic.csv.gz
 }
 
 function help() {
