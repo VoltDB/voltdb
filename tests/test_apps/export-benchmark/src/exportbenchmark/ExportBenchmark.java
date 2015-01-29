@@ -46,15 +46,40 @@ public class ExportBenchmark {
     
     private Client client;
     
+    long count = 10000;
+    
     /**
      * Creates a new instance of the test to be run.
      * Establishes a client connection to a voltdb server, which should already be running
+     * @param args The arguments passed to the program
      */
-    public ExportBenchmark() {
+    public ExportBenchmark(String[] args) {
+        parseCommandLine(args);
+        
         ClientConfig clientConfig = new ClientConfig("", "");
         clientConfig.setReconnectOnConnectionLoss(true);
         clientConfig.setClientAffinity(true);
         client = ClientFactory.createClient(clientConfig);
+    }
+    
+    /**
+     * Loops through the command line arguments & applies them
+     * @param args The arguments passed to the program
+     */
+    private void parseCommandLine(String[] args) {
+        for (int i = 0; i < args.length; i++) {
+            if (args[i].equals("-n")) {
+                i++;
+                try {
+                    count = Long.parseLong(args[i]);
+                } catch (NumberFormatException e) {
+                    System.err.println("'" + args[i] + "': not a valid number");
+                    System.exit(1);
+                }
+            } else {
+                System.err.println("Unknown argument: '" + args[i] + "' - ignoring");
+            }
+        }
     }
 
     /**
@@ -79,7 +104,7 @@ public class ExportBenchmark {
         try {
             System.out.println("Inserting objects");
             String sql = "";
-            for (int i = 0; i < 1000000; i++) {
+            for (int i = 0; i < count; i++) {
                 sql = "INSERT INTO valuesToExport VALUES (" + i + ", " + 42 + ");";
                 client.callProcedure("@AdHoc", sql);
             }
@@ -107,7 +132,7 @@ public class ExportBenchmark {
         
         // See how much time elapsed
         long estimatedTime = System.nanoTime() - startTime;
-        System.out.println("Export time elapsed (ms) for 1,000,000 objects: " + estimatedTime/1000000);
+        System.out.println("Export time elapsed (ms) for " + count + " objects: " + estimatedTime/1000000);
     }
 
     /**
@@ -117,7 +142,7 @@ public class ExportBenchmark {
      * @throws Exception if anything goes wrong.
      */
     public static void main(String[] args) throws Exception {
-        ExportBenchmark bench = new ExportBenchmark();
+        ExportBenchmark bench = new ExportBenchmark(args);
         bench.runTest();
     }
 }

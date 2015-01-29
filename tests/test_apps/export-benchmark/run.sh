@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 APPNAME="export-benchmark"
+COUNT=10000
 
 # find voltdb binaries in either installation or distribution directory.
 if [ -n "$(which voltdb 2> /dev/null)" ]; then
@@ -40,6 +41,33 @@ HOST="localhost"
 # remove build artifacts
 function clean() {
     rm -rf obj debugoutput $APPNAME.jar voltdbroot statement-plans catalog-report.html log "$VOLTDB_LIB/NoOpExporter.jar"
+}
+
+# Grab the necessary command line arguments
+function parse_command_line() {
+    OPTIND=1
+    
+    while getopts ":h?e:n:" opt; do
+	case "$opt" in
+	e)
+	    ARG=$( echo $OPTARG | tr "," "\n" )
+	    for e in $ARG; do
+		EXPORTS+=("$e")
+	    done
+	    ;;
+	n)
+	    COUNT=$OPTARG
+	    ;;
+	esac
+    done
+
+    # Return the function to run
+    shift $(($OPTIND - 1))
+    RUN=$@
+}
+
+function build_deployment_file() {
+    exit
 }
 
 # compile the source code for procedures and the client
@@ -97,7 +125,7 @@ function run-benchmark-help() {
 function run_benchmark() {
     srccompile
     java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
-        exportbenchmark.ExportBenchmark \
+        exportbenchmark.ExportBenchmark -n $COUNT\
         --displayinterval=5 \
         --duration=120 \
         --servers=localhost \
@@ -116,7 +144,8 @@ function help() {
     echo "Usage: ./run.sh {clean|catalog|server|run-benchmark|run-benchmark-help|...}"
 }
 
+parse_command_line $@
+echo $RUN
 # Run the target passed as the first arg on the command line
 # If no first arg, run server
-if [ $# -gt 1 ]; then help; exit; fi
-if [ $# = 1 ]; then $1; else server; fi
+if [ -n "$RUN" ]; then $RUN; else server; fi
