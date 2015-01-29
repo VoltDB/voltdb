@@ -74,12 +74,6 @@ public class BigTableLoader extends Thread {
         log.info("BigTableLoader table: "+ tableName + " targetCount: " + targetCount + " storage required: " + targetCount*rowSize + " bytes");
     }
 
-    long getRowCount() throws NoConnectionsException, IOException, ProcCallException {
-        // XXX/PSR maybe we don't care (so much) about mp reads relative to mpRatio control?
-        VoltTable t = client.callProcedure("@AdHoc", "select count(*) from " + tableName + ";").getResults()[0];
-        return t.asScalarLong();
-    }
-
     void shutdown() {
         m_shouldContinue.set(false);
         log.info("BigTableLoader " + tableName + " shutdown: inserts tried " + insertsTried + " rows loaded " + rowsLoaded +
@@ -127,7 +121,7 @@ public class BigTableLoader extends Thread {
             r.nextBytes(data);
 
             try {
-                currentRowCount = getRowCount();
+                currentRowCount = TxnId2Utils.getRowCount(client, tableName);
                 // insert some batches...
                 while ((currentRowCount < targetCount) && (m_shouldContinue.get())) {
                     CountDownLatch latch = new CountDownLatch(batchSize);
@@ -153,7 +147,7 @@ public class BigTableLoader extends Thread {
                         }
                         log.error("BigTableLoader thread interrupted while waiting.", e);
                     }
-                    long nextRowCount = getRowCount();
+                    long nextRowCount = TxnId2Utils.getRowCount(client, tableName);
                     // if no progress, throttle a bit
                     if (nextRowCount == currentRowCount) {
                         try { Thread.sleep(1000); } catch (Exception e2) {}

@@ -111,12 +111,6 @@ public class LoadTableLoader extends Thread {
         setPriority(getPriority() + 1);
     }
 
-    long getRowCount() throws NoConnectionsException, IOException, ProcCallException {
-        // XXX/PSR maybe we don't care (so much) about mp reads relative to mpRatio control?
-        VoltTable t = client.callProcedure("@AdHoc", "select count(*) from " + m_tableName + ";").getResults()[0];
-        return t.asScalarLong();
-    }
-
     void shutdown() {
         m_shouldContinue.set(false);
         this.interrupt();
@@ -316,7 +310,12 @@ public class LoadTableLoader extends Thread {
                 //Wait for all @Load{SP|MP}Done
                 latch.await();
                 cpDelQueue.addAll(lcpDelQueue);
-                long nextRowCount = getRowCount();
+                long nextRowCount = 0;
+                try { nextRowCount = TxnId2Utils.getRowCount(client, m_tableName);
+                } catch (Exception e) {
+                    log.error("getrowcount exception", e);
+                    System.exit(-1);
+                }
                 // if no progress, throttle a bit
                 if (nextRowCount == currentRowCount.get()) {
                     Thread.sleep(1000);

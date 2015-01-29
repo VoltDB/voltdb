@@ -77,12 +77,6 @@ public class TruncateTableLoader extends Thread {
         log.info("TruncateTableLoader table: "+ tableName + " targetCount: " + targetCount);
     }
 
-    long getRowCount() throws NoConnectionsException, IOException, ProcCallException {
-        // XXX/PSR maybe we don't care (so much) about mp reads relative to mpRatio control?
-        VoltTable t = client.callProcedure("@AdHoc", "select count(*) from " + tableName + ";").getResults()[0];
-        return t.asScalarLong();
-    }
-
     void shutdown() {
         m_shouldContinue.set(false);
         this.interrupt();
@@ -124,12 +118,18 @@ public class TruncateTableLoader extends Thread {
     public void run() {
         byte[] data = new byte[rowSize];
         byte shouldRollback = 0;
-        long currentRowCount;
+        long currentRowCount = 0;
         while (m_shouldContinue.get()) {
             r.nextBytes(data);
 
             try {
-                currentRowCount = getRowCount();
+                currentRowCount = TxnId2Utils.getRowCount(client, tableName);
+            } catch (Exception e) {
+                log.error("getrowcount exception", e);
+                System.exit(-1);
+            }
+
+            try {
                 // insert some batches...
                 int tc = batchSize * r.nextInt(99);
                 while ((currentRowCount < tc) && (m_shouldContinue.get())) {
@@ -142,7 +142,13 @@ public class TruncateTableLoader extends Thread {
                         client.callProcedure(new InsertCallback(latch), tableName.toUpperCase() + "TableInsert", p, data);
                     }
                     latch.await(10, TimeUnit.SECONDS);
-                    long nextRowCount = getRowCount();
+                    long nextRowCount = -1;
+                    try {
+                        nextRowCount = TxnId2Utils.getRowCount(client, tableName);
+                    } catch (Exception e) {
+                        log.error("getrowcount exception", e);
+                        System.exit(-1);
+                    }
                     // if no progress, throttle a bit
                     if (nextRowCount == currentRowCount) {
                         try { Thread.sleep(1000); } catch (Exception e2) {}
@@ -159,7 +165,13 @@ public class TruncateTableLoader extends Thread {
 
             // truncate the table, check for zero rows
             try {
-                currentRowCount = getRowCount();
+                currentRowCount = TxnId2Utils.getRowCount(client, tableName);
+            } catch (Exception e) {
+                log.error("getrowcount exception", e);
+                System.exit(-1);
+            }
+
+            try {
                 log.debug("TruncateTableLoader truncate table..." + tableName + " current row count is " + currentRowCount);
                 shouldRollback = (byte) (r.nextInt(10) == 0 ? 1 : 0);
                 long p = Math.abs(r.nextLong());
@@ -210,7 +222,13 @@ public class TruncateTableLoader extends Thread {
 
             // scan-agg table
             try {
-                currentRowCount = getRowCount();
+                currentRowCount = TxnId2Utils.getRowCount(client, tableName);
+            } catch (Exception e) {
+                log.error("getrowcount exception", e);
+                System.exit(-1);
+            }
+
+            try {
                 log.debug("TruncateTableLoader scan agg table..." + tableName + " current row count is " + currentRowCount);
                 shouldRollback = (byte) (r.nextInt(10) == 0 ? 1 : 0);
                 long p = Math.abs(r.nextLong());

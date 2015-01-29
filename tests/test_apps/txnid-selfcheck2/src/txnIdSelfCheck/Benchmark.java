@@ -555,6 +555,8 @@ public class Benchmark {
 
         InvokeDroppedProcedureThread idpt = new InvokeDroppedProcedureThread(client);
         idpt.start();
+        CatalogUpdateThread ddlt = new CatalogUpdateThread(client);
+        ddlt.start();
 
         List<ClientThread> clientThreads = new ArrayList<ClientThread>();
         for (byte cid = (byte) config.threadoffset; cid < config.threadoffset + config.threads; cid++) {
@@ -581,6 +583,7 @@ public class Benchmark {
         readThread.shutdown();
         adHocMayhemThread.shutdown();
         idpt.shutdown();
+        ddlt.shutdown();
         for (ClientThread clientThread : clientThreads) {
             clientThread.shutdown();
         }
@@ -589,6 +592,7 @@ public class Benchmark {
         readThread.join();
         adHocMayhemThread.join();
         idpt.join();
+        ddlt.join();
 
         //Shutdown LoadTableLoader
         rlt.shutdown();
