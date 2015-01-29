@@ -228,7 +228,7 @@ public class ClientThread extends Thread {
         }
         // other proc call exceptions are logged, but don't stop the thread
         else {
-            log.warn("ClientThread had a proc-call exception that didn't indicate bad data", e);
+            log.warn("ClientThread had a proc-call exception that didn't indicate bad data: " + e.getMessage());
             log.warn(cri.toJSONString());
 
             // take a breather to avoid slamming the log (stay paused if no connections)

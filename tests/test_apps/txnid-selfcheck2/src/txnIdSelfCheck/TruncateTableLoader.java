@@ -159,7 +159,7 @@ public class TruncateTableLoader extends Thread {
             }
             catch (Exception e) {
                 // on exception, log and end the thread, but don't kill the process
-                log.error("TruncateTableLoader failed a TableInsert procedure call for table " + tableName, e);
+                log.error("TruncateTableLoader failed a TableInsert procedure call for table '" + tableName + "' " + e.getMessage());
                 try { Thread.sleep(3000); } catch (Exception e2) {}
             }
 
@@ -207,7 +207,7 @@ public class TruncateTableLoader extends Thread {
                     if ((cri.getStatus() == ClientResponse.GRACEFUL_FAILURE) ||
                             (cri.getStatus() == ClientResponse.USER_ABORT)) {
                         // on exception, log and end the thread, but don't kill the process
-                        log.error("TruncateTableLoader failed a TruncateTable ProcCallException call for table " + tableName, e);
+                        log.error("TruncateTableLoader failed a TruncateTable ProcCallException call for table '" + tableName + "' " + e.getMessage());
                         Benchmark.printJStack();
                         System.exit(-1);
                     }
@@ -218,7 +218,7 @@ public class TruncateTableLoader extends Thread {
             }
             catch (Exception e) {
                 // on exception, log and end the thread, but don't kill the process
-                log.error("TruncateTableLoader failed a non-proc call exception for table " + tableName, e);
+                log.error("TruncateTableLoader failed a non-proc call exception for table '" + tableName + "' " + e.getMessage());
                 try { Thread.sleep(3000); } catch (Exception e2) {}
             }
 
@@ -263,7 +263,7 @@ public class TruncateTableLoader extends Thread {
                     if ((cri.getStatus() == ClientResponse.GRACEFUL_FAILURE) ||
                             (cri.getStatus() == ClientResponse.USER_ABORT)) {
                         // on exception, log and end the thread, but don't kill the process
-                        log.error("TruncateTableLoader failed a ScanAgg ProcCallException call for table " + tableName, e);
+                        log.error("TruncateTableLoader failed a ScanAgg ProcCallException call for table '" + tableName + "' " + e.getMessage());
                         Benchmark.printJStack();
                         System.exit(-1);
                     }
@@ -274,7 +274,7 @@ public class TruncateTableLoader extends Thread {
             }
             catch (Exception e) {
                 // on exception, log and end the thread, but don't kill the process
-                log.error("TruncateTableLoader failed a non-proc call exception for table " + tableName, e);
+                log.error("TruncateTableLoader failed a non-proc call exception for table '" + tableName + "' " + e.getMessage());
                 try { Thread.sleep(3000); } catch (Exception e2) {}
             }
         }

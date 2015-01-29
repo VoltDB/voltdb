@@ -58,7 +58,7 @@ public class BigTableLoader extends Thread {
     long nTruncates = 0;
 
     BigTableLoader(Client client, String tableName, long targetCount, int rowSize, int batchSize, Semaphore permits, int partitionCount) {
-        setName("BigTableLoader");
+        setName("BigTableLoader-"+tableName);
         setDaemon(true);
 
         this.client = client;
@@ -141,7 +141,7 @@ public class BigTableLoader extends Thread {
                             if (!m_shouldContinue.get()) {
                                 return;
                             }
-                            log.error("BigTableLoader thread interrupted while waiting for permit.", e);
+                            log.error("BigTableLoader thread interrupted while waiting for permit. " + e.getMessage());
                         }
                         insertsTried++;
                         client.callProcedure(new InsertCallback(latch), tableName.toUpperCase() + "TableInsert", p, data);
@@ -152,7 +152,7 @@ public class BigTableLoader extends Thread {
                         if (!m_shouldContinue.get()) {
                             return;
                         }
-                        log.error("BigTableLoader thread interrupted while waiting.", e);
+                        log.error("BigTableLoader thread interrupted while waiting." + e.getMessage());
                     }
                     long nextRowCount = TxnId2Utils.getRowCount(client, tableName);
                     // if no progress, throttle a bit
@@ -168,7 +168,7 @@ public class BigTableLoader extends Thread {
                     continue;
                 }
                 // on exception, log and end the thread, but don't kill the process
-                log.error("BigTableLoader failed a TableInsert procedure call for table " + tableName, e);
+                log.error("BigTableLoader failed a TableInsert procedure call for table '" + tableName + "' " + e.getMessage());
                 try { Thread.sleep(3000); } catch (Exception e2) {}
             }
         }
