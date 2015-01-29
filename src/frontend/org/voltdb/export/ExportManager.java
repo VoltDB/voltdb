@@ -152,7 +152,8 @@ public class ExportManager
              * Do all the work to switch to a new generation in the thread for the processor
              * of the old generation
              */
-            synchronized (ExportManager.this) {
+            ExportManager instance = instance();
+            synchronized (instance) {
                 if (m_generationGhosts.contains(m_generation)) {
                     exportLog.info("Generation already drained: " + m_generation);
                     return;
@@ -186,7 +187,8 @@ public class ExportManager
         ExportDataProcessor newProcessor = null;
         ExportDataProcessor oldProcessor = null;
         boolean installNewProcessor = false;
-        synchronized (ExportManager.this) {
+        ExportManager instance = instance();
+        synchronized (instance) {
             if (m_generations.containsValue(drainedGeneration)) {
                 m_generations.remove(drainedGeneration.m_timestamp);
                 m_generationGhosts.add(drainedGeneration.m_timestamp);
@@ -602,8 +604,8 @@ public class ExportManager
         try {
             Map<Long, ExportGeneration> generations = instance.m_generations;
             if (generations.isEmpty()) {
-                assert(false);
-                return -1;
+                //This is now fine as you could get a stats tick and have no generation if you dropped last table.
+                return 0;
             }
 
             long exportBytes = 0;
