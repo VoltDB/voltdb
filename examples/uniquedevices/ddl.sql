@@ -7,17 +7,18 @@ DROP PROCEDURE TopApps IF EXISTS;
 DROP TABLE estimates IF EXISTS;
 DROP TABLE exact IF EXISTS;
 
--- contestants table holds the contestants numbers (for voting) and names
+-- holds current estimate as integral value and HLL bytes
 CREATE TABLE estimates
 (
   appid       bigint          NOT NULL,
   devicecount bigint          NOT NULL,
   hll         varbinary(8192) DEFAULT NULL,
-  CONSTRAINT  PK_estimates PRIMARY KEY (appid)
+  CONSTRAINT  PK_estimates    PRIMARY KEY (appid)
 );
 PARTITION TABLE estimates ON COLUMN appid;
 CREATE INDEX rank ON ESTIMATES (devicecount);
 
+-- used for CountDeviceExact and CountDeviceExact procs
 CREATE TABLE exact
 (
   appid      bigint          NOT NULL,

@@ -758,7 +758,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 fail("did not fail on invalid SQL verb");
             }
             catch (ProcCallException pcex) {
-                assertTrue(pcex.getMessage().indexOf("Unsupported SQL verb in statement") > 0);
+                assertTrue(pcex.getMessage().indexOf("this type of sql statement is not supported") > 0);
             }
         }
         finally {
