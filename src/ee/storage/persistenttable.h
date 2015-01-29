@@ -539,18 +539,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     TBPtr allocateNextBlock();
 
-    // XXX (nshi): Hack to get the MP unique ID for replicated table
-    // stream. Should be replaced with sequence number once it's implemented.
-    inline int64_t getSpUniqueId(ExecutorContext *ec) {
-        int64_t currentSpUniqueId;
-        if (m_partitionColumn == -1) {
-            currentSpUniqueId = ec->currentUniqueId();
-        } else {
-            currentSpUniqueId = ec->currentSpUniqueId();
-        }
-        return currentSpUniqueId;
-    }
-
     inline DRTupleStream *getDRTupleStream(ExecutorContext *ec) {
         if (m_partitionColumn == -1) {
             return ec->drReplicatedStream();

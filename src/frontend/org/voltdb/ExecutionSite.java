@@ -1299,13 +1299,13 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     }
 
     @Override
-    public long getDRSequenceNumber()
+    public Pair<Long, Long> getDRSequenceNumbers()
     {
         throw new RuntimeException("ExecutionSite doesn't know how to do this");
     }
 
     @Override
-    public void setDRSequenceNumber(long sequenceNumber) {}
+    public void setDRSequenceNumbers(long partitionSequenceNumber, long mpSequenceNumber) {}
 
     @Override
     public void toggleProfiler(int toggle)

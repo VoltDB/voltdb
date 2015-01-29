@@ -923,17 +923,20 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public long getDRSequenceNumber()
+    public Pair<Long, Long> getDRSequenceNumbers()
     {
-        ByteBuffer resultBuffer = ByteBuffer.wrap(m_ee.executeTask(TaskType.GET_DR_SEQUENCE_NUMBER, null));
-        return resultBuffer.getLong();
+        ByteBuffer resultBuffer = ByteBuffer.wrap(m_ee.executeTask(TaskType.GET_DR_SEQUENCE_NUMBERS, null));
+        long partitionSequenceNumber = resultBuffer.getLong();
+        long mpSequenceNumber = resultBuffer.getLong();
+        return Pair.of(partitionSequenceNumber, mpSequenceNumber < -1 ? null : mpSequenceNumber);
     }
 
     @Override
-    public void setDRSequenceNumber(long sequenceNumber) {
-        ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(8);
-        paramBuffer.putLong(sequenceNumber);
-        m_ee.executeTask(TaskType.SET_DR_SEQUENCE_NUMBER, paramBuffer);
+    public void setDRSequenceNumbers(long partitionSequenceNumber, long mpSequenceNumber) {
+        ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(16);
+        paramBuffer.putLong(partitionSequenceNumber);
+        paramBuffer.putLong(mpSequenceNumber);
+        m_ee.executeTask(TaskType.SET_DR_SEQUENCE_NUMBERS, paramBuffer);
     }
 
     @Override
@@ -1124,7 +1127,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
         Long partitionDRSequenceNumber;
         if (drSequenceNumbers != null && (partitionDRSequenceNumber = drSequenceNumbers.get(m_partitionId)) != null) {
-            setDRSequenceNumber(partitionDRSequenceNumber);
+            Long mpDRSequenceNumber = drSequenceNumbers.get(MpInitiator.MP_INIT_PID);
+            assert (mpDRSequenceNumber != null);
+            setDRSequenceNumbers(partitionDRSequenceNumber, mpDRSequenceNumber);
         } else if (requireExistingSequenceNumbers) {
             VoltDB.crashLocalVoltDB("Could not find DR sequence number for partition " + m_partitionId);
         }

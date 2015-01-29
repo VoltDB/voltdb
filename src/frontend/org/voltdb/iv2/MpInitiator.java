@@ -122,11 +122,13 @@ public class MpInitiator extends BaseInitiator implements Promotable
                 // term syslogs the start of leader promotion.
                 long txnid = Long.MIN_VALUE;
                 long uniqueId = UniqueIdGenerator.makeZero(MP_INIT_PID);
+                long binaryLogDRId = Long.MIN_VALUE;
                 long binaryLogUniqueId = Long.MIN_VALUE;
                 try {
                     RepairResult res = repair.start().get();
                     txnid = res.m_txnId;
                     uniqueId = res.m_uniqueId;
+                    binaryLogDRId = res.m_binaryLogDRId;
                     binaryLogUniqueId = res.m_binaryLogUniqueId;
                     success = true;
                 } catch (CancellationException e) {
@@ -165,7 +167,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
                     iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
 
                     if (m_consumerDRGateway != null) {
-                        m_consumerDRGateway.promotePartition(m_partitionId, binaryLogUniqueId);
+                        m_consumerDRGateway.promotePartition(m_partitionId, binaryLogDRId, binaryLogUniqueId);
                     }
                 }
                 else {

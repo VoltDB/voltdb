@@ -225,7 +225,7 @@ void DRTupleStream::pushExportBuffer(StreamBlock *block, bool sync, bool endOfSt
     ExecutorContext::getExecutorContext()->getTopend()->pushDRBuffer(m_partitionId, block);
 }
 
-void DRTupleStream::beginTransaction(int64_t uniqueId, int64_t sequenceNumber) {
+void DRTupleStream::beginTransaction(int64_t sequenceNumber, int64_t uniqueId) {
 //    std::cout << "Beginning txn uniqueId " << uniqueId << " spUniqueId " << spUniqueId << std::endl;
 //    std::cout << "Beginning txn uniqueId " << (uniqueId & UniqueId::PARTITION_ID_MASK) << " spUniqueId " << (spUniqueId & UniqueId::PARTITION_ID_MASK) << std::endl;
     if (!m_currBlock) {
@@ -254,7 +254,7 @@ void DRTupleStream::beginTransaction(int64_t uniqueId, int64_t sequenceNumber) {
      m_uso += io.position();
 }
 
-void DRTupleStream::endTransaction(int64_t uniqueId, int64_t sequenceNumber) {
+void DRTupleStream::endTransaction(int64_t sequenceNumber, int64_t uniqueId) {
 //    std::cout << "Ending txn spUniqueId " << spUniqueId << std::endl;
     if (!m_currBlock) {
          extendBufferChain(m_defaultCapacity);
@@ -307,6 +307,12 @@ bool DRTupleStream::checkOpenTransaction(StreamBlock* sb, size_t minLength, size
         return true;
     }
     return false;
+}
+
+void DRTupleStream::setLastCommittedSequenceNumber(int64_t sequenceNumber) {
+    assert(m_committedSequenceNumber == 0);
+    m_openSequenceNumber = sequenceNumber;
+    m_committedSequenceNumber = sequenceNumber;
 }
 
 int32_t DRTupleStream::getTestDRBuffer(char *outBytes) {

@@ -416,13 +416,13 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     }
 
     @Override
-    public long getDRSequenceNumber()
+    public Pair<Long, Long> getDRSequenceNumbers()
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }
 
     @Override
-    public void setDRSequenceNumber(long sequenceNumber)
+    public void setDRSequenceNumbers(long partitionSequenceNumber, long mpSequenceNumber)
     {
         throw new RuntimeException("RO MP Site doesn't do this, shouldn't be here.");
     }

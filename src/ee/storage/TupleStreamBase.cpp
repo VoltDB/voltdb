@@ -45,11 +45,11 @@ TupleStreamBase::TupleStreamBase()
       // calls appendTupple with LONG_MIN transaction ids
       // this allows initial ticks to succeed after rejoins
       m_openSpHandle(0),
-      m_openSequenceNumber(0),
+      m_openSequenceNumber(-1),
       m_openUniqueId(0),
       m_openTransactionUso(0),
       m_committedSpHandle(0), m_committedUso(0),
-      m_committedSequenceNumber(0),
+      m_committedSequenceNumber(-1),
       m_committedUniqueId(0)
 {
     extendBufferChain(m_defaultCapacity);
@@ -135,7 +135,7 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
     if (m_openSpHandle < currentSpHandle && currentSpHandle != lastCommittedSpHandle)
     {
         if (m_openSpHandle > 0 && m_openSpHandle > m_committedSpHandle) {
-            endTransaction(m_openUniqueId, m_openSequenceNumber);
+            endTransaction(m_openSequenceNumber, m_openUniqueId);
         }
         //std::cout << "m_openSpHandle(" << m_openSpHandle << ") < currentSpHandle("
         //<< currentSpHandle << ")" << std::endl;
@@ -152,7 +152,7 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
             extendBufferChain(0);
         }
 
-        beginTransaction(uniqueId, m_openSequenceNumber);
+        beginTransaction(m_openSequenceNumber, uniqueId);
     }
 
     // now check to see if the lastCommittedSpHandle tells us that our open
@@ -163,7 +163,7 @@ void TupleStreamBase::commit(int64_t lastCommittedSpHandle, int64_t currentSpHan
         //std::cout << "m_openSpHandle(" << m_openSpHandle << ") <= lastCommittedSpHandle(" <<
         //lastCommittedSpHandle << ")" << std::endl;
         if (m_openSpHandle > 0 && m_openSpHandle > m_committedSpHandle) {
-            endTransaction(m_openUniqueId, m_openSequenceNumber);
+            endTransaction(m_openSequenceNumber, m_openUniqueId);
         }
         m_committedSequenceNumber = m_openSequenceNumber;
         m_committedUso = m_uso;

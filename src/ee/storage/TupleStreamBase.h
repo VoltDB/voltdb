@@ -74,8 +74,8 @@ public:
     void pushPendingBlocks();
     void discardBlock(StreamBlock *sb);
 
-    virtual void beginTransaction(int64_t uniqueId, int64_t sequenceNumber) {}
-    virtual void endTransaction(int64_t uniqueId, int64_t sequenceNumber) {}
+    virtual void beginTransaction(int64_t sequenceNumber, int64_t uniqueId) {}
+    virtual void endTransaction(int64_t sequenceNumber, int64_t uniqueId) {}
 
     virtual bool checkOpenTransaction(StreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso) { return false; }
 

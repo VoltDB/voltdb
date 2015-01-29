@@ -72,10 +72,13 @@ public:
 
     size_t computeOffsets(TableTuple &tuple,size_t *rowHeaderSz);
 
-    void beginTransaction(int64_t uniqueId, int64_t sequenceNumber);
-    void endTransaction(int64_t uniqueId, int64_t sequenceNumber);
+    void beginTransaction(int64_t sequenceNumber, int64_t uniqueId);
+    void endTransaction(int64_t sequenceNumber, int64_t uniqueId);
 
     bool checkOpenTransaction(StreamBlock *sb, size_t minLength, size_t& blockSize, size_t& uso);
+
+    int64_t getLastCommittedSequenceNumber() { return m_committedSequenceNumber; }
+    void setLastCommittedSequenceNumber(int64_t sequenceNumber);
 
     bool m_enabled;
 

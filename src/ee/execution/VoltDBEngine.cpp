@@ -1900,14 +1900,23 @@ void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
         m_binaryLogSink.apply(taskParams, m_tablesBySignatureHash, &m_stringPool, this);
         break;
     }
-    case TASK_TYPE_GET_DR_SEQUENCE_NUMBER:
-    	m_resultOutput.writeInt(static_cast<int32_t>(sizeof(int64_t)));
-        m_resultOutput.writeLong(m_drStream.m_committedSequenceNumber);
+    case TASK_TYPE_GET_DR_SEQUENCE_NUMBERS:
+        m_resultOutput.writeInt(static_cast<int32_t>(2 * sizeof(int64_t)));
+        m_resultOutput.writeLong(m_drStream->getLastCommittedSequenceNumber());
+        if (m_drReplicatedStream) {
+            m_resultOutput.writeLong(m_drReplicatedStream->getLastCommittedSequenceNumber());
+        } else {
+            m_resultOutput.writeLong(std::numeric_limits<int64_t>::min());
+        }
         break;
-    case TASK_TYPE_SET_DR_SEQUENCE_NUMBER: {
-    	ReferenceSerializeInputBE taskInfo(taskParams, std::numeric_limits<std::size_t>::max());
-        m_drStream.m_openSequenceNumber = taskInfo.readLong();
-        m_drStream.m_committedSequenceNumber = m_drStream.m_openSequenceNumber;
+    case TASK_TYPE_SET_DR_SEQUENCE_NUMBERS: {
+        ReferenceSerializeInputBE taskInfo(taskParams, std::numeric_limits<std::size_t>::max());
+        int64_t partitionSequenceNumber = taskInfo.readLong();
+        int64_t mpSequenceNumber = taskInfo.readLong();
+        m_drStream->setLastCommittedSequenceNumber(partitionSequenceNumber);
+        if (m_drReplicatedStream) {
+            m_drReplicatedStream->setLastCommittedSequenceNumber(mpSequenceNumber);
+        }
         break;
     }
     default:

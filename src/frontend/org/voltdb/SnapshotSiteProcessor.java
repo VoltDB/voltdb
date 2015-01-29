@@ -51,6 +51,7 @@ import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
+import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.SiteTaskerQueue;
 import org.voltdb.iv2.SnapshotTask;
 import org.voltdb.rejoin.StreamSnapshotDataTarget.StreamSnapshotTimeoutException;
@@ -241,8 +242,11 @@ public class SnapshotSiteProcessor {
                                 ackOffSetAndSequenceNumber[0],
                                 ackOffSetAndSequenceNumber[1]));
         }
-        long drSequenceNumber = context.getSiteProcedureConnection().getDRSequenceNumber();
-        m_drSequenceNumbers.put(context.getPartitionId(), drSequenceNumber);
+        Pair<Long, Long> drSequenceNumbers = context.getSiteProcedureConnection().getDRSequenceNumbers();
+        m_drSequenceNumbers.put(context.getPartitionId(), drSequenceNumbers.getFirst());
+        if (drSequenceNumbers.getSecond() != null) {
+            m_drSequenceNumbers.put(MpInitiator.MP_INIT_PID, drSequenceNumbers.getSecond());
+        }
     }
 
     public static Map<String, Map<Integer, Pair<Long, Long>>> getExportSequenceNumbers() {

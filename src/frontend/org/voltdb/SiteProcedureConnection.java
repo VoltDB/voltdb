@@ -169,9 +169,9 @@ public interface SiteProcedureConnection {
 
     public long[] getUSOForExportTable(String signature);
 
-    public long getDRSequenceNumber();
+    public Pair<Long, Long> getDRSequenceNumbers();
 
-    public void setDRSequenceNumber(long sequenceNumber);
+    public void setDRSequenceNumbers(long partitionSequenceNumber, long mpSequenceNumber);
 
     public void toggleProfiler(int toggle);
 
