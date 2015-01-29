@@ -152,6 +152,13 @@ public class ExportManager
              * Do all the work to switch to a new generation in the thread for the processor
              * of the old generation
              */
+            synchronized (ExportManager.this) {
+                if (m_generationGhosts.contains(m_generation)) {
+                    exportLog.info("Generation already drained: " + m_generation);
+                    return;
+                }
+            }
+            //After all generations drained processors can not be null as above check should kick you out.
             ExportDataProcessor proc = m_processor.get();
             if (proc == null) {
                 VoltDB.crashLocalVoltDB("No export data processor found", true, null);
@@ -229,13 +236,13 @@ public class ExportManager
                             nextGeneration.acceptMastershipTask(partitionId);
                         }
                     }
-                    if (installNewProcessor) {
+                    if (installNewProcessor && newProcessor != null) {
                         //If we installed new processor get old one to shutdown.
-                        exportLog.info("Last export table dropped processor will be removed: " + m_loaderClass);
-                        oldProcessor = m_processor.getAndSet(null);
+                        oldProcessor = m_processor.getAndSet(newProcessor);
                     }
                 } else {
                     //We deleted last of the generation as we dropped the last export table.
+                    exportLog.info("Last export table dropped processor will be removed: " + m_loaderClass);
                     oldProcessor = m_processor.getAndSet(null);
                 }
             } catch (Exception e) {
@@ -595,7 +602,7 @@ public class ExportManager
         try {
             Map<Long, ExportGeneration> generations = instance.m_generations;
             if (generations.isEmpty()) {
-                //assert(false);
+                assert(false);
                 return -1;
             }
 
@@ -643,8 +650,7 @@ public class ExportManager
                  */
                 synchronized(instance) {
                     if (!instance.m_generationGhosts.contains(exportGeneration)) {
-                        //assert(false);
-                        (new Exception()).printStackTrace();
+                        assert(false);
                         exportLog.error("Could not a find an export generation " + exportGeneration +
                         ". Should be impossible. Discarding export data");
                     }

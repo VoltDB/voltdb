@@ -40,6 +40,7 @@ StreamedTable::createForTest(size_t wrapperBufSize, ExecutorContext *ctx) {
     return st;
 }
 
+//This returns true if a stream was created thus caller can setSignatureAndGeneration to push.
 bool StreamedTable::enableStream() {
     if (!m_wrapper) {
         m_wrapper = new ExportTupleStream(m_executorContext->m_partitionId,
