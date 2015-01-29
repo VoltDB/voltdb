@@ -83,7 +83,8 @@ public class ExportBenchmark {
             } else if (arg[0].equals("--port")) {
                 port = Integer.parseInt(arg[1]);
             } else {
-                System.err.println("Unknown argument: '" + args[i] + "' - ignoring");
+                System.err.println("Unknown argument: '" + args[i] + "'");
+                System.exit(1);
             }
         }
     }
