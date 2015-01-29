@@ -40,7 +40,7 @@ HOST="localhost"
 
 # remove build artifacts
 function clean() {
-    rm -rf obj debugoutput $APPNAME.jar voltdbroot statement-plans catalog-report.html log "$VOLTDB_LIB/NoOpExporter.jar"
+    rm -rf obj debugoutput $APPNAME.jar voltdbroot statement-plans catalog-report.html log "$VOLTDB_LIB/ExportBenchmark.jar"
 }
 
 # Grab the necessary command line arguments
@@ -77,7 +77,7 @@ function srccompile() {
         src/exportbenchmark/*.java 
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
-    (cd obj && jar cvf NoOpExport.jar exportbenchmark/*)
+    (cd obj && jar cvf ExportBenchmark.jar exportbenchmark/*)
 
     cp ./obj/*.jar "$VOLTDB_LIB/"
 }
