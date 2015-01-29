@@ -47,6 +47,8 @@ public class ExportBenchmark {
     private Client client;
     
     long count = 10000;
+    String host = "localhost";
+    int port = 21212;
     
     /**
      * Creates a new instance of the test to be run.
@@ -56,7 +58,7 @@ public class ExportBenchmark {
     public ExportBenchmark(String[] args) {
         parseCommandLine(args);
         
-        ClientConfig clientConfig = new ClientConfig("", "");
+        ClientConfig clientConfig = new ClientConfig();
         clientConfig.setReconnectOnConnectionLoss(true);
         clientConfig.setClientAffinity(true);
         client = ClientFactory.createClient(clientConfig);
@@ -68,14 +70,18 @@ public class ExportBenchmark {
      */
     private void parseCommandLine(String[] args) {
         for (int i = 0; i < args.length; i++) {
-            if (args[i].equals("-n")) {
-                i++;
+            String[] arg = args[i].split("=");
+            if (arg[0].equals("--count")) {
                 try {
-                    count = Long.parseLong(args[i]);
+                    count = Long.parseLong(arg[1]);
                 } catch (NumberFormatException e) {
-                    System.err.println("'" + args[i] + "': not a valid number");
+                    System.err.println("'" + arg[1] + "': not a valid number");
                     System.exit(1);
                 }
+            } else if (arg[0].equals("--servers")) {
+                host = arg[1];
+            } else if (arg[0].equals("--port")) {
+                port = Integer.parseInt(arg[1]);
             } else {
                 System.err.println("Unknown argument: '" + args[i] + "' - ignoring");
             }
@@ -90,7 +96,7 @@ public class ExportBenchmark {
         
         // Server connection
         try {
-            client.createConnection("localhost");
+            client.createConnection(host, port);
         }
         catch (Exception e) {
             System.err.printf("Connection to VoltDB failed\n" + e.getMessage());

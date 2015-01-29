@@ -125,7 +125,8 @@ function run-benchmark-help() {
 function run_benchmark() {
     srccompile
     java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
-        exportbenchmark.ExportBenchmark -n $COUNT\
+        exportbenchmark.ExportBenchmark \
+        --count=$COUNT \
         --displayinterval=5 \
         --duration=120 \
         --servers=localhost \
