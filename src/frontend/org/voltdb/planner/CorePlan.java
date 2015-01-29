@@ -23,9 +23,11 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltType;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.AdHocPlannedStatement;
+import org.voltdb.utils.Encoder;
 
 /**
  * CorePlan is an immutable representation of a SQL execution plan.
@@ -57,8 +59,8 @@ public class CorePlan {
     /** Does the statement write? */
     public final boolean readOnly;
 
-    /** Which version of the catalog is this plan good for? */
-    public final int catalogVersion;
+    /** What SHA-1 hash of the catalog is this plan good for? */
+    private final byte[] catalogHash;
 
     /** What are the types of the paramters this plan accepts? */
     public final VoltType[] parameterTypes;
@@ -75,9 +77,9 @@ public class CorePlan {
      * Constructor from QueryPlanner output.
      *
      * @param plan The output from the QueryPlanner.
-     * @param catalogVersion The version of the catalog this plan was generated against.
+     * @param catalogHash  The sha-1 hash of the catalog this plan was generated against.
      */
-    public CorePlan(CompiledPlan plan, int catalogVersion) {
+    public CorePlan(CompiledPlan plan, byte[] catalogHash) {
         aggregatorFragment = CompiledPlan.bytesForPlan(plan.rootPlanGraph);
         collectorFragment = CompiledPlan.bytesForPlan(plan.subPlanGraph);
 
@@ -102,7 +104,7 @@ public class CorePlan {
 
         isReplicatedTableDML = plan.replicatedTableDML;
         isNonDeterministic = (!plan.isContentDeterministic()) || (!plan.isOrderDeterministic());
-        this.catalogVersion = catalogVersion;
+        this.catalogHash = catalogHash;
         parameterTypes = plan.parameterTypes();
         readOnly = plan.readOnly;
     }
@@ -116,7 +118,7 @@ public class CorePlan {
      * @param isNonDeterministic        non-deterministic SQL flag
      * @param isReadOnly                does it write
      * @param paramTypes                parameter type array
-     * @param catalogVersion            catalog version
+     * @param catalogHash               SHA-1 hash of catalog
      */
     public CorePlan(byte[] aggregatorFragment,
                     byte[] collectorFragment,
@@ -126,7 +128,8 @@ public class CorePlan {
                     boolean isNonDeterministic,
                     boolean isReadOnly,
                     VoltType[] paramTypes,
-                    int catalogVersion) {
+                    byte[] catalogHash)
+    {
         this.aggregatorFragment = aggregatorFragment;
         this.collectorFragment = collectorFragment;
         this.aggregatorHash = aggregatorHash;
@@ -135,7 +138,7 @@ public class CorePlan {
         this.isNonDeterministic = isNonDeterministic;
         this.readOnly = isReadOnly;
         this.parameterTypes = paramTypes;
-        this.catalogVersion = catalogVersion;
+        this.catalogHash = catalogHash;
     }
 
     @Override
@@ -161,7 +164,7 @@ public class CorePlan {
             size += 4;
         }
         size += 3; // booleans
-        size += 4; // catalog version
+        size += 20;  // catalog hash SHA-1 is 20b
 
         size += 2; // params count
         size += parameterTypes.length;
@@ -188,8 +191,8 @@ public class CorePlan {
         buf.put((byte) (isNonDeterministic ? 1 : 0));
         buf.put((byte) (readOnly ? 1 : 0));
 
-        // catalog version
-        buf.putInt(catalogVersion);
+        // catalog hash
+        buf.put(catalogHash);
 
         // param types
         buf.putShort((short) parameterTypes.length);
@@ -219,8 +222,9 @@ public class CorePlan {
         boolean isNonDeterministic = buf.get() == 1;
         boolean isReadOnly = buf.get() == 1;
 
-        // catalog version
-        int catalogVersion = buf.getInt();
+        // catalog hash
+        byte[] catalogHash = new byte[20];  // Catalog sha-1 hash is 20b
+        buf.get(catalogHash);
 
         // param types
         short paramCount = buf.getShort();
@@ -238,7 +242,7 @@ public class CorePlan {
                 isNonDeterministic,
                 isReadOnly,
                 paramTypes,
-                catalogVersion);
+                catalogHash);
     }
 
     /* (non-Javadoc)
@@ -271,7 +275,7 @@ public class CorePlan {
         if (readOnly != other.readOnly) {
             return false;
         }
-        if (catalogVersion != other.catalogVersion) {
+        if (!Arrays.equals(catalogHash, other.catalogHash)) {
             return false;
         }
         if (partitioningParamIndex != other.partitioningParamIndex) {
@@ -304,11 +308,19 @@ public class CorePlan {
     }
 
     public VoltType getPartitioningParamType() {
-        // TODO Auto-generated method stub
         if (partitioningParamIndex < 0 || partitioningParamIndex >= parameterTypes.length) {
             return VoltType.NULL;
         }
         return parameterTypes[partitioningParamIndex];
     }
 
+    public boolean wasPlannedAgainstHash(byte[] catalogHash) {
+        if (!Arrays.equals(catalogHash, this.catalogHash)) {
+            VoltLogger logger = new VoltLogger("HOST");
+            logger.warn("ADHOC REPLAY PLANNING FAIL.  PLANNED HASH: " +
+                    Encoder.hexEncode(this.catalogHash) +
+                    ", PROVIDED HASH: " + Encoder.hexEncode(catalogHash));
+        }
+        return Arrays.equals(catalogHash, this.catalogHash);
+    }
 }

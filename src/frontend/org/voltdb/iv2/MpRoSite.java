@@ -154,6 +154,13 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
             throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
         }
 
+        @Override
+        public byte[] getCatalogHash() {
+            // AdHoc invocations need to be able to check the hash of the current catalog
+            // against the hash of the catalog they were planned against.
+            return m_context.getCatalogHash();
+        }
+
         // Needed for Adhoc queries
         @Override
         public int getCatalogVersion() {

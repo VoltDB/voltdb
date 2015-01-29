@@ -32,6 +32,7 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.PlannerTool;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.VoltFile;
 
@@ -48,6 +49,7 @@ public class CatalogContext {
     public final CatalogMap<Table> tables;
     public final AuthSystem authSystem;
     public final int catalogVersion;
+    private final byte[] catalogHash;
     private final long catalogCRC;
     public final long deploymentCRC;
     public final long m_transactionId;
@@ -61,7 +63,6 @@ public class CatalogContext {
     public final PlannerTool m_ptool;
 
     // PRIVATE
-    //private final String m_path;
     private final InMemoryJarfile m_jarfile;
 
     public CatalogContext(
@@ -70,30 +71,29 @@ public class CatalogContext {
             Catalog catalog,
             byte[] catalogBytes,
             long deploymentCRC,
-            int version,
-            long prevCRC) {
+            int version)
+    {
         m_transactionId = transactionId;
         m_uniqueId = uniqueId;
         // check the heck out of the given params in this immutable class
         assert(catalog != null);
-        if (catalog == null)
+        if (catalog == null) {
             throw new RuntimeException("Can't create CatalogContext with null catalog.");
+        }
 
-        //m_path = pathToCatalogJar;
-        long tempCRC = 0;
+        assert(catalogBytes != null);
         if (catalogBytes != null) {
             try {
                 m_jarfile = new InMemoryJarfile(catalogBytes);
-                tempCRC = m_jarfile.getCRC();
+                catalogCRC = m_jarfile.getCRC();
             }
             catch (Exception e) {
                 throw new RuntimeException(e);
             }
-            catalogCRC = tempCRC;
+            this.catalogHash = CatalogUtil.makeCatalogOrDeploymentHash(catalogBytes);
         }
         else {
-            m_jarfile = null;
-            catalogCRC = prevCRC;
+            throw new RuntimeException("Can't create CatalogContext with null catalog bytes.");
         }
 
         this.catalog = catalog;
@@ -104,7 +104,7 @@ public class CatalogContext {
         authSystem = new AuthSystem(database, cluster.getSecurityenabled());
         this.deploymentCRC = deploymentCRC;
         m_jdbc = new JdbcDatabaseMetaDataGenerator(catalog);
-        m_ptool = new PlannerTool(cluster, database, version);
+        m_ptool = new PlannerTool(cluster, database, catalogHash);
         catalogVersion = version;
     }
 
@@ -137,8 +137,7 @@ public class CatalogContext {
                     newCatalog,
                     bytes,
                     realDepCRC,
-                    catalogVersion + incValue,
-                    catalogCRC);
+                    catalogVersion + incValue);
         return retval;
     }
 
@@ -273,5 +272,10 @@ public class CatalogContext {
 
     public long getCatalogCRC() {
         return catalogCRC;
+    }
+
+    public byte[] getCatalogHash()
+    {
+        return catalogHash;
     }
 }

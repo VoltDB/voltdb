@@ -1443,6 +1443,25 @@ public abstract class CatalogUtil {
         return Encoder.hexEncode(passwordHash);
     }
 
+    /**
+     * This code appeared repeatedly. Extract method to take bytes for the catalog
+     * or deployment file, do the irritating exception crash test, jam the bytes in,
+     * and get the SHA-1 hash.
+     */
+    public static byte[] makeCatalogOrDeploymentHash(byte[] inbytes)
+    {
+        MessageDigest md = null;
+        try {
+            md = MessageDigest.getInstance("SHA-1");
+        } catch (NoSuchAlgorithmException e) {
+            VoltDB.crashLocalVoltDB("Bad JVM has no SHA-1 hash.", true, e);
+        }
+        md.update(inbytes);
+        byte[] hash = md.digest();
+        assert(hash.length == 20); // sha-1 length
+        return hash;
+    }
+
     public static void
         uploadCatalogToZK(ZooKeeper zk, int catalogVersion, long txnId, long uniqueId, byte[] catalogHash, byte catalogBytes[])
                 throws KeeperException, InterruptedException {

@@ -274,6 +274,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
+        public byte[] getCatalogHash() {
+            return m_context.getCatalogHash();
+        }
+
+        @Override
         public int getCatalogVersion() {
             return m_context.catalogVersion;
         }

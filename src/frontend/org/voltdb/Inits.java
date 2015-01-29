@@ -365,7 +365,7 @@ public class Inits {
                 m_rvdb.m_catalogContext = new CatalogContext(
                         catalogStuff.txnId,
                         catalogStuff.uniqueId,
-                        catalog, catalogStuff.bytes, m_rvdb.m_depCRC, catalogStuff.version, -1);
+                        catalog, catalogStuff.bytes, m_rvdb.m_depCRC, catalogStuff.version);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Error agreeing on starting catalog version", false, e);
             }

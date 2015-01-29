@@ -582,6 +582,8 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
         @Override
         public long getCatalogCRC()                             { return m_context.getCatalogCRC(); }
         @Override
+        public byte[] getCatalogHash()                          { return m_context.getCatalogHash(); }
+        @Override
         public int getCatalogVersion()                          { return m_context.catalogVersion; }
         @Override
         public SiteTracker getSiteTrackerForSnapshot()          { return m_tracker; }

@@ -158,18 +158,6 @@ public class TestInMemoryJarfile extends TestCase {
         long crc1 = new InMemoryJarfile(m_jarPath).getCRC();
         long crc2 = new InMemoryJarfile("testout-dupe.jar").getCRC();
         assertEquals(crc1, crc2);
-
-        // Check the modification times and make sure
-        // that they differ in the two jars
-        JarInputStream j_in = new JarInputStream(new FileInputStream(m_jarPath));
-        JarEntry entry = j_in.getNextJarEntry();
-        long time1 = entry.getTime();
-        j_in.close();
-
-        j_in = new JarInputStream(new FileInputStream("testout-dupe.jar"));
-        entry = j_in.getNextJarEntry();
-        long time2 = entry.getTime();
-        assertFalse(time1 == time2);
     }
 
     public void testDifferentJarContentsDontMatchCRCs()
@@ -199,17 +187,5 @@ public class TestInMemoryJarfile extends TestCase {
         long crc1 = new InMemoryJarfile(m_jarPathWithGroupInsteadOfRole).getCRC();
         long crc2 = new InMemoryJarfile("testout-dupe-groups.jar").getCRC();
         assertEquals(crc1, crc2);
-
-        // Check the modification times and make sure
-        // that they differ in the two jars
-        JarInputStream j_in = new JarInputStream(new FileInputStream(m_jarPathWithGroupInsteadOfRole));
-        JarEntry entry = j_in.getNextJarEntry();
-        long time1 = entry.getTime();
-        j_in.close();
-
-        j_in = new JarInputStream(new FileInputStream("testout-dupe-groups.jar"));
-        entry = j_in.getNextJarEntry();
-        long time2 = entry.getTime();
-        assertFalse(time1 == time2);
     }
 }
