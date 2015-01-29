@@ -239,6 +239,9 @@ public class LoadedProcedureSet {
                 Procedure newCatProc = StatementCompiler.compileDefaultProcedure(m_plannerTool, catProc, sqlText);
                 VoltProcedure voltProc = new ProcedureRunner.StmtProcedure();
                 pr = m_runnerFactory.create(voltProc, newCatProc, m_csp);
+                // this will ensure any created fragment tasks know to load the plans
+                // for this plan-on-the-fly procedure
+                pr.setProcNameToLoadForFragmentTasks(catProc.getTypeName());
                 m_defaultProcCache.put(procName, pr);
             }
         }

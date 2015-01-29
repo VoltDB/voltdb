@@ -1840,6 +1840,23 @@ public class TestFixedSQLSuite extends RegressionSuite {
                 new long[][] {{1}});
     }
 
+    public void testInnerJoinWithOverflow() throws Exception {
+        // In this bug, ENG-7349, we would fail an erroneous assertion
+        // in the EE that we must have more than one active index key when
+        // joining with a multi-component index.
+
+        Client client = getClient();
+
+        VoltTable vt = client.callProcedure("SM_IDX_TBL.insert", 1, 1, 1000)
+                .getResults()[0];
+        validateTableOfScalarLongs(vt, new long[] {1});
+
+        validateTableOfLongs(client,
+                "select * "
+                + "from sm_idx_tbl as t1 inner join sm_idx_tbl as t2 "
+                + "on t1.ti1 = t2.bi",
+                new long[][] {});
+    }
 
     //
     // JUnit / RegressionSuite boilerplate

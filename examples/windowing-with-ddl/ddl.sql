@@ -58,13 +58,13 @@ AS SELECT TRUNCATE(SECOND, update_ts), COUNT(*), SUM(val)
 -- case, it needs to scan 1 row per second times the number of
 -- partitions, or 80 rows. That's a tremendous advantage of
 -- pre-aggregating the table sums and counts by second.
-CREATE PROCEDURE ddlwindowing.Average AS
+CREATE PROCEDURE Average AS
     SELECT SUM(sum_values) / SUM(count_values)
     FROM agg_by_second
     WHERE second_ts >= TO_TIMESTAMP(SECOND, SINCE_EPOCH(SECOND, NOW) - ?);
 
 -- Find the maximum value across all rows and partitions.
-CREATE PROCEDURE ddlwindowing.MaxValue AS
+CREATE PROCEDURE MaxValue AS
     SELECT MAX(val)
     FROM timedata;
 
@@ -76,22 +76,22 @@ CREATE PROCEDURE ddlwindowing.MaxValue AS
 -- It's just here to provide a place for the parameter
 -- used to partition the procedure, so it can be called
 -- in the "run everywhere" pattern.
-CREATE PROCEDURE ddlwindowing.AgeOfOldest AS
+CREATE PROCEDURE AgeOfOldest
+  PARTITION ON TABLE timedata COLUMN uuid
+AS
   SELECT SINCE_EPOCH(MILLISECOND, NOW)
          - SINCE_EPOCH(MILLISECOND, update_ts) AS age_ms
   FROM timedata
   WHERE uuid IS NOT NULL OR uuid = ?
   ORDER BY update_ts LIMIT 1;
 
--- Tell VoltDB to use the value of UUID to partition the procedure.
-PARTITION PROCEDURE AgeOfOldest ON TABLE timedata COLUMN uuid;
-
 -- A procedure that finds the age of the youngest tuple
 -- in a partition, similar to the procedure above.
-CREATE PROCEDURE ddlwindowing.AgeOfYoungest AS
+CREATE PROCEDURE AgeOfYoungest
+  PARTITION ON TABLE timedata COLUMN uuid
+AS
   SELECT SINCE_EPOCH(MILLISECOND, NOW)
          - SINCE_EPOCH(MILLISECOND, update_ts) AS age_ms
   FROM timedata
   WHERE uuid IS NOT NULL OR uuid = ?
   ORDER BY update_ts DESC LIMIT 1;
-PARTITION PROCEDURE AgeOfYoungest ON TABLE timedata COLUMN uuid;

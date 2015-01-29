@@ -162,7 +162,9 @@ begin Statement           "A parameterized SQL statement embedded in a stored pr
   int cost                  "The cost of this plan measured in arbitrary units"
   int seqscancount          "The number of sequential table scans in the plan"
   string explainplan        "A human-readable plan description"
-  string tablestouched      "A CSV list of tables this statement touches"
+  string tablesread         "A CSV list of tables this statement reads"
+  string tablesupdated      "A CSV list of tables this statement may update"
+  string indexesused        "A CSV list of indexes this statement may use”
   string cachekeyprefix     "Unique string that combines with the SQL text to identify a unique corresponding plan."
 end
 
