@@ -111,7 +111,7 @@ public class ExportBenchmark {
             System.out.println("Inserting objects");
             String sql = "";
             for (int i = 0; i < count; i++) {
-                sql = "INSERT INTO valuesToExport VALUES (" + i + ", " + 42 + ");";
+                sql = "INSERT INTO valuesToExport VALUES (" + 4 + "," + 8 + ","  + 16 + "," + 32 + "," + 42.15 + "," + 12.52 + ",'string1'," + 4215 + ");";
                 client.callProcedure("@AdHoc", sql);
             }
             System.out.println("Object insertion complete");
