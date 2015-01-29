@@ -87,6 +87,62 @@ public class ExportBenchmark {
             }
         }
     }
+    
+    public void waitForStreamedAllocatedMemoryZero() throws Exception {
+        boolean passed = false;
+
+        VoltTable stats = null;
+        long ftime = 0;
+        long st = System.currentTimeMillis();
+        //Wait 10 mins only
+        long end = System.currentTimeMillis() + (10 * 60 * 1000);
+        while (true) {
+            stats = client.callProcedure("@Statistics", "table", 0).getResults()[0];
+            boolean passedThisTime = true;
+            long ctime = System.currentTimeMillis();
+            if (ctime > end) {
+                System.out.println("Waited too long...");
+                System.out.println(stats);
+                break;
+            }
+            if (ctime - st > (3 * 60 * 1000)) {
+                System.out.println(stats);
+                st = System.currentTimeMillis();
+            }
+            long ts = 0;
+            while (stats.advanceRow()) {
+                String ttype = stats.getString("TABLE_TYPE");
+                Long tts = stats.getLong("TIMESTAMP");
+                //Get highest timestamp and watch is change
+                if (tts > ts) {
+                    ts = tts;
+                }
+                if (ttype.equals("StreamedTable")) {
+                    if (0 != stats.getLong("TUPLE_ALLOCATED_MEMORY")) {
+                        passedThisTime = false;
+                        System.out.println("Partition Not Zero.");
+                        break;
+                    }
+                }
+            }
+            if (passedThisTime) {
+                if (ftime == 0) {
+                    ftime = ts;
+                    continue;
+                }
+                //we got 0 stats 2 times in row with diff highest timestamp.
+                if (ftime != ts) {
+                    passed = true;
+                    break;
+                }
+                System.out.println("Passed but not ready to declare victory.");
+            }
+            Thread.sleep(5000);
+        }
+        System.out.println("Passed is: " + passed);
+        System.out.println(stats);
+    }
+
 
     /**
      * Runs the export benchmark test
@@ -122,17 +178,10 @@ public class ExportBenchmark {
         
         // Wait until export is done
         try {
-            while (true) {
-                VoltTable results = client.callProcedure("@Statistics", "TABLE", 0).getResults()[0];
-                results.advanceRow();
-                if (results.getLong("TUPLE_ALLOCATED_MEMORY") == 0) {
-                    break;
-                }
-                Thread.sleep(100);
-            }
+            waitForStreamedAllocatedMemoryZero();
         } catch (Exception e) {
-            System.err.println("Unable to analyze export table");
-            System.err.println(e.getMessage());
+            System.err.println("Error while waiting for export: ");
+            e.printStackTrace();
             System.exit(1);
         }
         
