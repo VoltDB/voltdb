@@ -34,7 +34,9 @@
 
 package exportbenchmark;
 
+import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
+import org.voltdb.CLIConfig.Option;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -50,43 +52,29 @@ public class ExportBenchmark {
     String host = "localhost";
     int port = 21212;
     
+    static class ExportBenchConfig extends CLIConfig {
+        @Option(desc = "Number of inserts to make into the export table.")
+        long count = 10000;
+
+        @Option(desc = "Comma separated list of the form server[:port] to connect to.")
+        String servers = "localhost";
+
+        @Override
+        public void validate() {
+            if (count <= 0) exitWithMessageAndUsage("duration must be > 0");
+        }
+    }
+    
     /**
      * Creates a new instance of the test to be run.
      * Establishes a client connection to a voltdb server, which should already be running
      * @param args The arguments passed to the program
      */
-    public ExportBenchmark(String[] args) {
-        parseCommandLine(args);
-        
+    public ExportBenchmark() {
         ClientConfig clientConfig = new ClientConfig();
         clientConfig.setReconnectOnConnectionLoss(true);
         clientConfig.setClientAffinity(true);
         client = ClientFactory.createClient(clientConfig);
-    }
-    
-    /**
-     * Loops through the command line arguments & applies them
-     * @param args The arguments passed to the program
-     */
-    private void parseCommandLine(String[] args) {
-        for (int i = 0; i < args.length; i++) {
-            String[] arg = args[i].split("=");
-            if (arg[0].equals("--count")) {
-                try {
-                    count = Long.parseLong(arg[1]);
-                } catch (NumberFormatException e) {
-                    System.err.println("'" + arg[1] + "': not a valid number");
-                    System.exit(1);
-                }
-            } else if (arg[0].equals("--servers")) {
-                host = arg[1];
-            } else if (arg[0].equals("--port")) {
-                port = Integer.parseInt(arg[1]);
-            } else {
-                System.err.println("Unknown argument: '" + args[i] + "'");
-                System.exit(1);
-            }
-        }
     }
     
     public void waitForStreamedAllocatedMemoryZero() throws Exception {
@@ -200,7 +188,10 @@ public class ExportBenchmark {
      * @throws Exception if anything goes wrong.
      */
     public static void main(String[] args) throws Exception {
-        ExportBenchmark bench = new ExportBenchmark(args);
+        ExportBenchConfig config = new ExportBenchConfig();
+        config.parse(ExportBenchmark.class.getName(), args);
+        
+        ExportBenchmark bench = new ExportBenchmark();
         bench.runTest();
     }
 }
