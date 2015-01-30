@@ -36,6 +36,7 @@ package exportbenchmark;
 
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
+import org.voltdb.CLIConfig.Option;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -68,6 +69,15 @@ public class ExportBenchmark {
      * and validation.
      */
     static class ExportBenchConfig extends CLIConfig {
+        @Option(desc = "Interval for performance feedback, in seconds.")
+        long displayinterval = 5;
+
+        @Option(desc = "Benchmark duration, in seconds.")
+        int duration = 10;
+
+        @Option(desc = "Warmup duration in seconds.")
+        int warmup = 5;
+
         @Option(desc = "Number of inserts to make into the export table.")
         long count = 10000;
         
@@ -82,6 +92,9 @@ public class ExportBenchmark {
 
         @Override
         public void validate() {
+            if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
+            if (warmup < 0) exitWithMessageAndUsage("warmup must be >= 0");
+            if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
             if (count <= 0) exitWithMessageAndUsage("duration must be > 0");
             if (tableName == null || tableName.isEmpty()) exitWithMessageAndUsage("Table name cannot be blank");
         }
@@ -198,8 +211,6 @@ public class ExportBenchmark {
         }
         System.out.printf("Connected to VoltDB node at: %s.\n", server);
     }
-
-
 
     /**
      * Runs the export benchmark test
