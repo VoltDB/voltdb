@@ -324,6 +324,11 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
             return false;
         }
 
+        // Skip partial indexes
+        if (!index.getPredicatejson().isEmpty()) {
+            return false;
+        }
+
         String exprsjson = index.getExpressionsjson();
 
         if (exprsjson.isEmpty()) {

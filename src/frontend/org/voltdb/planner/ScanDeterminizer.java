@@ -115,6 +115,10 @@ public class ScanDeterminizer {
             else if (index.getType() != IndexType.BALANCED_TREE.getValue()) {
                 continue;
             }
+            // skip partial indexes
+            else if (!index.getPredicatejson().isEmpty()) {
+                continue;
+            }
             else {
                 if (indexToScan == null) {
                     indexToScan = index;
