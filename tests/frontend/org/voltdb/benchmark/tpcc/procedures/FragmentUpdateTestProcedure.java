@@ -71,6 +71,9 @@ public class FragmentUpdateTestProcedure extends VoltProcedure {
     // Not meaningful, but should take long.
     public final SQLStmt item_big_del = new SQLStmt("DELETE FROM ITEM WHERE I_NAME <> 'NULL_NULL';");
 
+    // Just a quick query
+    public final SQLStmt quick_query = new SQLStmt("SELECT W_ID FROM WAREHOUSE LIMIT 0");
+
     public VoltTable[] run() {
         voltQueueSQL(warehouse_select);
         voltQueueSQL(warehouse_del_half);
