@@ -65,6 +65,8 @@ import org.voltdb.compiler.VoltCompiler.ProcedureDescriptor;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AggregateExpression;
+import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.groovy.GroovyCodeBlockCompiler;
@@ -1699,9 +1701,18 @@ public class DDLCompiler {
         }
 
         // Duplicate indexes have identical columns in identical order.
-        return Arrays.equals(idx1baseTableOrder, idx2baseTableOrder);
-    }
+        if ( ! Arrays.equals(idx1baseTableOrder, idx2baseTableOrder) ) {
+            return false;
+        }
 
+        // Check the predicates
+        if (idx1.getPredicatejson().length() > 0) {
+            return idx1.getPredicatejson().equals(idx2.getPredicatejson());
+        } else if (idx2.getPredicatejson().length() > 0) {
+            return idx2.getPredicatejson().equals(idx1.getPredicatejson());
+        }
+        return true;
+    }
 
     /**
      * This function will recursively find any function expression with ID functionId.
@@ -1740,6 +1751,8 @@ public class DDLCompiler {
 
         // "parse" the expression trees for an expression-based index (vs. a simple column value index)
         List<AbstractExpression> exprs = null;
+        // "parse" the WHERE expression for partial index if any
+        AbstractExpression predicate = null;
         for (VoltXMLElement subNode : node.children) {
             if (subNode.name.equals("exprs")) {
                 exprs = new ArrayList<AbstractExpression>();
@@ -1755,6 +1768,10 @@ public class DDLCompiler {
                     expr.finalizeValueTypes();
                     exprs.add(expr);
                 }
+            } else if (subNode.name.equals("predicate")) {
+                assert(subNode.children.size() == 1);
+                predicate = dummy.parseExpressionTree(subNode.children.get(0));
+                checkPartialIndexPredicateMeetsSpec(name, predicate, table);
             }
         }
 
@@ -1857,6 +1874,15 @@ public class DDLCompiler {
         }
         index.setAssumeunique(assumeUnique);
 
+        if (predicate != null) {
+            try {
+                index.setPredicatejson(convertToJSONObject(predicate));
+            } catch (JSONException e) {
+                throw m_compiler.new VoltCompilerException("Unexpected error serializing predicate for partial index '" +
+                        name + "' on type '" + table.getTypeName() + "': " + e.toString());
+            }
+        }
+
         // check if an existing index duplicates another index (if so, drop it)
         // note that this is an exact dup... uniqueness, counting-ness and type
         // will make two indexes different
@@ -1903,6 +1929,14 @@ public class DDLCompiler {
             stringer.endObject();
         }
         stringer.endArray();
+        return stringer.toString();
+    }
+
+    private static String convertToJSONObject(AbstractExpression expr) throws JSONException {
+        JSONStringer stringer = new JSONStringer();
+        stringer.object();
+        expr.toJSONString(stringer);
+        stringer.endObject();
         return stringer.toString();
     }
 
@@ -2317,6 +2351,41 @@ public class DDLCompiler {
             }
         }
         return null;
+    }
+
+    /**
+     * Verify the partial view expression satisfies the rules.
+     * Throw hopefully helpful error messages otherwise.
+     *
+     * @param indexName The name of the index being checked.
+     * @param predicate The index predicate.
+     * @param table Table
+     * @throws VoltCompilerException
+     */
+    private void checkPartialIndexPredicateMeetsSpec(String indexName, AbstractExpression predicate, Table table) throws VoltCompilerException {
+        if (predicate == null) {
+            return;
+        }
+        String tableName = table.getTypeName();
+        String msg = "Partial index \"" + indexName + "\" ";
+
+        assert(tableName != null);
+        for (TupleValueExpression tve : ExpressionUtil.getTupleValueExpressions(predicate)) {
+            if (!tableName.equals(tve.getTableName())) {
+                msg += "with expression(s) involving other tables is not supported.";
+                throw m_compiler.new VoltCompilerException(msg);
+            }
+        }
+        if (!predicate.findAllSubexpressionsOfClass(AggregateExpression.class).isEmpty()) {
+            msg += "with aggregate expression(s) is not supported.";
+            throw m_compiler.new VoltCompilerException(msg);
+        }
+        // @TODO: un-comment once subqueries are supported
+//        if (!predicate.findAllSubexpressionsOfClass(SubqueryExpression.class).isEmpty()) {
+//            msg += "with subquery expression(s) is not supported.";
+//            throw m_compiler.new VoltCompilerException(msg);
+//        }
+
     }
 
     /**
