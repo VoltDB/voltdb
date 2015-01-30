@@ -591,6 +591,12 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         return result;
     }
 
+    public static AbstractExpression fromJSONString(String jsontext, StmtTableScan tableScan) throws JSONException
+    {
+        JSONObject jobject = new JSONObject(jsontext);
+        return fromJSONObject(jobject, tableScan);
+    }
+
     /**
      * For TVEs, it is only serialized column index and table index. In order to match expression,
      * there needs more information to revert back the table name, table alisa and column name.
