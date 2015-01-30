@@ -90,6 +90,10 @@ public class ExportManager
     private final CopyOnWriteArrayList<Long> m_generationGhosts =
             new CopyOnWriteArrayList<Long>();
 
+    //Keep track of initial or last generation that was set in EE but has no Java side as export is disabled and misconfigured.
+    //Typically start with table pointing to bad group. fix group and unfix it again...keep doing this and you will
+    //have a generation thats last one which has not java side as export s disabled.
+    private static long m_lastNonEnabledGeneration = 0;
     private final HostMessenger m_messenger;
 
     /**
@@ -287,6 +291,8 @@ public class ExportManager
         m_self = em;
         if (hasEnabledConnectors(connectors)) {
             em.createInitialExportProcessor(catalogContext, connectors, true, partitions, isRejoin);
+        } else {
+            m_lastNonEnabledGeneration = catalogContext.m_uniqueId;
         }
     }
 
@@ -562,6 +568,7 @@ public class ExportManager
 
         updateProcessorConfig(connectors);
         if (m_processorConfig.size() == 0) {
+            m_lastNonEnabledGeneration = catalogContext.m_uniqueId;
             return;
         }
 
@@ -651,6 +658,10 @@ public class ExportManager
                  * If the generation was already drained it is fine for a buffer to come late and miss it
                  */
                 synchronized(instance) {
+                    if (exportGeneration ==  m_lastNonEnabledGeneration) {
+                        exportLog.info("Push from last generation which had no export enabled.");
+                        return;
+                    }
                     if (!instance.m_generationGhosts.contains(exportGeneration)) {
                         assert(false);
                         exportLog.error("Could not a find an export generation " + exportGeneration +
