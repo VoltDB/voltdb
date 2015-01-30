@@ -1,4 +1,4 @@
-CREATE TABLE valuesToExport (
+CREATE TABLE allValues (
     value1 TINYINT,
     value2 SMALLINT,
     value3 INT,

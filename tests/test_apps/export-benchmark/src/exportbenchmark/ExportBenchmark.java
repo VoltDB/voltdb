@@ -68,6 +68,9 @@ public class ExportBenchmark {
     static class ExportBenchConfig extends CLIConfig {
         @Option(desc = "Number of inserts to make into the export table.")
         long count = 10000;
+        
+        @Option(desc = "Export table to use")
+        String tableName = "allValues";
 
         @Option(desc = "Comma separated list of the form server[:port] to connect to.")
         String servers = "localhost";
@@ -78,6 +81,7 @@ public class ExportBenchmark {
         @Override
         public void validate() {
             if (count <= 0) exitWithMessageAndUsage("duration must be > 0");
+            if (tableName == null || tableName.isEmpty()) exitWithMessageAndUsage("Table name cannot be blank");
         }
     }
     
@@ -205,7 +209,7 @@ public class ExportBenchmark {
             System.out.println("Inserting objects");
             String sql = "";
             for (int i = 0; i < config.count; i++) {
-                sql = "INSERT INTO valuesToExport VALUES (" + 4 + "," + 8 + ","  + 16 + "," + 32 + "," + 42.15 + "," + 12.52 + ",'string1'," + 4215 + ");";
+                sql = "INSERT INTO " + config.tableName + " VALUES (" + 4 + "," + 8 + ","  + 16 + "," + 32 + "," + 42.15 + "," + 12.52 + ",'string1'," + 4215 + ");";
                 client.callProcedure("@AdHoc", sql);
             }
             System.out.println("Object insertion complete");
