@@ -804,7 +804,7 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const string &catalogPay
     }
 
     // Set DR flag based on current catalog state
-    m_drStream.m_enabled = catalogCluster->drProducerEnabled();
+    m_drStream->m_enabled = catalogCluster->drProducerEnabled();
 
     // load up all the tables, adding all tables
     if (processCatalogAdditions(timestamp) == false) {
@@ -1208,7 +1208,7 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const string &catalogPayloa
     m_catalog->execute(catalogPayload);
 
     // Set DR flag based on current catalog state
-    m_drStream.m_enabled = m_catalog->clusters().get("cluster")->drProducerEnabled();
+    m_drStream->m_enabled = m_catalog->clusters().get("cluster")->drProducerEnabled();
 
     if (updateCatalogDatabaseReference() == false) {
         VOLT_ERROR("Error re-caching catalog references.");
