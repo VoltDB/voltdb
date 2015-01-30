@@ -296,5 +296,18 @@ public interface Index extends SchemaObject {
     Index setAssumeUnique(boolean assumeUnique);
 
     Index withExpressions(org.hsqldb_voltpatches.Expression[] adjustExprs);
+
+    /**
+     * VoltDB added method to get a predicate for a partial index.
+     * @return the partial index predicate , or null.
+     */
+    public org.hsqldb_voltpatches.Expression getPredicate();
+
+    /**
+     * VoltDB added method to get a partial index.
+     * @return the partial index.
+     */
+    Index withPredicate(org.hsqldb_voltpatches.Expression indexPredicate);
+
     /**********************************************************************/
 }

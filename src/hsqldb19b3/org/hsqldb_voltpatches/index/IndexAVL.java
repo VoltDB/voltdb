@@ -1587,6 +1587,7 @@ public class IndexAVL implements Index {
 
     private org.hsqldb_voltpatches.Expression[]    exprs; // A VoltDB extension to support indexed expressions
     private boolean         isAssumeUnique;  // A VoltDB extension to allow unique index on partitioned table without partition column included.
+    private org.hsqldb_voltpatches.Expression predicate; // A VoltDB extension to support partial indexes
 
     /**
      * VoltDB-specific Expression Index Constructor supports indexed expressions
@@ -1602,6 +1603,18 @@ public class IndexAVL implements Index {
     @Override
     public IndexAVL withExpressions(org.hsqldb_voltpatches.Expression[] expressions) {
         exprs = expressions;
+        return this;
+    }
+
+    /**
+     * VoltDB-specific Partial Index Constructor
+     *
+     * @param indexPredicate partial index predicate
+     * @return Index
+     */
+    @Override
+    public IndexAVL withPredicate(org.hsqldb_voltpatches.Expression indexPredicate) {
+        predicate = indexPredicate;
         return this;
     }
 
@@ -1699,6 +1712,12 @@ public class IndexAVL implements Index {
         }
         index.attributes.put("unique", isUnique() ? "true" : "false");
 
+        if (predicate != null) {
+            org.hsqldb_voltpatches.VoltXMLElement partialExpr = new org.hsqldb_voltpatches.VoltXMLElement("predicate");
+            index.children.add(partialExpr);
+            org.hsqldb_voltpatches.VoltXMLElement xml = predicate.voltGetExpressionXML(session, (Table) table);
+            partialExpr.children.add(xml);
+        }
         return index;
     }
 
@@ -1720,6 +1739,11 @@ public class IndexAVL implements Index {
     public Index setAssumeUnique(boolean assumeUnique) {
         this.isAssumeUnique = assumeUnique;
         return this;
+    }
+
+    @Override
+    public org.hsqldb_voltpatches.Expression getPredicate() {
+        return predicate;
     }
     /**********************************************************************/
 }
