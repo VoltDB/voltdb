@@ -42,6 +42,10 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
 
+
+/**
+ * Asychronously sends data to an export table to test VoltDB export performance.
+ */
 public class ExportBenchmark {
     
     // handy, rather than typing this out several times
@@ -49,14 +53,18 @@ public class ExportBenchmark {
             "----------" + "----------" + "----------" + "----------" +
             "----------" + "----------" + "----------" + "----------" + "\n";
 
+    // Client connection to the server
+    final Client client;
+    // Validated CLI config
+    final ExportBenchConfig config;
+    // Stats collected during run
+    final ClientStatsContext fullStatsContext;
     
-    private Client client;
-    ExportBenchConfig config;
-    ClientStatsContext fullStatsContext;
-    
-    long count;
-    String servers;
-    
+    /**
+     * Uses included {@link CLIConfig} class to
+     * declaratively state command line options with defaults
+     * and validation.
+     */
     static class ExportBenchConfig extends CLIConfig {
         @Option(desc = "Number of inserts to make into the export table.")
         long count = 10000;
@@ -85,12 +93,14 @@ public class ExportBenchmark {
         clientConfig.setClientAffinity(true);
         client = ClientFactory.createClient(clientConfig);
         
-        count = config.count;
-        servers = config.servers;
-        
         fullStatsContext = client.createStatsContext();
     }
     
+    /**
+     * Checks the export table to make sure that everything has been successfully
+     * processed.
+     * @throws Exception
+     */
     public void waitForStreamedAllocatedMemoryZero() throws Exception {
         boolean passed = false;
 
@@ -179,7 +189,7 @@ public class ExportBenchmark {
         
         // Server connection
         try {
-            connectToOneServerWithRetry(servers);
+            connectToOneServerWithRetry(config.servers);
         }
         catch (Exception e) {
             System.err.printf("Connection to VoltDB failed");
@@ -194,7 +204,7 @@ public class ExportBenchmark {
         try {
             System.out.println("Inserting objects");
             String sql = "";
-            for (int i = 0; i < count; i++) {
+            for (int i = 0; i < config.count; i++) {
                 sql = "INSERT INTO valuesToExport VALUES (" + 4 + "," + 8 + ","  + 16 + "," + 32 + "," + 42.15 + "," + 12.52 + ",'string1'," + 4215 + ");";
                 client.callProcedure("@AdHoc", sql);
             }
@@ -216,7 +226,7 @@ public class ExportBenchmark {
         
         // See how much time elapsed
         long estimatedTime = System.nanoTime() - startTime;
-        System.out.println("Export time elapsed (ms) for " + count + " objects: " + estimatedTime/1000000);
+        System.out.println("Export time elapsed (ms) for " + config.count + " objects: " + estimatedTime/1000000);
         printResults();
     }
     
