@@ -54,9 +54,8 @@ public class ExportBenchmark {
     ExportBenchConfig config;
     ClientStatsContext fullStatsContext;
     
-    long count = 10000;
-    String host = "localhost";
-    int port = 21212;
+    long count;
+    String servers;
     
     static class ExportBenchConfig extends CLIConfig {
         @Option(desc = "Number of inserts to make into the export table.")
@@ -87,6 +86,7 @@ public class ExportBenchmark {
         client = ClientFactory.createClient(clientConfig);
         
         count = config.count;
+        servers = config.servers;
         
         fullStatsContext = client.createStatsContext();
     }
@@ -145,6 +145,30 @@ public class ExportBenchmark {
         System.out.println("Passed is: " + passed);
         System.out.println(stats);
     }
+    
+    /**
+     * Connect to a single server with retry. Limited exponential backoff.
+     * No timeout. This will run until the process is killed if it's not
+     * able to connect.
+     *
+     * @param server hostname:port or just hostname (hostname can be ip).
+     */
+    void connectToOneServerWithRetry(String server) {
+        int sleep = 1000;
+        while (true) {
+            try {
+                client.createConnection(server);
+                break;
+            }
+            catch (Exception e) {
+                System.err.printf("Connection failed - retrying in %d second(s).\n", sleep / 1000);
+                try { Thread.sleep(sleep); } catch (Exception interruted) {}
+                if (sleep < 8000) sleep += sleep;
+            }
+        }
+        System.out.printf("Connected to VoltDB node at: %s.\n", server);
+    }
+
 
 
     /**
@@ -155,7 +179,7 @@ public class ExportBenchmark {
         
         // Server connection
         try {
-            client.createConnection(host, port);
+            connectToOneServerWithRetry(servers);
         }
         catch (Exception e) {
             System.err.printf("Connection to VoltDB failed");
