@@ -81,7 +81,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.OnDemandBinaryLogger;
 import org.voltcore.utils.Pair;
 import org.voltcore.utils.ShutdownHooks;
-import org.voltcore.zk.SynchronizedStatesManager;
 import org.voltcore.zk.ZKCountdownLatch;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.TheHashinator.HashinatorType;
@@ -325,9 +324,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private ScheduledThreadPoolExecutor m_periodicWorkThread;
     private ScheduledThreadPoolExecutor m_periodicPriorityWorkThread;
 
-    private SynchronizedStatesManager m_perHostStatesManager;
-    private final int m_perHostStateMachines = 1;
-
     // The configured license api: use to decide enterprise/community edition feature enablement
     LicenseApi m_licenseApi;
     private LatencyStats m_latencyStats;
@@ -515,18 +511,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 VoltDB.crashLocalVoltDB("Unable to start GlobalServiceElector", true, e);
             }
 
-            // Create global StateMachineManager. Do this after GlobalServiceElector in case a state machine depends
-            // on it being there.
-            String hostIdStr = "Host_" + m_messenger.getHostId();
-            try {
-                m_perHostStatesManager = new SynchronizedStatesManager(m_messenger.getZK(),
-                        "PER_HOST_STATES", hostIdStr, m_perHostStateMachines);
-            }
-            catch (KeeperException | InterruptedException e)
-            {
-                m_perHostStatesManager = null;
-            }
-
             // Always create a mailbox for elastic join data transfer
             if (m_config.m_isEnterprise) {
                 long elasticHSId = m_messenger.getHSIdForLocalSite(HostMessenger.REBALANCE_SITE_ID);
@@ -669,11 +653,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     } else {
                         drOverflowDir = new File(m_catalogContext.cluster.getVoltroot(), "dr_overflow");
                         ndrgwClass = Class.forName("org.voltdb.dr.InvocationBufferServer");
+                        Constructor<?> ndrgwConstructor = ndrgwClass.getConstructor(File.class, boolean.class, int.class);
+                        m_nodeDRGateway = (NodeDRGateway) ndrgwConstructor.newInstance(drOverflowDir,
+                                                                                       m_replicationActive,
+                                                                                       m_configuredNumberOfPartitions);
                     }
                     Constructor<?> ndrgwConstructor = ndrgwClass.getConstructor(File.class, boolean.class, int.class);
                     m_nodeDRGateway = (NodeDRGateway) ndrgwConstructor.newInstance(drOverflowDir,
                                                                                    m_replicationActive,
                                                                                    m_configuredNumberOfPartitions);
+                    m_nodeDRGateway.start();
+                    m_nodeDRGateway.blockOnDRStateConvergence();
                 } catch (Exception e) {
                     VoltDB.crashLocalVoltDB("Unable to load DR system", true, e);
                 }
@@ -781,6 +771,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             // Configure consumer-side DR if relevant
             if (m_config.m_isEnterprise && useDRV2 && m_config.m_replicationRole == ReplicationRole.REPLICA) {
                 String drProducerHost = m_catalogContext.cluster.getDrmasterhost();
+                byte drConsumerClusterId = (byte)m_catalogContext.cluster.getDrclusterid();
                 if (drProducerHost == null || drProducerHost.isEmpty()) {
                     VoltDB.crashLocalVoltDB("Cannot start as DR consumer without an enabled DR data connection.");
                 }
@@ -789,11 +780,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     Constructor<?> rdrgwConstructor = rdrgwClass.getConstructor(
                             String.class,
                             ClientInterface.class,
+                            byte.class,
                             boolean.class,
                             String.class);
                     m_consumerDRGateway = (ConsumerDRGateway) rdrgwConstructor.newInstance(
                             drProducerHost,
                             m_clientInterface,
+                            drConsumerClusterId,
                             usingCommandLog,
                             clSnapshotPath);
                     m_globalServiceElector.registerService(m_consumerDRGateway);
@@ -2617,7 +2610,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private void prepareReplication() {
         try {
             if (m_nodeDRGateway != null) {
-                m_nodeDRGateway.start();
                 m_nodeDRGateway.bindPorts(m_catalogContext.cluster.getDrproducerenabled());
             }
             if (m_consumerDRGateway != null) {
@@ -2679,11 +2671,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     @Override
     public void onSyncSnapshotCompletion() {
         m_leaderAppointer.onSyncSnapshotCompletion();
-    }
-
-    @Override
-    public SynchronizedStatesManager getPerHostStatesManager() {
-        return m_perHostStatesManager;
     }
 
     @Override

@@ -23,7 +23,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
-import org.voltcore.zk.SynchronizedStatesManager;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.licensetool.LicenseApi;
 
@@ -169,8 +168,6 @@ public interface VoltDBInterface
     public ConsumerDRGateway getConsumerDRGateway();
 
     public void onSyncSnapshotCompletion();
-
-    public SynchronizedStatesManager getPerHostStatesManager();
 
     /**
      * Set the operation mode of this server.

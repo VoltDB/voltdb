@@ -8,6 +8,7 @@ import java.nio.ByteBuffer;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -31,8 +32,8 @@ public class StateMachineSnipits extends ZKTestBase {
     public void setUp() throws Exception {
         setUpZK(NUM_AGREEMENT_SITES);
         ZooKeeper zk = m_messengers.get(0).getZK();
-        SynchronizedStatesManager.addIfMissing(zk, "/db", CreateMode.PERSISTENT, null);
-        SynchronizedStatesManager.addIfMissing(zk, VoltZK.syncStateMachine, CreateMode.PERSISTENT, null);
+        ZKUtil.addIfMissing(zk, "/db", CreateMode.PERSISTENT, null);
+        ZKUtil.addIfMissing(zk, VoltZK.syncStateMachine, CreateMode.PERSISTENT, null);
     }
 
     @After
@@ -307,9 +308,9 @@ public class StateMachineSnipits extends ZKTestBase {
         public void lockRequestGranted();
         public void processTask(ByteBuffer newTask);
         public void ourCorrelatedTaskComplete(Map<String, ByteBuffer> results);
-        public void ourUncorrelatedTaskComplete(Set<ByteBuffer> results);
+        public void ourUncorrelatedTaskComplete(List<ByteBuffer> results);
         public void externalCorrelatedTaskComplete(Map<String, ByteBuffer> results);
-        public void externalUncorrelatedTaskComplete(Set<ByteBuffer> results);
+        public void externalUncorrelatedTaskComplete(List<ByteBuffer> results);
     }
 
     public abstract class Task extends SynchronizedStatesManager.StateMachineInstance {
@@ -353,7 +354,7 @@ public class StateMachineSnipits extends ZKTestBase {
         }
 
         @Override
-        protected void uncorrelatedTaskCompleted(boolean ourTask, ByteBuffer taskRequest, Set<ByteBuffer> results) {
+        protected void uncorrelatedTaskCompleted(boolean ourTask, ByteBuffer taskRequest, List<ByteBuffer> results) {
             boolean processingTask = m_taskPending.getAndSet(false);
             assert(processingTask);
             if (ourTask) {
@@ -869,10 +870,10 @@ public class StateMachineSnipits extends ZKTestBase {
             supplyResponse(taskResponse);
         }
 
-        public void ourUncorrelatedTaskComplete(Set<ByteBuffer> results) {
+        public void ourUncorrelatedTaskComplete(List<ByteBuffer> results) {
             // This would allow you to determine the slowest responder
         }
-        public void externalUncorrelatedTaskComplete(Set<ByteBuffer> results) {
+        public void externalUncorrelatedTaskComplete(List<ByteBuffer> results) {
             // This would allow you to determine the slowest responder
         }
 
