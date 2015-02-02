@@ -422,6 +422,12 @@ public class TestFragmentProgressUpdate extends TestCase {
 
         try {
 
+            // NOTE: callers of this method specify something other than SQL_STATEMENT
+            // in order to prove that we don't crash if the sqlTexts array passed to
+            // (Java class) ExecutionEngine is malformed.
+            //
+            // This issue was related to ENG-7610, which took down the EE.  It has since
+            // been fixed, so (we hope) nothing like this will happen in the wild.
             switch (sqlTextExpectation) {
             case SQL_STATEMENT:
                 // leave sqlTexts AS-IS
@@ -429,11 +435,13 @@ public class TestFragmentProgressUpdate extends TestCase {
             case NO_STATEMENT:
                 sqlTexts = null;
                 break;
-            default:
-                assert (sqlTextExpectation == SqlTextExpectation.STATEMENT_LIST);
+            case STATEMENT_LIST:
                 // Leave off the last item, which is the one that needs to be
                 // reported.
                 sqlTexts = Arrays.copyOfRange(sqlTexts, 0, numFragsToExecute - 1);
+                break;
+            default:
+                fail("Invalid value for sqlTextExpectation");
             }
 
             m_ee.executePlanFragments(
@@ -455,7 +463,7 @@ public class TestFragmentProgressUpdate extends TestCase {
             assertEquals(msg, ex.getMessage());
         }
 
-        String expectedSqlTextMsg;
+        String expectedSqlTextMsg = null;
         switch (sqlTextExpectation) {
         case SQL_STATEMENT:
             String sqlText = sqlTexts[numFragsToExecute - 1];
@@ -464,12 +472,14 @@ public class TestFragmentProgressUpdate extends TestCase {
         case NO_STATEMENT:
             expectedSqlTextMsg = "SQL statement text is not available.";
             break;
-        default:
-            assert (sqlTextExpectation == SqlTextExpectation.STATEMENT_LIST);
+        case STATEMENT_LIST:
             expectedSqlTextMsg = "Unable to report specific SQL statement text "
                     + "for fragment task message index " + (numFragsToExecute - 1) + ".  "
                     + "It MAY be one of these " + (numFragsToExecute - 1) + " items: "
-                    + "\"SELECT W_ID FROM WAREHOUSE LIMIT 0;\", ";
+                    + "\"SELECT W_ID FROM WAREHOUSE LIMIT 1;\", ";
+            break;
+        default:
+            fail("Invalid value for sqlTextExpectation");
         }
 
         verify(mockedLogger, atLeastOnce()).info(contains(expectedSqlTextMsg));
